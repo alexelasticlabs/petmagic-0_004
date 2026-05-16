@@ -1,0 +1,32 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "PetMagic"
+    }
+  ],
+  "settings": {
+    "dotnet.defaultSolution": "PetMagic.slnx",
+    "editor.formatOnSave": true,
+    "files.exclude": {
+      "**/bin": true,
+      "**/obj": true,
+      "**/.next": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/bin": true,
+      "**/obj": true,
+      "**/.next": true
+    },
+    "[csharp]": {
+      "editor.defaultFormatter": "ms-dotnettools.csharp"
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    }
+  }
+}
