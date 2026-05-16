@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminPageHero, AdminStatusBadge } from "@/components/admin/admin-primitives";
+import { AdminMetricStrip, AdminPageHero, AdminSectionHeader, AdminStatusBadge } from "@/components/admin/admin-primitives";
 import { TemplateBasicFields } from "@/components/templates/template-basic-fields";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import { TemplatePreviewAssetSection } from "@/components/templates/template-preview-asset-section";
@@ -393,15 +393,15 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
           <div className={styles.editorGrid}>
             <div className={styles.editorMain}>
               <section id="template-basics" className={styles.sectionCard}>
-                <div className={styles.sectionHeader}>
-                  <div>
-                    <h2 className={styles.sectionTitle}>{text.editorStepBasics}</h2>
-                    <p className={styles.sectionDescription}>{text.editorBasicsHint}</p>
-                  </div>
-                  <span className={joinClassNames(styles.inlineState, editorModel.basicInfoReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
-                    {editorModel.basicInfoReady ? text.editorReady : text.editorMissing}
-                  </span>
-                </div>
+                <AdminSectionHeader
+                  title={text.editorStepBasics}
+                  description={text.editorBasicsHint}
+                  aside={(
+                    <span className={joinClassNames(styles.inlineState, editorModel.basicInfoReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
+                      {editorModel.basicInfoReady ? text.editorReady : text.editorMissing}
+                    </span>
+                  )}
+                />
 
                 <TemplateBasicFields
                   text={text}
@@ -413,15 +413,15 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
               </section>
 
               <section id="template-media" className={styles.sectionCard}>
-                <div className={styles.sectionHeader}>
-                  <div>
-                    <h2 className={styles.sectionTitle}>{text.editorStepMedia}</h2>
-                    <p className={styles.sectionDescription}>{text.editorMediaHint}</p>
-                  </div>
-                  <span className={joinClassNames(styles.inlineState, editorModel.mediaReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
-                    {editorModel.mediaReady ? text.editorReady : text.editorMissing}
-                  </span>
-                </div>
+                <AdminSectionHeader
+                  title={text.editorStepMedia}
+                  description={text.editorMediaHint}
+                  aside={(
+                    <span className={joinClassNames(styles.inlineState, editorModel.mediaReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
+                      {editorModel.mediaReady ? text.editorReady : text.editorMissing}
+                    </span>
+                  )}
+                />
 
                 <div className={styles.mediaGrid}>
                   <TemplatePreviewAssetSection
@@ -445,28 +445,25 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
                   />
                 </div>
 
-                <div className={styles.derivedGrid}>
-                  <div className={styles.derivedCard}>
-                    <span className={styles.reviewTileLabel}>{text.referenceDurationLabel}</span>
-                    <strong className={styles.reviewTileValue}>{formatDuration(editorModel.referenceDuration)}</strong>
-                  </div>
-                  <div className={styles.derivedCard}>
-                    <span className={styles.reviewTileLabel}>{text.characterOrientationLabel}</span>
-                    <strong className={styles.reviewTileValue}>{editorModel.characterOrientation || text.editorMissing}</strong>
-                  </div>
-                </div>
+                <AdminMetricStrip
+                  className={styles.derivedGrid}
+                  items={[
+                    { label: text.referenceDurationLabel, value: formatDuration(editorModel.referenceDuration) },
+                    { label: text.characterOrientationLabel, value: editorModel.characterOrientation || text.editorMissing },
+                  ]}
+                />
               </section>
 
               <section id="template-ai" className={styles.sectionCard}>
-                <div className={styles.sectionHeader}>
-                  <div>
-                    <h2 className={styles.sectionTitle}>{text.editorStepAi}</h2>
-                    <p className={styles.sectionDescription}>{text.editorAiHint}</p>
-                  </div>
-                  <span className={joinClassNames(styles.inlineState, editorModel.aiReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
-                    {editorModel.aiReady ? text.editorReady : text.editorMissing}
-                  </span>
-                </div>
+                <AdminSectionHeader
+                  title={text.editorStepAi}
+                  description={text.editorAiHint}
+                  aside={(
+                    <span className={joinClassNames(styles.inlineState, editorModel.aiReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
+                      {editorModel.aiReady ? text.editorReady : text.editorMissing}
+                    </span>
+                  )}
+                />
 
                 <TemplateVideoModelSection
                   text={text}
@@ -509,7 +506,12 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
                       <p className={styles.phoneDescription}>{editorModel.shortDescription || text.editorPreviewRailHint}</p>
                       {editorModel.musicDescription ? (
                         <p className={styles.phoneMusicDescription}>
-                          <span className={styles.phoneMusicLabel}>{text.musicDescriptionLabel}:</span> {editorModel.musicDescription}
+                          <span className={styles.phoneMusicLabel} aria-hidden="true">
+                            <svg viewBox="0 0 16 16" focusable="false">
+                              <path d="M10.7 2.15a.55.55 0 0 1 .7.53v7.05a2.2 2.2 0 1 1-1.1-1.92V5.08L6.2 6.1v5.03a2.2 2.2 0 1 1-1.1-1.92V5.67c0-.25.17-.47.41-.53l5.19-1.3Z" fill="currentColor" />
+                            </svg>
+                          </span>
+                          <span className={styles.phoneMusicText}>{editorModel.musicDescription}</span>
                         </p>
                       ) : null}
 

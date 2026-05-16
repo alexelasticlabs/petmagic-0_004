@@ -39,6 +39,24 @@ type AdminSummaryChipsProps = {
   className?: string;
 };
 
+type AdminSectionHeaderProps = {
+  eyebrow?: string;
+  title: ReactNode;
+  description?: ReactNode;
+  aside?: ReactNode;
+  className?: string;
+};
+
+type AdminMetricStripItem = {
+  label: ReactNode;
+  value: ReactNode;
+};
+
+type AdminMetricStripProps = {
+  items: readonly AdminMetricStripItem[];
+  className?: string;
+};
+
 function joinClassNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -124,6 +142,38 @@ export function AdminPageHero({ eyebrow, title, description, badge, actions, met
       </div>
       <AdminSummaryChips items={metaItems} />
     </section>
+  );
+}
+
+export function AdminSectionHeader({ eyebrow, title, description, aside, className }: AdminSectionHeaderProps) {
+  return (
+    <div className={joinClassNames(styles.sectionHeader, className)}>
+      <div className={styles.sectionHeaderCopy}>
+        {eyebrow ? <p className={styles.sectionEyebrow}>{eyebrow}</p> : null}
+        <h2 className={styles.sectionHeading}>{title}</h2>
+        {description ? <p className={styles.sectionText}>{description}</p> : null}
+      </div>
+      {aside ? <div className={styles.sectionHeaderAside}>{aside}</div> : null}
+    </div>
+  );
+}
+
+export function AdminMetricStrip({ items, className }: AdminMetricStripProps) {
+  const visibleItems = items.filter((item) => item && (item.label || item.value));
+
+  if (!visibleItems.length) {
+    return null;
+  }
+
+  return (
+    <div className={joinClassNames(styles.metricStrip, className)}>
+      {visibleItems.map((item, index) => (
+        <div key={index} className={styles.metricChip}>
+          <span className={styles.metricChipLabel}>{item.label}</span>
+          <strong className={styles.metricChipValue}>{item.value}</strong>
+        </div>
+      ))}
+    </div>
   );
 }
 
