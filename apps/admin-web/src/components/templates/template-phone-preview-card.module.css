@@ -49,64 +49,68 @@
 }
 
 .phoneHeroBadge {
-  min-height: 1.96rem;
-  padding: 0.28rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 100%);
-  color: #fbfdff;
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  min-height: 1.78rem;
+  padding: 0.24rem 0.78rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 100%);
+  color: #f7fbff;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(12px) saturate(1.18);
+  -webkit-backdrop-filter: blur(12px) saturate(1.18);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
-    0 8px 24px rgba(0, 0, 0, 0.32),
-    0 2px 8px rgba(0, 0, 0, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(4, 8, 14, 0.08),
+    0 10px 18px rgba(4, 8, 14, 0.2);
+}
+
+.phoneHeroBadge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 44%, rgba(255, 255, 255, 0) 100%);
+  opacity: 0.8;
+  pointer-events: none;
 }
 
 .phoneHeroBadgeNew {
-  border-color: rgba(134, 239, 172, 0.5);
-  background: linear-gradient(135deg, rgba(74, 222, 128, 0.62) 0%, rgba(16, 185, 129, 0.38) 100%);
-  color: #d6ffe7;
+  border-color: rgba(145, 223, 177, 0.32);
+  background: linear-gradient(135deg, rgba(76, 191, 126, 0.28) 0%, rgba(18, 110, 85, 0.18) 100%);
+  color: #e7fff0;
   box-shadow:
-    inset 0 1px 0 rgba(180, 255, 210, 0.4),
-    0 0 0 1px rgba(74, 222, 128, 0.16),
-    0 0 22px rgba(74, 222, 128, 0.42),
-    0 4px 14px rgba(0, 0, 0, 0.42);
+    inset 0 1px 0 rgba(214, 255, 231, 0.2),
+    0 10px 18px rgba(5, 14, 12, 0.18);
 }
 
 .phoneHeroBadgeTrending {
-  border-color: rgba(251, 191, 36, 0.55);
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.62) 0%, rgba(249, 115, 22, 0.4) 100%);
-  color: #fff0b8;
+  border-color: rgba(240, 191, 107, 0.32);
+  background: linear-gradient(135deg, rgba(184, 139, 58, 0.28) 0%, rgba(118, 72, 24, 0.18) 100%);
+  color: #fff1ca;
   box-shadow:
-    inset 0 1px 0 rgba(255, 232, 140, 0.42),
-    0 0 0 1px rgba(251, 191, 36, 0.18),
-    0 0 22px rgba(249, 115, 22, 0.45),
-    0 4px 14px rgba(0, 0, 0, 0.42);
+    inset 0 1px 0 rgba(255, 237, 193, 0.2),
+    0 10px 18px rgba(17, 11, 4, 0.18);
 }
 
 .phoneHeroBadgePopular {
-  border-color: rgba(96, 165, 250, 0.55);
-  background: linear-gradient(135deg, rgba(99, 172, 255, 0.62) 0%, rgba(37, 99, 235, 0.4) 100%);
-  color: #d6ecff;
+  border-color: rgba(123, 174, 232, 0.32);
+  background: linear-gradient(135deg, rgba(72, 124, 196, 0.28) 0%, rgba(29, 57, 112, 0.18) 100%);
+  color: #e4f0ff;
   box-shadow:
-    inset 0 1px 0 rgba(180, 220, 255, 0.4),
-    0 0 0 1px rgba(96, 165, 250, 0.18),
-    0 0 22px rgba(96, 165, 250, 0.48),
-    0 4px 14px rgba(0, 0, 0, 0.42);
+    inset 0 1px 0 rgba(219, 235, 255, 0.2),
+    0 10px 18px rgba(4, 9, 18, 0.18);
 }
 
 .phoneHeroBadgeFunny {
-  border-color: rgba(244, 114, 182, 0.55);
-  background: linear-gradient(135deg, rgba(248, 128, 192, 0.62) 0%, rgba(236, 72, 153, 0.4) 100%);
-  color: #ffe4f2;
+  border-color: rgba(230, 153, 195, 0.32);
+  background: linear-gradient(135deg, rgba(176, 92, 140, 0.28) 0%, rgba(105, 37, 85, 0.18) 100%);
+  color: #ffe8f5;
   box-shadow:
-    inset 0 1px 0 rgba(255, 205, 235, 0.4),
-    0 0 0 1px rgba(244, 114, 182, 0.18),
-    0 0 22px rgba(236, 72, 153, 0.45),
-    0 4px 14px rgba(0, 0, 0, 0.42);
+    inset 0 1px 0 rgba(255, 225, 241, 0.2),
+    0 10px 18px rgba(18, 5, 14, 0.18);
 }
 
 .phoneMediaAsset {
@@ -147,13 +151,13 @@
 .phoneBottomContent::before {
   content: "";
   position: absolute;
-  inset: -6.5rem 0 0;
+  inset: 0;
   border-radius: inherit;
   background:
-    linear-gradient(180deg, rgba(236, 244, 255, 0.08) 0%, rgba(188, 206, 232, 0.05) 16%, rgba(76, 95, 124, 0.12) 34%, rgba(17, 25, 38, 0.36) 58%, rgba(6, 11, 18, 0.68) 80%, rgba(2, 5, 10, 0.92) 100%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.012) 42%, rgba(255, 255, 255, 0.02) 100%);
-  backdrop-filter: blur(12px) saturate(1.08);
-  -webkit-backdrop-filter: blur(12px) saturate(1.08);
+    linear-gradient(180deg, rgba(236, 244, 255, 0) 0%, rgba(236, 244, 255, 0) 10%, rgba(20, 31, 47, 0.65) 30%, rgba(9, 15, 24, 0.78) 62%, rgba(4, 8, 14, 0.9) 84%, rgba(2, 5, 10, 0.97) 100%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.01) 38%, rgba(255, 255, 255, 0.028) 100%);
+  backdrop-filter: blur(10px) saturate(1.06);
+  -webkit-backdrop-filter: blur(10px) saturate(1.06);
   pointer-events: none;
 }
 
@@ -248,6 +252,32 @@
 
 .phoneMusicText {
   flex: 1 1 auto;
+}
+
+.phoneTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.phoneTag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 1.22rem;
+  padding: 0.08rem 0.42rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(10, 17, 29, 0.2);
+  color: rgba(228, 238, 251, 0.88);
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  text-shadow: 0 4px 12px rgba(3, 7, 15, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .phoneMetaRow {

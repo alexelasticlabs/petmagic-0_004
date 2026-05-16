@@ -62,6 +62,27 @@ public sealed class FileMediaMetadataReaderTests
     }
 
     [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldReturnNull_ForNonMp4Video()
+    {
+        var filePath = CreateTempFile([0x1A, 0x45, 0xDF, 0xA3, 0x93], ".webm");
+        var reader = new FileMediaMetadataReader();
+
+        try
+        {
+            var result = await reader.GetVideoDurationSecondsAsync(
+                new StoredMediaResponse("https://cdn.example.com/video.webm", "templates/video.webm", "video.webm", "video/webm", null, filePath),
+                CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Null(result.Value);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public async Task GetVideoDurationSecondsAsync_ShouldFail_WhenMp4PayloadIsMalformed()
     {
         var filePath = CreateTempFile([1, 2, 3, 4, 5, 6, 7, 8]);
@@ -82,9 +103,9 @@ public sealed class FileMediaMetadataReaderTests
         }
     }
 
-    private static string CreateTempFile(byte[] content)
+    private static string CreateTempFile(byte[] content, string extension = ".mp4")
     {
-        var filePath = Path.Combine(Path.GetTempPath(), $"petmagic-mp4-{Guid.NewGuid():N}.mp4");
+        var filePath = Path.Combine(Path.GetTempPath(), $"petmagic-media-{Guid.NewGuid():N}{extension}");
         File.WriteAllBytes(filePath, content);
         return filePath;
     }

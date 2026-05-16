@@ -482,6 +482,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
                   <TemplatePhonePreviewCard
                     title={editorModel.title || text.videoTemplateCreatePageTitle}
                     shortDescription={editorModel.shortDescription || text.editorPreviewRailHint}
+                    tags={form.tags}
                     previewUrl={form.previewUrl}
                     previewContentType={form.previewContentType}
                     tokenCost={editorModel.tokenCost}
