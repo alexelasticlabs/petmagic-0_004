@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminMetricStrip, AdminPageHero, AdminSectionHeader, AdminStatusBadge } from "@/components/admin/admin-primitives";
+import { AdminMetricStrip, AdminPageHero, AdminSectionHeader } from "@/components/admin/admin-primitives";
 import { TemplateBasicFields } from "@/components/templates/template-basic-fields";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import { TemplatePreviewAssetSection } from "@/components/templates/template-preview-asset-section";
@@ -350,9 +350,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
     const catalogPath = getTemplateCatalogPath(locale, templateType);
     const editorModel = buildVideoEditorModel(text, form, selectedTemplate);
     const pageTitle = isEditMode ? text.videoTemplateEditPageTitle : text.videoTemplateCreatePageTitle;
-    const pageHint = isEditMode ? text.videoTemplateEditPageHint : text.videoTemplateCreatePageHint;
     const badgeLabel = isEditMode ? selectedTemplate?.status ?? text.editorDraft : text.editorDraft;
-    const badgeColor = isEditMode ? getStatusColor(selectedTemplate?.status) : "#22c55e";
 
     return (
       <section className={styles.videoEditorPage}>
@@ -368,7 +366,6 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
           </div>
 
           <div className={styles.headerActions}>
-            <AdminStatusBadge color={badgeColor}>{badgeLabel}</AdminStatusBadge>
             <Button type="button" variant="ghost" className={styles.adminButton} disabled={isSaving} onClick={resetForm}>
               {text.resetForm}
             </Button>
@@ -376,15 +373,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
         </div>
 
         <AdminPageHero
-          eyebrow={sectionTitle}
           title={pageTitle}
-          description={pageHint}
-          badge={badgeLabel}
-          metaItems={[
-            isEditMode ? text.updateTemplate : text.createNewTemplate,
-            form.isPremium ? text.premiumLabel : text.freeLabel,
-            `${text.categoryLabel}: ${form.category || text.editorMissing}`,
-          ]}
         />
 
         {error ? <div className={styles.error}>{error}</div> : null}
@@ -395,7 +384,6 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
               <section id="template-basics" className={styles.sectionCard}>
                 <AdminSectionHeader
                   title={text.editorStepBasics}
-                  description={text.editorBasicsHint}
                   aside={(
                     <span className={joinClassNames(styles.inlineState, editorModel.basicInfoReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
                       {editorModel.basicInfoReady ? text.editorReady : text.editorMissing}
@@ -415,7 +403,6 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
               <section id="template-media" className={styles.sectionCard}>
                 <AdminSectionHeader
                   title={text.editorStepMedia}
-                  description={text.editorMediaHint}
                   aside={(
                     <span className={joinClassNames(styles.inlineState, editorModel.mediaReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
                       {editorModel.mediaReady ? text.editorReady : text.editorMissing}
@@ -457,7 +444,6 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
               <section id="template-ai" className={styles.sectionCard}>
                 <AdminSectionHeader
                   title={text.editorStepAi}
-                  description={text.editorAiHint}
                   aside={(
                     <span className={joinClassNames(styles.inlineState, editorModel.aiReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
                       {editorModel.aiReady ? text.editorReady : text.editorMissing}
@@ -536,7 +522,6 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
 
               <section className={styles.railCard}>
                 <div className={styles.railHeader}>
-                  <p className={styles.railEyebrow}>Readiness</p>
                   <h2 className={styles.railTitle}>{text.editorChecklistTitle}</h2>
                 </div>
 

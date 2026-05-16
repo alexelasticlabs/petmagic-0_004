@@ -194,7 +194,6 @@ export function TemplateVideoModelSection({ text, form, setForm, preprocessingMo
           <div className={styles.modelCardHeader}>
             <p className={styles.modelCardEyebrow}>Input shaping</p>
             <p className={styles.modelCardTitle}>{text.preprocessingModelLabel}</p>
-            <p className={styles.modelCardNote}>{text.editorAiHint}</p>
           </div>
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
@@ -216,7 +215,6 @@ export function TemplateVideoModelSection({ text, form, setForm, preprocessingMo
           <div className={styles.modelCardHeader}>
             <p className={styles.modelCardEyebrow}>Motion pass</p>
             <p className={styles.modelCardTitle}>{text.klingModelLabel}</p>
-            <p className={styles.modelCardNote}>{text.editorTipKling}</p>
           </div>
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
