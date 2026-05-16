@@ -70,6 +70,32 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.DoesNotContain(job.ReferenceMotionUrl!, mediaStorage.DeletedUrls);
     }
 
+    [Fact]
+    public async Task CleanupNextExpiredGenerationAsync_ShouldKeepFailedChargedJobPendingRefund()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Failed, DateTime.UtcNow.AddDays(-10));
+        job.RefundAttemptCount = 3;
+        job.RefundLastErrorCode = "economy.unavailable";
+        job.RefundLastAttemptedAtUtc = DateTime.UtcNow.AddDays(-9);
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var mediaStorage = new TrackingMediaStorage();
+        var processor = CreateProcessor(dbContext, mediaStorage: mediaStorage, options: CreateOptions(retentionDays: 7));
+
+        var processed = await processor.CleanupNextExpiredGenerationAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.False(processed);
+        Assert.Equal(TemplateGenerationStatus.Failed, persisted.Status);
+        Assert.Null(persisted.RefundedAtUtc);
+        Assert.Empty(mediaStorage.DeletedUrls);
+    }
+
     private static TemplatesDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<TemplatesDbContext>()

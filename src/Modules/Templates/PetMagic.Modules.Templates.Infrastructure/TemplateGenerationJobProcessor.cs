@@ -148,7 +148,9 @@ internal sealed class TemplateGenerationJobProcessor(
         var job = await dbContext.TemplateGenerationJobs
             .Where(x => x.CompletedAtUtc != null
                 && x.CompletedAtUtc <= cutoff
-                && (x.Status == TemplateGenerationStatus.Completed || x.Status == TemplateGenerationStatus.Failed))
+                && (x.Status == TemplateGenerationStatus.Completed
+                    || (x.Status == TemplateGenerationStatus.Failed
+                        && (x.ChargedAtUtc == null || x.RefundedAtUtc != null))))
             .OrderBy(x => x.CompletedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
