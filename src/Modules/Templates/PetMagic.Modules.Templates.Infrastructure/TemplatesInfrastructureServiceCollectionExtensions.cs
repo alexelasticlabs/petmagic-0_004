@@ -3,6 +3,7 @@ using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -14,16 +15,18 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 public static class TemplatesInfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddTemplatesInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddTemplatesInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
     {
         var section = configuration.GetSection(TemplatesOptions.SectionName);
         var r2Section = section.GetSection("R2");
         var falSection = section.GetSection("Fal");
+        var configuredStorageProvider = ReadValue(section, "StorageProvider", "TEMPLATES_STORAGE_PROVIDER");
+        var configuredAiProvider = ReadValue(section, "AiProvider", "TEMPLATES_AI_PROVIDER");
         var options = new TemplatesOptions
         {
-            StorageProvider = ReadValue(section, "StorageProvider", "TEMPLATES_STORAGE_PROVIDER")
+            StorageProvider = configuredStorageProvider
                 ?? (HasR2Environment() ? TemplateStorageProviders.R2 : TemplateStorageProviders.Local),
-            AiProvider = ReadValue(section, "AiProvider", "TEMPLATES_AI_PROVIDER")
+            AiProvider = configuredAiProvider
                 ?? (HasFalEnvironment() ? TemplateAiProviders.Fal : TemplateAiProviders.Fake),
             PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "templates-media"),
@@ -48,6 +51,10 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], true),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
             GenerationWorkerPollIntervalMilliseconds = ParseInt(section["GenerationWorkerPollIntervalMilliseconds"], 1_000),
+            MaxGenerationAttempts = ParsePositiveInt(section["MaxGenerationAttempts"], 3),
+            MaxRefundAttempts = ParsePositiveInt(section["MaxRefundAttempts"], 5),
+            RefundRetryDelayMilliseconds = ParseNonNegativeInt(section["RefundRetryDelayMilliseconds"], 30_000),
+            GenerationRetentionDaysAfterCompletion = ParseInt(section["GenerationRetentionDaysAfterCompletion"], 7),
             GeneratedVideoMaxFileSizeBytes = ParseLong(section["GeneratedVideoMaxFileSizeBytes"], 250 * 1024 * 1024),
             R2 = new R2StorageOptions
             {
@@ -67,6 +74,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 MaxPollingAttempts = ParseInt(falSection["MaxPollingAttempts"], 180)
             }
         };
+
+        ValidateProductionProviderConfiguration(options, services, environment, configuredStorageProvider, configuredAiProvider);
 
         services.AddSingleton(options);
         services.AddDbContext<TemplatesDbContext>(dbOptions =>
@@ -206,7 +215,13 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             return;
         }
 
-        services.AddSingleton<IMediaStorage, LocalFileMediaStorage>();
+        if (IsProvider(options.StorageProvider, TemplateStorageProviders.Local))
+        {
+            services.AddSingleton<IMediaStorage, LocalFileMediaStorage>();
+            return;
+        }
+
+        throw new InvalidOperationException($"Unsupported templates storage provider '{options.StorageProvider}'.");
     }
 
     private static void AddAiProviders(IServiceCollection services, TemplatesOptions options)
@@ -225,8 +240,14 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             return;
         }
 
-        services.AddSingleton<IImagePreprocessor, FakeImagePreprocessor>();
-        services.AddSingleton<IVideoMotionGenerator, FakeVideoMotionGenerator>();
+        if (IsProvider(options.AiProvider, TemplateAiProviders.Fake))
+        {
+            services.AddSingleton<IImagePreprocessor, FakeImagePreprocessor>();
+            services.AddSingleton<IVideoMotionGenerator, FakeVideoMotionGenerator>();
+            return;
+        }
+
+        throw new InvalidOperationException($"Unsupported templates AI provider '{options.AiProvider}'.");
     }
 
     private static void AddGeneratedMediaImporter(IServiceCollection services, TemplatesOptions options)
@@ -238,7 +259,13 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             return;
         }
 
-        services.AddSingleton<IGeneratedMediaImporter, FakeGeneratedMediaImporter>();
+        if (IsProvider(options.AiProvider, TemplateAiProviders.Fake))
+        {
+            services.AddSingleton<IGeneratedMediaImporter, FakeGeneratedMediaImporter>();
+            return;
+        }
+
+        throw new InvalidOperationException($"Unsupported templates AI provider '{options.AiProvider}'.");
     }
 
     private static void AddGenerationBilling(IServiceCollection services)
@@ -250,6 +277,54 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         }
 
         services.AddScoped<ITemplateGenerationBilling, NoopTemplateGenerationBilling>();
+    }
+
+    private static void ValidateProductionProviderConfiguration(
+        TemplatesOptions options,
+        IServiceCollection services,
+        IHostEnvironment? environment,
+        string? configuredStorageProvider,
+        string? configuredAiProvider)
+    {
+        if (environment is null || !environment.IsProduction())
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(configuredStorageProvider))
+        {
+            throw new InvalidOperationException("Templates:StorageProvider or TEMPLATES_STORAGE_PROVIDER must be explicitly set in Production.");
+        }
+
+        if (string.IsNullOrWhiteSpace(configuredAiProvider))
+        {
+            throw new InvalidOperationException("Templates:AiProvider or TEMPLATES_AI_PROVIDER must be explicitly set in Production.");
+        }
+
+        if (IsProvider(options.StorageProvider, TemplateStorageProviders.Local))
+        {
+            throw new InvalidOperationException("Local templates media storage cannot be used in Production.");
+        }
+
+        if (IsProvider(options.AiProvider, TemplateAiProviders.Fake))
+        {
+            throw new InvalidOperationException("Fake templates AI provider cannot be used in Production.");
+        }
+
+        if (IsProvider(options.StorageProvider, TemplateStorageProviders.R2) && !options.R2.IsConfigured)
+        {
+            throw new InvalidOperationException("R2 media storage is selected but R2_ACCOUNT_ID, R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET_NAME or R2_PUBLIC_URL is missing.");
+        }
+
+        if (IsProvider(options.AiProvider, TemplateAiProviders.Fal) && !options.Fal.IsConfigured)
+        {
+            throw new InvalidOperationException("FAL AI provider is selected but FAL_AI_API_KEY is missing.");
+        }
+
+        if (!services.Any(descriptor => descriptor.ServiceType == typeof(IEconomyService)))
+        {
+            throw new InvalidOperationException("Economy-backed template generation billing must be registered in Production.");
+        }
     }
 
     private static IAmazonS3 CreateR2Client(R2StorageOptions options)
@@ -304,5 +379,15 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     private static int ParseInt(string? raw, int fallback)
     {
         return int.TryParse(raw, out var parsed) ? parsed : fallback;
+    }
+
+    private static int ParsePositiveInt(string? raw, int fallback)
+    {
+        return int.TryParse(raw, out var parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private static int ParseNonNegativeInt(string? raw, int fallback)
+    {
+        return int.TryParse(raw, out var parsed) && parsed >= 0 ? parsed : fallback;
     }
 }

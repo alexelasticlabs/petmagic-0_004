@@ -31,6 +31,10 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TemplateAiProviders.Fake, options.AiProvider);
         Assert.True(options.GenerationWorkerEnabled);
         Assert.Equal(1_000, options.GenerationWorkerPollIntervalMilliseconds);
+        Assert.Equal(3, options.MaxGenerationAttempts);
+        Assert.Equal(5, options.MaxRefundAttempts);
+        Assert.Equal(30_000, options.RefundRetryDelayMilliseconds);
+        Assert.Equal(7, options.GenerationRetentionDaysAfterCompletion);
         Assert.Equal(250 * 1024 * 1024, options.GeneratedVideoMaxFileSizeBytes);
         Assert.Equal("LocalFileMediaStorage", mediaStorage.GetType().Name);
         Assert.Equal("FakeImagePreprocessor", imagePreprocessor.GetType().Name);
@@ -56,6 +60,10 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:Fal:ApiKey"] = "test-fal-key",
             ["Templates:Fal:QueueBaseUrl"] = "https://queue.fal.run",
             ["Templates:GenerationWorkerPollIntervalMilliseconds"] = "250",
+            ["Templates:MaxGenerationAttempts"] = "4",
+            ["Templates:MaxRefundAttempts"] = "6",
+            ["Templates:RefundRetryDelayMilliseconds"] = "125",
+            ["Templates:GenerationRetentionDaysAfterCompletion"] = "14",
             ["Templates:GeneratedVideoMaxFileSizeBytes"] = "1048576"
         });
 
@@ -74,6 +82,10 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal("petmagic-test", options.R2.BucketName);
         Assert.Equal("test-fal-key", options.Fal.ApiKey);
         Assert.Equal(250, options.GenerationWorkerPollIntervalMilliseconds);
+        Assert.Equal(4, options.MaxGenerationAttempts);
+        Assert.Equal(6, options.MaxRefundAttempts);
+        Assert.Equal(125, options.RefundRetryDelayMilliseconds);
+        Assert.Equal(14, options.GenerationRetentionDaysAfterCompletion);
         Assert.Equal(1024 * 1024, options.GeneratedVideoMaxFileSizeBytes);
         Assert.Equal("R2MediaStorage", mediaStorage.GetType().Name);
         Assert.Equal("FalImagePreprocessor", imagePreprocessor.GetType().Name);
@@ -93,6 +105,66 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration));
 
         Assert.Contains("R2 media storage is selected", exception.Message);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRejectImplicitProviders_InProduction()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration([]);
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Templates:StorageProvider", exception.Message);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRejectLocalStorage_InProduction()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:StorageProvider"] = TemplateStorageProviders.Local,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:Fal:ApiKey"] = "test-fal-key"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Local templates media storage", exception.Message);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRejectNoopBilling_InProduction()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.example.test",
+            ["Templates:Fal:ApiKey"] = "test-fal-key"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Economy-backed template generation billing", exception.Message);
     }
 
     private static IConfiguration CreateConfiguration(IEnumerable<KeyValuePair<string, string?>> values)

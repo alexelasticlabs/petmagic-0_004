@@ -10,20 +10,3 @@ export function inferTemplateMediaKind(contentType: string, url: string): Templa
 
   return "image";
 }
-
-export function formatTemplateFileSize(raw: string): string {
-  const value = Number.parseInt(raw, 10);
-  if (Number.isNaN(value) || value <= 0) {
-    return "--";
-  }
-
-  if (value < 1024) {
-    return `${value} B`;
-  }
-
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}

@@ -26,6 +26,16 @@ internal sealed class TemplateGenerationWorker(
                 var processed = await processor.ProcessNextAsync(stoppingToken);
                 if (!processed)
                 {
+                    processed = await processor.RetryNextRefundAsync(stoppingToken);
+                }
+
+                if (!processed)
+                {
+                    processed = await processor.CleanupNextExpiredGenerationAsync(stoppingToken);
+                }
+
+                if (!processed)
+                {
                     await Task.Delay(options.GenerationWorkerPollIntervalMilliseconds, stoppingToken);
                 }
             }

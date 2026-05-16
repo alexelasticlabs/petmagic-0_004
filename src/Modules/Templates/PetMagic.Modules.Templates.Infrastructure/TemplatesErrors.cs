@@ -19,6 +19,7 @@ internal static class TemplatesErrors
     public static readonly Error AiProviderUnavailable = new("templates.ai_provider_unavailable", "AI provider is not configured.");
     public static readonly Error AiProviderFailed = new("templates.ai_provider_failed", "AI provider request failed.");
     public static readonly Error AiProviderTimedOut = new("templates.ai_provider_timed_out", "AI provider request timed out.");
+    public static readonly Error GenerationAttemptsExceeded = new("templates.generation_attempts_exceeded", "Template generation exceeded the maximum number of attempts.");
     public static readonly Error GeneratedMediaImportFailed = new("templates.generated_media_import_failed", "Generated media could not be imported into storage.");
     public static readonly Error GeneratedMediaTooLarge = new("templates.generated_media_too_large", "Generated media exceeds the maximum allowed size.");
 }

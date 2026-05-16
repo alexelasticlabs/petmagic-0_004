@@ -84,7 +84,7 @@ builder.Services
     .AddEconomyApiModule()
     .AddIdentityInfrastructure(builder.Configuration)
     .AddIdentityApiModule()
-    .AddTemplatesInfrastructure(builder.Configuration)
+    .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
     .AddTemplatesApiModule();
 
 builder.Services

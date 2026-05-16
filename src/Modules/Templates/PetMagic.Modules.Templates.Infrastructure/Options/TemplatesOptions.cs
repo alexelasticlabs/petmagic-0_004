@@ -30,6 +30,14 @@ public sealed class TemplatesOptions
 
     public int GenerationWorkerPollIntervalMilliseconds { get; init; } = 1_000;
 
+    public int MaxGenerationAttempts { get; init; } = 3;
+
+    public int MaxRefundAttempts { get; init; } = 5;
+
+    public int RefundRetryDelayMilliseconds { get; init; } = 30_000;
+
+    public int GenerationRetentionDaysAfterCompletion { get; init; } = 7;
+
     public long GeneratedVideoMaxFileSizeBytes { get; init; } = 250 * 1024 * 1024;
 
     public R2StorageOptions R2 { get; init; } = new();

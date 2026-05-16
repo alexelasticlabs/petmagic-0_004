@@ -58,7 +58,10 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.OutputUrl).HasMaxLength(2048);
             entity.Property(x => x.FailureCode).HasMaxLength(128);
             entity.Property(x => x.FailureMessage).HasMaxLength(1000);
+            entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.RefundedAtUtc, x.RefundLastAttemptedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.TemplateId, x.Status, x.CreatedAtUtc });
             entity.HasOne(x => x.Template)

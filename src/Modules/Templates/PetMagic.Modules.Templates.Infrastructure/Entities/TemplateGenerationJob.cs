@@ -46,6 +46,12 @@ public sealed class TemplateGenerationJob
 
     public DateTime? RefundedAtUtc { get; set; }
 
+    public int RefundAttemptCount { get; set; }
+
+    public string? RefundLastErrorCode { get; set; }
+
+    public DateTime? RefundLastAttemptedAtUtc { get; set; }
+
     public DateTime? StartedAtUtc { get; set; }
 
     public DateTime? CompletedAtUtc { get; set; }
