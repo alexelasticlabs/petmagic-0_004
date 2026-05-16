@@ -155,7 +155,7 @@ export function TemplatePreviewAssetSection({
           </div>
           <div className={styles.uploadActions}>
             <Button type="button" variant="primary" className={styles.primaryButton} disabled={!previewFile || uploadingKind !== null} onClick={onUploadPreview}>
-              {uploadingKind === "Preview" ? text.uploadingMedia : text.uploadPreview}
+              {uploadingKind === "Preview" ? text.uploadingMedia : text.uploadAction}
             </Button>
             <Button
               type="button"

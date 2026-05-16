@@ -82,6 +82,7 @@ export type Dictionary = {
   resetForm: string;
   uploadPreview: string;
   uploadReference: string;
+  uploadAction: string;
   uploadingMedia: string;
   mediaUploadHint: string;
   mediaDropzoneHint: string;
@@ -202,6 +203,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     resetForm: "Сбросить",
     uploadPreview: "Загрузить preview",
     uploadReference: "Загрузить референсное видео",
+    uploadAction: "Загрузить",
     uploadingMedia: "Загрузка файла...",
     mediaUploadHint: "После загрузки backend сам определяет URL, имя файла, тип, размер и длительность media.",
     mediaDropzoneHint: "Кликните по области или перетащите файл сюда.",
@@ -320,6 +322,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     resetForm: "Reset",
     uploadPreview: "Upload preview",
     uploadReference: "Upload reference video",
+    uploadAction: "Upload",
     uploadingMedia: "Uploading file...",
     mediaUploadHint: "After upload, the backend fills the media URL, file name, type, size, and duration automatically.",
     mediaDropzoneHint: "Click the area or drag a file here.",

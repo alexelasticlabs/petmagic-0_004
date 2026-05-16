@@ -151,7 +151,7 @@ export function TemplateReferenceAssetSection({
           </div>
           <div className={styles.uploadActions}>
             <Button type="button" variant="primary" className={styles.primaryButton} disabled={!referenceFile || uploadingKind !== null} onClick={onUploadReference}>
-              {uploadingKind === "ReferenceMotion" ? text.uploadingMedia : text.uploadReference}
+              {uploadingKind === "ReferenceMotion" ? text.uploadingMedia : text.uploadAction}
             </Button>
             <Button
               type="button"
