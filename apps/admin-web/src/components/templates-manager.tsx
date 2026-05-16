@@ -71,6 +71,8 @@ type VideoEditorModel = {
   checklist: ChecklistItem[];
 };
 
+type EditorVisibilityStatus = Extract<TemplateStatus, "Draft" | "Active">;
+
 const DEFAULT_PREPROCESSING_PROMPT = "Keep the same pet, same face, same fur, same colors, same background, same lighting and camera angle. Adjust the pet into an upright pose standing on its two hind legs like a human, with the front paws naturally positioned like arms. Make the full body clearly visible and suitable for motion transfer. Do not change the pet’s identity, breed, facial features, background, or image style.";
 const DEFAULT_KLING_PROMPT = "A cute pet performing a funny viral dance, smooth animation, high quality.";
 
@@ -102,6 +104,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [uploadingKind, setUploadingKind] = useState<TemplateAssetKind | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [editorStatus, setEditorStatus] = useState<EditorVisibilityStatus>("Draft");
   const isVideo = templateType === "Video";
 
   useEffect(() => {
@@ -146,6 +149,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
       const response = await fetchAdminTemplate(templateId);
       setSelectedTemplate(response);
       setForm(createFormFromTemplate(response));
+      setEditorStatus(resolveEditorVisibilityStatus(response.status));
     } catch {
       setError(text.errorLoadingTemplates);
       setToast({ type: "error", message: text.errorLoadingTemplates });
@@ -174,6 +178,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
   function resetForm() {
     setSelectedTemplate(null);
     setForm(createInitialForm(templateType));
+    setEditorStatus("Draft");
     setPreviewFile(null);
     setReferenceFile(null);
     setError(null);
@@ -181,24 +186,43 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await handleSave(editorStatus);
+  }
+
+  async function handleSave(targetStatus: EditorVisibilityStatus) {
     setIsSaving(true);
     setError(null);
 
+    let savedTemplate: AdminTemplate | null = null;
+
     try {
-      const response = templateType === "Video"
+      savedTemplate = templateType === "Video"
         ? await saveVideoTemplate(selectedTemplate?.templateId, form)
         : await saveImageTemplate(selectedTemplate?.templateId, form);
 
-      setSelectedTemplate(response);
-      setForm(createFormFromTemplate(response));
+      if (savedTemplate.status !== targetStatus) {
+        savedTemplate = await changeTemplateStatus(savedTemplate.templateId, targetStatus);
+      }
+
+      setSelectedTemplate(savedTemplate);
+      setForm(createFormFromTemplate(savedTemplate));
+      setEditorStatus(resolveEditorVisibilityStatus(savedTemplate.status));
       await loadTemplates(false);
       setToast({
         type: "success",
-        message: locale === "ru" ? "Шаблон сохранен" : "Template saved"
+        message: targetStatus === "Active" ? text.templateActivated : text.templateSavedAsDraft
       });
-    } catch {
-      setError(text.errorSavingTemplate);
-      setToast({ type: "error", message: text.errorSavingTemplate });
+    } catch (error) {
+      if (savedTemplate) {
+        setSelectedTemplate(savedTemplate);
+        setForm(createFormFromTemplate(savedTemplate));
+        setEditorStatus(resolveEditorVisibilityStatus(savedTemplate.status));
+        await loadTemplates(false);
+      }
+
+      const message = getTemplateSaveErrorMessage(error, text, targetStatus);
+      setError(message);
+      setToast({ type: "error", message });
     } finally {
       setIsSaving(false);
     }
@@ -212,6 +236,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
       const response = await changeTemplateStatus(templateId, status);
       setSelectedTemplate(response);
       setForm(createFormFromTemplate(response));
+      setEditorStatus(resolveEditorVisibilityStatus(response.status));
       await loadTemplates(false);
       setToast({
         type: "success",
@@ -350,7 +375,6 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
     const catalogPath = getTemplateCatalogPath(locale, templateType);
     const editorModel = buildVideoEditorModel(text, form, selectedTemplate);
     const pageTitle = isEditMode ? text.videoTemplateEditPageTitle : text.videoTemplateCreatePageTitle;
-    const badgeLabel = isEditMode ? selectedTemplate?.status ?? text.editorDraft : text.editorDraft;
 
     return (
       <section className={styles.videoEditorPage}>
@@ -558,12 +582,46 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
           </div>
 
           <div className={styles.footerBar}>
+            <div className={styles.footerStatusPanel}>
+              <div className={styles.footerStatusCopy}>
+                <span className={styles.footerStatusLabel}>{text.editorVisibilityTitle}</span>
+                <p className={styles.footerStatusHint}>
+                  {editorStatus === "Active" ? text.editorVisibleToUsersHint : text.editorHiddenFromUsersHint}
+                </p>
+              </div>
+
+              <div className={styles.footerStatusSwitch} role="group" aria-label={text.editorVisibilityTitle}>
+                <button
+                  type="button"
+                  className={joinClassNames(styles.footerStatusButton, editorStatus === "Draft" ? styles.footerStatusButtonActive : null)}
+                  aria-pressed={editorStatus === "Draft"}
+                  onClick={() => setEditorStatus("Draft")}
+                >
+                  {text.editorDraft}
+                </button>
+                <button
+                  type="button"
+                  className={joinClassNames(styles.footerStatusButton, editorStatus === "Active" ? styles.footerStatusButtonActive : null, editorStatus === "Active" ? styles.footerStatusButtonLive : null)}
+                  aria-pressed={editorStatus === "Active"}
+                  onClick={() => setEditorStatus("Active")}
+                >
+                  {text.editorActive}
+                </button>
+              </div>
+            </div>
+
             <div className={styles.footerActions}>
               <Button type="button" variant="secondary" className={styles.adminButton} disabled={isSaving} onClick={() => router.push(catalogPath)}>
                 {text.editorCancel}
               </Button>
-              <Button type="submit" variant="primary" className={styles.primaryButton} disabled={isSaving}>
-                {isEditMode ? text.saveTemplate : text.editorSaveAndContinue}
+              <Button type="button" variant="ghost" className={styles.adminButton} disabled={isSaving} onClick={resetForm}>
+                {text.resetForm}
+              </Button>
+              <Button type="button" variant="secondary" className={styles.adminButton} disabled={isSaving} onClick={() => void handleSave("Draft")}>
+                {text.editorSaveDraft}
+              </Button>
+              <Button type="button" variant="primary" className={styles.primaryButton} disabled={isSaving} onClick={() => void handleSave("Active")}>
+                {text.editorSaveAndActivate}
               </Button>
             </div>
           </div>
@@ -631,13 +689,46 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
           </>
         ) : null}
 
-        <div className={styles.actions}>
-          <Button type="submit" variant="primary" className={styles.primaryButton} disabled={isSaving}>
-            {text.saveTemplate}
-          </Button>
-          <Button type="button" variant="secondary" className={styles.adminButton} disabled={isSaving} onClick={resetForm}>
-            {text.resetForm}
-          </Button>
+        <div className={styles.footerBar}>
+          <div className={styles.footerStatusPanel}>
+            <div className={styles.footerStatusCopy}>
+              <span className={styles.footerStatusLabel}>{text.editorVisibilityTitle}</span>
+              <p className={styles.footerStatusHint}>
+                {editorStatus === "Active" ? text.editorVisibleToUsersHint : text.editorHiddenFromUsersHint}
+              </p>
+            </div>
+
+            <div className={styles.footerStatusSwitch} role="group" aria-label={text.editorVisibilityTitle}>
+              <button
+                type="button"
+                className={joinClassNames(styles.footerStatusButton, editorStatus === "Draft" ? styles.footerStatusButtonActive : null)}
+                aria-pressed={editorStatus === "Draft"}
+                onClick={() => setEditorStatus("Draft")}
+              >
+                {text.editorDraft}
+              </button>
+              <button
+                type="button"
+                className={joinClassNames(styles.footerStatusButton, editorStatus === "Active" ? styles.footerStatusButtonActive : null, editorStatus === "Active" ? styles.footerStatusButtonLive : null)}
+                aria-pressed={editorStatus === "Active"}
+                onClick={() => setEditorStatus("Active")}
+              >
+                {text.editorActive}
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.footerActions}>
+            <Button type="button" variant="ghost" className={styles.adminButton} disabled={isSaving} onClick={resetForm}>
+              {text.resetForm}
+            </Button>
+            <Button type="button" variant="secondary" className={styles.adminButton} disabled={isSaving} onClick={() => void handleSave("Draft")}>
+              {text.editorSaveDraft}
+            </Button>
+            <Button type="button" variant="primary" className={styles.primaryButton} disabled={isSaving} onClick={() => void handleSave("Active")}>
+              {text.editorSaveAndActivate}
+            </Button>
+          </div>
         </div>
       </form>
       {toast ? <Toast message={toast.message} type={toast.type} /> : null}
@@ -851,6 +942,18 @@ function resolveEffectivePromoBadge(
 
 function joinClassNames(...classes: Array<string | null | undefined | false>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function resolveEditorVisibilityStatus(status?: TemplateStatus): EditorVisibilityStatus {
+  return status === "Active" ? "Active" : "Draft";
+}
+
+function getTemplateSaveErrorMessage(error: unknown, text: Dictionary, targetStatus: EditorVisibilityStatus): string {
+  if (error instanceof Error && error.message && !/^API request failed with status \d+$/i.test(error.message)) {
+    return error.message;
+  }
+
+  return targetStatus === "Active" ? text.errorActivatingTemplate : text.errorSavingTemplate;
 }
 
 function createInitialForm(templateType: TemplateType): TemplateFormState {

@@ -130,7 +130,7 @@ const AUTH_SESSION_EVENT = "petmagic_admin_auth_changed";
 const ADMIN_LIST_CACHE_TTL_MS = 30_000;
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
 
-type ApiError = Error & { status?: number };
+type ApiError = Error & { status?: number; detail?: string; code?: string };
 type AuthSessionSnapshot = AuthSession | null | undefined;
 
 let cachedAuthRaw: string | null | undefined;
@@ -261,6 +261,20 @@ async function apiRequest<TResponse>(
   if (!response.ok) {
     const error = new Error(`API request failed with status ${response.status}`) as ApiError;
     error.status = response.status;
+
+    try {
+      const problem = (await response.json()) as { title?: string; detail?: string };
+      error.code = problem.title;
+      error.detail = problem.detail;
+      if (problem.detail) {
+        error.message = problem.detail;
+      } else if (problem.title) {
+        error.message = problem.title;
+      }
+    } catch {
+      // Ignore invalid or empty error payloads and fall back to the generic message.
+    }
+
     throw error;
   }
 

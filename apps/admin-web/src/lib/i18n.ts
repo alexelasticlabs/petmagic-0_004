@@ -26,6 +26,7 @@ export type Dictionary = {
   errorLoadingUsers: string;
   errorLoadingTemplates: string;
   errorSavingTemplate: string;
+  errorActivatingTemplate: string;
   errorDeletingTemplate: string;
   noUsers: string;
   noTemplates: string;
@@ -116,7 +117,15 @@ export type Dictionary = {
   editorReady: string;
   editorMissing: string;
   editorDraft: string;
+  editorActive: string;
   editorOpenPreview: string;
+  editorVisibilityTitle: string;
+  editorVisibleToUsersHint: string;
+  editorHiddenFromUsersHint: string;
+  editorSaveDraft: string;
+  editorSaveAndActivate: string;
+  templateSavedAsDraft: string;
+  templateActivated: string;
   editorAccessFreeHint: string;
   editorAccessPremiumHint: string;
   editorReviewReadyHint: string;
@@ -147,6 +156,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     errorLoadingUsers: "Не удалось загрузить пользователей.",
     errorLoadingTemplates: "Не удалось загрузить шаблоны.",
     errorSavingTemplate: "Не удалось сохранить шаблон.",
+    errorActivatingTemplate: "Не удалось активировать шаблон.",
     errorDeletingTemplate: "Не удалось удалить шаблон.",
     noUsers: "Пользователи не найдены.",
     noTemplates: "Шаблоны не найдены.",
@@ -237,7 +247,15 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorReady: "Готово",
     editorMissing: "Не заполнено",
     editorDraft: "Черновик",
+    editorActive: "Активен",
     editorOpenPreview: "Посмотреть превью",
+    editorVisibilityTitle: "Видимость для пользователей",
+    editorVisibleToUsersHint: "Активный шаблон виден пользователям в каталоге.",
+    editorHiddenFromUsersHint: "Черновик скрыт от пользователей и доступен только в админке.",
+    editorSaveDraft: "Сохранить как черновик",
+    editorSaveAndActivate: "Сохранить и активировать",
+    templateSavedAsDraft: "Шаблон сохранен как черновик.",
+    templateActivated: "Шаблон сохранен и активирован.",
     editorAccessFreeHint: "Доступно всем пользователям.",
     editorAccessPremiumHint: "Только для Premium пользователей.",
     editorReviewReadyHint: "Шаблон выглядит цельным и готовым к следующему шагу публикации.",
@@ -266,6 +284,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     errorLoadingUsers: "Failed to load users.",
     errorLoadingTemplates: "Failed to load templates.",
     errorSavingTemplate: "Failed to save template.",
+    errorActivatingTemplate: "Failed to activate template.",
     errorDeletingTemplate: "Failed to delete template.",
     noUsers: "No users found.",
     noTemplates: "No templates found.",
@@ -356,7 +375,15 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorReady: "Ready",
     editorMissing: "Missing",
     editorDraft: "Draft",
+    editorActive: "Active",
     editorOpenPreview: "Open preview",
+    editorVisibilityTitle: "User visibility",
+    editorVisibleToUsersHint: "Active templates are visible to users in the catalog.",
+    editorHiddenFromUsersHint: "Draft templates stay hidden from users and remain admin-only.",
+    editorSaveDraft: "Save as draft",
+    editorSaveAndActivate: "Save and activate",
+    templateSavedAsDraft: "Template saved as draft.",
+    templateActivated: "Template saved and activated.",
     editorAccessFreeHint: "Available to all users.",
     editorAccessPremiumHint: "Only for Premium users.",
     editorReviewReadyHint: "The template feels cohesive and ready for the next publishing step.",
