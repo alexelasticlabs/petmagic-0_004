@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Documentation
+docs/
+README.md
+SECURITY.md
+
+# Tests (excluded from image)
+tests/
+*.test.js
+
+# Build artifacts
+bin/
+obj/
+.next/
+
+# Node
+node_modules/
+
+# Docker
+Dockerfile*
+docker-compose.yml
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

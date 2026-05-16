@@ -2,31 +2,42 @@
 .env
 .env.local
 .env.*.local
-
-# Docker
-.dockerignore
+**/.env
+**/.env.local
+**/.env.*.local
+!.env.example
+!**/.env.example
 
 # Build outputs
 bin/
 obj/
-.next/
-node_modules/
+Results/
+TestResults/
 
-# Dependencies
-packages.lock.json
-**/NuGet.Config
+# Frontend build outputs
+.next/
+out/
+build/
+dist/
+coverage/
+node_modules/
+*.tsbuildinfo
 
 # IDE
+.vs/
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Database
 *.db
@@ -39,7 +50,6 @@ Thumbs.db
 # Temporary
 temp/
 tmp/
-dist/
 
 # Docker Compose volumes
 postgres_data/
