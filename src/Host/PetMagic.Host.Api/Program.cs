@@ -82,7 +82,7 @@ builder.Services.AddRateLimiter(options =>
 builder.Services
     .AddEconomyInfrastructure(builder.Configuration)
     .AddEconomyApiModule()
-    .AddIdentityInfrastructure(builder.Configuration)
+    .AddIdentityInfrastructure(builder.Configuration, builder.Environment)
     .AddIdentityApiModule()
     .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
     .AddTemplatesApiModule();

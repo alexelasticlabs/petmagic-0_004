@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Net;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -20,11 +21,14 @@ public sealed class IdentityService(
     UserManager<AppUser> userManager,
     RoleManager<IdentityRole<Guid>> roleManager,
     IdentityDbContext dbContext,
+    IIdentityEmailTemplateRenderer emailTemplateRenderer,
+    EmailOptions emailOptions,
     IOptions<JwtOptions> jwtOptions) : IIdentityService
 {
     public async Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken)
     {
-        var normalizedEmail = command.Email.Trim().ToUpperInvariant();
+        var email = command.Email.Trim();
+        var normalizedEmail = email.ToUpperInvariant();
         var existing = await userManager.Users
             .AnyAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
 
@@ -36,8 +40,9 @@ public sealed class IdentityService(
         var user = new AppUser
         {
             Id = Guid.NewGuid(),
-            UserName = command.Email,
-            Email = command.Email,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = false,
             DisplayName = command.DisplayName,
             IsPremium = false,
             IsActive = true,
@@ -50,7 +55,13 @@ public sealed class IdentityService(
             return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
         }
 
-        await userManager.AddToRoleAsync(user, SystemRoles.User);
+        var addRoleResult = await userManager.AddToRoleAsync(user, SystemRoles.User);
+        if (!addRoleResult.Succeeded)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
+        }
+
+        await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
         await WriteAuditAsync(user.Id, "user.registered", "User self-registration completed.", cancellationToken);
 
         return Result.Success(ToUserProfileResponse(user, [SystemRoles.User]));
@@ -73,11 +84,133 @@ public sealed class IdentityService(
             return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
         }
 
+        if (!user.EmailConfirmed)
+        {
+            await WriteAuditAsync(user.Id, "auth.login.denied", "Login denied: email is not confirmed.", cancellationToken);
+            return Result.Failure<TokenPairResponse>(IdentityErrors.EmailNotConfirmed);
+        }
+
         var roles = await userManager.GetRolesAsync(user);
         var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken);
         await WriteAuditAsync(user.Id, "auth.login.succeeded", "User logged in.", cancellationToken);
 
         return Result.Success(tokenPair);
+    }
+
+    public async Task<Result> RequestEmailConfirmationAsync(RequestEmailConfirmationCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == command.Email.Trim().ToUpperInvariant(), cancellationToken);
+
+        if (user is null || !user.IsActive || user.EmailConfirmed)
+        {
+            return Result.Success();
+        }
+
+        var now = DateTime.UtcNow;
+        var lastActiveCode = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == user.Id
+                && x.Purpose == EmailCodePurpose.EmailConfirmation
+                && x.ConsumedAtUtc == null
+                && x.ExpiresAtUtc > now)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (lastActiveCode?.LastSentAtUtc is not null
+            && lastActiveCode.LastSentAtUtc > now.AddSeconds(-emailOptions.ConfirmationResendCooldownSeconds))
+        {
+            return Result.Success();
+        }
+
+        await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
+        await WriteAuditAsync(user.Id, "user.email_confirmation.requested", "Email confirmation code requested.", cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> ConfirmEmailAsync(ConfirmEmailCommand command, CancellationToken cancellationToken)
+    {
+        var email = command.Email.Trim();
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == email.ToUpperInvariant(), cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return Result.Failure(IdentityErrors.EmailCodeInvalid);
+        }
+
+        if (user.EmailConfirmed)
+        {
+            return Result.Success();
+        }
+
+        var now = DateTime.UtcNow;
+        var codeEntity = await FindMatchingCodeAsync(user.Id, EmailCodePurpose.EmailConfirmation, command.Code, now, cancellationToken);
+        if (codeEntity is null)
+        {
+            return Result.Failure(IdentityErrors.EmailCodeInvalid);
+        }
+
+        codeEntity.ConsumedAtUtc = now;
+        user.EmailConfirmed = true;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.OperationFailed);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditAsync(user.Id, "user.email_confirmed", "Email address confirmed.", cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> RequestPasswordResetAsync(RequestPasswordResetCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == command.Email.Trim().ToUpperInvariant(), cancellationToken);
+
+        if (user is null || !user.IsActive || string.IsNullOrWhiteSpace(user.Email) || string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return Result.Success();
+        }
+
+        await QueueEmailCodeAsync(user, EmailCodePurpose.PasswordReset, cancellationToken);
+        await WriteAuditAsync(user.Id, "auth.password_reset.requested", "Password reset requested.", cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken)
+    {
+        var email = command.Email.Trim();
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == email.ToUpperInvariant(), cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return Result.Failure(IdentityErrors.PasswordResetCodeInvalid);
+        }
+
+        var now = DateTime.UtcNow;
+        var codeEntity = await FindMatchingCodeAsync(user.Id, EmailCodePurpose.PasswordReset, command.Code, now, cancellationToken);
+        if (codeEntity is null)
+        {
+            return Result.Failure(IdentityErrors.PasswordResetCodeInvalid);
+        }
+
+        user.PasswordHash = userManager.PasswordHasher.HashPassword(user, command.NewPassword);
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.OperationFailed);
+        }
+
+        codeEntity.ConsumedAtUtc = now;
+        await RevokeRefreshTokensAsync(user.Id, now, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditAsync(user.Id, "auth.password_reset.succeeded", "Password reset completed.", cancellationToken);
+        return Result.Success();
     }
 
     public async Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
@@ -246,11 +379,51 @@ public sealed class IdentityService(
                 user.DisplayName,
                 user.IsPremium,
                 user.IsActive,
+                user.EmailConfirmed,
                 roles.ToList(),
                 user.CreatedAtUtc));
         }
 
         return Result.Success<IReadOnlyList<UserListItemResponse>>(output);
+    }
+
+    public async Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken)
+    {
+        IQueryable<AppUser> query = userManager.Users
+            .Where(x => x.IsActive && x.EmailConfirmed && !string.IsNullOrWhiteSpace(x.Email));
+
+        if (string.Equals(command.Audience, EmailAudiences.Premium, StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(x => x.IsPremium);
+        }
+        else if (string.Equals(command.Audience, EmailAudiences.Selected, StringComparison.OrdinalIgnoreCase))
+        {
+            var selectedIds = command.UserIds?
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToArray() ?? [];
+
+            query = query.Where(x => selectedIds.Contains(x.Id));
+        }
+
+        var recipients = await query
+            .Select(x => new { x.Id, x.Email })
+            .ToListAsync(cancellationToken);
+
+        if (recipients.Count == 0)
+        {
+            return Result.Success();
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var recipient in recipients)
+        {
+            dbContext.EmailDispatchJobs.Add(CreateBroadcastEmailJob(recipient.Id, recipient.Email!, command.Subject, command.Body, now));
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditAsync(null, "admin.bulk_email.queued", $"Bulk email queued for {recipients.Count} recipients.", cancellationToken);
+        return Result.Success();
     }
 
     public async Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken)
@@ -408,6 +581,137 @@ public sealed class IdentityService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    private async Task QueueEmailCodeAsync(AppUser user, EmailCodePurpose purpose, CancellationToken cancellationToken)
+    {
+        var email = user.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        await InvalidateActiveCodesAsync(user.Id, purpose, now, cancellationToken);
+
+        var code = CreateVerificationCode(emailOptions.VerificationCodeLength);
+        var ttlMinutes = purpose == EmailCodePurpose.EmailConfirmation
+            ? emailOptions.VerificationCodeTtlMinutes
+            : emailOptions.PasswordResetCodeTtlMinutes;
+        var expiresAtUtc = now.AddMinutes(ttlMinutes);
+
+        dbContext.UserEmailCodes.Add(new UserEmailCode
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Email = email,
+            Purpose = purpose,
+            CodeHash = HashToken(code),
+            RequestedAtUtc = now,
+            ExpiresAtUtc = expiresAtUtc,
+            LastSentAtUtc = now,
+            SendCount = 1
+        });
+
+        var message = purpose == EmailCodePurpose.EmailConfirmation
+            ? emailTemplateRenderer.RenderEmailConfirmation(user.DisplayName, code, expiresAtUtc)
+            : emailTemplateRenderer.RenderPasswordReset(user.DisplayName, code, expiresAtUtc);
+
+        dbContext.EmailDispatchJobs.Add(new EmailDispatchJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            RecipientEmail = email,
+            Kind = purpose == EmailCodePurpose.EmailConfirmation
+                ? EmailDispatchKind.EmailConfirmation
+                : EmailDispatchKind.PasswordReset,
+            Status = EmailDispatchStatus.Queued,
+            Subject = message.Subject,
+            HtmlBody = message.HtmlBody,
+            TextBody = message.TextBody,
+            AttemptCount = 0,
+            QueuedAtUtc = now,
+            UpdatedAtUtc = now,
+            NextAttemptAtUtc = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task InvalidateActiveCodesAsync(Guid userId, EmailCodePurpose purpose, DateTime now, CancellationToken cancellationToken)
+    {
+        var activeCodes = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == userId
+                && x.Purpose == purpose
+                && x.ConsumedAtUtc == null
+                && x.ExpiresAtUtc > now)
+            .ToListAsync(cancellationToken);
+
+        foreach (var activeCode in activeCodes)
+        {
+            activeCode.ConsumedAtUtc = now;
+        }
+    }
+
+    private async Task<UserEmailCode?> FindMatchingCodeAsync(
+        Guid userId,
+        EmailCodePurpose purpose,
+        string code,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var codeHash = HashToken(code.Trim());
+        return await dbContext.UserEmailCodes
+            .Where(x => x.UserId == userId
+                && x.Purpose == purpose
+                && x.ConsumedAtUtc == null
+                && x.ExpiresAtUtc > now
+                && x.CodeHash == codeHash)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task RevokeRefreshTokensAsync(Guid userId, DateTime revokedAtUtc, CancellationToken cancellationToken)
+    {
+        var sessions = await dbContext.RefreshTokenSessions
+            .Where(x => x.UserId == userId && x.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var session in sessions)
+        {
+            session.RevokedAtUtc = revokedAtUtc;
+        }
+    }
+
+    private static string CreateVerificationCode(int length)
+    {
+        var size = Math.Clamp(length, 6, 12);
+        var chars = new char[size];
+        for (var index = 0; index < size; index++)
+        {
+            chars[index] = (char)('0' + RandomNumberGenerator.GetInt32(0, 10));
+        }
+
+        return new string(chars);
+    }
+
+    private static EmailDispatchJob CreateBroadcastEmailJob(Guid userId, string recipientEmail, string subject, string body, DateTime now)
+    {
+        return new EmailDispatchJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            RecipientEmail = recipientEmail,
+            Kind = EmailDispatchKind.Broadcast,
+            Status = EmailDispatchStatus.Queued,
+            Subject = subject.Trim(),
+            HtmlBody = $"<p>{WebUtility.HtmlEncode(body).Replace("\n", "<br/>", StringComparison.Ordinal)}</p>",
+            TextBody = body,
+            AttemptCount = 0,
+            QueuedAtUtc = now,
+            UpdatedAtUtc = now,
+            NextAttemptAtUtc = now
+        };
+    }
+
     private static string HashToken(string token)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
@@ -420,5 +724,6 @@ public sealed class IdentityService(
             user.Email ?? string.Empty,
             user.DisplayName,
             user.IsPremium,
+            user.EmailConfirmed,
             roles.ToList());
 }

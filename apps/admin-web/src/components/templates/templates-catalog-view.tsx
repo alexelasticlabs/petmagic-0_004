@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { TemplatePhonePreviewCard } from "@/components/templates/template-phone-preview-card";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -14,7 +15,6 @@ import {
     type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -256,13 +256,37 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
               <Select value={sortMode} options={sortOptions} ariaLabel={copy.sortLabel} onChange={(value) => setSortMode(value as SortMode)} />
             </label>
 
-            <div className={styles.viewToggle} aria-label={copy.viewToggleLabel}>
-              <button type="button" className={viewMode === "cards" ? styles.viewButtonActive : styles.viewButton} onClick={() => setViewMode("cards")}>
-                {copy.cardsView}
-              </button>
-              <button type="button" className={viewMode === "list" ? styles.viewButtonActive : styles.viewButton} onClick={() => setViewMode("list")}>
-                {copy.listView}
-              </button>
+            <div className={styles.viewToggleShell}>
+              <span className={styles.viewToggleCaption}>{copy.viewToggleLabel}</span>
+              <div className={styles.viewToggle} role="group" aria-label={copy.viewToggleLabel}>
+                <button
+                  type="button"
+                  className={viewMode === "cards" ? styles.viewButtonActive : styles.viewButton}
+                  aria-pressed={viewMode === "cards"}
+                  onClick={() => setViewMode("cards")}
+                >
+                  <span className={`${styles.viewButtonGlyph} ${styles.viewButtonGlyphCards}`} aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                  <span>{copy.cardsView}</span>
+                </button>
+                <button
+                  type="button"
+                  className={viewMode === "list" ? styles.viewButtonActive : styles.viewButton}
+                  aria-pressed={viewMode === "list"}
+                  onClick={() => setViewMode("list")}
+                >
+                  <span className={`${styles.viewButtonGlyph} ${styles.viewButtonGlyphList}`} aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                  <span>{copy.listView}</span>
+                </button>
+              </div>
             </div>
           </div>
           {!filteredTemplates.length ? (
@@ -384,56 +408,37 @@ function TemplateCatalogCard({ locale, template, editorBasePath, busyTemplateId,
 
   return (
     <article className={styles.templateCard}>
-      <TemplatePreview template={template} />
+      <TemplatePhonePreviewCard
+        className={styles.previewCard}
+        title={template.title}
+        shortDescription={template.shortDescription}
+        previewUrl={template.previewAsset?.url}
+        previewContentType={template.previewAsset?.contentType}
+        tokenCost={template.tokenCost}
+        category={template.category}
+        isPremium={template.isPremium}
+        referenceDurationSeconds={template.referenceVideoDurationSeconds}
+        promoBadge={template.effectivePromoBadge}
+      />
       <div className={styles.cardBody}>
-        <div className={styles.cardTitleRow}>
-          <div>
-            <h2>{template.title}</h2>
-            <p>{template.category}</p>
-          </div>
+        <div className={styles.cardFooter}>
+          <span className={styles.cardTimestamp}>{copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}</span>
           <AdminStatusBadge color={statusColors[template.status]}>{formatStatus(template.status, locale)}</AdminStatusBadge>
         </div>
-        <p className={styles.cardDescription}>{template.shortDescription}</p>
-        <div className={styles.metaRow}>
-          <span>{template.tokenCost} {copy.tokensShort}</span>
-          <span>{template.isPremium ? "Premium" : "Free"}</span>
-          <span>{formatDuration(template.referenceVideoDurationSeconds)}</span>
-        </div>
-        <div className={styles.tagRow}>
-          {template.tags.slice(0, 3).map((tag) => <span key={tag}>#{tag}</span>)}
-        </div>
-        <div className={styles.cardFooter}>
-          <span>{copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}</span>
-          <div className={styles.cardActions}>
-            <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.compactLink}>{text.editTemplate}</Link>
-            {template.status !== "Active" ? (
-              <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => onStatusChange(template.templateId, "Active")}>{text.activate}</Button>
-            ) : null}
+        {template.tags.length ? (
+          <div className={styles.tagRow}>
+            {template.tags.slice(0, 3).map((tag) => <span key={tag}>#{tag}</span>)}
           </div>
+        ) : null}
+        <div className={styles.cardActions}>
+          <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.compactLink}>{text.editTemplate}</Link>
+          {template.status !== "Active" ? (
+            <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => onStatusChange(template.templateId, "Active")}>{text.activate}</Button>
+          ) : null}
         </div>
       </div>
     </article>
   );
-}
-
-function TemplatePreview({ template }: { template: AdminTemplateListItem }) {
-  const asset = template.previewAsset;
-
-  if (!asset?.url) {
-    return (
-      <div className={styles.previewFallback} data-template-type={template.templateType}>
-        <span>{template.title.slice(0, 2).toUpperCase()}</span>
-      </div>
-    );
-  }
-
-  if (asset.contentType.startsWith("video/")) {
-    return (
-      <video className={styles.previewMedia} src={asset.url} muted playsInline preload="metadata" aria-label={template.title} />
-    );
-  }
-
-  return <Image className={styles.previewMedia} src={asset.url} alt={template.title} width={640} height={400} sizes="(max-width: 760px) 100vw, 18rem" unoptimized />;
 }
 
 function StatLine({ label, value }: { label: string; value: number }) {

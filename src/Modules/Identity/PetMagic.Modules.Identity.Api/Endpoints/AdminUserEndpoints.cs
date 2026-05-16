@@ -19,6 +19,7 @@ public static class AdminUserEndpoints
             .RequireAuthorization("ModeratorOrAdmin");
 
         group.MapGet("/", ListUsersAsync);
+        group.MapPost("/emails", SendBulkEmailAsync).RequireAuthorization("AdminOnly");
         group.MapPut("/{userId:guid}/role", AssignRoleAsync).RequireAuthorization("AdminOnly");
         group.MapDelete("/{userId:guid}/role", RevokeRoleAsync).RequireAuthorization("AdminOnly");
         group.MapPut("/{userId:guid}/premium", SetPremiumStatusAsync);
@@ -145,6 +146,28 @@ public static class AdminUserEndpoints
         return TypedResults.NoContent();
     }
 
+    private static async Task<Results<Accepted, ValidationProblem, ProblemHttpResult>> SendBulkEmailAsync(
+        [FromBody] SendBulkEmailRequest request,
+        [FromServices] IValidator<SendBulkEmailCommand> validator,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new SendBulkEmailCommand(request.Audience, request.Subject, request.Body, request.UserIds);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.SendBulkEmailAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Accepted((string?)null);
+    }
+
     public sealed record AssignRoleRequest(string Role);
 
     public sealed record RevokeRoleRequest(string Role);
@@ -152,4 +175,6 @@ public static class AdminUserEndpoints
     public sealed record SetPremiumStatusRequest(bool IsPremium);
 
     public sealed record SetActiveStatusRequest(bool IsActive);
+
+    public sealed record SendBulkEmailRequest(string Audience, string Subject, string Body, IReadOnlyList<Guid>? UserIds);
 }

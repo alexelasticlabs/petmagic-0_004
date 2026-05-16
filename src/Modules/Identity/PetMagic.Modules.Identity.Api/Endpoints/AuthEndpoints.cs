@@ -15,6 +15,7 @@ public static class AuthEndpoints
 {
     private const string InvalidSubjectCode = "auth.invalid_subject";
     private const string RefreshTokenOwnershipViolationCode = "auth.refresh_token_not_owned";
+    private const string EmailNotConfirmedCode = "auth.email_not_confirmed";
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -26,6 +27,18 @@ public static class AuthEndpoints
             .AllowAnonymous();
 
         group.MapPost("/login", LoginAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/email-confirmation/request", RequestEmailConfirmationAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/email-confirmation/confirm", ConfirmEmailAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/password-reset/request", RequestPasswordResetAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/password-reset/confirm", ConfirmPasswordResetAsync)
             .AllowAnonymous();
 
         group.MapPost("/refresh", RefreshAsync)
@@ -82,10 +95,98 @@ public static class AuthEndpoints
         var result = await service.LoginAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status401Unauthorized);
+            var statusCode = string.Equals(result.Error.Code, EmailNotConfirmedCode, StringComparison.Ordinal)
+                ? StatusCodes.Status403Forbidden
+                : StatusCodes.Status401Unauthorized;
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Accepted, ValidationProblem, ProblemHttpResult>> RequestEmailConfirmationAsync(
+        RequestEmailConfirmationCommand command,
+        IValidator<RequestEmailConfirmationCommand> validator,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.RequestEmailConfirmationAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Accepted((string?)null);
+    }
+
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> ConfirmEmailAsync(
+        ConfirmEmailCommand command,
+        IValidator<ConfirmEmailCommand> validator,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ConfirmEmailAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Accepted, ValidationProblem, ProblemHttpResult>> RequestPasswordResetAsync(
+        RequestPasswordResetCommand command,
+        IValidator<RequestPasswordResetCommand> validator,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.RequestPasswordResetAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Accepted((string?)null);
+    }
+
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> ConfirmPasswordResetAsync(
+        ConfirmPasswordResetCommand command,
+        IValidator<ConfirmPasswordResetCommand> validator,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ConfirmPasswordResetAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
     }
 
     private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> RefreshAsync(

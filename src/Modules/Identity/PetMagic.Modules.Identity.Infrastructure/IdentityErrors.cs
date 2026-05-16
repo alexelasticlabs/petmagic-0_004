@@ -16,6 +16,16 @@ public static class IdentityErrors
 
     public static readonly Error ExternalEmailMissing = new("auth.external_email_missing", "External provider did not supply an email.");
 
+    public static readonly Error EmailNotConfirmed = new("auth.email_not_confirmed", "Email address is not confirmed.");
+
+    public static readonly Error EmailCodeInvalid = new("auth.email_code_invalid", "Email confirmation code is invalid.");
+
+    public static readonly Error PasswordResetCodeInvalid = new("auth.password_reset_code_invalid", "Password reset code is invalid.");
+
+    public static readonly Error EmailProviderNotConfigured = new("email.not_configured", "SMTP provider is not configured.");
+
+    public static readonly Error EmailDispatchFailed = new("email.dispatch_failed", "Email delivery failed.");
+
     public static readonly Error UserNotFound = new("users.not_found", "User not found.");
 
     public static readonly Error RoleNotAllowed = new("users.role_not_allowed", "Only Admin can assign Admin or Moderator roles.");

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Infrastructure.Data;
@@ -15,6 +16,10 @@ public sealed class IdentityDbContext : IdentityDbContext<AppUser, IdentityRole<
     public DbSet<RefreshTokenSession> RefreshTokenSessions => Set<RefreshTokenSession>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    public DbSet<UserEmailCode> UserEmailCodes => Set<UserEmailCode>();
+
+    public DbSet<EmailDispatchJob> EmailDispatchJobs => Set<EmailDispatchJob>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -50,6 +55,34 @@ public sealed class IdentityDbContext : IdentityDbContext<AppUser, IdentityRole<
             entity.Property(x => x.Action).HasMaxLength(120).IsRequired();
             entity.Property(x => x.Details).HasMaxLength(2000);
             entity.HasIndex(x => x.OccurredAtUtc);
+        });
+
+        builder.Entity<UserEmailCode>(entity =>
+        {
+            entity.ToTable("user_email_codes");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).HasMaxLength(320).IsRequired();
+            entity.Property(x => x.CodeHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Purpose).HasConversion<int>().IsRequired();
+            entity.HasIndex(x => new { x.UserId, x.Purpose, x.ExpiresAtUtc });
+            entity.HasIndex(x => new { x.Email, x.Purpose, x.ConsumedAtUtc });
+        });
+
+        builder.Entity<EmailDispatchJob>(entity =>
+        {
+            entity.ToTable("email_dispatch_jobs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.RecipientEmail).HasMaxLength(320).IsRequired();
+            entity.Property(x => x.Subject).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.HtmlBody).HasMaxLength(20000).IsRequired();
+            entity.Property(x => x.TextBody).HasMaxLength(20000).IsRequired();
+            entity.Property(x => x.Kind).HasConversion<int>().IsRequired();
+            entity.Property(x => x.Status).HasConversion<int>().IsRequired();
+            entity.Property(x => x.FailureCode).HasMaxLength(120);
+            entity.Property(x => x.FailureMessage).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
+            entity.HasIndex(x => x.NextAttemptAtUtc);
+            entity.HasIndex(x => x.UserId);
         });
     }
 }

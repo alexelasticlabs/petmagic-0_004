@@ -33,6 +33,7 @@
     <ProjectReference Include="..\..\src\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Domain\PetMagic.Modules.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Infrastructure\PetMagic.Modules.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Api\PetMagic.Modules.Templates.Api.csproj" />
     <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Application\PetMagic.Modules.Templates.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Domain\PetMagic.Modules.Templates.Domain.csproj" />

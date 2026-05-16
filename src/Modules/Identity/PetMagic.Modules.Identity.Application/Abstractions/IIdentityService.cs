@@ -9,6 +9,14 @@ public interface IIdentityService
 
     Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken);
 
+    Task<Result> RequestEmailConfirmationAsync(RequestEmailConfirmationCommand command, CancellationToken cancellationToken);
+
+    Task<Result> ConfirmEmailAsync(ConfirmEmailCommand command, CancellationToken cancellationToken);
+
+    Task<Result> RequestPasswordResetAsync(RequestPasswordResetCommand command, CancellationToken cancellationToken);
+
+    Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken);
+
     Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken);
 
     Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken);
@@ -18,6 +26,8 @@ public interface IIdentityService
     Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken);
 
     Task<Result<IReadOnlyList<UserListItemResponse>>> ListUsersAsync(CancellationToken cancellationToken);
+
+    Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken);
 
     Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken);
 

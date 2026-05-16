@@ -4,3 +4,66 @@ GET {{PetMagic.Host.Api_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+POST {{PetMagic.Host.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+	"email": "demo.user@petmagic.app",
+	"password": "StrongPassword123",
+	"displayName": "Demo User"
+}
+
+###
+
+POST {{PetMagic.Host.Api_HostAddress}}/api/auth/email-confirmation/request
+Content-Type: application/json
+
+{
+	"email": "demo.user@petmagic.app"
+}
+
+###
+
+POST {{PetMagic.Host.Api_HostAddress}}/api/auth/email-confirmation/confirm
+Content-Type: application/json
+
+{
+	"email": "demo.user@petmagic.app",
+	"code": "123456"
+}
+
+###
+
+POST {{PetMagic.Host.Api_HostAddress}}/api/auth/password-reset/request
+Content-Type: application/json
+
+{
+	"email": "demo.user@petmagic.app"
+}
+
+###
+
+POST {{PetMagic.Host.Api_HostAddress}}/api/auth/password-reset/confirm
+Content-Type: application/json
+
+{
+	"email": "demo.user@petmagic.app",
+	"code": "123456",
+	"newPassword": "AnotherStrong123"
+}
+
+###
+
+POST {{PetMagic.Host.Api_HostAddress}}/api/admin/users/emails
+Content-Type: application/json
+Authorization: Bearer {{admin_access_token}}
+
+{
+	"audience": "all-active",
+	"subject": "PetMagic update",
+	"body": "Hello from PetMagic admin mailings.",
+	"userIds": null
+}
+
+###

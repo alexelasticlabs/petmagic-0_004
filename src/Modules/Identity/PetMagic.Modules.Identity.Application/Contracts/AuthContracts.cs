@@ -4,6 +4,14 @@ public sealed record RegisterUserCommand(string Email, string Password, string? 
 
 public sealed record LoginCommand(string Email, string Password);
 
+public sealed record RequestEmailConfirmationCommand(string Email);
+
+public sealed record ConfirmEmailCommand(string Email, string Code);
+
+public sealed record RequestPasswordResetCommand(string Email);
+
+public sealed record ConfirmPasswordResetCommand(string Email, string Code, string NewPassword);
+
 public sealed record RefreshTokenCommand(string RefreshToken);
 
 public sealed record LogoutCommand(Guid UserId, string RefreshToken);
@@ -25,6 +33,7 @@ public sealed record UserProfileResponse(
     string Email,
     string? DisplayName,
     bool IsPremium,
+    bool EmailConfirmed,
     IReadOnlyList<string> Roles);
 
 public sealed record UserListItemResponse(
@@ -33,8 +42,26 @@ public sealed record UserListItemResponse(
     string? DisplayName,
     bool IsPremium,
     bool IsActive,
+    bool EmailConfirmed,
     IReadOnlyList<string> Roles,
     DateTime CreatedAtUtc);
+
+public sealed record SendBulkEmailCommand(
+    string Audience,
+    string Subject,
+    string Body,
+    IReadOnlyList<Guid>? UserIds);
+
+public static class EmailAudiences
+{
+    public const string AllActive = "all-active";
+
+    public const string Premium = "premium";
+
+    public const string Selected = "selected";
+
+    public static IReadOnlyList<string> All { get; } = [AllActive, Premium, Selected];
+}
 
 public sealed record AssignRoleCommand(Guid UserId, string Role);
 

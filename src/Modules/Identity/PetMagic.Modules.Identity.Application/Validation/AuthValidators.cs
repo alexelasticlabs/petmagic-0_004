@@ -27,6 +27,52 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
     }
 }
 
+public sealed class RequestEmailConfirmationCommandValidator : AbstractValidator<RequestEmailConfirmationCommand>
+{
+    public RequestEmailConfirmationCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+    }
+}
+
+public sealed class ConfirmEmailCommandValidator : AbstractValidator<ConfirmEmailCommand>
+{
+    public ConfirmEmailCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Code)
+            .NotEmpty()
+            .MinimumLength(6)
+            .MaximumLength(12);
+    }
+}
+
+public sealed class RequestPasswordResetCommandValidator : AbstractValidator<RequestPasswordResetCommand>
+{
+    public RequestPasswordResetCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+    }
+}
+
+public sealed class ConfirmPasswordResetCommandValidator : AbstractValidator<ConfirmPasswordResetCommand>
+{
+    public ConfirmPasswordResetCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Code)
+            .NotEmpty()
+            .MinimumLength(6)
+            .MaximumLength(12);
+        RuleFor(x => x.NewPassword)
+            .NotEmpty()
+            .MinimumLength(10)
+            .Matches("[A-Z]").WithMessage("Password must contain at least one uppercase letter.")
+            .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter.")
+            .Matches("[0-9]").WithMessage("Password must contain at least one digit.");
+    }
+}
+
 public sealed class RefreshTokenCommandValidator : AbstractValidator<RefreshTokenCommand>
 {
     public RefreshTokenCommandValidator()
@@ -90,5 +136,30 @@ public sealed class SetUserActiveStatusCommandValidator : AbstractValidator<SetU
     public SetUserActiveStatusCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty();
+    }
+}
+
+public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEmailCommand>
+{
+    public SendBulkEmailCommandValidator()
+    {
+        RuleFor(x => x.Audience)
+            .NotEmpty()
+            .Must(audience => EmailAudiences.All.Contains(audience, StringComparer.OrdinalIgnoreCase))
+            .WithMessage("Audience is not supported.");
+
+        RuleFor(x => x.Subject)
+            .NotEmpty()
+            .MaximumLength(200);
+
+        RuleFor(x => x.Body)
+            .NotEmpty()
+            .MaximumLength(10000);
+
+        RuleFor(x => x.UserIds)
+            .Must((command, userIds) =>
+                !string.Equals(command.Audience, EmailAudiences.Selected, StringComparison.OrdinalIgnoreCase)
+                || (userIds is { Count: > 0 } && userIds.All(id => id != Guid.Empty)))
+            .WithMessage("Selected audience requires at least one user id.");
     }
 }

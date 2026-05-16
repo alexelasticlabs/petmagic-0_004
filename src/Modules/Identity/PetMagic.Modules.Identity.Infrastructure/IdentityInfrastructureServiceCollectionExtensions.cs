@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Domain.Enums;
@@ -18,13 +19,14 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 
 public static class IdentityInfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddIdentityInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddIdentityInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<BootstrapAdminOptions>(configuration.GetSection(BootstrapAdminOptions.SectionName));
 
         var externalAuth = configuration.GetSection(ExternalAuthOptions.SectionName).Get<ExternalAuthOptions>() ?? new ExternalAuthOptions();
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+        var emailOptions = BuildEmailOptions(configuration.GetSection(EmailOptions.SectionName));
 
         services.AddDbContext<IdentityDbContext>(options =>
         {
@@ -37,6 +39,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
                 options.Password.RequireDigit = true;
                 options.Password.RequireUppercase = true;
                 options.Password.RequireLowercase = true;
+                options.Password.RequireNonAlphanumeric = false;
                 options.User.RequireUniqueEmail = true;
                 options.Lockout.MaxFailedAccessAttempts = 8;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
@@ -72,6 +75,13 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             .AddPolicy("AdminOnly", policy => policy.RequireRole(SystemRoles.Admin))
             .AddPolicy("ModeratorOrAdmin", policy => policy.RequireRole(SystemRoles.Moderator, SystemRoles.Admin));
 
+        ValidateProductionEmailConfiguration(emailOptions, environment);
+
+        services.AddSingleton(emailOptions);
+        services.AddSingleton<IIdentityEmailTemplateRenderer, IdentityEmailTemplateRenderer>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<EmailDispatchProcessor>();
+        services.AddHostedService<EmailDispatchWorker>();
         services.AddScoped<IIdentityService, IdentityService>();
 
         return services;
@@ -110,6 +120,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         {
             Id = Guid.NewGuid(),
             Email = options.Email,
+            EmailConfirmed = true,
             UserName = options.Email,
             DisplayName = options.DisplayName,
             IsActive = true,
@@ -163,5 +174,72 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         options.ClaimActions.MapJsonKey("email", "email");
         options.ClaimActions.MapJsonKey("name", "name");
         options.SaveTokens = true;
+    }
+
+    private static EmailOptions BuildEmailOptions(IConfigurationSection section)
+    {
+        return new EmailOptions
+        {
+            Host = ReadValue(section, "Host", "EMAIL_HOST") ?? string.Empty,
+            Port = ParseInt(ReadValue(section, "Port", "EMAIL_PORT"), 2525),
+            Username = ReadValue(section, "Username", "EMAIL_USERNAME") ?? string.Empty,
+            Password = ReadValue(section, "Password", "EMAIL_PASSWORD") ?? string.Empty,
+            UseSsl = ParseBool(ReadValue(section, "UseSsl", "EMAIL_USE_SSL"), true),
+            FromAddress = ReadValue(section, "FromAddress", "EMAIL_FROM_ADDRESS") ?? "no-reply@petmagic.local",
+            FromName = ReadValue(section, "FromName", "EMAIL_FROM_NAME") ?? "PetMagic",
+            VerificationCodeLength = ParseInt(section["VerificationCodeLength"], 6),
+            VerificationCodeTtlMinutes = ParseInt(section["VerificationCodeTtlMinutes"], 15),
+            PasswordResetCodeTtlMinutes = ParseInt(section["PasswordResetCodeTtlMinutes"], 15),
+            ConfirmationResendCooldownSeconds = ParseInt(section["ConfirmationResendCooldownSeconds"], 60),
+            DispatchWorkerEnabled = ParseBool(section["DispatchWorkerEnabled"], true),
+            DispatchPollIntervalMilliseconds = ParseInt(section["DispatchPollIntervalMilliseconds"], 1_000),
+            MaxDispatchAttempts = ParsePositiveInt(section["MaxDispatchAttempts"], 3),
+            RetryDelaySeconds = ParseNonNegativeInt(section["RetryDelaySeconds"], 30),
+            CompletedDispatchRetentionDays = ParseInt(section["CompletedDispatchRetentionDays"], 7)
+        };
+    }
+
+    private static string? ReadValue(IConfigurationSection section, string key, string environmentVariableName)
+    {
+        var configured = section[key];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        return Environment.GetEnvironmentVariable(environmentVariableName);
+    }
+
+    private static int ParseInt(string? rawValue, int fallback)
+    {
+        return int.TryParse(rawValue, out var parsed) ? parsed : fallback;
+    }
+
+    private static int ParsePositiveInt(string? rawValue, int fallback)
+    {
+        return int.TryParse(rawValue, out var parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private static int ParseNonNegativeInt(string? rawValue, int fallback)
+    {
+        return int.TryParse(rawValue, out var parsed) && parsed >= 0 ? parsed : fallback;
+    }
+
+    private static bool ParseBool(string? rawValue, bool fallback)
+    {
+        return bool.TryParse(rawValue, out var parsed) ? parsed : fallback;
+    }
+
+    private static void ValidateProductionEmailConfiguration(EmailOptions options, IHostEnvironment? environment)
+    {
+        if (environment is null || environment.IsDevelopment() || !options.DispatchWorkerEnabled)
+        {
+            return;
+        }
+
+        if (!options.IsConfigured)
+        {
+            throw new InvalidOperationException("Email dispatch worker is enabled but SMTP configuration is incomplete.");
+        }
     }
 }
