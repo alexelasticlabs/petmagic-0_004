@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -28,6 +29,7 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 
 public sealed class TemplatesApiIntegrationTests
 {
+    private static readonly Guid TestUserId = Guid.Parse("35E91443-4E1A-4DF2-8CF7-7C95662324B4");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
@@ -284,6 +286,190 @@ public sealed class TemplatesApiIntegrationTests
         Assert.Contains("templates.reference_duration_required", body);
     }
 
+    [Fact]
+    public async Task VideoGenerationFlow_ShouldUploadSourceCreateCompletedJobAndFetchResult()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "preview.mp4",
+            "video/mp4",
+            TemplateAssetKind.Preview,
+            "preview-video-content"u8.ToArray());
+
+        var referenceAsset = await UploadMediaAsync(
+            application.Client,
+            "reference.mp4",
+            "video/mp4",
+            TemplateAssetKind.ReferenceMotion,
+            "reference-video-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/video",
+            new CreateVideoTemplateCommand(
+                "Viral Dance",
+                "Funny dance template",
+                "Dance",
+                ["viral", "dance"],
+                true,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                "Meme soundtrack",
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                new TemplateAssetCommand(referenceAsset.Url, referenceAsset.FileName, referenceAsset.ContentType, referenceAsset.FileSizeBytes, referenceAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "Funny dance.",
+                true,
+                TemplateStatus.Active.ToString()));
+
+        var queued = await UploadGenerationSourceAsync(
+            application.Client,
+            created.TemplateId,
+            "pet.jpg",
+            "image/jpeg",
+            "source-pet-image"u8.ToArray());
+
+        Assert.Equal(TestUserId, queued.UserId);
+        Assert.Equal(created.TemplateId, queued.TemplateId);
+        Assert.Equal("Queued", queued.Status);
+        Assert.Null(queued.StartedAtUtc);
+        Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
+
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
+
+        Assert.Equal(TestUserId, generation.UserId);
+        Assert.Equal(created.TemplateId, generation.TemplateId);
+        Assert.Equal("Completed", generation.Status);
+        Assert.Equal(60, generation.TokenCost);
+        Assert.Equal("pet.jpg", generation.SourceImageAsset.FileName);
+        Assert.Equal(generation.SourceImageAsset.Url, generation.NormalizedImageUrl);
+        Assert.Equal(referenceAsset.Url, generation.ReferenceMotionUrl);
+        Assert.EndsWith($"generated-{generation.GenerationId:N}.mp4", generation.OutputUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(generation.FailureCode);
+        Assert.Empty(application.Billing.RefundedGenerationIds);
+
+        var fetched = await GetFromJsonAsync<TemplateGenerationResponse>(
+            application.Client,
+            $"/api/templates/generations/{generation.GenerationId}");
+
+        Assert.Equal(generation.GenerationId, fetched.GenerationId);
+        Assert.Equal("Completed", fetched.Status);
+        Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
+    }
+
+    [Fact]
+    public async Task VideoGenerationFlow_ShouldRejectDraftTemplateAndCleanupUploadedSource()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "preview.mp4",
+            "video/mp4",
+            TemplateAssetKind.Preview,
+            "preview-video-content"u8.ToArray());
+
+        var referenceAsset = await UploadMediaAsync(
+            application.Client,
+            "reference.mp4",
+            "video/mp4",
+            TemplateAssetKind.ReferenceMotion,
+            "reference-video-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/video",
+            new CreateVideoTemplateCommand(
+                "Draft Dance",
+                "Draft dance template",
+                "Dance",
+                ["draft"],
+                false,
+                40,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                new TemplateAssetCommand(referenceAsset.Url, referenceAsset.FileName, referenceAsset.ContentType, referenceAsset.FileSizeBytes, referenceAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                "fal-ai/kling-video/v3/standard/motion-control",
+                "Dance prompt.",
+                true,
+                TemplateStatus.Draft.ToString()));
+
+        using var multipart = new MultipartFormDataContent();
+        using var fileContent = new ByteArrayContent("source-pet-image"u8.ToArray());
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        multipart.Add(fileContent, "sourceImage", "pet.jpg");
+
+        using var response = await application.Client.PostAsync($"/api/templates/{created.TemplateId}/generations", multipart);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains("templates.invalid_status", body);
+        Assert.Single(application.MediaStorage.DeletedUrls);
+        Assert.Empty(application.Billing.ChargedGenerationIds);
+    }
+
+    [Fact]
+    public async Task VideoGenerationFlow_ShouldRefundCharge_WhenGeneratedMediaImportFails()
+    {
+        await using var application = await TestApplication.CreateAsync(failGeneratedMediaImport: true);
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "preview.mp4",
+            "video/mp4",
+            TemplateAssetKind.Preview,
+            "preview-video-content"u8.ToArray());
+
+        var referenceAsset = await UploadMediaAsync(
+            application.Client,
+            "reference.mp4",
+            "video/mp4",
+            TemplateAssetKind.ReferenceMotion,
+            "reference-video-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/video",
+            new CreateVideoTemplateCommand(
+                "Refund Dance",
+                "Refund on failed generation",
+                "Dance",
+                ["refund"],
+                true,
+                45,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                new TemplateAssetCommand(referenceAsset.Url, referenceAsset.FileName, referenceAsset.ContentType, referenceAsset.FileSizeBytes, referenceAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                "fal-ai/kling-video/v3/standard/motion-control",
+                "Dance prompt.",
+                true,
+                TemplateStatus.Active.ToString()));
+
+        var queued = await UploadGenerationSourceAsync(
+            application.Client,
+            created.TemplateId,
+            "pet.jpg",
+            "image/jpeg",
+            "source-pet-image"u8.ToArray());
+
+        var failed = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Failed");
+
+        Assert.Equal("templates.generated_media_import_failed", failed.FailureCode);
+        Assert.Null(failed.OutputUrl);
+        Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
+        Assert.Contains(queued.GenerationId, application.Billing.RefundedGenerationIds);
+    }
+
     private static async Task<TemplateAssetResponse> UploadMediaAsync(
         HttpClient client,
         string fileName,
@@ -301,6 +487,41 @@ public sealed class TemplatesApiIntegrationTests
         response.EnsureSuccessStatusCode();
 
         return await ReadJsonAsync<TemplateAssetResponse>(response);
+    }
+
+    private static async Task<TemplateGenerationResponse> UploadGenerationSourceAsync(
+        HttpClient client,
+        Guid templateId,
+        string fileName,
+        string contentType,
+        byte[] content)
+    {
+        using var multipart = new MultipartFormDataContent();
+        using var fileContent = new ByteArrayContent(content);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        multipart.Add(fileContent, "sourceImage", fileName);
+
+        using var response = await client.PostAsync($"/api/templates/{templateId}/generations", multipart);
+        await EnsureSuccessStatusCodeAsync(response, $"/api/templates/{templateId}/generations");
+
+        return await ReadJsonAsync<TemplateGenerationResponse>(response);
+    }
+
+    private static async Task<TemplateGenerationResponse> WaitForGenerationStatusAsync(HttpClient client, Guid generationId, string expectedStatus)
+    {
+        TemplateGenerationResponse? last = null;
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            last = await GetFromJsonAsync<TemplateGenerationResponse>(client, $"/api/templates/generations/{generationId}");
+            if (string.Equals(last.Status, expectedStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                return last;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Generation {generationId} did not reach {expectedStatus}. Last status: {last?.Status ?? "unknown"}.");
     }
 
     private static async Task<TResponse> PostAsJsonAsync<TResponse>(HttpClient client, string path, object body)
@@ -345,18 +566,21 @@ public sealed class TemplatesApiIntegrationTests
     {
         private readonly WebApplication app;
 
-        private TestApplication(WebApplication app, HttpClient client, InMemoryMediaStorage mediaStorage)
+        private TestApplication(WebApplication app, HttpClient client, InMemoryMediaStorage mediaStorage, TestTemplateGenerationBilling billing)
         {
             this.app = app;
             Client = client;
             MediaStorage = mediaStorage;
+            Billing = billing;
         }
 
         public HttpClient Client { get; }
 
         public InMemoryMediaStorage MediaStorage { get; }
 
-        public static async Task<TestApplication> CreateAsync()
+        public TestTemplateGenerationBilling Billing { get; }
+
+        public static async Task<TestApplication> CreateAsync(bool failGeneratedMediaImport = false)
         {
             var databaseRoot = new InMemoryDatabaseRoot();
             var databaseName = $"templates-api-tests-{Guid.NewGuid():N}";
@@ -412,13 +636,23 @@ public sealed class TemplatesApiIntegrationTests
                 PreviewMaxFileSizeBytes = 5 * 1024 * 1024,
                 ReferenceMotionMaxFileSizeBytes = 5 * 1024 * 1024,
                 SeedSampleTemplates = false,
+                GenerationWorkerPollIntervalMilliseconds = 10,
+                GeneratedVideoMaxFileSizeBytes = 5 * 1024 * 1024,
             });
 
             var mediaStorage = new InMemoryMediaStorage();
+            var billing = new TestTemplateGenerationBilling();
             builder.Services.AddSingleton<IMediaStorage>(mediaStorage);
             builder.Services.AddSingleton<IMediaMetadataReader, TestMediaMetadataReader>();
             builder.Services.AddSingleton<ITemplateMediaUploadPolicy>(new FixedTemplateMediaUploadPolicy());
+            builder.Services.AddSingleton<IImagePreprocessor, TestImagePreprocessor>();
+            builder.Services.AddSingleton<IVideoMotionGenerator, TestVideoMotionGenerator>();
+            builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
+            builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
+            builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+            builder.Services.AddScoped<TemplateGenerationJobProcessor>();
+            builder.Services.AddHostedService<TemplateGenerationWorker>();
             builder.Services.AddTemplatesApiModule();
 
             var app = builder.Build();
@@ -432,7 +666,7 @@ public sealed class TemplatesApiIntegrationTests
             var client = app.GetTestClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName);
 
-            return new TestApplication(app, client, mediaStorage);
+            return new TestApplication(app, client, mediaStorage, billing);
         }
 
         public async ValueTask DisposeAsync()
@@ -445,9 +679,9 @@ public sealed class TemplatesApiIntegrationTests
 
     private sealed class InMemoryMediaStorage : IMediaStorage
     {
-        private readonly Dictionary<string, StoredMediaResponse> assets = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, StoredMediaResponse> assets = new(StringComparer.OrdinalIgnoreCase);
 
-        public List<string> DeletedUrls { get; } = [];
+        public ConcurrentBag<string> DeletedUrls { get; } = [];
 
         public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
@@ -459,7 +693,7 @@ public sealed class TemplatesApiIntegrationTests
 
         public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
         {
-            assets.Remove(assetUrl);
+            assets.TryRemove(assetUrl, out _);
             DeletedUrls.Add(assetUrl);
             return Task.FromResult(Result.Success());
         }
@@ -490,6 +724,63 @@ public sealed class TemplatesApiIntegrationTests
         public long GetMaxFileSizeBytes(TemplateAssetKind assetKind) => 5 * 1024 * 1024;
     }
 
+    private sealed class TestImagePreprocessor : IImagePreprocessor
+    {
+        public Task<Result<string>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(originalImageUrl));
+        }
+    }
+
+    private sealed class TestVideoMotionGenerator : IVideoMotionGenerator
+    {
+        public Task<Result<string>> CreateAsync(
+            string normalizedImageUrl,
+            string referenceVideoUrl,
+            string characterOrientation,
+            bool keepOriginalSound,
+            string prompt,
+            string model,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success($"https://fal.example.test/generated/{Guid.NewGuid():N}.mp4"));
+        }
+    }
+
+    private sealed class TestGeneratedMediaImporter(IMediaStorage mediaStorage, bool shouldFail) : IGeneratedMediaImporter
+    {
+        public Task<Result<StoredMediaResponse>> ImportVideoAsync(string generatedVideoUrl, Guid generationId, CancellationToken cancellationToken)
+        {
+            if (shouldFail)
+            {
+                return Task.FromResult(Result.Failure<StoredMediaResponse>(new Error("templates.generated_media_import_failed", "Generated media import failed.")));
+            }
+
+            return mediaStorage.StoreAsync(
+                new MediaUploadCommand($"generated-{generationId:N}.mp4", "video/mp4", "generated-video-content"u8.ToArray()),
+                cancellationToken);
+        }
+    }
+
+    private sealed class TestTemplateGenerationBilling : ITemplateGenerationBilling
+    {
+        public ConcurrentBag<Guid> ChargedGenerationIds { get; } = [];
+
+        public ConcurrentBag<Guid> RefundedGenerationIds { get; } = [];
+
+        public Task<Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
+        {
+            ChargedGenerationIds.Add(generationId);
+            return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
+        {
+            RefundedGenerationIds.Add(generationId);
+            return Task.FromResult(Result.Success());
+        }
+    }
+
     private sealed class TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -501,7 +792,7 @@ public sealed class TemplatesApiIntegrationTests
         {
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, "integration-test-user"),
+                new Claim(ClaimTypes.NameIdentifier, TestUserId.ToString()),
                 new Claim(ClaimTypes.Name, "integration-test-user"),
                 new Claim(ClaimTypes.Role, "Admin"),
             };

@@ -15,6 +15,30 @@ namespace PetMagic.Modules.Identity.Tests.Economy;
 public sealed class EconomyServiceTests
 {
     [Fact]
+    public async Task CreditAsync_ShouldIncreaseWalletAndAppendLedgerEntry()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var result = await service.CreditAsync(
+            new CreditBalanceCommand(userId, 60, "generation_refund", "template_generation:test"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(60, result.Value.NewBalance);
+
+        var wallet = await dbContext.Wallets.FirstAsync(x => x.UserId == userId);
+        var ledger = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+
+        Assert.Equal(60, wallet.Balance);
+        Assert.Equal(60, ledger.Delta);
+        Assert.Equal("generation_refund", ledger.Source);
+        Assert.Equal("template_generation:test", ledger.Reason);
+    }
+
+    [Fact]
     public async Task ConfirmPackPurchase_ShouldCreditWalletOnce()
     {
         await using var dbContext = CreateDbContext();
@@ -99,7 +123,7 @@ public sealed class EconomyServiceTests
         var eventId = $"evt_{Guid.NewGuid():N}";
         var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{createResult.Value.ExternalPaymentId}\",\"object\":\"checkout.session\",\"metadata\":{{\"order_id\":\"{createResult.Value.OrderId:D}\"}}}}}}}}";
-        var signature = BuildStripeSignature(payload, "whsec_test_secret");
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var first = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
         var second = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
@@ -121,8 +145,8 @@ public sealed class EconomyServiceTests
             WeeklyPremiumSpark = 250,
             AdRewardSpark = 15,
             AdRewardDailyLimit = 5,
-            StripeSecretKey = "sk_test_change_me",
-            StripeWebhookSecret = "whsec_test_secret",
+            StripeSecretKey = "test_stripe_secret_key",
+            StripeWebhookSecret = "test_webhook_secret",
             StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
             StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel"
         });

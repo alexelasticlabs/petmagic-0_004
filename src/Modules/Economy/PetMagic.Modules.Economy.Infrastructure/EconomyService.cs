@@ -73,6 +73,11 @@ public sealed class EconomyService(
 
     public async Task<Result<WalletOperationResponse>> SpendAsync(SpendBalanceCommand command, CancellationToken cancellationToken)
     {
+        if (command.Amount <= 0)
+        {
+            return Result.Failure<WalletOperationResponse>(EconomyErrors.InvalidAmount);
+        }
+
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         if (wallet.Balance < command.Amount)
         {
@@ -81,6 +86,21 @@ public sealed class EconomyService(
 
         var now = DateTime.UtcNow;
         var response = ApplyWalletDelta(wallet, -command.Amount, WalletLedgerSource.GenerationSpend, command.Reason, now);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(response);
+    }
+
+    public async Task<Result<WalletOperationResponse>> CreditAsync(CreditBalanceCommand command, CancellationToken cancellationToken)
+    {
+        if (command.Amount <= 0)
+        {
+            return Result.Failure<WalletOperationResponse>(EconomyErrors.InvalidAmount);
+        }
+
+        var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
+        var now = DateTime.UtcNow;
+        var response = ApplyWalletDelta(wallet, command.Amount, command.Source, command.Reason, now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(response);

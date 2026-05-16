@@ -21,8 +21,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             WeeklyPremiumSpark = ParseInt(section["WeeklyPremiumSpark"], 250),
             AdRewardSpark = ParseInt(section["AdRewardSpark"], 15),
             AdRewardDailyLimit = ParseInt(section["AdRewardDailyLimit"], 5),
-            StripeSecretKey = section["StripeSecretKey"] ?? "sk_test_change_me",
-            StripeWebhookSecret = section["StripeWebhookSecret"] ?? "whsec_dev_change_me",
+            StripeSecretKey = ReadValue(section, "StripeSecretKey", "STRIPE_SECRET_KEY") ?? string.Empty,
+            StripeWebhookSecret = ReadValue(section, "StripeWebhookSecret", "STRIPE_WEBHOOK_SECRET") ?? string.Empty,
             StripeCheckoutSuccessUrl = section["StripeCheckoutSuccessUrl"] ?? "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}",
             StripeCheckoutCancelUrl = section["StripeCheckoutCancelUrl"] ?? "https://petmagic.app/payments/cancel"
         };
@@ -43,6 +43,18 @@ public static class EconomyInfrastructureServiceCollectionExtensions
     private static int ParseInt(string? raw, int fallback)
     {
         return int.TryParse(raw, out var value) ? value : fallback;
+    }
+
+    private static string? ReadValue(IConfigurationSection section, string key, string environmentVariable)
+    {
+        var value = section[key];
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        value = Environment.GetEnvironmentVariable(environmentVariable);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     public static async Task EnsureEconomySeedDataAsync(this IServiceProvider serviceProvider)

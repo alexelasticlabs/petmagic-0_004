@@ -3,10 +3,12 @@
   <ItemGroup>
     <ProjectReference Include="..\PetMagic.Modules.Templates.Application\PetMagic.Modules.Templates.Application.csproj" />
     <ProjectReference Include="..\PetMagic.Modules.Templates.Domain\PetMagic.Modules.Templates.Domain.csproj" />
+    <ProjectReference Include="..\..\Economy\PetMagic.Modules.Economy.Application\PetMagic.Modules.Economy.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="3.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

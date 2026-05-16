@@ -9,6 +9,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateAsset> TemplateAssets => Set<TemplateAsset>();
 
+    public DbSet<TemplateGenerationJob> TemplateGenerationJobs => Set<TemplateGenerationJob>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<TemplateItem>(entity =>
@@ -39,6 +41,28 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.TemplateId, x.AssetKind }).IsUnique();
             entity.HasOne(x => x.Template)
                 .WithMany(x => x.Assets)
+                .HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateGenerationJob>(entity =>
+        {
+            entity.ToTable("templates_generation_jobs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status).HasConversion<int>();
+            entity.Property(x => x.SourceImageUrl).HasMaxLength(2048).IsRequired();
+            entity.Property(x => x.SourceImageFileName).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.SourceImageContentType).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.NormalizedImageUrl).HasMaxLength(2048);
+            entity.Property(x => x.ReferenceMotionUrl).HasMaxLength(2048);
+            entity.Property(x => x.OutputUrl).HasMaxLength(2048);
+            entity.Property(x => x.FailureCode).HasMaxLength(128);
+            entity.Property(x => x.FailureMessage).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.TemplateId, x.Status, x.CreatedAtUtc });
+            entity.HasOne(x => x.Template)
+                .WithMany()
                 .HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

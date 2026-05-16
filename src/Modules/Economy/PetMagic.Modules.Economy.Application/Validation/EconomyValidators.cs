@@ -29,6 +29,17 @@ public sealed class SpendBalanceCommandValidator : AbstractValidator<SpendBalanc
     }
 }
 
+public sealed class CreditBalanceCommandValidator : AbstractValidator<CreditBalanceCommand>
+{
+    public CreditBalanceCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Amount).GreaterThan(0);
+        RuleFor(x => x.Source).NotEmpty().MaximumLength(80);
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(120);
+    }
+}
+
 public sealed class CreatePackPurchaseCommandValidator : AbstractValidator<CreatePackPurchaseCommand>
 {
     public CreatePackPurchaseCommandValidator()

@@ -12,9 +12,9 @@ public sealed class EconomyOptions
 
     public int AdRewardDailyLimit { get; init; } = 5;
 
-    public string StripeSecretKey { get; init; } = "sk_test_change_me";
+    public string StripeSecretKey { get; init; } = string.Empty;
 
-    public string StripeWebhookSecret { get; init; } = "whsec_dev_change_me";
+    public string StripeWebhookSecret { get; init; } = string.Empty;
 
     public string StripeCheckoutSuccessUrl { get; init; } = "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}";
 

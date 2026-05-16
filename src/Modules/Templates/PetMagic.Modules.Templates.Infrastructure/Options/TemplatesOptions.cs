@@ -4,6 +4,10 @@ public sealed class TemplatesOptions
 {
     public const string SectionName = "Templates";
 
+    public string StorageProvider { get; init; } = TemplateStorageProviders.Local;
+
+    public string AiProvider { get; init; } = TemplateAiProviders.Fake;
+
     public required string PublicBaseUrl { get; init; }
 
     public required string LocalMediaRootPath { get; init; }
@@ -21,4 +25,63 @@ public sealed class TemplatesOptions
     public long ReferenceMotionMaxFileSizeBytes { get; init; } = 100 * 1024 * 1024;
 
     public bool SeedSampleTemplates { get; init; } = true;
+
+    public bool GenerationWorkerEnabled { get; init; } = true;
+
+    public int GenerationWorkerPollIntervalMilliseconds { get; init; } = 1_000;
+
+    public long GeneratedVideoMaxFileSizeBytes { get; init; } = 250 * 1024 * 1024;
+
+    public R2StorageOptions R2 { get; init; } = new();
+
+    public FalAiOptions Fal { get; init; } = new();
+}
+
+public static class TemplateStorageProviders
+{
+    public const string Local = "Local";
+    public const string R2 = "R2";
+}
+
+public static class TemplateAiProviders
+{
+    public const string Fake = "Fake";
+    public const string Fal = "Fal";
+}
+
+public sealed class R2StorageOptions
+{
+    public string AccountId { get; init; } = string.Empty;
+
+    public string AccessKey { get; init; } = string.Empty;
+
+    public string SecretKey { get; init; } = string.Empty;
+
+    public string BucketName { get; init; } = string.Empty;
+
+    public string PublicBaseUrl { get; init; } = string.Empty;
+
+    public string ObjectKeyPrefix { get; init; } = "templates-media";
+
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(AccountId)
+        && !string.IsNullOrWhiteSpace(AccessKey)
+        && !string.IsNullOrWhiteSpace(SecretKey)
+        && !string.IsNullOrWhiteSpace(BucketName)
+        && !string.IsNullOrWhiteSpace(PublicBaseUrl);
+}
+
+public sealed class FalAiOptions
+{
+    public string ApiKey { get; init; } = string.Empty;
+
+    public string QueueBaseUrl { get; init; } = "https://queue.fal.run";
+
+    public int StartTimeoutSeconds { get; init; } = 120;
+
+    public int PollIntervalMilliseconds { get; init; } = 2_000;
+
+    public int MaxPollingAttempts { get; init; } = 180;
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey);
 }

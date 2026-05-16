@@ -10,6 +10,8 @@ public static class EconomyErrors
 
     public static readonly Error InsufficientBalance = new("economy.insufficient_balance", "Not enough PawSpark balance.");
 
+    public static readonly Error InvalidAmount = new("economy.invalid_amount", "Wallet amount must be greater than zero.");
+
     public static readonly Error InvalidSubject = new("economy.invalid_subject", "Invalid access token subject.");
 
     public static readonly Error CurrencyPackNotFound = new("economy.pack_not_found", "Currency pack was not found.");

@@ -8,5 +8,7 @@ public static class WalletLedgerSource
 
     public const string GenerationSpend = "generation_spend";
 
+    public const string GenerationRefund = "generation_refund";
+
     public const string PackPurchase = "pack_purchase";
 }

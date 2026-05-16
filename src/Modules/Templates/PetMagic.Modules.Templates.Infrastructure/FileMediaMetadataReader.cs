@@ -33,5 +33,9 @@ internal sealed class FileMediaMetadataReader : IMediaMetadataReader
         {
             return Task.FromResult(Result.Failure<double?>(TemplatesErrors.MediaMetadataFailed));
         }
+        finally
+        {
+            TemplateMediaTempFiles.TryDeleteIfOwned(storedMedia.LocalPath);
+        }
     }
 }

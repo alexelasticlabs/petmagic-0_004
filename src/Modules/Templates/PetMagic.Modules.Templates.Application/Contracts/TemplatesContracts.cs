@@ -74,6 +74,11 @@ public sealed record UpdateVideoTemplateCommand(
 
 public sealed record ChangeTemplateStatusCommand(Guid TemplateId, string Status);
 
+public sealed record StartTemplateGenerationCommand(
+    Guid UserId,
+    Guid TemplateId,
+    TemplateAssetCommand SourceImageAsset);
+
 public sealed record StoredMediaResponse(
     string Url,
     string StorageKey,
@@ -158,3 +163,20 @@ public sealed record PublicTemplateResponse(
     TemplateAssetResponse? PreviewAsset,
     string? MusicDescription,
     double? ReferenceVideoDurationSeconds);
+
+public sealed record TemplateGenerationResponse(
+    Guid GenerationId,
+    Guid UserId,
+    Guid TemplateId,
+    string Status,
+    int TokenCost,
+    TemplateAssetResponse SourceImageAsset,
+    string? NormalizedImageUrl,
+    string? ReferenceMotionUrl,
+    string? OutputUrl,
+    string? FailureCode,
+    string? FailureMessage,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    DateTime? StartedAtUtc,
+    DateTime? CompletedAtUtc);

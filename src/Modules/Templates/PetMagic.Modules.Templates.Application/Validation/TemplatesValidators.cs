@@ -102,3 +102,16 @@ public sealed class ChangeTemplateStatusCommandValidator : AbstractValidator<Cha
         RuleFor(x => x.Status).NotEmpty().MaximumLength(32);
     }
 }
+
+public sealed class StartTemplateGenerationCommandValidator : AbstractValidator<StartTemplateGenerationCommand>
+{
+    public StartTemplateGenerationCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.TemplateId).NotEmpty();
+        RuleFor(x => x.SourceImageAsset).NotNull().SetValidator(new TemplateAssetCommandValidator());
+        RuleFor(x => x.SourceImageAsset.ContentType)
+            .Must(contentType => contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("Source image content type is invalid.");
+    }
+}

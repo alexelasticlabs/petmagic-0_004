@@ -1,0 +1,120 @@
+using Amazon.S3;
+using Amazon.S3.Model;
+using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Templates.Application.Abstractions;
+using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Infrastructure.Options;
+
+namespace PetMagic.Modules.Templates.Infrastructure;
+
+internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Client) : IMediaStorage
+{
+    public async Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+    {
+        if (asset.Content.Length == 0)
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+        }
+
+        if (!options.R2.IsConfigured)
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
+        }
+
+        string? tempPath = null;
+        var extension = Path.GetExtension(asset.FileName);
+        var storageKey = BuildObjectKey(extension);
+
+        try
+        {
+            tempPath = await TemplateMediaTempFiles.WriteAsync(asset.Content, extension, cancellationToken);
+
+            await using var stream = new MemoryStream(asset.Content, writable: false);
+            var request = new PutObjectRequest
+            {
+                BucketName = options.R2.BucketName,
+                Key = storageKey,
+                InputStream = stream,
+                ContentType = asset.ContentType,
+                DisablePayloadSigning = true,
+                DisableDefaultChecksumValidation = true
+            };
+
+            await s3Client.PutObjectAsync(request, cancellationToken);
+
+            return Result.Success(new StoredMediaResponse(
+                BuildPublicUrl(storageKey),
+                storageKey,
+                asset.FileName,
+                asset.ContentType,
+                asset.Content.LongLength,
+                tempPath));
+        }
+        catch
+        {
+            TemplateMediaTempFiles.TryDeleteIfOwned(tempPath);
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
+        }
+    }
+
+    public async Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl) || !options.R2.IsConfigured)
+        {
+            return Result.Success();
+        }
+
+        var storageKey = TryResolveManagedKey(assetUrl);
+        if (storageKey is null)
+        {
+            return Result.Success();
+        }
+
+        try
+        {
+            await s3Client.DeleteObjectAsync(options.R2.BucketName, storageKey, cancellationToken);
+            return Result.Success();
+        }
+        catch
+        {
+            return Result.Failure(TemplatesErrors.MediaStorageFailed);
+        }
+    }
+
+    private string BuildObjectKey(string extension)
+    {
+        var now = DateTime.UtcNow;
+        var prefix = NormalizePrefix(options.R2.ObjectKeyPrefix);
+        var safeExtension = string.IsNullOrWhiteSpace(extension) || extension.Length > 16
+            ? string.Empty
+            : extension;
+
+        return $"{prefix}/{now:yyyy}/{now:MM}/{Guid.NewGuid():N}{safeExtension}";
+    }
+
+    private string BuildPublicUrl(string storageKey)
+    {
+        return $"{options.R2.PublicBaseUrl.TrimEnd('/')}/{storageKey}";
+    }
+
+    private string? TryResolveManagedKey(string assetUrl)
+    {
+        var baseUrl = options.R2.PublicBaseUrl.TrimEnd('/');
+        if (!assetUrl.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var storageKey = assetUrl[baseUrl.Length..].TrimStart('/').Replace('\\', '/');
+        var prefix = NormalizePrefix(options.R2.ObjectKeyPrefix);
+        return storageKey.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase)
+            ? storageKey
+            : null;
+    }
+
+    private static string NormalizePrefix(string prefix)
+    {
+        var normalized = prefix.Trim().Trim('/').Replace('\\', '/');
+        return string.IsNullOrWhiteSpace(normalized) ? "templates-media" : normalized;
+    }
+}
