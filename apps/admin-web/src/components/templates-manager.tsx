@@ -10,7 +10,7 @@ import {
     saveImageTemplateFromForm,
     saveVideoTemplateFromForm,
 } from "@/components/templates/template-form-mappers";
-import { TemplatePhonePreviewCard } from "@/components/templates/template-phone-preview-card";
+import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
 import { TemplatePreviewAssetSection } from "@/components/templates/template-preview-asset-section";
 import { buildVideoEditorModel, formatDuration } from "@/components/templates/template-video-editor-model";
 import { TemplateReferenceAssetSection, TemplateVideoModelSection } from "@/components/templates/template-video-sections";
@@ -479,7 +479,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
             <aside className={styles.editorRail}>
               <section className={joinClassNames(styles.railCard, styles.previewRailCard)}>
                 <div className={styles.previewCardWrap}>
-                  <TemplatePhonePreviewCard
+                  <TemplatePreviewCard
                     title={editorModel.title || text.videoTemplateCreatePageTitle}
                     shortDescription={editorModel.shortDescription || text.editorPreviewRailHint}
                     tags={form.tags}

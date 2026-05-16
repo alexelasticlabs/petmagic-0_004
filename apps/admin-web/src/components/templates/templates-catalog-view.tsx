@@ -1,7 +1,7 @@
 "use client";
 
-import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
-import { TemplatePhonePreviewCard } from "@/components/templates/template-phone-preview-card";
+import { AdminCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -200,22 +200,10 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
 
   return (
     <section className={styles.catalogPage}>
-      <AdminPageHero
-        eyebrow={templateType === "Video" ? "Video templates" : "Image templates"}
-        title={copy.title}
-        description={copy.description}
-        actions={(
-          <>
-            <Link href={categoriesPath} className={styles.secondaryLink}>{copy.manageCategories}</Link>
-            <Link href={editorBasePath} className={styles.primaryLink}>{copy.createTemplate}</Link>
-          </>
-        )}
-        metaItems={[
-          copy.showing(filteredTemplates.length, catalog.stats.total),
-          `${locale === "ru" ? "Активных" : "Active"}: ${catalog.stats.active}`,
-          `${locale === "ru" ? "Категорий" : "Categories"}: ${catalog.categories.length}`,
-        ]}
-      />
+      <div className={styles.catalogActions}>
+        <Link href={categoriesPath} className={styles.secondaryLink}>{copy.manageCategories}</Link>
+        <Link href={editorBasePath} className={styles.primaryLink}>{copy.createTemplate}</Link>
+      </div>
 
       <div className={styles.tabRow} role="tablist" aria-label={copy.archiveTabsLabel}>
         <button type="button" className={archiveFilter === "active" ? styles.tabActive : styles.tab} onClick={() => setArchiveFilter("active")}>
@@ -253,7 +241,7 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
 
             <label className={styles.selectField}>
               <span>{copy.sortLabel}</span>
-              <Select value={sortMode} options={sortOptions} ariaLabel={copy.sortLabel} onChange={(value) => setSortMode(value as SortMode)} />
+              <Select value={sortMode} options={sortOptions} ariaLabel={copy.sortLabel} showSelectedDescription={false} onChange={(value) => setSortMode(value as SortMode)} />
             </label>
 
             <div className={styles.viewToggleShell}>
@@ -408,10 +396,11 @@ function TemplateCatalogCard({ locale, template, editorBasePath, busyTemplateId,
 
   return (
     <article className={styles.templateCard}>
-      <TemplatePhonePreviewCard
+      <TemplatePreviewCard
         className={styles.previewCard}
         title={template.title}
         shortDescription={template.shortDescription}
+        tags={template.tags}
         previewUrl={template.previewAsset?.url}
         previewContentType={template.previewAsset?.contentType}
         tokenCost={template.tokenCost}
@@ -425,11 +414,6 @@ function TemplateCatalogCard({ locale, template, editorBasePath, busyTemplateId,
           <span className={styles.cardTimestamp}>{copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}</span>
           <AdminStatusBadge color={statusColors[template.status]}>{formatStatus(template.status, locale)}</AdminStatusBadge>
         </div>
-        {template.tags.length ? (
-          <div className={styles.tagRow}>
-            {template.tags.slice(0, 3).map((tag) => <span key={tag}>#{tag}</span>)}
-          </div>
-        ) : null}
         <div className={styles.cardActions}>
           <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.compactLink}>{text.editTemplate}</Link>
           {template.status !== "Active" ? (

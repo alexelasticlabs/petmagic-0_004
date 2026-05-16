@@ -4,7 +4,7 @@ import { formatDuration, formatPromoBadge } from "@/components/templates/templat
 import { type TemplatePromoBadgeMode } from "@/lib/api-client";
 import Image from "next/image";
 
-type TemplatePhonePreviewCardProps = {
+type TemplatePreviewCardProps = {
   title: string;
   shortDescription: string;
   tags?: string[] | string;
@@ -19,7 +19,7 @@ type TemplatePhonePreviewCardProps = {
   className?: string;
 };
 
-export function TemplatePhonePreviewCard({
+export function TemplatePreviewCard({
   title,
   shortDescription,
   tags,
@@ -32,7 +32,7 @@ export function TemplatePhonePreviewCard({
   promoBadge,
   musicDescription,
   className,
-}: TemplatePhonePreviewCardProps) {
+}: TemplatePreviewCardProps) {
   const normalizedTitle = title.trim();
   const normalizedDescription = shortDescription.trim();
   const normalizedTags = normalizePreviewTags(tags);
@@ -143,3 +143,5 @@ function normalizePreviewTags(tags: string[] | string | undefined): string[] {
     ),
   ).slice(0, 3);
 }
+
+export { TemplatePreviewCard as TemplatePhonePreviewCard };

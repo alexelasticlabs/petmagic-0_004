@@ -16,9 +16,10 @@ type SelectProps = {
   options: readonly SelectOption[];
   onChange: (value: string) => void;
   ariaLabel?: string;
+  showSelectedDescription?: boolean;
 };
 
-export function Select({ value, options, onChange, ariaLabel }: SelectProps) {
+export function Select({ value, options, onChange, ariaLabel, showSelectedDescription = true }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -137,7 +138,7 @@ export function Select({ value, options, onChange, ariaLabel }: SelectProps) {
             <span className={styles.value}>{selectedOption?.label ?? value}</span>
             {selectedOption?.badge ? <span className={`${styles.badge} ${getBadgeToneClassName(selectedOption.tone)}`.trim()}>{selectedOption.badge}</span> : null}
           </span>
-          {selectedOption?.description ? <span className={styles.triggerDescription}>{selectedOption.description}</span> : null}
+          {showSelectedDescription && selectedOption?.description ? <span className={styles.triggerDescription}>{selectedOption.description}</span> : null}
         </span>
         <span className={styles.chevron} aria-hidden="true" />
       </button>
