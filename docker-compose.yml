@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: petmagic_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PetMagic_DevPassword123}
+      POSTGRES_DB: petmagic_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U petmagic_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - petmagic-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5000
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:-PetMagic_DevPassword123};
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-PetMagicDemoSigningKey12345DemoSigningKey}
+      Jwt__Issuer: petmagic.app
+      Jwt__Audience: petmagic-admin
+      BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL:-admin@petmagic.app}
+      BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-DemoPassword123!}
+      BootstrapAdmin__DisplayName: PetMagic Admin
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - petmagic-network
+
+  admin-web:
+    build:
+      context: ./apps/admin-web
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - petmagic-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  petmagic-network:
+    driver: bridge

@@ -1,0 +1,11 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS builder
+WORKDIR /src
+COPY ["src/", "src/"]
+RUN dotnet restore "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj"
+RUN dotnet publish "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" -c Release --no-restore -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview
+WORKDIR /app
+COPY --from=builder /app/publish .
+EXPOSE 5000
+ENTRYPOINT ["dotnet", "PetMagic.Host.Api.dll"]

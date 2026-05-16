@@ -1,0 +1,31 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/PetMagic.BuildingBlocks/PetMagic.BuildingBlocks.csproj" />
+  </Folder>
+  <Folder Name="/src/Host/">
+    <Project Path="src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+    <Folder Name="/src/Modules/Economy/">
+      <Project Path="src/Modules/Economy/PetMagic.Modules.Economy.Api/PetMagic.Modules.Economy.Api.csproj" />
+      <Project Path="src/Modules/Economy/PetMagic.Modules.Economy.Application/PetMagic.Modules.Economy.Application.csproj" />
+      <Project Path="src/Modules/Economy/PetMagic.Modules.Economy.Domain/PetMagic.Modules.Economy.Domain.csproj" />
+      <Project Path="src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/PetMagic.Modules.Economy.Infrastructure.csproj" />
+    </Folder>
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/PetMagic.Modules.Identity.Api/PetMagic.Modules.Identity.Api.csproj" />
+    <Project Path="src/Modules/Identity/PetMagic.Modules.Identity.Application/PetMagic.Modules.Identity.Application.csproj" />
+    <Project Path="src/Modules/Identity/PetMagic.Modules.Identity.Domain/PetMagic.Modules.Identity.Domain.csproj" />
+    <Project Path="src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/PetMagic.Modules.Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Templates/">
+    <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Api/PetMagic.Modules.Templates.Api.csproj" />
+    <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Application/PetMagic.Modules.Templates.Application.csproj" />
+    <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Domain/PetMagic.Modules.Templates.Domain.csproj" />
+    <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/PetMagic.Modules.Templates.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PetMagic.Modules.Identity.Tests/PetMagic.Modules.Identity.Tests.csproj" />
+  </Folder>
+</Solution>

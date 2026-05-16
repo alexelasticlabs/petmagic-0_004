@@ -1,0 +1,45 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker
+.dockerignore
+
+# Build outputs
+bin/
+obj/
+.next/
+node_modules/
+
+# Dependencies
+packages.lock.json
+**/NuGet.Config
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary
+temp/
+tmp/
+dist/
+
+# Docker Compose volumes
+postgres_data/

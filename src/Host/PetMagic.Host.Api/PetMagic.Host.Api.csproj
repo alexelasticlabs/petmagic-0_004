@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Suppress accepted known vulnerabilities: OpenTelemetry (stable), Microsoft.Build (transitive, dev-only) -->
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Enrichers.CorrelationId" Version="3.0.1" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Economy\PetMagic.Modules.Economy.Api\PetMagic.Modules.Economy.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Economy\PetMagic.Modules.Economy.Infrastructure\PetMagic.Modules.Economy.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\PetMagic.Modules.Identity.Api\PetMagic.Modules.Identity.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\PetMagic.Modules.Identity.Infrastructure\PetMagic.Modules.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Templates\PetMagic.Modules.Templates.Api\PetMagic.Modules.Templates.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\PetMagic.Modules.Templates.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

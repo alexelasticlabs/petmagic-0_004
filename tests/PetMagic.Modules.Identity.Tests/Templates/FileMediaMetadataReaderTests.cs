@@ -1,0 +1,134 @@
+using System.Buffers.Binary;
+using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Infrastructure;
+
+namespace PetMagic.Modules.Identity.Tests.Templates;
+
+public sealed class FileMediaMetadataReaderTests
+{
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldReadMp4Version0Duration()
+    {
+        var filePath = CreateTempFile(BuildMp4WithMovieHeader(timescale: 1000, duration: 7250, version: 0));
+        var reader = new FileMediaMetadataReader();
+
+        try
+        {
+            var result = await reader.GetVideoDurationSecondsAsync(
+                new StoredMediaResponse("https://cdn.example.com/video.mp4", "templates/video.mp4", "video.mp4", "video/mp4", null, filePath),
+                CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(7.25, result.Value);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldReadMp4Version1Duration()
+    {
+        var filePath = CreateTempFile(BuildMp4WithMovieHeader(timescale: 48000, duration: 360000, version: 1));
+        var reader = new FileMediaMetadataReader();
+
+        try
+        {
+            var result = await reader.GetVideoDurationSecondsAsync(
+                new StoredMediaResponse("https://cdn.example.com/video.mp4", "templates/video.mp4", "video.mp4", "video/mp4", null, filePath),
+                CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(7.5, result.Value);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldReturnNull_WhenFileDoesNotExist()
+    {
+        var reader = new FileMediaMetadataReader();
+
+        var result = await reader.GetVideoDurationSecondsAsync(
+            new StoredMediaResponse("https://cdn.example.com/missing.mp4", "templates/missing.mp4", "missing.mp4", "video/mp4", null, Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.mp4")),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value);
+    }
+
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldFail_WhenMp4PayloadIsMalformed()
+    {
+        var filePath = CreateTempFile([1, 2, 3, 4, 5, 6, 7, 8]);
+        var reader = new FileMediaMetadataReader();
+
+        try
+        {
+            var result = await reader.GetVideoDurationSecondsAsync(
+                new StoredMediaResponse("https://cdn.example.com/bad.mp4", "templates/bad.mp4", "bad.mp4", "video/mp4", null, filePath),
+                CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Equal("templates.media_metadata_failed", result.Error.Code);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    private static string CreateTempFile(byte[] content)
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"petmagic-mp4-{Guid.NewGuid():N}.mp4");
+        File.WriteAllBytes(filePath, content);
+        return filePath;
+    }
+
+    private static byte[] BuildMp4WithMovieHeader(uint timescale, ulong duration, byte version)
+    {
+        var payload = version == 0
+            ? BuildVersion0MovieHeader(timescale, checked((uint)duration))
+            : BuildVersion1MovieHeader(timescale, duration);
+
+        var mvhd = BuildBox("mvhd", payload);
+        var moov = BuildBox("moov", mvhd);
+        var ftyp = BuildBox("ftyp", "isom0000isomiso2"u8.ToArray());
+
+        return [.. ftyp, .. moov];
+    }
+
+    private static byte[] BuildVersion0MovieHeader(uint timescale, uint duration)
+    {
+        var buffer = new byte[20];
+        buffer[0] = 0;
+        BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(12, 4), timescale);
+        BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(16, 4), duration);
+        return buffer;
+    }
+
+    private static byte[] BuildVersion1MovieHeader(uint timescale, ulong duration)
+    {
+        var buffer = new byte[32];
+        buffer[0] = 1;
+        BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(20, 4), timescale);
+        BinaryPrimitives.WriteUInt64BigEndian(buffer.AsSpan(24, 8), duration);
+        return buffer;
+    }
+
+    private static byte[] BuildBox(string type, byte[] payload)
+    {
+        var box = new byte[8 + payload.Length];
+        BinaryPrimitives.WriteUInt32BigEndian(box.AsSpan(0, 4), (uint)box.Length);
+        box[4] = (byte)type[0];
+        box[5] = (byte)type[1];
+        box[6] = (byte)type[2];
+        box[7] = (byte)type[3];
+        payload.CopyTo(box, 8);
+        return box;
+    }
+}
