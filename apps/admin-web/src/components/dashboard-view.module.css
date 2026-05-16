@@ -1,0 +1,183 @@
+.dashboard {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.72fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.wideCard {
+  min-height: 20rem;
+}
+
+.chartToolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.34rem 0.68rem;
+  border: 1px solid #213047;
+  border-radius: 999px;
+  background: rgba(18, 35, 58, 0.72);
+  color: #8da1ba;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.chartToolbar svg {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+.chartSvg {
+  width: 100%;
+  height: 14rem;
+  display: block;
+}
+
+.donutLayout {
+  display: grid;
+  grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.donutSvg {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+}
+
+.legend {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.legendItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.legendDot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--legend-color);
+}
+
+.legendLabel {
+  min-width: 0;
+  overflow: hidden;
+  color: #c7d7ea;
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendPercent {
+  color: #f4f8ff;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.legendCount {
+  color: #70859f;
+  font-size: 0.78rem;
+}
+
+.activityList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activityItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  padding: 0.78rem 0;
+  border-bottom: 1px solid #122136;
+}
+
+.activityItem:last-child {
+  border-bottom: 0;
+}
+
+.activityIcon {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--activity-color) 20%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--activity-color) 13%, transparent);
+  color: var(--activity-color);
+}
+
+.activityIcon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.activityBody {
+  min-width: 0;
+}
+
+.activityText {
+  margin: 0;
+  color: #c7d7ea;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.activityTime {
+  margin: 0.25rem 0 0;
+  color: #5f748e;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 1180px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard {
+    gap: 1rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .chartSvg {
+    height: 12.5rem;
+  }
+
+  .donutLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .donutSvg {
+    width: min(11rem, 100%);
+  }
+}

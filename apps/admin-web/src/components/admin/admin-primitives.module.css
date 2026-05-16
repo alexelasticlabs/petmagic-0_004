@@ -1,0 +1,212 @@
+.card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border: 1px solid #1a2738;
+  border-radius: 1.05rem;
+  background: linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(13, 21, 36, 0.96) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035), 0 18px 42px rgba(0, 0, 0, 0.18);
+}
+
+.cardPaddingMd {
+  padding: 1rem;
+}
+
+.cardPaddingLg {
+  padding: 1.15rem;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.cardTitleGroup {
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cardTitle {
+  margin: 0;
+  color: #e8f0fb;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.cardDescription {
+  margin: 0;
+  color: #70859f;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.cardAction {
+  flex-shrink: 0;
+  color: #22c55e;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.cardAction:hover {
+  color: #4ade80;
+}
+
+.statCard {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 10.2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.05rem;
+  border: 1px solid #1a2738;
+  border-radius: 1.05rem;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--stat-accent, #22c55e) 18%, transparent) 0%, transparent 42%),
+    linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(13, 21, 36, 0.96) 100%);
+}
+
+.statContent {
+  min-width: 0;
+}
+
+.statLabel {
+  margin: 0;
+  color: #70859f;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.statValue {
+  margin: 0.55rem 0 0;
+  color: #ffffff;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: clamp(1.45rem, 1.2rem + 0.75vw, 2rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.statDelta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.65rem;
+  color: var(--stat-accent, #22c55e);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.statDelta svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.statSubtext {
+  margin: 0.32rem 0 0;
+  color: #5f748e;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.statIcon {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--stat-accent, #22c55e) 16%, transparent);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--stat-accent, #22c55e) 12%, transparent);
+  color: var(--stat-accent, #22c55e);
+}
+
+.statIcon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.tableWrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 0 0.55rem 0.65rem;
+  border-bottom: 1px solid #1a2738;
+  color: #5f748e;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.table td {
+  padding: 0.78rem 0.55rem;
+  border-bottom: 1px solid #122136;
+  color: #c7d7ea;
+  font-size: 0.84rem;
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.mono {
+  color: #8ba0ba;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.numeric {
+  color: #f4f8ff;
+  font-weight: 800;
+  text-align: right;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.65rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--status-color, #22c55e) 24%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--status-color, #22c55e) 13%, transparent);
+  color: var(--status-color, #22c55e);
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .cardPaddingLg,
+  .cardPaddingMd,
+  .statCard {
+    padding: 0.95rem;
+  }
+
+  .cardHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
