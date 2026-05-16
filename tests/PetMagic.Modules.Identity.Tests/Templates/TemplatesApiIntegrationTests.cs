@@ -340,12 +340,15 @@ public sealed class TemplatesApiIntegrationTests
         Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
 
         var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
+        Assert.NotNull(generation);
 
-        Assert.Equal(TestUserId, generation.UserId);
+        Assert.Equal(TestUserId, generation!.UserId);
         Assert.Equal(created.TemplateId, generation.TemplateId);
         Assert.Equal("Completed", generation.Status);
         Assert.Equal(60, generation.TokenCost);
-        Assert.Equal("pet.jpg", generation.SourceImageAsset.FileName);
+        Assert.False(generation.UserMediaExpired);
+        Assert.NotNull(generation.SourceImageAsset);
+        Assert.Equal("pet.jpg", generation.SourceImageAsset!.FileName);
         Assert.Equal(generation.SourceImageAsset.Url, generation.NormalizedImageUrl);
         Assert.Equal(referenceAsset.Url, generation.ReferenceMotionUrl);
         Assert.EndsWith($"generated-{generation.GenerationId:N}.mp4", generation.OutputUrl, StringComparison.OrdinalIgnoreCase);
@@ -649,6 +652,7 @@ public sealed class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<IVideoMotionGenerator, TestVideoMotionGenerator>();
             builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
+            builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
             builder.Services.AddScoped<TemplateGenerationJobProcessor>();

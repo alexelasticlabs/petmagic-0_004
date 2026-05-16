@@ -38,6 +38,18 @@ public sealed class TemplatesOptions
 
     public int GenerationRetentionDaysAfterCompletion { get; init; } = 7;
 
+    public int TemporaryUploadRetentionMinutes { get; init; } = 60;
+
+    public bool MediaCleanupWorkerEnabled { get; init; } = true;
+
+    public int MediaCleanupPollIntervalMilliseconds { get; init; } = 1_000;
+
+    public int MediaCleanupRetryDelayMilliseconds { get; init; } = 30_000;
+
+    public int MetadataTempRetentionHours { get; init; } = 24;
+
+    public bool CleanupExpiredGenerationMediaWhileRefundPending { get; init; } = true;
+
     public long GeneratedVideoMaxFileSizeBytes { get; init; } = 250 * 1024 * 1024;
 
     public R2StorageOptions R2 { get; init; } = new();

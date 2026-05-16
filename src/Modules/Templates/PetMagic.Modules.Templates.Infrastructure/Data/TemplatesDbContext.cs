@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data;
@@ -10,6 +11,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
     public DbSet<TemplateAsset> TemplateAssets => Set<TemplateAsset>();
 
     public DbSet<TemplateGenerationJob> TemplateGenerationJobs => Set<TemplateGenerationJob>();
+
+    public DbSet<TemplateMediaRecord> TemplateMediaRecords => Set<TemplateMediaRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -59,6 +62,9 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.FailureCode).HasMaxLength(128);
             entity.Property(x => x.FailureMessage).HasMaxLength(1000);
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
+            entity.Property(x => x.UserMediaCleanupFailureCode).HasMaxLength(128);
+            entity.HasIndex(x => x.UserMediaDeletedAtUtc);
+            entity.HasIndex(x => x.LastUserMediaCleanupAttemptAtUtc);
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
             entity.HasIndex(x => new { x.Status, x.RefundedAtUtc, x.RefundLastAttemptedAtUtc });
@@ -68,6 +74,31 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateMediaRecord>(entity =>
+        {
+            entity.ToTable("templates_media_records");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Url).HasMaxLength(2048).IsRequired();
+            entity.Property(x => x.FileName).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Role).HasConversion<int>();
+            entity.Property(x => x.LifecycleState).HasConversion<int>();
+            entity.Property(x => x.FailureCode).HasMaxLength(128);
+            entity.Property(x => x.FailureMessage).HasMaxLength(1000);
+            entity.HasIndex(x => x.Url).IsUnique();
+            entity.HasIndex(x => new { x.LifecycleState, x.ExpiresAtUtc });
+            entity.HasIndex(x => new { x.TemplateId, x.LifecycleState });
+            entity.HasIndex(x => new { x.GenerationJobId, x.LifecycleState });
+            entity.HasOne(x => x.Template)
+                .WithMany(x => x.MediaRecords)
+                .HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.GenerationJob)
+                .WithMany(x => x.MediaRecords)
+                .HasForeignKey(x => x.GenerationJobId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

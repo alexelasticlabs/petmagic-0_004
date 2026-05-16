@@ -46,4 +46,34 @@ internal static class TemplateMediaTempFiles
             // Metadata temp files are best-effort cleanup and must not fail request handling.
         }
     }
+
+    public static bool CleanupNextExpiredAsync(TimeSpan retention)
+    {
+        try
+        {
+            if (retention < TimeSpan.Zero || !Directory.Exists(Root))
+            {
+                return false;
+            }
+
+            var cutoff = DateTime.UtcNow.Subtract(retention);
+            var file = new DirectoryInfo(Root)
+                .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                .Where(x => x.LastWriteTimeUtc <= cutoff)
+                .OrderBy(x => x.LastWriteTimeUtc)
+                .FirstOrDefault();
+
+            if (file is null)
+            {
+                return false;
+            }
+
+            file.Delete();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

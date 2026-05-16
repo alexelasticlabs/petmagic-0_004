@@ -1,11 +1,15 @@
 using System.Text;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Api.Endpoints;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure;
+using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -14,6 +18,8 @@ public sealed class AdminTemplateUploadEndpointTests
     [Fact]
     public async Task UploadMediaAsync_ShouldReturnUploadedImage_WhenPreviewImageIsValid()
     {
+        await using var dbContext = CreateDbContext();
+        var lifecycleService = CreateLifecycleService(dbContext);
         var file = CreateFormFile("preview.jpg", "image/jpeg", Encoding.UTF8.GetBytes("image-bytes"));
         var storage = new RecordingMediaStorage(new StoredMediaResponse(
             "https://cdn.example.com/templates/preview.jpg",
@@ -28,21 +34,29 @@ public sealed class AdminTemplateUploadEndpointTests
             file,
             TemplateAssetKind.Preview.ToString(),
             storage,
+            lifecycleService,
             new FixedTemplateMediaUploadPolicy(1024),
             metadataReader,
             CancellationToken.None);
 
         var response = await ExecuteAsync(result);
+        var record = await dbContext.TemplateMediaRecords.SingleAsync();
 
         Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
         Assert.Contains("preview.jpg", response.Body);
         Assert.Contains("image/jpeg", response.Body);
         Assert.False(metadataReader.StoredMediaCalls > 0);
+        Assert.Equal(TemplateMediaLifecycleState.Temporary, record.LifecycleState);
+        Assert.Equal(TemplateMediaRole.PreviewAsset, record.Role);
+        Assert.Equal("https://cdn.example.com/templates/preview.jpg", record.Url);
+        Assert.NotNull(record.ExpiresAtUtc);
     }
 
     [Fact]
     public async Task UploadMediaAsync_ShouldReturnDuration_WhenReferenceVideoIsValid()
     {
+        await using var dbContext = CreateDbContext();
+        var lifecycleService = CreateLifecycleService(dbContext);
         var file = CreateFormFile("reference.mp4", "video/mp4", Encoding.UTF8.GetBytes("video-bytes"));
         var storage = new RecordingMediaStorage(new StoredMediaResponse(
             "https://cdn.example.com/templates/reference.mp4",
@@ -57,6 +71,7 @@ public sealed class AdminTemplateUploadEndpointTests
             file,
             TemplateAssetKind.ReferenceMotion.ToString(),
             storage,
+            lifecycleService,
             new FixedTemplateMediaUploadPolicy(2048),
             metadataReader,
             CancellationToken.None);
@@ -71,12 +86,14 @@ public sealed class AdminTemplateUploadEndpointTests
     [Fact]
     public async Task UploadMediaAsync_ShouldRejectInvalidContentType()
     {
+        await using var dbContext = CreateDbContext();
         var file = CreateFormFile("notes.txt", "text/plain", Encoding.UTF8.GetBytes("not-media"));
 
         var result = await AdminTemplateEndpoints.UploadMediaAsync(
             file,
             TemplateAssetKind.ReferenceMotion.ToString(),
             new RecordingMediaStorage(),
+            CreateLifecycleService(dbContext),
             new FixedTemplateMediaUploadPolicy(2048),
             new RecordingMediaMetadataReader(),
             CancellationToken.None);
@@ -90,12 +107,14 @@ public sealed class AdminTemplateUploadEndpointTests
     [Fact]
     public async Task UploadMediaAsync_ShouldRejectOversizedFile_UsingConfiguredLimit()
     {
+        await using var dbContext = CreateDbContext();
         var file = CreateFormFile("preview.jpg", "image/jpeg", new byte[11]);
 
         var result = await AdminTemplateEndpoints.UploadMediaAsync(
             file,
             TemplateAssetKind.Preview.ToString(),
             new RecordingMediaStorage(),
+            CreateLifecycleService(dbContext),
             new FixedTemplateMediaUploadPolicy(10),
             new RecordingMediaMetadataReader(),
             CancellationToken.None);
@@ -131,6 +150,29 @@ public sealed class AdminTemplateUploadEndpointTests
         context.Response.Body.Position = 0;
         using var reader = new StreamReader(context.Response.Body, Encoding.UTF8);
         return (context.Response.StatusCode, await reader.ReadToEndAsync());
+    }
+
+    private static TemplatesDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseInMemoryDatabase($"admin-template-upload-endpoint-tests-{Guid.NewGuid():N}")
+            .Options;
+
+        return new TemplatesDbContext(options);
+    }
+
+    private static ITemplateMediaLifecycleService CreateLifecycleService(TemplatesDbContext dbContext)
+    {
+        return new TemplateMediaLifecycleService(dbContext, new TemplatesOptions
+        {
+            PublicBaseUrl = "http://localhost:5000",
+            LocalMediaRootPath = "wwwroot/templates-media",
+            DefaultPreprocessingPrompt = "Keep the same pet.",
+            DefaultKlingPrompt = "Funny dance.",
+            AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
+            AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
+            TemporaryUploadRetentionMinutes = 60
+        });
     }
 
     private sealed class FixedTemplateMediaUploadPolicy(long maxFileSizeBytes) : ITemplateMediaUploadPolicy

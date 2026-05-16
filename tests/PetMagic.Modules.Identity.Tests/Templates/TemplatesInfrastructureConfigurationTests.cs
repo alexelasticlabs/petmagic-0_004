@@ -35,12 +35,19 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(5, options.MaxRefundAttempts);
         Assert.Equal(30_000, options.RefundRetryDelayMilliseconds);
         Assert.Equal(7, options.GenerationRetentionDaysAfterCompletion);
+        Assert.Equal(60, options.TemporaryUploadRetentionMinutes);
+        Assert.True(options.MediaCleanupWorkerEnabled);
+        Assert.Equal(1_000, options.MediaCleanupPollIntervalMilliseconds);
+        Assert.Equal(30_000, options.MediaCleanupRetryDelayMilliseconds);
+        Assert.Equal(24, options.MetadataTempRetentionHours);
+        Assert.True(options.CleanupExpiredGenerationMediaWhileRefundPending);
         Assert.Equal(250 * 1024 * 1024, options.GeneratedVideoMaxFileSizeBytes);
         Assert.Equal("LocalFileMediaStorage", mediaStorage.GetType().Name);
         Assert.Equal("FakeImagePreprocessor", imagePreprocessor.GetType().Name);
         Assert.Equal("FakeVideoMotionGenerator", videoMotionGenerator.GetType().Name);
         Assert.Equal("FakeGeneratedMediaImporter", generatedMediaImporter.GetType().Name);
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateGenerationWorker");
+        Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateMediaCleanupWorker");
     }
 
     [Fact]
@@ -64,6 +71,12 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:MaxRefundAttempts"] = "6",
             ["Templates:RefundRetryDelayMilliseconds"] = "125",
             ["Templates:GenerationRetentionDaysAfterCompletion"] = "14",
+            ["Templates:TemporaryUploadRetentionMinutes"] = "90",
+            ["Templates:MediaCleanupWorkerEnabled"] = "false",
+            ["Templates:MediaCleanupPollIntervalMilliseconds"] = "2500",
+            ["Templates:MediaCleanupRetryDelayMilliseconds"] = "7500",
+            ["Templates:MetadataTempRetentionHours"] = "48",
+            ["Templates:CleanupExpiredGenerationMediaWhileRefundPending"] = "false",
             ["Templates:GeneratedVideoMaxFileSizeBytes"] = "1048576"
         });
 
@@ -86,6 +99,12 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(6, options.MaxRefundAttempts);
         Assert.Equal(125, options.RefundRetryDelayMilliseconds);
         Assert.Equal(14, options.GenerationRetentionDaysAfterCompletion);
+        Assert.Equal(90, options.TemporaryUploadRetentionMinutes);
+        Assert.False(options.MediaCleanupWorkerEnabled);
+        Assert.Equal(2500, options.MediaCleanupPollIntervalMilliseconds);
+        Assert.Equal(7500, options.MediaCleanupRetryDelayMilliseconds);
+        Assert.Equal(48, options.MetadataTempRetentionHours);
+        Assert.False(options.CleanupExpiredGenerationMediaWhileRefundPending);
         Assert.Equal(1024 * 1024, options.GeneratedVideoMaxFileSizeBytes);
         Assert.Equal("R2MediaStorage", mediaStorage.GetType().Name);
         Assert.Equal("FalImagePreprocessor", imagePreprocessor.GetType().Name);

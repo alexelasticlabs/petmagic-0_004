@@ -43,7 +43,7 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
-    public async Task CleanupNextExpiredGenerationAsync_ShouldDeleteManagedGenerationMediaAndRemoveJob()
+    public async Task CleanupNextExpiredGenerationAsync_ShouldRemoveJob_WhenUserMediaWasAlreadyDeleted()
     {
         await using var dbContext = CreateDbContext();
         var template = CreateReadyTemplate();
@@ -52,6 +52,7 @@ public sealed class TemplateGenerationJobProcessorTests
         job.NormalizedImageUrl = "http://localhost:5000/templates-media/normalized.jpg";
         job.ReferenceMotionUrl = "http://localhost:5000/templates-media/reference.mp4";
         job.OutputUrl = "http://localhost:5000/templates-media/output.mp4";
+        job.UserMediaDeletedAtUtc = DateTime.UtcNow.AddDays(-2);
 
         dbContext.TemplateItems.Add(template);
         dbContext.TemplateGenerationJobs.Add(job);
@@ -64,10 +65,7 @@ public sealed class TemplateGenerationJobProcessorTests
 
         Assert.True(processed);
         Assert.False(await dbContext.TemplateGenerationJobs.AnyAsync(x => x.Id == job.Id));
-        Assert.Contains(job.SourceImageUrl, mediaStorage.DeletedUrls);
-        Assert.Contains(job.NormalizedImageUrl, mediaStorage.DeletedUrls);
-        Assert.Contains(job.OutputUrl, mediaStorage.DeletedUrls);
-        Assert.DoesNotContain(job.ReferenceMotionUrl!, mediaStorage.DeletedUrls);
+        Assert.Empty(mediaStorage.DeletedUrls);
     }
 
     [Fact]
@@ -76,6 +74,7 @@ public sealed class TemplateGenerationJobProcessorTests
         await using var dbContext = CreateDbContext();
         var template = CreateReadyTemplate();
         var job = CreateGenerationJob(template, TemplateGenerationStatus.Failed, DateTime.UtcNow.AddDays(-10));
+        job.UserMediaDeletedAtUtc = DateTime.UtcNow.AddDays(-2);
         job.RefundAttemptCount = 3;
         job.RefundLastErrorCode = "economy.unavailable";
         job.RefundLastAttemptedAtUtc = DateTime.UtcNow.AddDays(-9);
@@ -116,7 +115,6 @@ public sealed class TemplateGenerationJobProcessorTests
             new NoopImagePreprocessor(),
             new NoopVideoMotionGenerator(),
             new NoopGeneratedMediaImporter(),
-            mediaStorage ?? new TrackingMediaStorage(),
             billing ?? new TestTemplateGenerationBilling(),
             options ?? CreateOptions(),
             NullLogger<TemplateGenerationJobProcessor>.Instance);

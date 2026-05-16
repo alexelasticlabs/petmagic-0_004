@@ -1,11 +1,12 @@
 .phonePreview {
-  --phone-preview-min-height: clamp(29rem, 27rem + 10vw, 33.75rem);
+  --phone-preview-min-height: clamp(23.2rem, 21.6rem + 8vw, 27rem);
   width: 100%;
   min-width: 0;
 }
 
 .phoneMedia {
   position: relative;
+  height: var(--phone-preview-min-height);
   min-height: var(--phone-preview-min-height);
   overflow: hidden;
   border: 1px solid rgba(140, 156, 176, 0.14);
@@ -20,8 +21,9 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(4, 8, 14, 0.1) 0%, rgba(4, 8, 14, 0.02) 28%, rgba(4, 8, 14, 0.18) 48%, rgba(4, 8, 14, 0.72) 82%, rgba(4, 8, 14, 0.9) 100%),
-    linear-gradient(180deg, rgba(9, 16, 28, 0.08) 0%, rgba(9, 16, 28, 0) 36%);
+    linear-gradient(180deg, rgba(4, 8, 14, 0) 0%, rgba(4, 8, 14, 0.015) 46%, rgba(4, 8, 14, 0.08) 68%, rgba(4, 8, 14, 0.22) 84%, rgba(4, 8, 14, 0.42) 100%),
+    radial-gradient(circle at 50% 115%, rgba(7, 16, 29, 0.34) 0%, rgba(7, 16, 29, 0) 58%);
+  pointer-events: none;
 }
 
 .phoneTopRow {
@@ -108,14 +110,19 @@
 }
 
 .phoneMediaAsset {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
+  object-position: center;
   background: #0b1421;
 }
 
 .phonePlaceholder {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
@@ -130,8 +137,29 @@
   right: 0;
   bottom: 0;
   display: grid;
-  gap: 0.56rem;
-  padding: 1.15rem 1rem 1rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.95rem 0.85rem;
+  border-radius: 0 0 1.28rem 1.28rem;
+  isolation: isolate;
+  z-index: 1;
+}
+
+.phoneBottomContent::before {
+  content: "";
+  position: absolute;
+  inset: -6.5rem 0 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(236, 244, 255, 0.08) 0%, rgba(188, 206, 232, 0.05) 16%, rgba(76, 95, 124, 0.12) 34%, rgba(17, 25, 38, 0.36) 58%, rgba(6, 11, 18, 0.68) 80%, rgba(2, 5, 10, 0.92) 100%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.012) 42%, rgba(255, 255, 255, 0.02) 100%);
+  backdrop-filter: blur(12px) saturate(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
+  pointer-events: none;
+}
+
+.phoneBottomContent > * {
+  position: relative;
+  z-index: 1;
 }
 
 .phoneMetricRow,
@@ -144,13 +172,13 @@
 
 .phoneMetricBadge {
   gap: 0.35rem;
-  min-height: 1.86rem;
-  padding: 0.3rem 0.62rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(15, 24, 37, 0.44);
+  min-height: 1.68rem;
+  padding: 0.22rem 0.56rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(15, 24, 37, 0.28);
   color: #eef6ff;
-  font-size: 0.88rem;
-  box-shadow: 0 10px 18px rgba(2, 6, 14, 0.24);
+  font-size: 0.82rem;
+  box-shadow: 0 8px 16px rgba(2, 6, 14, 0.15);
 }
 
 .phoneMetricIcon {
@@ -170,20 +198,20 @@
 .phoneTitle {
   margin: 0;
   color: #ffffff;
-  max-width: 10.5rem;
-  font-size: 1.22rem;
+  max-width: 12.8rem;
+  font-size: 1.1rem;
   font-weight: 900;
-  line-height: 1.08;
+  line-height: 1.03;
   letter-spacing: -0.03em;
   text-shadow: 0 8px 20px rgba(3, 7, 15, 0.62);
 }
 
 .phoneDescription {
   margin: 0;
-  max-width: 10.8rem;
+  max-width: 13.2rem;
   color: rgba(236, 244, 255, 0.9);
-  font-size: 0.72rem;
-  line-height: 1.38;
+  font-size: 0.68rem;
+  line-height: 1.3;
   text-shadow: 0 6px 16px rgba(3, 7, 15, 0.48);
 }
 
@@ -224,7 +252,7 @@
 
 .phoneMetaRow {
   color: rgba(228, 238, 251, 0.9);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
@@ -242,13 +270,13 @@
 
 .phoneAccessTag {
   gap: 0.32rem;
-  min-height: 1.65rem;
-  padding: 0.22rem 0.62rem 0.22rem 0.46rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(6, 12, 20, 0.3);
+  min-height: 1.5rem;
+  padding: 0.18rem 0.56rem 0.18rem 0.42rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(6, 12, 20, 0.24);
   backdrop-filter: blur(12px) saturate(1.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  font-size: 0.76rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.04em;
 }

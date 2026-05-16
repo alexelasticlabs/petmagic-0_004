@@ -55,6 +55,12 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             MaxRefundAttempts = ParsePositiveInt(section["MaxRefundAttempts"], 5),
             RefundRetryDelayMilliseconds = ParseNonNegativeInt(section["RefundRetryDelayMilliseconds"], 30_000),
             GenerationRetentionDaysAfterCompletion = ParseInt(section["GenerationRetentionDaysAfterCompletion"], 7),
+            TemporaryUploadRetentionMinutes = ParsePositiveInt(section["TemporaryUploadRetentionMinutes"], 60),
+            MediaCleanupWorkerEnabled = ParseBool(section["MediaCleanupWorkerEnabled"], true),
+            MediaCleanupPollIntervalMilliseconds = ParsePositiveInt(section["MediaCleanupPollIntervalMilliseconds"], 1_000),
+            MediaCleanupRetryDelayMilliseconds = ParseNonNegativeInt(section["MediaCleanupRetryDelayMilliseconds"], 30_000),
+            MetadataTempRetentionHours = ParsePositiveInt(section["MetadataTempRetentionHours"], 24),
+            CleanupExpiredGenerationMediaWhileRefundPending = ParseBool(section["CleanupExpiredGenerationMediaWhileRefundPending"], true),
             GeneratedVideoMaxFileSizeBytes = ParseLong(section["GeneratedVideoMaxFileSizeBytes"], 250 * 1024 * 1024),
             R2 = new R2StorageOptions
             {
@@ -88,10 +94,13 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         AddAiProviders(services, options);
         AddGeneratedMediaImporter(services, options);
         AddGenerationBilling(services);
+        services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplatesService, TemplatesService>();
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
         services.AddScoped<TemplateGenerationJobProcessor>();
+        services.AddScoped<TemplateMediaCleanupProcessor>();
         services.AddHostedService<TemplateGenerationWorker>();
+        services.AddHostedService<TemplateMediaCleanupWorker>();
 
         return services;
     }

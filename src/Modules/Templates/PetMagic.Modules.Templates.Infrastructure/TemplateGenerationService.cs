@@ -134,12 +134,7 @@ internal sealed class TemplateGenerationService(
             job.TemplateId,
             job.Status.ToString(),
             job.TokenCost,
-            new TemplateAssetResponse(
-                job.SourceImageUrl,
-                job.SourceImageFileName,
-                job.SourceImageContentType,
-                job.SourceImageFileSizeBytes,
-                null),
+            MapSourceImageAsset(job),
             job.NormalizedImageUrl,
             job.ReferenceMotionUrl,
             job.OutputUrl,
@@ -148,6 +143,22 @@ internal sealed class TemplateGenerationService(
             job.CreatedAtUtc,
             job.UpdatedAtUtc,
             job.StartedAtUtc,
-            job.CompletedAtUtc);
+            job.CompletedAtUtc,
+            job.UserMediaDeletedAtUtc != null);
+    }
+
+    private static TemplateAssetResponse? MapSourceImageAsset(TemplateGenerationJob job)
+    {
+        if (string.IsNullOrWhiteSpace(job.SourceImageUrl))
+        {
+            return null;
+        }
+
+        return new TemplateAssetResponse(
+            job.SourceImageUrl,
+            job.SourceImageFileName,
+            job.SourceImageContentType,
+            job.SourceImageFileSizeBytes,
+            null);
     }
 }

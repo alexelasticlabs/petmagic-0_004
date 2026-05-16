@@ -196,6 +196,13 @@ public sealed class TemplatesServiceTests
         Assert.True(updated.IsSuccess);
         Assert.Single(storage.DeletedUrls);
         Assert.Equal("http://localhost:5000/templates-media/2026/05/old-preview.jpg", storage.DeletedUrls[0]);
+
+        var oldRecord = await dbContext.TemplateMediaRecords.SingleAsync(x => x.Url == "http://localhost:5000/templates-media/2026/05/old-preview.jpg");
+        var newRecord = await dbContext.TemplateMediaRecords.SingleAsync(x => x.Url == "http://localhost:5000/templates-media/2026/05/new-preview.jpg");
+        Assert.Equal(TemplateMediaLifecycleState.Deleted, oldRecord.LifecycleState);
+        Assert.Null(oldRecord.TemplateId);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, newRecord.LifecycleState);
+        Assert.Equal(created.Value.TemplateId, newRecord.TemplateId);
     }
 
     [Fact]
@@ -467,6 +474,73 @@ public sealed class TemplatesServiceTests
         Assert.Equal(TemplatePromoBadgeMode.Funny.ToString(), created.Value.EffectivePromoBadge);
     }
 
+    [Fact]
+    public async Task CreateVideoAsync_ShouldClaimTemporaryMediaRecords_WhenTemplateIsPersisted()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var now = DateTime.UtcNow;
+        var preview = CreatePreviewAsset("https://cdn.example.com/templates/preview.mp4", "preview.mp4", "video/mp4");
+        var reference = CreateReferenceAsset(8.5, "https://cdn.example.com/templates/reference.mp4");
+
+        dbContext.TemplateMediaRecords.AddRange(
+            new PetMagic.Modules.Templates.Infrastructure.Entities.TemplateMediaRecord
+            {
+                Id = Guid.NewGuid(),
+                Url = preview.Url,
+                FileName = preview.FileName,
+                ContentType = preview.ContentType,
+                FileSizeBytes = preview.FileSizeBytes,
+                Role = TemplateMediaRole.PreviewAsset,
+                LifecycleState = TemplateMediaLifecycleState.Temporary,
+                UploadedAtUtc = now,
+                ExpiresAtUtc = now.AddHours(1)
+            },
+            new PetMagic.Modules.Templates.Infrastructure.Entities.TemplateMediaRecord
+            {
+                Id = Guid.NewGuid(),
+                Url = reference.Url,
+                FileName = reference.FileName,
+                ContentType = reference.ContentType,
+                FileSizeBytes = reference.FileSizeBytes,
+                Role = TemplateMediaRole.ReferenceMotionAsset,
+                LifecycleState = TemplateMediaLifecycleState.Temporary,
+                UploadedAtUtc = now,
+                ExpiresAtUtc = now.AddHours(1)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Claimed Dance",
+                "Temporary assets should become attached",
+                "Dance",
+                ["claim"],
+                false,
+                30,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                preview,
+                reference,
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var previewRecord = await dbContext.TemplateMediaRecords.SingleAsync(x => x.Url == preview.Url);
+        var referenceRecord = await dbContext.TemplateMediaRecords.SingleAsync(x => x.Url == reference.Url);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, previewRecord.LifecycleState);
+        Assert.Equal(created.Value.TemplateId, previewRecord.TemplateId);
+        Assert.Null(previewRecord.ExpiresAtUtc);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, referenceRecord.LifecycleState);
+        Assert.Equal(created.Value.TemplateId, referenceRecord.TemplateId);
+        Assert.Null(referenceRecord.ExpiresAtUtc);
+    }
+
     private static TemplatesService CreateService(TemplatesDbContext dbContext, IMediaStorage? mediaStorage = null)
     {
         var options = new TemplatesOptions
@@ -487,7 +561,8 @@ public sealed class TemplatesServiceTests
         };
 
         IMediaMetadataReader metadataReader = new TestMediaMetadataReader();
-        return new TemplatesService(dbContext, options, metadataReader, mediaStorage ?? new RecordingMediaStorage());
+        ITemplateMediaLifecycleService lifecycleService = new TemplateMediaLifecycleService(dbContext, options);
+        return new TemplatesService(dbContext, options, metadataReader, mediaStorage ?? new RecordingMediaStorage(), lifecycleService);
     }
 
     private static TemplatesDbContext CreateDbContext()

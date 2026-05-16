@@ -13,7 +13,8 @@ internal sealed class TemplatesService(
     TemplatesDbContext dbContext,
     TemplatesOptions options,
     IMediaMetadataReader metadataReader,
-    IMediaStorage mediaStorage) : ITemplatesService
+    IMediaStorage mediaStorage,
+    ITemplateMediaLifecycleService mediaLifecycleService) : ITemplatesService
 {
     private static readonly string[] FunnyKeywords = ["funny", "meme", "viral", "dance", "lol", "cute"];
 
@@ -75,6 +76,7 @@ internal sealed class TemplatesService(
         }
 
         dbContext.TemplateItems.Add(template);
+        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
@@ -122,6 +124,7 @@ internal sealed class TemplatesService(
             }
         }
 
+        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(MapAdminResponse(template));
@@ -180,6 +183,8 @@ internal sealed class TemplatesService(
         }
 
         dbContext.TemplateItems.Add(template);
+        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
+        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
@@ -244,6 +249,8 @@ internal sealed class TemplatesService(
             }
         }
 
+        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
+        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(MapAdminResponse(template));
@@ -440,8 +447,17 @@ internal sealed class TemplatesService(
     {
         foreach (var assetUrl in assetUrls)
         {
-            await mediaStorage.DeleteAsync(assetUrl, cancellationToken);
+            var deleteResult = await mediaStorage.DeleteAsync(assetUrl, cancellationToken);
+            if (deleteResult.IsFailure)
+            {
+                await mediaLifecycleService.MarkCleanupFailureAsync(assetUrl, deleteResult.Error.Code, deleteResult.Error.Message, cancellationToken);
+                continue;
+            }
+
+            await mediaLifecycleService.MarkDeletedAsync(assetUrl, cancellationToken);
         }
+
+        await mediaLifecycleService.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<Result> DeleteTemplateAssetsAsync(string[] assetUrls, CancellationToken cancellationToken)
@@ -453,7 +469,11 @@ internal sealed class TemplatesService(
             {
                 return deleteResult;
             }
+
+            await mediaLifecycleService.MarkDeletedAsync(assetUrl, cancellationToken);
         }
+
+        await mediaLifecycleService.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

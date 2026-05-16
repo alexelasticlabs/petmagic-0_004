@@ -56,5 +56,13 @@ public sealed class TemplateGenerationJob
 
     public DateTime? CompletedAtUtc { get; set; }
 
+    public DateTime? UserMediaDeletedAtUtc { get; set; }
+
+    public DateTime? LastUserMediaCleanupAttemptAtUtc { get; set; }
+
+    public string? UserMediaCleanupFailureCode { get; set; }
+
     public TemplateItem Template { get; set; } = null!;
+
+    public List<TemplateMediaRecord> MediaRecords { get; set; } = [];
 }

@@ -221,6 +221,7 @@ public static class AdminTemplateEndpoints
         [FromForm] IFormFile? file,
         [FromForm] string assetKind,
         [FromServices] IMediaStorage mediaStorage,
+        [FromServices] ITemplateMediaLifecycleService mediaLifecycleService,
         [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
         [FromServices] IMediaMetadataReader metadataReader,
         CancellationToken cancellationToken)
@@ -281,11 +282,23 @@ public static class AdminTemplateEndpoints
             var durationResult = await metadataReader.GetVideoDurationSecondsAsync(storeResult.Value, cancellationToken);
             if (durationResult.IsFailure)
             {
+                await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
                 return TypedResults.Problem(title: durationResult.Error.Code, detail: durationResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
             }
 
             duration = durationResult.Value;
         }
+
+        await mediaLifecycleService.RegisterTemporaryUploadAsync(
+            new TemplateAssetCommand(
+                storeResult.Value.Url,
+                storeResult.Value.FileName,
+                storeResult.Value.ContentType,
+                storeResult.Value.FileSizeBytes,
+                duration),
+            MapMediaRole(kind),
+            cancellationToken);
+        await mediaLifecycleService.SaveChangesAsync(cancellationToken);
 
         return TypedResults.Ok(new TemplateAssetResponse(
             storeResult.Value.Url,
@@ -293,6 +306,15 @@ public static class AdminTemplateEndpoints
             storeResult.Value.ContentType,
             storeResult.Value.FileSizeBytes,
             duration));
+    }
+
+    private static TemplateMediaRole MapMediaRole(TemplateAssetKind assetKind)
+    {
+        return assetKind switch
+        {
+            TemplateAssetKind.ReferenceMotion => TemplateMediaRole.ReferenceMotionAsset,
+            _ => TemplateMediaRole.PreviewAsset
+        };
     }
 
     private static bool IsAllowedContentType(TemplateAssetKind assetKind, string contentType)

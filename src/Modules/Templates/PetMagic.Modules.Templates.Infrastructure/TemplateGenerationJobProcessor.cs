@@ -14,7 +14,6 @@ internal sealed class TemplateGenerationJobProcessor(
     IImagePreprocessor imagePreprocessor,
     IVideoMotionGenerator videoMotionGenerator,
     IGeneratedMediaImporter generatedMediaImporter,
-    IMediaStorage mediaStorage,
     ITemplateGenerationBilling billing,
     TemplatesOptions options,
     ILogger<TemplateGenerationJobProcessor> logger)
@@ -148,6 +147,7 @@ internal sealed class TemplateGenerationJobProcessor(
         var job = await dbContext.TemplateGenerationJobs
             .Where(x => x.CompletedAtUtc != null
                 && x.CompletedAtUtc <= cutoff
+                && x.UserMediaDeletedAtUtc != null
                 && (x.Status == TemplateGenerationStatus.Completed
                     || (x.Status == TemplateGenerationStatus.Failed
                         && (x.ChargedAtUtc == null || x.RefundedAtUtc != null))))
@@ -155,12 +155,6 @@ internal sealed class TemplateGenerationJobProcessor(
             .FirstOrDefaultAsync(cancellationToken);
 
         if (job is null)
-        {
-            return false;
-        }
-
-        var mediaDeleted = await DeleteGenerationMediaAsync(job, cancellationToken);
-        if (!mediaDeleted)
         {
             return false;
         }
@@ -293,30 +287,5 @@ internal sealed class TemplateGenerationJobProcessor(
         }
 
         return false;
-    }
-
-    private async Task<bool> DeleteGenerationMediaAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
-    {
-        var urls = new[]
-            {
-                job.SourceImageUrl,
-                job.NormalizedImageUrl,
-                job.OutputUrl
-            }
-            .Where(url => !string.IsNullOrWhiteSpace(url))
-            .Cast<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var url in urls)
-        {
-            var deleted = await mediaStorage.DeleteAsync(url, cancellationToken);
-            if (deleted.IsFailure)
-            {
-                logger.LogWarning("Template generation media cleanup failed for job {GenerationId}: {ErrorCode}", job.Id, deleted.Error.Code);
-                return false;
-            }
-        }
-
-        return true;
     }
 }

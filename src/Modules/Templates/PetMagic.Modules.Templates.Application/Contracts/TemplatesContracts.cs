@@ -170,7 +170,7 @@ public sealed record TemplateGenerationResponse(
     Guid TemplateId,
     string Status,
     int TokenCost,
-    TemplateAssetResponse SourceImageAsset,
+    TemplateAssetResponse? SourceImageAsset,
     string? NormalizedImageUrl,
     string? ReferenceMotionUrl,
     string? OutputUrl,
@@ -179,4 +179,5 @@ public sealed record TemplateGenerationResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     DateTime? StartedAtUtc,
-    DateTime? CompletedAtUtc);
+    DateTime? CompletedAtUtc,
+    bool UserMediaExpired);

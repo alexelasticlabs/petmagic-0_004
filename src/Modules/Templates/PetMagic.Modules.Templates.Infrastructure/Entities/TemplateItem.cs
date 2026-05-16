@@ -45,4 +45,6 @@ public sealed class TemplateItem
     public DateTime UpdatedAtUtc { get; set; }
 
     public List<TemplateAsset> Assets { get; set; } = [];
+
+    public List<TemplateMediaRecord> MediaRecords { get; set; } = [];
 }
