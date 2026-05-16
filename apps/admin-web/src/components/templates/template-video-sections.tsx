@@ -125,7 +125,10 @@ export function TemplateReferenceAssetSection({
         {hasReference ? (
           <video src={effectiveReferenceUrl} className={styles.assetPreviewMedia} controls playsInline />
         ) : (
-          <div className={styles.assetPreviewPlaceholder}>{text.referenceMotionTitle}</div>
+          <div className={styles.assetPreviewPlaceholder}>
+            <span className={styles.assetPreviewPlaceholderTitle}>{text.uploadReference}</span>
+            <span className={styles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
+          </div>
         )}
       </div>
 

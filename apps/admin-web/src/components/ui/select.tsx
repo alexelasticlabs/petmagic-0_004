@@ -95,7 +95,7 @@ export function Select({ value, options, onChange, ariaLabel }: SelectProps) {
   return (
     <div
       ref={rootRef}
-      className={styles.root}
+      className={`${styles.root} ${isOpen ? styles.rootOpen : ""}`.trim()}
       onBlur={(event) => {
         if (!rootRef.current?.contains(event.relatedTarget as Node | null)) {
           setIsOpen(false);

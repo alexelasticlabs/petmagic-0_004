@@ -1,6 +1,15 @@
 .root {
   position: relative;
   isolation: isolate;
+  z-index: 0;
+}
+
+.rootOpen {
+  z-index: 40;
+}
+
+.root:focus-within {
+  z-index: 40;
 }
 
 .trigger {
@@ -91,7 +100,7 @@
   top: calc(100% + 0.42rem);
   left: 0;
   right: 0;
-  z-index: 20;
+  z-index: 60;
   display: grid;
   gap: 0.34rem;
   padding: 0.45rem;

@@ -15,6 +15,21 @@ const TITLE_LIMIT = 60;
 const SHORT_DESCRIPTION_LIMIT = 120;
 
 export function TemplateBasicFields({ text, form, setForm, categorySuggestions = [], showMusicDescription = false }: TemplateBasicFieldsProps) {
+  const categoryValues = Array.from(new Set([...categorySuggestions, form.category].map((value) => value.trim()).filter(Boolean)));
+  const categoryOptions: SelectOption[] = [
+    {
+      value: "",
+      label: text.editorMissing,
+      description: text.categoryLabel,
+      tone: "neutral",
+    },
+    ...categoryValues.map((category) => ({
+      value: category,
+      label: category,
+      description: text.categoryLabel,
+      tone: "neutral" as const,
+    })),
+  ];
   const promoBadgeOptions: SelectOption[] = [
     { value: "Auto", label: text.promoBadgeAutoLabel, description: text.promoBadgeAutoHint, badge: "Auto", tone: "neutral" },
     { value: "New", label: "NEW", description: text.promoBadgeNewHint, badge: "Fresh", tone: "recommended" },
@@ -57,19 +72,20 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
           <span className={styles.fieldHeader}>
             <span>{text.categoryLabel}</span>
           </span>
-          <input
-            list="template-category-suggestions"
-            value={form.category}
-            onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-            required
-          />
-          {categorySuggestions.length ? (
-            <datalist id="template-category-suggestions">
-              {categorySuggestions.map((category) => (
-                <option key={category} value={category} />
-              ))}
-            </datalist>
-          ) : null}
+          {categoryValues.length ? (
+            <Select
+              value={form.category}
+              options={categoryOptions}
+              ariaLabel={text.categoryLabel}
+              onChange={(value) => setForm((current) => ({ ...current, category: value }))}
+            />
+          ) : (
+            <input
+              value={form.category}
+              onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
+              required
+            />
+          )}
         </label>
 
         <label className={styles.fieldBlock}>
@@ -130,7 +146,16 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
           <span className={styles.fieldHeader}>
             <span>{text.tokenCostLabel}</span>
           </span>
-          <input value={form.tokenCost} onChange={(event) => setForm((current) => ({ ...current, tokenCost: event.target.value }))} inputMode="numeric" required />
+          <input
+            value={form.tokenCost}
+            onChange={(event) => setForm((current) => ({ ...current, tokenCost: event.target.value.replace(/\D+/g, "") }))}
+            onBlur={(event) => setForm((current) => ({ ...current, tokenCost: event.target.value.replace(/\D+/g, "") }))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            min="1"
+            step="1"
+            required
+          />
         </label>
 
         {showMusicDescription ? (

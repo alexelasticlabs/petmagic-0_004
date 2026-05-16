@@ -129,7 +129,10 @@ export function TemplatePreviewAssetSection({
             <Image src={effectivePreviewUrl} alt={previewFileLabel || text.previewAssetTitle} width={480} height={600} unoptimized className={styles.assetPreviewMedia} />
           )
         ) : (
-          <div className={styles.assetPreviewPlaceholder}>{text.previewAssetTitle}</div>
+          <div className={styles.assetPreviewPlaceholder}>
+            <span className={styles.assetPreviewPlaceholderTitle}>{text.uploadPreview}</span>
+            <span className={styles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
+          </div>
         )}
       </div>
 

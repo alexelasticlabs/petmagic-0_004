@@ -474,7 +474,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
             </div>
 
             <aside className={styles.editorRail}>
-              <section className={styles.railCard}>
+              <section className={joinClassNames(styles.railCard, styles.previewRailCard)}>
                 <div className={styles.previewCardWrap}>
                   <div className={styles.phoneMedia}>
                     {renderPhonePreview(form.previewUrl, form.previewContentType, editorModel.title || text.videoTemplateCreatePageTitle, styles.phoneMediaAsset, styles.phonePlaceholder)}
@@ -658,7 +658,7 @@ function buildVideoEditorModel(text: Dictionary, form: TemplateFormState, select
   const musicDescription = form.musicDescription.trim();
   const category = form.category.trim();
   const promoBadge = resolveEffectivePromoBadge(form, selectedTemplate);
-  const tokenCost = form.tokenCost.trim() || "0";
+  const tokenCost = normalizeIntegerString(form.tokenCost) || "0";
   const previewReady = Boolean(form.previewUrl.trim());
   const referenceReady = Boolean(form.referenceUrl.trim());
   const referenceDuration = selectedTemplate?.referenceVideoDurationSeconds ?? parseOptionalDecimal(form.referenceDurationSeconds);
@@ -988,13 +988,17 @@ function normalizeTags(raw: string): string[] {
 }
 
 function parseNumber(raw: string): number {
-  const value = Number.parseInt(raw, 10);
+  const value = Number.parseInt(normalizeIntegerString(raw), 10);
   return Number.isNaN(value) ? 0 : value;
 }
 
 function parseOptionalNumber(raw: string): number | undefined {
-  const value = Number.parseInt(raw, 10);
+  const value = Number.parseInt(normalizeIntegerString(raw), 10);
   return Number.isNaN(value) ? undefined : value;
+}
+
+function normalizeIntegerString(raw: string): string {
+  return raw.replace(/\D+/g, "");
 }
 
 function parseOptionalDecimal(raw?: string): number | undefined {

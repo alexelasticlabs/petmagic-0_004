@@ -84,6 +84,7 @@ export type Dictionary = {
   uploadReference: string;
   uploadingMedia: string;
   mediaUploadHint: string;
+  mediaDropzoneHint: string;
   selectedFileLabel: string;
   chooseFile: string;
   noFileSelected: string;
@@ -203,6 +204,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     uploadReference: "Загрузить референсное видео",
     uploadingMedia: "Загрузка файла...",
     mediaUploadHint: "После загрузки backend сам определяет URL, имя файла, тип, размер и длительность media.",
+    mediaDropzoneHint: "Кликните по области или перетащите файл сюда.",
     selectedFileLabel: "Выбранный файл",
     chooseFile: "Выбрать файл",
     noFileSelected: "Файл не выбран",
@@ -320,6 +322,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     uploadReference: "Upload reference video",
     uploadingMedia: "Uploading file...",
     mediaUploadHint: "After upload, the backend fills the media URL, file name, type, size, and duration automatically.",
+    mediaDropzoneHint: "Click the area or drag a file here.",
     selectedFileLabel: "Selected file",
     chooseFile: "Choose file",
     noFileSelected: "No file selected",
