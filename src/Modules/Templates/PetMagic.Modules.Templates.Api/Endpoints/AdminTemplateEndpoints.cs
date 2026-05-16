@@ -21,6 +21,10 @@ public static class AdminTemplateEndpoints
 
         group.MapGet("/", ListAsync);
         group.MapGet("/{templateId:guid}", GetAsync);
+        group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
+        group.MapPost("/{templateId:guid}/test", StartAdminTestAsync)
+            .DisableAntiforgery();
+        group.MapGet("/tests/{generationId:guid}", GetAdminTestAsync);
         group.MapPost("/image", CreateImageAsync);
         group.MapPut("/image/{templateId:guid}", UpdateImageAsync);
         group.MapPost("/video", CreateVideoAsync);
@@ -52,6 +56,79 @@ public static class AdminTemplateEndpoints
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminAsync(templateId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminTemplateStatisticsResponse>, ProblemHttpResult>> GetStatisticsAsync(
+        Guid templateId,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminStatisticsAsync(templateId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Accepted<TemplateGenerationResponse>, ProblemHttpResult, ValidationProblem>> StartAdminTestAsync(
+        Guid templateId,
+        [FromForm] IFormFile? sourceImage,
+        [FromServices] IMediaStorage mediaStorage,
+        [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var uploadValidation = ValidateSourceImage(sourceImage, uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview));
+        if (uploadValidation.Count > 0)
+        {
+            return TypedResults.ValidationProblem(uploadValidation);
+        }
+
+        await using var stream = sourceImage!.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, cancellationToken);
+
+        var storeResult = await mediaStorage.StoreAsync(
+            new MediaUploadCommand(Path.GetFileName(sourceImage.FileName), sourceImage.ContentType, memoryStream.ToArray()),
+            cancellationToken);
+
+        if (storeResult.IsFailure)
+        {
+            return TypedResults.Problem(title: storeResult.Error.Code, detail: storeResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var stored = storeResult.Value;
+        var result = await generationService.StartAdminTestAsync(
+            templateId,
+            new TemplateAssetCommand(stored.Url, stored.FileName, stored.ContentType, stored.FileSizeBytes, null),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveGenerationFailureStatusCode(result.Error));
+        }
+
+        return TypedResults.Accepted($"/api/admin/templates/tests/{result.Value.GenerationId}", result.Value);
+    }
+
+    private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> GetAdminTestAsync(
+        Guid generationId,
+        ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var result = await generationService.GetAdminAsync(generationId, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
@@ -217,6 +294,41 @@ public static class AdminTemplateEndpoints
         return Enum.TryParse<TemplateStatus>(raw, true, out var value) ? value : null;
     }
 
+    private static Dictionary<string, string[]> ValidateSourceImage(IFormFile? sourceImage, long maxSizeBytes)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (sourceImage is null || sourceImage.Length == 0)
+        {
+            errors[nameof(sourceImage)] = ["Source image is required."];
+            return errors;
+        }
+
+        if (!sourceImage.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            errors[nameof(sourceImage)] = ["Source image content type is not allowed."];
+        }
+
+        if (sourceImage.Length > maxSizeBytes)
+        {
+            errors[nameof(sourceImage)] = [$"Source image exceeds the maximum allowed size of {maxSizeBytes} bytes."];
+        }
+
+        return errors;
+    }
+
+    private static int ResolveGenerationFailureStatusCode(PetMagic.BuildingBlocks.Results.Error error)
+    {
+        return error.Code switch
+        {
+            "templates.not_found" => StatusCodes.Status404NotFound,
+            "templates.invalid_status" => StatusCodes.Status409Conflict,
+            "templates.type_mismatch" => StatusCodes.Status400BadRequest,
+            "templates.reference_motion_required" => StatusCodes.Status409Conflict,
+            "templates.character_orientation_required" => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status400BadRequest
+        };
+    }
+
     internal static async Task<Results<Ok<TemplateAssetResponse>, ValidationProblem, ProblemHttpResult>> UploadMediaAsync(
         [FromForm] IFormFile? file,
         [FromForm] string assetKind,
@@ -245,7 +357,7 @@ public static class AdminTemplateEndpoints
 
         var kind = parsedAssetKind;
         var contentType = file!.ContentType ?? "application/octet-stream";
-        if (!IsAllowedContentType(kind, contentType))
+        if (!IsAllowedUpload(file.FileName, kind, contentType))
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -276,8 +388,13 @@ public static class AdminTemplateEndpoints
             return TypedResults.Problem(title: storeResult.Error.Code, detail: storeResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
         }
 
+        var storedContentType = string.IsNullOrWhiteSpace(storeResult.Value.ContentType)
+            ? contentType
+            : storeResult.Value.ContentType;
+
         double? duration = null;
-        if (contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+        if (storedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(storedContentType, "application/mp4", StringComparison.OrdinalIgnoreCase))
         {
             var durationResult = await metadataReader.GetVideoDurationSecondsAsync(storeResult.Value, cancellationToken);
             if (durationResult.IsFailure)
@@ -317,15 +434,32 @@ public static class AdminTemplateEndpoints
         };
     }
 
-    private static bool IsAllowedContentType(TemplateAssetKind assetKind, string contentType)
+    private static bool IsAllowedUpload(string fileName, TemplateAssetKind assetKind, string contentType)
     {
         if (assetKind == TemplateAssetKind.ReferenceMotion)
         {
-            return contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+            return IsAllowedReferenceMotionUpload(fileName, contentType);
         }
 
         return contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
             || contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAllowedReferenceMotionUpload(string fileName, string contentType)
+    {
+        if (string.Equals(contentType, "video/mp4", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "application/mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!fileName.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(contentType)
+            || string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase);
     }
 
     public sealed record UpdateImageTemplateRequest(

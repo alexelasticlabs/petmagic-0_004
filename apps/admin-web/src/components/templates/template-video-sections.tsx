@@ -5,6 +5,8 @@ import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
+const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
+
 type TemplateReferenceAssetSectionProps = {
   text: Dictionary;
   form: TemplateFormState;
@@ -54,7 +56,7 @@ export function TemplateReferenceAssetSection({
   }
 
   function handleReferenceFileSelection(file: File | null) {
-    if (!file || !file.type.startsWith("video/")) {
+    if (!file || !isSupportedReferenceMotionFile(file)) {
       return;
     }
 
@@ -74,7 +76,7 @@ export function TemplateReferenceAssetSection({
         ref={fileInputRef}
         className={styles.filePickerInput}
         type="file"
-        accept="video/*"
+        accept={referenceMotionAccept}
         onChange={(event) => handleReferenceFileSelection(event.target.files?.[0] ?? null)}
       />
       <div
@@ -171,10 +173,24 @@ export function TemplateReferenceAssetSection({
             </Button>
           </div>
         </div>
-        <p className={styles.muted}>{text.mediaUploadHint}</p>
+        <p className={styles.muted}>{text.referenceMotionUploadHint}</p>
       </div>
     </div>
   );
+}
+
+function isSupportedReferenceMotionFile(file: File): boolean {
+  const normalizedType = file.type.trim().toLowerCase();
+
+  if (normalizedType === "video/mp4" || normalizedType === "application/mp4") {
+    return true;
+  }
+
+  if (normalizedType && normalizedType !== "application/octet-stream") {
+    return false;
+  }
+
+  return file.name.toLowerCase().endsWith(".mp4");
 }
 
 export function TemplateVideoModelSection({ text, form, setForm, preprocessingModels, klingModels }: TemplateVideoModelSectionProps) {

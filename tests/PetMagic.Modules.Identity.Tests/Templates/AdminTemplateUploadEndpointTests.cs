@@ -84,6 +84,58 @@ public sealed class AdminTemplateUploadEndpointTests
     }
 
     [Fact]
+    public async Task UploadMediaAsync_ShouldAcceptReferenceMp4_WhenMimeTypeFallsBackToOctetStream()
+    {
+        await using var dbContext = CreateDbContext();
+        var lifecycleService = CreateLifecycleService(dbContext);
+        var file = CreateFormFile("reference.mp4", "application/octet-stream", Encoding.UTF8.GetBytes("video-bytes"));
+        var storage = new RecordingMediaStorage(new StoredMediaResponse(
+            "https://cdn.example.com/templates/reference.mp4",
+            "templates/reference.mp4",
+            "reference.mp4",
+            "video/mp4",
+            file.Length,
+            "c:/temp/reference.mp4"));
+        var metadataReader = new RecordingMediaMetadataReader(7.25);
+
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            file,
+            TemplateAssetKind.ReferenceMotion.ToString(),
+            storage,
+            lifecycleService,
+            new FixedTemplateMediaUploadPolicy(2048),
+            metadataReader,
+            CancellationToken.None);
+
+        var response = await ExecuteAsync(result);
+
+        Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
+        Assert.Contains("reference.mp4", response.Body);
+        Assert.Equal(1, metadataReader.StoredMediaCalls);
+    }
+
+    [Fact]
+    public async Task UploadMediaAsync_ShouldRejectReferenceWebm()
+    {
+        await using var dbContext = CreateDbContext();
+        var file = CreateFormFile("reference.webm", "video/webm", Encoding.UTF8.GetBytes("video-bytes"));
+
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            file,
+            TemplateAssetKind.ReferenceMotion.ToString(),
+            new RecordingMediaStorage(),
+            CreateLifecycleService(dbContext),
+            new FixedTemplateMediaUploadPolicy(2048),
+            new RecordingMediaMetadataReader(),
+            CancellationToken.None);
+
+        var response = await ExecuteAsync(result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
+        Assert.Contains("File content type is not allowed", response.Body);
+    }
+
+    [Fact]
     public async Task UploadMediaAsync_ShouldRejectInvalidContentType()
     {
         await using var dbContext = CreateDbContext();

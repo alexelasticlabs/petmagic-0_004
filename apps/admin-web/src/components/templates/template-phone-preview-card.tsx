@@ -7,7 +7,6 @@ import Image from "next/image";
 type TemplatePreviewCardProps = {
   title: string;
   shortDescription: string;
-  tags?: string[] | string;
   previewUrl?: string | null;
   previewContentType?: string | null;
   tokenCost: number | string;
@@ -22,7 +21,6 @@ type TemplatePreviewCardProps = {
 export function TemplatePreviewCard({
   title,
   shortDescription,
-  tags,
   previewUrl,
   previewContentType,
   tokenCost,
@@ -35,7 +33,6 @@ export function TemplatePreviewCard({
 }: TemplatePreviewCardProps) {
   const normalizedTitle = title.trim();
   const normalizedDescription = shortDescription.trim();
-  const normalizedTags = normalizePreviewTags(tags);
   const normalizedCategory = category.trim();
   const normalizedMusicDescription = musicDescription?.trim();
 
@@ -75,11 +72,6 @@ export function TemplatePreviewCard({
               </span>
               <span className={styles.phoneMusicText}>{normalizedMusicDescription}</span>
             </p>
-          ) : null}
-          {normalizedTags.length ? (
-            <div className={styles.phoneTagRow}>
-              {normalizedTags.map((tag) => <span key={tag} className={styles.phoneTag}>#{tag}</span>)}
-            </div>
           ) : null}
 
           <div className={styles.phoneMetaRow}>
@@ -130,18 +122,6 @@ function getPromoBadgeClassName(value: Exclude<TemplatePromoBadgeMode, "Auto">):
 
 function joinClassNames(...classes: Array<string | null | undefined | false>) {
   return classes.filter(Boolean).join(" ");
-}
-
-function normalizePreviewTags(tags: string[] | string | undefined): string[] {
-  const rawTags = Array.isArray(tags) ? tags : typeof tags === "string" ? tags.split(",") : [];
-
-  return Array.from(
-    new Set(
-      rawTags
-        .map((tag) => tag.trim().replace(/^#+/, ""))
-        .filter(Boolean),
-    ),
-  ).slice(0, 3);
 }
 
 export { TemplatePreviewCard as TemplatePhonePreviewCard };

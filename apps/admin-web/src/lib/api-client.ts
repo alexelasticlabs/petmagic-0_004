@@ -31,6 +31,8 @@ export type TemplateType = "Image" | "Video";
 
 export type TemplateStatus = "Draft" | "Active" | "Archived";
 
+export type TemplateGenerationJobStatus = "Queued" | "Processing" | "Completed" | "Failed";
+
 export type TemplatePromoBadgeMode = "Auto" | "New" | "Trending" | "Popular" | "Funny";
 
 export type TemplateAssetInput = {
@@ -94,6 +96,46 @@ export type AdminTemplate = {
   keepOriginalSound?: boolean;
   createdAtUtc: string;
   updatedAtUtc: string;
+};
+
+export type AdminTemplateStatistics = {
+  templateId: string;
+  totalRuns: number;
+  queuedRuns: number;
+  processingRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  successRatePercent: number;
+  totalTokenCost: number;
+  averageTokenCost: number;
+  lastRunAtUtc?: string | null;
+  lastCompletedAtUtc?: string | null;
+  averageGenerationSeconds?: number | null;
+};
+
+export type AdminTemplateTestRun = {
+  generationId: string;
+  userId: string;
+  templateId: string;
+  status: TemplateGenerationJobStatus;
+  tokenCost: number;
+  sourceImageAsset?: TemplateAsset;
+  normalizedImageUrl?: string | null;
+  referenceMotionUrl?: string | null;
+  outputUrl?: string | null;
+  attemptCount: number;
+  usedPreprocessingModel?: string | null;
+  usedKlingModel?: string | null;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  startedAtUtc?: string | null;
+  preprocessingCompletedAtUtc?: string | null;
+  motionGenerationCompletedAtUtc?: string | null;
+  mediaImportCompletedAtUtc?: string | null;
+  completedAtUtc?: string | null;
+  userMediaExpired: boolean;
 };
 
 export type ImageTemplatePayload = {
@@ -401,6 +443,24 @@ export async function fetchAdminTemplates(type?: TemplateType): Promise<AdminTem
 
 export async function fetchAdminTemplate(templateId: string): Promise<AdminTemplate> {
   return apiRequest<AdminTemplate>(`/api/admin/templates/${templateId}`, { method: "GET" });
+}
+
+export async function fetchAdminTemplateStatistics(templateId: string): Promise<AdminTemplateStatistics> {
+  return apiRequest<AdminTemplateStatistics>(`/api/admin/templates/${templateId}/statistics`, { method: "GET" });
+}
+
+export async function startAdminTemplateTest(templateId: string, file: File): Promise<AdminTemplateTestRun> {
+  const formData = new FormData();
+  formData.append("sourceImage", file);
+
+  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/${templateId}/test`, {
+    method: "POST",
+    body: formData
+  });
+}
+
+export async function fetchAdminTemplateTest(generationId: string): Promise<AdminTemplateTestRun> {
+  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/tests/${generationId}`, { method: "GET" });
 }
 
 export async function createImageTemplate(payload: ImageTemplatePayload): Promise<AdminTemplate> {

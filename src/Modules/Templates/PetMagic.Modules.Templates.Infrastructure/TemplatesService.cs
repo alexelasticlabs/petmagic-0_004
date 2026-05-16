@@ -18,6 +18,13 @@ internal sealed class TemplatesService(
 {
     private static readonly string[] FunnyKeywords = ["funny", "meme", "viral", "dance", "lol", "cute"];
 
+    private sealed record GenerationStatisticsProjection(
+        TemplateGenerationStatus Status,
+        int TokenCost,
+        DateTime CreatedAtUtc,
+        DateTime? StartedAtUtc,
+        DateTime? CompletedAtUtc);
+
     public async Task<Result<IReadOnlyList<AdminTemplateListItemResponse>>> ListAdminAsync(TemplateType? type, TemplateStatus? status, CancellationToken cancellationToken)
     {
         var items = await dbContext.TemplateItems
@@ -37,6 +44,31 @@ internal sealed class TemplatesService(
         return template is null
             ? Result.Failure<AdminTemplateResponse>(TemplatesErrors.NotFound)
             : Result.Success(MapAdminResponse(template));
+    }
+
+    public async Task<Result<AdminTemplateStatisticsResponse>> GetAdminStatisticsAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
+        {
+            return Result.Failure<AdminTemplateStatisticsResponse>(TemplatesErrors.NotFound);
+        }
+
+        var jobs = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId)
+            .Select(x => new GenerationStatisticsProjection(
+                x.Status,
+                x.TokenCost,
+                x.CreatedAtUtc,
+                x.StartedAtUtc,
+                x.CompletedAtUtc))
+            .ToArrayAsync(cancellationToken);
+
+        return Result.Success(MapAdminStatisticsResponse(templateId, jobs));
     }
 
     public async Task<Result<AdminTemplateResponse>> CreateImageAsync(CreateImageTemplateCommand command, CancellationToken cancellationToken)
@@ -458,6 +490,50 @@ internal sealed class TemplatesService(
         }
 
         await mediaLifecycleService.SaveChangesAsync(cancellationToken);
+    }
+
+    private static AdminTemplateStatisticsResponse MapAdminStatisticsResponse(Guid templateId, IReadOnlyCollection<GenerationStatisticsProjection> jobs)
+    {
+        var totalRuns = jobs.Count;
+        var queuedRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Queued);
+        var processingRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Processing);
+        var completedRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Completed);
+        var failedRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Failed);
+        var totalTokenCost = jobs.Sum(x => x.TokenCost);
+        var averageTokenCost = totalRuns == 0
+            ? 0
+            : Math.Round(jobs.Average(x => x.TokenCost), 1, MidpointRounding.AwayFromZero);
+        var successRatePercent = totalRuns == 0
+            ? 0
+            : Math.Round((double)completedRuns * 100 / totalRuns, 1, MidpointRounding.AwayFromZero);
+        DateTime? lastRunAtUtc = totalRuns == 0 ? null : jobs.Max(x => x.CreatedAtUtc);
+        var completedAtValues = jobs
+            .Where(x => x.CompletedAtUtc.HasValue && x.Status == TemplateGenerationStatus.Completed)
+            .Select(x => x.CompletedAtUtc!.Value)
+            .ToArray();
+        DateTime? lastCompletedAtUtc = completedAtValues.Length == 0 ? null : completedAtValues.Max();
+        var completedDurations = jobs
+            .Where(x => x.Status == TemplateGenerationStatus.Completed && x.StartedAtUtc.HasValue && x.CompletedAtUtc.HasValue)
+            .Select(x => (x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds)
+            .Where(x => x >= 0)
+            .ToArray();
+        double? averageGenerationSeconds = completedDurations.Length == 0
+            ? null
+            : Math.Round(completedDurations.Average(), 1, MidpointRounding.AwayFromZero);
+
+        return new AdminTemplateStatisticsResponse(
+            templateId,
+            totalRuns,
+            queuedRuns,
+            processingRuns,
+            completedRuns,
+            failedRuns,
+            successRatePercent,
+            totalTokenCost,
+            averageTokenCost,
+            lastRunAtUtc,
+            lastCompletedAtUtc,
+            averageGenerationSeconds);
     }
 
     private async Task<Result> DeleteTemplateAssetsAsync(string[] assetUrls, CancellationToken cancellationToken)

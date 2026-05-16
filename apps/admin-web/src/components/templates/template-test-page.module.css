@@ -1,0 +1,275 @@
+.page {
+  width: 100%;
+  max-width: 106rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid #1a2738;
+  border-radius: 1.08rem;
+  background: linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(13, 21, 36, 0.96) 100%);
+}
+
+.headerCopy {
+  display: grid;
+  gap: 0.38rem;
+  max-width: 45rem;
+}
+
+.eyebrow,
+.cardEyebrow {
+  margin: 0;
+  color: #4ade80;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.headerCopy h1,
+.summaryHeader h2,
+.mediaPreviewCard h3 {
+  margin: 0;
+  color: #f4f8ff;
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+.headerCopy p {
+  margin: 0;
+  color: #8da1ba;
+  line-height: 1.5;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.primaryLink,
+.secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  border-radius: 0.8rem;
+  padding: 0.68rem 0.88rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.primaryLink {
+  border: 1px solid rgba(34, 197, 94, 0.42);
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+  color: #052914;
+}
+
+.secondaryLink {
+  border: 1px solid #25354a;
+  background: rgba(15, 24, 41, 0.78);
+  color: #c7d7ea;
+}
+
+.primaryLink:hover,
+.secondaryLink:hover {
+  transform: translateY(-1px);
+}
+
+.summaryGrid,
+.contentGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.summaryGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.contentGrid {
+  grid-template-columns: minmax(0, 1.3fr) minmax(18rem, 0.7fr);
+  align-items: start;
+}
+
+.sideStack,
+.summaryCard,
+.mediaCard,
+.sideCard {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.summaryHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.kpiCard,
+.mediaPreviewCard,
+.detailRow,
+.timelineItem,
+.uploadField {
+  border: 1px solid #1a2738;
+  border-radius: 0.96rem;
+  background: rgba(11, 19, 33, 0.72);
+}
+
+.kpiCard {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.82rem 0.88rem;
+}
+
+.kpiCard span,
+.detailRow span,
+.uploadField span,
+.timelineItem span,
+.infoText {
+  color: #8da1ba;
+}
+
+.kpiCard strong,
+.detailRow strong,
+.timelineItem strong {
+  color: #f4f8ff;
+}
+
+.uploadField {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.82rem 0.88rem;
+}
+
+.uploadField input {
+  color: #c7d7ea;
+}
+
+.launchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.mediaPreviewCard {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.82rem;
+}
+
+.mediaAsset,
+.mediaPlaceholder {
+  width: 100%;
+  aspect-ratio: 3 / 5;
+  border-radius: 0.88rem;
+  overflow: hidden;
+}
+
+.mediaAsset {
+  display: block;
+  object-fit: cover;
+  background: #08111d;
+}
+
+.mediaPlaceholder {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  border: 1px dashed #25354a;
+  color: #70859f;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.detailRow,
+.timelineItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.78rem 0.85rem;
+}
+
+.timeline {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.timelineItem {
+  justify-content: flex-start;
+}
+
+.timelineItem div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.detailValue {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  min-width: 0;
+  text-align: right;
+}
+
+.detailValue strong {
+  overflow-wrap: anywhere;
+}
+
+.detailValue small,
+.timelineMeta {
+  color: #70859f;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.timelineDot {
+  width: 0.72rem;
+  height: 0.72rem;
+  margin-top: 0.16rem;
+  border-radius: 999px;
+  background: #4ade80;
+  box-shadow: 0 0 0 0.22rem rgba(74, 222, 128, 0.12);
+}
+
+.infoText,
+.errorText {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.errorText {
+  color: #fca5a5;
+}
+
+@media (max-width: 980px) {
+  .summaryGrid,
+  .contentGrid,
+  .mediaGrid {
+    grid-template-columns: 1fr;
+  }
+}

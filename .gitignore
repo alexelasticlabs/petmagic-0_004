@@ -11,6 +11,7 @@
 # Build outputs
 bin/
 obj/
+*.csproj.lscache
 Results/
 TestResults/
 

@@ -4,6 +4,7 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -415,6 +416,173 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetAdminStatisticsAsync_ShouldAggregateGenerationMetrics()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Stats Dance",
+                "Template with generation history",
+                "Dance",
+                ["stats"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var now = new DateTime(2026, 5, 17, 12, 0, 0, DateTimeKind.Utc);
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-1.jpg",
+                SourceImageFileName = "source-1.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                OutputUrl = "https://cdn.example.com/output-1.mp4",
+                CreatedAtUtc = now.AddMinutes(-40),
+                QueuedAtUtc = now.AddMinutes(-40),
+                StartedAtUtc = now.AddMinutes(-39),
+                CompletedAtUtc = now.AddMinutes(-36),
+                UpdatedAtUtc = now.AddMinutes(-36)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-2.jpg",
+                SourceImageFileName = "source-2.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                OutputUrl = "https://cdn.example.com/output-2.mp4",
+                CreatedAtUtc = now.AddMinutes(-24),
+                QueuedAtUtc = now.AddMinutes(-24),
+                StartedAtUtc = now.AddMinutes(-23),
+                CompletedAtUtc = now.AddMinutes(-21),
+                UpdatedAtUtc = now.AddMinutes(-21)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Failed,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-3.jpg",
+                SourceImageFileName = "source-3.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                FailureCode = "templates.ai_provider_failed",
+                FailureMessage = "Provider failed",
+                CreatedAtUtc = now.AddMinutes(-12),
+                QueuedAtUtc = now.AddMinutes(-12),
+                StartedAtUtc = now.AddMinutes(-11),
+                CompletedAtUtc = now.AddMinutes(-10),
+                UpdatedAtUtc = now.AddMinutes(-10)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-4.jpg",
+                SourceImageFileName = "source-4.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                CreatedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-3)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var statistics = await service.GetAdminStatisticsAsync(created.Value.TemplateId, CancellationToken.None);
+
+        Assert.True(statistics.IsSuccess);
+        Assert.Equal(created.Value.TemplateId, statistics.Value.TemplateId);
+        Assert.Equal(4, statistics.Value.TotalRuns);
+        Assert.Equal(1, statistics.Value.QueuedRuns);
+        Assert.Equal(0, statistics.Value.ProcessingRuns);
+        Assert.Equal(2, statistics.Value.CompletedRuns);
+        Assert.Equal(1, statistics.Value.FailedRuns);
+        Assert.Equal(50, statistics.Value.SuccessRatePercent);
+        Assert.Equal(240, statistics.Value.TotalTokenCost);
+        Assert.Equal(60, statistics.Value.AverageTokenCost);
+        Assert.Equal(now.AddMinutes(-3), statistics.Value.LastRunAtUtc);
+        Assert.Equal(now.AddMinutes(-21), statistics.Value.LastCompletedAtUtc);
+        Assert.Equal(150, statistics.Value.AverageGenerationSeconds);
+    }
+
+    [Fact]
+    public async Task StartAdminTestAsync_ShouldQueueUnchargedAdminGeneration()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Admin Test Dance",
+                "Template for admin test run",
+                "Dance",
+                ["admin-test"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true,
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var started = await generationService.StartAdminTestAsync(
+            created.Value.TemplateId,
+            new TemplateAssetCommand("https://cdn.example.com/admin-source.jpg", "admin-source.jpg", "image/jpeg", 2048, null),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(created.Value.TemplateId, started.Value.TemplateId);
+        Assert.Equal("Queued", started.Value.Status);
+        Assert.Equal(60, started.Value.TokenCost);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == started.Value.GenerationId);
+        Assert.Equal(Guid.Empty, persisted.UserId);
+        Assert.Null(persisted.ChargedAtUtc);
+        Assert.Equal(TemplateGenerationStatus.Queued, persisted.Status);
+
+        var fetched = await generationService.GetAdminAsync(started.Value.GenerationId, CancellationToken.None);
+        Assert.True(fetched.IsSuccess);
+        Assert.Equal(started.Value.GenerationId, fetched.Value.GenerationId);
+    }
+
+    [Fact]
     public async Task CreateVideoAsync_ShouldResolveNewBadgeInAutoMode_ForFreshTemplates()
     {
         await using var dbContext = CreateDbContext();
@@ -565,6 +733,11 @@ public sealed class TemplatesServiceTests
         return new TemplatesService(dbContext, options, metadataReader, mediaStorage ?? new RecordingMediaStorage(), lifecycleService);
     }
 
+    private static TemplateGenerationService CreateGenerationService(TemplatesDbContext dbContext)
+    {
+        return new TemplateGenerationService(dbContext, new PassiveGenerationBilling());
+    }
+
     private static TemplatesDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<TemplatesDbContext>()
@@ -633,6 +806,19 @@ public sealed class TemplatesServiceTests
         public Task<PetMagic.BuildingBlocks.Results.Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Failure(TemplatesErrors.MediaStorageFailed));
+        }
+    }
+
+    private sealed class PassiveGenerationBilling : ITemplateGenerationBilling
+    {
+        public Task<PetMagic.BuildingBlocks.Results.Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
         }
     }
 }

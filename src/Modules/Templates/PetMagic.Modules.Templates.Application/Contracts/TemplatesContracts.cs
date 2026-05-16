@@ -137,6 +137,20 @@ public sealed record AdminTemplateResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 
+public sealed record AdminTemplateStatisticsResponse(
+    Guid TemplateId,
+    int TotalRuns,
+    int QueuedRuns,
+    int ProcessingRuns,
+    int CompletedRuns,
+    int FailedRuns,
+    double SuccessRatePercent,
+    int TotalTokenCost,
+    double AverageTokenCost,
+    DateTime? LastRunAtUtc,
+    DateTime? LastCompletedAtUtc,
+    double? AverageGenerationSeconds);
+
 public sealed record PublicTemplateListItemResponse(
     Guid TemplateId,
     string TemplateType,
@@ -174,10 +188,16 @@ public sealed record TemplateGenerationResponse(
     string? NormalizedImageUrl,
     string? ReferenceMotionUrl,
     string? OutputUrl,
+    int AttemptCount,
+    string? UsedPreprocessingModel,
+    string? UsedKlingModel,
     string? FailureCode,
     string? FailureMessage,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     DateTime? StartedAtUtc,
+    DateTime? PreprocessingCompletedAtUtc,
+    DateTime? MotionGenerationCompletedAtUtc,
+    DateTime? MediaImportCompletedAtUtc,
     DateTime? CompletedAtUtc,
     bool UserMediaExpired);

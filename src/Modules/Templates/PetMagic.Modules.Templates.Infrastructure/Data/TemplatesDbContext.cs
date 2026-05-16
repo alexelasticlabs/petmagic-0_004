@@ -59,6 +59,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.NormalizedImageUrl).HasMaxLength(2048);
             entity.Property(x => x.ReferenceMotionUrl).HasMaxLength(2048);
             entity.Property(x => x.OutputUrl).HasMaxLength(2048);
+            entity.Property(x => x.UsedPreprocessingModel).HasMaxLength(256);
+            entity.Property(x => x.UsedKlingModel).HasMaxLength(256);
             entity.Property(x => x.FailureCode).HasMaxLength(128);
             entity.Property(x => x.FailureMessage).HasMaxLength(1000);
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);

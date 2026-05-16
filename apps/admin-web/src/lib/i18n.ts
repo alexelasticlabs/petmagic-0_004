@@ -102,6 +102,7 @@ export type Dictionary = {
   uploadAction: string;
   uploadingMedia: string;
   mediaUploadHint: string;
+  referenceMotionUploadHint: string;
   mediaDropzoneHint: string;
   selectedFileLabel: string;
   chooseFile: string;
@@ -248,6 +249,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     uploadAction: "Загрузить",
     uploadingMedia: "Загрузка файла...",
     mediaUploadHint: "После загрузки backend сам определяет URL, имя файла, тип, размер и длительность media.",
+    referenceMotionUploadHint: "Для reference motion поддерживается только MP4: backend использует этот формат для расчета длительности и ориентации персонажа.",
     mediaDropzoneHint: "Кликните по области или перетащите файл сюда.",
     selectedFileLabel: "Выбранный файл",
     chooseFile: "Выбрать файл",
@@ -292,7 +294,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorAccessPremiumHint: "Только для Premium пользователей.",
     editorReviewReadyHint: "Шаблон выглядит цельным и готовым к следующему шагу публикации.",
     editorReviewIncompleteHint: "Перед публикацией лучше закрыть незаполненные медиа или AI-блоки, чтобы карточка выглядела завершённой.",
-    editorMediaRequirements: "Все видео должны быть вертикальными 9:16. Длительность reference влияет на auto-detected character orientation."
+    editorMediaRequirements: "Все видео должны быть вертикальными 9:16. Для reference motion поддерживается только MP4, потому что его длительность влияет на auto-detected character orientation."
   },
   en: {
     loginTitle: "Sign in",
@@ -392,6 +394,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     uploadAction: "Upload",
     uploadingMedia: "Uploading file...",
     mediaUploadHint: "After upload, the backend fills the media URL, file name, type, size, and duration automatically.",
+    referenceMotionUploadHint: "Reference motion supports MP4 only because the backend relies on that format to calculate duration and character orientation.",
     mediaDropzoneHint: "Click the area or drag a file here.",
     selectedFileLabel: "Selected file",
     chooseFile: "Choose file",
@@ -436,7 +439,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorAccessPremiumHint: "Only for Premium users.",
     editorReviewReadyHint: "The template feels cohesive and ready for the next publishing step.",
     editorReviewIncompleteHint: "Before publishing, close the remaining media or AI gaps so the card reads as complete.",
-    editorMediaRequirements: "All videos should stay vertical 9:16. Reference duration affects the auto-detected character orientation."
+    editorMediaRequirements: "All videos should stay vertical 9:16. Reference motion supports MP4 only because its duration drives the auto-detected character orientation."
   }
 };
 

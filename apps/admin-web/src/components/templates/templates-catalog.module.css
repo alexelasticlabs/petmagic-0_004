@@ -100,8 +100,8 @@
 .filtersBar {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(15rem, 1.45fr) repeat(4, minmax(8.25rem, 0.74fr)) minmax(12rem, 13.5rem);
-  gap: clamp(0.55rem, 0.4rem + 0.35vw, 0.75rem);
+  grid-template-columns: minmax(13rem, 1.55fr) repeat(4, minmax(7rem, 0.82fr)) minmax(9.75rem, 0.95fr);
+  gap: clamp(0.5rem, 0.34rem + 0.28vw, 0.65rem);
   align-items: end;
 }
 
@@ -179,6 +179,14 @@
   font-weight: 900;
   cursor: pointer;
   transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.viewButton > span:last-child,
+.viewButtonActive > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .viewButtonActive {
@@ -358,8 +366,41 @@
 }
 
 .cardActions {
-  margin-left: auto;
-  justify-content: flex-end;
+  margin-left: 0;
+  justify-content: flex-start;
+  gap: 0.38rem;
+}
+
+.cardActionLink,
+.cardActionButton {
+  min-height: 2rem;
+  border-radius: 0.72rem;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
+.cardActionLink {
+  padding: 0.56rem 0.72rem;
+  border-color: #213248;
+  background: linear-gradient(180deg, rgba(17, 29, 48, 0.92) 0%, rgba(11, 19, 33, 0.9) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.cardActionButton {
+  padding-inline: 0.7rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.cardActionButtonSelected {
+  border-color: rgba(74, 222, 128, 0.34);
+  background: linear-gradient(180deg, rgba(25, 77, 46, 0.62) 0%, rgba(14, 49, 31, 0.5) 100%);
+  color: #d9ffe5;
+}
+
+.cardActionDanger {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: linear-gradient(180deg, rgba(93, 24, 24, 0.42) 0%, rgba(66, 18, 18, 0.32) 100%);
 }
 
 .cardTimestamp {
@@ -425,6 +466,33 @@
   font-family: var(--font-space-grotesk), sans-serif;
   font-size: 0.9rem;
   font-weight: 900;
+}
+
+.statsPanelHeader {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.statsPanelEyebrow {
+  margin: 0;
+  color: #4ade80;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statsPanelDescription,
+.railHint,
+.panelError {
+  margin: 0;
+  color: #8da1ba;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.panelError {
+  color: #fca5a5;
 }
 
 .statLine {
@@ -521,14 +589,14 @@
   }
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1680px) {
   .catalogShell {
     grid-template-columns: 1fr;
   }
 
   .sideRail {
     position: static;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
   }
 }
 

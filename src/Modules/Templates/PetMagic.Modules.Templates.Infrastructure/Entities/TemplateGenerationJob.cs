@@ -28,6 +28,16 @@ public sealed class TemplateGenerationJob
 
     public string? OutputUrl { get; set; }
 
+    public string? UsedPreprocessingModel { get; set; }
+
+    public string? UsedKlingModel { get; set; }
+
+    public DateTime? PreprocessingCompletedAtUtc { get; set; }
+
+    public DateTime? MotionGenerationCompletedAtUtc { get; set; }
+
+    public DateTime? MediaImportCompletedAtUtc { get; set; }
+
     public int AttemptCount { get; set; }
 
     public string? FailureCode { get; set; }

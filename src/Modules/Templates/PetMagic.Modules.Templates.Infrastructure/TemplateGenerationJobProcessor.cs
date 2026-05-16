@@ -51,12 +51,19 @@ internal sealed class TemplateGenerationJobProcessor(
                 "LastAttemptAtUtc" = {2},
                 "StartedAtUtc" = COALESCE("StartedAtUtc", {2}),
                 "UpdatedAtUtc" = {2},
+                "NormalizedImageUrl" = NULL,
+                "OutputUrl" = NULL,
+                "UsedPreprocessingModel" = NULL,
+                "UsedKlingModel" = NULL,
+                "PreprocessingCompletedAtUtc" = NULL,
+                "MotionGenerationCompletedAtUtc" = NULL,
+                "MediaImportCompletedAtUtc" = NULL,
                 "FailureCode" = NULL,
                 "FailureMessage" = NULL
             WHERE "Id" = (
                 SELECT "Id"
                 FROM templates_generation_jobs
-                WHERE "Status" = {0} AND "ChargedAtUtc" IS NOT NULL AND "AttemptCount" < {3}
+                WHERE "Status" = {0} AND ("ChargedAtUtc" IS NOT NULL OR "UserId" = {4}) AND "AttemptCount" < {3}
                 ORDER BY "QueuedAtUtc"
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
@@ -66,7 +73,8 @@ internal sealed class TemplateGenerationJobProcessor(
             (int)TemplateGenerationStatus.Queued,
             (int)TemplateGenerationStatus.Processing,
             now,
-            options.MaxGenerationAttempts)
+            options.MaxGenerationAttempts,
+            TemplateGenerationService.AdminTestUserId)
             .ToListAsync(cancellationToken);
 
         var claimedId = claimedIds.FirstOrDefault();
@@ -87,7 +95,7 @@ internal sealed class TemplateGenerationJobProcessor(
             .Include(x => x.Template)
             .ThenInclude(x => x.Assets)
             .Where(x => x.Status == TemplateGenerationStatus.Queued
-                && x.ChargedAtUtc != null
+                && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && x.AttemptCount < options.MaxGenerationAttempts)
             .OrderBy(x => x.QueuedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -109,6 +117,13 @@ internal sealed class TemplateGenerationJobProcessor(
         job.LastAttemptAtUtc = now;
         job.StartedAtUtc ??= now;
         job.UpdatedAtUtc = now;
+        job.NormalizedImageUrl = null;
+        job.OutputUrl = null;
+        job.UsedPreprocessingModel = null;
+        job.UsedKlingModel = null;
+        job.PreprocessingCompletedAtUtc = null;
+        job.MotionGenerationCompletedAtUtc = null;
+        job.MediaImportCompletedAtUtc = null;
         job.FailureCode = null;
         job.FailureMessage = null;
     }
@@ -168,7 +183,7 @@ internal sealed class TemplateGenerationJobProcessor(
     {
         var job = await dbContext.TemplateGenerationJobs
             .Where(x => x.Status == TemplateGenerationStatus.Queued
-                && x.ChargedAtUtc != null
+                && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && x.AttemptCount >= options.MaxGenerationAttempts)
             .OrderBy(x => x.QueuedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -194,10 +209,18 @@ internal sealed class TemplateGenerationJobProcessor(
             }
 
             var referenceMotion = TemplateGenerationService.GetAsset(job.Template, TemplateAssetKind.ReferenceMotion)!;
+            var preprocessingModel = job.Template.PreprocessingModel!;
+            var preprocessingPrompt = TemplateGenerationService.ResolvePrompt(job.Template.PreprocessingPrompt, options.DefaultPreprocessingPrompt);
+            var motionModel = job.Template.KlingModel!;
+            var motionPrompt = TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt);
+
+            job.UsedPreprocessingModel = preprocessingModel;
+            job.UsedKlingModel = motionModel;
+
             var normalized = await imagePreprocessor.NormalizeAsync(
                 job.SourceImageUrl,
-                job.Template.PreprocessingModel!,
-                TemplateGenerationService.ResolvePrompt(job.Template.PreprocessingPrompt, options.DefaultPreprocessingPrompt),
+                preprocessingModel,
+                preprocessingPrompt,
                 cancellationToken);
 
             if (normalized.IsFailure)
@@ -207,7 +230,8 @@ internal sealed class TemplateGenerationJobProcessor(
             }
 
             job.NormalizedImageUrl = normalized.Value;
-            job.UpdatedAtUtc = DateTime.UtcNow;
+            job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
+            job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
 
             var generated = await videoMotionGenerator.CreateAsync(
@@ -215,8 +239,8 @@ internal sealed class TemplateGenerationJobProcessor(
                 referenceMotion.Url,
                 job.Template.CharacterOrientation!.Value.ToString(),
                 job.Template.KeepOriginalSound ?? true,
-                TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt),
-                job.Template.KlingModel!,
+                motionPrompt,
+                motionModel,
                 cancellationToken);
 
             if (generated.IsFailure)
@@ -224,6 +248,10 @@ internal sealed class TemplateGenerationJobProcessor(
                 await MarkFailedAsync(job, generated.Error, cancellationToken);
                 return;
             }
+
+            job.MotionGenerationCompletedAtUtc = DateTime.UtcNow;
+            job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             var storedOutput = await generatedMediaImporter.ImportVideoAsync(generated.Value, job.Id, cancellationToken);
             if (storedOutput.IsFailure)
@@ -233,8 +261,9 @@ internal sealed class TemplateGenerationJobProcessor(
             }
 
             job.OutputUrl = storedOutput.Value.Url;
+            job.MediaImportCompletedAtUtc = DateTime.UtcNow;
             job.Status = TemplateGenerationStatus.Completed;
-            job.UpdatedAtUtc = DateTime.UtcNow;
+            job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
             job.CompletedAtUtc = job.UpdatedAtUtc;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
