@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminStatusBadge } from "@/components/admin/admin-primitives";
+import { AdminPageHero, AdminStatusBadge } from "@/components/admin/admin-primitives";
 import { TemplateBasicFields } from "@/components/templates/template-basic-fields";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import { TemplatePreviewAssetSection } from "@/components/templates/template-preview-asset-section";
@@ -375,11 +375,17 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
           </div>
         </div>
 
-        <div className={styles.pageHeader}>
-          <div>
-            <h1 className={styles.pageTitle}>{pageTitle}</h1>
-          </div>
-        </div>
+        <AdminPageHero
+          eyebrow={sectionTitle}
+          title={pageTitle}
+          description={pageHint}
+          badge={badgeLabel}
+          metaItems={[
+            isEditMode ? text.updateTemplate : text.createNewTemplate,
+            form.isPremium ? text.premiumLabel : text.freeLabel,
+            `${text.categoryLabel}: ${form.category || text.editorMissing}`,
+          ]}
+        />
 
         {error ? <div className={styles.error}>{error}</div> : null}
 

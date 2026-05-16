@@ -1,6 +1,9 @@
 .videoEditorPage {
+  width: 100%;
+  max-width: 106rem;
+  margin: 0 auto;
   display: grid;
-  gap: 1rem;
+  gap: clamp(0.9rem, 0.55rem + 0.7vw, 1.3rem);
 }
 
 .pageTop {
@@ -55,6 +58,14 @@
   gap: 1rem;
 }
 
+.pageHeader h1 {
+  margin: 0;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: clamp(2rem, 1.55rem + 1.25vw, 3rem);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+
 .editorForm {
   display: grid;
   gap: 1rem;
@@ -62,14 +73,14 @@
 
 .editorGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 21rem;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) clamp(19.5rem, 21vw, 23.5rem);
+  gap: clamp(0.95rem, 0.55rem + 0.8vw, 1.4rem);
   align-items: start;
 }
 
 .editorMain {
   display: grid;
-  gap: 1rem;
+  gap: clamp(0.9rem, 0.55rem + 0.7vw, 1.2rem);
 }
 
 .editorRail {
@@ -77,7 +88,7 @@
   top: 5.4rem;
   align-self: start;
   display: grid;
-  gap: 1rem;
+  gap: clamp(0.8rem, 0.5rem + 0.55vw, 1rem);
 }
 
 .previewRailCard {
@@ -93,7 +104,7 @@
   gap: 1rem;
   border: 1px solid #1a2738;
   border-radius: 1.05rem;
-  padding: 1.15rem;
+  padding: clamp(0.95rem, 0.72rem + 0.6vw, 1.2rem);
   background: linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(13, 21, 36, 0.96) 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035), 0 18px 42px rgba(0, 0, 0, 0.18);
 }
@@ -186,7 +197,7 @@
   gap: 0.6rem;
   border: 1px solid #1a2738;
   border-radius: 0.95rem;
-  padding: 0.76rem;
+  padding: clamp(0.72rem, 0.58rem + 0.35vw, 0.9rem);
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 30%),
     radial-gradient(circle at bottom left, rgba(15, 23, 42, 0.34), transparent 42%),
@@ -260,12 +271,12 @@
 .previewCardWrap {
   margin: 0 auto;
   width: 100%;
-  max-width: 17rem;
+  max-width: min(100%, 18rem);
 }
 
 .phoneMedia {
   position: relative;
-  min-height: 33.75rem;
+  min-height: clamp(29rem, 27rem + 10vw, 33.75rem);
   overflow: hidden;
   border: 1px solid rgba(140, 156, 176, 0.14);
   border-radius: 1.28rem;
@@ -606,7 +617,7 @@
   gap: 0.75rem;
   border: 1px solid #1a2738;
   border-radius: 0.9rem;
-  padding: 0.72rem 0.82rem;
+  padding: clamp(0.7rem, 0.55rem + 0.35vw, 0.86rem) clamp(0.78rem, 0.62rem + 0.45vw, 0.95rem);
   background: linear-gradient(180deg, rgba(15, 24, 41, 0.96) 0%, rgba(13, 21, 36, 0.94) 100%);
 }
 
@@ -1286,8 +1297,32 @@
   .editorRail {
     position: static;
   }
+
+  .previewCardWrap {
+    max-width: min(100%, 20rem);
+  }
   .layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1440px) {
+  .videoEditorPage {
+    max-width: 96rem;
+  }
+
+  .editorGrid {
+    grid-template-columns: minmax(0, 1fr) 21rem;
+  }
+}
+
+@media (max-width: 1280px) {
+  .videoEditorPage {
+    max-width: 88rem;
+  }
+
+  .mediaGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1295,6 +1330,10 @@
   .mediaGrid,
   .modelGrid {
     grid-template-columns: 1fr;
+  }
+
+  .pageHeader h1 {
+    max-width: 12ch;
   }
 }
 
@@ -1325,6 +1364,10 @@
     padding: 0.95rem;
   }
 
+  .phoneMedia {
+    min-height: 31rem;
+  }
+
   .headerRow {
     flex-direction: column;
   }
@@ -1344,5 +1387,37 @@
   .footerActions {
     width: 100%;
     justify-content: stretch;
+  }
+
+  .footerActions > * {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .videoEditorPage {
+    gap: 0.85rem;
+  }
+
+  .pageHeader h1 {
+    font-size: clamp(1.72rem, 1.45rem + 1vw, 2.05rem);
+  }
+
+  .sectionDescription,
+  .muted {
+    font-size: 0.74rem;
+  }
+
+  .phoneMedia {
+    min-height: 27.5rem;
+  }
+
+  .checklistItem {
+    grid-template-columns: auto 1fr;
+  }
+
+  .checklistState {
+    grid-column: 2;
+    justify-self: start;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import styles from "@/components/users-table.module.css";
@@ -42,6 +42,21 @@ export function UsersTable({ locale }: UsersTableProps) {
   }, [toast]);
 
   const canManageRoles = session?.user.roles.includes("Admin") ?? false;
+  const hero = (
+    <AdminPageHero
+      eyebrow={locale === "ru" ? "Access control" : "Access control"}
+      title={text.usersTitle}
+      description={locale === "ru"
+        ? "Управление ролями, premium-статусом и активностью пользователей в том же визуальном ритме, что и каталог, editor и dashboard."
+        : "Manage roles, premium status, and activity with the same visual rhythm as the catalog, editor, and dashboard."}
+      badge={locale === "ru" ? "Роли и доступ" : "Roles & access"}
+      metaItems={[
+        locale === "ru" ? `Пользователей: ${users.length}` : `Users: ${users.length}`,
+        canManageRoles ? (locale === "ru" ? "Admin controls enabled" : "Admin controls enabled") : (locale === "ru" ? "Просмотр без admin-control" : "View only"),
+        locale === "ru" ? "Живое управление статусами" : "Live status controls",
+      ]}
+    />
+  );
 
   async function loadUsers() {
     setIsLoading(true);
@@ -94,6 +109,7 @@ export function UsersTable({ locale }: UsersTableProps) {
   if (isLoading) {
     return (
       <div className={styles.page}>
+        {hero}
         <AdminCard title={text.usersTitle} description={locale === "ru" ? "Загрузка списка пользователей" : "Loading users list"}>
           <div className={styles.skeletonStack} aria-busy="true" aria-live="polite">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -107,6 +123,7 @@ export function UsersTable({ locale }: UsersTableProps) {
 
   return (
     <div className={styles.page}>
+      {hero}
       <AdminCard
         title={text.usersTitle}
         description={locale === "ru" ? "Роли, премиум-статус и активность пользователей" : "Roles, premium status, and user access controls"}

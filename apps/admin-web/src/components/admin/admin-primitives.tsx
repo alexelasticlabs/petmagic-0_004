@@ -24,6 +24,21 @@ type AdminStatusBadgeProps = {
   color: string;
 };
 
+type AdminPageHeroProps = {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  badge?: ReactNode;
+  actions?: ReactNode;
+  metaItems?: readonly ReactNode[];
+  className?: string;
+};
+
+type AdminSummaryChipsProps = {
+  items: readonly ReactNode[];
+  className?: string;
+};
+
 function joinClassNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -73,9 +88,61 @@ export function AdminStatusBadge({ children, color }: AdminStatusBadgeProps) {
   );
 }
 
+export function AdminSummaryChips({ items, className }: AdminSummaryChipsProps) {
+  const visibleItems = items.filter(Boolean);
+
+  if (!visibleItems.length) {
+    return null;
+  }
+
+  return (
+    <div className={joinClassNames(styles.pageMeta, className)}>
+      {visibleItems.map((item, index) => (
+        <span key={index} className={styles.pageMetaItem}>{item}</span>
+      ))}
+    </div>
+  );
+}
+
+export function AdminPageHero({ eyebrow, title, description, badge, actions, metaItems = [], className }: AdminPageHeroProps) {
+  const hasAside = badge || actions;
+
+  return (
+    <section className={joinClassNames(styles.pageHero, className)}>
+      <div className={styles.pageHeroHead}>
+        <div className={styles.pageTitleGroup}>
+          {eyebrow ? <p className={styles.pageEyebrow}>{eyebrow}</p> : null}
+          <h1 className={styles.pageTitle}>{title}</h1>
+          {description ? <p className={styles.pageDescription}>{description}</p> : null}
+        </div>
+        {hasAside ? (
+          <div className={styles.pageHeroAside}>
+            {actions}
+            {badge ? <span className={styles.pageBadge}>{badge}</span> : null}
+          </div>
+        ) : null}
+      </div>
+      <AdminSummaryChips items={metaItems} />
+    </section>
+  );
+}
+
 export const adminTableStyles = {
   tableWrap: styles.tableWrap,
   table: styles.table,
   mono: styles.mono,
   numeric: styles.numeric,
+};
+
+export const adminPageStyles = {
+  pageHero: styles.pageHero,
+  pageHeroHead: styles.pageHeroHead,
+  pageHeroAside: styles.pageHeroAside,
+  pageTitleGroup: styles.pageTitleGroup,
+  pageEyebrow: styles.pageEyebrow,
+  pageTitle: styles.pageTitle,
+  pageDescription: styles.pageDescription,
+  pageBadge: styles.pageBadge,
+  pageMeta: styles.pageMeta,
+  pageMetaItem: styles.pageMetaItem,
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminCard, AdminStatCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminPageHero, AdminStatCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import styles from "@/components/dashboard-view.module.css";
 import { type Locale } from "@/lib/i18n";
 import Link from "next/link";
@@ -143,6 +143,20 @@ export function DashboardView({ locale }: DashboardViewProps) {
 
   return (
     <div className={styles.dashboard}>
+      <AdminPageHero
+        eyebrow={isRu ? "Control center" : "Control center"}
+        title={isRu ? "Обзор админки" : "Admin Overview"}
+        description={isRu
+          ? "Ключевые метрики, активность и монетизация в одном темпе и с тем же визуальным ритмом, что и остальные экраны админки."
+          : "Key metrics, activity, and monetization with the same pacing and visual rhythm as the rest of the admin."}
+        badge={isRu ? "Последние 7 дней" : "Last 7 days"}
+        metaItems={[
+          isRu ? "4 KPI-карточки" : "4 KPI cards",
+          isRu ? "2 аналитических блока" : "2 analytics blocks",
+          isRu ? "Живой мониторинг" : "Live monitoring",
+        ]}
+      />
+
       <div className={styles.statsGrid}>
         {stats.map((stat) => (
           <AdminStatCard

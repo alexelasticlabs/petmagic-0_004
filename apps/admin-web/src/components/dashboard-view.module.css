@@ -1,18 +1,21 @@
 .dashboard {
+  width: 100%;
+  max-width: 106rem;
+  margin: 0 auto;
   display: grid;
-  gap: 1.25rem;
+  gap: clamp(1rem, 0.72rem + 0.7vw, 1.35rem);
 }
 
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
+  gap: clamp(0.8rem, 0.5rem + 0.6vw, 1rem);
 }
 
 .contentGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.72fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.72fr);
+  gap: clamp(0.9rem, 0.55rem + 0.7vw, 1.2rem);
   align-items: stretch;
 }
 
@@ -157,6 +160,12 @@
 
   .contentGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1440px) {
+  .dashboard {
+    max-width: 96rem;
   }
 }
 

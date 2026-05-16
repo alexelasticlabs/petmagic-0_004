@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { fetchAdminTemplates, getSession, type AdminTemplateListItem } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -66,13 +66,17 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
   return (
     <section className={styles.catalogPage}>
-      <div className={styles.catalogHero}>
-        <div className={styles.heroIcon} aria-hidden="true">#</div>
-        <div className={styles.heroCopy}>
-          <h1>{isRu ? "Категории шаблонов" : "Template Categories"}</h1>
-          <p>{isRu ? "Read-only сводка по категориям на основе существующих image и video шаблонов." : "Read-only category overview based on existing image and video templates."}</p>
-        </div>
-      </div>
+      <AdminPageHero
+        eyebrow={isRu ? "Template taxonomy" : "Template taxonomy"}
+        title={isRu ? "Категории шаблонов" : "Template Categories"}
+        description={isRu ? "Read-only сводка по категориям на основе существующих image и video шаблонов." : "Read-only category overview based on existing image and video templates."}
+        badge={isRu ? "Read only" : "Read only"}
+        metaItems={[
+          `${isRu ? "Категорий" : "Categories"}: ${categories.length}`,
+          `${isRu ? "Шаблонов" : "Templates"}: ${templates.length}`,
+          `Premium: ${totalPremium}`,
+        ]}
+      />
 
       {error ? <p className={styles.error}>{error}</p> : null}
 

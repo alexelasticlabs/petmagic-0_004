@@ -215,7 +215,7 @@
   align-items: center;
   gap: 1rem;
   min-height: 4.75rem;
-  padding: 1rem 1.5rem;
+  padding: 1rem clamp(1rem, 0.55rem + 1vw, 1.75rem);
   border-bottom: 1px solid var(--admin-border);
   background: rgba(9, 13, 22, 0.88);
   backdrop-filter: blur(14px);
@@ -326,7 +326,7 @@
 
 .content {
   min-width: 0;
-  padding: 1.5rem;
+  padding: clamp(1rem, 0.6rem + 1vw, 1.75rem);
 }
 
 .authGate {

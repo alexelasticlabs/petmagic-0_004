@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -172,17 +172,22 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
 
   return (
     <section className={styles.catalogPage}>
-      <div className={styles.catalogHero}>
-        <div className={styles.heroIcon} aria-hidden="true">{templateType === "Video" ? "▶" : "◼"}</div>
-        <div className={styles.heroCopy}>
-          <h1>{copy.title}</h1>
-          <p>{copy.description}</p>
-        </div>
-        <div className={styles.heroActions}>
-          <Link href={categoriesPath} className={styles.secondaryLink}>{copy.manageCategories}</Link>
-          <Link href={editorBasePath} className={styles.primaryLink}>{copy.createTemplate}</Link>
-        </div>
-      </div>
+      <AdminPageHero
+        eyebrow={templateType === "Video" ? "Video templates" : "Image templates"}
+        title={copy.title}
+        description={copy.description}
+        actions={(
+          <>
+            <Link href={categoriesPath} className={styles.secondaryLink}>{copy.manageCategories}</Link>
+            <Link href={editorBasePath} className={styles.primaryLink}>{copy.createTemplate}</Link>
+          </>
+        )}
+        metaItems={[
+          copy.showing(filteredTemplates.length, catalog.stats.total),
+          `${locale === "ru" ? "Активных" : "Active"}: ${catalog.stats.active}`,
+          `${locale === "ru" ? "Категорий" : "Categories"}: ${catalog.categories.length}`,
+        ]}
+      />
 
       <div className={styles.tabRow} role="tablist" aria-label={copy.archiveTabsLabel}>
         <button type="button" className={archiveFilter === "active" ? styles.tabActive : styles.tab} onClick={() => setArchiveFilter("active")}>
@@ -232,9 +237,6 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
               </button>
             </div>
           </div>
-
-          <p className={styles.resultSummary}>{copy.showing(filteredTemplates.length, catalog.stats.total)}</p>
-
           {!filteredTemplates.length ? (
             <div className={styles.empty}>{text.noTemplates}</div>
           ) : viewMode === "cards" ? (
