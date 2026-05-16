@@ -11,6 +11,19 @@ export type Dictionary = {
   passwordLabel: string;
   signIn: string;
   usersTitle: string;
+  usersHeroEyebrow: string;
+  usersHeroDescription: string;
+  usersHeroBadge: string;
+  usersMetaCountLabel: string;
+  usersMetaAdminEnabled: string;
+  usersMetaViewOnly: string;
+  usersMetaLiveControls: string;
+  usersLoadingDescription: string;
+  usersCardDescription: string;
+  usersEmptyDescription: string;
+  usersChangesSaved: string;
+  yesLabel: string;
+  noLabel: string;
   roleLabel: string;
   premiumLabel: string;
   activeLabel: string;
@@ -28,6 +41,9 @@ export type Dictionary = {
   errorSavingTemplate: string;
   errorActivatingTemplate: string;
   errorDeletingTemplate: string;
+  templateStatusUpdated: string;
+  templateDeleted: string;
+  templateFileUploaded: string;
   noUsers: string;
   noTemplates: string;
   activate: string;
@@ -141,6 +157,19 @@ const dictionaries: Record<Locale, Dictionary> = {
     passwordLabel: "Пароль",
     signIn: "Войти",
     usersTitle: "Пользователи",
+    usersHeroEyebrow: "Управление доступом",
+    usersHeroDescription: "Управление ролями, premium-статусом и активностью пользователей в том же визуальном ритме, что и каталог, editor и dashboard.",
+    usersHeroBadge: "Роли и доступ",
+    usersMetaCountLabel: "Пользователей",
+    usersMetaAdminEnabled: "Admin controls enabled",
+    usersMetaViewOnly: "Просмотр без admin-control",
+    usersMetaLiveControls: "Живое управление статусами",
+    usersLoadingDescription: "Загрузка списка пользователей",
+    usersCardDescription: "Роли, премиум-статус и активность пользователей",
+    usersEmptyDescription: "Когда пользователи появятся, здесь будут доступны их роли и переключатели доступа.",
+    usersChangesSaved: "Изменения сохранены",
+    yesLabel: "Да",
+    noLabel: "Нет",
     roleLabel: "Роль",
     premiumLabel: "Premium",
     activeLabel: "Активен",
@@ -158,6 +187,9 @@ const dictionaries: Record<Locale, Dictionary> = {
     errorSavingTemplate: "Не удалось сохранить шаблон.",
     errorActivatingTemplate: "Не удалось активировать шаблон.",
     errorDeletingTemplate: "Не удалось удалить шаблон.",
+    templateStatusUpdated: "Статус обновлен.",
+    templateDeleted: "Шаблон удален.",
+    templateFileUploaded: "Файл загружен.",
     noUsers: "Пользователи не найдены.",
     noTemplates: "Шаблоны не найдены.",
     activate: "Активировать",
@@ -269,6 +301,19 @@ const dictionaries: Record<Locale, Dictionary> = {
     passwordLabel: "Password",
     signIn: "Sign in",
     usersTitle: "Users",
+    usersHeroEyebrow: "Access control",
+    usersHeroDescription: "Manage roles, premium status, and activity with the same visual rhythm as the catalog, editor, and dashboard.",
+    usersHeroBadge: "Roles & access",
+    usersMetaCountLabel: "Users",
+    usersMetaAdminEnabled: "Admin controls enabled",
+    usersMetaViewOnly: "View only",
+    usersMetaLiveControls: "Live status controls",
+    usersLoadingDescription: "Loading users list",
+    usersCardDescription: "Roles, premium status, and user access controls",
+    usersEmptyDescription: "User roles and access toggles will appear here once the list is populated.",
+    usersChangesSaved: "Changes saved",
+    yesLabel: "Yes",
+    noLabel: "No",
     roleLabel: "Role",
     premiumLabel: "Premium",
     activeLabel: "Active",
@@ -286,6 +331,9 @@ const dictionaries: Record<Locale, Dictionary> = {
     errorSavingTemplate: "Failed to save template.",
     errorActivatingTemplate: "Failed to activate template.",
     errorDeletingTemplate: "Failed to delete template.",
+    templateStatusUpdated: "Status updated.",
+    templateDeleted: "Template deleted.",
+    templateFileUploaded: "File uploaded.",
     noUsers: "No users found.",
     noTemplates: "No templates found.",
     activate: "Activate",

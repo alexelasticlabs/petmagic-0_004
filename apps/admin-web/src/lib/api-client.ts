@@ -100,6 +100,7 @@ export type ImageTemplatePayload = {
   title: string;
   shortDescription: string;
   category: string;
+  status: TemplateStatus;
   promoBadgeMode: TemplatePromoBadgeMode;
   tags: string[];
   isPremium: boolean;
@@ -111,6 +112,7 @@ export type VideoTemplatePayload = {
   title: string;
   shortDescription: string;
   category: string;
+  status: TemplateStatus;
   promoBadgeMode: TemplatePromoBadgeMode;
   tags: string[];
   isPremium: boolean;

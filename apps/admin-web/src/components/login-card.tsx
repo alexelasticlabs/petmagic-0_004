@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "@/components/login-card.module.css";
 import { login, useAuthSession } from "@/lib/api-client";
 import { type Locale, getDictionary } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -8,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 /* ── SVG icons ────────────────────────────────────────────────────── */
 function IconEmail() {
   return (
-    <svg className="ls-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="2" y="4" width="20" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
       <path d="M22 6.5L12 13.5L2 6.5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </svg>
@@ -17,7 +18,7 @@ function IconEmail() {
 
 function IconLock() {
   return (
-    <svg className="ls-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="3" y="11" width="18" height="11" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </svg>
@@ -94,13 +95,13 @@ export function LoginCard({ locale }: LoginCardProps) {
   /* Dark skeleton while checking session */
   if (isCheckingSession || isRedirecting) {
     return (
-      <div className="ls-form-area">
-        <div className="ls-skel">
-          <div className="ls-skel__line ls-skel__line--title" />
-          <div className="ls-skel__line ls-skel__line--sub" />
-          <div className="ls-skel__line ls-skel__line--input" />
-          <div className="ls-skel__line ls-skel__line--input" />
-          <div className="ls-skel__line ls-skel__line--btn" />
+      <div className={styles.formArea}>
+        <div className={styles.skeleton}>
+          <div className={`${styles.skeletonLine} ${styles.skeletonTitle}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonSubtitle}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonInput}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonInput}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonButton}`} />
         </div>
       </div>
     );
@@ -129,28 +130,28 @@ export function LoginCard({ locale }: LoginCardProps) {
   const orText = isRu ? "или" : "or";
 
   return (
-    <div className="ls-form-area">
-      <h2 className="ls-form-title">{text.loginTitle}</h2>
-      <p className="ls-form-sub">{text.loginHint}</p>
+    <div className={styles.formArea}>
+      <h2 className={styles.title}>{text.loginTitle}</h2>
+      <p className={styles.subtitle}>{text.loginHint}</p>
 
       {error ? (
-        <p className="ls-form-error" role="alert" aria-live="polite">
+        <p className={styles.error} role="alert" aria-live="polite">
           {error}
         </p>
       ) : null}
 
-      <form className="ls-form" onSubmit={onSubmit} noValidate>
+      <form className={styles.form} onSubmit={onSubmit} noValidate>
         {/* Email */}
-        <div className="ls-field">
-          <label className="ls-field__label" htmlFor="login-email">
+        <div className={styles.field}>
+          <label className={styles.fieldLabel} htmlFor="login-email">
             {text.emailLabel}
           </label>
-          <div className="ls-input-wrap">
+          <div className={styles.inputWrap}>
             <IconEmail />
             <input
               ref={emailInputRef}
               id="login-email"
-              className="ls-input"
+              className={styles.input}
               type="email"
               name="email"
               placeholder={isRu ? "Введите email" : "Enter email"}
@@ -161,15 +162,15 @@ export function LoginCard({ locale }: LoginCardProps) {
         </div>
 
         {/* Password */}
-        <div className="ls-field">
-          <label className="ls-field__label" htmlFor="login-password">
+        <div className={styles.field}>
+          <label className={styles.fieldLabel} htmlFor="login-password">
             {text.passwordLabel}
           </label>
-          <div className="ls-input-wrap">
+          <div className={styles.inputWrap}>
             <IconLock />
             <input
               id="login-password"
-              className="ls-input ls-input--padded-right"
+              className={`${styles.input} ${styles.inputPaddedRight}`}
               type={showPassword ? "text" : "password"}
               name="password"
               placeholder={isRu ? "Введите пароль" : "Enter password"}
@@ -178,7 +179,7 @@ export function LoginCard({ locale }: LoginCardProps) {
             />
             <button
               type="button"
-              className="ls-eye-btn"
+              className={styles.eyeButton}
               aria-label={
                 showPassword
                   ? isRu ? "Скрыть пароль" : "Hide password"
@@ -192,19 +193,19 @@ export function LoginCard({ locale }: LoginCardProps) {
         </div>
 
         {/* Submit */}
-        <button type="submit" className="ls-submit" disabled={isSubmitting}>
-          {isSubmitting && <span className="ls-submit__spinner" aria-hidden="true" />}
+        <button type="submit" className={styles.submit} disabled={isSubmitting}>
+          {isSubmitting ? <span className={styles.spinner} aria-hidden="true" /> : null}
           {text.signIn}
         </button>
       </form>
 
-      <div className="ls-divider">
+      <div className={styles.divider}>
         <span>{orText}</span>
       </div>
 
-      <p className="ls-contact">
+      <p className={styles.contact}>
         {contactText}
-        <a href="mailto:admin@petmagic.app" className="ls-contact__link">
+        <a href="mailto:admin@petmagic.app" className={styles.contactLink}>
           {contactLinkText}
         </a>
       </p>

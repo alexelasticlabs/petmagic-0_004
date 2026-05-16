@@ -6,7 +6,7 @@ import { fetchAdminTemplates, getSession, type AdminTemplateListItem } from "@/l
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useState } from "react";
 
 type TemplatesCategoriesViewProps = {
   locale: Locale;
@@ -25,32 +25,41 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   const [error, setError] = useState<string | null>(null);
   const isRu = locale === "ru";
 
-  async function loadTemplates() {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const session = getSession();
-      if (!session) {
-        router.replace(`/${locale}`);
-        return;
-      }
-
-      setTemplates(await fetchAdminTemplates());
-    } catch {
-      setError(text.errorLoadingTemplates);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  const loadTemplatesOnMount = useEffectEvent(loadTemplates);
-
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadTemplatesOnMount();
-    });
-  }, []);
+    let isCancelled = false;
+
+    async function initialize() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const session = getSession();
+        if (!session) {
+          router.replace(`/${locale}`);
+          return;
+        }
+
+        const response = await fetchAdminTemplates();
+        if (!isCancelled) {
+          setTemplates(response);
+        }
+      } catch {
+        if (!isCancelled) {
+          setError(text.errorLoadingTemplates);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void initialize();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [locale, router, text.errorLoadingTemplates]);
 
   const categories = getCategoryRows(templates);
   const totalActive = templates.filter((template) => template.status === "Active").length;

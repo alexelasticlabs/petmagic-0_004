@@ -1,0 +1,267 @@
+.formArea {
+  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  margin-bottom: 0.4rem;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: clamp(1.4rem, 2.6vw, 1.8rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+}
+
+.subtitle {
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: #6b83a0;
+}
+
+.error {
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fieldLabel {
+  font-size: 0.83rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #c0d2e8;
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 0.9rem;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  pointer-events: none;
+  color: #3e546e;
+}
+
+.input {
+  width: 100%;
+  padding: 0.82rem 0.9rem 0.82rem 2.65rem;
+  border: 1px solid #1a2840;
+  border-radius: 10px;
+  background: #0d1929;
+  color: #e8f0fb;
+  font: inherit;
+  font-size: 0.9rem;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  appearance: none;
+}
+
+.input::placeholder {
+  color: #334a60;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+}
+
+.inputPaddedRight {
+  padding-right: 2.9rem;
+}
+
+.eyeButton {
+  position: absolute;
+  right: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #3e546e;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.eyeButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.eyeButton:hover {
+  color: #c0d2e8;
+}
+
+.eyeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.4);
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 0.4rem;
+  padding: 0.82rem 1rem;
+  border: 0;
+  border-radius: 10px;
+  background: #22c55e;
+  color: #052e14;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.28);
+  transition: background 150ms ease, box-shadow 150ms ease, transform 120ms ease;
+}
+
+.submit:hover:not(:disabled) {
+  background: #16a34a;
+  box-shadow: 0 6px 22px rgba(34, 197, 94, 0.38);
+  transform: translateY(-1px);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.22);
+}
+
+.submit:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4);
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid rgba(5, 46, 20, 0.3);
+  border-top-color: #052e14;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 1rem;
+  color: #334a60;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #182336;
+}
+
+.contact {
+  margin: 0;
+  text-align: center;
+  font-size: 0.83rem;
+  color: #3e546e;
+}
+
+.contactLink {
+  color: #22c55e;
+  font-weight: 700;
+  transition: color 120ms ease;
+}
+
+.contactLink:hover {
+  color: #4ade80;
+  text-decoration: underline;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.skeletonLine {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #162537 0%, #1e3048 50%, #162537 100%);
+  background-size: 220% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+.skeletonTitle {
+  width: 55%;
+  height: 2rem;
+}
+
+.skeletonSubtitle {
+  width: 80%;
+  height: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.skeletonInput {
+  height: 3rem;
+}
+
+.skeletonButton {
+  height: 3rem;
+  margin-top: 0.4rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .formArea {
+    width: 100%;
+  }
+}

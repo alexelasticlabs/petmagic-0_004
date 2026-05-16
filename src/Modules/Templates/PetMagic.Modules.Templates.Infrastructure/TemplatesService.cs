@@ -40,6 +40,12 @@ internal sealed class TemplatesService(
 
     public async Task<Result<AdminTemplateResponse>> CreateImageAsync(CreateImageTemplateCommand command, CancellationToken cancellationToken)
     {
+        var statusResult = ResolveRequestedStatus(command.Status, TemplateStatus.Draft);
+        if (statusResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(statusResult.Error);
+        }
+
         var now = DateTime.UtcNow;
         var template = new TemplateItem
         {
@@ -51,13 +57,22 @@ internal sealed class TemplatesService(
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
             TokenCost = command.TokenCost,
-            Status = TemplateStatus.Draft,
+            Status = statusResult.Value,
             PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode),
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
+
+        if (template.Status == TemplateStatus.Active)
+        {
+            var activationCheck = ValidateActivation(template);
+            if (activationCheck.IsFailure)
+            {
+                return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
+            }
+        }
 
         dbContext.TemplateItems.Add(template);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -78,18 +93,34 @@ internal sealed class TemplatesService(
             return Result.Failure<AdminTemplateResponse>(TemplatesErrors.TypeMismatch);
         }
 
+        var statusResult = ResolveRequestedStatus(command.Status, template.Status);
+        if (statusResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(statusResult.Error);
+        }
+
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
         template.Category = command.Category.Trim();
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
         template.TokenCost = command.TokenCost;
+        template.Status = statusResult.Value;
         template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
         template.UpdatedAtUtc = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
             SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset)
         ]);
+
+        if (template.Status == TemplateStatus.Active)
+        {
+            var activationCheck = ValidateActivation(template);
+            if (activationCheck.IsFailure)
+            {
+                return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
+            }
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
@@ -104,6 +135,12 @@ internal sealed class TemplatesService(
             return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
         }
 
+        var statusResult = ResolveRequestedStatus(command.Status, TemplateStatus.Draft);
+        if (statusResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(statusResult.Error);
+        }
+
         var (duration, orientation) = await ResolveReferenceMetadataAsync(command.ReferenceMotionAsset, cancellationToken);
         var now = DateTime.UtcNow;
         var template = new TemplateItem
@@ -116,7 +153,7 @@ internal sealed class TemplatesService(
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
             TokenCost = command.TokenCost,
-            Status = TemplateStatus.Draft,
+            Status = statusResult.Value,
             PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode),
             MusicDescription = string.IsNullOrWhiteSpace(command.MusicDescription) ? null : command.MusicDescription.Trim(),
             ReferenceVideoDurationSeconds = duration,
@@ -132,6 +169,15 @@ internal sealed class TemplatesService(
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
         SetAsset(template, TemplateAssetKind.ReferenceMotion, command.ReferenceMotionAsset);
+
+        if (template.Status == TemplateStatus.Active)
+        {
+            var activationCheck = ValidateActivation(template);
+            if (activationCheck.IsFailure)
+            {
+                return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
+            }
+        }
 
         dbContext.TemplateItems.Add(template);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -158,6 +204,12 @@ internal sealed class TemplatesService(
             return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
         }
 
+        var statusResult = ResolveRequestedStatus(command.Status, template.Status);
+        if (statusResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(statusResult.Error);
+        }
+
         var (duration, orientation) = await ResolveReferenceMetadataAsync(command.ReferenceMotionAsset, cancellationToken);
 
         template.Title = command.Title.Trim();
@@ -175,6 +227,7 @@ internal sealed class TemplatesService(
         template.KlingModel = command.KlingModel.Trim();
         template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
         template.KeepOriginalSound = command.KeepOriginalSound;
+        template.Status = statusResult.Value;
         template.UpdatedAtUtc = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
@@ -187,7 +240,7 @@ internal sealed class TemplatesService(
             var activationCheck = ValidateActivation(template);
             if (activationCheck.IsFailure)
             {
-                template.Status = TemplateStatus.Draft;
+                return Result.Failure<AdminTemplateResponse>(activationCheck.Error);
             }
         }
 
@@ -234,9 +287,14 @@ internal sealed class TemplatesService(
         }
 
         var assetUrls = CollectObsoleteAssetUrls(template.Assets.Select(asset => asset.Url));
+        var cleanupResult = await DeleteTemplateAssetsAsync(assetUrls, cancellationToken);
+        if (cleanupResult.IsFailure)
+        {
+            return cleanupResult;
+        }
+
         dbContext.TemplateItems.Remove(template);
         await dbContext.SaveChangesAsync(cancellationToken);
-        await CleanupObsoleteMediaAsync(assetUrls, cancellationToken);
 
         return Result.Success();
     }
@@ -317,6 +375,18 @@ internal sealed class TemplatesService(
         return Result.Success();
     }
 
+    private static Result<TemplateStatus> ResolveRequestedStatus(string? rawStatus, TemplateStatus fallback)
+    {
+        if (string.IsNullOrWhiteSpace(rawStatus))
+        {
+            return Result.Success(fallback);
+        }
+
+        return Enum.TryParse<TemplateStatus>(rawStatus, true, out var status)
+            ? Result.Success(status)
+            : Result.Failure<TemplateStatus>(TemplatesErrors.InvalidStatus);
+    }
+
     private async Task<(double? duration, CharacterOrientation? orientation)> ResolveReferenceMetadataAsync(TemplateAssetCommand? asset, CancellationToken cancellationToken)
     {
         if (asset is null)
@@ -372,6 +442,20 @@ internal sealed class TemplatesService(
         {
             await mediaStorage.DeleteAsync(assetUrl, cancellationToken);
         }
+    }
+
+    private async Task<Result> DeleteTemplateAssetsAsync(string[] assetUrls, CancellationToken cancellationToken)
+    {
+        foreach (var assetUrl in assetUrls)
+        {
+            var deleteResult = await mediaStorage.DeleteAsync(assetUrl, cancellationToken);
+            if (deleteResult.IsFailure)
+            {
+                return deleteResult;
+            }
+        }
+
+        return Result.Success();
     }
 
     private static string[] CollectObsoleteAssetUrls(IEnumerable<string?> assetUrls)

@@ -3,7 +3,7 @@ import type { SetTemplateFormState, TemplateFormState } from "@/components/templ
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
-import { type DragEvent, useEffect, useRef, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type TemplateReferenceAssetSectionProps = {
   text: Dictionary;
@@ -33,8 +33,8 @@ export function TemplateReferenceAssetSection({
   onUploadReference,
 }: TemplateReferenceAssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [localReferenceUrl, setLocalReferenceUrl] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  const localReferenceUrl = useMemo(() => (referenceFile ? URL.createObjectURL(referenceFile) : null), [referenceFile]);
   const persistedReferenceUrl = form.referenceUrl.trim();
   const effectiveReferenceUrl = localReferenceUrl ?? persistedReferenceUrl;
   const hasReference = Boolean(effectiveReferenceUrl);
@@ -42,18 +42,12 @@ export function TemplateReferenceAssetSection({
   const referenceStateLabel = hasReference ? text.editorReady : text.editorMissing;
 
   useEffect(() => {
-    if (!referenceFile) {
-      setLocalReferenceUrl(null);
-      return;
-    }
-
-    const nextObjectUrl = URL.createObjectURL(referenceFile);
-    setLocalReferenceUrl(nextObjectUrl);
-
     return () => {
-      URL.revokeObjectURL(nextObjectUrl);
+      if (localReferenceUrl) {
+        URL.revokeObjectURL(localReferenceUrl);
+      }
     };
-  }, [referenceFile]);
+  }, [localReferenceUrl]);
 
   function openFilePicker() {
     fileInputRef.current?.click();

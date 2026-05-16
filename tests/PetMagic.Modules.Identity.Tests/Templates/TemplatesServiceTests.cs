@@ -41,6 +41,36 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task CreateVideoAsync_ShouldPersistActiveStatus_WhenRequestedStatusIsActiveAndTemplateIsValid()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Viral Dance",
+                "Funny dance template",
+                "Dance",
+                ["viral", "dance"],
+                true,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                "Meme soundtrack",
+                CreatePreviewAsset(),
+                CreateReferenceAsset(9.8),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "funny dance",
+                true,
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TemplateStatus.Active.ToString(), result.Value.Status);
+    }
+
+    [Fact]
     public async Task ChangeStatusAsync_ShouldRejectActivation_WhenReferenceDurationWasNotResolved()
     {
         await using var dbContext = CreateDbContext();
@@ -222,6 +252,58 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task UpdateVideoAsync_ShouldRejectRequestedActiveStatus_WhenReferenceDurationIsMissing()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Long Motion",
+                "Needs metadata",
+                "Dance",
+                ["dance"],
+                false,
+                40,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(null),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/standard/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var updated = await service.UpdateVideoAsync(
+            new UpdateVideoTemplateCommand(
+                created.Value.TemplateId,
+                "Long Motion",
+                "Needs metadata",
+                "Dance",
+                ["dance"],
+                false,
+                40,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(null),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/standard/motion-control",
+                "dance",
+                true,
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(updated.IsFailure);
+        Assert.Equal("templates.reference_duration_required", updated.Error.Code);
+    }
+
+    [Fact]
     public async Task UpdateImageAsync_ShouldNotDeletePreview_WhenPreviewUrlDoesNotChange()
     {
         await using var dbContext = CreateDbContext();
@@ -295,6 +377,34 @@ public sealed class TemplatesServiceTests
         Assert.Contains("http://localhost:5000/templates-media/2026/05/preview.mp4", storage.DeletedUrls);
         Assert.Contains("http://localhost:5000/templates-media/2026/05/reference.mp4", storage.DeletedUrls);
         Assert.False(await dbContext.TemplateItems.AnyAsync(x => x.Id == created.Value.TemplateId));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldKeepTemplate_WhenMediaCleanupFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var storage = new FailingDeleteMediaStorage();
+        var service = CreateService(dbContext, storage);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/preview.jpg", "preview.jpg", "image/jpeg")),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var deleted = await service.DeleteAsync(created.Value.TemplateId, CancellationToken.None);
+
+        Assert.True(deleted.IsFailure);
+        Assert.Equal("templates.media_storage_failed", deleted.Error.Code);
+        Assert.True(await dbContext.TemplateItems.AnyAsync(x => x.Id == created.Value.TemplateId));
     }
 
     [Fact]
@@ -434,6 +544,20 @@ public sealed class TemplatesServiceTests
         public Task<PetMagic.BuildingBlocks.Results.Result<double?>> GetVideoDurationSecondsAsync(StoredMediaResponse storedMedia, CancellationToken cancellationToken)
         {
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success<double?>(null));
+        }
+    }
+
+    private sealed class FailingDeleteMediaStorage : IMediaStorage
+    {
+        public Task<PetMagic.BuildingBlocks.Results.Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(
+                new StoredMediaResponse($"http://localhost:5000/stub/{asset.FileName}", $"stub/{asset.FileName}", asset.FileName, asset.ContentType, asset.Content.LongLength, null)));
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Failure(TemplatesErrors.MediaStorageFailed));
         }
     }
 }

@@ -44,13 +44,6 @@
   color: #f4f8ff;
 }
 
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-}
-
 .pageHeader {
   display: flex;
   align-items: flex-end;

@@ -17,7 +17,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useState } from "react";
 
 type TemplatesCatalogViewProps = {
   locale: Locale;
@@ -76,13 +76,41 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
     }
   }
 
-  const loadTemplatesOnMount = useEffectEvent(loadTemplates);
-
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadTemplatesOnMount();
-    });
-  }, []);
+    let isCancelled = false;
+
+    async function initialize() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const session = getSession();
+        if (!session) {
+          router.replace(`/${locale}`);
+          return;
+        }
+
+        const response = await fetchAdminTemplates(templateType);
+        if (!isCancelled) {
+          setTemplates(response);
+        }
+      } catch {
+        if (!isCancelled) {
+          setError(text.errorLoadingTemplates);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void initialize();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [locale, router, templateType, text.errorLoadingTemplates]);
 
   async function handleStatusChange(templateId: string, status: TemplateStatus) {
     setBusyTemplateId(templateId);

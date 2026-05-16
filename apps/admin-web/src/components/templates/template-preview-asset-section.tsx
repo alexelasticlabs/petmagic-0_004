@@ -4,7 +4,7 @@ import type { SetTemplateFormState, TemplateFormState } from "@/components/templ
 import { Button } from "@/components/ui/button";
 import type { Dictionary } from "@/lib/i18n";
 import Image from "next/image";
-import { type DragEvent, useEffect, useRef, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type TemplatePreviewAssetSectionProps = {
   text: Dictionary;
@@ -26,8 +26,8 @@ export function TemplatePreviewAssetSection({
   onUploadPreview,
 }: TemplatePreviewAssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  const localPreviewUrl = useMemo(() => (previewFile ? URL.createObjectURL(previewFile) : null), [previewFile]);
   const persistedPreviewUrl = form.previewUrl.trim();
   const effectivePreviewUrl = localPreviewUrl ?? persistedPreviewUrl;
   const hasPreview = Boolean(effectivePreviewUrl);
@@ -38,18 +38,12 @@ export function TemplatePreviewAssetSection({
   const previewStateLabel = hasPreview ? text.editorReady : text.editorMissing;
 
   useEffect(() => {
-    if (!previewFile) {
-      setLocalPreviewUrl(null);
-      return;
-    }
-
-    const nextObjectUrl = URL.createObjectURL(previewFile);
-    setLocalPreviewUrl(nextObjectUrl);
-
     return () => {
-      URL.revokeObjectURL(nextObjectUrl);
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
     };
-  }, [previewFile]);
+  }, [localPreviewUrl]);
 
   function openFilePicker() {
     fileInputRef.current?.click();

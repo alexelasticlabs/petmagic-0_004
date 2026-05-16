@@ -27,7 +27,8 @@ public static class AdminTemplateEndpoints
         group.MapPut("/video/{templateId:guid}", UpdateVideoAsync);
         group.MapPut("/{templateId:guid}/status", ChangeStatusAsync);
         group.MapDelete("/{templateId:guid}", DeleteAsync);
-        group.MapPost("/media/upload", UploadMediaAsync);
+        group.MapPost("/media/upload", UploadMediaAsync)
+            .DisableAntiforgery();
 
         return endpoints;
     }
@@ -82,12 +83,12 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<AdminTemplateResponse>, ValidationProblem, ProblemHttpResult>> UpdateImageAsync(
         [FromRoute] Guid templateId,
-        [FromBody] CreateImageTemplateCommand request,
+        [FromBody] UpdateImageTemplateRequest request,
         [FromServices] IValidator<UpdateImageTemplateCommand> validator,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var command = new UpdateImageTemplateCommand(templateId, request.Title, request.ShortDescription, request.Category, request.Tags, request.IsPremium, request.TokenCost, request.PromoBadgeMode, request.PreviewAsset);
+        var command = new UpdateImageTemplateCommand(templateId, request.Title, request.ShortDescription, request.Category, request.Tags, request.IsPremium, request.TokenCost, request.PromoBadgeMode, request.PreviewAsset, request.Status);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -126,7 +127,7 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<AdminTemplateResponse>, ValidationProblem, ProblemHttpResult>> UpdateVideoAsync(
         [FromRoute] Guid templateId,
-        [FromBody] CreateVideoTemplateCommand request,
+        [FromBody] UpdateVideoTemplateRequest request,
         [FromServices] IValidator<UpdateVideoTemplateCommand> validator,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
@@ -147,7 +148,8 @@ public static class AdminTemplateEndpoints
             request.PreprocessingPrompt,
             request.KlingModel,
             request.KlingPrompt,
-            request.KeepOriginalSound);
+            request.KeepOriginalSound,
+            request.Status);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -303,6 +305,35 @@ public static class AdminTemplateEndpoints
         return contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
             || contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
     }
+
+    public sealed record UpdateImageTemplateRequest(
+        string Title,
+        string ShortDescription,
+        string Category,
+        IReadOnlyList<string> Tags,
+        bool IsPremium,
+        int TokenCost,
+        string PromoBadgeMode,
+        TemplateAssetCommand? PreviewAsset,
+        string? Status = null);
+
+    public sealed record UpdateVideoTemplateRequest(
+        string Title,
+        string ShortDescription,
+        string Category,
+        IReadOnlyList<string> Tags,
+        bool IsPremium,
+        int TokenCost,
+        string PromoBadgeMode,
+        string MusicDescription,
+        TemplateAssetCommand? PreviewAsset,
+        TemplateAssetCommand? ReferenceMotionAsset,
+        string PreprocessingModel,
+        string PreprocessingPrompt,
+        string KlingModel,
+        string KlingPrompt,
+        bool KeepOriginalSound,
+        string? Status = null);
 
     public sealed record ChangeTemplateStatusRequest(string Status);
 }

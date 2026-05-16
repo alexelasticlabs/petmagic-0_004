@@ -1,0 +1,206 @@
+import { type TemplateFormState } from "@/components/templates/types";
+import {
+    createImageTemplate,
+    createVideoTemplate,
+    updateImageTemplate,
+    updateVideoTemplate,
+    type AdminTemplate,
+    type ImageTemplatePayload,
+    type TemplateAssetInput,
+    type TemplatePromoBadgeMode,
+    type TemplateStatus,
+    type TemplateType,
+    type VideoTemplatePayload,
+} from "@/lib/api-client";
+
+export const DEFAULT_PREPROCESSING_PROMPT = "Keep the same pet, same face, same fur, same colors, same background, same lighting and camera angle. Adjust the pet into an upright pose standing on its two hind legs like a human, with the front paws naturally positioned like arms. Make the full body clearly visible and suitable for motion transfer. Do not change the pet’s identity, breed, facial features, background, or image style.";
+export const DEFAULT_KLING_PROMPT = "A cute pet performing a funny viral dance, smooth animation, high quality.";
+
+export const PREPROCESSING_MODELS = [
+  "openai/gpt-image-2/edit",
+  "fal-ai/nano-banana-pro/edit",
+  "fal-ai/flux-2-pro/edit",
+  "fal-ai/gpt-image-1.5/edit",
+  "fal-ai/bytedance/seedream/v5/lite/edit",
+  "fal-ai/nano-banana-2/edit"
+] as const;
+
+export const KLING_MODELS = [
+  "fal-ai/kling-video/v3/pro/motion-control",
+  "fal-ai/kling-video/v3/standard/motion-control"
+] as const;
+
+export function createInitialTemplateForm(templateType: TemplateType): TemplateFormState {
+  return {
+    title: "",
+    shortDescription: "",
+    category: "",
+    promoBadgeMode: "Auto",
+    tags: "",
+    isPremium: false,
+    tokenCost: templateType === "Video" ? "60" : "20",
+    previewUrl: "",
+    previewFileName: "",
+    previewContentType: templateType === "Video" ? "video/mp4" : "image/jpeg",
+    previewFileSizeBytes: "",
+    musicDescription: "",
+    referenceUrl: "",
+    referenceFileName: "",
+    referenceContentType: "video/mp4",
+    referenceFileSizeBytes: "",
+    referenceDurationSeconds: "",
+    preprocessingModel: PREPROCESSING_MODELS[0],
+    preprocessingPrompt: DEFAULT_PREPROCESSING_PROMPT,
+    klingModel: KLING_MODELS[0],
+    klingPrompt: DEFAULT_KLING_PROMPT,
+    keepOriginalSound: true,
+  };
+}
+
+export function createFormFromTemplate(template: AdminTemplate): TemplateFormState {
+  return {
+    title: template.title,
+    shortDescription: template.shortDescription,
+    category: template.category,
+    promoBadgeMode: template.promoBadgeMode,
+    tags: template.tags.join(", "),
+    isPremium: template.isPremium,
+    tokenCost: template.tokenCost.toString(),
+    previewUrl: template.previewAsset?.url ?? "",
+    previewFileName: template.previewAsset?.fileName ?? "",
+    previewContentType: template.previewAsset?.contentType ?? (template.templateType === "Video" ? "video/mp4" : "image/jpeg"),
+    previewFileSizeBytes: template.previewAsset?.fileSizeBytes?.toString() ?? "",
+    musicDescription: template.musicDescription ?? "",
+    referenceUrl: template.referenceMotionAsset?.url ?? "",
+    referenceFileName: template.referenceMotionAsset?.fileName ?? "",
+    referenceContentType: template.referenceMotionAsset?.contentType ?? "video/mp4",
+    referenceFileSizeBytes: template.referenceMotionAsset?.fileSizeBytes?.toString() ?? "",
+    referenceDurationSeconds: template.referenceMotionAsset?.durationSeconds?.toString() ?? "",
+    preprocessingModel: template.preprocessingModel ?? PREPROCESSING_MODELS[0],
+    preprocessingPrompt: template.preprocessingPrompt ?? DEFAULT_PREPROCESSING_PROMPT,
+    klingModel: template.klingModel ?? KLING_MODELS[0],
+    klingPrompt: template.klingPrompt ?? DEFAULT_KLING_PROMPT,
+    keepOriginalSound: template.keepOriginalSound ?? true,
+  };
+}
+
+export async function saveImageTemplateFromForm(templateId: string | undefined, form: TemplateFormState, status: TemplateStatus): Promise<AdminTemplate> {
+  const payload: ImageTemplatePayload = {
+    title: form.title,
+    shortDescription: form.shortDescription,
+    category: form.category,
+    status,
+    promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
+    tags: normalizeTags(form.tags),
+    isPremium: form.isPremium,
+    tokenCost: parseNumber(form.tokenCost),
+    previewAsset: buildAsset(form.previewUrl, form.previewFileName, form.previewContentType, form.previewFileSizeBytes),
+  };
+
+  return templateId ? updateImageTemplate(templateId, payload) : createImageTemplate(payload);
+}
+
+export async function saveVideoTemplateFromForm(templateId: string | undefined, form: TemplateFormState, status: TemplateStatus): Promise<AdminTemplate> {
+  const payload: VideoTemplatePayload = {
+    title: form.title,
+    shortDescription: form.shortDescription,
+    category: form.category,
+    status,
+    promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
+    tags: normalizeTags(form.tags),
+    isPremium: form.isPremium,
+    tokenCost: parseNumber(form.tokenCost),
+    musicDescription: form.musicDescription,
+    previewAsset: buildAsset(form.previewUrl, form.previewFileName, form.previewContentType, form.previewFileSizeBytes),
+    referenceMotionAsset: buildAsset(
+      form.referenceUrl,
+      form.referenceFileName,
+      form.referenceContentType,
+      form.referenceFileSizeBytes,
+      form.referenceDurationSeconds,
+    ),
+    preprocessingModel: form.preprocessingModel,
+    preprocessingPrompt: form.preprocessingPrompt,
+    klingModel: form.klingModel,
+    klingPrompt: form.klingPrompt,
+    keepOriginalSound: form.keepOriginalSound,
+  };
+
+  return templateId ? updateVideoTemplate(templateId, payload) : createVideoTemplate(payload);
+}
+
+export function parseNumber(raw: string): number {
+  const value = Number.parseInt(normalizeIntegerString(raw), 10);
+  return Number.isNaN(value) ? 0 : value;
+}
+
+export function parseOptionalDecimal(raw?: string): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const value = Number.parseFloat(raw);
+  return Number.isNaN(value) ? undefined : value;
+}
+
+function buildAsset(
+  url: string,
+  fileName: string,
+  contentType: string,
+  fileSizeBytes: string,
+  durationSeconds?: string,
+): TemplateAssetInput | undefined {
+  if (!url.trim()) {
+    return undefined;
+  }
+
+  const size = parseOptionalNumber(fileSizeBytes);
+  const duration = parseOptionalDecimal(durationSeconds);
+
+  return {
+    url: url.trim(),
+    fileName: fileName.trim() || inferFileName(url),
+    contentType: contentType.trim() || inferContentType(url),
+    fileSizeBytes: size,
+    durationSeconds: duration,
+  };
+}
+
+function normalizeTags(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function parseOptionalNumber(raw: string): number | undefined {
+  const value = Number.parseInt(normalizeIntegerString(raw), 10);
+  return Number.isNaN(value) ? undefined : value;
+}
+
+function normalizeIntegerString(raw: string): string {
+  return raw.replace(/\D+/g, "");
+}
+
+function inferFileName(url: string): string {
+  const parts = url.split("/");
+  return parts.at(-1) || "asset";
+}
+
+function inferContentType(url: string): string {
+  const lower = url.toLowerCase();
+
+  if (lower.endsWith(".mp4")) {
+    return "video/mp4";
+  }
+
+  if (lower.endsWith(".webm")) {
+    return "video/webm";
+  }
+
+  if (lower.endsWith(".png")) {
+    return "image/png";
+  }
+
+  return "image/jpeg";
+}

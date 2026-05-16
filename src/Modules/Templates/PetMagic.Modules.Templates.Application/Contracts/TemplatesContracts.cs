@@ -20,7 +20,8 @@ public sealed record CreateImageTemplateCommand(
     bool IsPremium,
     int TokenCost,
     string PromoBadgeMode,
-    TemplateAssetCommand? PreviewAsset);
+    TemplateAssetCommand? PreviewAsset,
+    string? Status = null);
 
 public sealed record UpdateImageTemplateCommand(
     Guid TemplateId,
@@ -31,7 +32,8 @@ public sealed record UpdateImageTemplateCommand(
     bool IsPremium,
     int TokenCost,
     string PromoBadgeMode,
-    TemplateAssetCommand? PreviewAsset);
+    TemplateAssetCommand? PreviewAsset,
+    string? Status = null);
 
 public sealed record CreateVideoTemplateCommand(
     string Title,
@@ -48,7 +50,8 @@ public sealed record CreateVideoTemplateCommand(
     string PreprocessingPrompt,
     string KlingModel,
     string KlingPrompt,
-    bool KeepOriginalSound);
+    bool KeepOriginalSound,
+    string? Status = null);
 
 public sealed record UpdateVideoTemplateCommand(
     Guid TemplateId,
@@ -66,7 +69,8 @@ public sealed record UpdateVideoTemplateCommand(
     string PreprocessingPrompt,
     string KlingModel,
     string KlingPrompt,
-    bool KeepOriginalSound);
+    bool KeepOriginalSound,
+    string? Status = null);
 
 public sealed record ChangeTemplateStatusCommand(Guid TemplateId, string Status);
 
