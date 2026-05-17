@@ -209,6 +209,95 @@ public sealed record AdminTemplateEventAnalyticsResponse(
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Devices,
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Geography);
 
+public sealed record AdminTemplatesAnalyticsQuery(
+    int? PeriodDays,
+    string? TemplateType,
+    string? Category,
+    string? Status,
+    string? Access,
+    string? Sort,
+    int? Take);
+
+public sealed record AdminTemplatesAnalyticsSummaryResponse(
+    int TotalTemplates,
+    int VideoTemplates,
+    int ImageTemplates,
+    int ActiveTemplates,
+    int PremiumTemplates,
+    int TotalViews,
+    int TotalGenerationStarts,
+    int CompletedGenerations,
+    int FailedGenerations,
+    double ConversionPercent,
+    int TotalTokenCost,
+    double AverageTokenCost,
+    decimal TotalProviderCostUsd,
+    decimal EstimatedRevenueUsd,
+    decimal EstimatedGrossMarginUsd,
+    int TotalComplaints);
+
+public sealed record AdminTemplatesAnalyticsTrendPointResponse(
+    DateTime DateUtc,
+    int TotalViews,
+    int TotalGenerationStarts,
+    int CompletedGenerations,
+    int FailedGenerations,
+    int TotalTokenCost,
+    decimal TotalProviderCostUsd,
+    decimal EstimatedRevenueUsd);
+
+public sealed record AdminTemplatesAnalyticsTemplateRowResponse(
+    Guid TemplateId,
+    string TemplateType,
+    string Title,
+    string Category,
+    string Status,
+    bool IsPremium,
+    int TokenCost,
+    TemplateAssetResponse? PreviewAsset,
+    int Views,
+    int GenerationStarts,
+    int CompletedGenerations,
+    int FailedGenerations,
+    double ConversionPercent,
+    int TotalTokenCost,
+    decimal TotalProviderCostUsd,
+    decimal EstimatedRevenueUsd,
+    DateTime UpdatedAtUtc);
+
+public sealed record AdminTemplatesAnalyticsBreakdownResponse(
+    string Key,
+    string Label,
+    int TemplateCount,
+    int Views,
+    int GenerationStarts,
+    int CompletedGenerations,
+    double ConversionPercent,
+    int TotalTokenCost,
+    decimal TotalProviderCostUsd,
+    decimal EstimatedRevenueUsd);
+
+public sealed record AdminTemplatesAnalyticsFunnelResponse(
+    int Views,
+    int GenerationStarts,
+    int CompletedGenerations,
+    int FailedGenerations,
+    int Complaints);
+
+public sealed record AdminTemplatesAnalyticsOverviewResponse(
+    AdminTemplatesAnalyticsSummaryResponse Summary,
+    IReadOnlyList<AdminTemplatesAnalyticsTrendPointResponse> TrendPoints,
+    IReadOnlyList<AdminTemplatesAnalyticsTemplateRowResponse> TopTemplates,
+    IReadOnlyList<AdminTemplatesAnalyticsBreakdownResponse> Categories,
+    IReadOnlyList<AdminTemplatesAnalyticsBreakdownResponse> TemplateTypes,
+    IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Sources,
+    IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Devices,
+    IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Geography,
+    AdminTemplatesAnalyticsFunnelResponse ConversionFunnel,
+    IReadOnlyList<AdminTemplatesAnalyticsTemplateRowResponse> Templates,
+    string[] AvailableCategories,
+    DateTime GeneratedAtUtc);
+
 public sealed record PublicTemplateListItemResponse(
     Guid TemplateId,
     string TemplateType,

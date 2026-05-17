@@ -1,8 +1,8 @@
 "use client";
 
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import {
     fetchUsers,
-    getSession,
     useAuthSession,
     type UserListItem,
 } from "@/lib/api-client";
@@ -43,9 +43,7 @@ export function useUsersAdmin(locale: Locale) {
       setError(null);
 
       try {
-        const currentSession = getSession();
-        if (!currentSession) {
-          router.replace(`/${locale}`);
+        if (!ensureAdminSession(locale, router)) {
           return;
         }
 

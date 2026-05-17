@@ -445,14 +445,82 @@
   border-radius: 0.76rem;
 }
 
+.listCard :global(.admin-primitives-module__gNhzuG__table) {
+  min-width: 96rem;
+}
+
+.listCard :global(.admin-primitives-module__gNhzuG__table th) {
+  padding: 0 0.7rem 0.9rem;
+  color: #6f86a4;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.listCard :global(.admin-primitives-module__gNhzuG__table td) {
+  padding: 0.95rem 0.7rem;
+  border-bottom-color: #15243a;
+}
+
+.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr) {
+  background: linear-gradient(180deg, rgba(11, 19, 33, 0.88) 0%, rgba(9, 16, 28, 0.96) 100%);
+}
+
+.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:hover) {
+  background: linear-gradient(180deg, rgba(13, 23, 39, 0.96) 0%, rgba(10, 18, 31, 1) 100%);
+}
+
+.listCard :global(.admin-primitives-module__gNhzuG__statusBadge) {
+  min-height: 1.7rem;
+  padding-inline: 0.7rem;
+}
+
+.listTemplateCell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.listTemplateThumb {
+  position: relative;
+  width: 3.4rem;
+  height: 3.4rem;
+  flex: 0 0 3.4rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid #23344c;
+  border-radius: 0.72rem;
+  background-color: #0f1a2c;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.listTemplateMedia {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.listTemplateThumbIcon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: #7f97b5;
+}
+
 .titleCell {
   display: grid;
   gap: 0.24rem;
+  min-width: 0;
 }
 
 .titleCell strong {
   color: #f4f8ff;
   font-size: 0.86rem;
+  line-height: 1.2;
 }
 
 .titleCell span {
@@ -465,12 +533,113 @@
   overflow: hidden;
 }
 
+.templateMetaId {
+  color: #5f748e;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.typeCell {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  min-height: 1.7rem;
+  border: 1px solid #203149;
+  border-radius: 999px;
+  padding: 0.24rem 0.58rem;
+  background: rgba(11, 19, 31, 0.84);
+  color: #d8e7fb;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.typeIcon {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: #4ade80;
+}
+
+.typeMeta {
+  color: #7b90ab;
+  font-size: 0.73rem;
+  font-weight: 800;
+}
+
+.freePill,
+.premiumPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.7rem;
+  border-radius: 999px;
+  padding: 0.24rem 0.62rem;
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.freePill {
+  border: 1px solid rgba(34, 197, 94, 0.22);
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.premiumPill {
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  background: rgba(168, 85, 247, 0.14);
+  color: #d8b4fe;
+}
+
+.numericCell {
+  color: #eef5ff;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.metricValueCell {
+  color: #e7f0ff;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.numericSuffix {
+  color: #70859f;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.updatedCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  color: #b7c8dd;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.updatedIcon {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: #6e85a3;
+}
+
 .tableActionsCell {
-  min-width: 15rem;
+  min-width: 13.5rem;
 }
 
 .tableActions {
   justify-content: flex-end;
+  flex-wrap: nowrap;
 }
 
 .error {
@@ -570,6 +739,7 @@
 
   .tableActions {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 
@@ -585,6 +755,12 @@
 
   .tableActionsCell {
     min-width: 13rem;
+  }
+
+  .listTemplateThumb {
+    width: 2.9rem;
+    height: 2.9rem;
+    flex-basis: 2.9rem;
   }
 }
 

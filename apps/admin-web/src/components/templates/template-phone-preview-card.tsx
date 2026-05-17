@@ -11,10 +11,11 @@ type TemplatePreviewCardProps = {
   previewUrl?: string | null;
   previewContentType?: string | null;
   templateKind?: "video" | "image";
-  templateKindLabel?: string;
+  templateKindLabel: string;
   tokenCost: number | string;
   category: string;
   isPremium: boolean;
+  accessLabel: string;
   referenceDurationSeconds?: number;
   promoBadge?: Exclude<TemplatePromoBadgeMode, "Auto">;
   musicDescription?: string;
@@ -32,6 +33,7 @@ export function TemplatePreviewCard({
   tokenCost,
   category,
   isPremium,
+  accessLabel,
   referenceDurationSeconds,
   promoBadge,
   musicDescription,
@@ -43,7 +45,8 @@ export function TemplatePreviewCard({
   const normalizedMusicDescription = musicDescription?.trim();
   const normalizedTags = (tags ?? []).map((tag) => tag.trim()).filter(Boolean).slice(0, 4);
   const resolvedTemplateKind = templateKind ?? inferTemplateMediaKind(previewContentType?.trim() ?? "", previewUrl?.trim() ?? "");
-  const resolvedTemplateKindLabel = templateKindLabel ?? (resolvedTemplateKind === "video" ? "Video" : "Image");
+  const resolvedTemplateKindLabel = templateKindLabel.trim();
+  const resolvedAccessLabel = accessLabel.trim();
 
   return (
     <div className={joinClassNames(styles.phonePreview, className)}>
@@ -119,7 +122,7 @@ export function TemplatePreviewCard({
                   <path d="M8 1.75 13 4.6v5.8L8 13.25 3 10.4V4.6l5-2.85Zm0 1.72L4.5 5.45v4.1L8 11.53l3.5-1.98v-4.1L8 3.47Z" fill="currentColor" />
                 </svg>
               </span>
-              <span>{isPremium ? "Premium" : "Free"}</span>
+              <span>{resolvedAccessLabel}</span>
             </span>
           </div>
         </div>

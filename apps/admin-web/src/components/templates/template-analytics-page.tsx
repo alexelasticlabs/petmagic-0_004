@@ -1,19 +1,20 @@
 "use client";
 
-import { AdminMetricStrip, AdminPageHero } from "@/components/admin/admin-primitives";
 import {
-  CalendarIcon,
-  ChartIcon,
-  ClockIcon,
-  DashboardIcon,
-  DownloadIcon,
-  GlobeIcon,
-  RefreshIcon,
-  TableIcon,
-  TrendUpIcon,
-  UsersIcon,
-  VideoIcon,
+    CalendarIcon,
+    ChartIcon,
+    DashboardIcon,
+    DownloadIcon,
+    GlobeIcon,
+    RefreshIcon,
+    TableIcon,
+    TrendUpIcon,
+    UsersIcon,
+    VideoIcon,
 } from "@/components/admin/admin-icons";
+import { AdminMetricStrip } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
+import { getTemplateAccessLabel, getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
 import styles from "@/components/templates/template-analytics-page.module.css";
 import {
     fetchAdminTemplate,
@@ -22,7 +23,6 @@ import {
     fetchAdminTemplateRecentGenerations,
     fetchAdminTemplateStatistics,
     fetchAdminTemplateTrends,
-    getSession,
     type AdminTemplate,
     type AdminTemplateEventAnalytics,
     type AdminTemplateFailureBreakdownItem,
@@ -32,7 +32,8 @@ import {
     type TemplateGenerationJobStatus,
     type TemplateStatus,
 } from "@/lib/api-client";
-import { type Locale } from "@/lib/i18n";
+import { getDictionary, type Locale } from "@/lib/i18n";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -114,9 +115,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
       setError(null);
 
       try {
-        const session = getSession();
-        if (!session) {
-          router.replace(`/${locale}`);
+        if (!ensureAdminSession(locale, router)) {
           return;
         }
 
@@ -300,32 +299,20 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 
   return (
     <section className={styles.page}>
-      <div className={styles.breadcrumbs}>
-        <Link href={catalogPath}>{text.breadcrumbsRoot}</Link>
-        <span aria-hidden="true">/</span>
-        <Link href={editorPath}>{template.title}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{text.pageTitle}</span>
-      </div>
+      <div className={styles.pageHeaderRow}>
+        <div className={styles.breadcrumbs}>
+          <Link href={catalogPath}>{text.breadcrumbsRoot}</Link>
+          <span aria-hidden="true">/</span>
+          <Link href={editorPath}>{template.title}</Link>
+          <span aria-hidden="true">/</span>
+          <span>{text.pageTitle}</span>
+        </div>
 
-      <AdminPageHero
-        eyebrow={text.eyebrow}
-        title={template.title}
-        description={text.pageDescription}
-        badge={<span className={`${styles.statusBadge} ${styles[getStatusBadgeClassName(template.status)]}`}>{formatTemplateStatus(template.status, isRu)}</span>}
-        actions={(
-          <div className={styles.heroActions}>
-            <Link href={catalogPath} className={styles.secondaryLink}><TableIcon className={styles.controlIcon} /><span>{text.backToCatalog}</span></Link>
-            <Link href={editorPath} className={styles.primaryLink}><ChartIcon className={styles.controlIcon} /><span>{text.openEditor}</span></Link>
-          </div>
-        )}
-        metaItems={[
-          `${text.statusLabel}: ${formatTemplateStatus(template.status, isRu)}`,
-          template.category,
-          template.isPremium ? text.premiumLabel : text.freeLabel,
-          `${template.tokenCost} ${isRu ? "токенов" : "tokens"}`,
-        ]}
-      />
+        <div className={styles.heroActions}>
+          <Link href={catalogPath} className={styles.secondaryLink}><TableIcon className={styles.controlIcon} /><span>{text.backToCatalog}</span></Link>
+          <Link href={editorPath} className={styles.primaryLink}><ChartIcon className={styles.controlIcon} /><span>{text.openEditor}</span></Link>
+        </div>
+      </div>
 
       <AdminMetricStrip
         className={styles.metricStrip}
@@ -516,18 +503,16 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 }
 
 function TemplateProfileCard({ template, locale, text, isRu }: { template: AdminTemplate; locale: Locale; text: AnalyticsCopy; isRu: boolean }) {
+  const dictionary = getDictionary(locale);
   const previewUrl = template.previewAsset?.url;
-  const [isPreviewBroken, setIsPreviewBroken] = useState(false);
-
-  useEffect(() => {
-    setIsPreviewBroken(false);
-  }, [previewUrl]);
+  const [brokenPreviewUrl, setBrokenPreviewUrl] = useState<string | null>(null);
+  const isPreviewBroken = previewUrl === brokenPreviewUrl;
 
   return (
     <article className={styles.templateCard}>
       <div className={styles.templatePreviewWrap}>
         {previewUrl && !isPreviewBroken ? (
-          <img src={previewUrl} alt="" className={styles.templatePreviewImage} onError={() => setIsPreviewBroken(true)} />
+          <Image src={previewUrl} alt="" width={480} height={600} unoptimized className={styles.templatePreviewImage} onError={() => setBrokenPreviewUrl(previewUrl)} />
         ) : (
           <div className={styles.templatePreviewFallback}>{template.title.slice(0, 1)}</div>
         )}
@@ -539,7 +524,7 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
             <span>{text.templateOverviewTitle}</span>
             <h2>{template.title}</h2>
           </div>
-          <span className={`${styles.statusBadge} ${styles[getStatusBadgeClassName(template.status)]}`}>{formatTemplateStatus(template.status, isRu)}</span>
+          <span className={`${styles.statusBadge} ${styles[getStatusBadgeClassName(template.status)]}`}>{getTemplateStatusLabel(template.status, locale)}</span>
         </div>
 
         <p>{template.shortDescription}</p>
@@ -547,7 +532,7 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
         <div className={styles.templateMetaGrid}>
           <SummaryRow label={text.templateIdLabel} value={shortenId(template.templateId)} />
           <SummaryRow label={text.categoryLabel} value={template.category} />
-          <SummaryRow label={text.priceLabel} value={template.isPremium ? text.premiumLabel : text.freeLabel} />
+          <SummaryRow label={text.priceLabel} value={getTemplateAccessLabel(template.isPremium, dictionary)} />
           <SummaryRow label={text.tokenCostLabel} value={formatTokens(template.tokenCost, isRu)} />
           <SummaryRow label={text.createdLabel} value={formatDateTime(template.createdAtUtc, locale)} />
           <SummaryRow label={text.updatedLabel} value={formatDateTime(template.updatedAtUtc, locale)} />
@@ -921,8 +906,6 @@ function getAnalyticsCopy(locale: Locale) {
     exportAnalytics: isRu ? "Экспорт JSON" : "Export JSON",
     compareNoBase: isRu ? "нет базы сравнения" : "no comparison base",
     statusLabel: isRu ? "Статус" : "Status",
-    premiumLabel: "Premium",
-    freeLabel: "Free",
     templateOverviewTitle: isRu ? "Карточка шаблона" : "Template card",
     templateIdLabel: "ID",
     categoryLabel: isRu ? "Категория" : "Category",
@@ -1217,22 +1200,6 @@ function getJobStatusClassName(status: TemplateGenerationJobStatus) {
   }
 
   return "statusChip_info";
-}
-
-function formatTemplateStatus(status: TemplateStatus, isRu: boolean) {
-  if (!isRu) {
-    return status;
-  }
-
-  if (status === "Active") {
-    return "Активен";
-  }
-
-  if (status === "Archived") {
-    return "Архив";
-  }
-
-  return "Черновик";
 }
 
 function formatJobStatus(status: TemplateGenerationJobStatus, isRu: boolean) {

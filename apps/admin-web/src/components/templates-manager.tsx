@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminMetricStrip, AdminPageHero, AdminSectionHeader } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import { TemplateBasicFields } from "@/components/templates/template-basic-fields";
 import {
     KLING_MODELS,
@@ -25,7 +26,6 @@ import {
     deleteTemplate,
     fetchAdminTemplate,
     fetchAdminTemplates,
-    getSession,
     uploadTemplateMedia,
     type AdminTemplate,
     type AdminTemplateListItem,
@@ -83,9 +83,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
     setError(null);
 
     try {
-      const session = getSession();
-      if (!session) {
-        router.replace(`/${locale}`);
+      if (!ensureAdminSession(locale, router)) {
         return;
       }
 
@@ -126,9 +124,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
       setError(null);
 
       try {
-        const session = getSession();
-        if (!session) {
-          router.replace(`/${locale}`);
+        if (!ensureAdminSession(locale, router)) {
           return;
         }
 
@@ -501,6 +497,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
                     tokenCost={editorModel.tokenCost}
                     category={editorModel.category || text.editorDraft}
                     isPremium={form.isPremium}
+                    accessLabel={form.isPremium ? text.premiumLabel : text.freeLabel}
                     referenceDurationSeconds={editorModel.referenceDuration}
                     promoBadge={editorModel.promoBadge}
                     musicDescription={editorModel.musicDescription}

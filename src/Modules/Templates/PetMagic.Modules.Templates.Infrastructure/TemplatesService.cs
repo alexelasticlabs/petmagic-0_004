@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -17,6 +18,10 @@ internal sealed class TemplatesService(
     ITemplateMediaLifecycleService mediaLifecycleService) : ITemplatesService
 {
     private static readonly string[] FunnyKeywords = ["funny", "meme", "viral", "dance", "lol", "cute"];
+    private const decimal EstimatedUsdPerToken = 0.01m;
+    private const string AnalyticsEventTypeView = "view";
+    private const string AnalyticsEventTypeVideoView = "video_view";
+    private const string AnalyticsEventTypeComplaint = "complaint";
 
     private sealed record GenerationStatisticsProjection(
         TemplateGenerationStatus Status,
@@ -28,6 +33,7 @@ internal sealed class TemplatesService(
 
     private sealed record GenerationAnalyticsProjection(
         Guid GenerationId,
+        Guid TemplateId,
         Guid UserId,
         TemplateGenerationStatus Status,
         int TokenCost,
@@ -208,9 +214,9 @@ internal sealed class TemplatesService(
             .Where(x => x.TemplateId == templateId)
             .ToArrayAsync(cancellationToken);
 
-        var viewEvents = events.Where(x => x.EventType == "view").ToArray();
-        var videoViewEvents = events.Where(x => x.EventType == "video_view").ToArray();
-        var complaintEvents = events.Where(x => x.EventType == "complaint").ToArray();
+        var viewEvents = events.Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeView)).ToArray();
+        var videoViewEvents = events.Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeVideoView)).ToArray();
+        var complaintEvents = events.Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeComplaint)).ToArray();
 
         var response = new AdminTemplateEventAnalyticsResponse(
             viewEvents.Length,
@@ -219,6 +225,126 @@ internal sealed class TemplatesService(
             BuildDimension(viewEvents, x => x.Source, "direct"),
             BuildDimension(viewEvents, x => x.DeviceClass, "unknown"),
             BuildDimension(viewEvents, x => x.CountryCode, "unknown"));
+
+        return Result.Success(response);
+    }
+
+    public async Task<Result<AdminTemplatesAnalyticsOverviewResponse>> GetAdminTemplatesAnalyticsAsync(AdminTemplatesAnalyticsQuery query, CancellationToken cancellationToken)
+    {
+        var generatedAtUtc = DateTime.UtcNow;
+        var periodDays = query.PeriodDays.HasValue ? Math.Clamp(query.PeriodDays.Value, 1, 3650) : (int?)null;
+        var periodStartUtc = periodDays.HasValue ? generatedAtUtc.Date.AddDays(-(periodDays.Value - 1)) : (DateTime?)null;
+        var templateType = ParseTemplateTypeFilter(query.TemplateType);
+        var templateStatus = ParseTemplateStatusFilter(query.Status);
+        var access = NormalizeAnalyticsFilter(query.Access);
+        var category = string.IsNullOrWhiteSpace(query.Category) ? null : query.Category.Trim();
+        var take = Math.Clamp(query.Take ?? 50, 1, 200);
+
+        var allTemplates = await dbContext.TemplateItems
+            .AsNoTracking()
+            .Include(x => x.Assets)
+            .ToArrayAsync(cancellationToken);
+
+        var templates = allTemplates
+            .Where(x => !templateType.HasValue || x.TemplateType == templateType.Value)
+            .Where(x => !templateStatus.HasValue || x.Status == templateStatus.Value)
+            .Where(x => category is null || string.Equals(x.Category, category, StringComparison.OrdinalIgnoreCase))
+            .Where(x => access is null || access == "all" || (access == "premium" ? x.IsPremium : !x.IsPremium))
+            .ToArray();
+        var templateIds = templates.Select(x => x.Id).ToHashSet();
+
+        var jobs = templateIds.Count == 0
+            ? Array.Empty<GenerationAnalyticsProjection>()
+            : await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .Where(x => templateIds.Contains(x.TemplateId))
+                .Where(x => !periodStartUtc.HasValue || x.CreatedAtUtc >= periodStartUtc.Value)
+                .Select(x => new GenerationAnalyticsProjection(
+                    x.Id,
+                    x.TemplateId,
+                    x.UserId,
+                    x.Status,
+                    x.TokenCost,
+                    x.AttemptCount,
+                    x.UsedPreprocessingModel,
+                    x.UsedKlingModel,
+                    x.MotionProviderCostUsd,
+                    x.FailureCode,
+                    x.FailureMessage,
+                    x.OutputUrl,
+                    x.CreatedAtUtc,
+                    x.StartedAtUtc,
+                    x.CompletedAtUtc))
+                .ToArrayAsync(cancellationToken);
+
+        var events = templateIds.Count == 0
+            ? Array.Empty<TemplateAnalyticsEvent>()
+            : await dbContext.TemplateAnalyticsEvents
+                .AsNoTracking()
+                .Where(x => templateIds.Contains(x.TemplateId))
+                .Where(x => !periodStartUtc.HasValue || x.CreatedAtUtc >= periodStartUtc.Value)
+                .ToArrayAsync(cancellationToken);
+
+        var jobsByTemplate = jobs.GroupBy(x => x.TemplateId).ToDictionary(x => x.Key, x => x.ToArray());
+        var eventsByTemplate = events.GroupBy(x => x.TemplateId).ToDictionary(x => x.Key, x => x.ToArray());
+        var rows = templates
+            .Select(template => BuildTemplatesAnalyticsRow(
+                template,
+                jobsByTemplate.GetValueOrDefault(template.Id) ?? [],
+                eventsByTemplate.GetValueOrDefault(template.Id) ?? []))
+            .ToArray();
+        var sortedRows = SortTemplatesAnalyticsRows(rows, query.Sort).ToArray();
+
+        var totalStarts = rows.Sum(x => x.GenerationStarts);
+        var completed = rows.Sum(x => x.CompletedGenerations);
+        var totalTokenCost = rows.Sum(x => x.TotalTokenCost);
+        var totalProviderCostUsd = rows.Sum(x => x.TotalProviderCostUsd);
+        var estimatedRevenueUsd = rows.Sum(x => x.EstimatedRevenueUsd);
+        var totalViews = rows.Sum(x => x.Views);
+        var totalComplaints = events.Count(x => IsAnalyticsEventType(x, AnalyticsEventTypeComplaint));
+        var viewEvents = events
+            .Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeView))
+            .ToArray();
+
+        var response = new AdminTemplatesAnalyticsOverviewResponse(
+            new AdminTemplatesAnalyticsSummaryResponse(
+                rows.Length,
+                templates.Count(x => x.TemplateType == TemplateType.Video),
+                templates.Count(x => x.TemplateType == TemplateType.Image),
+                templates.Count(x => x.Status == TemplateStatus.Active),
+                templates.Count(x => x.IsPremium),
+                totalViews,
+                totalStarts,
+                completed,
+                rows.Sum(x => x.FailedGenerations),
+                CalculatePercent(completed, totalStarts),
+                totalTokenCost,
+                totalStarts == 0 ? 0 : Math.Round((double)totalTokenCost / totalStarts, 1, MidpointRounding.AwayFromZero),
+                Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+                Math.Round(estimatedRevenueUsd, 4, MidpointRounding.AwayFromZero),
+                Math.Round(estimatedRevenueUsd - totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+                totalComplaints),
+            BuildTemplatesAnalyticsTrend(jobs, events),
+            sortedRows.Take(5).ToArray(),
+            BuildTemplatesAnalyticsBreakdown(rows, row => row.Category),
+            BuildTemplatesAnalyticsBreakdown(rows, row => row.TemplateType),
+            BuildDimension(viewEvents, x => x.Source, "direct"),
+            BuildDimension(viewEvents, x => x.DeviceClass, "unknown"),
+            BuildDimension(viewEvents, x => x.CountryCode, "unknown"),
+            new AdminTemplatesAnalyticsFunnelResponse(
+                totalViews,
+                totalStarts,
+                completed,
+                rows.Sum(x => x.FailedGenerations),
+                totalComplaints),
+            sortedRows.Take(take).ToArray(),
+            allTemplates
+                .Select(x => x.Category)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToArray(),
+            generatedAtUtc);
 
         return Result.Success(response);
     }
@@ -240,7 +366,7 @@ internal sealed class TemplatesService(
             TemplateId = command.TemplateId,
             UserId = command.UserId,
             GenerationId = command.GenerationId,
-            EventType = NormalizeAnalyticsValue(command.EventType, "view", 64),
+            EventType = NormalizeAnalyticsValue(command.EventType, AnalyticsEventTypeView, 64),
             Source = NormalizeAnalyticsValue(command.Source, "direct", 64),
             DeviceClass = NormalizeAnalyticsValue(command.DeviceClass, "unknown", 32),
             CountryCode = NormalizeAnalyticsValue(command.CountryCode, "unknown", 8).ToUpperInvariant(),
@@ -726,6 +852,151 @@ internal sealed class TemplatesService(
             averageGenerationSeconds);
     }
 
+    private static AdminTemplatesAnalyticsTemplateRowResponse BuildTemplatesAnalyticsRow(
+        TemplateItem template,
+        IReadOnlyCollection<GenerationAnalyticsProjection> jobs,
+        IReadOnlyCollection<TemplateAnalyticsEvent> events)
+    {
+        var starts = jobs.Count;
+        var completed = jobs.Count(x => x.Status == TemplateGenerationStatus.Completed);
+        var failed = jobs.Count(x => x.Status == TemplateGenerationStatus.Failed);
+        var totalTokenCost = jobs.Sum(x => x.TokenCost);
+        var totalProviderCostUsd = jobs.Sum(x => x.MotionProviderCostUsd ?? 0m);
+        var estimatedRevenueUsd = totalTokenCost * EstimatedUsdPerToken;
+
+        return new AdminTemplatesAnalyticsTemplateRowResponse(
+            template.Id,
+            template.TemplateType.ToString(),
+            template.Title,
+            template.Category,
+            template.Status.ToString(),
+            template.IsPremium,
+            template.TokenCost,
+            GetAsset(template, TemplateAssetKind.Preview),
+            events.Count(x => IsAnalyticsEventType(x, AnalyticsEventTypeView)),
+            starts,
+            completed,
+            failed,
+            CalculatePercent(completed, starts),
+            totalTokenCost,
+            Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+            Math.Round(estimatedRevenueUsd, 4, MidpointRounding.AwayFromZero),
+            template.UpdatedAtUtc);
+    }
+
+    private static IReadOnlyList<AdminTemplatesAnalyticsTrendPointResponse> BuildTemplatesAnalyticsTrend(
+        IReadOnlyCollection<GenerationAnalyticsProjection> jobs,
+        IReadOnlyCollection<TemplateAnalyticsEvent> events)
+    {
+        var jobsByDay = jobs
+            .GroupBy(x => x.CreatedAtUtc.Date)
+            .ToDictionary(x => x.Key, x => x.ToArray());
+        var eventsByDay = events
+            .GroupBy(x => x.CreatedAtUtc.Date)
+            .ToDictionary(x => x.Key, x => x.ToArray());
+
+        return jobsByDay.Keys
+            .Concat(eventsByDay.Keys)
+            .Distinct()
+            .OrderBy(x => x)
+            .Select(day =>
+            {
+                var dayJobs = jobsByDay.GetValueOrDefault(day) ?? [];
+                var dayEvents = eventsByDay.GetValueOrDefault(day) ?? [];
+                var totalTokenCost = dayJobs.Sum(x => x.TokenCost);
+                var totalProviderCostUsd = dayJobs.Sum(x => x.MotionProviderCostUsd ?? 0m);
+
+                return new AdminTemplatesAnalyticsTrendPointResponse(
+                    DateTime.SpecifyKind(day, DateTimeKind.Utc),
+                    dayEvents.Count(x => IsAnalyticsEventType(x, AnalyticsEventTypeView)),
+                    dayJobs.Length,
+                    dayJobs.Count(x => x.Status == TemplateGenerationStatus.Completed),
+                    dayJobs.Count(x => x.Status == TemplateGenerationStatus.Failed),
+                    totalTokenCost,
+                    Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+                    Math.Round(totalTokenCost * EstimatedUsdPerToken, 4, MidpointRounding.AwayFromZero));
+            })
+            .ToArray();
+    }
+
+    private static IReadOnlyList<AdminTemplatesAnalyticsBreakdownResponse> BuildTemplatesAnalyticsBreakdown(
+        IReadOnlyCollection<AdminTemplatesAnalyticsTemplateRowResponse> rows,
+        Func<AdminTemplatesAnalyticsTemplateRowResponse, string> selector)
+    {
+        return rows
+            .GroupBy(row => NormalizeAnalyticsValue(selector(row), "unknown", 128))
+            .OrderByDescending(group => group.Sum(x => x.Views))
+            .ThenByDescending(group => group.Sum(x => x.GenerationStarts))
+            .ThenBy(group => group.Key)
+            .Select(group =>
+            {
+                var starts = group.Sum(x => x.GenerationStarts);
+                var completed = group.Sum(x => x.CompletedGenerations);
+                var totalTokenCost = group.Sum(x => x.TotalTokenCost);
+                var totalProviderCostUsd = group.Sum(x => x.TotalProviderCostUsd);
+                var estimatedRevenueUsd = group.Sum(x => x.EstimatedRevenueUsd);
+
+                return new AdminTemplatesAnalyticsBreakdownResponse(
+                    group.Key,
+                    FormatDimensionLabel(group.Key),
+                    group.Count(),
+                    group.Sum(x => x.Views),
+                    starts,
+                    completed,
+                    CalculatePercent(completed, starts),
+                    totalTokenCost,
+                    Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+                    Math.Round(estimatedRevenueUsd, 4, MidpointRounding.AwayFromZero));
+            })
+            .ToArray();
+    }
+
+    private static IEnumerable<AdminTemplatesAnalyticsTemplateRowResponse> SortTemplatesAnalyticsRows(
+        IReadOnlyCollection<AdminTemplatesAnalyticsTemplateRowResponse> rows,
+        string? sort)
+    {
+        var normalizedSort = NormalizeAnalyticsFilter(sort) ?? "views";
+        IOrderedEnumerable<AdminTemplatesAnalyticsTemplateRowResponse> ordered = normalizedSort switch
+        {
+            "starts" => rows.OrderByDescending(x => x.GenerationStarts),
+            "conversion" => rows.OrderByDescending(x => x.ConversionPercent),
+            "revenue" => rows.OrderByDescending(x => x.EstimatedRevenueUsd),
+            "cost" => rows.OrderByDescending(x => x.TotalProviderCostUsd),
+            "tokens" => rows.OrderByDescending(x => x.TotalTokenCost),
+            "updated" => rows.OrderByDescending(x => x.UpdatedAtUtc),
+            _ => rows.OrderByDescending(x => x.Views),
+        };
+
+        return ordered.ThenBy(x => x.Title);
+    }
+
+    private static TemplateType? ParseTemplateTypeFilter(string? raw)
+    {
+        return Enum.TryParse<TemplateType>(raw, true, out var templateType) ? templateType : null;
+    }
+
+    private static TemplateStatus? ParseTemplateStatusFilter(string? raw)
+    {
+        return Enum.TryParse<TemplateStatus>(raw, true, out var templateStatus) ? templateStatus : null;
+    }
+
+    private static string? NormalizeAnalyticsFilter(string? raw)
+    {
+        return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim().ToLowerInvariant();
+    }
+
+    private static double CalculatePercent(int numerator, int denominator)
+    {
+        return denominator == 0
+            ? 0
+            : Math.Round((double)numerator * 100 / denominator, 1, MidpointRounding.AwayFromZero);
+    }
+
+    private static bool IsAnalyticsEventType(TemplateAnalyticsEvent analyticsEvent, string eventType)
+    {
+        return string.Equals(analyticsEvent.EventType, eventType, StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task<GenerationAnalyticsProjection[]?> GetAnalyticsProjectionsAsync(Guid templateId, CancellationToken cancellationToken)
     {
         var templateExists = await dbContext.TemplateItems
@@ -742,6 +1013,7 @@ internal sealed class TemplatesService(
             .Where(x => x.TemplateId == templateId)
             .Select(x => new GenerationAnalyticsProjection(
                 x.Id,
+                x.TemplateId,
                 x.UserId,
                 x.Status,
                 x.TokenCost,
@@ -803,7 +1075,8 @@ internal sealed class TemplatesService(
         "web" => "Web",
         "bot" => "Bot",
         "unknown" => "Unknown",
-        _ => key.ToUpperInvariant()
+        _ when key.Length <= 3 => key.ToUpperInvariant(),
+        _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(key.Replace('-', ' ').Replace('_', ' '))
     };
 
     private async Task<Result> DeleteTemplateAssetsAsync(string[] assetUrls, CancellationToken cancellationToken)

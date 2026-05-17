@@ -1,27 +1,27 @@
 "use client";
 
 import {
-  CalendarIcon,
-  ChartIcon,
-  ClockIcon,
-  DownloadIcon,
-  ImageIcon,
-  PlayCircleIcon,
-  RefreshIcon,
-  TableIcon,
-  VideoIcon,
+    CalendarIcon,
+    ChartIcon,
+    ClockIcon,
+    DownloadIcon,
+    ImageIcon,
+    PlayCircleIcon,
+    RefreshIcon,
+    TableIcon,
+    VideoIcon,
 } from "@/components/admin/admin-icons";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/templates/template-test-page.module.css";
 import { Button } from "@/components/ui/button";
 import {
     fetchAdminTemplate,
     fetchAdminTemplateTest,
-    getSession,
     startAdminTemplateTest,
     type AdminTemplate,
     type AdminTemplateTestRun,
 } from "@/lib/api-client";
-import { type Locale } from "@/lib/i18n";
+import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
@@ -52,21 +52,16 @@ type ArtifactItem = {
   downloadName?: string;
 };
 
-const runStatusColors: Record<AdminTemplateTestRun["status"], string> = {
-  Queued: "#94a3b8",
-  Processing: "#60a5fa",
-  Completed: "#22c55e",
-  Failed: "#f87171",
-};
-
 export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) {
   const isRu = locale === "ru";
+  const text = getDictionary(locale);
   const router = useRouter();
   const [template, setTemplate] = useState<AdminTemplate | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFilePreviewUrl, setSelectedFilePreviewUrl] = useState<string | null>(null);
+  const selectedFilePreviewObjectUrlRef = useRef<string | null>(null);
   const [run, setRun] = useState<AdminTemplateTestRun | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,9 +75,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       setLoadError(null);
 
       try {
-        const session = getSession();
-        if (!session) {
-          router.replace(`/${locale}`);
+        if (!ensureAdminSession(locale, router)) {
           return;
         }
 
@@ -127,19 +120,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     };
   }, [isRu, run]);
 
-  useEffect(() => {
-    if (!selectedFile) {
-      setSelectedFilePreviewUrl(null);
-      return;
+  useEffect(() => () => {
+    if (selectedFilePreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(selectedFilePreviewObjectUrlRef.current);
     }
-
-    const objectUrl = URL.createObjectURL(selectedFile);
-    setSelectedFilePreviewUrl(objectUrl);
-
-    return () => {
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, [selectedFile]);
+  }, []);
 
   async function handleStartTest() {
     if (!selectedFile) {
@@ -170,15 +155,29 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       return;
     }
 
+    clearSelectedFilePreviewUrl();
+    const objectUrl = URL.createObjectURL(file);
+    selectedFilePreviewObjectUrlRef.current = objectUrl;
     setSelectedFile(file);
+    setSelectedFilePreviewUrl(objectUrl);
     setRun(null);
     setRunError(null);
   }
 
   function handleResetTest() {
+    clearSelectedFilePreviewUrl();
     setSelectedFile(null);
     setRun(null);
     setRunError(null);
+  }
+
+  function clearSelectedFilePreviewUrl() {
+    if (selectedFilePreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(selectedFilePreviewObjectUrlRef.current);
+      selectedFilePreviewObjectUrlRef.current = null;
+    }
+
+    setSelectedFilePreviewUrl(null);
   }
 
   const timeline = useMemo(() => buildTimeline(run, locale), [locale, run]);
@@ -213,7 +212,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       placeholderTitle: isRu ? "Нормализованное фото" : "Normalized photo",
       placeholderText: selectedFile || run?.sourceImageAsset
         ? (isRu ? "Карточка заполнится сразу после завершения препроцессинга." : "This frame will fill in as soon as preprocessing finishes.")
-        : (isRu ? "Загрузите фото питомца, чтобы подготовить кадр для motion generation." : "Upload a pet photo to prepare the frame for motion generation."),
+        : (isRu ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения." : "Upload a pet photo to prepare the frame for motion generation."),
     },
     {
       key: "output",
@@ -265,7 +264,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <StatusPill tone={template.status === "Active" ? "success" : template.status === "Draft" ? "warning" : "muted"}>
                 {formatTemplateStatus(template.status, locale)}
               </StatusPill>
-              <StatusPill tone={template.isPremium ? "premium" : "success"}>{template.isPremium ? "Premium" : "Free"}</StatusPill>
+              <StatusPill tone={template.isPremium ? "premium" : "success"}>{template.isPremium ? text.premiumLabel : text.freeLabel}</StatusPill>
               <StatusPill tone="muted">{template.tokenCost} tokens</StatusPill>
               <StatusPill tone="muted">{formatReferenceDuration(template.referenceVideoDurationSeconds, isRu)}</StatusPill>
             </div>
@@ -423,15 +422,6 @@ function StatusPill({ children, tone }: { children: ReactNode; tone: "success" |
   return <span className={`${styles.statusPill} ${styles[`statusPill_${tone}`]}`}>{children}</span>;
 }
 
-function CostLine({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className={strong ? styles.costLineStrong : styles.costLine}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
     <div className={styles.metricTile}>
@@ -485,8 +475,6 @@ function MediaPreviewCard({
   downloadLabel?: string;
   downloadName?: string;
 }) {
-  const hasMedia = Boolean(videoUrl || imageUrl);
-
   return (
     <section className={`${styles.mediaPreviewCard} ${styles[`mediaPreviewCard_${accent}`]}`}>
       <div className={styles.mediaCardHeader}>
@@ -497,7 +485,7 @@ function MediaPreviewCard({
       {videoUrl ? (
         <video src={videoUrl} controls className={styles.mediaAsset} />
       ) : imageUrl ? (
-        <img src={imageUrl} alt={title} className={styles.mediaAsset} />
+        <div role="img" aria-label={title} className={`${styles.mediaAsset} ${styles.mediaAssetImage}`} style={{ backgroundImage: toCssImageUrl(imageUrl) }} />
       ) : (
         <div className={`${styles.mediaAsset} ${styles.mediaPlaceholder}`}>
           <div className={styles.mediaPlaceholderGlow} aria-hidden="true" />
@@ -595,7 +583,7 @@ function SourceUploadCard({
       >
         <input ref={inputRef} className={styles.uploadDropzoneInput} type="file" accept="image/*" onChange={handleInputChange} />
         {imageUrl ? (
-          <img src={imageUrl} alt={fileName} className={styles.mediaAsset} />
+          <div role="img" aria-label={fileName} className={`${styles.mediaAsset} ${styles.mediaAssetImage}`} style={{ backgroundImage: toCssImageUrl(imageUrl) }} />
         ) : (
           <div className={`${styles.mediaAsset} ${styles.mediaPlaceholder}`}>
             <div className={styles.mediaPlaceholderGlow} aria-hidden="true" />
@@ -635,6 +623,10 @@ function formatReferenceDuration(value: number | undefined, isRu: boolean) {
   const minutes = Math.floor(rounded / 60).toString().padStart(2, "0");
   const seconds = (rounded % 60).toString().padStart(2, "0");
   return rounded >= 60 ? `${minutes}:${seconds}` : isRu ? `${rounded} сек` : `${rounded} sec`;
+}
+
+function toCssImageUrl(value: string) {
+  return `url(${JSON.stringify(value)})`;
 }
 
 function formatGenerationDuration(run: AdminTemplateTestRun | null, isRu: boolean) {
@@ -795,14 +787,14 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale): Timeli
     items.push({
       label: isRu ? "Препроцессинг завершён" : "Preprocessing completed",
       at: formatDateTime(run.preprocessingCompletedAtUtc, locale),
-      description: isRu ? "Нормализованное изображение готово для motion generation." : "The normalized image is ready for motion generation.",
+      description: isRu ? "Нормализованное изображение готово для генерации движения." : "The normalized image is ready for motion generation.",
       done: true,
     });
   }
 
   if (run.preprocessingCompletedAtUtc || run.motionGenerationCompletedAtUtc) {
     items.push({
-      label: isRu ? "Генерация motion" : "Motion generation",
+      label: isRu ? "Генерация движения" : "Motion generation",
       at: formatDateTime(run.preprocessingCompletedAtUtc ?? run.startedAtUtc, locale),
       description: `${isRu ? "Модель" : "Model"}: ${run.usedKlingModel ?? "-"}`,
       done: Boolean(run.motionGenerationCompletedAtUtc),

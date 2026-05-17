@@ -20,6 +20,7 @@ public static class AdminTemplateEndpoints
             .RequireRateLimiting("templates");
 
         group.MapGet("/", ListAsync);
+    group.MapGet("/analytics", GetAnalyticsOverviewAsync);
         group.MapGet("/{templateId:guid}", GetAsync);
         group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
         group.MapGet("/{templateId:guid}/statistics/trends", GetTrendAsync);
@@ -50,6 +51,24 @@ public static class AdminTemplateEndpoints
         var templateType = ParseType(type);
         var templateStatus = ParseStatus(status);
         var result = await service.ListAdminAsync(templateType, templateStatus, cancellationToken);
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminTemplatesAnalyticsOverviewResponse>> GetAnalyticsOverviewAsync(
+        [FromQuery] int? periodDays,
+        [FromQuery] string? templateType,
+        [FromQuery] string? category,
+        [FromQuery] string? status,
+        [FromQuery] string? access,
+        [FromQuery] string? sort,
+        [FromQuery] int? take,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminTemplatesAnalyticsAsync(
+            new AdminTemplatesAnalyticsQuery(periodDays, templateType, category, status, access, sort, take),
+            cancellationToken);
 
         return TypedResults.Ok(result.Value);
     }

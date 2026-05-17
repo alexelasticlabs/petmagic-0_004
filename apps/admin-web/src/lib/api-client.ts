@@ -167,6 +167,102 @@ export type AdminTemplateEventAnalytics = {
   geography: AdminTemplateAnalyticsDimension[];
 };
 
+export type AdminTemplatesAnalyticsQuery = {
+  periodDays?: number;
+  templateType?: TemplateType | "All";
+  category?: string;
+  status?: TemplateStatus | "All";
+  access?: "all" | "free" | "premium";
+  sort?: "views" | "starts" | "conversion" | "revenue" | "cost" | "tokens" | "updated";
+  take?: number;
+};
+
+export type AdminTemplatesAnalyticsSummary = {
+  totalTemplates: number;
+  videoTemplates: number;
+  imageTemplates: number;
+  activeTemplates: number;
+  premiumTemplates: number;
+  totalViews: number;
+  totalGenerationStarts: number;
+  completedGenerations: number;
+  failedGenerations: number;
+  conversionPercent: number;
+  totalTokenCost: number;
+  averageTokenCost: number;
+  totalProviderCostUsd: number;
+  estimatedRevenueUsd: number;
+  estimatedGrossMarginUsd: number;
+  totalComplaints: number;
+};
+
+export type AdminTemplatesAnalyticsTrendPoint = {
+  dateUtc: string;
+  totalViews: number;
+  totalGenerationStarts: number;
+  completedGenerations: number;
+  failedGenerations: number;
+  totalTokenCost: number;
+  totalProviderCostUsd: number;
+  estimatedRevenueUsd: number;
+};
+
+export type AdminTemplatesAnalyticsTemplateRow = {
+  templateId: string;
+  templateType: TemplateType;
+  title: string;
+  category: string;
+  status: TemplateStatus;
+  isPremium: boolean;
+  tokenCost: number;
+  previewAsset?: TemplateAsset | null;
+  views: number;
+  generationStarts: number;
+  completedGenerations: number;
+  failedGenerations: number;
+  conversionPercent: number;
+  totalTokenCost: number;
+  totalProviderCostUsd: number;
+  estimatedRevenueUsd: number;
+  updatedAtUtc: string;
+};
+
+export type AdminTemplatesAnalyticsBreakdown = {
+  key: string;
+  label: string;
+  templateCount: number;
+  views: number;
+  generationStarts: number;
+  completedGenerations: number;
+  conversionPercent: number;
+  totalTokenCost: number;
+  totalProviderCostUsd: number;
+  estimatedRevenueUsd: number;
+};
+
+export type AdminTemplatesAnalyticsFunnel = {
+  views: number;
+  generationStarts: number;
+  completedGenerations: number;
+  failedGenerations: number;
+  complaints: number;
+};
+
+export type AdminTemplatesAnalyticsOverview = {
+  summary: AdminTemplatesAnalyticsSummary;
+  trendPoints: AdminTemplatesAnalyticsTrendPoint[];
+  topTemplates: AdminTemplatesAnalyticsTemplateRow[];
+  categories: AdminTemplatesAnalyticsBreakdown[];
+  templateTypes: AdminTemplatesAnalyticsBreakdown[];
+  sources: AdminTemplateAnalyticsDimension[];
+  devices: AdminTemplateAnalyticsDimension[];
+  geography: AdminTemplateAnalyticsDimension[];
+  conversionFunnel: AdminTemplatesAnalyticsFunnel;
+  templates: AdminTemplatesAnalyticsTemplateRow[];
+  availableCategories: string[];
+  generatedAtUtc: string;
+};
+
 export type AdminTemplateTestRun = {
   generationId: string;
   userId: string;
@@ -534,6 +630,20 @@ export async function fetchAdminTemplateFailureBreakdown(templateId: string): Pr
 
 export async function fetchAdminTemplateEventAnalytics(templateId: string): Promise<AdminTemplateEventAnalytics> {
   return apiRequest<AdminTemplateEventAnalytics>(`/api/admin/templates/${templateId}/statistics/events`, { method: "GET" });
+}
+
+export async function fetchAdminTemplatesAnalyticsOverview(query: AdminTemplatesAnalyticsQuery = {}): Promise<AdminTemplatesAnalyticsOverview> {
+  const params = new URLSearchParams();
+  if (query.periodDays) params.set("periodDays", String(query.periodDays));
+  if (query.templateType && query.templateType !== "All") params.set("templateType", query.templateType);
+  if (query.category) params.set("category", query.category);
+  if (query.status && query.status !== "All") params.set("status", query.status);
+  if (query.access && query.access !== "all") params.set("access", query.access);
+  if (query.sort) params.set("sort", query.sort);
+  if (query.take) params.set("take", String(query.take));
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return apiRequest<AdminTemplatesAnalyticsOverview>(`/api/admin/templates/analytics${suffix}`, { method: "GET" });
 }
 
 export async function startAdminTemplateTest(templateId: string, file: File): Promise<AdminTemplateTestRun> {

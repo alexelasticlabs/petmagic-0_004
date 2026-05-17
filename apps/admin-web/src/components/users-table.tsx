@@ -17,11 +17,23 @@ import {
     setActive,
     setPremium,
 } from "@/lib/api-client";
-import { getDictionary, type Locale } from "@/lib/i18n";
+import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 
 type UsersTableProps = {
   locale: Locale;
 };
+
+type UserRoleText = Pick<Dictionary, "userRoleAdmin" | "userRoleModerator" | "userRoleUser">;
+
+function getUserRoleLabel(role: string, text: UserRoleText) {
+  return role === "Admin"
+    ? text.userRoleAdmin
+    : role === "Moderator"
+      ? text.userRoleModerator
+      : role === "User"
+        ? text.userRoleUser
+        : role;
+}
 
 export function UsersTable({ locale }: UsersTableProps) {
   const text = getDictionary(locale);
@@ -95,7 +107,7 @@ export function UsersTable({ locale }: UsersTableProps) {
                     <td data-label={text.roleLabel}>
                       <div className={styles.roleList}>
                         {user.roles.map((role) => (
-                          <span key={role} className={styles.rolePill}>{role}</span>
+                          <span key={role} className={styles.rolePill}>{getUserRoleLabel(role, text)}</span>
                         ))}
                       </div>
                     </td>

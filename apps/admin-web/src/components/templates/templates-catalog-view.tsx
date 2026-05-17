@@ -1,6 +1,23 @@
 "use client";
 
+import {
+    CalendarIcon,
+    CancelCircleIcon,
+    ChartIcon,
+    ImageIcon,
+    PencilIcon,
+    PlayCircleIcon,
+    RefreshIcon,
+    VideoIcon,
+} from "@/components/admin/admin-icons";
 import { AdminCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
+import {
+    getCharacterOrientationLabel,
+    getTemplateAccessLabel,
+    getTemplateStatusLabel,
+    getTemplateTypeLabel,
+} from "@/components/templates/template-admin-shared";
 import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { Button } from "@/components/ui/button";
@@ -9,12 +26,14 @@ import {
     changeTemplateStatus,
     deleteTemplate,
     fetchAdminTemplates,
-    getSession,
+    fetchAdminTemplatesAnalyticsOverview,
     type AdminTemplateListItem,
+    type AdminTemplatesAnalyticsTemplateRow,
     type TemplateStatus,
     type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -36,11 +55,30 @@ const statusColors: Record<TemplateStatus, string> = {
   Archived: "#94a3b8",
 };
 
+async function fetchTemplatesList(locale: Locale, router: { replace: (href: string) => void }, templateType: TemplateType) {
+  if (!ensureAdminSession(locale, router)) {
+    return null;
+  }
+
+  return fetchAdminTemplates(templateType);
+}
+
+async function fetchTemplatesAnalyticsRows(locale: Locale, router: { replace: (href: string) => void }, templateType: TemplateType) {
+  if (!ensureAdminSession(locale, router)) {
+    return null;
+  }
+
+  const response = await fetchAdminTemplatesAnalyticsOverview({ templateType, sort: "updated", take: 500 });
+  return Object.fromEntries(response.templates.map((row) => [row.templateId, row]));
+}
+
 export function TemplatesCatalogView({ locale, templateType, initialCategory }: TemplatesCatalogViewProps) {
+  const isRu = locale === "ru";
   const text = getDictionary(locale);
   const copy = getCatalogCopy(locale, templateType);
   const router = useRouter();
   const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
+  const [analyticsRows, setAnalyticsRows] = useState<Record<string, AdminTemplatesAnalyticsTemplateRow>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
@@ -52,25 +90,34 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
   const [statusFilter, setStatusFilter] = useState<TemplateStatus | "all">("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
 
-  async function loadTemplates(showLoading = true) {
-    if (showLoading) {
+  async function loadTemplates(showLoading = true, canUpdateState: () => boolean = () => true) {
+    if (showLoading && canUpdateState()) {
       setIsLoading(true);
     }
-    setError(null);
+    if (canUpdateState()) {
+      setError(null);
+    }
 
     try {
-      const session = getSession();
-      if (!session) {
-        router.replace(`/${locale}`);
+      const [templatesResponse, analyticsResponse] = await Promise.all([
+        fetchTemplatesList(locale, router, templateType),
+        fetchTemplatesAnalyticsRows(locale, router, templateType),
+      ]);
+
+      if (!templatesResponse) {
         return;
       }
 
-      const response = await fetchAdminTemplates(templateType);
-      setTemplates(response);
+      if (canUpdateState()) {
+        setTemplates(templatesResponse);
+        setAnalyticsRows(analyticsResponse ?? {});
+      }
     } catch {
-      setError(text.errorLoadingTemplates);
+      if (canUpdateState()) {
+        setError(text.errorLoadingTemplates);
+      }
     } finally {
-      if (showLoading) {
+      if (showLoading && canUpdateState()) {
         setIsLoading(false);
       }
     }
@@ -84,15 +131,14 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
       setError(null);
 
       try {
-        const session = getSession();
-        if (!session) {
-          router.replace(`/${locale}`);
-          return;
-        }
+        const [templatesResponse, analyticsResponse] = await Promise.all([
+          fetchTemplatesList(locale, router, templateType),
+          fetchTemplatesAnalyticsRows(locale, router, templateType),
+        ]);
 
-        const response = await fetchAdminTemplates(templateType);
-        if (!isCancelled) {
-          setTemplates(response);
+        if (templatesResponse && !isCancelled) {
+          setTemplates(templatesResponse);
+          setAnalyticsRows(analyticsResponse ?? {});
         }
       } catch {
         if (!isCancelled) {
@@ -157,14 +203,14 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
   ];
   const accessOptions: SelectOption[] = [
     { value: "all", label: copy.allAccess, tone: "neutral" },
-    { value: "premium", label: "Premium", badge: "Premium", tone: "premium" },
-    { value: "free", label: "Free", badge: "Free", tone: "recommended" },
+    { value: "premium", label: text.premiumLabel, badge: text.premiumLabel, tone: "premium" },
+    { value: "free", label: text.freeLabel, badge: text.freeLabel, tone: "recommended" },
   ];
   const statusOptions: SelectOption[] = [
     { value: "all", label: copy.allStatuses, tone: "neutral" },
-    { value: "Active", label: formatStatus("Active", locale), badge: "Live", tone: "premium" },
-    { value: "Draft", label: formatStatus("Draft", locale), badge: "Draft", tone: "fast" },
-    { value: "Archived", label: formatStatus("Archived", locale), badge: "Archive", tone: "neutral" },
+    { value: "Active", label: getTemplateStatusLabel("Active", locale), badge: locale === "ru" ? "Активен" : "Live", tone: "premium" },
+    { value: "Draft", label: getTemplateStatusLabel("Draft", locale), badge: locale === "ru" ? "Черновик" : "Draft", tone: "fast" },
+    { value: "Archived", label: getTemplateStatusLabel("Archived", locale), badge: locale === "ru" ? "Архив" : "Archive", tone: "neutral" },
   ];
   const sortOptions: SelectOption[] = [
     { value: "newest", label: copy.sortNewest, description: locale === "ru" ? "Сначала свежие шаблоны" : "Most recent templates first", tone: "recommended" },
@@ -301,52 +347,157 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                 <table className={adminTableStyles.table}>
                   <thead>
                     <tr>
-                      <th>{text.titleLabel}</th>
+                      <th>{isRu ? "Шаблон" : "Template"}</th>
+                      <th>{isRu ? "Тип" : "Type"}</th>
                       <th>{text.categoryLabel}</th>
                       <th>{copy.accessLabel}</th>
-                      <th>{text.tokenCostLabel}</th>
                       <th>{text.statusLabel}</th>
-                      <th>{templateType === "Video" ? text.characterOrientationLabel : copy.updatedLabel}</th>
+                      <th>{isRu ? "Просмотры" : "Views"}</th>
+                      <th>{isRu ? "Запуски" : "Starts"}</th>
+                      <th>{isRu ? "Конверсия" : "Conversion"}</th>
+                      <th>{isRu ? "Успех" : "Success"}</th>
+                      <th>{isRu ? "Средняя стоимость" : "Average cost"}</th>
+                      <th>{copy.updatedLabel}</th>
                       <th>{text.actionsLabel}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredTemplates.map((template) => {
                       const isBusy = busyTemplateId === template.templateId;
+                      const analytics = analyticsRows[template.templateId];
 
                       return (
                         <tr key={template.templateId}>
-                          <td data-label={text.titleLabel}>
-                            <div className={styles.titleCell}>
-                              <strong>{template.title}</strong>
-                              <span>{template.shortDescription}</span>
+                          <td data-label={isRu ? "Шаблон" : "Template"}>
+                            <div className={styles.listTemplateCell}>
+                              <div className={styles.listTemplateThumb} aria-hidden="true">
+                                {template.previewAsset?.url ? (
+                                  template.previewAsset.contentType?.startsWith("video/") ? (
+                                    <video
+                                      className={styles.listTemplateMedia}
+                                      src={template.previewAsset.url}
+                                      muted
+                                      playsInline
+                                      autoPlay
+                                      loop
+                                      preload="metadata"
+                                    />
+                                  ) : (
+                                    <Image
+                                      className={styles.listTemplateMedia}
+                                      src={template.previewAsset.url}
+                                      alt=""
+                                      width={56}
+                                      height={56}
+                                      unoptimized
+                                    />
+                                  )
+                                ) : (
+                                  template.templateType === "Video" ? <VideoIcon className={styles.listTemplateThumbIcon} /> : <ImageIcon className={styles.listTemplateThumbIcon} />
+                                )}
+                              </div>
+                              <div className={styles.titleCell}>
+                                <strong>{template.title}</strong>
+                                <span>{template.shortDescription}</span>
+                                <small className={styles.templateMetaId}>ID: {template.templateId.slice(0, 12)}</small>
+                              </div>
+                            </div>
+                          </td>
+                          <td data-label={isRu ? "Тип" : "Type"}>
+                            <div className={styles.typeCell}>
+                              <span className={styles.typeBadge}>
+                                {template.templateType === "Video" ? <VideoIcon className={styles.typeIcon} /> : <ImageIcon className={styles.typeIcon} />}
+                                {getTemplateTypeLabel(template.templateType, text)}
+                              </span>
+                              <span className={styles.typeMeta}>
+                                {template.templateType === "Video"
+                                  ? formatDuration(template.referenceVideoDurationSeconds)
+                                  : getCharacterOrientationLabel(template.characterOrientation, text)}
+                              </span>
                             </div>
                           </td>
                           <td data-label={text.categoryLabel}>{template.category}</td>
-                          <td data-label={copy.accessLabel}>{template.isPremium ? "Premium" : "Free"}</td>
-                          <td data-label={text.tokenCostLabel}>{template.tokenCost}</td>
-                          <td data-label={text.statusLabel}>
-                            <AdminStatusBadge color={statusColors[template.status]}>{formatStatus(template.status, locale)}</AdminStatusBadge>
+                          <td data-label={copy.accessLabel}>
+                            <span className={template.isPremium ? styles.premiumPill : styles.freePill}>
+                              {getTemplateAccessLabel(template.isPremium, text)}
+                            </span>
                           </td>
-                          <td data-label={templateType === "Video" ? text.characterOrientationLabel : copy.updatedLabel}>
-                            {templateType === "Video" ? formatOrientation(template.characterOrientation, locale) : formatDate(template.updatedAtUtc, locale)}
+                          <td data-label={text.statusLabel}>
+                            <AdminStatusBadge color={statusColors[template.status]}>{getTemplateStatusLabel(template.status, locale)}</AdminStatusBadge>
+                          </td>
+                          <td data-label={isRu ? "Просмотры" : "Views"} className={styles.metricValueCell}>
+                            {formatAnalyticsInteger(analytics?.views)}
+                          </td>
+                          <td data-label={isRu ? "Запуски" : "Starts"} className={styles.metricValueCell}>
+                            {formatAnalyticsInteger(analytics?.generationStarts)}
+                          </td>
+                          <td data-label={isRu ? "Конверсия" : "Conversion"} className={styles.metricValueCell}>
+                            {formatPercentMetric(analytics?.generationStarts ? analytics.conversionPercent : null)}
+                          </td>
+                          <td data-label={isRu ? "Успех" : "Success"} className={styles.metricValueCell}>
+                            {formatPercentMetric(getSuccessRatePercent(analytics))}
+                          </td>
+                          <td data-label={isRu ? "Средняя стоимость" : "Average cost"} className={styles.numericCell}>
+                            {template.tokenCost} <span className={styles.numericSuffix}>{copy.tokensShort}</span>
+                          </td>
+                          <td data-label={copy.updatedLabel}>
+                            <div className={styles.updatedCell}>
+                              <CalendarIcon className={styles.updatedIcon} />
+                              <span>{formatDate(template.updatedAtUtc, locale)}</span>
+                            </div>
                           </td>
                           <td data-label={text.actionsLabel} className={styles.tableActionsCell}>
                             <div className={styles.tableActions}>
-                              <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.compactLink}>{text.editTemplate}</Link>
+                              <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.cardActionIconButton} aria-label={text.editTemplate} title={text.editTemplate}>
+                                <PencilIcon className={styles.actionIcon} />
+                              </Link>
                               {template.templateType === "Video" ? (
                                 <>
-                                  <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.compactLink}>{copy.analyticsAction}</Link>
-                                  <Link href={`${testBasePath}/${template.templateId}`} className={styles.compactLink}>{copy.testAction}</Link>
+                                  <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.analyticsAction} title={copy.analyticsAction}>
+                                    <ChartIcon className={styles.actionIcon} />
+                                  </Link>
+                                  <Link href={`${testBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.testAction} title={copy.testAction}>
+                                    <PlayCircleIcon className={styles.actionIcon} />
+                                  </Link>
                                 </>
                               ) : null}
                               {template.status !== "Active" ? (
-                                <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => void handleStatusChange(template.templateId, "Active")}>{text.activate}</Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className={styles.cardActionIconButton}
+                                  disabled={isBusy}
+                                  aria-label={text.activate}
+                                  title={text.activate}
+                                  onClick={() => void handleStatusChange(template.templateId, "Active")}
+                                >
+                                  <RefreshIcon className={styles.actionIcon} />
+                                </Button>
                               ) : null}
                               {template.status !== "Archived" ? (
-                                <Button size="sm" variant="danger" disabled={isBusy} onClick={() => void handleStatusChange(template.templateId, "Archived")}>{text.archive}</Button>
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+                                  disabled={isBusy}
+                                  aria-label={text.archive}
+                                  title={text.archive}
+                                  onClick={() => void handleStatusChange(template.templateId, "Archived")}
+                                >
+                                  <RefreshIcon className={styles.actionIcon} />
+                                </Button>
                               ) : null}
-                              <Button size="sm" variant="danger" disabled={isBusy} onClick={() => void handleDelete(template.templateId)}>{text.deleteTemplate}</Button>
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+                                disabled={isBusy}
+                                aria-label={text.deleteTemplate}
+                                title={text.deleteTemplate}
+                                onClick={() => void handleDelete(template.templateId)}
+                              >
+                                <CancelCircleIcon className={styles.actionIcon} />
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -393,13 +544,14 @@ function TemplateCatalogCard({ locale, template, editorBasePath, analyticsBasePa
         tokenCost={template.tokenCost}
         category={template.category}
         isPremium={template.isPremium}
+        accessLabel={getTemplateAccessLabel(template.isPremium, text)}
         referenceDurationSeconds={template.referenceVideoDurationSeconds}
         promoBadge={template.effectivePromoBadge}
       />
       <div className={styles.cardBody}>
         <div className={styles.cardFooter}>
           <span className={styles.cardTimestamp}>{copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}</span>
-          <AdminStatusBadge color={statusColors[template.status]}>{formatStatus(template.status, locale)}</AdminStatusBadge>
+          <AdminStatusBadge color={statusColors[template.status]}>{getTemplateStatusLabel(template.status, locale)}</AdminStatusBadge>
         </div>
         <div className={styles.cardMetrics}>
           {getTemplateCardMetrics(template, locale).map((metric) => (
@@ -526,12 +678,33 @@ function formatDuration(seconds?: number) {
   return `${minutes}:${remainder}`;
 }
 
-function formatStatus(status: TemplateStatus, locale: Locale) {
-  if (locale === "ru") {
-    return status === "Active" ? "Активен" : status === "Draft" ? "Черновик" : "Архив";
+function formatAnalyticsInteger(value?: number) {
+  if (value === undefined || value === null) {
+    return "-";
   }
 
-  return status;
+  return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+function formatPercentMetric(value?: number | null) {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return "-";
+  }
+
+  return `${value.toFixed(1)}%`;
+}
+
+function getSuccessRatePercent(analytics?: AdminTemplatesAnalyticsTemplateRow) {
+  if (!analytics) {
+    return null;
+  }
+
+  const finishedCount = analytics.completedGenerations + analytics.failedGenerations;
+  if (finishedCount <= 0) {
+    return null;
+  }
+
+  return (analytics.completedGenerations / finishedCount) * 100;
 }
 
 function getTemplateCardMetrics(template: AdminTemplateListItem, locale: Locale) {
@@ -563,18 +736,6 @@ function getTemplateCardMetrics(template: AdminTemplateListItem, locale: Locale)
   return metrics;
 }
 
-function formatOrientation(value: string | undefined, locale: Locale) {
-  if (!value) {
-    return "-";
-  }
-
-  if (locale === "ru") {
-    return value === "Image" ? "image" : "video";
-  }
-
-  return value;
-}
-
 function formatPromoBadgeMetric(value: AdminTemplateListItem["effectivePromoBadge"], locale: Locale) {
   if (!value) {
     return locale === "ru" ? "Нет" : "None";
@@ -603,8 +764,8 @@ function getCatalogCopy(locale: Locale, templateType: TemplateType) {
     title: isVideo ? (isRu ? "Видео шаблоны" : "Video Templates") : (isRu ? "Шаблоны изображений" : "Image Templates"),
     description: isVideo
       ? (isRu ? "Каталог motion-шаблонов, статусы, категории и параметры доступа." : "Motion template catalog, statuses, categories, and access settings.")
-      : (isRu ? "Каталог image-шаблонов, статусы, категории и параметры доступа." : "Image template catalog, statuses, categories, and access settings."),
-    createTemplate: isVideo ? (isRu ? "Создать видео шаблон" : "Create video template") : (isRu ? "Создать image шаблон" : "Create image template"),
+      : (isRu ? "Каталог шаблонов изображений, статусы, категории и параметры доступа." : "Image template catalog, statuses, categories, and access settings."),
+    createTemplate: isVideo ? (isRu ? "Создать видео шаблон" : "Create video template") : (isRu ? "Создать шаблон изображения" : "Create image template"),
     manageCategories: isRu ? "Управление категориями" : "Manage categories",
     analyticsAction: isRu ? "Аналитика" : "Analytics",
     archiveTabsLabel: isRu ? "Фильтр архива" : "Archive filter",

@@ -25,6 +25,9 @@ export type Dictionary = {
   yesLabel: string;
   noLabel: string;
   roleLabel: string;
+  userRoleAdmin: string;
+  userRoleModerator: string;
+  userRoleUser: string;
   premiumLabel: string;
   activeLabel: string;
   statusLabel: string;
@@ -33,6 +36,7 @@ export type Dictionary = {
   navTemplates: string;
   navImageTemplates: string;
   navVideoTemplates: string;
+  navTemplateAnalytics: string;
   navTemplateCategories: string;
   navLogout: string;
   loading: string;
@@ -162,11 +166,11 @@ const dictionaries: Record<Locale, Dictionary> = {
     signIn: "Войти",
     usersTitle: "Пользователи",
     usersHeroEyebrow: "Управление доступом",
-    usersHeroDescription: "Управление ролями, premium-статусом и активностью пользователей в том же визуальном ритме, что и каталог, editor и dashboard.",
+    usersHeroDescription: "Управление ролями, премиум-статусом и активностью пользователей в едином стиле админ-панели.",
     usersHeroBadge: "Роли и доступ",
     usersMetaCountLabel: "Пользователей",
-    usersMetaAdminEnabled: "Admin controls enabled",
-    usersMetaViewOnly: "Просмотр без admin-control",
+    usersMetaAdminEnabled: "Админ-функции включены",
+    usersMetaViewOnly: "Режим только просмотра",
     usersMetaLiveControls: "Живое управление статусами",
     usersLoadingDescription: "Загрузка списка пользователей",
     usersCardDescription: "Роли, премиум-статус и активность пользователей",
@@ -175,6 +179,9 @@ const dictionaries: Record<Locale, Dictionary> = {
     yesLabel: "Да",
     noLabel: "Нет",
     roleLabel: "Роль",
+    userRoleAdmin: "Администратор",
+    userRoleModerator: "Модератор",
+    userRoleUser: "Пользователь",
     premiumLabel: "Premium",
     activeLabel: "Активен",
     statusLabel: "Статус",
@@ -183,6 +190,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     navTemplates: "Шаблоны",
     navImageTemplates: "Шаблоны изображений",
     navVideoTemplates: "Видео шаблоны",
+    navTemplateAnalytics: "Аналитика шаблонов",
     navTemplateCategories: "Категории",
     navLogout: "Выйти",
     loading: "Загрузка...",
@@ -247,15 +255,15 @@ const dictionaries: Record<Locale, Dictionary> = {
     klingModelLabel: "Модель Kling",
     klingPromptLabel: "Промпт Kling",
     keepOriginalSoundLabel: "Сохранять оригинальный звук",
-    computedValueHint: "Вычисляется backend и не редактируется вручную.",
+    computedValueHint: "Рассчитывается сервером и не редактируется вручную.",
     saveTemplate: "Сохранить",
     resetForm: "Сбросить",
     uploadPreview: "Загрузить preview",
     uploadReference: "Загрузить референсное видео",
     uploadAction: "Загрузить",
     uploadingMedia: "Загрузка файла...",
-    mediaUploadHint: "После загрузки backend сам определяет URL, имя файла, тип, размер и длительность media.",
-    referenceMotionUploadHint: "Для reference motion поддерживается только MP4: backend использует этот формат для расчета длительности и ориентации персонажа.",
+    mediaUploadHint: "После загрузки сервер сам определяет URL, имя файла, тип, размер и длительность медиа.",
+    referenceMotionUploadHint: "Для референсного движения поддерживается только MP4: сервер использует этот формат для расчета длительности и ориентации персонажа.",
     mediaDropzoneHint: "Кликните по области или перетащите файл сюда.",
     selectedFileLabel: "Выбранный файл",
     chooseFile: "Выбрать файл",
@@ -323,6 +331,9 @@ const dictionaries: Record<Locale, Dictionary> = {
     yesLabel: "Yes",
     noLabel: "No",
     roleLabel: "Role",
+    userRoleAdmin: "Admin",
+    userRoleModerator: "Moderator",
+    userRoleUser: "User",
     premiumLabel: "Premium",
     activeLabel: "Active",
     statusLabel: "Status",
@@ -331,6 +342,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     navTemplates: "Templates",
     navImageTemplates: "Image Templates",
     navVideoTemplates: "Video Templates",
+    navTemplateAnalytics: "Template Analytics",
     navTemplateCategories: "Categories",
     navLogout: "Logout",
     loading: "Loading...",

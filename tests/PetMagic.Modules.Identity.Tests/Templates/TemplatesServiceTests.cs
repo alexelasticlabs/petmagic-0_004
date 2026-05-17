@@ -705,6 +705,137 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetAdminTemplatesAnalyticsAsync_ShouldAggregateTemplatesJobsEventsAndCosts()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var video = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Analytics Dance",
+                "Template with global analytics",
+                "Dance",
+                ["analytics"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true,
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+        var image = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait Magic",
+                "Image analytics template",
+                "Portrait",
+                ["analytics"],
+                true,
+                30,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(video.IsSuccess);
+        Assert.True(image.IsSuccess);
+
+        var now = new DateTime(2026, 5, 17, 12, 0, 0, DateTimeKind.Utc);
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = video.Value.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-1.jpg",
+                SourceImageFileName = "source-1.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                OutputUrl = "https://cdn.example.com/output.mp4",
+                MotionProviderCostUsd = 0.5000m,
+                CreatedAtUtc = now.AddDays(-1),
+                QueuedAtUtc = now.AddDays(-1),
+                StartedAtUtc = now.AddDays(-1).AddMinutes(1),
+                CompletedAtUtc = now.AddDays(-1).AddMinutes(4),
+                UpdatedAtUtc = now.AddDays(-1).AddMinutes(4)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = video.Value.TemplateId,
+                Status = TemplateGenerationStatus.Failed,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-2.jpg",
+                SourceImageFileName = "source-2.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                FailureCode = "templates.ai_provider_failed",
+                MotionProviderCostUsd = 0.1200m,
+                CreatedAtUtc = now,
+                QueuedAtUtc = now,
+                StartedAtUtc = now.AddMinutes(1),
+                CompletedAtUtc = now.AddMinutes(2),
+                UpdatedAtUtc = now.AddMinutes(2)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = image.Value.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 30,
+                SourceImageUrl = "https://cdn.example.com/source-3.jpg",
+                SourceImageFileName = "source-3.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now,
+                QueuedAtUtc = now,
+                StartedAtUtc = now.AddMinutes(1),
+                CompletedAtUtc = now.AddMinutes(2),
+                UpdatedAtUtc = now.AddMinutes(2)
+            });
+        dbContext.TemplateAnalyticsEvents.AddRange(
+            new TemplateAnalyticsEvent { Id = Guid.NewGuid(), TemplateId = video.Value.TemplateId, EventType = "view", Source = "home", DeviceClass = "ios", CountryCode = "US", CreatedAtUtc = now.AddDays(-1) },
+            new TemplateAnalyticsEvent { Id = Guid.NewGuid(), TemplateId = video.Value.TemplateId, EventType = "view", Source = "search", DeviceClass = "web", CountryCode = "US", CreatedAtUtc = now },
+            new TemplateAnalyticsEvent { Id = Guid.NewGuid(), TemplateId = image.Value.TemplateId, EventType = "view", Source = "home", DeviceClass = "android", CountryCode = "BR", CreatedAtUtc = now },
+            new TemplateAnalyticsEvent { Id = Guid.NewGuid(), TemplateId = video.Value.TemplateId, EventType = "complaint", Source = "profile", DeviceClass = "web", CountryCode = "US", CreatedAtUtc = now });
+        await dbContext.SaveChangesAsync();
+
+        var overview = await service.GetAdminTemplatesAnalyticsAsync(new AdminTemplatesAnalyticsQuery(null, null, null, null, null, "views", 10), CancellationToken.None);
+
+        Assert.True(overview.IsSuccess);
+        Assert.Equal(2, overview.Value.Summary.TotalTemplates);
+        Assert.Equal(1, overview.Value.Summary.VideoTemplates);
+        Assert.Equal(1, overview.Value.Summary.ImageTemplates);
+        Assert.Equal(3, overview.Value.Summary.TotalViews);
+        Assert.Equal(3, overview.Value.Summary.TotalGenerationStarts);
+        Assert.Equal(2, overview.Value.Summary.CompletedGenerations);
+        Assert.Equal(1, overview.Value.Summary.FailedGenerations);
+        Assert.Equal(66.7, overview.Value.Summary.ConversionPercent);
+        Assert.Equal(150, overview.Value.Summary.TotalTokenCost);
+        Assert.Equal(0.6200m, overview.Value.Summary.TotalProviderCostUsd);
+        Assert.Equal(1.5000m, overview.Value.Summary.EstimatedRevenueUsd);
+        Assert.Equal(0.8800m, overview.Value.Summary.EstimatedGrossMarginUsd);
+        Assert.Equal(1, overview.Value.Summary.TotalComplaints);
+        Assert.Equal(video.Value.TemplateId, overview.Value.TopTemplates[0].TemplateId);
+        Assert.Contains(overview.Value.Categories, x => x.Key == "dance" && x.Views == 2 && x.GenerationStarts == 2);
+        Assert.Contains(overview.Value.TemplateTypes, x => x.Key == "video" && x.TemplateCount == 1 && x.TotalProviderCostUsd == 0.6200m);
+        Assert.Contains(overview.Value.Sources, x => x.Key == "home" && x.Count == 2 && x.SharePercent == 66.7);
+        Assert.Contains(overview.Value.Devices, x => x.Key == "ios" && x.Count == 1);
+        Assert.Contains(overview.Value.Geography, x => x.Key == "us" && x.Count == 2);
+        Assert.Equal(2, overview.Value.TrendPoints.Count);
+        Assert.Contains("Dance", overview.Value.AvailableCategories);
+        Assert.Contains("Portrait", overview.Value.AvailableCategories);
+    }
+
+    [Fact]
     public async Task StartAdminTestAsync_ShouldQueueUnchargedAdminGeneration()
     {
         await using var dbContext = CreateDbContext();

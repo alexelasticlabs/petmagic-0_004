@@ -2,8 +2,9 @@
 
 import { ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
 import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/templates/templates-catalog.module.css";
-import { fetchAdminTemplates, getSession, type AdminTemplateListItem } from "@/lib/api-client";
+import { fetchAdminTemplates, type AdminTemplateListItem } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -34,9 +35,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       setError(null);
 
       try {
-        const session = getSession();
-        if (!session) {
-          router.replace(`/${locale}`);
+        if (!ensureAdminSession(locale, router)) {
           return;
         }
 
@@ -77,14 +76,14 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   return (
     <section className={styles.catalogPage}>
       <AdminPageHero
-        eyebrow={isRu ? "Template taxonomy" : "Template taxonomy"}
+        eyebrow={isRu ? "Структура каталога" : "Template taxonomy"}
         title={isRu ? "Категории шаблонов" : "Template Categories"}
-        description={isRu ? "Read-only сводка по категориям на основе существующих image и video шаблонов." : "Read-only category overview based on existing image and video templates."}
-        badge={isRu ? "Read only" : "Read only"}
+        description={isRu ? "Сводка по категориям на основе существующих видео-шаблонов и шаблонов изображений." : "Read-only category overview based on existing image and video templates."}
+        badge={isRu ? "Только просмотр" : "Read only"}
         metaItems={[
           `${isRu ? "Категорий" : "Categories"}: ${categories.length}`,
           `${isRu ? "Шаблонов" : "Templates"}: ${templates.length}`,
-          `Premium: ${totalPremium}`,
+          `${text.premiumLabel}: ${totalPremium}`,
         ]}
       />
 
@@ -94,18 +93,18 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
         <AdminCard title={isRu ? "Всего категорий" : "Total categories"} description={isRu ? "Уникальные значения category" : "Unique category values"}>
           <p className={styles.bigMetric}>{categories.length}</p>
         </AdminCard>
-        <AdminCard title={isRu ? "Всего шаблонов" : "Total templates"} description={isRu ? "Video и image вместе" : "Video and image combined"}>
+        <AdminCard title={isRu ? "Всего шаблонов" : "Total templates"} description={isRu ? "Видео и изображения вместе" : "Video and image combined"}>
           <p className={styles.bigMetric}>{templates.length}</p>
         </AdminCard>
         <AdminCard title={isRu ? "Активных" : "Active"} description={isRu ? "Готовы к каталогу" : "Ready for catalog"}>
           <p className={styles.bigMetric}>{totalActive}</p>
         </AdminCard>
-        <AdminCard title="Premium" description={isRu ? "Монетизируемые шаблоны" : "Monetized templates"}>
+        <AdminCard title={text.premiumLabel} description={isRu ? "Монетизируемые шаблоны" : "Monetized templates"}>
           <p className={styles.bigMetric}>{totalPremium}</p>
         </AdminCard>
       </div>
 
-      <AdminCard title={isRu ? "Категории" : "Categories"} description={isRu ? "Для CRUD категорий нужен отдельный backend endpoint; сейчас экран использует существующее поле category." : "Category CRUD needs a dedicated backend endpoint; this screen uses the existing category field."}>
+      <AdminCard title={isRu ? "Категории" : "Categories"} description={isRu ? "Для управления категориями нужен отдельный серверный API; сейчас экран использует существующее поле category." : "Category CRUD needs a dedicated backend endpoint; this screen uses the existing category field."}>
         {!categories.length ? (
           <div className={styles.empty}>{isRu ? "Категории не найдены." : "No categories found."}</div>
         ) : (
@@ -115,10 +114,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                 <tr>
                   <th>{text.categoryLabel}</th>
                   <th>{isRu ? "Всего" : "Total"}</th>
-                  <th>Video</th>
-                  <th>Image</th>
+                  <th>{text.templateKindVideoBadge}</th>
+                  <th>{text.templateKindImageBadge}</th>
                   <th>{text.statusLabel}</th>
-                  <th>Premium</th>
+                  <th>{text.premiumLabel}</th>
                   <th>{text.actionsLabel}</th>
                 </tr>
               </thead>
@@ -132,19 +131,19 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                       </div>
                     </td>
                     <td data-label={isRu ? "Всего" : "Total"}>{category.total}</td>
-                    <td data-label="Video"><AdminStatusBadge color={typeColors.Video}>{category.video}</AdminStatusBadge></td>
-                    <td data-label="Image"><AdminStatusBadge color={typeColors.Image}>{category.image}</AdminStatusBadge></td>
+                    <td data-label={text.templateKindVideoBadge}><AdminStatusBadge color={typeColors.Video}>{category.video}</AdminStatusBadge></td>
+                    <td data-label={text.templateKindImageBadge}><AdminStatusBadge color={typeColors.Image}>{category.image}</AdminStatusBadge></td>
                     <td data-label={text.statusLabel}>{category.active} / {category.draft} / {category.archived}</td>
-                    <td data-label="Premium">{category.premium}</td>
+                    <td data-label={text.premiumLabel}>{category.premium}</td>
                     <td data-label={text.actionsLabel}>
                       <div className={styles.tableActions}>
                         <Link className={styles.compactLink} href={`/${locale}/templates/video?category=${encodeURIComponent(category.name)}`}>
                           <VideoIcon className={styles.linkIcon} />
-                          <span>Video</span>
+                          <span>{text.templateKindVideoBadge}</span>
                         </Link>
                         <Link className={styles.compactLink} href={`/${locale}/templates/image?category=${encodeURIComponent(category.name)}`}>
                           <ImageIcon className={styles.linkIcon} />
-                          <span>Image</span>
+                          <span>{text.templateKindImageBadge}</span>
                         </Link>
                       </div>
                     </td>

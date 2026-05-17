@@ -1,6 +1,7 @@
 import {
     BrandMark,
     CaretDownIcon,
+    ChartIcon,
     DashboardIcon,
     ImageIcon,
     LogoutIcon,
@@ -27,6 +28,7 @@ const iconMap = {
   users: UsersIcon,
   templates: TemplatesIcon,
   "image-templates": ImageIcon,
+  "template-analytics": ChartIcon,
   "video-templates": VideoIcon,
   "template-categories": TemplatesIcon,
 };

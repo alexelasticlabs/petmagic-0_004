@@ -6,6 +6,7 @@ export type AdminSectionKey =
   | "templates"
   | "image-templates"
   | "video-templates"
+  | "template-analytics"
   | "template-categories";
 
 export type AdminNavLink = {
@@ -62,6 +63,7 @@ export function getAdminNavItems(locale: Locale): AdminNavEntry[] {
       items: [
         { type: "link", key: "video-templates", href: `/${locale}/templates/video`, label: text.navVideoTemplates },
         { type: "link", key: "image-templates", href: `/${locale}/templates/image`, label: text.navImageTemplates },
+        { type: "link", key: "template-analytics", href: `/${locale}/templates/analytics`, label: text.navTemplateAnalytics },
         { type: "link", key: "template-categories", href: `/${locale}/templates/categories`, label: text.navTemplateCategories },
       ],
     },
@@ -127,12 +129,22 @@ export function getAdminPageMeta(locale: Locale, currentPath: string, userName: 
     };
   }
 
+  if (matchesAdminPath(currentPath, "/templates/analytics")) {
+    return {
+      title: locale === "ru" ? "Аналитика шаблонов" : "Template analytics",
+      description:
+        locale === "ru"
+          ? "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов."
+          : "Overview of template views, generations, spend, and performance.",
+    };
+  }
+
   if (matchesAdminPath(currentPath, "/templates")) {
     return {
       title: locale === "ru" ? "Шаблоны" : "Templates",
       description:
         locale === "ru"
-          ? "Управление видео и image шаблонами, категориями и состояниями каталога."
+          ? "Управление видео-шаблонами, шаблонами изображений, категориями и состояниями каталога."
           : "Manage video and image templates, categories, and catalog states.",
     };
   }
