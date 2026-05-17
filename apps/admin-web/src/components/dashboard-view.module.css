@@ -39,22 +39,12 @@
 }
 
 .cardActionLink {
-  color: #7dd3fc;
+  color: var(--info);
   font-weight: 800;
 }
 
 .chartToolbar {
-  display: inline-flex;
-  align-items: center;
   gap: 0.35rem;
-  min-height: 2rem;
-  padding: 0.34rem 0.68rem;
-  border: 1px solid #213047;
-  border-radius: 999px;
-  background: rgba(18, 35, 58, 0.72);
-  color: #8da1ba;
-  font-size: 0.78rem;
-  font-weight: 900;
 }
 
 .chartToolbar svg {
@@ -96,27 +86,27 @@
 .legendDot {
   width: 0.65rem;
   height: 0.65rem;
-  border-radius: 999px;
+  border-radius: var(--radius-xs);
   background: var(--legend-color);
 }
 
 .legendLabel {
   min-width: 0;
   overflow: hidden;
-  color: #c7d7ea;
+  color: var(--text-soft);
   font-size: 0.84rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .legendPercent {
-  color: #f4f8ff;
+  color: var(--text-strong);
   font-size: 0.84rem;
   font-weight: 900;
 }
 
 .legendCount {
-  color: #70859f;
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -133,7 +123,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.8rem;
   padding: 0.78rem 0;
-  border-bottom: 1px solid #122136;
+  border-bottom: 1px solid rgba(40, 68, 99, 0.56);
 }
 
 .activityItem:last-child {
@@ -146,7 +136,7 @@
   display: grid;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--activity-color) 20%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--activity-color) 13%, transparent);
   color: var(--activity-color);
 }
@@ -162,14 +152,14 @@
 
 .activityText {
   margin: 0;
-  color: #c7d7ea;
+  color: var(--text-soft);
   font-size: 0.84rem;
   line-height: 1.45;
 }
 
 .activityTime {
   margin: 0.25rem 0 0;
-  color: #5f748e;
+  color: var(--text-muted);
   font-size: 0.75rem;
 }
 

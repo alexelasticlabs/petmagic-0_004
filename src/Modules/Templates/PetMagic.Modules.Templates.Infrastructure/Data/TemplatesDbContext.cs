@@ -6,6 +6,8 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data;
 
 public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> options) : DbContext(options)
 {
+    public DbSet<TemplateCategory> TemplateCategories => Set<TemplateCategory>();
+
     public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
 
     public DbSet<TemplateAsset> TemplateAssets => Set<TemplateAsset>();
@@ -18,6 +20,16 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        builder.Entity<TemplateCategory>(entity =>
+        {
+            entity.ToTable("templates_categories");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.NormalizedName).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => x.NormalizedName).IsUnique();
+            entity.HasIndex(x => new { x.IsArchived, x.Name });
+        });
+
         builder.Entity<TemplateItem>(entity =>
         {
             entity.ToTable("templates_items");

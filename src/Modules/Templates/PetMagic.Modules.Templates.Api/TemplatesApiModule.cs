@@ -11,6 +11,9 @@ public static class TemplatesApiModule
 {
     public static IServiceCollection AddTemplatesApiModule(this IServiceCollection services)
     {
+        services.AddScoped<IValidator<CreateTemplateCategoryCommand>, CreateTemplateCategoryCommandValidator>();
+        services.AddScoped<IValidator<UpdateTemplateCategoryCommand>, UpdateTemplateCategoryCommandValidator>();
+        services.AddScoped<IValidator<ChangeTemplateCategoryArchiveStateCommand>, ChangeTemplateCategoryArchiveStateCommandValidator>();
         services.AddScoped<IValidator<CreateImageTemplateCommand>, CreateImageTemplateCommandValidator>();
         services.AddScoped<IValidator<UpdateImageTemplateCommand>, UpdateImageTemplateCommandValidator>();
         services.AddScoped<IValidator<CreateVideoTemplateCommand>, CreateVideoTemplateCommandValidator>();
@@ -23,6 +26,7 @@ public static class TemplatesApiModule
 
     public static IApplicationBuilder MapTemplatesApiModule(this WebApplication app)
     {
+        app.MapAdminTemplateCategoryEndpoints();
         app.MapAdminTemplateEndpoints();
         app.MapPublicTemplateEndpoints();
         app.MapTemplateGenerationEndpoints();

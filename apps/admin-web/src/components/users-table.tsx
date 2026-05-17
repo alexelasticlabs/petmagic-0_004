@@ -6,7 +6,7 @@ import {
     RefreshIcon,
     UsersIcon,
 } from "@/components/admin/admin-icons";
-import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminBadge, AdminCard, AdminPage, AdminPageHero, AdminStateCard, AdminStatusBadge, adminTableStyles, type AdminTone } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import styles from "@/components/users-table.module.css";
@@ -35,6 +35,18 @@ function getUserRoleLabel(role: string, text: UserRoleText) {
         : role;
 }
 
+function getUserRoleTone(role: string): AdminTone {
+  if (role === "Admin") {
+    return "danger";
+  }
+
+  if (role === "Moderator") {
+    return "info";
+  }
+
+  return "neutral";
+}
+
 export function UsersTable({ locale }: UsersTableProps) {
   const text = getDictionary(locale);
   const { busyUserId, canManageRoles, error, isLoading, runAction, toast, users } = useUsersAdmin(locale);
@@ -54,33 +66,30 @@ export function UsersTable({ locale }: UsersTableProps) {
 
   if (isLoading) {
     return (
-      <div className={styles.page}>
+      <AdminPage className={styles.page}>
         {hero}
-        <AdminCard title={text.usersTitle} description={text.usersLoadingDescription}>
+        <AdminStateCard tone="info" title={text.usersTitle} description={text.usersLoadingDescription}>
           <div className={styles.skeletonStack} aria-busy="true" aria-live="polite">
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className={styles.skeletonLine} />
             ))}
           </div>
-        </AdminCard>
-      </div>
+        </AdminStateCard>
+      </AdminPage>
     );
   }
 
   return (
-    <div className={styles.page}>
+    <AdminPage className={styles.page}>
       {hero}
       <AdminCard
         title={text.usersTitle}
         description={text.usersCardDescription}
       >
-        {error ? <p className={styles.message}>{error}</p> : null}
+        {error ? <AdminStateCard tone="danger" className={styles.message} title={error} /> : null}
 
         {!users.length ? (
-          <div className={styles.emptyState}>
-            <p className={styles.emptyTitle}>{text.noUsers}</p>
-            <p className={styles.emptyDescription}>{text.usersEmptyDescription}</p>
-          </div>
+          <AdminStateCard tone="info" className={styles.emptyState} title={text.noUsers} description={text.usersEmptyDescription} />
         ) : null}
 
         {!!users.length && (
@@ -107,7 +116,7 @@ export function UsersTable({ locale }: UsersTableProps) {
                     <td data-label={text.roleLabel}>
                       <div className={styles.roleList}>
                         {user.roles.map((role) => (
-                          <span key={role} className={styles.rolePill}>{getUserRoleLabel(role, text)}</span>
+                          <AdminBadge key={role} tone={getUserRoleTone(role)} className={styles.rolePill}>{getUserRoleLabel(role, text)}</AdminBadge>
                         ))}
                       </div>
                     </td>
@@ -187,6 +196,6 @@ export function UsersTable({ locale }: UsersTableProps) {
       </AdminCard>
 
       {toast ? <Toast message={toast.message} type={toast.type} /> : null}
-    </div>
+    </AdminPage>
   );
 }

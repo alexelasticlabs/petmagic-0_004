@@ -5,6 +5,10 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal static class TemplatesErrors
 {
     public static readonly Error NotFound = new("templates.not_found", "Template was not found.");
+    public static readonly Error CategoryNotFound = new("templates.category_not_found", "Template category was not found.");
+    public static readonly Error CategoryAlreadyExists = new("templates.category_already_exists", "Template category already exists.");
+    public static readonly Error CategoryArchived = new("templates.category_archived", "Template category is archived and cannot be assigned to new templates.");
+    public static readonly Error CategoryHasTemplates = new("templates.category_has_templates", "Template category cannot be deleted while templates still reference it.");
     public static readonly Error TypeMismatch = new("templates.type_mismatch", "Template type does not match the requested operation.");
     public static readonly Error InvalidStatus = new("templates.invalid_status", "Template status is invalid.");
     public static readonly Error MissingPreview = new("templates.preview_required", "Preview asset is required before activation.");

@@ -73,6 +73,94 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task UpdateCategoryAsync_ShouldRenameLinkedTemplates()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg")),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var category = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Portrait");
+        var updatedCategory = await service.UpdateCategoryAsync(
+            new UpdateTemplateCategoryCommand(category.Id, "Studio Portrait"),
+            CancellationToken.None);
+
+        Assert.True(updatedCategory.IsSuccess);
+        Assert.Equal("Studio Portrait", updatedCategory.Value.Name);
+
+        var updatedTemplate = await service.GetAdminAsync(created.Value.TemplateId, CancellationToken.None);
+        Assert.True(updatedTemplate.IsSuccess);
+        Assert.Equal("Studio Portrait", updatedTemplate.Value.Category);
+    }
+
+    [Fact]
+    public async Task ChangeCategoryArchiveStateAsync_ShouldToggleArchiveFlag()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var createdCategory = await service.CreateCategoryAsync(
+            new CreateTemplateCategoryCommand("Seasonal"),
+            CancellationToken.None);
+
+        Assert.True(createdCategory.IsSuccess);
+        Assert.False(createdCategory.Value.IsArchived);
+
+        var archived = await service.ChangeCategoryArchiveStateAsync(
+            new ChangeTemplateCategoryArchiveStateCommand(createdCategory.Value.CategoryId, true),
+            CancellationToken.None);
+
+        Assert.True(archived.IsSuccess);
+        Assert.True(archived.Value.IsArchived);
+
+        var restored = await service.ChangeCategoryArchiveStateAsync(
+            new ChangeTemplateCategoryArchiveStateCommand(createdCategory.Value.CategoryId, false),
+            CancellationToken.None);
+
+        Assert.True(restored.IsSuccess);
+        Assert.False(restored.Value.IsArchived);
+    }
+
+    [Fact]
+    public async Task DeleteCategoryAsync_ShouldReject_WhenTemplatesStillReferenceCategory()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg")),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var category = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Portrait");
+        var deleted = await service.DeleteCategoryAsync(category.Id, CancellationToken.None);
+
+        Assert.True(deleted.IsFailure);
+        Assert.Equal("templates.category_has_templates", deleted.Error.Code);
+    }
+
+    [Fact]
     public async Task ChangeStatusAsync_ShouldRejectActivation_WhenReferenceDurationWasNotResolved()
     {
         await using var dbContext = CreateDbContext();

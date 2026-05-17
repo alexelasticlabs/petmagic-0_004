@@ -252,6 +252,50 @@ public sealed class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task TemplateCategoryCrud_ShouldSupportCreateRenameArchiveAndDelete()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<AdminTemplateCategoryListItemResponse>(
+            application.Client,
+            "/api/admin/templates/categories/",
+            new CreateTemplateCategoryCommand("Seasonal"));
+
+        Assert.Equal("Seasonal", created.Name);
+        Assert.False(created.IsArchived);
+
+        var listed = await GetFromJsonAsync<IReadOnlyList<AdminTemplateCategoryListItemResponse>>(
+            application.Client,
+            "/api/admin/templates/categories/?includeArchived=true");
+
+        Assert.Contains(listed, category => category.CategoryId == created.CategoryId && category.Name == "Seasonal");
+
+        var updated = await PutAsJsonAsync<AdminTemplateCategoryListItemResponse>(
+            application.Client,
+            $"/api/admin/templates/categories/{created.CategoryId}",
+            new AdminTemplateCategoryEndpoints.UpdateTemplateCategoryRequest("Holiday"));
+
+        Assert.Equal("Holiday", updated.Name);
+
+        var archived = await PutAsJsonAsync<AdminTemplateCategoryListItemResponse>(
+            application.Client,
+            $"/api/admin/templates/categories/{created.CategoryId}/archive",
+            new AdminTemplateCategoryEndpoints.ChangeTemplateCategoryArchiveStateRequest(true));
+
+        Assert.True(archived.IsArchived);
+
+        using var deleteResponse = await application.Client.DeleteAsync($"/api/admin/templates/categories/{created.CategoryId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var afterDelete = await GetFromJsonAsync<IReadOnlyList<AdminTemplateCategoryListItemResponse>>(
+            application.Client,
+            "/api/admin/templates/categories/?includeArchived=true");
+
+        Assert.DoesNotContain(afterDelete, category => category.CategoryId == created.CategoryId);
+    }
+
+    [Fact]
     public async Task CreateVideoEndpoint_ShouldReturnProblem_WhenActiveTemplateHasNoReferenceDuration()
     {
         await using var application = await TestApplication.CreateAsync();

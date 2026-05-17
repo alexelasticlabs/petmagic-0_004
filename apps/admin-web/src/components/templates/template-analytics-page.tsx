@@ -12,7 +12,7 @@ import {
     UsersIcon,
     VideoIcon,
 } from "@/components/admin/admin-icons";
-import { AdminMetricStrip } from "@/components/admin/admin-primitives";
+import { AdminMetricStrip, AdminPage, AdminStateCard, AdminToolbar } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateAccessLabel, getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
 import styles from "@/components/templates/template-analytics-page.module.css";
@@ -242,17 +242,17 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 
   if (isLoading) {
     return (
-      <section className={styles.page}>
-        <div className={styles.loadingCard}>{text.loading}</div>
-      </section>
+      <AdminPage className={styles.page}>
+        <AdminStateCard tone="info" title={text.loading} />
+      </AdminPage>
     );
   }
 
   if (error || !template || !statistics) {
     return (
-      <section className={styles.page}>
-        <div className={styles.errorCard}>{error ?? text.loadError}</div>
-      </section>
+      <AdminPage className={styles.page}>
+        <AdminStateCard tone="danger" title={error ?? text.loadError} />
+      </AdminPage>
     );
   }
 
@@ -373,7 +373,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
   }
 
   return (
-    <section className={styles.page}>
+    <AdminPage className={styles.page}>
       <div className={styles.pageHeaderRow}>
         <div className={styles.breadcrumbs}>
           <Link href={catalogPath}>{text.breadcrumbsRoot}</Link>
@@ -399,7 +399,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
         ]}
       />
 
-      <div className={styles.analyticsToolbar}>
+      <AdminToolbar className={styles.analyticsToolbar}>
         <div className={styles.segmentedControl} aria-label={text.rangeLabel}>
           {periodOptions.map((option) => (
             <button
@@ -429,7 +429,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
             <span>{text.exportAnalytics}</span>
           </button>
         </div>
-      </div>
+        </AdminToolbar>
 
       <div className={styles.overviewGrid}>
         <TemplateProfileCard template={template} locale={locale} text={text} isRu={isRu} />
@@ -618,7 +618,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 
         {!statistics.totalRuns ? <p className={styles.emptyState}>{text.noData}</p> : null}
       </section>
-    </section>
+    </AdminPage>
   );
 }
 
@@ -777,7 +777,7 @@ function FunnelPanel({ statistics, text, isRu }: { statistics: AdminTemplateStat
           </div>
         ))}
       </div>
-    </section>
+      </section>
   );
 }
 

@@ -73,6 +73,22 @@ export type AdminTemplateListItem = {
   updatedAtUtc: string;
 };
 
+export type AdminTemplateCategory = {
+  categoryId: string;
+  name: string;
+  isArchived: boolean;
+  totalTemplates: number;
+  videoTemplates: number;
+  imageTemplates: number;
+  activeTemplates: number;
+  draftTemplates: number;
+  archivedTemplates: number;
+  premiumTemplates: number;
+  tags: string[];
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
 export type AdminTemplate = {
   templateId: string;
   templateType: TemplateType;
@@ -356,6 +372,10 @@ export type VideoTemplatePayload = {
   keepOriginalSound: boolean;
 };
 
+export type TemplateCategoryPayload = {
+  name: string;
+};
+
 const AUTH_KEY = "petmagic_admin_auth";
 const AUTH_SESSION_EVENT = "petmagic_admin_auth_changed";
 const ADMIN_LIST_CACHE_TTL_MS = 30_000;
@@ -637,6 +657,45 @@ export async function fetchAdminTemplates(type?: TemplateType): Promise<AdminTem
   const templates = await apiRequest<AdminTemplateListItem[]>(`/api/admin/templates/${query}`, { method: "GET" });
   cachedTemplateLists.set(cacheKey, { value: templates, expiresAt: now + ADMIN_LIST_CACHE_TTL_MS });
   return templates;
+}
+
+export async function fetchAdminTemplateCategories(includeArchived = true): Promise<AdminTemplateCategory[]> {
+  const query = includeArchived ? "?includeArchived=true" : "";
+  return apiRequest<AdminTemplateCategory[]>(`/api/admin/templates/categories/${query}`, { method: "GET" });
+}
+
+export async function createTemplateCategory(payload: TemplateCategoryPayload): Promise<AdminTemplateCategory> {
+  const category = await apiRequest<AdminTemplateCategory>("/api/admin/templates/categories/", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  clearAdminListCaches();
+  return category;
+}
+
+export async function updateTemplateCategory(categoryId: string, payload: TemplateCategoryPayload): Promise<AdminTemplateCategory> {
+  const category = await apiRequest<AdminTemplateCategory>(`/api/admin/templates/categories/${categoryId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  clearAdminListCaches();
+  return category;
+}
+
+export async function changeTemplateCategoryArchiveState(categoryId: string, isArchived: boolean): Promise<AdminTemplateCategory> {
+  const category = await apiRequest<AdminTemplateCategory>(`/api/admin/templates/categories/${categoryId}/archive`, {
+    method: "PUT",
+    body: JSON.stringify({ isArchived })
+  });
+  clearAdminListCaches();
+  return category;
+}
+
+export async function deleteTemplateCategory(categoryId: string): Promise<void> {
+  await apiRequest<void>(`/api/admin/templates/categories/${categoryId}`, {
+    method: "DELETE"
+  });
+  clearAdminListCaches();
 }
 
 export async function fetchAdminTemplate(templateId: string): Promise<AdminTemplate> {

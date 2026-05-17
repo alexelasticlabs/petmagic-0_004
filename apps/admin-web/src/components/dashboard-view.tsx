@@ -2,20 +2,20 @@
 
 import {
     ArrowUpSmallIcon,
-  CalendarIcon,
+    CalendarIcon,
     CancelCircleIcon,
     CartIcon,
-  ChartIcon,
-  DashboardIcon,
+    ChartIcon,
+    DashboardIcon,
     DollarIcon,
     PeopleIcon,
     RefreshIcon,
-  TableIcon,
+    TableIcon,
     TrendUpIcon,
-  UsersIcon,
     UserRegisterIcon,
+    UsersIcon,
 } from "@/components/admin/admin-icons";
-import { AdminCard, AdminPageHero, AdminStatCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminBadge, AdminCard, AdminPage, AdminPageGrid, AdminPageHero, AdminStatCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import styles from "@/components/dashboard-view.module.css";
 import { DonutChart, RevenueChart } from "@/components/dashboard/dashboard-charts";
 import { buildDashboardViewModel, type DashboardActivityType, type DashboardStatIcon } from "@/components/dashboard/dashboard-view-model";
@@ -58,7 +58,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
   };
 
   return (
-    <div className={styles.dashboard}>
+    <AdminPage className={styles.dashboard}>
       <AdminPageHero
         eyebrow={viewModel.hero.eyebrow}
         title={viewModel.hero.title}
@@ -67,7 +67,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
         metaItems={viewModel.hero.metaItems}
       />
 
-      <div className={styles.statsGrid}>
+      <AdminPageGrid columns="four" className={styles.statsGrid}>
         {viewModel.stats.map((stat) => (
           <AdminStatCard
             key={stat.label}
@@ -79,14 +79,14 @@ export function DashboardView({ locale }: DashboardViewProps) {
             accentColor={stat.accentColor}
           />
         ))}
-      </div>
+      </AdminPageGrid>
 
       <div className={styles.contentGrid}>
         <AdminCard
           className={styles.wideCard}
           title={<span className={styles.cardTitleWithIcon}><ChartIcon className={styles.cardTitleIcon} /><span>{viewModel.revenueChart.title}</span></span>}
           description={viewModel.revenueChart.description}
-          action={<span className={styles.chartToolbar}><CalendarIcon className={styles.toolbarIcon} />{viewModel.revenueChart.rangeLabel}<svg viewBox="0 0 12 8" fill="none" aria-hidden="true"><path d="M1 1L6 7L11 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg></span>}
+          action={<AdminBadge tone="info" className={styles.chartToolbar}><CalendarIcon className={styles.toolbarIcon} />{viewModel.revenueChart.rangeLabel}<svg viewBox="0 0 12 8" fill="none" aria-hidden="true"><path d="M1 1L6 7L11 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg></AdminBadge>}
         >
           <RevenueChart xLabels={viewModel.revenueChart.xLabels} ariaLabel={viewModel.revenueChart.ariaLabel} />
         </AdminCard>
@@ -155,6 +155,6 @@ export function DashboardView({ locale }: DashboardViewProps) {
           </ul>
         </AdminCard>
       </div>
-    </div>
+    </AdminPage>
   );
 }

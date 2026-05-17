@@ -103,6 +103,31 @@ public sealed class ChangeTemplateStatusCommandValidator : AbstractValidator<Cha
     }
 }
 
+public sealed class CreateTemplateCategoryCommandValidator : AbstractValidator<CreateTemplateCategoryCommand>
+{
+    public CreateTemplateCategoryCommandValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(64);
+    }
+}
+
+public sealed class UpdateTemplateCategoryCommandValidator : AbstractValidator<UpdateTemplateCategoryCommand>
+{
+    public UpdateTemplateCategoryCommandValidator()
+    {
+        RuleFor(x => x.CategoryId).NotEmpty();
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(64);
+    }
+}
+
+public sealed class ChangeTemplateCategoryArchiveStateCommandValidator : AbstractValidator<ChangeTemplateCategoryArchiveStateCommand>
+{
+    public ChangeTemplateCategoryArchiveStateCommandValidator()
+    {
+        RuleFor(x => x.CategoryId).NotEmpty();
+    }
+}
+
 public sealed class StartTemplateGenerationCommandValidator : AbstractValidator<StartTemplateGenerationCommand>
 {
     public StartTemplateGenerationCommandValidator()

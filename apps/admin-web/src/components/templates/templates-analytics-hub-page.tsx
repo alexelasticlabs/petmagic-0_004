@@ -10,7 +10,7 @@ import {
     TrendUpIcon,
     VideoIcon,
 } from "@/components/admin/admin-icons";
-import { AdminMetricStrip, AdminPageHero } from "@/components/admin/admin-primitives";
+import { AdminFilterBar, AdminKpiCard, AdminMetricStrip, AdminPage, AdminPageHero, AdminSelectField, AdminStateCard, AdminToolbar, type AdminTone } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateAccessLabel, getTemplateStatusLabel, getTemplateTypeLabel } from "@/components/templates/template-admin-shared";
 import styles from "@/components/templates/templates-analytics-hub-page.module.css";
@@ -123,11 +123,11 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   }
 
   if (isLoading && !overview) {
-    return <section className={styles.page}><div className={styles.stateCard}>{text.loading}</div></section>;
+    return <AdminPage className={styles.page}><AdminStateCard tone="info" title={text.loading} /></AdminPage>;
   }
 
   if (error || !overview) {
-    return <section className={styles.page}><div className={styles.stateCard}>{error ?? text.loadError}</div></section>;
+    return <AdminPage className={styles.page}><AdminStateCard tone="danger" title={error ?? text.loadError} /></AdminPage>;
   }
 
   const summary = overview.summary;
@@ -148,7 +148,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   ];
 
   return (
-    <section className={styles.page}>
+    <AdminPage className={styles.page}>
       <AdminPageHero
         eyebrow={text.eyebrow}
         title={text.title}
@@ -174,7 +174,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         ]}
       />
 
-      <div className={styles.toolbar}>
+      <AdminToolbar className={styles.toolbar}>
         <div className={styles.segmented} aria-label={text.periodLabel}>
           {PERIOD_OPTIONS.map((option) => (
             <button key={option.key} type="button" className={period === option.key ? styles.segmentedActive : styles.segmentedButton} onClick={() => setPeriod(option.key)}>
@@ -184,17 +184,17 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           ))}
         </div>
 
-        <div className={styles.filters}>
+        <AdminFilterBar className={styles.filters}>
           <SelectBox label={text.typeFilter} value={templateType} onChange={(value) => setTemplateType(value as TemplateType | "All")} options={[{ value: "All", label: text.allTemplates }, { value: "Video", label: getTemplateTypeLabel("Video", dictionary) }, { value: "Image", label: getTemplateTypeLabel("Image", dictionary) }]} />
           <SelectBox label={text.categoryFilter} value={category} onChange={setCategory} options={[{ value: "", label: text.allCategories }, ...overview.availableCategories.map((value) => ({ value, label: value }))]} />
           <SelectBox label={text.statusFilter} value={status} onChange={(value) => setStatus(value as TemplateStatus | "All")} options={[{ value: "All", label: text.allStatuses }, { value: "Active", label: getTemplateStatusLabel("Active", locale) }, { value: "Draft", label: getTemplateStatusLabel("Draft", locale) }, { value: "Archived", label: getTemplateStatusLabel("Archived", locale) }]} />
           <SelectBox label={text.accessFilter} value={access} onChange={(value) => setAccess(value as "all" | "free" | "premium")} options={[{ value: "all", label: text.allAccess }, { value: "free", label: getTemplateAccessLabel(false, dictionary) }, { value: "premium", label: getTemplateAccessLabel(true, dictionary) }]} />
           <SelectBox label={text.sortFilter} value={sort} onChange={(value) => setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>)} options={[{ value: "views", label: text.sortViews }, { value: "starts", label: text.sortStarts }, { value: "conversion", label: text.sortConversion }, { value: "cost", label: text.sortCost }, { value: "updated", label: text.sortUpdated }]} />
-        </div>
-      </div>
+        </AdminFilterBar>
+      </AdminToolbar>
 
       <div className={styles.kpiGrid}>
-        {kpis.map((item) => <KpiCard key={item.label} {...item} />)}
+        {kpis.map((item) => <AdminKpiCard key={item.label} label={item.label} value={item.value} hint={item.hint} tone={getKpiTone(item.tone)} />)}
       </div>
 
       <div className={styles.mainGrid}>
@@ -254,29 +254,36 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         </div>
         <TemplatesTable rows={overview.templates} locale={locale} text={text} />
       </section>
-    </section>
+    </AdminPage>
   );
 }
 
 function SelectBox({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
-  return (
-    <label className={styles.selectWrap}>
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
-  );
+  return <AdminSelectField label={label} value={value} options={options} onChange={onChange} />;
 }
 
-function KpiCard({ label, value, hint, tone }: { label: string; value: string; hint: string; tone: string }) {
-  return (
-    <article className={`${styles.kpiCard} ${styles[`kpi_${tone}`]}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{hint}</p>
-    </article>
-  );
+function getKpiTone(tone: string): AdminTone {
+  if (tone === "green") {
+    return "success";
+  }
+
+  if (tone === "violet") {
+    return "magenta";
+  }
+
+  if (tone === "blue") {
+    return "info";
+  }
+
+  if (tone === "amber") {
+    return "warning";
+  }
+
+  if (tone === "red") {
+    return "danger";
+  }
+
+  return "neutral";
 }
 
 function FeedbackFeedPanel({ items, locale, text }: { items: readonly AdminTemplatesAnalyticsFeedbackItem[]; locale: AppLocale; text: Copy }) {

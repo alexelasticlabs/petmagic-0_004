@@ -10,7 +10,7 @@ import {
     RefreshIcon,
     VideoIcon,
 } from "@/components/admin/admin-icons";
-import { AdminCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminFilterBar, AdminPage, AdminPageGrid, AdminStateCard, AdminStatusBadge, AdminToolbar, adminTableStyles } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import {
     getCharacterOrientationLabel,
@@ -203,14 +203,14 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
   ];
   const accessOptions: SelectOption[] = [
     { value: "all", label: copy.allAccess, tone: "neutral" },
-    { value: "premium", label: text.premiumLabel, badge: text.premiumLabel, tone: "premium" },
-    { value: "free", label: text.freeLabel, badge: text.freeLabel, tone: "recommended" },
+    { value: "premium", label: text.premiumLabel, tone: "premium" },
+    { value: "free", label: text.freeLabel, tone: "recommended" },
   ];
   const statusOptions: SelectOption[] = [
     { value: "all", label: copy.allStatuses, tone: "neutral" },
-    { value: "Active", label: getTemplateStatusLabel("Active", locale), badge: locale === "ru" ? "Активен" : "Live", tone: "premium" },
-    { value: "Draft", label: getTemplateStatusLabel("Draft", locale), badge: locale === "ru" ? "Черновик" : "Draft", tone: "fast" },
-    { value: "Archived", label: getTemplateStatusLabel("Archived", locale), badge: locale === "ru" ? "Архив" : "Archive", tone: "neutral" },
+    { value: "Active", label: getTemplateStatusLabel("Active", locale), tone: "premium" },
+    { value: "Draft", label: getTemplateStatusLabel("Draft", locale), tone: "fast" },
+    { value: "Archived", label: getTemplateStatusLabel("Archived", locale), tone: "neutral" },
   ];
   const sortOptions: SelectOption[] = [
     { value: "newest", label: copy.sortNewest, description: locale === "ru" ? "Сначала свежие шаблоны" : "Most recent templates first", tone: "recommended" },
@@ -236,20 +236,22 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
 
   if (isLoading) {
     return (
-      <section className={styles.loadingGrid} aria-busy="true" aria-live="polite">
-        {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className={styles.skeletonCard} />
-        ))}
-      </section>
+      <AdminPage className={styles.catalogPage}>
+        <AdminPageGrid columns="four" className={styles.loadingGrid} aria-busy="true" aria-live="polite">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div key={index} className={styles.skeletonCard} />
+          ))}
+        </AdminPageGrid>
+      </AdminPage>
     );
   }
 
   return (
-    <section className={styles.catalogPage}>
-      <div className={styles.catalogActions}>
+    <AdminPage className={styles.catalogPage}>
+      <AdminToolbar className={styles.catalogActions}>
         <Link href={categoriesPath} className={styles.secondaryLink}>{copy.manageCategories}</Link>
         <Link href={editorBasePath} className={styles.primaryLink}>{copy.createTemplate}</Link>
-      </div>
+      </AdminToolbar>
 
       <div className={styles.tabRow} role="tablist" aria-label={copy.archiveTabsLabel}>
         <button type="button" className={archiveFilter === "active" ? styles.tabActive : styles.tab} onClick={() => setArchiveFilter("active")}>
@@ -260,11 +262,11 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
         </button>
       </div>
 
-      {error ? <p className={styles.error}>{error}</p> : null}
+      {error ? <AdminStateCard tone="danger" className={styles.error} title={error} /> : null}
 
       <div className={styles.catalogShell}>
         <div className={styles.catalogMain}>
-          <div className={styles.filtersBar}>
+          <AdminFilterBar className={styles.filtersBar}>
             <label className={styles.searchField}>
               <span className={styles.visuallyHidden}>{copy.searchLabel}</span>
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.searchPlaceholder} />
@@ -322,9 +324,9 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                 </button>
               </div>
             </div>
-          </div>
+          </AdminFilterBar>
           {!filteredTemplates.length ? (
-            <div className={styles.empty}>{text.noTemplates}</div>
+            <AdminStateCard tone="info" className={styles.empty} title={text.noTemplates} />
           ) : viewMode === "cards" ? (
             <div className={styles.cardGrid}>
               {filteredTemplates.map((template) => (
@@ -511,7 +513,7 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
           )}
         </div>
       </div>
-    </section>
+    </AdminPage>
   );
 }
 

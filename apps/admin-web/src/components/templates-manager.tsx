@@ -25,6 +25,7 @@ import {
     changeTemplateStatus,
     deleteTemplate,
     fetchAdminTemplate,
+    fetchAdminTemplateCategories,
     fetchAdminTemplates,
     uploadTemplateMedia,
     type AdminTemplate,
@@ -54,6 +55,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
   const text = getDictionary(locale);
   const router = useRouter();
   const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
+  const [categorySuggestions, setCategorySuggestions] = useState<string[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<AdminTemplate | null>(null);
   const [form, setForm] = useState<TemplateFormState>(() => createInitialTemplateForm(templateType));
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +89,13 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
         return;
       }
 
-      const response = await fetchAdminTemplates(templateType);
-      setTemplates(response);
+      const [templatesResponse, categoriesResponse] = await Promise.all([
+        fetchAdminTemplates(templateType),
+        fetchAdminTemplateCategories(false),
+      ]);
+
+      setTemplates(templatesResponse);
+      setCategorySuggestions(categoriesResponse.map((category) => category.name));
     } catch {
       setError(text.errorLoadingTemplates);
       setToast({ type: "error", message: text.errorLoadingTemplates });
@@ -128,12 +135,16 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
           return;
         }
 
-        const response = await fetchAdminTemplates(templateType);
+        const [templatesResponse, categoriesResponse] = await Promise.all([
+          fetchAdminTemplates(templateType),
+          fetchAdminTemplateCategories(false),
+        ]);
         if (isCancelled) {
           return;
         }
 
-        setTemplates(response);
+        setTemplates(templatesResponse);
+        setCategorySuggestions(categoriesResponse.map((category) => category.name));
 
         if (initialTemplateId) {
           setBusyTemplateId(initialTemplateId);
@@ -371,7 +382,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
   }
 
   const sectionTitle = templateType === "Video" ? text.videoTemplatesTitle : text.imageTemplatesTitle;
-  const categorySuggestions = getUniqueValues(templates.map((template) => template.category));
+  const mergedCategorySuggestions = getUniqueValues([...categorySuggestions, ...templates.map((template) => template.category)]);
 
   if (isVideo) {
     const isEditMode = selectedTemplate !== null;
@@ -416,7 +427,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
                   text={text}
                   form={form}
                   setForm={setForm}
-                  categorySuggestions={categorySuggestions}
+                  categorySuggestions={mergedCategorySuggestions}
                   showMusicDescription
                 />
               </section>
@@ -615,7 +626,7 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
           </div>
         </div>
 
-        <TemplateBasicFields text={text} form={form} setForm={setForm} />
+        <TemplateBasicFields text={text} form={form} setForm={setForm} categorySuggestions={mergedCategorySuggestions} />
         <TemplatePreviewAssetSection
           text={text}
           form={form}

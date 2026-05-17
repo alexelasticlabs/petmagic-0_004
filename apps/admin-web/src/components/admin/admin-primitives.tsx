@@ -1,5 +1,7 @@
 import styles from "@/components/admin/admin-primitives.module.css";
-import { type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
+
+export type AdminTone = "neutral" | "primary" | "info" | "success" | "warning" | "danger" | "magenta";
 
 type AdminCardProps = {
   title?: ReactNode;
@@ -57,8 +59,146 @@ type AdminMetricStripProps = {
   className?: string;
 };
 
+type AdminPageProps = HTMLAttributes<HTMLElement> & {
+  children: ReactNode;
+  className?: string;
+};
+
+type AdminPageGridProps = HTMLAttributes<HTMLDivElement> & {
+  children: ReactNode;
+  columns?: "two" | "three" | "four" | "auto";
+  className?: string;
+};
+
+type AdminToolbarProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+type AdminIconTileProps = {
+  icon: ReactNode;
+  tone?: AdminTone;
+  className?: string;
+};
+
+type AdminKpiCardProps = {
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+  delta?: ReactNode;
+  icon?: ReactNode;
+  tone?: AdminTone;
+  className?: string;
+};
+
+type AdminBadgeProps = {
+  children: ReactNode;
+  tone?: AdminTone;
+  className?: string;
+};
+
+type AdminStateCardProps = {
+  title?: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
+  action?: ReactNode;
+  children?: ReactNode;
+  tone?: AdminTone;
+  className?: string;
+};
+
+type AdminSelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
+type AdminSelectFieldProps = {
+  label: string;
+  value: string;
+  options: readonly AdminSelectOption[];
+  onChange: (value: string) => void;
+  id?: string;
+  name?: string;
+  disabled?: boolean;
+  className?: string;
+};
+
 function joinClassNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function styleClass(name: string) {
+  return (styles as Record<string, string>)[name];
+}
+
+function toneClass(prefix: string, tone: AdminTone) {
+  return styleClass(`${prefix}_${tone}`);
+}
+
+export function AdminPage({ children, className, ...rest }: AdminPageProps) {
+  return <section className={joinClassNames(styles.page, className)} {...rest}>{children}</section>;
+}
+
+export function AdminPageGrid({ children, columns = "auto", className, ...rest }: AdminPageGridProps) {
+  return <div className={joinClassNames(styles.pageGrid, styleClass(`pageGrid_${columns}`), className)} {...rest}>{children}</div>;
+}
+
+export function AdminToolbar({ children, className }: AdminToolbarProps) {
+  return <div className={joinClassNames(styles.toolbar, className)}>{children}</div>;
+}
+
+export function AdminFilterBar({ children, className }: AdminToolbarProps) {
+  return <div className={joinClassNames(styles.filterBar, className)}>{children}</div>;
+}
+
+export function AdminIconTile({ icon, tone = "primary", className }: AdminIconTileProps) {
+  return <span className={joinClassNames(styles.iconTile, toneClass("iconTile", tone), className)}>{icon}</span>;
+}
+
+export function AdminKpiCard({ label, value, hint, delta, icon, tone = "primary", className }: AdminKpiCardProps) {
+  return (
+    <article className={joinClassNames(styles.kpiCard, toneClass("kpiCard", tone), className)}>
+      <div className={styles.kpiBody}>
+        <span className={styles.kpiLabel}>{label}</span>
+        <strong className={styles.kpiValue}>{value}</strong>
+        {delta ? <span className={styles.kpiDelta}>{delta}</span> : null}
+        {hint ? <span className={styles.kpiHint}>{hint}</span> : null}
+      </div>
+      {icon ? <AdminIconTile icon={icon} tone={tone} /> : null}
+    </article>
+  );
+}
+
+export function AdminBadge({ children, tone = "neutral", className }: AdminBadgeProps) {
+  return <span className={joinClassNames(styles.badge, toneClass("badge", tone), className)}>{children}</span>;
+}
+
+export function AdminStateCard({ title, description, icon, action, children, tone = "neutral", className }: AdminStateCardProps) {
+  return (
+    <section className={joinClassNames(styles.stateCard, toneClass("stateCard", tone), className)}>
+      {icon ? <AdminIconTile icon={icon} tone={tone} /> : null}
+      <div className={styles.stateCardBody}>
+        {title ? <h2 className={styles.stateCardTitle}>{title}</h2> : null}
+        {description ? <p className={styles.stateCardText}>{description}</p> : null}
+        {children}
+      </div>
+      {action ? <div className={styles.stateCardAction}>{action}</div> : null}
+    </section>
+  );
+}
+
+export function AdminSelectField({ label, value, options, onChange, id, name, disabled, className }: AdminSelectFieldProps) {
+  return (
+    <label className={joinClassNames(styles.selectField, className)}>
+      <span className={styles.selectLabel}>{label}</span>
+      <select id={id} name={name} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={styles.selectControl}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 export function AdminCard({ title, description, action, children, padding = "lg", className }: AdminCardProps) {
@@ -182,9 +322,12 @@ export const adminTableStyles = {
   table: styles.table,
   mono: styles.mono,
   numeric: styles.numeric,
+  empty: styles.tableEmpty,
 };
 
 export const adminPageStyles = {
+  page: styles.page,
+  pageGrid: styles.pageGrid,
   pageHero: styles.pageHero,
   pageHeroHead: styles.pageHeroHead,
   pageHeroAside: styles.pageHeroAside,

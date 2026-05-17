@@ -7,23 +7,13 @@
 }
 
 .message {
-  border: 1px solid rgba(248, 113, 113, 0.22);
-  border-radius: 0.65rem;
-  padding: 0.8rem 0.9rem;
-  background: rgba(127, 29, 29, 0.16);
-  color: #fca5a5;
-  font-size: 0.86rem;
-  font-weight: 700;
+  grid-template-columns: 1fr;
 }
 
 .emptyState {
-  display: grid;
-  gap: 0.35rem;
+  grid-template-columns: 1fr;
   place-items: center;
   min-height: 12rem;
-  border: 1px dashed #25354a;
-  border-radius: 0.72rem;
-  color: #8da1ba;
   text-align: center;
 }
 
@@ -46,16 +36,7 @@
 }
 
 .rolePill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.55rem;
-  padding: 0.22rem 0.55rem;
-  border: 1px solid #25354a;
-  border-radius: 999px;
-  background: rgba(17, 29, 48, 0.72);
-  color: #c7d7ea;
-  font-size: 0.74rem;
-  font-weight: 900;
+  white-space: nowrap;
 }
 
 .actionsCell {
@@ -70,23 +51,23 @@
 }
 
 .adminButton {
-  border-color: #25354a !important;
-  background: rgba(17, 29, 48, 0.76) !important;
-  color: #c7d7ea !important;
+  border-color: var(--border-soft) !important;
+  background: rgba(12, 26, 43, 0.78) !important;
+  color: var(--text-soft) !important;
   box-shadow: none !important;
   gap: 0.38rem;
 }
 
 .adminButton:hover:not(:disabled) {
-  border-color: #34506f !important;
-  background: rgba(24, 40, 65, 0.94) !important;
-  color: #ffffff !important;
+  border-color: var(--border-accent) !important;
+  background: rgba(23, 47, 74, 0.94) !important;
+  color: var(--text-strong) !important;
 }
 
 .adminButtonPrimary {
-  border-color: rgba(34, 197, 94, 0.36) !important;
-  background: rgba(34, 197, 94, 0.13) !important;
-  color: #4ade80 !important;
+  border-color: rgba(45, 212, 191, 0.42) !important;
+  background: rgba(45, 212, 191, 0.14) !important;
+  color: #99fff0 !important;
   gap: 0.38rem;
 }
 
@@ -103,8 +84,8 @@
 
 .skeletonLine {
   height: 2.5rem;
-  border-radius: 0.61rem;
-  background: linear-gradient(90deg, #111d30 0%, #17263c 50%, #111d30 100%);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--surface-1) 0%, var(--surface-3) 50%, var(--surface-1) 100%);
   background-size: 220% 100%;
   animation: shimmer 1.4s linear infinite;
 }

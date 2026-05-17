@@ -48,7 +48,7 @@
 .phoneAccessTag {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   backdrop-filter: blur(14px);
   font-weight: 800;
 }
@@ -171,7 +171,7 @@
   display: block;
   object-fit: cover;
   object-position: center;
-  background: #0b1421;
+  background: var(--surface-0);
 }
 
 .phonePlaceholder {
@@ -305,7 +305,7 @@
   max-width: 100%;
   padding: 0.14rem 0.46rem;
   border: 1px solid rgba(125, 211, 252, 0.18);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: rgba(10, 18, 31, 0.34);
   color: rgba(183, 227, 255, 0.94);
   font-size: 0.62rem;
@@ -326,7 +326,7 @@
   height: 1.2rem;
   margin-top: 0.02rem;
   border: 1px solid rgba(251, 191, 36, 0.2);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(180deg, rgba(251, 191, 36, 0.18) 0%, rgba(217, 119, 6, 0.1) 100%);
   color: rgba(255, 228, 157, 0.96);
   box-shadow: inset 0 1px 0 rgba(255, 250, 224, 0.08), 0 8px 18px rgba(20, 12, 2, 0.16);
@@ -355,7 +355,7 @@
 .phoneMetaDot {
   width: 0.24rem;
   height: 0.24rem;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: #46b0ff;
   box-shadow: 0 0 0 0.18rem rgba(70, 176, 255, 0.12);
 }
@@ -417,3 +417,4 @@
   width: 100%;
   height: 100%;
 }
+

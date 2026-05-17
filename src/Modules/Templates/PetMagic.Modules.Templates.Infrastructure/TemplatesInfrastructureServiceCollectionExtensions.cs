@@ -125,6 +125,27 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         }
 
         var now = DateTime.UtcNow;
+        dbContext.TemplateCategories.AddRange(
+            new TemplateCategory
+            {
+                Id = Guid.Parse("667D3514-6549-4B18-8427-A0F08503BA91"),
+                Name = "Portrait",
+                NormalizedName = "PORTRAIT",
+                IsArchived = false,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            },
+            new TemplateCategory
+            {
+                Id = Guid.Parse("A5B2B18A-5093-4144-9489-947F1690E998"),
+                Name = "Dance",
+                NormalizedName = "DANCE",
+                IsArchived = false,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            }
+        );
+
         dbContext.TemplateItems.AddRange(
             new TemplateItem
             {
