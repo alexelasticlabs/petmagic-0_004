@@ -99,21 +99,29 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
     }
   }
 
-  const loadEditorLookups = useCallback(async (isCancelled: () => boolean) => {
-    try {
-      const [templatesResponse, categoriesResponse] = await Promise.all([
-        fetchAdminTemplates(templateType),
-        fetchAdminTemplateCategories(false),
-      ]);
+  const loadEditorLookups = useCallback(async (isCancelled: () => boolean, notifyOnFailure = true) => {
+    const [templatesResult, categoriesResult] = await Promise.allSettled([
+      fetchAdminTemplates(templateType),
+      fetchAdminTemplateCategories(false),
+    ]);
 
-      if (!isCancelled()) {
-        setTemplates(templatesResponse);
-        setCategorySuggestions(categoriesResponse.map((category) => category.name));
-      }
-    } catch {
-      if (!isCancelled()) {
-        setToast({ type: "error", message: text.errorLoadingTemplates });
-      }
+    if (isCancelled()) {
+      return;
+    }
+
+    const hasTemplateData = templatesResult.status === "fulfilled";
+    const hasCategoryData = categoriesResult.status === "fulfilled";
+
+    if (hasTemplateData) {
+      setTemplates(templatesResult.value);
+    }
+
+    if (hasCategoryData) {
+      setCategorySuggestions(categoriesResult.value.map((category) => category.name));
+    }
+
+    if (!hasTemplateData && !hasCategoryData && notifyOnFailure) {
+      setToast({ type: "error", message: text.errorLoadingTemplates });
     }
   }, [templateType, text.errorLoadingTemplates]);
 
@@ -142,7 +150,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
           setIsLoading(false);
         }
 
-        void loadEditorLookups(() => isCancelled);
+        void loadEditorLookups(() => isCancelled, false);
       } catch {
         if (!isCancelled) {
           setToast({ type: "error", message: text.errorLoadingTemplates });

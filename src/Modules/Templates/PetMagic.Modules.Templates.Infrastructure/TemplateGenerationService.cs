@@ -25,7 +25,7 @@ internal sealed class TemplateGenerationService(
             return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound);
         }
 
-        var readiness = ValidateTemplate(template);
+        var readiness = ValidateTemplate(template, requireActiveStatus: true);
         if (readiness is not null)
         {
             return Result.Failure<TemplateGenerationResponse>(readiness);
@@ -82,7 +82,7 @@ internal sealed class TemplateGenerationService(
             return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound);
         }
 
-        var readiness = ValidateTemplate(template);
+        var readiness = ValidateTemplate(template, requireActiveStatus: false);
         if (readiness is not null)
         {
             return Result.Failure<TemplateGenerationResponse>(readiness);
@@ -134,9 +134,9 @@ internal sealed class TemplateGenerationService(
             : Result.Success(MapResponse(job));
     }
 
-    internal static Error? ValidateTemplate(TemplateItem template)
+    internal static Error? ValidateTemplate(TemplateItem template, bool requireActiveStatus)
     {
-        if (template.Status != TemplateStatus.Active)
+        if (requireActiveStatus && template.Status != TemplateStatus.Active)
         {
             return TemplatesErrors.InvalidStatus;
         }

@@ -138,8 +138,8 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     try {
       const started = await startAdminTemplateTest(templateId, selectedFile);
       setRun(started);
-    } catch {
-      setRunError(isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation.");
+    } catch (error) {
+      setRunError(getStartTestErrorMessage(error, isRu, template?.templateType === "Video"));
     } finally {
       setIsSubmitting(false);
     }
@@ -205,19 +205,30 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const finalDownloadName = run && template
     ? buildGeneratedDownloadName(template.title, run.generationId, isVideoTemplate ? ".mp4" : ".png")
     : undefined;
+  const runDetails = buildRunDetails({
+    run,
+    locale,
+    isRu,
+    isVideoTemplate,
+    statusText,
+    petMagicBillingLabel,
+    internalBillingText,
+    falProviderCostLabel,
+    providerCostText,
+  });
   const hasSourceImage = Boolean(sourceImageUrl);
   const middleArtifact: ArtifactItem | null = isVideoTemplate
     ? {
-        key: "normalized",
-        title: isRu ? "Препроцессинг" : "Preprocessing",
-        accent: "preprocess",
-        imageUrl: run?.normalizedImageUrl ?? undefined,
-        placeholderEyebrow: isRu ? "Stage 01" : "Stage 01",
-        placeholderTitle: isRu ? "Нормализованное фото" : "Normalized photo",
-        placeholderText: selectedFile || run?.sourceImageAsset
-          ? (isRu ? "Карточка заполнится сразу после завершения препроцессинга." : "This frame will fill in as soon as preprocessing finishes.")
-          : (isRu ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения." : "Upload a pet photo to prepare the frame for motion generation."),
-      }
+      key: "normalized",
+      title: isRu ? "Препроцессинг" : "Preprocessing",
+      accent: "preprocess",
+      imageUrl: run?.normalizedImageUrl ?? undefined,
+      placeholderEyebrow: isRu ? "Stage 01" : "Stage 01",
+      placeholderTitle: isRu ? "Нормализованное фото" : "Normalized photo",
+      placeholderText: selectedFile || run?.sourceImageAsset
+        ? (isRu ? "Карточка заполнится сразу после завершения препроцессинга." : "This frame will fill in as soon as preprocessing finishes.")
+        : (isRu ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения." : "Upload a pet photo to prepare the frame for motion generation."),
+    }
     : null;
   const resultArtifact: ArtifactItem = {
     key: "output",
@@ -379,27 +390,141 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           <section className={styles.card}>
             <StepHeader number="3" title={isRu ? "Сводка запуска" : "Run summary"} />
             <div className={styles.detailGrid}>
-              <DetailRow label={isRu ? "Попытка" : "Attempt"} value={run ? String(run.attemptCount) : "-"} />
-              <DetailRow label={isRu ? "Статус" : "Status"} value={statusText} />
-              <DetailRow label={petMagicBillingLabel} value={internalBillingText} />
-              <DetailRow label={falProviderCostLabel} value={providerCostText} />
-              <DetailRow label={isRu ? "Создан" : "Created"} value={run ? formatDateTime(run.createdAtUtc, locale, true) : "-"} />
-              <DetailRow label={isRu ? "Запущен" : "Started"} value={formatDateTime(run?.startedAtUtc, locale, true)} />
-              <DetailRow label={isVideoTemplate ? (isRu ? "Препроцессинг завершён" : "Preprocessing completed") : (isRu ? "Генерация изображения завершена" : "Image generation completed")} value={formatDateTime(run?.preprocessingCompletedAtUtc, locale, true)} />
-              <DetailRow label={isVideoTemplate ? (isRu ? "Fal preprocess request" : "Fal preprocess request") : (isRu ? "Fal image request" : "Fal image request")} value={run?.preprocessingProviderRequestId ?? "-"} />
-              <DetailRow label={isVideoTemplate ? (isRu ? "Fal preprocess inference" : "Fal preprocess inference") : (isRu ? "Fal image inference" : "Fal image inference")} value={formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu)} />
-              {isVideoTemplate ? <DetailRow label={isRu ? "Motion завершён" : "Motion completed"} value={formatDateTime(run?.motionGenerationCompletedAtUtc, locale, true)} /> : null}
-              {isVideoTemplate ? <DetailRow label={isRu ? "Fal motion request" : "Fal motion request"} value={run?.motionProviderRequestId ?? "-"} /> : null}
-              {isVideoTemplate ? <DetailRow label={isRu ? "Fal motion inference" : "Fal motion inference"} value={formatSeconds(run?.motionInferenceTimeSeconds, isRu)} /> : null}
-              {isVideoTemplate ? <DetailRow label={isRu ? "Длительность финального видео" : "Final video duration"} value={formatSeconds(run?.outputVideoDurationSeconds, isRu)} /> : null}
-              <DetailRow label={isRu ? "Импорт медиа" : "Media import"} value={formatDateTime(run?.mediaImportCompletedAtUtc, locale, true)} />
-              <DetailRow label={isRu ? "Ошибка" : "Failure"} value={run?.failureMessage ?? "-"} multiline />
+              {runDetails.map((item) => (
+                <DetailRow key={item.label} label={item.label} value={item.value} multiline={item.multiline} />
+              ))}
             </div>
           </section>
         </div>
       </div>
     </section>
   );
+}
+
+type ApiLikeError = {
+  message?: string;
+  detail?: string;
+  code?: string;
+  status?: number;
+  validationErrors?: string[];
+};
+
+function getStartTestErrorMessage(error: unknown, isRu: boolean, isVideoTemplate: boolean): string {
+  const apiError = error as ApiLikeError | null;
+  if (!apiError) {
+    return isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation.";
+  }
+
+  if (Array.isArray(apiError.validationErrors) && apiError.validationErrors.length > 0) {
+    return apiError.validationErrors.join(" ");
+  }
+
+  if (apiError.code === "templates.invalid_status") {
+    return isRu
+      ? "Тест недоступен: проверьте статус и обязательные поля шаблона в редакторе."
+      : "Test is unavailable. Check template status and required fields in the editor.";
+  }
+
+  if (apiError.code === "templates.image_model_required" || apiError.code === "templates.invalid_image_model") {
+    return isRu
+      ? "Для image-теста нужно выбрать корректную image model в редакторе шаблона."
+      : "Image test requires a valid image model in the template editor.";
+  }
+
+  if (isVideoTemplate && apiError.code === "templates.reference_motion_required") {
+    return isRu
+      ? "Для видео-теста нужно загрузить reference motion в редакторе шаблона."
+      : "Video test requires a reference motion asset in the template editor.";
+  }
+
+  if (isVideoTemplate && apiError.code === "templates.invalid_preprocessing_model") {
+    return isRu
+      ? "Для видео-теста нужно выбрать preprocessing model в редакторе шаблона."
+      : "Video test requires a preprocessing model in the template editor.";
+  }
+
+  if (isVideoTemplate && apiError.code === "templates.invalid_kling_model") {
+    return isRu
+      ? "Для видео-теста нужно выбрать Kling model в редакторе шаблона."
+      : "Video test requires a Kling model in the template editor.";
+  }
+
+  if (isVideoTemplate && apiError.code === "templates.character_orientation_required") {
+    return isRu
+      ? "Для видео-теста нужно указать длительность референса, чтобы вычислилась ориентация персонажа."
+      : "Video test requires reference duration so character orientation can be resolved.";
+  }
+
+  if (typeof apiError.message === "string" && apiError.message.trim().length > 0 && !/^API request failed with status \d+$/i.test(apiError.message)) {
+    return apiError.message;
+  }
+
+  if (typeof apiError.detail === "string" && apiError.detail.trim().length > 0) {
+    return apiError.detail;
+  }
+
+  return isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation.";
+}
+
+type DetailItem = {
+  label: string;
+  value: string;
+  multiline?: boolean;
+};
+
+function buildRunDetails({
+  run,
+  locale,
+  isRu,
+  isVideoTemplate,
+  statusText,
+  petMagicBillingLabel,
+  internalBillingText,
+  falProviderCostLabel,
+  providerCostText,
+}: {
+  run: AdminTemplateTestRun | null;
+  locale: Locale;
+  isRu: boolean;
+  isVideoTemplate: boolean;
+  statusText: string;
+  petMagicBillingLabel: string;
+  internalBillingText: string;
+  falProviderCostLabel: string;
+  providerCostText: string;
+}): DetailItem[] {
+  const common: DetailItem[] = [
+    { label: isRu ? "Попытка" : "Attempt", value: run ? String(run.attemptCount) : "-" },
+    { label: isRu ? "Статус" : "Status", value: statusText },
+    { label: petMagicBillingLabel, value: internalBillingText },
+    { label: falProviderCostLabel, value: providerCostText },
+    { label: isRu ? "Создан" : "Created", value: run ? formatDateTime(run.createdAtUtc, locale, true) : "-" },
+    { label: isRu ? "Запущен" : "Started", value: formatDateTime(run?.startedAtUtc, locale, true) },
+  ];
+
+  if (!isVideoTemplate) {
+    return [
+      ...common,
+      { label: isRu ? "Генерация изображения завершена" : "Image generation completed", value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true) },
+      { label: isRu ? "Fal image request" : "Fal image request", value: run?.preprocessingProviderRequestId ?? "-" },
+      { label: isRu ? "Fal image inference" : "Fal image inference", value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu) },
+      { label: isRu ? "Импорт медиа" : "Media import", value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true) },
+      { label: isRu ? "Ошибка" : "Failure", value: run?.failureMessage ?? "-", multiline: true },
+    ];
+  }
+
+  return [
+    ...common,
+    { label: isRu ? "Препроцессинг завершён" : "Preprocessing completed", value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true) },
+    { label: isRu ? "Fal preprocess request" : "Fal preprocess request", value: run?.preprocessingProviderRequestId ?? "-" },
+    { label: isRu ? "Fal preprocess inference" : "Fal preprocess inference", value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu) },
+    { label: isRu ? "Motion завершён" : "Motion completed", value: formatDateTime(run?.motionGenerationCompletedAtUtc, locale, true) },
+    { label: isRu ? "Fal motion request" : "Fal motion request", value: run?.motionProviderRequestId ?? "-" },
+    { label: isRu ? "Fal motion inference" : "Fal motion inference", value: formatSeconds(run?.motionInferenceTimeSeconds, isRu) },
+    { label: isRu ? "Длительность финального видео" : "Final video duration", value: formatSeconds(run?.outputVideoDurationSeconds, isRu) },
+    { label: isRu ? "Импорт медиа" : "Media import", value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true) },
+    { label: isRu ? "Ошибка" : "Failure", value: run?.failureMessage ?? "-", multiline: true },
+  ];
 }
 
 function WorkflowConnector() {

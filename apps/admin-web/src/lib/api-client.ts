@@ -706,7 +706,7 @@ export async function fetchAdminTemplates(type?: TemplateType): Promise<AdminTem
 
 export async function fetchAdminTemplateCategories(includeArchived = true): Promise<AdminTemplateCategory[]> {
   const cacheKey = includeArchived ? "archived" : "active";
-  const query = includeArchived ? "?includeArchived=true" : "";
+  const query = includeArchived ? "?includeArchived=true" : "?includeArchived=false";
 
   return cachedGet(
     `template-categories:${cacheKey}`,

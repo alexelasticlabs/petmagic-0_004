@@ -263,7 +263,9 @@ internal sealed class TemplateGenerationJobProcessor(
     {
         try
         {
-            var readiness = TemplateGenerationService.ValidateTemplate(job.Template);
+            var readiness = TemplateGenerationService.ValidateTemplate(
+                job.Template,
+                requireActiveStatus: job.UserId != TemplateGenerationService.AdminTestUserId);
             if (readiness is not null)
             {
                 await MarkFailedAsync(job, readiness, cancellationToken);

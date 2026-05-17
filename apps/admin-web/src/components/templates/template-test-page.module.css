@@ -30,11 +30,11 @@
   min-width: 0;
 }
 
-.breadcrumbs > *,
-.pillRow > *,
-.headerActions > *,
-.uploadActions > *,
-.resultHeaderActions > * {
+.breadcrumbs>*,
+.pillRow>*,
+.headerActions>*,
+.uploadActions>*,
+.resultHeaderActions>* {
   min-width: 0;
 }
 
@@ -207,13 +207,13 @@
   min-width: 0;
 }
 
-.stepHeader > *,
-.sectionHeaderRow > *,
-.mediaHeading > *,
-.toggleLine > *,
-.detailRow > *,
-.detailRowMultiline > *,
-.readonlyField > * {
+.stepHeader>*,
+.sectionHeaderRow>*,
+.mediaHeading>*,
+.toggleLine>*,
+.detailRow>*,
+.detailRowMultiline>*,
+.readonlyField>* {
   min-width: 0;
 }
 
@@ -501,7 +501,7 @@
   min-width: 0;
 }
 
-.sourceUploadFooter > * {
+.sourceUploadFooter>* {
   min-width: 0;
 }
 
@@ -561,7 +561,7 @@
   min-width: 0;
 }
 
-.mediaCardHeader > * {
+.mediaCardHeader>* {
   min-width: 0;
 }
 
@@ -674,7 +674,7 @@
   min-width: 0;
 }
 
-.mediaFooter > * {
+.mediaFooter>* {
   min-width: 0;
 }
 
@@ -743,7 +743,7 @@
   background: rgba(8, 15, 27, 0.34);
 }
 
-.timelineItem > * {
+.timelineItem>* {
   min-width: 0;
 }
 
@@ -806,6 +806,7 @@
 }
 
 @media (max-width: 1280px) {
+
   .workflowGrid,
   .headerGrid {
     grid-template-columns: 1fr;
@@ -874,6 +875,7 @@
 }
 
 @media (max-width: 620px) {
+
   .pageHeader,
   .card {
     border-radius: 0.72rem;
@@ -884,7 +886,7 @@
     width: 100%;
   }
 
-  .headerActions > *,
+  .headerActions>*,
   .resultHeaderActions :global(.ui-button) {
     width: 100%;
   }
@@ -922,7 +924,3 @@
     width: 100%;
   }
 }
-
-
-
-
