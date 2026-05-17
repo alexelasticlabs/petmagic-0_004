@@ -689,21 +689,24 @@ function MediaPreviewCard({
       return;
     }
 
-    const response = await fetch(previewUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download asset: ${response.status}`);
-    }
+    const isSameOrigin = (() => {
+      try {
+        return new URL(previewUrl, window.location.href).origin === window.location.origin;
+      } catch {
+        return false;
+      }
+    })();
 
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
-    anchor.href = objectUrl;
+    anchor.href = previewUrl;
     anchor.download = downloadName ?? (videoUrl ? "template-test.mp4" : "template-test.png");
     anchor.rel = "noreferrer";
+    if (!isSameOrigin) {
+      anchor.target = "_blank";
+    }
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
 
   return (

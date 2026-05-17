@@ -712,7 +712,31 @@ internal sealed class TemplatesService(
         }
 
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Reload the entity from the database and reapply changes
+            await dbContext.Entry(template).ReloadAsync(cancellationToken);
+            template.Title = command.Title.Trim();
+            template.ShortDescription = command.ShortDescription.Trim();
+            template.Category = categoryResult.Value.Name;
+            template.Tags = SerializeTags(command.Tags);
+            template.IsPremium = command.IsPremium;
+            template.TokenCost = command.TokenCost;
+            template.Status = statusResult.Value;
+            template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
+            template.ImageModel = command.ImageModel.Trim();
+            template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
+            template.UpdatedAtUtc = DateTime.UtcNow;
+
+            // Try to save again
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(MapAdminResponse(template));
     }
@@ -850,7 +874,37 @@ internal sealed class TemplatesService(
 
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Reload the entity from the database and reapply changes
+            await dbContext.Entry(template).ReloadAsync(cancellationToken);
+            template.Title = command.Title.Trim();
+            template.ShortDescription = command.ShortDescription.Trim();
+            template.Category = categoryResult.Value.Name;
+            template.Tags = SerializeTags(command.Tags);
+            template.IsPremium = command.IsPremium;
+            template.TokenCost = command.TokenCost;
+            template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
+            template.MusicDescription = string.IsNullOrWhiteSpace(command.MusicDescription) ? null : command.MusicDescription.Trim();
+            template.ReferenceVideoDurationSeconds = duration;
+            template.CharacterOrientation = orientation;
+            template.PreprocessingModel = command.PreprocessingModel.Trim();
+            template.PreprocessingPrompt = ResolvePrompt(command.PreprocessingPrompt, options.DefaultPreprocessingPrompt);
+            template.KlingModel = command.KlingModel.Trim();
+            template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
+            template.KeepOriginalSound = command.KeepOriginalSound;
+            template.Status = statusResult.Value;
+            template.UpdatedAtUtc = DateTime.UtcNow;
+
+            // Try to save again
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(MapAdminResponse(template));
     }
