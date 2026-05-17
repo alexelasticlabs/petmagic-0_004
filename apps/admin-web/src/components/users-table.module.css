@@ -19,13 +19,13 @@
 
 .emptyTitle {
   margin: 0;
-  color: #e8f0fb;
+  color: var(--text-strong);
   font-weight: 900;
 }
 
 .emptyDescription {
   margin: 0;
-  color: #70859f;
+  color: var(--text-muted);
   font-size: 0.86rem;
 }
 
@@ -61,23 +61,31 @@
 
 .adminButton {
   border-color: var(--border-soft) !important;
-  background: rgba(12, 26, 43, 0.78) !important;
+  background: rgba(3, 6, 5, 0.9) !important;
   color: var(--text-soft) !important;
-  box-shadow: none !important;
+  box-shadow: none;
   gap: 0.38rem;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .adminButton:hover:not(:disabled) {
   border-color: var(--border-accent) !important;
-  background: rgba(23, 47, 74, 0.94) !important;
+  background: rgba(8, 18, 14, 0.98) !important;
+  box-shadow: var(--interactive-glow);
   color: var(--text-strong) !important;
+  transform: translateY(-1px);
 }
 
 .adminButtonPrimary {
   border-color: rgba(45, 212, 191, 0.42) !important;
-  background: rgba(45, 212, 191, 0.14) !important;
-  color: #99fff0 !important;
+  background: rgba(16, 185, 129, 0.16) !important;
+  color: #a7f3d0 !important;
   gap: 0.38rem;
+}
+
+.adminButtonPrimary:hover:not(:disabled) {
+  border-color: rgba(45, 212, 191, 0.62) !important;
+  background: rgba(16, 185, 129, 0.22) !important;
 }
 
 .buttonIcon {
@@ -120,5 +128,3 @@
     max-width: 96rem;
   }
 }
-
-

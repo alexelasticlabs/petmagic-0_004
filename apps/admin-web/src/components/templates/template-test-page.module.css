@@ -115,7 +115,7 @@
 .fileButton,
 .iconButton {
   border: 1px solid var(--border-soft);
-  background: linear-gradient(180deg, rgba(18, 29, 47, 0.96) 0%, rgba(11, 19, 33, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(16, 24, 21, 0.96) 0%, rgba(9, 15, 13, 0.96) 100%);
   color: var(--text-soft);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
@@ -188,7 +188,7 @@
   padding: clamp(1.02rem, 0.8rem + 0.48vw, 1.26rem);
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.05), transparent 24%),
-    linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(11, 18, 31, 0.98) 100%);
+    linear-gradient(180deg, rgba(16, 24, 21, 0.98) 0%, rgba(5, 8, 7, 0.98) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 20px 46px rgba(0, 0, 0, 0.18);
 }
 
@@ -388,7 +388,7 @@
   padding: 0.55rem 0.45rem;
   border: 1px solid rgba(43, 62, 86, 0.52);
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(14, 24, 40, 0.92) 0%, rgba(9, 16, 28, 0.82) 100%);
+  background: linear-gradient(180deg, rgba(16, 24, 21, 0.92) 0%, rgba(5, 8, 7, 0.84) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 28px rgba(0, 0, 0, 0.14);
 }
 
@@ -532,7 +532,7 @@
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.52rem;
-  background: rgba(15, 24, 41, 0.78);
+  background: rgba(16, 24, 21, 0.78);
   color: #fca5a5;
   font-family: var(--font-space-grotesk), sans-serif;
   font-size: 0.75rem;
@@ -694,7 +694,7 @@
   padding: 0.48rem 0.72rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.52rem;
-  background: rgba(15, 24, 41, 0.78);
+  background: rgba(16, 24, 21, 0.78);
   color: var(--text-soft);
   font-size: 0.76rem;
   font-weight: 800;

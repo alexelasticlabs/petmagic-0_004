@@ -5,11 +5,11 @@
 }
 
 .phonePreviewVideo {
-  --phone-preview-aspect-ratio: var(--template-video-aspect-ratio);
+  --phone-preview-aspect-ratio: var(--phone-preview-card-aspect-ratio, var(--template-video-aspect-ratio));
 }
 
 .phonePreviewImage {
-  --phone-preview-aspect-ratio: var(--template-image-aspect-ratio);
+  --phone-preview-aspect-ratio: var(--phone-preview-card-aspect-ratio, var(--template-image-aspect-ratio));
 }
 
 .phoneMedia {

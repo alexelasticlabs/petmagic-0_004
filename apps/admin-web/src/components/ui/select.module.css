@@ -18,13 +18,13 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.72rem;
-  border: 1px solid rgba(58, 83, 113, 0.88);
+  border: 1px solid var(--border-soft);
   border-radius: 0.59rem;
   padding: 0.62rem 0.72rem;
   background:
-    radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 24%),
-    linear-gradient(180deg, rgba(19, 30, 48, 0.98) 0%, rgba(13, 21, 36, 0.94) 100%);
-  color: #f4f8ff;
+    radial-gradient(circle at top right, rgba(16, 185, 129, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(9, 14, 12, 0.99) 0%, rgba(3, 6, 5, 0.98) 100%);
+  color: var(--text-strong);
   text-align: left;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 18px rgba(2, 6, 23, 0.2);
@@ -32,14 +32,14 @@
 }
 
 .trigger:hover {
-  border-color: #4f7397;
-  transform: translateY(-1px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 24px rgba(2, 6, 23, 0.24);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), var(--interactive-glow), 0 12px 24px rgba(0, 0, 0, 0.28);
 }
 
 .triggerOpen {
-  border-color: rgba(56, 189, 248, 0.64);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 32px rgba(2, 6, 23, 0.3);
+  border-color: rgba(52, 211, 153, 0.64);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 32px rgba(2, 6, 23, 0.34);
 }
 
 .trigger:focus-visible {
@@ -49,7 +49,7 @@
 }
 
 .value {
-  color: #e8f0fb;
+  color: var(--text-strong);
   font-size: 0.82rem;
   font-weight: 800;
   line-height: 1.28;
@@ -77,7 +77,7 @@
 }
 
 .triggerDescription {
-  color: #8da1ba;
+  color: var(--text-muted);
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.28;
@@ -90,8 +90,8 @@
   flex: 0 0 auto;
   width: 0.56rem;
   height: 0.56rem;
-  border-right: 1.8px solid #b6c8de;
-  border-bottom: 1.8px solid #b6c8de;
+  border-right: 1.8px solid var(--text-soft);
+  border-bottom: 1.8px solid var(--text-soft);
   transform: rotate(45deg) translateY(-1px);
 }
 
@@ -104,11 +104,11 @@
   display: grid;
   gap: 0.34rem;
   padding: 0.45rem;
-  border: 1px solid #35506f;
+  border: 1px solid var(--border-strong);
   border-radius: 0.65rem;
   background:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(20, 31, 50, 0.995) 0%, rgba(10, 17, 29, 0.99) 100%);
+    radial-gradient(circle at top, rgba(16, 185, 129, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(5, 8, 7, 0.995) 0%, rgba(1, 3, 2, 0.99) 100%);
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(18px);
 }
@@ -116,11 +116,11 @@
 .option {
   width: 100%;
   display: block;
-  border: 1px solid rgba(53, 80, 111, 0.36);
+  border: 1px solid rgba(58, 90, 79, 0.42);
   border-radius: 0.58rem;
   padding: 0.68rem 0.72rem;
-  background: rgba(16, 25, 42, 0.82);
-  color: #c7d7ea;
+  background: rgba(3, 6, 5, 0.9);
+  color: var(--text-soft);
   text-align: left;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -128,23 +128,24 @@
 }
 
 .option:hover {
-  border-color: #4f7397;
-  background: rgba(24, 38, 61, 0.96);
-  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  background: rgba(8, 18, 14, 0.98);
+  box-shadow: var(--interactive-glow);
+  transform: translateY(-2px);
 }
 
 .optionSelected {
   border-color: rgba(34, 197, 94, 0.44);
   background:
     radial-gradient(circle at top right, rgba(34, 197, 94, 0.12), transparent 30%),
-    rgba(24, 50, 41, 0.74);
+    rgba(12, 43, 31, 0.76);
   box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .option:focus-visible {
   outline: none;
-  border-color: rgba(56, 189, 248, 0.62);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+  border-color: rgba(52, 211, 153, 0.62);
+  box-shadow: var(--focus-ring);
 }
 
 .optionBody {
@@ -170,7 +171,7 @@
 }
 
 .optionDescription {
-  color: #8da1ba;
+  color: var(--text-muted);
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.3;
@@ -186,7 +187,7 @@
 .optionPrice {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #7dd3fc;
+  color: var(--info);
   white-space: nowrap;
 }
 
@@ -200,7 +201,7 @@
 .triggerPrice {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #7dd3fc;
+  color: var(--info);
   white-space: nowrap;
 }
 

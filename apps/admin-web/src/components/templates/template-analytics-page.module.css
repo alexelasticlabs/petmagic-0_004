@@ -77,7 +77,7 @@
 
 .secondaryLink {
   border: 1px solid var(--border-soft);
-  background: linear-gradient(180deg, rgba(18, 29, 47, 0.96) 0%, rgba(11, 19, 33, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(16, 24, 21, 0.96) 0%, rgba(9, 15, 13, 0.96) 100%);
   color: var(--text-soft);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
@@ -148,7 +148,7 @@
   padding: 0.62rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.68rem;
-  background: rgba(8, 15, 27, 0.5);
+  background: rgba(5, 8, 7, 0.56);
 }
 
 .toolbarActions,
@@ -172,7 +172,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.5rem;
   padding: 0.48rem 0.68rem;
-  background: rgba(12, 22, 36, 0.86);
+  background: rgba(10, 15, 13, 0.88);
   color: var(--text-muted);
   font-family: var(--font-space-grotesk), sans-serif;
   font-size: 0.72rem;
@@ -200,7 +200,7 @@
 .statCard {
   border: 1px solid var(--border-soft);
   border-radius: 0.79rem;
-  background: linear-gradient(180deg, rgba(14, 24, 40, 0.97) 0%, rgba(9, 16, 28, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(16, 24, 21, 0.97) 0%, rgba(5, 8, 7, 0.96) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 20px 40px rgba(0, 0, 0, 0.16);
 }
 
@@ -261,7 +261,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.79rem;
   padding: 0.88rem;
-  background: linear-gradient(180deg, rgba(14, 24, 40, 0.97) 0%, rgba(9, 16, 28, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(16, 24, 21, 0.97) 0%, rgba(5, 8, 7, 0.96) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 20px 40px rgba(0, 0, 0, 0.16);
 }
 
@@ -462,7 +462,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.62rem;
   padding: 0.72rem 0.78rem;
-  background: rgba(8, 15, 27, 0.42);
+  background: rgba(5, 8, 7, 0.48);
 }
 
 .summaryRow {
@@ -505,7 +505,7 @@
 .funnelRow {
   border: 1px solid var(--border-soft);
   border-radius: 0.61rem;
-  background: rgba(8, 15, 27, 0.38);
+  background: rgba(5, 8, 7, 0.44);
 }
 
 .pendingRow {
@@ -562,7 +562,7 @@
   border: 1px dashed var(--border-soft);
   border-radius: 0.61rem;
   padding: 0.75rem 0.8rem;
-  background: rgba(8, 15, 27, 0.26);
+  background: rgba(5, 8, 7, 0.32);
 }
 
 .funnelRow {
@@ -792,7 +792,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.55rem;
   padding: 0.5rem 0.72rem;
-  background: rgba(12, 22, 36, 0.86);
+  background: rgba(10, 15, 13, 0.88);
   color: var(--text-soft);
   font-size: 0.78rem;
 }
@@ -803,8 +803,8 @@
 
 .feedbackSearchInput:focus {
   outline: none;
-  border-color: rgba(56, 189, 248, 0.35);
-  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.18);
+  border-color: rgba(52, 211, 153, 0.46);
+  box-shadow: var(--focus-ring);
 }
 
 .feedbackItem {
@@ -813,7 +813,7 @@
   border: 1px solid rgba(56, 189, 248, 0.18);
   border-radius: 0.7rem;
   padding: 0.8rem 0.88rem;
-  background: rgba(8, 15, 27, 0.38);
+  background: rgba(5, 8, 7, 0.44);
 }
 
 .feedbackHeader {
@@ -862,11 +862,11 @@
   border-radius: 0.72rem;
   background:
     radial-gradient(circle at 18% 12%, rgba(45, 212, 191, 0.11), transparent 28%),
-    linear-gradient(180deg, rgba(8, 15, 27, 0.72) 0%, rgba(7, 12, 22, 0.68) 100%);
+    linear-gradient(180deg, rgba(5, 8, 7, 0.78) 0%, rgba(4, 7, 6, 0.72) 100%);
 }
 
 .chartGridLine {
-  stroke: rgba(141, 161, 186, 0.16);
+  stroke: rgba(127, 147, 139, 0.2);
   stroke-width: 1;
 }
 
@@ -883,7 +883,7 @@
 
 .chartLine {
   fill: none;
-  stroke: #4ade80;
+  stroke: #34d399;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 3;
@@ -891,19 +891,19 @@
 }
 
 .chartDot {
-  fill: #d9ffe7;
+  fill: #dcfce7;
   stroke: var(--success);
   stroke-width: 2;
 }
 
 .chartPointBadge {
-  fill: rgba(8, 15, 27, 0.92);
+  fill: rgba(5, 8, 7, 0.94);
   stroke: rgba(74, 222, 128, 0.36);
   stroke-width: 1;
 }
 
 .chartPointValue {
-  fill: #d9ffe7;
+  fill: #dcfce7;
   font-size: 0.72rem;
   font-weight: 900;
 }
@@ -921,7 +921,7 @@
   padding: 0.6rem 0.68rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.58rem;
-  background: rgba(8, 15, 27, 0.36);
+  background: rgba(5, 8, 7, 0.44);
 }
 
 .chartSummaryItem span {
@@ -993,7 +993,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-
 
 
 

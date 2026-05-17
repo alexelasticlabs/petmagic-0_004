@@ -1,19 +1,19 @@
 .layout {
   --admin-bg: var(--surface-0);
   --admin-bg-muted: var(--surface-1);
-  --admin-surface: rgba(12, 26, 43, 0.92);
-  --admin-surface-strong: rgba(7, 17, 31, 0.98);
+  --admin-surface: rgba(5, 8, 7, 0.96);
+  --admin-surface-strong: rgba(1, 3, 2, 0.98);
   --admin-border: var(--border-soft);
   --admin-border-strong: var(--border-strong);
   --admin-text: var(--text-strong);
   --admin-text-soft: var(--text-soft);
   --admin-text-dim: var(--text-muted);
   --admin-accent: var(--accent);
-  --admin-accent-soft: rgba(45, 212, 191, 0.16);
+  --admin-accent-soft: rgba(16, 185, 129, 0.18);
   min-height: 100vh;
   display: grid;
   grid-template-columns: 17rem minmax(0, 1fr);
-  background: linear-gradient(180deg, rgba(7, 17, 31, 0.18) 0%, rgba(7, 17, 31, 0.48) 100%);
+  background: linear-gradient(180deg, rgba(1, 3, 2, 0.46) 0%, rgba(1, 3, 2, 0.84) 100%);
   color: var(--admin-text);
 }
 
@@ -31,9 +31,10 @@
   padding: 1rem 0.9rem;
   border-right: 1px solid var(--admin-border);
   background:
-    linear-gradient(180deg, rgba(12, 26, 43, 0.98) 0%, rgba(7, 17, 31, 0.98) 100%);
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.08), transparent 14rem),
+    linear-gradient(180deg, rgba(3, 6, 5, 0.99) 0%, rgba(1, 3, 2, 0.99) 100%);
   backdrop-filter: blur(12px);
-  box-shadow: 14px 0 32px rgba(0, 0, 0, 0.18);
+  box-shadow: 16px 0 38px rgba(0, 0, 0, 0.32);
 }
 
 .brand {
@@ -49,7 +50,7 @@
   width: 2.125rem;
   height: 2.375rem;
   color: var(--admin-accent);
-  filter: drop-shadow(0 10px 20px rgba(45, 212, 191, 0.2));
+  filter: drop-shadow(0 10px 22px rgba(16, 185, 129, 0.28));
 }
 
 .brandName {
@@ -92,22 +93,26 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--admin-text-soft);
-  background: rgba(7, 17, 31, 0.18);
-  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
+  background: rgba(1, 3, 2, 0.28);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, filter 140ms ease,
+    transform 140ms ease;
 }
 
 .navItem:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(23, 47, 74, 0.82);
+  background: rgba(12, 25, 20, 0.94);
   color: var(--admin-text);
-  transform: translateY(-1px);
+  box-shadow: var(--interactive-glow);
+  filter: saturate(1.12);
+  transform: translateY(-2px);
 }
 
 .navItemActive {
-  border-color: rgba(45, 212, 191, 0.48);
-  background: linear-gradient(180deg, rgba(45, 212, 191, 0.18) 0%, rgba(12, 26, 43, 0.94) 100%);
-  color: var(--admin-accent);
-  box-shadow: inset 3px 0 0 rgba(45, 212, 191, 0.8), inset 0 0 0 1px rgba(45, 212, 191, 0.08);
+  border-color: rgba(52, 211, 153, 0.66);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.26) 0%, rgba(3, 8, 6, 0.98) 100%);
+  color: #8ff5c4;
+  box-shadow: inset 3px 0 0 rgba(52, 211, 153, 0.95), inset 0 0 0 1px rgba(52, 211, 153, 0.14),
+    0 14px 30px rgba(0, 0, 0, 0.28), var(--interactive-glow);
 }
 
 .navIcon {
@@ -142,7 +147,7 @@
   gap: 0.18rem;
   margin-left: 1rem;
   padding-left: 0.9rem;
-  border-left: 1px solid rgba(76, 107, 143, 0.72);
+  border-left: 1px solid rgba(58, 90, 79, 0.78);
 }
 
 .navChild {
@@ -153,20 +158,22 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--admin-text-dim);
-  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .navChild:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(23, 47, 74, 0.76);
+  background: rgba(12, 25, 20, 0.9);
   color: var(--admin-text);
+  box-shadow: var(--interactive-glow);
+  transform: translateX(2px);
 }
 
 .navChildActive {
-  border-color: rgba(56, 189, 248, 0.34);
-  background: rgba(56, 189, 248, 0.12);
-  color: #a7ecff;
-  box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.78);
+  border-color: rgba(45, 212, 191, 0.4);
+  background: rgba(16, 185, 129, 0.16);
+  color: #a7f3d0;
+  box-shadow: inset 3px 0 0 rgba(45, 212, 191, 0.88), var(--interactive-glow);
 }
 
 .navChildLabel {
@@ -194,13 +201,15 @@
   color: var(--admin-text-soft);
   font: inherit;
   cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .logoutButton:hover {
   border-color: rgba(251, 113, 133, 0.34);
-  background: rgba(115, 23, 45, 0.32);
+  background: rgba(94, 18, 37, 0.36);
   color: #ffb4c0;
+  box-shadow: 0 12px 24px rgba(76, 18, 36, 0.24);
+  transform: translateY(-1px);
 }
 
 .main {
@@ -223,7 +232,7 @@
   border-bottom: 1px solid var(--admin-border);
   background: var(--surface-overlay);
   backdrop-filter: blur(14px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
 }
 
 .topbar > * {
@@ -238,16 +247,18 @@
   height: 2.6rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius-sm);
-  background: rgba(12, 26, 43, 0.76);
+  background: rgba(1, 3, 2, 0.86);
   color: var(--admin-text-soft);
   cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .sidebarToggle:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(23, 47, 74, 0.88);
+  background: rgba(12, 25, 20, 0.96);
   color: var(--admin-text);
+  box-shadow: var(--interactive-glow);
+  transform: translateY(-1px);
 }
 
 .topbarHeading {
@@ -297,7 +308,15 @@
   padding: 0.4rem 0.45rem 0.4rem 0.4rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius);
-  background: rgba(12, 26, 43, 0.82);
+  background: rgba(3, 6, 5, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.userBadge:hover {
+  border-color: var(--admin-border-strong);
+  box-shadow: var(--interactive-glow);
+  transform: translateY(-1px);
 }
 
 .userAvatar {
@@ -306,8 +325,8 @@
   display: grid;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--accent) 0%, var(--brand) 100%);
-  color: #03131d;
+  background: linear-gradient(135deg, #34d399 0%, var(--brand) 100%);
+  color: var(--accent-contrast);
   font-size: 0.78rem;
   font-weight: 900;
 }
@@ -353,9 +372,10 @@
   place-items: center;
   padding: 1.5rem;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px),
-    linear-gradient(180deg, #06101d 0%, #07111f 100%);
-  background-size: 44px 44px, auto;
+    linear-gradient(90deg, rgba(210, 255, 232, 0.022) 1px, transparent 1px),
+    radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 30rem),
+    linear-gradient(180deg, #030504 0%, #050706 100%);
+  background-size: 44px 44px, auto, auto;
   color: var(--text-strong);
 }
 
@@ -366,7 +386,7 @@
   padding: 0.9rem 1rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  background: rgba(12, 26, 43, 0.86);
+  background: rgba(10, 15, 13, 0.88);
   color: var(--text-soft);
   font-size: 0.92rem;
   font-weight: 700;
@@ -378,8 +398,8 @@
   display: grid;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--accent) 0%, var(--brand) 100%);
-  color: #03131d;
+  background: linear-gradient(135deg, #34d399 0%, var(--brand) 100%);
+  color: var(--accent-contrast);
   font-size: 0.72rem;
   font-weight: 900;
 }
@@ -396,18 +416,20 @@
   padding: 0.45rem 0.78rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius-sm);
-  background: rgba(12, 26, 43, 0.82);
+  background: rgba(3, 6, 5, 0.9);
   color: var(--admin-text);
   font: inherit;
   font-size: 0.83rem;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .localeTrigger:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(23, 47, 74, 0.96);
+  background: rgba(12, 25, 20, 0.96);
+  box-shadow: var(--interactive-glow);
+  transform: translateY(-1px);
 }
 
 .localeIcon {
@@ -426,7 +448,7 @@
   padding: 0.35rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius);
-  background: rgba(7, 17, 31, 0.98);
+  background: rgba(5, 8, 7, 0.98);
   box-shadow: var(--shadow-strong);
 }
 
@@ -444,13 +466,13 @@
 }
 
 .localeOption:hover {
-  background: rgba(23, 47, 74, 0.92);
+  background: rgba(20, 33, 28, 0.92);
   color: var(--admin-text);
 }
 
 .localeOptionActive {
-  color: var(--admin-accent);
-  background: rgba(45, 212, 191, 0.12);
+  color: #8ff5c4;
+  background: rgba(16, 185, 129, 0.14);
 }
 
 .localeCheck {
@@ -480,7 +502,7 @@
   .backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(5, 9, 17, 0.62);
+    background: rgba(2, 4, 3, 0.68);
     backdrop-filter: blur(3px);
     z-index: 29;
   }
@@ -538,5 +560,3 @@
     display: none;
   }
 }
-
-

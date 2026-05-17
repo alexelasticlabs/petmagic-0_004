@@ -86,7 +86,7 @@ export function buildDashboardViewModel(locale: Locale) {
         delta: "+12.5%",
         subtext: isRu ? "к прошлой неделе" : "compared to last week",
         icon: "people",
-        accentColor: "#60a5fa",
+        accentColor: "#2dd4bf",
       },
       {
         label: isRu ? "Заказы" : "Orders",
@@ -110,7 +110,7 @@ export function buildDashboardViewModel(locale: Locale) {
         delta: "+6.2%",
         subtext: isRu ? "к прошлой неделе" : "compared to last week",
         icon: "trendUp",
-        accentColor: "#c084fc",
+        accentColor: "#f472b6",
       },
     ] satisfies DashboardStatItem[],
     orders: [

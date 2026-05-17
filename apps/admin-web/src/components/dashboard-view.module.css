@@ -129,7 +129,7 @@
   gap: 0.8rem;
   min-width: 0;
   padding: 0.78rem 0;
-  border-bottom: 1px solid rgba(40, 68, 99, 0.56);
+  border-bottom: 1px solid rgba(33, 51, 45, 0.7);
 }
 
 .activityItem:last-child {

@@ -83,7 +83,7 @@
 .segmentedButton,
 .chartTab {
   border: 1px solid var(--border-soft);
-  background: rgba(7, 17, 31, 0.82);
+  background: rgba(5, 8, 7, 0.86);
   color: var(--text-soft);
   padding: 0.7rem 0.92rem;
 }
@@ -570,7 +570,7 @@
 .statusBadge {
   padding: 0.25rem 0.46rem;
   border: 1px solid var(--border-soft);
-  background: rgba(7, 17, 31, 0.72);
+  background: rgba(5, 8, 7, 0.76);
   color: var(--text-soft);
 }
 
@@ -582,7 +582,7 @@
 
 .status_draft {
   background: rgba(56, 189, 248, 0.1);
-  border-color: rgba(56, 189, 248, 0.35);
+  border-color: rgba(45, 212, 191, 0.38);
   color: var(--info);
 }
 
