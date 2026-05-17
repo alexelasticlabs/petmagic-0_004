@@ -2,7 +2,7 @@ import styles from "@/components/admin/admin-primitives.module.css";
 import { type CSSProperties, type ReactNode } from "react";
 
 type AdminCardProps = {
-  title?: string;
+  title?: ReactNode;
   description?: string;
   action?: ReactNode;
   children: ReactNode;

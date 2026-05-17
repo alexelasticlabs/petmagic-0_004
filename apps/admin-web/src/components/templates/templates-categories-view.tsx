@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
 import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { fetchAdminTemplates, getSession, type AdminTemplateListItem } from "@/lib/api-client";
@@ -137,8 +138,14 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                     <td data-label="Premium">{category.premium}</td>
                     <td data-label={text.actionsLabel}>
                       <div className={styles.tableActions}>
-                        <Link className={styles.compactLink} href={`/${locale}/templates/video?category=${encodeURIComponent(category.name)}`}>Video</Link>
-                        <Link className={styles.compactLink} href={`/${locale}/templates/image?category=${encodeURIComponent(category.name)}`}>Image</Link>
+                        <Link className={styles.compactLink} href={`/${locale}/templates/video?category=${encodeURIComponent(category.name)}`}>
+                          <VideoIcon className={styles.linkIcon} />
+                          <span>Video</span>
+                        </Link>
+                        <Link className={styles.compactLink} href={`/${locale}/templates/image?category=${encodeURIComponent(category.name)}`}>
+                          <ImageIcon className={styles.linkIcon} />
+                          <span>Image</span>
+                        </Link>
                       </div>
                     </td>
                   </tr>

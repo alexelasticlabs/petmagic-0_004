@@ -730,15 +730,15 @@ public sealed class TemplatesApiIntegrationTests
 
     private sealed class TestImagePreprocessor : IImagePreprocessor
     {
-        public Task<Result<string>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
+        public Task<Result<ImagePreprocessResult>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success(originalImageUrl));
+            return Task.FromResult(Result.Success(new ImagePreprocessResult(originalImageUrl, null, null)));
         }
     }
 
     private sealed class TestVideoMotionGenerator : IVideoMotionGenerator
     {
-        public Task<Result<string>> CreateAsync(
+        public Task<Result<VideoMotionGenerationResult>> CreateAsync(
             string normalizedImageUrl,
             string referenceVideoUrl,
             string characterOrientation,
@@ -747,7 +747,7 @@ public sealed class TemplatesApiIntegrationTests
             string model,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success($"https://fal.example.test/generated/{Guid.NewGuid():N}.mp4"));
+            return Task.FromResult(Result.Success(new VideoMotionGenerationResult($"https://fal.example.test/generated/{Guid.NewGuid():N}.mp4", null, null)));
         }
     }
 

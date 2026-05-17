@@ -24,7 +24,7 @@
   margin-bottom: 1rem;
   padding: 0.65rem 0.9rem;
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
+  border-radius: 5.76px;
   background: rgba(239, 68, 68, 0.1);
   color: #fca5a5;
   font-size: 0.875rem;
@@ -70,7 +70,7 @@
   width: 100%;
   padding: 0.82rem 0.9rem 0.82rem 2.65rem;
   border: 1px solid #1a2840;
-  border-radius: 10px;
+  border-radius: 7.2px;
   background: #0d1929;
   color: #e8f0fb;
   font: inherit;
@@ -103,7 +103,7 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4.32px;
   background: transparent;
   color: #3e546e;
   cursor: pointer;
@@ -134,7 +134,7 @@
   margin-top: 0.4rem;
   padding: 0.82rem 1rem;
   border: 0;
-  border-radius: 10px;
+  border-radius: 7.2px;
   background: #22c55e;
   color: #052e14;
   font: inherit;
@@ -222,7 +222,7 @@
 }
 
 .skeletonLine {
-  border-radius: 8px;
+  border-radius: 5.76px;
   background: linear-gradient(90deg, #162537 0%, #1e3048 50%, #162537 100%);
   background-size: 220% 100%;
   animation: shimmer 1.5s linear infinite;
@@ -265,3 +265,5 @@
     width: 100%;
   }
 }
+
+

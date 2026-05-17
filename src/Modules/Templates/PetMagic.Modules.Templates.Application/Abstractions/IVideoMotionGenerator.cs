@@ -4,7 +4,7 @@ namespace PetMagic.Modules.Templates.Application.Abstractions;
 
 public interface IVideoMotionGenerator
 {
-    Task<Result<string>> CreateAsync(
+    Task<Result<VideoMotionGenerationResult>> CreateAsync(
         string normalizedImageUrl,
         string referenceVideoUrl,
         string characterOrientation,

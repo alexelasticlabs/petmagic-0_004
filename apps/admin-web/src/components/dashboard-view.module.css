@@ -23,6 +23,26 @@
   min-height: 20rem;
 }
 
+.cardTitleWithIcon,
+.cardActionLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.cardTitleIcon,
+.cardActionIcon,
+.toolbarIcon {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.cardActionLink {
+  color: #7dd3fc;
+  font-weight: 800;
+}
+
 .chartToolbar {
   display: inline-flex;
   align-items: center;

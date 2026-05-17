@@ -6,7 +6,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVideoMotionGenerator
 {
-    public async Task<Result<string>> CreateAsync(
+    public async Task<Result<VideoMotionGenerationResult>> CreateAsync(
         string normalizedImageUrl,
         string referenceVideoUrl,
         string characterOrientation,
@@ -27,13 +27,13 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
         var result = await queueClient.RunAsync(model, input, cancellationToken);
         if (result.IsFailure)
         {
-            return Result.Failure<string>(result.Error);
+            return Result.Failure<VideoMotionGenerationResult>(result.Error);
         }
 
-        using var document = result.Value;
+        using var document = result.Value.Response;
         return TryReadVideoUrl(document.RootElement, out var videoUrl)
-            ? Result.Success(videoUrl)
-            : Result.Failure<string>(TemplatesErrors.AiProviderFailed);
+            ? Result.Success(new VideoMotionGenerationResult(videoUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds))
+            : Result.Failure<VideoMotionGenerationResult>(TemplatesErrors.AiProviderFailed);
     }
 
     private static bool TryReadVideoUrl(JsonElement root, out string videoUrl)

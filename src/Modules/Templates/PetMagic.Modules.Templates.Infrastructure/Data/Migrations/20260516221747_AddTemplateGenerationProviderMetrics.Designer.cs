@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PetMagic.Modules.Templates.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PetMagic.Modules.Templates.Infrastructure.Data;
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TemplatesDbContext))]
-    partial class TemplatesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260516221747_AddTemplateGenerationProviderMetrics")]
+    partial class AddTemplateGenerationProviderMetrics
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,57 +24,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateAnalyticsEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CountryCode")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DeviceClass")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<Guid?>("GenerationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<Guid>("TemplateId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TemplateId", "CountryCode");
-
-                    b.HasIndex("TemplateId", "DeviceClass");
-
-                    b.HasIndex("TemplateId", "Source");
-
-                    b.HasIndex("TemplateId", "EventType", "CreatedAtUtc");
-
-                    b.ToTable("templates_analytics_events", (string)null);
-                });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateAsset", b =>
                 {
@@ -430,17 +382,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("TemplateId", "LifecycleState");
 
                     b.ToTable("templates_media_records", (string)null);
-                });
-
-            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateAnalyticsEvent", b =>
-                {
-                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", "Template")
-                        .WithMany()
-                        .HasForeignKey("TemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Template");
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateAsset", b =>

@@ -2,12 +2,17 @@
 
 import {
     ArrowUpSmallIcon,
+  CalendarIcon,
     CancelCircleIcon,
     CartIcon,
+  ChartIcon,
+  DashboardIcon,
     DollarIcon,
     PeopleIcon,
     RefreshIcon,
+  TableIcon,
     TrendUpIcon,
+  UsersIcon,
     UserRegisterIcon,
 } from "@/components/admin/admin-icons";
 import { AdminCard, AdminPageHero, AdminStatCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
@@ -79,17 +84,17 @@ export function DashboardView({ locale }: DashboardViewProps) {
       <div className={styles.contentGrid}>
         <AdminCard
           className={styles.wideCard}
-          title={viewModel.revenueChart.title}
+          title={<span className={styles.cardTitleWithIcon}><ChartIcon className={styles.cardTitleIcon} /><span>{viewModel.revenueChart.title}</span></span>}
           description={viewModel.revenueChart.description}
-          action={<span className={styles.chartToolbar}>{viewModel.revenueChart.rangeLabel}<svg viewBox="0 0 12 8" fill="none" aria-hidden="true"><path d="M1 1L6 7L11 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg></span>}
+          action={<span className={styles.chartToolbar}><CalendarIcon className={styles.toolbarIcon} />{viewModel.revenueChart.rangeLabel}<svg viewBox="0 0 12 8" fill="none" aria-hidden="true"><path d="M1 1L6 7L11 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg></span>}
         >
           <RevenueChart xLabels={viewModel.revenueChart.xLabels} ariaLabel={viewModel.revenueChart.ariaLabel} />
         </AdminCard>
 
         <AdminCard
-          title={viewModel.ordersSection.title}
+          title={<span className={styles.cardTitleWithIcon}><TableIcon className={styles.cardTitleIcon} /><span>{viewModel.ordersSection.title}</span></span>}
           description={viewModel.ordersSection.description}
-          action={<Link href={`/${locale}/users`}>{viewModel.ordersSection.viewAllLabel}</Link>}
+          action={<Link href={`/${locale}/users`} className={styles.cardActionLink}><UsersIcon className={styles.cardActionIcon} /><span>{viewModel.ordersSection.viewAllLabel}</span></Link>}
         >
           <div className={adminTableStyles.tableWrap}>
             <table className={adminTableStyles.table}>
@@ -117,7 +122,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
       </div>
 
       <div className={styles.contentGrid}>
-        <AdminCard title={viewModel.distributionSection.title}>
+        <AdminCard title={<span className={styles.cardTitleWithIcon}><DashboardIcon className={styles.cardTitleIcon} /><span>{viewModel.distributionSection.title}</span></span>}>
           <div className={styles.donutLayout}>
             <DonutChart label={viewModel.distributionSection.totalLabel} />
             <div className={styles.legend}>
@@ -136,7 +141,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
           </div>
         </AdminCard>
 
-        <AdminCard title={viewModel.activitySection.title} description={viewModel.activitySection.description}>
+        <AdminCard title={<span className={styles.cardTitleWithIcon}><RefreshIcon className={styles.cardTitleIcon} /><span>{viewModel.activitySection.title}</span></span>} description={viewModel.activitySection.description}>
           <ul className={styles.activityList}>
             {viewModel.activities.map((activity) => (
               <li key={`${activity.type}-${activity.time}`} className={styles.activityItem}>

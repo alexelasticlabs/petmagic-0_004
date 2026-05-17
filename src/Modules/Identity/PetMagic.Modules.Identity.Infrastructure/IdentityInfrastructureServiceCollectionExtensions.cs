@@ -113,6 +113,26 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         var existing = await userManager.FindByEmailAsync(options.Email);
         if (existing is not null)
         {
+            existing.UserName = options.Email;
+            existing.DisplayName = options.DisplayName;
+            existing.EmailConfirmed = true;
+            existing.IsActive = true;
+            existing.IsPremium = true;
+
+            await userManager.UpdateAsync(existing);
+
+            var passwordValid = await userManager.CheckPasswordAsync(existing, options.Password);
+            if (!passwordValid)
+            {
+                var resetToken = await userManager.GeneratePasswordResetTokenAsync(existing);
+                await userManager.ResetPasswordAsync(existing, resetToken, options.Password);
+            }
+
+            if (!await userManager.IsInRoleAsync(existing, SystemRoles.Admin))
+            {
+                await userManager.AddToRoleAsync(existing, SystemRoles.Admin);
+            }
+
             return;
         }
 

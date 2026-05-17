@@ -5,8 +5,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class FakeImagePreprocessor : IImagePreprocessor
 {
-    public Task<Result<string>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
+    public Task<Result<ImagePreprocessResult>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
     {
-        return Task.FromResult(Result.Success(originalImageUrl));
+        return Task.FromResult(Result.Success(new ImagePreprocessResult(originalImageUrl, null, null)));
     }
 }

@@ -21,6 +21,23 @@ internal sealed class TemplatesService(
     private sealed record GenerationStatisticsProjection(
         TemplateGenerationStatus Status,
         int TokenCost,
+        decimal? MotionProviderCostUsd,
+        DateTime CreatedAtUtc,
+        DateTime? StartedAtUtc,
+        DateTime? CompletedAtUtc);
+
+    private sealed record GenerationAnalyticsProjection(
+        Guid GenerationId,
+        Guid UserId,
+        TemplateGenerationStatus Status,
+        int TokenCost,
+        int AttemptCount,
+        string? UsedPreprocessingModel,
+        string? UsedKlingModel,
+        decimal? MotionProviderCostUsd,
+        string? FailureCode,
+        string? FailureMessage,
+        string? OutputUrl,
         DateTime CreatedAtUtc,
         DateTime? StartedAtUtc,
         DateTime? CompletedAtUtc);
@@ -63,12 +80,175 @@ internal sealed class TemplatesService(
             .Select(x => new GenerationStatisticsProjection(
                 x.Status,
                 x.TokenCost,
+                x.MotionProviderCostUsd,
                 x.CreatedAtUtc,
                 x.StartedAtUtc,
                 x.CompletedAtUtc))
             .ToArrayAsync(cancellationToken);
 
         return Result.Success(MapAdminStatisticsResponse(templateId, jobs));
+    }
+
+    public async Task<Result<IReadOnlyList<AdminTemplateTrendPointResponse>>> GetAdminTrendAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        var jobs = await GetAnalyticsProjectionsAsync(templateId, cancellationToken);
+        if (jobs is null)
+        {
+            return Result.Failure<IReadOnlyList<AdminTemplateTrendPointResponse>>(TemplatesErrors.NotFound);
+        }
+
+        var trend = jobs
+            .GroupBy(x => x.CreatedAtUtc.Date)
+            .OrderBy(x => x.Key)
+            .Select(group =>
+            {
+                var entries = group.ToArray();
+                var totalRuns = entries.Length;
+                var queuedRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Queued);
+                var processingRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Processing);
+                var completedRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Completed);
+                var failedRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Failed);
+                var totalTokenCost = entries.Sum(x => x.TokenCost);
+                var totalProviderCostUsd = entries.Sum(x => x.MotionProviderCostUsd ?? 0m);
+                var successRatePercent = totalRuns == 0
+                    ? 0
+                    : Math.Round((double)completedRuns * 100 / totalRuns, 1, MidpointRounding.AwayFromZero);
+                var durations = entries
+                    .Where(x => x.Status == TemplateGenerationStatus.Completed && x.StartedAtUtc.HasValue && x.CompletedAtUtc.HasValue)
+                    .Select(x => (x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds)
+                    .Where(x => x >= 0)
+                    .ToArray();
+                double? averageGenerationSeconds = durations.Length == 0
+                    ? null
+                    : Math.Round(durations.Average(), 1, MidpointRounding.AwayFromZero);
+
+                return new AdminTemplateTrendPointResponse(
+                    group.Key,
+                    totalRuns,
+                    queuedRuns,
+                    processingRuns,
+                    completedRuns,
+                    failedRuns,
+                    successRatePercent,
+                    totalTokenCost,
+                    Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+                    averageGenerationSeconds);
+            })
+            .ToArray();
+
+        return Result.Success<IReadOnlyList<AdminTemplateTrendPointResponse>>(trend);
+    }
+
+    public async Task<Result<IReadOnlyList<AdminTemplateRecentGenerationResponse>>> GetAdminRecentGenerationsAsync(Guid templateId, int take, CancellationToken cancellationToken)
+    {
+        var jobs = await GetAnalyticsProjectionsAsync(templateId, cancellationToken);
+        if (jobs is null)
+        {
+            return Result.Failure<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(TemplatesErrors.NotFound);
+        }
+
+        var recent = jobs
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .Select(x => new AdminTemplateRecentGenerationResponse(
+                x.GenerationId,
+                x.UserId,
+                x.Status.ToString(),
+                x.TokenCost,
+                x.AttemptCount,
+                x.UsedPreprocessingModel,
+                x.UsedKlingModel,
+                x.MotionProviderCostUsd,
+                x.FailureCode,
+                x.FailureMessage,
+                x.OutputUrl,
+                x.CreatedAtUtc,
+                x.StartedAtUtc,
+                x.CompletedAtUtc))
+            .ToArray();
+
+        return Result.Success<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(recent);
+    }
+
+    public async Task<Result<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>> GetAdminFailureBreakdownAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        var jobs = await GetAnalyticsProjectionsAsync(templateId, cancellationToken);
+        if (jobs is null)
+        {
+            return Result.Failure<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>(TemplatesErrors.NotFound);
+        }
+
+        var failures = jobs
+            .Where(x => x.Status == TemplateGenerationStatus.Failed)
+            .GroupBy(x => string.IsNullOrWhiteSpace(x.FailureCode) ? "templates.unknown_failure" : x.FailureCode!)
+            .OrderByDescending(x => x.Count())
+            .ThenBy(x => x.Key)
+            .Select(group => new AdminTemplateFailureBreakdownItemResponse(
+                group.Key,
+                group.Count(),
+                group.Max(x => x.CompletedAtUtc ?? x.StartedAtUtc ?? x.CreatedAtUtc)))
+            .ToArray();
+
+        return Result.Success<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>(failures);
+    }
+
+    public async Task<Result<AdminTemplateEventAnalyticsResponse>> GetAdminEventAnalyticsAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
+        {
+            return Result.Failure<AdminTemplateEventAnalyticsResponse>(TemplatesErrors.NotFound);
+        }
+
+        var events = await dbContext.TemplateAnalyticsEvents
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId)
+            .ToArrayAsync(cancellationToken);
+
+        var viewEvents = events.Where(x => x.EventType == "view").ToArray();
+        var videoViewEvents = events.Where(x => x.EventType == "video_view").ToArray();
+        var complaintEvents = events.Where(x => x.EventType == "complaint").ToArray();
+
+        var response = new AdminTemplateEventAnalyticsResponse(
+            viewEvents.Length,
+            videoViewEvents.Length,
+            complaintEvents.Length,
+            BuildDimension(viewEvents, x => x.Source, "direct"),
+            BuildDimension(viewEvents, x => x.DeviceClass, "unknown"),
+            BuildDimension(viewEvents, x => x.CountryCode, "unknown"));
+
+        return Result.Success(response);
+    }
+
+    public async Task<Result> RecordAnalyticsEventAsync(RecordTemplateAnalyticsEventCommand command, CancellationToken cancellationToken)
+    {
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == command.TemplateId, cancellationToken);
+
+        if (!templateExists)
+        {
+            return Result.Failure(TemplatesErrors.NotFound);
+        }
+
+        dbContext.TemplateAnalyticsEvents.Add(new TemplateAnalyticsEvent
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = command.TemplateId,
+            UserId = command.UserId,
+            GenerationId = command.GenerationId,
+            EventType = NormalizeAnalyticsValue(command.EventType, "view", 64),
+            Source = NormalizeAnalyticsValue(command.Source, "direct", 64),
+            DeviceClass = NormalizeAnalyticsValue(command.DeviceClass, "unknown", 32),
+            CountryCode = NormalizeAnalyticsValue(command.CountryCode, "unknown", 8).ToUpperInvariant(),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
     }
 
     public async Task<Result<AdminTemplateResponse>> CreateImageAsync(CreateImageTemplateCommand command, CancellationToken cancellationToken)
@@ -503,6 +683,14 @@ internal sealed class TemplatesService(
         var averageTokenCost = totalRuns == 0
             ? 0
             : Math.Round(jobs.Average(x => x.TokenCost), 1, MidpointRounding.AwayFromZero);
+        var totalProviderCostUsd = jobs.Sum(x => x.MotionProviderCostUsd ?? 0m);
+        var providerCostSamples = jobs
+            .Where(x => x.MotionProviderCostUsd.HasValue)
+            .Select(x => x.MotionProviderCostUsd!.Value)
+            .ToArray();
+        var averageProviderCostUsd = providerCostSamples.Length == 0
+            ? 0m
+            : Math.Round(providerCostSamples.Average(), 4, MidpointRounding.AwayFromZero);
         var successRatePercent = totalRuns == 0
             ? 0
             : Math.Round((double)completedRuns * 100 / totalRuns, 1, MidpointRounding.AwayFromZero);
@@ -531,10 +719,92 @@ internal sealed class TemplatesService(
             successRatePercent,
             totalTokenCost,
             averageTokenCost,
+            Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+            averageProviderCostUsd,
             lastRunAtUtc,
             lastCompletedAtUtc,
             averageGenerationSeconds);
     }
+
+    private async Task<GenerationAnalyticsProjection[]?> GetAnalyticsProjectionsAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
+        {
+            return null;
+        }
+
+        return await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId)
+            .Select(x => new GenerationAnalyticsProjection(
+                x.Id,
+                x.UserId,
+                x.Status,
+                x.TokenCost,
+                x.AttemptCount,
+                x.UsedPreprocessingModel,
+                x.UsedKlingModel,
+                x.MotionProviderCostUsd,
+                x.FailureCode,
+                x.FailureMessage,
+                x.OutputUrl,
+                x.CreatedAtUtc,
+                x.StartedAtUtc,
+                x.CompletedAtUtc))
+            .ToArrayAsync(cancellationToken);
+    }
+
+    private static IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> BuildDimension(
+        IReadOnlyCollection<TemplateAnalyticsEvent> events,
+        Func<TemplateAnalyticsEvent, string> selector,
+        string fallback)
+    {
+        if (events.Count == 0)
+        {
+            return [];
+        }
+
+        return events
+            .Select(selector)
+            .Select(value => NormalizeAnalyticsValue(value, fallback, 64))
+            .GroupBy(value => value)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key)
+            .Select(group => new AdminTemplateAnalyticsDimensionResponse(
+                group.Key,
+                FormatDimensionLabel(group.Key),
+                group.Count(),
+                Math.Round((double)group.Count() * 100 / events.Count, 1, MidpointRounding.AwayFromZero)))
+            .ToArray();
+    }
+
+    private static string NormalizeAnalyticsValue(string? value, string fallback, int maxLength)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value)
+            ? fallback
+            : value.Trim().ToLowerInvariant();
+
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    private static string FormatDimensionLabel(string key) => key switch
+    {
+        "home" => "Home",
+        "categories" => "Categories",
+        "search" => "Search",
+        "profile" => "Profile",
+        "direct" => "Direct",
+        "ios" => "iOS",
+        "android" => "Android",
+        "web" => "Web",
+        "bot" => "Bot",
+        "unknown" => "Unknown",
+        _ => key.ToUpperInvariant()
+    };
 
     private async Task<Result> DeleteTemplateAssetsAsync(string[] assetUrls, CancellationToken cancellationToken)
     {

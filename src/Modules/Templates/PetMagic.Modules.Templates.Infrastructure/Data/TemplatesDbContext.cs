@@ -12,6 +12,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateGenerationJob> TemplateGenerationJobs => Set<TemplateGenerationJob>();
 
+    public DbSet<TemplateAnalyticsEvent> TemplateAnalyticsEvents => Set<TemplateAnalyticsEvent>();
+
     public DbSet<TemplateMediaRecord> TemplateMediaRecords => Set<TemplateMediaRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -61,6 +63,9 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.OutputUrl).HasMaxLength(2048);
             entity.Property(x => x.UsedPreprocessingModel).HasMaxLength(256);
             entity.Property(x => x.UsedKlingModel).HasMaxLength(256);
+            entity.Property(x => x.PreprocessingProviderRequestId).HasMaxLength(128);
+            entity.Property(x => x.MotionProviderRequestId).HasMaxLength(128);
+            entity.Property(x => x.MotionProviderCostUsd).HasPrecision(12, 4);
             entity.Property(x => x.FailureCode).HasMaxLength(128);
             entity.Property(x => x.FailureMessage).HasMaxLength(1000);
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
@@ -76,6 +81,24 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateAnalyticsEvent>(entity =>
+        {
+            entity.ToTable("templates_analytics_events");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EventType).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Source).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.DeviceClass).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.CountryCode).HasMaxLength(8).IsRequired();
+            entity.HasIndex(x => new { x.TemplateId, x.EventType, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.TemplateId, x.Source });
+            entity.HasIndex(x => new { x.TemplateId, x.DeviceClass });
+            entity.HasIndex(x => new { x.TemplateId, x.CountryCode });
+            entity.HasOne(x => x.Template)
+            .WithMany()
+            .HasForeignKey(x => x.TemplateId)
+            .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<TemplateMediaRecord>(entity =>

@@ -22,6 +22,10 @@ public static class AdminTemplateEndpoints
         group.MapGet("/", ListAsync);
         group.MapGet("/{templateId:guid}", GetAsync);
         group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
+        group.MapGet("/{templateId:guid}/statistics/trends", GetTrendAsync);
+        group.MapGet("/{templateId:guid}/statistics/recent", GetRecentAsync);
+        group.MapGet("/{templateId:guid}/statistics/failures", GetFailureBreakdownAsync);
+        group.MapGet("/{templateId:guid}/statistics/events", GetEventAnalyticsAsync);
         group.MapPost("/{templateId:guid}/test", StartAdminTestAsync)
             .DisableAntiforgery();
         group.MapGet("/tests/{generationId:guid}", GetAdminTestAsync);
@@ -70,6 +74,64 @@ public static class AdminTemplateEndpoints
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminStatisticsAsync(templateId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<AdminTemplateTrendPointResponse>>, ProblemHttpResult>> GetTrendAsync(
+        Guid templateId,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminTrendAsync(templateId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<AdminTemplateRecentGenerationResponse>>, ProblemHttpResult>> GetRecentAsync(
+        Guid templateId,
+        [FromQuery] int? take,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var size = Math.Clamp(take ?? 8, 1, 24);
+        var result = await service.GetAdminRecentGenerationsAsync(templateId, size, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>, ProblemHttpResult>> GetFailureBreakdownAsync(
+        Guid templateId,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminFailureBreakdownAsync(templateId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminTemplateEventAnalyticsResponse>, ProblemHttpResult>> GetEventAnalyticsAsync(
+        Guid templateId,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminEventAnalyticsAsync(templateId, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);

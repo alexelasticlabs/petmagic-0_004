@@ -456,6 +456,7 @@ public sealed class TemplatesServiceTests
                 SourceImageContentType = "image/jpeg",
                 ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
                 OutputUrl = "https://cdn.example.com/output-1.mp4",
+                MotionProviderCostUsd = 0.1200m,
                 CreatedAtUtc = now.AddMinutes(-40),
                 QueuedAtUtc = now.AddMinutes(-40),
                 StartedAtUtc = now.AddMinutes(-39),
@@ -474,6 +475,7 @@ public sealed class TemplatesServiceTests
                 SourceImageContentType = "image/jpeg",
                 ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
                 OutputUrl = "https://cdn.example.com/output-2.mp4",
+                MotionProviderCostUsd = 0.1800m,
                 CreatedAtUtc = now.AddMinutes(-24),
                 QueuedAtUtc = now.AddMinutes(-24),
                 StartedAtUtc = now.AddMinutes(-23),
@@ -528,9 +530,178 @@ public sealed class TemplatesServiceTests
         Assert.Equal(50, statistics.Value.SuccessRatePercent);
         Assert.Equal(240, statistics.Value.TotalTokenCost);
         Assert.Equal(60, statistics.Value.AverageTokenCost);
+        Assert.Equal(0.3000m, statistics.Value.TotalProviderCostUsd);
+        Assert.Equal(0.1500m, statistics.Value.AverageProviderCostUsd);
         Assert.Equal(now.AddMinutes(-3), statistics.Value.LastRunAtUtc);
         Assert.Equal(now.AddMinutes(-21), statistics.Value.LastCompletedAtUtc);
         Assert.Equal(150, statistics.Value.AverageGenerationSeconds);
+    }
+
+    [Fact]
+    public async Task GetAdminAnalyticsAsync_ShouldReturnTrendRecentRunsAndFailureBreakdown()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Analytics Dance",
+                "Template with analytics history",
+                "Dance",
+                ["analytics"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var now = new DateTime(2026, 5, 17, 12, 0, 0, DateTimeKind.Utc);
+        var failedId = Guid.NewGuid();
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-1.jpg",
+                SourceImageFileName = "source-1.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                OutputUrl = "https://cdn.example.com/output-1.mp4",
+                UsedPreprocessingModel = "openai/gpt-image-2/edit",
+                UsedKlingModel = "fal-ai/kling-video/v3/pro/motion-control",
+                MotionProviderCostUsd = 0.2400m,
+                CreatedAtUtc = now.AddDays(-1).AddMinutes(-40),
+                QueuedAtUtc = now.AddDays(-1).AddMinutes(-40),
+                StartedAtUtc = now.AddDays(-1).AddMinutes(-39),
+                CompletedAtUtc = now.AddDays(-1).AddMinutes(-36),
+                UpdatedAtUtc = now.AddDays(-1).AddMinutes(-36)
+            },
+            new TemplateGenerationJob
+            {
+                Id = failedId,
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Failed,
+                TokenCost = 60,
+                AttemptCount = 2,
+                SourceImageUrl = "https://cdn.example.com/source-2.jpg",
+                SourceImageFileName = "source-2.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                FailureCode = "templates.ai_provider_failed",
+                FailureMessage = "Provider failed",
+                MotionProviderCostUsd = 0.0600m,
+                CreatedAtUtc = now.AddMinutes(-8),
+                QueuedAtUtc = now.AddMinutes(-8),
+                StartedAtUtc = now.AddMinutes(-7),
+                CompletedAtUtc = now.AddMinutes(-6),
+                UpdatedAtUtc = now.AddMinutes(-6)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = created.Value.TemplateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 60,
+                SourceImageUrl = "https://cdn.example.com/source-3.jpg",
+                SourceImageFileName = "source-3.jpg",
+                SourceImageContentType = "image/jpeg",
+                ReferenceMotionUrl = "https://cdn.example.com/reference.mp4",
+                CreatedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-3)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var trend = await service.GetAdminTrendAsync(created.Value.TemplateId, CancellationToken.None);
+        var recent = await service.GetAdminRecentGenerationsAsync(created.Value.TemplateId, 2, CancellationToken.None);
+        var failures = await service.GetAdminFailureBreakdownAsync(created.Value.TemplateId, CancellationToken.None);
+
+        Assert.True(trend.IsSuccess);
+        Assert.Equal(2, trend.Value.Count);
+        Assert.Equal(now.AddDays(-1).Date, trend.Value[0].DateUtc);
+        Assert.Equal(1, trend.Value[0].CompletedRuns);
+        Assert.Equal(0.2400m, trend.Value[0].TotalProviderCostUsd);
+        Assert.Equal(now.Date, trend.Value[1].DateUtc);
+        Assert.Equal(2, trend.Value[1].TotalRuns);
+        Assert.Equal(1, trend.Value[1].QueuedRuns);
+        Assert.Equal(1, trend.Value[1].FailedRuns);
+        Assert.Equal(0.0600m, trend.Value[1].TotalProviderCostUsd);
+        Assert.Equal(0, trend.Value[1].SuccessRatePercent);
+
+        Assert.True(recent.IsSuccess);
+        Assert.Equal(2, recent.Value.Count);
+        Assert.Equal(TemplateGenerationStatus.Queued.ToString(), recent.Value[0].Status);
+        Assert.Equal(failedId, recent.Value[1].GenerationId);
+        Assert.Equal(2, recent.Value[1].AttemptCount);
+
+        Assert.True(failures.IsSuccess);
+        var failure = Assert.Single(failures.Value);
+        Assert.Equal("templates.ai_provider_failed", failure.FailureCode);
+        Assert.Equal(1, failure.Count);
+        Assert.Equal(now.AddMinutes(-6), failure.LastOccurredAtUtc);
+    }
+
+    [Fact]
+    public async Task GetAdminEventAnalyticsAsync_ShouldAggregateViewEventDimensions()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Analytics Events",
+                "Template with tracked public events",
+                "Dance",
+                ["analytics"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "view", "home", "ios", "us", Guid.NewGuid(), null), CancellationToken.None);
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "view", "home", "android", "us", Guid.NewGuid(), null), CancellationToken.None);
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "view", "search", "web", "br", Guid.NewGuid(), null), CancellationToken.None);
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "video_view", "home", "ios", "us", Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "complaint", "profile", "web", "de", Guid.NewGuid(), null), CancellationToken.None);
+
+        var analytics = await service.GetAdminEventAnalyticsAsync(created.Value.TemplateId, CancellationToken.None);
+
+        Assert.True(analytics.IsSuccess);
+        Assert.Equal(3, analytics.Value.TotalViews);
+        Assert.Equal(1, analytics.Value.TotalVideoViews);
+        Assert.Equal(1, analytics.Value.TotalComplaints);
+
+        var home = Assert.Single(analytics.Value.Sources, x => x.Key == "home");
+        Assert.Equal(2, home.Count);
+        Assert.Equal(66.7, home.SharePercent);
+
+        Assert.Contains(analytics.Value.Devices, x => x.Key == "ios" && x.Count == 1);
+        Assert.Contains(analytics.Value.Devices, x => x.Key == "android" && x.Count == 1);
+        Assert.Contains(analytics.Value.Geography, x => x.Key == "us" && x.Label == "US" && x.Count == 2);
     }
 
     [Fact]

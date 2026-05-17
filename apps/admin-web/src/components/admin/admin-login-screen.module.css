@@ -50,7 +50,7 @@
   margin-top: 0.5rem;
   overflow: hidden;
   border: 1px solid #182336;
-  border-radius: 10px;
+  border-radius: 7.2px;
   background: #0e1b2d;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
@@ -108,7 +108,7 @@
   display: block;
   width: 20px;
   height: 5px;
-  border-radius: 3px;
+  border-radius: 2.16px;
   background: #22c55e;
   opacity: 0.35;
 }
@@ -218,3 +218,5 @@
     padding: 1rem;
   }
 }
+
+

@@ -5,7 +5,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class FakeVideoMotionGenerator : IVideoMotionGenerator
 {
-    public Task<Result<string>> CreateAsync(
+    public Task<Result<VideoMotionGenerationResult>> CreateAsync(
         string normalizedImageUrl,
         string referenceVideoUrl,
         string characterOrientation,
@@ -14,6 +14,6 @@ internal sealed class FakeVideoMotionGenerator : IVideoMotionGenerator
         string model,
         CancellationToken cancellationToken)
     {
-        return Task.FromResult(Result.Success(referenceVideoUrl));
+        return Task.FromResult(Result.Success(new VideoMotionGenerationResult(referenceVideoUrl, null, null)));
     }
 }

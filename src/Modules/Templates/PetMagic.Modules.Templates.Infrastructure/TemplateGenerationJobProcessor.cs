@@ -14,6 +14,7 @@ internal sealed class TemplateGenerationJobProcessor(
     IImagePreprocessor imagePreprocessor,
     IVideoMotionGenerator videoMotionGenerator,
     IGeneratedMediaImporter generatedMediaImporter,
+    IMediaMetadataReader mediaMetadataReader,
     ITemplateGenerationBilling billing,
     TemplatesOptions options,
     ILogger<TemplateGenerationJobProcessor> logger)
@@ -55,6 +56,12 @@ internal sealed class TemplateGenerationJobProcessor(
                 "OutputUrl" = NULL,
                 "UsedPreprocessingModel" = NULL,
                 "UsedKlingModel" = NULL,
+                "PreprocessingProviderRequestId" = NULL,
+                "PreprocessingInferenceTimeSeconds" = NULL,
+                "MotionProviderRequestId" = NULL,
+                "MotionInferenceTimeSeconds" = NULL,
+                "OutputVideoDurationSeconds" = NULL,
+                "MotionProviderCostUsd" = NULL,
                 "PreprocessingCompletedAtUtc" = NULL,
                 "MotionGenerationCompletedAtUtc" = NULL,
                 "MediaImportCompletedAtUtc" = NULL,
@@ -121,6 +128,12 @@ internal sealed class TemplateGenerationJobProcessor(
         job.OutputUrl = null;
         job.UsedPreprocessingModel = null;
         job.UsedKlingModel = null;
+        job.PreprocessingProviderRequestId = null;
+        job.PreprocessingInferenceTimeSeconds = null;
+        job.MotionProviderRequestId = null;
+        job.MotionInferenceTimeSeconds = null;
+        job.OutputVideoDurationSeconds = null;
+        job.MotionProviderCostUsd = null;
         job.PreprocessingCompletedAtUtc = null;
         job.MotionGenerationCompletedAtUtc = null;
         job.MediaImportCompletedAtUtc = null;
@@ -229,13 +242,15 @@ internal sealed class TemplateGenerationJobProcessor(
                 return;
             }
 
-            job.NormalizedImageUrl = normalized.Value;
+            job.NormalizedImageUrl = normalized.Value.ImageUrl;
+            job.PreprocessingProviderRequestId = normalized.Value.ProviderRequestId;
+            job.PreprocessingInferenceTimeSeconds = normalized.Value.InferenceTimeSeconds;
             job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
             job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
 
             var generated = await videoMotionGenerator.CreateAsync(
-                normalized.Value,
+                normalized.Value.ImageUrl,
                 referenceMotion.Url,
                 job.Template.CharacterOrientation!.Value.ToString(),
                 job.Template.KeepOriginalSound ?? true,
@@ -249,15 +264,28 @@ internal sealed class TemplateGenerationJobProcessor(
                 return;
             }
 
+            job.MotionProviderRequestId = generated.Value.ProviderRequestId;
+            job.MotionInferenceTimeSeconds = generated.Value.InferenceTimeSeconds;
             job.MotionGenerationCompletedAtUtc = DateTime.UtcNow;
             job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            var storedOutput = await generatedMediaImporter.ImportVideoAsync(generated.Value, job.Id, cancellationToken);
+            var storedOutput = await generatedMediaImporter.ImportVideoAsync(generated.Value.VideoUrl, job.Id, cancellationToken);
             if (storedOutput.IsFailure)
             {
                 await MarkFailedAsync(job, storedOutput.Error, cancellationToken);
                 return;
+            }
+
+            var durationResult = await mediaMetadataReader.GetVideoDurationSecondsAsync(storedOutput.Value, cancellationToken);
+            if (durationResult.IsFailure)
+            {
+                logger.LogWarning("Generated template media duration could not be determined for job {GenerationId}.", job.Id);
+            }
+            else
+            {
+                job.OutputVideoDurationSeconds = durationResult.Value;
+                job.MotionProviderCostUsd = FalModelPricing.TryCalculateMotionCostUsd(motionModel, durationResult.Value);
             }
 
             job.OutputUrl = storedOutput.Value.Url;

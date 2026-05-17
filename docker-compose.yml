@@ -28,8 +28,8 @@ services:
       Jwt__SigningKey: ${JWT_SIGNING_KEY:-PetMagicDemoSigningKey12345DemoSigningKey}
       Jwt__Issuer: petmagic.app
       Jwt__Audience: petmagic-admin
-      BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL:-admin@petmagic.app}
-      BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-DemoPassword123!}
+      BootstrapAdmin__Email: admin@petmagic.app
+      BootstrapAdmin__Password: PetMagic!Admin2026
       BootstrapAdmin__DisplayName: PetMagic Admin
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}

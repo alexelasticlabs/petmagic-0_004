@@ -79,3 +79,35 @@ export function GlobeIcon({ className }: IconProps) {
 export function CaretDownIcon({ className }: IconProps) {
   return <svg viewBox="0 0 12 8" fill="none" className={className} aria-hidden="true"><path d="M1 1L6 7L11 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
 }
+
+export function PlusIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+}
+
+export function PencilIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><path d="M17.5 3.5a2.12 2.12 0 1 1 3 3L8 19l-4 1 1-4 12.5-12.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="m14 7 3 3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
+}
+
+export function ChartIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><path d="M4 20V10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M10 20V4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M16 20v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M22 20v-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M2 20h20" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
+}
+
+export function PlayCircleIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" /><path d="M10 8.8c0-.58.64-.94 1.14-.62l4.85 3.2a.74.74 0 0 1 0 1.24l-4.85 3.2A.74.74 0 0 1 10 15.2V8.8Z" fill="currentColor" /></svg>;
+}
+
+export function CalendarIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.7" /><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
+}
+
+export function ClockIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" /><path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+export function DownloadIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><path d="M12 3v11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="m8 10 4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M4 20h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
+}
+
+export function TableIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M3 10h18M9 4v16M15 4v16" stroke="currentColor" strokeWidth="1.5" /></svg>;
+}

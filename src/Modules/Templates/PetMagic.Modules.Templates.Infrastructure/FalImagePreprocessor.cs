@@ -6,7 +6,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImagePreprocessor
 {
-    public async Task<Result<string>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
+    public async Task<Result<ImagePreprocessResult>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
     {
         var input = new
         {
@@ -19,13 +19,13 @@ internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImageP
         var result = await queueClient.RunAsync(model, input, cancellationToken);
         if (result.IsFailure)
         {
-            return Result.Failure<string>(result.Error);
+            return Result.Failure<ImagePreprocessResult>(result.Error);
         }
 
-        using var document = result.Value;
+        using var document = result.Value.Response;
         return TryReadFirstImageUrl(document.RootElement, out var imageUrl)
-            ? Result.Success(imageUrl)
-            : Result.Failure<string>(TemplatesErrors.AiProviderFailed);
+            ? Result.Success(new ImagePreprocessResult(imageUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds))
+            : Result.Failure<ImagePreprocessResult>(TemplatesErrors.AiProviderFailed);
     }
 
     private static bool TryReadFirstImageUrl(JsonElement root, out string imageUrl)

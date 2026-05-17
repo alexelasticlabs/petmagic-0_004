@@ -7,6 +7,7 @@ import {
     PREPROCESSING_MODELS,
     createFormFromTemplate,
     createInitialTemplateForm,
+    parseOptionalDecimal,
     saveImageTemplateFromForm,
     saveVideoTemplateFromForm,
 } from "@/components/templates/template-form-mappers";
@@ -194,8 +195,16 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
     setError(null);
 
     let savedTemplate: AdminTemplate | null = null;
+    const catalogPath = getTemplateCatalogPath(locale, templateType);
 
     try {
+      const activationReadinessError = getActivationReadinessError(templateType, form, text, targetStatus);
+      if (activationReadinessError) {
+        setError(activationReadinessError);
+        setToast({ type: "error", message: activationReadinessError });
+        return;
+      }
+
       savedTemplate = templateType === "Video"
         ? await saveVideoTemplateFromForm(selectedTemplate?.templateId, form, targetStatus)
         : await saveImageTemplateFromForm(selectedTemplate?.templateId, form, targetStatus);
@@ -208,6 +217,8 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
         type: "success",
         message: targetStatus === "Active" ? text.templateActivated : text.templateSavedAsDraft
       });
+
+      router.push(catalogPath);
     } catch (error) {
       if (savedTemplate) {
         setSelectedTemplate(savedTemplate);
@@ -482,8 +493,11 @@ export function TemplatesManager({ locale, templateType, initialTemplateId }: Te
                   <TemplatePreviewCard
                     title={editorModel.title || text.videoTemplateCreatePageTitle}
                     shortDescription={editorModel.shortDescription || text.editorPreviewRailHint}
+                    tags={form.tags.split(",").map((tag) => tag.trim()).filter(Boolean)}
                     previewUrl={form.previewUrl}
                     previewContentType={form.previewContentType}
+                    templateKind={isVideo ? "video" : "image"}
+                    templateKindLabel={isVideo ? text.templateKindVideoBadge : text.templateKindImageBadge}
                     tokenCost={editorModel.tokenCost}
                     category={editorModel.category || text.editorDraft}
                     isPremium={form.isPremium}
@@ -698,10 +712,50 @@ function resolveEditorVisibilityStatus(status?: TemplateStatus): EditorVisibilit
 }
 
 function getTemplateSaveErrorMessage(error: unknown, text: Dictionary, targetStatus: EditorVisibilityStatus): string {
+  if (error && typeof error === "object" && "validationErrors" in error) {
+    const validationErrors = (error as { validationErrors?: string[] }).validationErrors ?? [];
+    if (validationErrors.length > 0) {
+      return validationErrors.join(" ");
+    }
+  }
+
   if (error instanceof Error && error.message && !/^API request failed with status \d+$/i.test(error.message)) {
     return error.message;
   }
 
   return targetStatus === "Active" ? text.errorActivatingTemplate : text.errorSavingTemplate;
+}
+
+function getActivationReadinessError(
+  templateType: TemplateType,
+  form: TemplateFormState,
+  text: Dictionary,
+  targetStatus: EditorVisibilityStatus,
+): string | null {
+  if (targetStatus !== "Active") {
+    return null;
+  }
+
+  const missingLabels: string[] = [];
+
+  if (!form.previewUrl.trim()) {
+    missingLabels.push(text.previewAssetTitle);
+  }
+
+  if (templateType === "Video") {
+    if (!form.referenceUrl.trim()) {
+      missingLabels.push(text.referenceMotionTitle);
+    }
+
+    if (parseOptionalDecimal(form.referenceDurationSeconds) === undefined) {
+      missingLabels.push(text.referenceDurationLabel);
+    }
+  }
+
+  if (missingLabels.length === 0) {
+    return null;
+  }
+
+  return `${text.activationRequirementsMissing} ${missingLabels.join(", ")}.`;
 }
 

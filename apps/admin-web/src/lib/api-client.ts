@@ -108,9 +108,63 @@ export type AdminTemplateStatistics = {
   successRatePercent: number;
   totalTokenCost: number;
   averageTokenCost: number;
+  totalProviderCostUsd: number;
+  averageProviderCostUsd: number;
   lastRunAtUtc?: string | null;
   lastCompletedAtUtc?: string | null;
   averageGenerationSeconds?: number | null;
+};
+
+export type AdminTemplateTrendPoint = {
+  dateUtc: string;
+  totalRuns: number;
+  queuedRuns: number;
+  processingRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  successRatePercent: number;
+  totalTokenCost: number;
+  totalProviderCostUsd: number;
+  averageGenerationSeconds?: number | null;
+};
+
+export type AdminTemplateRecentGeneration = {
+  generationId: string;
+  userId: string;
+  status: TemplateGenerationJobStatus;
+  tokenCost: number;
+  attemptCount: number;
+  usedPreprocessingModel?: string | null;
+  usedKlingModel?: string | null;
+  motionProviderCostUsd?: number | null;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  outputUrl?: string | null;
+  createdAtUtc: string;
+  startedAtUtc?: string | null;
+  completedAtUtc?: string | null;
+};
+
+export type AdminTemplateFailureBreakdownItem = {
+  failureCode: string;
+  count: number;
+  lastOccurredAtUtc?: string | null;
+};
+
+export type AdminTemplateAnalyticsDimension = {
+  key: string;
+  label: string;
+  count: number;
+  sharePercent: number;
+};
+
+export type AdminTemplateEventAnalytics = {
+  totalViews: number;
+  totalVideoViews: number;
+  totalComplaints: number;
+  sources: AdminTemplateAnalyticsDimension[];
+  devices: AdminTemplateAnalyticsDimension[];
+  geography: AdminTemplateAnalyticsDimension[];
 };
 
 export type AdminTemplateTestRun = {
@@ -126,6 +180,12 @@ export type AdminTemplateTestRun = {
   attemptCount: number;
   usedPreprocessingModel?: string | null;
   usedKlingModel?: string | null;
+  preprocessingProviderRequestId?: string | null;
+  preprocessingInferenceTimeSeconds?: number | null;
+  motionProviderRequestId?: string | null;
+  motionInferenceTimeSeconds?: number | null;
+  outputVideoDurationSeconds?: number | null;
+  motionProviderCostUsd?: number | null;
   failureCode?: string | null;
   failureMessage?: string | null;
   createdAtUtc: string;
@@ -174,7 +234,7 @@ const AUTH_SESSION_EVENT = "petmagic_admin_auth_changed";
 const ADMIN_LIST_CACHE_TTL_MS = 30_000;
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
 
-type ApiError = Error & { status?: number; detail?: string; code?: string };
+type ApiError = Error & { status?: number; detail?: string; code?: string; validationErrors?: string[] };
 type AuthSessionSnapshot = AuthSession | null | undefined;
 
 let cachedAuthRaw: string | null | undefined;
@@ -307,11 +367,22 @@ async function apiRequest<TResponse>(
     error.status = response.status;
 
     try {
-      const problem = (await response.json()) as { title?: string; detail?: string };
+      const problem = (await response.json()) as { title?: string; detail?: string; errors?: Record<string, string[]> };
       error.code = problem.title;
       error.detail = problem.detail;
+      const validationErrors = Object.values(problem.errors ?? {})
+        .flat()
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      if (validationErrors.length > 0) {
+        error.validationErrors = validationErrors;
+      }
+
       if (problem.detail) {
         error.message = problem.detail;
+      } else if (validationErrors.length > 0) {
+        error.message = validationErrors.join(" ");
       } else if (problem.title) {
         error.message = problem.title;
       }
@@ -447,6 +518,22 @@ export async function fetchAdminTemplate(templateId: string): Promise<AdminTempl
 
 export async function fetchAdminTemplateStatistics(templateId: string): Promise<AdminTemplateStatistics> {
   return apiRequest<AdminTemplateStatistics>(`/api/admin/templates/${templateId}/statistics`, { method: "GET" });
+}
+
+export async function fetchAdminTemplateTrends(templateId: string): Promise<AdminTemplateTrendPoint[]> {
+  return apiRequest<AdminTemplateTrendPoint[]>(`/api/admin/templates/${templateId}/statistics/trends`, { method: "GET" });
+}
+
+export async function fetchAdminTemplateRecentGenerations(templateId: string, take = 8): Promise<AdminTemplateRecentGeneration[]> {
+  return apiRequest<AdminTemplateRecentGeneration[]>(`/api/admin/templates/${templateId}/statistics/recent?take=${encodeURIComponent(String(take))}`, { method: "GET" });
+}
+
+export async function fetchAdminTemplateFailureBreakdown(templateId: string): Promise<AdminTemplateFailureBreakdownItem[]> {
+  return apiRequest<AdminTemplateFailureBreakdownItem[]>(`/api/admin/templates/${templateId}/statistics/failures`, { method: "GET" });
+}
+
+export async function fetchAdminTemplateEventAnalytics(templateId: string): Promise<AdminTemplateEventAnalytics> {
+  return apiRequest<AdminTemplateEventAnalytics>(`/api/admin/templates/${templateId}/statistics/events`, { method: "GET" });
 }
 
 export async function startAdminTemplateTest(templateId: string, file: File): Promise<AdminTemplateTestRun> {

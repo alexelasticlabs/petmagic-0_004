@@ -1,5 +1,11 @@
 "use client";
 
+import {
+    CancelCircleIcon,
+    DollarIcon,
+    RefreshIcon,
+    UsersIcon,
+} from "@/components/admin/admin-icons";
 import { AdminCard, AdminPageHero, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
@@ -112,7 +118,8 @@ export function UsersTable({ locale }: UsersTableProps) {
                           disabled={isBusy}
                           onClick={() => runAction(user.userId, () => setPremium(user.userId, !user.isPremium))}
                         >
-                          {user.isPremium ? text.removePremium : text.makePremium}
+                          <DollarIcon className={styles.buttonIcon} />
+                          <span>{user.isPremium ? text.removePremium : text.makePremium}</span>
                         </Button>
                         <Button
                           variant="secondary"
@@ -121,7 +128,8 @@ export function UsersTable({ locale }: UsersTableProps) {
                           disabled={isBusy}
                           onClick={() => runAction(user.userId, () => setActive(user.userId, !user.isActive))}
                         >
-                          {user.isActive ? text.deactivate : text.activate}
+                          {user.isActive ? <CancelCircleIcon className={styles.buttonIcon} /> : <RefreshIcon className={styles.buttonIcon} />}
+                          <span>{user.isActive ? text.deactivate : text.activate}</span>
                         </Button>
                         {canManageRoles && (
                           <>
@@ -136,7 +144,8 @@ export function UsersTable({ locale }: UsersTableProps) {
                                 )
                               }
                             >
-                              {isModerator ? text.revokeModerator : text.assignModerator}
+                              <UsersIcon className={styles.buttonIcon} />
+                              <span>{isModerator ? text.revokeModerator : text.assignModerator}</span>
                             </Button>
                             <Button
                               variant="ghost"
@@ -149,7 +158,8 @@ export function UsersTable({ locale }: UsersTableProps) {
                                 )
                               }
                             >
-                              {isAdmin ? text.revokeAdmin : text.assignAdmin}
+                              <UsersIcon className={styles.buttonIcon} />
+                              <span>{isAdmin ? text.revokeAdmin : text.assignAdmin}</span>
                             </Button>
                           </>
                         )}

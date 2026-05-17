@@ -96,7 +96,7 @@
   display: grid;
   gap: 1rem;
   border: 1px solid #1a2738;
-  border-radius: 1.05rem;
+  border-radius: 0.76rem;
   padding: clamp(0.95rem, 0.72rem + 0.6vw, 1.2rem);
   background: linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(13, 21, 36, 0.96) 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035), 0 18px 42px rgba(0, 0, 0, 0.18);
@@ -166,7 +166,7 @@
   display: grid;
   gap: 0.18rem;
   border: 1px solid rgba(29, 48, 71, 0.64);
-  border-radius: 0.82rem;
+  border-radius: 0.59rem;
   padding: 0.58rem 0.7rem;
   background: rgba(10, 18, 31, 0.42);
 }
@@ -189,7 +189,7 @@
   display: grid;
   gap: 0.6rem;
   border: 1px solid #1a2738;
-  border-radius: 0.95rem;
+  border-radius: 0.68rem;
   padding: clamp(0.72rem, 0.58rem + 0.35vw, 0.9rem);
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 30%),
@@ -231,7 +231,7 @@
   display: grid;
   gap: 0.1rem;
   border: 1px solid rgba(43, 62, 87, 0.78);
-  border-radius: 0.8rem;
+  border-radius: 0.58rem;
   padding: 0.56rem 0.65rem;
   background: rgba(10, 18, 31, 0.78);
 }
@@ -278,7 +278,7 @@
   gap: 0.5rem;
   align-items: center;
   border: 1px solid rgba(29, 48, 71, 0.72);
-  border-radius: 0.82rem;
+  border-radius: 0.59rem;
   padding: 0.52rem 0.6rem;
   background: rgba(10, 18, 31, 0.68);
 }
@@ -364,7 +364,7 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   border: 1px solid #1a2738;
-  border-radius: 0.9rem;
+  border-radius: 0.65rem;
   padding: clamp(0.7rem, 0.55rem + 0.35vw, 0.86rem) clamp(0.78rem, 0.62rem + 0.45vw, 0.95rem);
   background: linear-gradient(180deg, rgba(15, 24, 41, 0.96) 0%, rgba(13, 21, 36, 0.94) 100%);
 }
@@ -484,7 +484,7 @@
 
 .accessOption {
   border: 1px solid rgba(36, 53, 77, 0.9);
-  border-radius: 0.82rem;
+  border-radius: 0.59rem;
   padding: 0.7rem 0.78rem;
   background: linear-gradient(180deg, rgba(13, 21, 35, 0.9) 0%, rgba(10, 17, 29, 0.8) 100%);
   color: #d8e5f5;
@@ -557,7 +557,7 @@
   align-self: start;
   overflow: hidden;
   border: 1px solid #1e2f46;
-  border-radius: 0.95rem;
+  border-radius: 0.68rem;
   background: #0b1421;
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
@@ -690,7 +690,7 @@
   display: grid;
   gap: 0.9rem;
   border: 1px solid #1d3047;
-  border-radius: 1rem;
+  border-radius: 0.72rem;
   padding: 1rem;
   background: linear-gradient(180deg, rgba(14, 22, 38, 0.96) 0%, rgba(10, 17, 29, 0.88) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 14px 28px rgba(0, 0, 0, 0.14);
@@ -733,7 +733,7 @@
   align-items: center;
   gap: 0.7rem;
   border: 1px solid #1d3047;
-  border-radius: 0.95rem;
+  border-radius: 0.68rem;
   padding: 0.9rem 1rem;
   background: rgba(10, 17, 29, 0.7);
 }
@@ -758,7 +758,7 @@
 .loadingHero,
 .loadingCard {
   border: 1px solid #1a2738;
-  border-radius: 1.05rem;
+  border-radius: 0.76rem;
   padding: 1.15rem;
   background: linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(13, 21, 36, 0.96) 100%);
 }
@@ -785,7 +785,7 @@
   display: grid;
   gap: 1.1rem;
   border: 1px solid #1a2738;
-  border-radius: 1.05rem;
+  border-radius: 0.76rem;
   padding: 1.15rem;
   background: linear-gradient(180deg, rgba(15, 24, 41, 0.98) 0%, rgba(13, 21, 36, 0.96) 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035), 0 18px 42px rgba(0, 0, 0, 0.18);
@@ -811,7 +811,7 @@
   place-items: center;
   min-height: 9rem;
   border: 1px dashed #25354a;
-  border-radius: 1rem;
+  border-radius: 0.72rem;
   color: #8da1ba;
   text-align: center;
 }
@@ -880,7 +880,7 @@
 .mediaGrid .formSection,
 .sectionCard .formSection {
   border: 1px solid #1d3047;
-  border-radius: 1rem;
+  border-radius: 0.72rem;
   padding: 1rem;
   background: rgba(10, 17, 29, 0.7);
 }
@@ -919,7 +919,7 @@
 .filePickerSurface {
   width: 100%;
   border: 1px solid #24354d;
-  border-radius: 0.85rem;
+  border-radius: 0.61rem;
   padding: 0.72rem 0.8rem;
   background: rgba(10, 17, 29, 0.74);
   color: #e8f0fb;
@@ -987,7 +987,7 @@
   display: grid;
   gap: 0.65rem;
   border: 1px solid #1d3047;
-  border-radius: 0.88rem;
+  border-radius: 0.63rem;
   padding: 0.72rem;
   background:
     radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), transparent 34%),
@@ -1050,7 +1050,7 @@
 .filePickerButton {
   flex: 0 0 auto;
   border: 1px solid #304866;
-  border-radius: 0.7rem;
+  border-radius: 0.5rem;
   padding: 0.42rem 0.72rem;
   background: linear-gradient(180deg, rgba(31, 46, 69, 0.95) 0%, rgba(17, 29, 48, 0.95) 100%);
   color: #f4f8ff;
@@ -1081,7 +1081,7 @@
   min-width: 0;
   min-height: 2.2rem;
   padding: 0.56rem 0.82rem;
-  border-radius: 0.8rem;
+  border-radius: 0.58rem;
   font-size: 0.79rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -1119,7 +1119,7 @@
 
 .skeletonLine {
   height: 2.5rem;
-  border-radius: 0.85rem;
+  border-radius: 0.61rem;
   background: linear-gradient(90deg, #111d30 0%, #17263c 50%, #111d30 100%);
   background-size: 220% 100%;
   animation: shimmer 1.4s linear infinite;
@@ -1287,3 +1287,5 @@
     justify-self: start;
   }
 }
+
+

@@ -7,8 +7,11 @@ import Image from "next/image";
 type TemplatePreviewCardProps = {
   title: string;
   shortDescription: string;
+  tags?: string[];
   previewUrl?: string | null;
   previewContentType?: string | null;
+  templateKind?: "video" | "image";
+  templateKindLabel?: string;
   tokenCost: number | string;
   category: string;
   isPremium: boolean;
@@ -21,8 +24,11 @@ type TemplatePreviewCardProps = {
 export function TemplatePreviewCard({
   title,
   shortDescription,
+  tags,
   previewUrl,
   previewContentType,
+  templateKind,
+  templateKindLabel,
   tokenCost,
   category,
   isPremium,
@@ -35,15 +41,36 @@ export function TemplatePreviewCard({
   const normalizedDescription = shortDescription.trim();
   const normalizedCategory = category.trim();
   const normalizedMusicDescription = musicDescription?.trim();
+  const normalizedTags = (tags ?? []).map((tag) => tag.trim()).filter(Boolean).slice(0, 4);
+  const resolvedTemplateKind = templateKind ?? inferTemplateMediaKind(previewContentType?.trim() ?? "", previewUrl?.trim() ?? "");
+  const resolvedTemplateKindLabel = templateKindLabel ?? (resolvedTemplateKind === "video" ? "Video" : "Image");
 
   return (
     <div className={joinClassNames(styles.phonePreview, className)}>
       <div className={styles.phoneMedia}>
         {renderPhonePreviewMedia(previewUrl, previewContentType, normalizedTitle || "Template preview")}
-        {promoBadge ? (
+        {promoBadge || resolvedTemplateKindLabel ? (
           <div className={styles.phoneTopRow}>
-            <span className={joinClassNames(styles.phoneHeroBadge, getPromoBadgeClassName(promoBadge))}>
-              {formatPromoBadge(promoBadge)}
+            {promoBadge ? (
+              <span className={joinClassNames(styles.phoneHeroBadge, getPromoBadgeClassName(promoBadge))}>
+                {formatPromoBadge(promoBadge)}
+              </span>
+            ) : (
+              <span className={styles.phoneTopSpacer} aria-hidden="true" />
+            )}
+            <span className={joinClassNames(styles.phoneMediaKindBadge, resolvedTemplateKind === "video" ? styles.phoneMediaKindBadgeVideo : styles.phoneMediaKindBadgeImage)}>
+              <span className={styles.phoneMediaKindIcon} aria-hidden="true">
+                {resolvedTemplateKind === "video" ? (
+                  <svg viewBox="0 0 16 16" focusable="false">
+                    <path d="M5.5 4.2c0-.58.64-.93 1.13-.62l5.14 3.3a.74.74 0 0 1 0 1.24l-5.14 3.3a.74.74 0 0 1-1.13-.62V4.2Z" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 16 16" focusable="false">
+                    <path d="M3.25 3.25h9.5a1 1 0 0 1 1 1v7.5a1 1 0 0 1-1 1h-9.5a1 1 0 0 1-1-1v-7.5a1 1 0 0 1 1-1Zm0 1v7.5h9.5v-7.5h-9.5Zm1.35 5.65 1.85-2.25a.7.7 0 0 1 1.08.01l1.22 1.5.98-1.12a.7.7 0 0 1 1.05.01l1.12 1.3v1.4H4.6v-.85Zm1.55-3.75a1.05 1.05 0 1 1 0 2.1 1.05 1.05 0 0 1 0-2.1Z" fill="currentColor" />
+                  </svg>
+                )}
+              </span>
+              <span>{resolvedTemplateKindLabel}</span>
             </span>
           </div>
         ) : null}
@@ -63,6 +90,13 @@ export function TemplatePreviewCard({
 
           <h3 className={styles.phoneTitle}>{normalizedTitle}</h3>
           <p className={styles.phoneDescription}>{normalizedDescription}</p>
+          {normalizedTags.length ? (
+            <div className={styles.phoneTagRow}>
+              {normalizedTags.map((tag) => (
+                <span key={tag} className={styles.phoneTag}>#{tag}</span>
+              ))}
+            </div>
+          ) : null}
           {normalizedMusicDescription ? (
             <p className={styles.phoneMusicDescription}>
               <span className={styles.phoneMusicLabel} aria-hidden="true">

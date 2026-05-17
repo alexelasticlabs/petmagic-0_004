@@ -151,6 +151,12 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.True(persisted.MediaImportCompletedAtUtc <= persisted.CompletedAtUtc);
         Assert.Equal(template.PreprocessingModel, persisted.UsedPreprocessingModel);
         Assert.Equal(template.KlingModel, persisted.UsedKlingModel);
+        Assert.Equal("preprocess-request-1", persisted.PreprocessingProviderRequestId);
+        Assert.Equal(1.25, persisted.PreprocessingInferenceTimeSeconds);
+        Assert.Equal("motion-request-1", persisted.MotionProviderRequestId);
+        Assert.Equal(8.4, persisted.MotionInferenceTimeSeconds);
+        Assert.Equal(7.5, persisted.OutputVideoDurationSeconds);
+        Assert.Equal(1.2600m, persisted.MotionProviderCostUsd);
         Assert.Equal(template.PreprocessingModel, imagePreprocessor.Model);
         Assert.Equal(template.KlingModel, videoMotionGenerator.Model);
         Assert.Equal("https://fal.example.test/generated.mp4", generatedMediaImporter.GeneratedVideoUrl);
@@ -175,6 +181,7 @@ public sealed class TemplateGenerationJobProcessorTests
         IImagePreprocessor? imagePreprocessor = null,
         IVideoMotionGenerator? videoMotionGenerator = null,
         IGeneratedMediaImporter? generatedMediaImporter = null,
+        IMediaMetadataReader? mediaMetadataReader = null,
         TemplatesOptions? options = null)
     {
         return new TemplateGenerationJobProcessor(
@@ -182,6 +189,7 @@ public sealed class TemplateGenerationJobProcessorTests
             imagePreprocessor ?? new NoopImagePreprocessor(),
             videoMotionGenerator ?? new NoopVideoMotionGenerator(),
             generatedMediaImporter ?? new NoopGeneratedMediaImporter(),
+            mediaMetadataReader ?? new FixedDurationMetadataReader(),
             billing ?? new TestTemplateGenerationBilling(),
             options ?? CreateOptions(),
             NullLogger<TemplateGenerationJobProcessor>.Instance);
@@ -277,9 +285,9 @@ public sealed class TemplateGenerationJobProcessorTests
 
     private sealed class NoopImagePreprocessor : IImagePreprocessor
     {
-        public Task<Result<string>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
+        public Task<Result<ImagePreprocessResult>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success(originalImageUrl));
+            return Task.FromResult(Result.Success(new ImagePreprocessResult(originalImageUrl, null, null)));
         }
     }
 
@@ -287,16 +295,19 @@ public sealed class TemplateGenerationJobProcessorTests
     {
         public string? Model { get; private set; }
 
-        public Task<Result<string>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
+        public Task<Result<ImagePreprocessResult>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
         {
             Model = model;
-            return Task.FromResult(Result.Success("http://localhost:5000/templates-media/normalized.jpg"));
+            return Task.FromResult(Result.Success(new ImagePreprocessResult(
+                "http://localhost:5000/templates-media/normalized.jpg",
+                "preprocess-request-1",
+                1.25)));
         }
     }
 
     private sealed class NoopVideoMotionGenerator : IVideoMotionGenerator
     {
-        public Task<Result<string>> CreateAsync(
+        public Task<Result<VideoMotionGenerationResult>> CreateAsync(
             string normalizedImageUrl,
             string referenceVideoUrl,
             string characterOrientation,
@@ -305,7 +316,7 @@ public sealed class TemplateGenerationJobProcessorTests
             string model,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success("https://fal.example.test/generated.mp4"));
+            return Task.FromResult(Result.Success(new VideoMotionGenerationResult("https://fal.example.test/generated.mp4", null, null)));
         }
     }
 
@@ -313,7 +324,7 @@ public sealed class TemplateGenerationJobProcessorTests
     {
         public string? Model { get; private set; }
 
-        public Task<Result<string>> CreateAsync(
+        public Task<Result<VideoMotionGenerationResult>> CreateAsync(
             string normalizedImageUrl,
             string referenceVideoUrl,
             string characterOrientation,
@@ -323,7 +334,23 @@ public sealed class TemplateGenerationJobProcessorTests
             CancellationToken cancellationToken)
         {
             Model = model;
-            return Task.FromResult(Result.Success("https://fal.example.test/generated.mp4"));
+            return Task.FromResult(Result.Success(new VideoMotionGenerationResult(
+                "https://fal.example.test/generated.mp4",
+                "motion-request-1",
+                8.4)));
+        }
+    }
+
+    private sealed class FixedDurationMetadataReader : IMediaMetadataReader
+    {
+        public Task<Result<double?>> GetVideoDurationSecondsAsync(TemplateAssetCommand asset, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success<double?>(asset.DurationSeconds));
+        }
+
+        public Task<Result<double?>> GetVideoDurationSecondsAsync(StoredMediaResponse storedMedia, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success<double?>(7.5));
         }
     }
 

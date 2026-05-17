@@ -147,9 +147,67 @@ public sealed record AdminTemplateStatisticsResponse(
     double SuccessRatePercent,
     int TotalTokenCost,
     double AverageTokenCost,
+    decimal TotalProviderCostUsd,
+    decimal AverageProviderCostUsd,
     DateTime? LastRunAtUtc,
     DateTime? LastCompletedAtUtc,
     double? AverageGenerationSeconds);
+
+public sealed record AdminTemplateTrendPointResponse(
+    DateTime DateUtc,
+    int TotalRuns,
+    int QueuedRuns,
+    int ProcessingRuns,
+    int CompletedRuns,
+    int FailedRuns,
+    double SuccessRatePercent,
+    int TotalTokenCost,
+    decimal TotalProviderCostUsd,
+    double? AverageGenerationSeconds);
+
+public sealed record AdminTemplateRecentGenerationResponse(
+    Guid GenerationId,
+    Guid UserId,
+    string Status,
+    int TokenCost,
+    int AttemptCount,
+    string? UsedPreprocessingModel,
+    string? UsedKlingModel,
+    decimal? MotionProviderCostUsd,
+    string? FailureCode,
+    string? FailureMessage,
+    string? OutputUrl,
+    DateTime CreatedAtUtc,
+    DateTime? StartedAtUtc,
+    DateTime? CompletedAtUtc);
+
+public sealed record AdminTemplateFailureBreakdownItemResponse(
+    string FailureCode,
+    int Count,
+    DateTime? LastOccurredAtUtc);
+
+public sealed record RecordTemplateAnalyticsEventCommand(
+    Guid TemplateId,
+    string EventType,
+    string? Source,
+    string? DeviceClass,
+    string? CountryCode,
+    Guid? UserId,
+    Guid? GenerationId);
+
+public sealed record AdminTemplateAnalyticsDimensionResponse(
+    string Key,
+    string Label,
+    int Count,
+    double SharePercent);
+
+public sealed record AdminTemplateEventAnalyticsResponse(
+    int TotalViews,
+    int TotalVideoViews,
+    int TotalComplaints,
+    IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Sources,
+    IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Devices,
+    IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Geography);
 
 public sealed record PublicTemplateListItemResponse(
     Guid TemplateId,
@@ -191,6 +249,12 @@ public sealed record TemplateGenerationResponse(
     int AttemptCount,
     string? UsedPreprocessingModel,
     string? UsedKlingModel,
+    string? PreprocessingProviderRequestId,
+    double? PreprocessingInferenceTimeSeconds,
+    string? MotionProviderRequestId,
+    double? MotionInferenceTimeSeconds,
+    double? OutputVideoDurationSeconds,
+    decimal? MotionProviderCostUsd,
     string? FailureCode,
     string? FailureMessage,
     DateTime CreatedAtUtc,

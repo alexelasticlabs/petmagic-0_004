@@ -40,6 +40,7 @@ export type Dictionary = {
   errorLoadingTemplates: string;
   errorSavingTemplate: string;
   errorActivatingTemplate: string;
+  activationRequirementsMissing: string;
   errorDeletingTemplate: string;
   templateStatusUpdated: string;
   templateDeleted: string;
@@ -84,6 +85,8 @@ export type Dictionary = {
   fileNameLabel: string;
   contentTypeLabel: string;
   fileSizeLabel: string;
+  templateKindVideoBadge: string;
+  templateKindImageBadge: string;
   musicDescriptionLabel: string;
   referenceMotionTitle: string;
   referenceUrlLabel: string;
@@ -187,6 +190,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     errorLoadingTemplates: "Не удалось загрузить шаблоны.",
     errorSavingTemplate: "Не удалось сохранить шаблон.",
     errorActivatingTemplate: "Не удалось активировать шаблон.",
+    activationRequirementsMissing: "Чтобы активировать шаблон, сначала заполните обязательные поля:",
     errorDeletingTemplate: "Не удалось удалить шаблон.",
     templateStatusUpdated: "Статус обновлен.",
     templateDeleted: "Шаблон удален.",
@@ -231,6 +235,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     fileNameLabel: "Имя файла",
     contentTypeLabel: "Тип контента",
     fileSizeLabel: "Размер файла, байты",
+    templateKindVideoBadge: "Видео",
+    templateKindImageBadge: "Изображение",
     musicDescriptionLabel: "Описание музыки / звука",
     referenceMotionTitle: "Референсное видео движения",
     referenceUrlLabel: "URL референсного видео",
@@ -332,6 +338,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     errorLoadingTemplates: "Failed to load templates.",
     errorSavingTemplate: "Failed to save template.",
     errorActivatingTemplate: "Failed to activate template.",
+    activationRequirementsMissing: "To activate the template, fill in the required fields first:",
     errorDeletingTemplate: "Failed to delete template.",
     templateStatusUpdated: "Status updated.",
     templateDeleted: "Template deleted.",
@@ -376,6 +383,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     fileNameLabel: "File name",
     contentTypeLabel: "Content type",
     fileSizeLabel: "File size bytes",
+    templateKindVideoBadge: "Video",
+    templateKindImageBadge: "Image",
     musicDescriptionLabel: "Music / sound description",
     referenceMotionTitle: "Reference motion video",
     referenceUrlLabel: "Reference video URL",

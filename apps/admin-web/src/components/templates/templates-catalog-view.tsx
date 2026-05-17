@@ -8,11 +8,9 @@ import { Select, type SelectOption } from "@/components/ui/select";
 import {
     changeTemplateStatus,
     deleteTemplate,
-    fetchAdminTemplateStatistics,
     fetchAdminTemplates,
     getSession,
     type AdminTemplateListItem,
-    type AdminTemplateStatistics,
     type TemplateStatus,
     type TemplateType,
 } from "@/lib/api-client";
@@ -53,10 +51,6 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const [statusFilter, setStatusFilter] = useState<TemplateStatus | "all">("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
-  const [statisticsTemplateId, setStatisticsTemplateId] = useState<string | null>(null);
-  const [statistics, setStatistics] = useState<AdminTemplateStatistics | null>(null);
-  const [statisticsLoading, setStatisticsLoading] = useState(false);
-  const [statisticsError, setStatisticsError] = useState<string | null>(null);
 
   async function loadTemplates(showLoading = true) {
     if (showLoading) {
@@ -151,20 +145,12 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
     }
   }
 
-  function handleOpenStatistics(templateId: string) {
-    setStatisticsTemplateId(templateId);
-  }
-
   const editorBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/editor`;
   const testBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/test`;
+  const analyticsBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/analytics`;
   const categoriesPath = `/${locale}/templates/categories`;
   const catalog = buildCatalogModel(templates);
-  const selectedStatisticsTemplate = statisticsTemplateId
-    ? templates.find((template) => template.templateId === statisticsTemplateId) ?? null
-    : null;
   const visiblePool = archiveFilter === "archived" ? catalog.archivedTemplates : catalog.activeTemplates;
-  const categoryStats = catalog.categoryStats.slice(0, 6);
-  const tagStats = catalog.tagStats.slice(0, 6);
   const categoryOptions: SelectOption[] = [
     { value: "all", label: copy.allCategories, tone: "neutral" },
     ...catalog.categories.map((category) => ({ value: category, label: category, tone: "neutral" as const })),
@@ -201,54 +187,6 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
       return matchesSearch && matchesCategory && matchesAccess && matchesStatus;
     })
     .sort((firstTemplate, secondTemplate) => compareTemplates(firstTemplate, secondTemplate, sortMode));
-
-  useEffect(() => {
-    if (!statisticsTemplateId) {
-      setStatistics(null);
-      setStatisticsError(null);
-      setStatisticsLoading(false);
-      return;
-    }
-
-    const templateId = statisticsTemplateId;
-
-    let isCancelled = false;
-
-    async function loadStatistics() {
-      setStatisticsLoading(true);
-      setStatistics(null);
-      setStatisticsError(null);
-
-      try {
-        const response = await fetchAdminTemplateStatistics(templateId);
-        if (!isCancelled) {
-          setStatistics(response);
-        }
-      } catch {
-        if (!isCancelled) {
-          setStatisticsError(copy.statisticsLoadError);
-        }
-      } finally {
-        if (!isCancelled) {
-          setStatisticsLoading(false);
-        }
-      }
-    }
-
-    void loadStatistics();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [copy.statisticsLoadError, statisticsTemplateId]);
-
-  useEffect(() => {
-    if (!isLoading && statisticsTemplateId && !templates.some((template) => template.templateId === statisticsTemplateId)) {
-      setStatisticsTemplateId(null);
-      setStatistics(null);
-      setStatisticsError(null);
-    }
-  }, [isLoading, statisticsTemplateId, templates]);
 
   if (isLoading) {
     return (
@@ -349,12 +287,11 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                   locale={locale}
                   template={template}
                   editorBasePath={editorBasePath}
+                  analyticsBasePath={analyticsBasePath}
                   testBasePath={testBasePath}
                   busyTemplateId={busyTemplateId}
                   onStatusChange={handleStatusChange}
                   onDeleteTemplate={handleDelete}
-                  onOpenStatistics={handleOpenStatistics}
-                  isStatisticsSelected={statisticsTemplateId === template.templateId}
                 />
               ))}
             </div>
@@ -397,9 +334,11 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                           <td data-label={text.actionsLabel} className={styles.tableActionsCell}>
                             <div className={styles.tableActions}>
                               <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.compactLink}>{text.editTemplate}</Link>
-                              <Button size="sm" variant={statisticsTemplateId === template.templateId ? "secondary" : "ghost"} onClick={() => handleOpenStatistics(template.templateId)}>{copy.statisticsAction}</Button>
                               {template.templateType === "Video" ? (
-                                <Link href={`${testBasePath}/${template.templateId}`} className={styles.compactLink}>{copy.testAction}</Link>
+                                <>
+                                  <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.compactLink}>{copy.analyticsAction}</Link>
+                                  <Link href={`${testBasePath}/${template.templateId}`} className={styles.compactLink}>{copy.testAction}</Link>
+                                </>
                               ) : null}
                               {template.status !== "Active" ? (
                                 <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => void handleStatusChange(template.templateId, "Active")}>{text.activate}</Button>
@@ -419,66 +358,6 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
             </AdminCard>
           )}
         </div>
-
-        <aside className={styles.sideRail} aria-label={copy.quickStats}>
-          <div className={styles.railPanel}>
-            <div className={styles.statsPanelHeader}>
-              <p className={styles.statsPanelEyebrow}>{copy.statisticsPanelEyebrow}</p>
-              <h2>{selectedStatisticsTemplate ? selectedStatisticsTemplate.title : copy.statisticsEmptyTitle}</h2>
-              <p className={styles.statsPanelDescription}>
-                {selectedStatisticsTemplate
-                  ? `${selectedStatisticsTemplate.category} • ${formatStatus(selectedStatisticsTemplate.status, locale)}`
-                  : copy.statisticsEmptyDescription}
-              </p>
-            </div>
-
-            {statisticsLoading ? (
-              <p className={styles.railHint}>{copy.statisticsLoading}</p>
-            ) : statisticsError ? (
-              <p className={styles.panelError}>{statisticsError}</p>
-            ) : statistics ? (
-              <>
-                <StatLine label={copy.totalRunsLabel} value={statistics.totalRuns} />
-                <StatLine label={copy.inProgressRunsLabel} value={statistics.queuedRuns + statistics.processingRuns} />
-                <StatLine label={copy.completedRunsLabel} value={statistics.completedRuns} />
-                <StatLine label={copy.failedRunsLabel} value={statistics.failedRuns} />
-                <StatLine label={copy.successRateLabel} value={formatPercent(statistics.successRatePercent)} />
-                <StatLine label={copy.totalTokensSpentLabel} value={statistics.totalTokenCost} />
-                <StatLine label={copy.averageTokensLabel} value={statistics.averageTokenCost.toFixed(1)} />
-                <StatLine label={copy.averageTimeLabel} value={formatSeconds(statistics.averageGenerationSeconds, locale)} />
-                <StatLine label={copy.lastRunLabel} value={formatDateTime(statistics.lastRunAtUtc, locale)} />
-                <StatLine label={copy.lastCompletedLabel} value={formatDateTime(statistics.lastCompletedAtUtc, locale)} />
-              </>
-            ) : (
-              <p className={styles.railHint}>{copy.statisticsEmptyDescription}</p>
-            )}
-          </div>
-
-          <div className={styles.railPanel}>
-            <h2>{copy.quickStats}</h2>
-            <StatLine label={copy.totalTemplates} value={catalog.stats.total} />
-            <StatLine label={copy.activeTemplates} value={catalog.stats.active} />
-            <StatLine label={copy.draftTemplates} value={catalog.stats.draft} />
-            <StatLine label={copy.archivedTemplates} value={catalog.stats.archived} />
-            <StatLine label="Premium" value={catalog.stats.premium} />
-            <StatLine label="Free" value={catalog.stats.free} />
-          </div>
-
-          <div className={styles.railPanel}>
-            <h2>{copy.categoriesTitle}</h2>
-            {categoryStats.map((category) => (
-              <StatLine key={category.label} label={category.label} value={category.count} />
-            ))}
-            <Link href={categoriesPath} className={styles.railLink}>{copy.manageCategories}</Link>
-          </div>
-
-          <div className={styles.railPanel}>
-            <h2>{copy.popularTags}</h2>
-            <div className={styles.tagCloud}>
-              {tagStats.map((tag) => <span key={tag.label}>#{tag.label} <b>{tag.count}</b></span>)}
-            </div>
-          </div>
-        </aside>
       </div>
     </section>
   );
@@ -488,15 +367,14 @@ type TemplateCatalogCardProps = {
   locale: Locale;
   template: AdminTemplateListItem;
   editorBasePath: string;
+  analyticsBasePath: string;
   testBasePath: string;
   busyTemplateId: string | null;
   onStatusChange: (templateId: string, status: TemplateStatus) => void;
   onDeleteTemplate: (templateId: string) => void;
-  onOpenStatistics: (templateId: string) => void;
-  isStatisticsSelected: boolean;
 };
 
-function TemplateCatalogCard({ locale, template, editorBasePath, testBasePath, busyTemplateId, onStatusChange, onDeleteTemplate, onOpenStatistics, isStatisticsSelected }: TemplateCatalogCardProps) {
+function TemplateCatalogCard({ locale, template, editorBasePath, analyticsBasePath, testBasePath, busyTemplateId, onStatusChange, onDeleteTemplate }: TemplateCatalogCardProps) {
   const text = getDictionary(locale);
   const copy = getCatalogCopy(locale, template.templateType);
   const isBusy = busyTemplateId === template.templateId;
@@ -507,8 +385,11 @@ function TemplateCatalogCard({ locale, template, editorBasePath, testBasePath, b
         className={styles.previewCard}
         title={template.title}
         shortDescription={template.shortDescription}
+        tags={template.tags}
         previewUrl={template.previewAsset?.url}
         previewContentType={template.previewAsset?.contentType}
+        templateKind={template.templateType === "Video" ? "video" : "image"}
+        templateKindLabel={template.templateType === "Video" ? text.templateKindVideoBadge : text.templateKindImageBadge}
         tokenCost={template.tokenCost}
         category={template.category}
         isPremium={template.isPremium}
@@ -520,11 +401,21 @@ function TemplateCatalogCard({ locale, template, editorBasePath, testBasePath, b
           <span className={styles.cardTimestamp}>{copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}</span>
           <AdminStatusBadge color={statusColors[template.status]}>{formatStatus(template.status, locale)}</AdminStatusBadge>
         </div>
+        <div className={styles.cardMetrics}>
+          {getTemplateCardMetrics(template, locale).map((metric) => (
+            <div key={metric.label} className={styles.cardMetric}>
+              <strong>{metric.value}</strong>
+              <span>{metric.label}</span>
+            </div>
+          ))}
+        </div>
         <div className={styles.cardActions}>
           <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={`${styles.compactLink} ${styles.cardActionLink}`}>{text.editTemplate}</Link>
-          <Button size="sm" variant={isStatisticsSelected ? "secondary" : "ghost"} className={`${styles.cardActionButton} ${isStatisticsSelected ? styles.cardActionButtonSelected : ""}`} onClick={() => onOpenStatistics(template.templateId)}>{copy.statisticsAction}</Button>
           {template.templateType === "Video" ? (
-            <Link href={`${testBasePath}/${template.templateId}`} className={`${styles.compactLink} ${styles.cardActionLink}`}>{copy.testAction}</Link>
+            <>
+              <Link href={`${analyticsBasePath}/${template.templateId}`} className={`${styles.compactLink} ${styles.cardActionLink}`}>{copy.analyticsAction}</Link>
+              <Link href={`${testBasePath}/${template.templateId}`} className={`${styles.compactLink} ${styles.cardActionLink}`}>{copy.testAction}</Link>
+            </>
           ) : null}
           {template.status !== "Active" ? (
             <Button size="sm" variant="ghost" className={styles.cardActionButton} disabled={isBusy} onClick={() => onStatusChange(template.templateId, "Active")}>{text.activate}</Button>
@@ -535,15 +426,6 @@ function TemplateCatalogCard({ locale, template, editorBasePath, testBasePath, b
         </div>
       </div>
     </article>
-  );
-}
-
-function StatLine({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className={styles.statLine}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   );
 }
 
@@ -633,45 +515,6 @@ function formatDate(value: string, locale: Locale) {
   }).format(date);
 }
 
-function formatDateTime(value: string | null | undefined, locale: Locale) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function formatPercent(value: number) {
-  return `${value.toFixed(value % 1 === 0 ? 0 : 1)}%`;
-}
-
-function formatSeconds(value: number | null | undefined, locale: Locale) {
-  if (value == null) {
-    return "-";
-  }
-
-  const rounded = Math.max(0, Math.round(value));
-  const minutes = Math.floor(rounded / 60);
-  const seconds = rounded % 60;
-
-  if (minutes > 0) {
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  }
-
-  return locale === "ru" ? `${rounded} сек` : `${rounded} sec`;
-}
-
 function formatDuration(seconds?: number) {
   if (!seconds) {
     return "-";
@@ -691,6 +534,35 @@ function formatStatus(status: TemplateStatus, locale: Locale) {
   return status;
 }
 
+function getTemplateCardMetrics(template: AdminTemplateListItem, locale: Locale) {
+  const isRu = locale === "ru";
+  const metrics = [
+    {
+      label: isRu ? "Теги" : "Tags",
+      value: String(template.tags.length),
+    },
+    {
+      label: isRu ? "Превью" : "Preview",
+      value: template.previewAsset?.url ? (isRu ? "Готово" : "Ready") : (isRu ? "Пусто" : "Missing"),
+    },
+    {
+      label: isRu ? "Бейдж" : "Badge",
+      value: formatPromoBadgeMetric(template.effectivePromoBadge, locale),
+    },
+    template.templateType === "Video"
+      ? {
+          label: isRu ? "Референс" : "Reference",
+          value: formatDuration(template.referenceVideoDurationSeconds),
+        }
+      : {
+          label: isRu ? "Создан" : "Created",
+          value: formatDate(template.createdAtUtc, locale),
+        },
+  ];
+
+  return metrics;
+}
+
 function formatOrientation(value: string | undefined, locale: Locale) {
   if (!value) {
     return "-";
@@ -701,6 +573,26 @@ function formatOrientation(value: string | undefined, locale: Locale) {
   }
 
   return value;
+}
+
+function formatPromoBadgeMetric(value: AdminTemplateListItem["effectivePromoBadge"], locale: Locale) {
+  if (!value) {
+    return locale === "ru" ? "Нет" : "None";
+  }
+
+  if (value === "Trending") {
+    return "Trending";
+  }
+
+  if (value === "Popular") {
+    return "Popular";
+  }
+
+  if (value === "Funny") {
+    return "Funny";
+  }
+
+  return "New";
 }
 
 function getCatalogCopy(locale: Locale, templateType: TemplateType) {
@@ -714,6 +606,7 @@ function getCatalogCopy(locale: Locale, templateType: TemplateType) {
       : (isRu ? "Каталог image-шаблонов, статусы, категории и параметры доступа." : "Image template catalog, statuses, categories, and access settings."),
     createTemplate: isVideo ? (isRu ? "Создать видео шаблон" : "Create video template") : (isRu ? "Создать image шаблон" : "Create image template"),
     manageCategories: isRu ? "Управление категориями" : "Manage categories",
+    analyticsAction: isRu ? "Аналитика" : "Analytics",
     archiveTabsLabel: isRu ? "Фильтр архива" : "Archive filter",
     allTemplates: isRu ? "Все шаблоны" : "All templates",
     archivedTemplates: isRu ? "Архив" : "Archive",
@@ -730,29 +623,7 @@ function getCatalogCopy(locale: Locale, templateType: TemplateType) {
     viewToggleLabel: isRu ? "Переключение вида" : "View mode",
     cardsView: isRu ? "Карточки" : "Cards",
     listView: isRu ? "Список" : "List",
-    quickStats: isRu ? "Быстрая статистика" : "Quick stats",
-    totalTemplates: isRu ? "Всего шаблонов" : "Total templates",
-    activeTemplates: isRu ? "Активных" : "Active",
-    draftTemplates: isRu ? "Черновиков" : "Drafts",
-    categoriesTitle: isRu ? "Категории" : "Categories",
-    popularTags: isRu ? "Популярные теги" : "Popular tags",
-    statisticsAction: isRu ? "Статистика" : "Statistics",
     testAction: isRu ? "Тест" : "Test",
-    statisticsPanelEyebrow: isRu ? "Generation stats" : "Generation stats",
-    statisticsEmptyTitle: isRu ? "Выберите шаблон" : "Select a template",
-    statisticsEmptyDescription: isRu ? "Откройте статистику на карточке, чтобы увидеть запуски, успехи и среднее время генерации." : "Open statistics from a card to inspect runs, success rate, and average generation time.",
-    statisticsLoadError: isRu ? "Не удалось загрузить статистику шаблона." : "Failed to load template statistics.",
-    statisticsLoading: isRu ? "Загрузка статистики шаблона..." : "Loading template statistics...",
-    totalRunsLabel: isRu ? "Всего запусков" : "Total runs",
-    inProgressRunsLabel: isRu ? "В работе" : "In progress",
-    completedRunsLabel: isRu ? "Успешно" : "Completed",
-    failedRunsLabel: isRu ? "Ошибок" : "Failed",
-    successRateLabel: isRu ? "Успешность" : "Success rate",
-    totalTokensSpentLabel: isRu ? "Токенов суммарно" : "Total tokens",
-    averageTokensLabel: isRu ? "Средняя стоимость" : "Average cost",
-    averageTimeLabel: isRu ? "Среднее время" : "Average time",
-    lastRunLabel: isRu ? "Последний запуск" : "Last run",
-    lastCompletedLabel: isRu ? "Последний успех" : "Last completed",
     tokensShort: isRu ? "ток." : "tokens",
     updatedLabel: isRu ? "Обновлен" : "Updated",
     updatedShort: isRu ? "Обновлен" : "Updated",

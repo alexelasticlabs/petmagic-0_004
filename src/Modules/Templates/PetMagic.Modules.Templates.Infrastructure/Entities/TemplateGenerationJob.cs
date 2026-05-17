@@ -32,6 +32,18 @@ public sealed class TemplateGenerationJob
 
     public string? UsedKlingModel { get; set; }
 
+    public string? PreprocessingProviderRequestId { get; set; }
+
+    public double? PreprocessingInferenceTimeSeconds { get; set; }
+
+    public string? MotionProviderRequestId { get; set; }
+
+    public double? MotionInferenceTimeSeconds { get; set; }
+
+    public double? OutputVideoDurationSeconds { get; set; }
+
+    public decimal? MotionProviderCostUsd { get; set; }
+
     public DateTime? PreprocessingCompletedAtUtc { get; set; }
 
     public DateTime? MotionGenerationCompletedAtUtc { get; set; }
