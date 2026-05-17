@@ -12,6 +12,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class TemplateGenerationJobProcessor(
     TemplatesDbContext dbContext,
     IImagePreprocessor imagePreprocessor,
+    IImageGenerator imageGenerator,
     IVideoMotionGenerator videoMotionGenerator,
     IGeneratedMediaImporter generatedMediaImporter,
     IMediaMetadataReader mediaMetadataReader,
@@ -269,79 +270,13 @@ internal sealed class TemplateGenerationJobProcessor(
                 return;
             }
 
-            var referenceMotion = TemplateGenerationService.GetAsset(job.Template, TemplateAssetKind.ReferenceMotion)!;
-            var preprocessingModel = job.Template.PreprocessingModel!;
-            var preprocessingPrompt = TemplateGenerationService.ResolvePrompt(job.Template.PreprocessingPrompt, options.DefaultPreprocessingPrompt);
-            var motionModel = job.Template.KlingModel!;
-            var motionPrompt = TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt);
-
-            job.UsedPreprocessingModel = preprocessingModel;
-            job.UsedKlingModel = motionModel;
-
-            var normalized = await imagePreprocessor.NormalizeAsync(
-                job.SourceImageUrl,
-                preprocessingModel,
-                preprocessingPrompt,
-                cancellationToken);
-
-            if (normalized.IsFailure)
+            if (job.Template.TemplateType == TemplateType.Image)
             {
-                await MarkFailedAsync(job, normalized.Error, cancellationToken);
+                await ProcessImageAsync(job, cancellationToken);
                 return;
             }
 
-            job.NormalizedImageUrl = normalized.Value.ImageUrl;
-            job.PreprocessingProviderRequestId = normalized.Value.ProviderRequestId;
-            job.PreprocessingInferenceTimeSeconds = normalized.Value.InferenceTimeSeconds;
-            job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
-            job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            var generated = await videoMotionGenerator.CreateAsync(
-                normalized.Value.ImageUrl,
-                referenceMotion.Url,
-                job.Template.CharacterOrientation!.Value.ToString(),
-                job.Template.KeepOriginalSound ?? true,
-                motionPrompt,
-                motionModel,
-                cancellationToken);
-
-            if (generated.IsFailure)
-            {
-                await MarkFailedAsync(job, generated.Error, cancellationToken);
-                return;
-            }
-
-            job.MotionProviderRequestId = generated.Value.ProviderRequestId;
-            job.MotionInferenceTimeSeconds = generated.Value.InferenceTimeSeconds;
-            job.MotionGenerationCompletedAtUtc = DateTime.UtcNow;
-            job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            var storedOutput = await generatedMediaImporter.ImportVideoAsync(generated.Value.VideoUrl, job.Id, cancellationToken);
-            if (storedOutput.IsFailure)
-            {
-                await MarkFailedAsync(job, storedOutput.Error, cancellationToken);
-                return;
-            }
-
-            var durationResult = await mediaMetadataReader.GetVideoDurationSecondsAsync(storedOutput.Value, cancellationToken);
-            if (durationResult.IsFailure)
-            {
-                logger.LogWarning("Generated template media duration could not be determined for job {GenerationId}.", job.Id);
-            }
-            else
-            {
-                job.OutputVideoDurationSeconds = durationResult.Value;
-                job.MotionProviderCostUsd = FalModelPricing.TryCalculateMotionCostUsd(motionModel, durationResult.Value);
-            }
-
-            job.OutputUrl = storedOutput.Value.Url;
-            job.MediaImportCompletedAtUtc = DateTime.UtcNow;
-            job.Status = TemplateGenerationStatus.Completed;
-            job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
-            job.CompletedAtUtc = job.UpdatedAtUtc;
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await ProcessVideoAsync(job, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -352,6 +287,124 @@ internal sealed class TemplateGenerationJobProcessor(
             logger.LogWarning(exception, "Template generation job {GenerationId} failed.", job.Id);
             await MarkFailedAsync(job, TemplatesErrors.AiProviderFailed, CancellationToken.None);
         }
+    }
+
+    private async Task ProcessImageAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
+    {
+        var imageModel = job.Template.ImageModel!;
+        var imagePrompt = TemplateGenerationService.ResolvePrompt(job.Template.ImagePrompt, options.DefaultImagePrompt);
+
+        job.UsedPreprocessingModel = imageModel;
+
+        var generated = await imageGenerator.CreateAsync(
+            job.SourceImageUrl,
+            imagePrompt,
+            imageModel,
+            cancellationToken);
+
+        if (generated.IsFailure)
+        {
+            await MarkFailedAsync(job, generated.Error, cancellationToken);
+            return;
+        }
+
+        job.PreprocessingProviderRequestId = generated.Value.ProviderRequestId;
+        job.PreprocessingInferenceTimeSeconds = generated.Value.InferenceTimeSeconds;
+        job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
+        job.MotionProviderCostUsd = FalModelPricing.TryGetImageGenerationCostUsd(imageModel);
+        job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var storedOutput = await generatedMediaImporter.ImportImageAsync(generated.Value.ImageUrl, job.Id, cancellationToken);
+        if (storedOutput.IsFailure)
+        {
+            await MarkFailedAsync(job, storedOutput.Error, cancellationToken);
+            return;
+        }
+
+        job.OutputUrl = storedOutput.Value.Url;
+        job.MediaImportCompletedAtUtc = DateTime.UtcNow;
+        job.Status = TemplateGenerationStatus.Completed;
+        job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
+        job.CompletedAtUtc = job.UpdatedAtUtc;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ProcessVideoAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
+    {
+        var referenceMotion = TemplateGenerationService.GetAsset(job.Template, TemplateAssetKind.ReferenceMotion)!;
+        var preprocessingModel = job.Template.PreprocessingModel!;
+        var preprocessingPrompt = TemplateGenerationService.ResolvePrompt(job.Template.PreprocessingPrompt, options.DefaultPreprocessingPrompt);
+        var motionModel = job.Template.KlingModel!;
+        var motionPrompt = TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt);
+
+        job.UsedPreprocessingModel = preprocessingModel;
+        job.UsedKlingModel = motionModel;
+
+        var normalized = await imagePreprocessor.NormalizeAsync(
+            job.SourceImageUrl,
+            preprocessingModel,
+            preprocessingPrompt,
+            cancellationToken);
+
+        if (normalized.IsFailure)
+        {
+            await MarkFailedAsync(job, normalized.Error, cancellationToken);
+            return;
+        }
+
+        job.NormalizedImageUrl = normalized.Value.ImageUrl;
+        job.PreprocessingProviderRequestId = normalized.Value.ProviderRequestId;
+        job.PreprocessingInferenceTimeSeconds = normalized.Value.InferenceTimeSeconds;
+        job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
+        job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var generated = await videoMotionGenerator.CreateAsync(
+            normalized.Value.ImageUrl,
+            referenceMotion.Url,
+            job.Template.CharacterOrientation!.Value.ToString(),
+            job.Template.KeepOriginalSound ?? true,
+            motionPrompt,
+            motionModel,
+            cancellationToken);
+
+        if (generated.IsFailure)
+        {
+            await MarkFailedAsync(job, generated.Error, cancellationToken);
+            return;
+        }
+
+        job.MotionProviderRequestId = generated.Value.ProviderRequestId;
+        job.MotionInferenceTimeSeconds = generated.Value.InferenceTimeSeconds;
+        job.MotionGenerationCompletedAtUtc = DateTime.UtcNow;
+        job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var storedOutput = await generatedMediaImporter.ImportVideoAsync(generated.Value.VideoUrl, job.Id, cancellationToken);
+        if (storedOutput.IsFailure)
+        {
+            await MarkFailedAsync(job, storedOutput.Error, cancellationToken);
+            return;
+        }
+
+        var durationResult = await mediaMetadataReader.GetVideoDurationSecondsAsync(storedOutput.Value, cancellationToken);
+        if (durationResult.IsFailure)
+        {
+            logger.LogWarning("Generated template media duration could not be determined for job {GenerationId}.", job.Id);
+        }
+        else
+        {
+            job.OutputVideoDurationSeconds = durationResult.Value;
+            job.MotionProviderCostUsd = FalModelPricing.TryCalculateMotionCostUsd(motionModel, durationResult.Value);
+        }
+
+        job.OutputUrl = storedOutput.Value.Url;
+        job.MediaImportCompletedAtUtc = DateTime.UtcNow;
+        job.Status = TemplateGenerationStatus.Completed;
+        job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
+        job.CompletedAtUtc = job.UpdatedAtUtc;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task MarkFailedAsync(TemplateGenerationJob job, Error error, CancellationToken cancellationToken)

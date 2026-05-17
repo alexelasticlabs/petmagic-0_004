@@ -98,6 +98,8 @@ export type Dictionary = {
   characterOrientationLabel: string;
   preprocessingModelLabel: string;
   preprocessingPromptLabel: string;
+  imageModelLabel: string;
+  imagePromptLabel: string;
   klingModelLabel: string;
   klingPromptLabel: string;
   keepOriginalSoundLabel: string;
@@ -252,6 +254,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     characterOrientationLabel: "Ориентация персонажа",
     preprocessingModelLabel: "Модель препроцессинга",
     preprocessingPromptLabel: "Промпт препроцессинга",
+    imageModelLabel: "Image model",
+    imagePromptLabel: "Промпт изображения",
     klingModelLabel: "Модель Kling",
     klingPromptLabel: "Промпт Kling",
     keepOriginalSoundLabel: "Сохранять оригинальный звук",
@@ -404,6 +408,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     characterOrientationLabel: "Character orientation",
     preprocessingModelLabel: "Preprocessing model",
     preprocessingPromptLabel: "Preprocessing prompt",
+    imageModelLabel: "Image model",
+    imagePromptLabel: "Image prompt",
     klingModelLabel: "Kling model",
     klingPromptLabel: "Kling prompt",
     keepOriginalSoundLabel: "Keep original sound",

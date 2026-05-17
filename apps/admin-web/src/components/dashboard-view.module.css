@@ -81,6 +81,11 @@
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 0.5rem;
   align-items: center;
+  min-width: 0;
+}
+
+.legendItem > * {
+  min-width: 0;
 }
 
 .legendDot {
@@ -122,6 +127,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.8rem;
+  min-width: 0;
   padding: 0.78rem 0;
   border-bottom: 1px solid rgba(40, 68, 99, 0.56);
 }
@@ -155,6 +161,8 @@
   color: var(--text-soft);
   font-size: 0.84rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .activityTime {

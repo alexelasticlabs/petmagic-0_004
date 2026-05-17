@@ -1,6 +1,6 @@
+import { formatDuration, formatPromoBadge } from "@/components/templates/template-editor-model";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import styles from "@/components/templates/template-phone-preview-card.module.css";
-import { formatDuration, formatPromoBadge } from "@/components/templates/template-video-editor-model";
 import { type TemplatePromoBadgeMode } from "@/lib/api-client";
 import Image from "next/image";
 

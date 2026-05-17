@@ -1,4 +1,4 @@
-.videoEditorPage {
+.templateEditorPage {
   width: 100%;
   max-width: 106rem;
   margin: 0 auto;
@@ -12,6 +12,7 @@
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .breadcrumbs {
@@ -49,6 +50,12 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pageHeader>* {
+  min-width: 0;
 }
 
 .pageHeader h1 {
@@ -107,6 +114,12 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.sectionHeader>* {
+  min-width: 0;
 }
 
 .sectionTitle {
@@ -154,6 +167,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.mediaGrid> :only-child {
+  grid-column: 1 / -1;
 }
 
 .derivedGrid {
@@ -277,6 +294,7 @@
   grid-template-columns: auto 1fr auto;
   gap: 0.5rem;
   align-items: center;
+  min-width: 0;
   border: 1px solid rgba(29, 48, 71, 0.72);
   border-radius: 0.59rem;
   padding: 0.52rem 0.6rem;
@@ -319,6 +337,8 @@
   font-size: 0.73rem;
   font-weight: 800;
   line-height: 1.16;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .checklistState {
@@ -362,11 +382,16 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
+  min-width: 0;
   gap: 0.75rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.65rem;
   padding: clamp(0.7rem, 0.55rem + 0.35vw, 0.86rem) clamp(0.78rem, 0.62rem + 0.45vw, 0.95rem);
   background: linear-gradient(180deg, rgba(15, 24, 41, 0.96) 0%, rgba(13, 21, 36, 0.94) 100%);
+}
+
+.footerBar>* {
+  min-width: 0;
 }
 
 .footerStatusPanel {
@@ -455,7 +480,13 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
+}
+
+.fieldHeader>* {
+  min-width: 0;
 }
 
 .fieldCounter,
@@ -463,6 +494,8 @@
   color: var(--text-muted);
   font-size: 0.73rem;
   font-weight: 700;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .accessGroup {
@@ -673,17 +706,24 @@
   align-items: center;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
+  max-width: 100%;
   padding: 0.34rem 0.62rem;
   background: rgba(17, 29, 48, 0.72);
   color: var(--text-muted);
   font-size: 0.73rem;
   font-weight: 700;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .modelGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.modelGrid> :only-child {
+  grid-column: 1 / -1;
 }
 
 .modelCard {
@@ -795,15 +835,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
+  min-width: 0;
 }
 
-.error {
-  padding: 0.8rem 0.9rem;
-  background: rgba(127, 29, 29, 0.16);
-  color: #fca5a5;
-  font-size: 0.86rem;
-  font-weight: 700;
+.headerRow>* {
+  min-width: 0;
 }
 
 .empty {
@@ -966,8 +1004,14 @@
   display: flex !important;
   grid-template-columns: none !important;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.65rem;
+  min-width: 0;
+}
+
+.checkboxRow>* {
+  min-width: 0;
 }
 
 .checkboxRow input {
@@ -999,7 +1043,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.55rem;
+  min-width: 0;
+}
+
+.uploadPanelHeader>* {
+  min-width: 0;
 }
 
 .uploadPanelEyebrow {
@@ -1017,6 +1067,8 @@
   font-size: 0.84rem;
   font-weight: 900;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .filePicker {
@@ -1152,7 +1204,7 @@
 }
 
 @media (max-width: 1440px) {
-  .videoEditorPage {
+  .templateEditorPage {
     max-width: 96rem;
   }
 
@@ -1162,7 +1214,7 @@
 }
 
 @media (max-width: 1280px) {
-  .videoEditorPage {
+  .templateEditorPage {
     max-width: 88rem;
   }
 
@@ -1261,7 +1313,7 @@
 }
 
 @media (max-width: 560px) {
-  .videoEditorPage {
+  .templateEditorPage {
     gap: 0.85rem;
   }
 
@@ -1287,8 +1339,3 @@
     justify-self: start;
   }
 }
-
-
-
-
-

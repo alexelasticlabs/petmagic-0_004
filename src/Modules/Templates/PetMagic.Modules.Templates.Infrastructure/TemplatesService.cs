@@ -585,6 +585,12 @@ internal sealed class TemplatesService(
             return Result.Failure<AdminTemplateResponse>(categoryResult.Error);
         }
 
+        var modelCheck = ValidateImageModel(command.ImageModel);
+        if (modelCheck.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
+        }
+
         var statusResult = ResolveRequestedStatus(command.Status, TemplateStatus.Draft);
         if (statusResult.IsFailure)
         {
@@ -604,6 +610,8 @@ internal sealed class TemplatesService(
             TokenCost = command.TokenCost,
             Status = statusResult.Value,
             PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode),
+            ImageModel = command.ImageModel.Trim(),
+            ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt),
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -645,6 +653,12 @@ internal sealed class TemplatesService(
             return Result.Failure<AdminTemplateResponse>(categoryResult.Error);
         }
 
+        var modelCheck = ValidateImageModel(command.ImageModel);
+        if (modelCheck.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
+        }
+
         var statusResult = ResolveRequestedStatus(command.Status, template.Status);
         if (statusResult.IsFailure)
         {
@@ -659,6 +673,8 @@ internal sealed class TemplatesService(
         template.TokenCost = command.TokenCost;
         template.Status = statusResult.Value;
         template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
+        template.ImageModel = command.ImageModel.Trim();
+        template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
         template.UpdatedAtUtc = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
@@ -916,6 +932,16 @@ internal sealed class TemplatesService(
         return Result.Success();
     }
 
+    private Result ValidateImageModel(string imageModel)
+    {
+        if (!options.AllowedImageModels.Contains(imageModel.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            return Result.Failure(TemplatesErrors.InvalidImageModel);
+        }
+
+        return Result.Success();
+    }
+
     private Result ValidateActivation(TemplateItem template)
     {
         if (GetAsset(template, TemplateAssetKind.Preview) is null)
@@ -939,6 +965,18 @@ internal sealed class TemplatesService(
             {
                 return Result.Failure(TemplatesErrors.MissingCharacterOrientation);
             }
+
+            return Result.Success();
+        }
+
+        if (string.IsNullOrWhiteSpace(template.ImageModel))
+        {
+            return Result.Failure(TemplatesErrors.MissingImageModel);
+        }
+
+        if (!options.AllowedImageModels.Contains(template.ImageModel.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            return Result.Failure(TemplatesErrors.InvalidImageModel);
         }
 
         return Result.Success();
@@ -1517,15 +1555,19 @@ internal sealed class TemplatesService(
             GetAsset(template, TemplateAssetKind.ReferenceMotion),
             template.ReferenceVideoDurationSeconds,
             template.CharacterOrientation?.ToString(),
+            template.ImageModel,
+            template.ImagePrompt,
             template.PreprocessingModel,
             template.PreprocessingPrompt,
             template.KlingModel,
             template.KlingPrompt,
             template.KeepOriginalSound,
-            FalModelPricing.TryCalculateEstimatedGenerationCostUsd(
-                template.PreprocessingModel,
-                template.KlingModel,
-                template.ReferenceVideoDurationSeconds),
+            template.TemplateType == TemplateType.Image
+                ? FalModelPricing.TryGetImageGenerationCostUsd(template.ImageModel)
+                : FalModelPricing.TryCalculateEstimatedGenerationCostUsd(
+                    template.PreprocessingModel,
+                    template.KlingModel,
+                    template.ReferenceVideoDurationSeconds),
             template.CreatedAtUtc,
             template.UpdatedAtUtc);
     }
@@ -1589,6 +1631,7 @@ internal sealed class TemplatesService(
                 template.Category,
                 template.Tags,
                 template.MusicDescription,
+                template.ImagePrompt,
                 template.KlingPrompt
             ],
             utcNow);

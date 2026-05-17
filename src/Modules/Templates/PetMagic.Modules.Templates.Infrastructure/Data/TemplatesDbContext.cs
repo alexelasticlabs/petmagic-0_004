@@ -40,6 +40,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.Tags).HasMaxLength(1000).IsRequired();
             entity.Property(x => x.PromoBadgeMode).HasConversion<int>();
             entity.Property(x => x.MusicDescription).HasMaxLength(240);
+            entity.Property(x => x.ImageModel).HasMaxLength(128);
+            entity.Property(x => x.ImagePrompt).HasMaxLength(1000);
             entity.Property(x => x.PreprocessingModel).HasMaxLength(128);
             entity.Property(x => x.PreprocessingPrompt).HasMaxLength(1000);
             entity.Property(x => x.KlingModel).HasMaxLength(128);

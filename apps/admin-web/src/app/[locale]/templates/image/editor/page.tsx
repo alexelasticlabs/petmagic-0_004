@@ -1,4 +1,4 @@
-import { TemplatesManager } from "@/components/templates-manager";
+import { TemplateEditor } from "@/components/template-editor";
 import { isLocale } from "@/lib/i18n";
 import { notFound } from "next/navigation";
 
@@ -17,5 +17,5 @@ export default async function ImageTemplateEditorPage({ params, searchParams }: 
   const { templateId } = await searchParams;
   const initialTemplateId = Array.isArray(templateId) ? templateId[0] : templateId;
 
-  return <TemplatesManager locale={locale} templateType="Image" initialTemplateId={initialTemplateId} />;
+  return <TemplateEditor locale={locale} templateType="Image" initialTemplateId={initialTemplateId} />;
 }

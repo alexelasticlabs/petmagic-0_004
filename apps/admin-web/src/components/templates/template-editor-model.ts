@@ -1,7 +1,7 @@
 import { parseNumber, parseOptionalDecimal } from "@/components/templates/template-form-mappers";
 import { resolveAutoPromoBadge } from "@/components/templates/template-promo-badge-rules";
 import { type TemplateFormState } from "@/components/templates/types";
-import { type AdminTemplate, type TemplatePromoBadgeMode } from "@/lib/api-client";
+import { type AdminTemplate, type TemplatePromoBadgeMode, type TemplateType } from "@/lib/api-client";
 import { type Dictionary } from "@/lib/i18n";
 
 export type ChecklistItem = {
@@ -27,6 +27,24 @@ export type VideoEditorModel = {
   reviewReady: boolean;
   checklist: ChecklistItem[];
 };
+
+export type ImageEditorModel = Omit<VideoEditorModel, "referenceReady" | "referenceDuration" | "characterOrientation" | "musicDescription"> & {
+  imageModelReady: boolean;
+  imagePromptReady: boolean;
+};
+
+export type TemplateEditorModel = VideoEditorModel | ImageEditorModel;
+
+export function buildTemplateEditorModel(
+  text: Dictionary,
+  form: TemplateFormState,
+  selectedTemplate: AdminTemplate | null,
+  templateType: TemplateType,
+): TemplateEditorModel {
+  return templateType === "Video"
+    ? buildVideoEditorModel(text, form, selectedTemplate)
+    : buildImageEditorModel(text, form, selectedTemplate);
+}
 
 export function buildVideoEditorModel(text: Dictionary, form: TemplateFormState, selectedTemplate: AdminTemplate | null): VideoEditorModel {
   const title = form.title.trim();
@@ -68,6 +86,41 @@ export function buildVideoEditorModel(text: Dictionary, form: TemplateFormState,
       characterOrientation,
       preprocessingReady,
       klingReady,
+    }),
+  };
+}
+
+export function buildImageEditorModel(text: Dictionary, form: TemplateFormState, selectedTemplate: AdminTemplate | null): ImageEditorModel {
+  const title = form.title.trim();
+  const shortDescription = form.shortDescription.trim();
+  const category = form.category.trim();
+  const promoBadge = resolveEffectivePromoBadge(form, selectedTemplate);
+  const tokenCost = normalizeIntegerString(form.tokenCost) || "0";
+  const previewReady = Boolean(form.previewUrl.trim());
+  const imageModelReady = Boolean(form.imageModel.trim());
+  const imagePromptReady = Boolean(form.imagePrompt.trim());
+  const basicInfoReady = Boolean(title && shortDescription && category && parseNumber(tokenCost) > 0);
+  const mediaReady = previewReady;
+  const aiReady = Boolean(imageModelReady && imagePromptReady);
+  const reviewReady = Boolean(basicInfoReady && mediaReady && aiReady);
+
+  return {
+    title,
+    shortDescription,
+    category,
+    promoBadge,
+    tokenCost,
+    previewReady,
+    imageModelReady,
+    imagePromptReady,
+    basicInfoReady,
+    mediaReady,
+    aiReady,
+    reviewReady,
+    checklist: buildImageChecklist(text, {
+      previewReady,
+      imageModelReady,
+      imagePromptReady,
     }),
   };
 }
@@ -132,6 +185,33 @@ function buildChecklist(
   ];
 }
 
+function buildImageChecklist(
+  text: Dictionary,
+  signals: {
+    previewReady: boolean;
+    imageModelReady: boolean;
+    imagePromptReady: boolean;
+  },
+): ChecklistItem[] {
+  return [
+    {
+      label: text.previewAssetTitle,
+      detail: signals.previewReady ? text.editorReady : text.editorMissing,
+      ready: signals.previewReady,
+    },
+    {
+      label: text.imageModelLabel,
+      detail: signals.imageModelReady ? text.editorReady : text.editorMissing,
+      ready: signals.imageModelReady,
+    },
+    {
+      label: text.imagePromptLabel,
+      detail: signals.imagePromptReady ? text.editorReady : text.editorMissing,
+      ready: signals.imagePromptReady,
+    },
+  ];
+}
+
 function resolveEffectivePromoBadge(
   form: TemplateFormState,
   selectedTemplate: AdminTemplate | null,
@@ -146,7 +226,7 @@ function resolveEffectivePromoBadge(
     status: selectedTemplate?.status,
     isPremium: form.isPremium,
     tokenCost: parseNumber(form.tokenCost),
-    searchFragments: [form.title, form.shortDescription, form.category, form.tags, form.musicDescription, form.klingPrompt],
+    searchFragments: [form.title, form.shortDescription, form.category, form.tags, form.musicDescription, form.klingPrompt, form.imagePrompt],
   });
 }
 

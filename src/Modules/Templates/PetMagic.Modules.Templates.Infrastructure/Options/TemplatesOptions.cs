@@ -16,6 +16,10 @@ public sealed class TemplatesOptions
 
     public required string DefaultKlingPrompt { get; init; }
 
+    public required string DefaultImagePrompt { get; init; }
+
+    public required string[] AllowedImageModels { get; init; }
+
     public required string[] AllowedPreprocessingModels { get; init; }
 
     public required string[] AllowedKlingModels { get; init; }
@@ -53,6 +57,8 @@ public sealed class TemplatesOptions
     public bool CleanupExpiredGenerationMediaWhileRefundPending { get; init; } = true;
 
     public long GeneratedVideoMaxFileSizeBytes { get; init; } = 250 * 1024 * 1024;
+
+    public long GeneratedImageMaxFileSizeBytes { get; init; } = 30 * 1024 * 1024;
 
     public R2StorageOptions R2 { get; init; } = new();
 

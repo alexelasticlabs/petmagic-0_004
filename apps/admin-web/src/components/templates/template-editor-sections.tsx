@@ -1,4 +1,4 @@
-import styles from "@/components/templates/templates-admin.module.css";
+import styles from "@/components/templates/template-editor.module.css";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -23,6 +23,13 @@ type TemplateVideoModelSectionProps = {
   setForm: SetTemplateFormState;
   preprocessingModels: readonly string[];
   klingModels: readonly string[];
+};
+
+type TemplateImageModelSectionProps = {
+  text: Dictionary;
+  form: TemplateFormState;
+  setForm: SetTemplateFormState;
+  imageModels: readonly string[];
 };
 
 export function TemplateReferenceAssetSection({
@@ -247,6 +254,37 @@ export function TemplateVideoModelSection({ text, form, setForm, preprocessingMo
         <input type="checkbox" checked={form.keepOriginalSound} onChange={(event) => setForm((current) => ({ ...current, keepOriginalSound: event.target.checked }))} />
         <span className={styles.switchCopy}>{text.keepOriginalSoundLabel}</span>
       </label>
+    </div>
+  );
+}
+
+export function TemplateImageModelSection({ text, form, setForm, imageModels }: TemplateImageModelSectionProps) {
+  const imageOptions = imageModels.map((model) => buildModelOption(model, "preprocess"));
+
+  return (
+    <div className={styles.formSection}>
+      <div className={styles.modelGrid}>
+        <div className={styles.modelCard}>
+          <div className={styles.modelCardHeader}>
+            <p className={styles.modelCardEyebrow}>Image pass</p>
+            <p className={styles.modelCardTitle}>{text.imageModelLabel}</p>
+          </div>
+          <label className={styles.fieldBlock}>
+            <span className={styles.fieldHeader}>
+              <span>{text.imageModelLabel}</span>
+              <span className={styles.fieldMeta}>fal.ai</span>
+            </span>
+            <Select value={form.imageModel} options={imageOptions} ariaLabel={text.imageModelLabel} onChange={(value) => setForm((current) => ({ ...current, imageModel: value }))} />
+          </label>
+          <label className={styles.fieldBlock}>
+            <span className={styles.fieldHeader}>
+              <span>{text.imagePromptLabel}</span>
+              <span className={styles.fieldCounter}>{form.imagePrompt.length}/1000</span>
+            </span>
+            <textarea value={form.imagePrompt} maxLength={1000} onChange={(event) => setForm((current) => ({ ...current, imagePrompt: event.target.value }))} rows={7} />
+          </label>
+        </div>
+      </div>
     </div>
   );
 }

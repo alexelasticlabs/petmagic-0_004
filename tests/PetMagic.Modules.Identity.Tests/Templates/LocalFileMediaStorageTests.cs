@@ -58,8 +58,10 @@ public sealed class LocalFileMediaStorageTests
         {
             PublicBaseUrl = "http://localhost:5000",
             LocalMediaRootPath = rootPath,
+            DefaultImagePrompt = "Create a themed pet portrait.",
             DefaultPreprocessingPrompt = "Keep the same pet.",
             DefaultKlingPrompt = "Funny dance.",
+            AllowedImageModels = ["openai/gpt-image-2/edit"],
             AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
             AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
             SeedSampleTemplates = false

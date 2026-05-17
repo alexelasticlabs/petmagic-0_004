@@ -106,6 +106,8 @@ export type AdminTemplate = {
   referenceMotionAsset?: TemplateAsset;
   referenceVideoDurationSeconds?: number;
   characterOrientation?: string;
+  imageModel?: string;
+  imagePrompt?: string;
   preprocessingModel?: string;
   preprocessingPrompt?: string;
   klingModel?: string;
@@ -351,6 +353,8 @@ export type ImageTemplatePayload = {
   isPremium: boolean;
   tokenCost: number;
   previewAsset?: TemplateAssetInput;
+  imageModel: string;
+  imagePrompt: string;
 };
 
 export type VideoTemplatePayload = {
@@ -386,16 +390,63 @@ type AuthSessionSnapshot = AuthSession | null | undefined;
 
 let cachedAuthRaw: string | null | undefined;
 let cachedAuthSession: AuthSession | null = null;
-let cachedUsersList: { value: UserListItem[]; expiresAt: number } | null = null;
+const cachedUsersLists = new Map<string, { value: UserListItem[]; expiresAt: number }>();
 const cachedTemplateLists = new Map<string, { value: AdminTemplateListItem[]; expiresAt: number }>();
+const cachedTemplateCategories = new Map<string, { value: AdminTemplateCategory[]; expiresAt: number }>();
+const cachedTemplatesAnalyticsOverview = new Map<string, { value: AdminTemplatesAnalyticsOverview; expiresAt: number }>();
+const inflightGetRequests = new Map<string, Promise<unknown>>();
 
 function clearAdminListCaches(): void {
-  cachedUsersList = null;
+  cachedUsersLists.clear();
   cachedTemplateLists.clear();
+  cachedTemplateCategories.clear();
+  cachedTemplatesAnalyticsOverview.clear();
+  inflightGetRequests.clear();
 }
 
 function getTemplateListCacheKey(type?: TemplateType): string {
   return type ?? "all";
+}
+
+function getAnalyticsOverviewCacheKey(query: AdminTemplatesAnalyticsQuery): string {
+  return JSON.stringify({
+    periodDays: query.periodDays ?? null,
+    templateType: query.templateType ?? null,
+    category: query.category ?? null,
+    status: query.status ?? null,
+    access: query.access ?? null,
+    sort: query.sort ?? null,
+    take: query.take ?? null,
+  });
+}
+
+async function cachedGet<TResponse>(
+  cacheKey: string,
+  cache: Map<string, { value: TResponse; expiresAt: number }>,
+  request: () => Promise<TResponse>,
+): Promise<TResponse> {
+  const now = Date.now();
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
+  }
+
+  const inflight = inflightGetRequests.get(cacheKey) as Promise<TResponse> | undefined;
+  if (inflight) {
+    return inflight;
+  }
+
+  const promise = request()
+    .then((value) => {
+      cache.set(cacheKey, { value, expiresAt: Date.now() + ADMIN_LIST_CACHE_TTL_MS });
+      return value;
+    })
+    .finally(() => {
+      inflightGetRequests.delete(cacheKey);
+    });
+
+  inflightGetRequests.set(cacheKey, promise);
+  return promise;
 }
 
 export function getSession(): AuthSession | null {
@@ -603,14 +654,11 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchUsers(): Promise<UserListItem[]> {
-  const now = Date.now();
-  if (cachedUsersList && cachedUsersList.expiresAt > now) {
-    return cachedUsersList.value;
-  }
-
-  const users = await apiRequest<UserListItem[]>("/api/admin/users/", { method: "GET" });
-  cachedUsersList = { value: users, expiresAt: now + ADMIN_LIST_CACHE_TTL_MS };
-  return users;
+  return cachedGet(
+    "users",
+    cachedUsersLists,
+    () => apiRequest<UserListItem[]>("/api/admin/users/", { method: "GET" }),
+  );
 }
 
 export async function assignRole(userId: string, role: string): Promise<void> {
@@ -618,7 +666,7 @@ export async function assignRole(userId: string, role: string): Promise<void> {
     method: "PUT",
     body: JSON.stringify({ role })
   });
-  cachedUsersList = null;
+  cachedUsersLists.clear();
 }
 
 export async function revokeRole(userId: string, role: string): Promise<void> {
@@ -626,7 +674,7 @@ export async function revokeRole(userId: string, role: string): Promise<void> {
     method: "DELETE",
     body: JSON.stringify({ role })
   });
-  cachedUsersList = null;
+  cachedUsersLists.clear();
 }
 
 export async function setPremium(userId: string, isPremium: boolean): Promise<void> {
@@ -634,7 +682,7 @@ export async function setPremium(userId: string, isPremium: boolean): Promise<vo
     method: "PUT",
     body: JSON.stringify({ isPremium })
   });
-  cachedUsersList = null;
+  cachedUsersLists.clear();
 }
 
 export async function setActive(userId: string, isActive: boolean): Promise<void> {
@@ -642,26 +690,29 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
     method: "PUT",
     body: JSON.stringify({ isActive })
   });
-  cachedUsersList = null;
+  cachedUsersLists.clear();
 }
 
 export async function fetchAdminTemplates(type?: TemplateType): Promise<AdminTemplateListItem[]> {
-  const now = Date.now();
   const cacheKey = getTemplateListCacheKey(type);
-  const cached = cachedTemplateLists.get(cacheKey);
-  if (cached && cached.expiresAt > now) {
-    return cached.value;
-  }
-
   const query = type ? `?type=${encodeURIComponent(type)}` : "";
-  const templates = await apiRequest<AdminTemplateListItem[]>(`/api/admin/templates/${query}`, { method: "GET" });
-  cachedTemplateLists.set(cacheKey, { value: templates, expiresAt: now + ADMIN_LIST_CACHE_TTL_MS });
-  return templates;
+
+  return cachedGet(
+    `templates:${cacheKey}`,
+    cachedTemplateLists,
+    () => apiRequest<AdminTemplateListItem[]>(`/api/admin/templates/${query}`, { method: "GET" }),
+  );
 }
 
 export async function fetchAdminTemplateCategories(includeArchived = true): Promise<AdminTemplateCategory[]> {
+  const cacheKey = includeArchived ? "archived" : "active";
   const query = includeArchived ? "?includeArchived=true" : "";
-  return apiRequest<AdminTemplateCategory[]>(`/api/admin/templates/categories/${query}`, { method: "GET" });
+
+  return cachedGet(
+    `template-categories:${cacheKey}`,
+    cachedTemplateCategories,
+    () => apiRequest<AdminTemplateCategory[]>(`/api/admin/templates/categories/${query}`, { method: "GET" }),
+  );
 }
 
 export async function createTemplateCategory(payload: TemplateCategoryPayload): Promise<AdminTemplateCategory> {
@@ -743,7 +794,12 @@ export async function fetchAdminTemplatesAnalyticsOverview(query: AdminTemplates
   if (query.take) params.set("take", String(query.take));
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
-  return apiRequest<AdminTemplatesAnalyticsOverview>(`/api/admin/templates/analytics${suffix}`, { method: "GET" });
+
+  return cachedGet(
+    `templates-analytics:${getAnalyticsOverviewCacheKey(query)}`,
+    cachedTemplatesAnalyticsOverview,
+    () => apiRequest<AdminTemplatesAnalyticsOverview>(`/api/admin/templates/analytics${suffix}`, { method: "GET" }),
+  );
 }
 
 export async function startAdminTemplateTest(templateId: string, file: File): Promise<AdminTemplateTestRun> {

@@ -33,10 +33,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .rolePill {
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .actionsCell {
@@ -48,6 +52,11 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.45rem;
+  min-width: 0;
+}
+
+.actions > * {
+  min-width: 0;
 }
 
 .adminButton {

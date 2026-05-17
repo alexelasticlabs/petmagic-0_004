@@ -34,6 +34,16 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 ?? "Keep the same pet, same face, same fur, same colors, same background, same lighting and camera angle. Adjust the pet into an upright pose standing on its two hind legs like a human, with the front paws naturally positioned like arms. Make the full body clearly visible and suitable for motion transfer. Do not change the pet’s identity, breed, facial features, background, or image style.",
             DefaultKlingPrompt = section["DefaultKlingPrompt"]
                 ?? "A cute pet performing a funny viral dance, smooth animation, high quality.",
+            DefaultImagePrompt = section["DefaultImagePrompt"]
+                ?? "Keep the same pet, same face, same fur, same colors, same eyes, same breed, and the same overall identity. Apply the template style and scene to the uploaded pet photo without replacing the pet with a different animal.",
+            AllowedImageModels = ReadValues(section, "AllowedImageModels", [
+                "openai/gpt-image-2/edit",
+                "fal-ai/nano-banana-pro/edit",
+                "fal-ai/flux-2-pro/edit",
+                "fal-ai/gpt-image-1.5/edit",
+                "fal-ai/bytedance/seedream/v5/lite/edit",
+                "fal-ai/nano-banana-2/edit"
+            ]),
             AllowedPreprocessingModels = ReadValues(section, "AllowedPreprocessingModels", [
                 "openai/gpt-image-2/edit",
                 "fal-ai/nano-banana-pro/edit",
@@ -63,6 +73,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             MetadataTempRetentionHours = ParsePositiveInt(section["MetadataTempRetentionHours"], 24),
             CleanupExpiredGenerationMediaWhileRefundPending = ParseBool(section["CleanupExpiredGenerationMediaWhileRefundPending"], true),
             GeneratedVideoMaxFileSizeBytes = ParseLong(section["GeneratedVideoMaxFileSizeBytes"], 250 * 1024 * 1024),
+            GeneratedImageMaxFileSizeBytes = ParseLong(section["GeneratedImageMaxFileSizeBytes"], 30 * 1024 * 1024),
             R2 = new R2StorageOptions
             {
                 AccountId = ReadValue(r2Section, "AccountId", "R2_ACCOUNT_ID") ?? string.Empty,
@@ -158,6 +169,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 IsPremium = false,
                 TokenCost = 20,
                 Status = TemplateStatus.Active,
+                ImageModel = options.AllowedImageModels[0],
+                ImagePrompt = options.DefaultImagePrompt,
                 Assets =
                 [
                     new TemplateAsset
@@ -267,6 +280,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             services.AddHttpClient(FalQueueClient.HttpClientName);
             services.AddSingleton<FalQueueClient>();
             services.AddSingleton<IImagePreprocessor, FalImagePreprocessor>();
+            services.AddSingleton<IImageGenerator, FalImageGenerator>();
             services.AddSingleton<IVideoMotionGenerator, FalVideoMotionGenerator>();
             return;
         }
@@ -274,6 +288,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (IsProvider(options.AiProvider, TemplateAiProviders.Fake))
         {
             services.AddSingleton<IImagePreprocessor, FakeImagePreprocessor>();
+            services.AddSingleton<IImageGenerator, FakeImageGenerator>();
             services.AddSingleton<IVideoMotionGenerator, FakeVideoMotionGenerator>();
             return;
         }

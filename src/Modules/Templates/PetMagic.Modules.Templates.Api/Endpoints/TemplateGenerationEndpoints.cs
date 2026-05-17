@@ -23,7 +23,7 @@ public static class TemplateGenerationEndpoints
             .WithTags("Template Generations")
             .RequireRateLimiting("templates");
 
-        group.MapPost("/{templateId:guid}/generations", StartVideoGenerationAsync)
+        group.MapPost("/{templateId:guid}/generations", StartGenerationAsync)
             .RequireAuthorization()
             .DisableAntiforgery();
 
@@ -33,7 +33,7 @@ public static class TemplateGenerationEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Accepted<TemplateGenerationResponse>, ProblemHttpResult, ValidationProblem>> StartVideoGenerationAsync(
+    private static async Task<Results<Accepted<TemplateGenerationResponse>, ProblemHttpResult, ValidationProblem>> StartGenerationAsync(
         HttpContext context,
         Guid templateId,
         [FromForm] IFormFile? sourceImage,
@@ -80,7 +80,7 @@ public static class TemplateGenerationEndpoints
             return TypedResults.ValidationProblem(validation.ToDictionary());
         }
 
-        var result = await generationService.StartVideoAsync(command, cancellationToken);
+        var result = await generationService.StartAsync(command, cancellationToken);
         if (result.IsFailure)
         {
             await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
@@ -143,6 +143,8 @@ public static class TemplateGenerationEndpoints
             "templates.not_found" => StatusCodes.Status404NotFound,
             "templates.invalid_status" => StatusCodes.Status409Conflict,
             "templates.type_mismatch" => StatusCodes.Status400BadRequest,
+            "templates.image_model_required" => StatusCodes.Status409Conflict,
+            "templates.invalid_image_model" => StatusCodes.Status400BadRequest,
             "templates.reference_motion_required" => StatusCodes.Status409Conflict,
             "templates.character_orientation_required" => StatusCodes.Status409Conflict,
             "economy.insufficient_balance" => StatusCodes.Status402PaymentRequired,

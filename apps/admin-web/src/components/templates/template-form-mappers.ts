@@ -13,8 +13,18 @@ import {
     type VideoTemplatePayload,
 } from "@/lib/api-client";
 
+export const DEFAULT_IMAGE_PROMPT = "Keep the same pet, same face, same fur, same colors, same eyes, same breed, and the same overall identity. Apply the template style and scene to the uploaded pet photo without replacing the pet with a different animal.";
 export const DEFAULT_PREPROCESSING_PROMPT = "Keep the same pet, same face, same fur, same colors, same background, same lighting and camera angle. Adjust the pet into an upright pose standing on its two hind legs like a human, with the front paws naturally positioned like arms. Make the full body clearly visible and suitable for motion transfer. Do not change the pet’s identity, breed, facial features, background, or image style.";
 export const DEFAULT_KLING_PROMPT = "A cute pet performing a funny viral dance, smooth animation, high quality.";
+
+export const IMAGE_MODELS = [
+  "openai/gpt-image-2/edit",
+  "fal-ai/nano-banana-pro/edit",
+  "fal-ai/flux-2-pro/edit",
+  "fal-ai/gpt-image-1.5/edit",
+  "fal-ai/bytedance/seedream/v5/lite/edit",
+  "fal-ai/nano-banana-2/edit"
+] as const;
 
 export const PREPROCESSING_MODELS = [
   "openai/gpt-image-2/edit",
@@ -49,6 +59,8 @@ export function createInitialTemplateForm(templateType: TemplateType): TemplateF
     referenceContentType: "video/mp4",
     referenceFileSizeBytes: "",
     referenceDurationSeconds: "",
+    imageModel: IMAGE_MODELS[0],
+    imagePrompt: DEFAULT_IMAGE_PROMPT,
     preprocessingModel: PREPROCESSING_MODELS[0],
     preprocessingPrompt: DEFAULT_PREPROCESSING_PROMPT,
     klingModel: KLING_MODELS[0],
@@ -76,6 +88,8 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     referenceContentType: template.referenceMotionAsset?.contentType ?? "video/mp4",
     referenceFileSizeBytes: template.referenceMotionAsset?.fileSizeBytes?.toString() ?? "",
     referenceDurationSeconds: template.referenceMotionAsset?.durationSeconds?.toString() ?? "",
+    imageModel: template.imageModel ?? IMAGE_MODELS[0],
+    imagePrompt: template.imagePrompt ?? DEFAULT_IMAGE_PROMPT,
     preprocessingModel: template.preprocessingModel ?? PREPROCESSING_MODELS[0],
     preprocessingPrompt: template.preprocessingPrompt ?? DEFAULT_PREPROCESSING_PROMPT,
     klingModel: template.klingModel ?? KLING_MODELS[0],
@@ -95,6 +109,8 @@ export async function saveImageTemplateFromForm(templateId: string | undefined, 
     isPremium: form.isPremium,
     tokenCost: parseNumber(form.tokenCost),
     previewAsset: buildAsset(form.previewUrl, form.previewFileName, form.previewContentType, form.previewFileSizeBytes),
+    imageModel: form.imageModel,
+    imagePrompt: form.imagePrompt,
   };
 
   return templateId ? updateImageTemplate(templateId, payload) : createImageTemplate(payload);

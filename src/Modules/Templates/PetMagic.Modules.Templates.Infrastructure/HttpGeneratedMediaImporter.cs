@@ -16,48 +16,12 @@ internal sealed class HttpGeneratedMediaImporter(
 
     public async Task<Result<StoredMediaResponse>> ImportVideoAsync(string generatedVideoUrl, Guid generationId, CancellationToken cancellationToken)
     {
-        if (!Uri.TryCreate(generatedVideoUrl, UriKind.Absolute, out var uri))
-        {
-            return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
-        }
+        return await ImportAsync(generatedVideoUrl, generationId, options.GeneratedVideoMaxFileSizeBytes, "video/mp4", ResolveVideoExtension, cancellationToken);
+    }
 
-        try
-        {
-            var client = httpClientFactory.CreateClient(HttpClientName);
-            using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
-            }
-
-            var length = response.Content.Headers.ContentLength;
-            if (length is > 0 && length > options.GeneratedVideoMaxFileSizeBytes)
-            {
-                return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
-            }
-
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? "video/mp4";
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var memoryStream = new MemoryStream();
-            await CopyWithLimitAsync(stream, memoryStream, options.GeneratedVideoMaxFileSizeBytes, cancellationToken);
-
-            var extension = ResolveVideoExtension(contentType, uri);
-            var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", contentType, memoryStream.ToArray());
-            return await mediaStorage.StoreAsync(upload, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (InvalidOperationException)
-        {
-            return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Generated template media import failed for generation {GenerationId}.", generationId);
-            return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
-        }
+    public Task<Result<StoredMediaResponse>> ImportImageAsync(string generatedImageUrl, Guid generationId, CancellationToken cancellationToken)
+    {
+        return ImportAsync(generatedImageUrl, generationId, options.GeneratedImageMaxFileSizeBytes, "image/png", ResolveImageExtension, cancellationToken);
     }
 
     private static async Task CopyWithLimitAsync(Stream source, Stream destination, long maxBytes, CancellationToken cancellationToken)
@@ -91,5 +55,73 @@ internal sealed class HttpGeneratedMediaImporter(
 
         var extension = Path.GetExtension(uri.AbsolutePath);
         return string.IsNullOrWhiteSpace(extension) ? ".mp4" : extension;
+    }
+
+    private static string ResolveImageExtension(string contentType, Uri uri)
+    {
+        if (string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase))
+        {
+            return ".jpg";
+        }
+
+        if (string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase))
+        {
+            return ".webp";
+        }
+
+        var extension = Path.GetExtension(uri.AbsolutePath);
+        return string.IsNullOrWhiteSpace(extension) ? ".png" : extension;
+    }
+
+    private async Task<Result<StoredMediaResponse>> ImportAsync(
+        string generatedMediaUrl,
+        Guid generationId,
+        long maxFileSizeBytes,
+        string defaultContentType,
+        Func<string, Uri, string> resolveExtension,
+        CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(generatedMediaUrl, UriKind.Absolute, out var uri))
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
+        }
+
+        try
+        {
+            var client = httpClientFactory.CreateClient(HttpClientName);
+            using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
+            }
+
+            var length = response.Content.Headers.ContentLength;
+            if (length is > 0 && length > maxFileSizeBytes)
+            {
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? defaultContentType;
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var memoryStream = new MemoryStream();
+            await CopyWithLimitAsync(stream, memoryStream, maxFileSizeBytes, cancellationToken);
+
+            var extension = resolveExtension(contentType, uri);
+            var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", contentType, memoryStream.ToArray());
+            return await mediaStorage.StoreAsync(upload, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (InvalidOperationException)
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Generated template media import failed for generation {GenerationId}.", generationId);
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
+        }
     }
 }

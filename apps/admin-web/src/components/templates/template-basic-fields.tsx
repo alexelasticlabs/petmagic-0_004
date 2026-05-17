@@ -1,4 +1,4 @@
-import styles from "@/components/templates/templates-admin.module.css";
+import styles from "@/components/templates/template-editor.module.css";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
@@ -72,20 +72,12 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
           <span className={styles.fieldHeader}>
             <span>{text.categoryLabel}</span>
           </span>
-          {categoryValues.length ? (
-            <Select
-              value={form.category}
-              options={categoryOptions}
-              ariaLabel={text.categoryLabel}
-              onChange={(value) => setForm((current) => ({ ...current, category: value }))}
-            />
-          ) : (
-            <input
-              value={form.category}
-              onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-              required
-            />
-          )}
+          <Select
+            value={form.category}
+            options={categoryOptions}
+            ariaLabel={text.categoryLabel}
+            onChange={(value) => setForm((current) => ({ ...current, category: value }))}
+          />
         </label>
 
         <label className={styles.fieldBlock}>

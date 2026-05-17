@@ -2,7 +2,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal static class FalModelPricing
 {
-    private static readonly IReadOnlyDictionary<string, decimal> PreprocessingUsdPerRequestByModel =
+    private static readonly IReadOnlyDictionary<string, decimal> ImageEditUsdPerRequestByModel =
         new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
         {
             ["openai/gpt-image-2/edit"] = 0.219m,
@@ -23,7 +23,18 @@ internal static class FalModelPricing
     public static decimal? TryGetPreprocessingCostUsd(string? model)
     {
         if (string.IsNullOrWhiteSpace(model)
-            || !PreprocessingUsdPerRequestByModel.TryGetValue(model, out var cost))
+            || !ImageEditUsdPerRequestByModel.TryGetValue(model, out var cost))
+        {
+            return null;
+        }
+
+        return cost;
+    }
+
+    public static decimal? TryGetImageGenerationCostUsd(string? model)
+    {
+        if (string.IsNullOrWhiteSpace(model)
+            || !ImageEditUsdPerRequestByModel.TryGetValue(model, out var cost))
         {
             return null;
         }

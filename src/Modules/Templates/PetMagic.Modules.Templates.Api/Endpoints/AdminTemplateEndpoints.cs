@@ -267,7 +267,7 @@ public static class AdminTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var command = new UpdateImageTemplateCommand(templateId, request.Title, request.ShortDescription, request.Category, request.Tags, request.IsPremium, request.TokenCost, request.PromoBadgeMode, request.PreviewAsset, request.Status);
+        var command = new UpdateImageTemplateCommand(templateId, request.Title, request.ShortDescription, request.Category, request.Tags, request.IsPremium, request.TokenCost, request.PromoBadgeMode, request.PreviewAsset, request.ImageModel, request.ImagePrompt, request.Status);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -425,6 +425,8 @@ public static class AdminTemplateEndpoints
             "templates.not_found" => StatusCodes.Status404NotFound,
             "templates.invalid_status" => StatusCodes.Status409Conflict,
             "templates.type_mismatch" => StatusCodes.Status400BadRequest,
+            "templates.image_model_required" => StatusCodes.Status409Conflict,
+            "templates.invalid_image_model" => StatusCodes.Status400BadRequest,
             "templates.reference_motion_required" => StatusCodes.Status409Conflict,
             "templates.character_orientation_required" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
@@ -573,6 +575,8 @@ public static class AdminTemplateEndpoints
         int TokenCost,
         string PromoBadgeMode,
         TemplateAssetCommand? PreviewAsset,
+        string ImageModel,
+        string ImagePrompt,
         string? Status = null);
 
     public sealed record UpdateVideoTemplateRequest(

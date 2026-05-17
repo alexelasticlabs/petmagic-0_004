@@ -256,8 +256,12 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
     );
   }
 
-  const catalogPath = `/${locale}/templates/video`;
-  const editorPath = `/${locale}/templates/video/editor?templateId=${templateId}`;
+  const templateSlug = template.templateType === "Video" ? "video" : "image";
+  const catalogPath = `/${locale}/templates/${templateSlug}`;
+  const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${templateId}`;
+  const breadcrumbsRoot = template.templateType === "Video"
+    ? (isRu ? "Видео шаблоны" : "Video templates")
+    : (isRu ? "Шаблоны изображений" : "Image templates");
   const activeRuns = statistics.queuedRuns + statistics.processingRuns;
   const canShowAllRecentRuns = statistics.totalRuns > RECENT_RUNS_PREVIEW_LIMIT;
   const canShowFailedRecentRuns = statistics.failedRuns > 0;
@@ -376,7 +380,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
     <AdminPage className={styles.page}>
       <div className={styles.pageHeaderRow}>
         <div className={styles.breadcrumbs}>
-          <Link href={catalogPath}>{text.breadcrumbsRoot}</Link>
+          <Link href={catalogPath}>{breadcrumbsRoot}</Link>
           <span aria-hidden="true">/</span>
           <Link href={editorPath}>{template.title}</Link>
           <span aria-hidden="true">/</span>

@@ -164,6 +164,12 @@
 .panelHeaderRow {
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.panelHeaderRow > * {
+  min-width: 0;
 }
 
 .panelTitle {
@@ -232,10 +238,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
   border: 1px solid var(--border-soft);
   border-radius: 0.7rem;
   padding: 0.75rem 0.85rem;
   background: var(--surface-1);
+}
+
+.chartSummary > * {
+  min-width: 0;
 }
 
 .chartSummary span,
@@ -315,10 +327,16 @@
 .funnelRow > div:first-child {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 0.75rem;
   color: var(--text-soft);
   font-size: 0.82rem;
   font-weight: 900;
+}
+
+.funnelRow > div:first-child > * {
+  min-width: 0;
 }
 
 .funnelTrack,
@@ -366,15 +384,20 @@
 }
 
 .breakdownRow {
-  grid-template-columns: minmax(7rem, 0.8fr) minmax(7rem, 1fr) auto;
+  grid-template-columns: minmax(0, 0.8fr) minmax(7rem, 1fr) auto;
 }
 
 .dimensionRow {
-  grid-template-columns: minmax(7rem, 0.75fr) minmax(8rem, 1fr) auto;
+  grid-template-columns: minmax(0, 0.75fr) minmax(8rem, 1fr) auto;
   border: 1px solid var(--border-soft);
   border-radius: 0.68rem;
   padding: 0.62rem;
   background: var(--surface-1);
+}
+
+.breakdownRow > *,
+.dimensionRow > * {
+  min-width: 0;
 }
 
 .dimensionRow > div:first-child {
@@ -455,11 +478,15 @@
 }
 
 .topRow {
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(0, auto) minmax(0, auto);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   padding: 0.55rem;
   background: var(--surface-1);
+}
+
+.topRow > * {
+  min-width: 0;
 }
 
 .rank {
@@ -516,11 +543,28 @@
 
 .templateCell {
   gap: 0.6rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.templateCell > * {
+  min-width: 0;
 }
 
 .templateCell > div:last-child {
   display: grid;
   gap: 0.12rem;
+  min-width: 0;
+}
+
+.breakdownMeta strong,
+.topRow strong,
+.templateCell strong,
+.breakdownMeta span,
+.topRow span,
+.templateCell span {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .statusBadge {

@@ -36,7 +36,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 
 type TemplatesCatalogViewProps = {
   locale: Locale;
@@ -75,7 +75,7 @@ async function fetchTemplatesAnalyticsRows(locale: Locale, router: { replace: (h
 export function TemplatesCatalogView({ locale, templateType, initialCategory }: TemplatesCatalogViewProps) {
   const isRu = locale === "ru";
   const text = getDictionary(locale);
-  const copy = getCatalogCopy(locale, templateType);
+  const copy = useMemo(() => getCatalogCopy(locale, templateType), [locale, templateType]);
   const router = useRouter();
   const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
   const [analyticsRows, setAnalyticsRows] = useState<Record<string, AdminTemplatesAnalyticsTemplateRow>>({});
@@ -99,19 +99,16 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
     }
 
     try {
-      const [templatesResponse, analyticsResponse] = await Promise.all([
-        fetchTemplatesList(locale, router, templateType),
-        fetchTemplatesAnalyticsRows(locale, router, templateType),
-      ]);
-
+      const templatesResponse = await fetchTemplatesList(locale, router, templateType);
       if (!templatesResponse) {
         return;
       }
 
       if (canUpdateState()) {
         setTemplates(templatesResponse);
-        setAnalyticsRows(analyticsResponse ?? {});
       }
+
+      void loadAnalyticsRows(canUpdateState);
     } catch {
       if (canUpdateState()) {
         setError(text.errorLoadingTemplates);
@@ -123,6 +120,19 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
     }
   }
 
+  const loadAnalyticsRows = useCallback(async (canUpdateState: () => boolean = () => true) => {
+    try {
+      const analyticsResponse = await fetchTemplatesAnalyticsRows(locale, router, templateType);
+      if (analyticsResponse && canUpdateState()) {
+        setAnalyticsRows(analyticsResponse);
+      }
+    } catch {
+      if (canUpdateState()) {
+        setAnalyticsRows({});
+      }
+    }
+  }, [locale, router, templateType]);
+
   useEffect(() => {
     let isCancelled = false;
 
@@ -131,15 +141,13 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
       setError(null);
 
       try {
-        const [templatesResponse, analyticsResponse] = await Promise.all([
-          fetchTemplatesList(locale, router, templateType),
-          fetchTemplatesAnalyticsRows(locale, router, templateType),
-        ]);
+        const templatesResponse = await fetchTemplatesList(locale, router, templateType);
 
         if (templatesResponse && !isCancelled) {
           setTemplates(templatesResponse);
-          setAnalyticsRows(analyticsResponse ?? {});
         }
+
+        void loadAnalyticsRows(() => !isCancelled);
       } catch {
         if (!isCancelled) {
           setError(text.errorLoadingTemplates);
@@ -156,7 +164,7 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
     return () => {
       isCancelled = true;
     };
-  }, [locale, router, templateType, text.errorLoadingTemplates]);
+  }, [loadAnalyticsRows, locale, router, templateType, text.errorLoadingTemplates]);
 
   async function handleStatusChange(templateId: string, status: TemplateStatus) {
     setBusyTemplateId(templateId);
@@ -195,30 +203,31 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
   const testBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/test`;
   const analyticsBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/analytics`;
   const categoriesPath = `/${locale}/templates/categories`;
-  const catalog = buildCatalogModel(templates);
+  const catalog = useMemo(() => buildCatalogModel(templates), [templates]);
   const visiblePool = archiveFilter === "archived" ? catalog.archivedTemplates : catalog.activeTemplates;
-  const categoryOptions: SelectOption[] = [
+  const deferredSearch = useDeferredValue(search);
+  const categoryOptions: SelectOption[] = useMemo(() => [
     { value: "all", label: copy.allCategories, tone: "neutral" },
     ...catalog.categories.map((category) => ({ value: category, label: category, tone: "neutral" as const })),
-  ];
+  ], [catalog.categories, copy]);
   const accessOptions: SelectOption[] = [
     { value: "all", label: copy.allAccess, tone: "neutral" },
     { value: "premium", label: text.premiumLabel, tone: "premium" },
     { value: "free", label: text.freeLabel, tone: "recommended" },
   ];
-  const statusOptions: SelectOption[] = [
+  const statusOptions: SelectOption[] = useMemo(() => [
     { value: "all", label: copy.allStatuses, tone: "neutral" },
     { value: "Active", label: getTemplateStatusLabel("Active", locale), tone: "premium" },
     { value: "Draft", label: getTemplateStatusLabel("Draft", locale), tone: "fast" },
     { value: "Archived", label: getTemplateStatusLabel("Archived", locale), tone: "neutral" },
-  ];
-  const sortOptions: SelectOption[] = [
+  ], [copy, locale]);
+  const sortOptions: SelectOption[] = useMemo(() => [
     { value: "newest", label: copy.sortNewest, description: locale === "ru" ? "Сначала свежие шаблоны" : "Most recent templates first", tone: "recommended" },
     { value: "title", label: copy.sortTitle, description: locale === "ru" ? "Алфавитный порядок" : "Alphabetical order", tone: "neutral" },
     { value: "tokens", label: copy.sortTokens, description: locale === "ru" ? "По стоимости в токенах" : "By token cost", tone: "fast" },
-  ];
-  const normalizedSearch = search.trim().toLowerCase();
-  const filteredTemplates = visiblePool
+  ], [copy, locale]);
+  const normalizedSearch = deferredSearch.trim().toLowerCase();
+  const filteredTemplates = useMemo(() => visiblePool
     .filter((template) => {
       const matchesSearch = !normalizedSearch
         || template.title.toLowerCase().includes(normalizedSearch)
@@ -232,7 +241,14 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
 
       return matchesSearch && matchesCategory && matchesAccess && matchesStatus;
     })
-    .sort((firstTemplate, secondTemplate) => compareTemplates(firstTemplate, secondTemplate, sortMode));
+    .sort((firstTemplate, secondTemplate) => compareTemplates(firstTemplate, secondTemplate, sortMode)), [
+      accessFilter,
+      categoryFilter,
+      normalizedSearch,
+      sortMode,
+      statusFilter,
+      visiblePool,
+    ]);
 
   if (isLoading) {
     return (
@@ -454,16 +470,12 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                               <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.cardActionIconButton} aria-label={text.editTemplate} title={text.editTemplate}>
                                 <PencilIcon className={styles.actionIcon} />
                               </Link>
-                              {template.templateType === "Video" ? (
-                                <>
-                                  <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.analyticsAction} title={copy.analyticsAction}>
-                                    <ChartIcon className={styles.actionIcon} />
-                                  </Link>
-                                  <Link href={`${testBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.testAction} title={copy.testAction}>
-                                    <PlayCircleIcon className={styles.actionIcon} />
-                                  </Link>
-                                </>
-                              ) : null}
+                              <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.analyticsAction} title={copy.analyticsAction}>
+                                <ChartIcon className={styles.actionIcon} />
+                              </Link>
+                              <Link href={`${testBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.testAction} title={copy.testAction}>
+                                <PlayCircleIcon className={styles.actionIcon} />
+                              </Link>
                               {template.status !== "Active" ? (
                                 <Button
                                   size="sm"
@@ -570,16 +582,12 @@ function TemplateCatalogCard({ locale, template, analytics, editorBasePath, anal
           <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.cardActionIconButton} aria-label={text.editTemplate} title={text.editTemplate}>
             <PencilIcon className={styles.actionIcon} />
           </Link>
-          {template.templateType === "Video" ? (
-            <>
-              <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.analyticsAction} title={copy.analyticsAction}>
-                <ChartIcon className={styles.actionIcon} />
-              </Link>
-              <Link href={`${testBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.testAction} title={copy.testAction}>
-                <PlayCircleIcon className={styles.actionIcon} />
-              </Link>
-            </>
-          ) : null}
+          <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.analyticsAction} title={copy.analyticsAction}>
+            <ChartIcon className={styles.actionIcon} />
+          </Link>
+          <Link href={`${testBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.testAction} title={copy.testAction}>
+            <PlayCircleIcon className={styles.actionIcon} />
+          </Link>
           {template.status !== "Active" ? (
             <Button
               size="sm"

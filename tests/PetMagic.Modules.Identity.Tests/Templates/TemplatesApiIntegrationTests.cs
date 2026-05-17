@@ -191,6 +191,8 @@ public sealed class TemplatesApiIntegrationTests
                 20,
                 TemplatePromoBadgeMode.New.ToString(),
                 new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
                 TemplateStatus.Active.ToString()));
 
         Assert.Equal("Active", created.Status);
@@ -214,6 +216,8 @@ public sealed class TemplatesApiIntegrationTests
                 25,
                 TemplatePromoBadgeMode.Trending.ToString(),
                 new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
                 TemplateStatus.Active.ToString()));
 
         Assert.Equal("Cozy Portrait Plus", updated.Title);
@@ -465,6 +469,74 @@ public sealed class TemplatesApiIntegrationTests
         Assert.Equal(generation.SourceImageAsset.Url, generation.NormalizedImageUrl);
         Assert.Equal(referenceAsset.Url, generation.ReferenceMotionUrl);
         Assert.EndsWith($"generated-{generation.GenerationId:N}.mp4", generation.OutputUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(generation.FailureCode);
+        Assert.Empty(application.Billing.RefundedGenerationIds);
+
+        var fetched = await GetFromJsonAsync<TemplateGenerationResponse>(
+            application.Client,
+            $"/api/templates/generations/{generation.GenerationId}");
+
+        Assert.Equal(generation.GenerationId, fetched.GenerationId);
+        Assert.Equal("Completed", fetched.Status);
+        Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
+    }
+
+    [Fact]
+    public async Task ImageGenerationFlow_ShouldUploadSourceCreateCompletedJobAndFetchResult()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "portrait.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            "portrait-image-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Cozy Portrait",
+                "Warm portrait template",
+                "Portrait",
+                ["cozy", "portrait"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()));
+
+        var queued = await UploadGenerationSourceAsync(
+            application.Client,
+            created.TemplateId,
+            "pet.jpg",
+            "image/jpeg",
+            "source-pet-image"u8.ToArray());
+
+        Assert.Equal(TestUserId, queued.UserId);
+        Assert.Equal(created.TemplateId, queued.TemplateId);
+        Assert.Equal("Queued", queued.Status);
+        Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
+
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
+
+        Assert.Equal(TestUserId, generation.UserId);
+        Assert.Equal(created.TemplateId, generation.TemplateId);
+        Assert.Equal("Completed", generation.Status);
+        Assert.Equal(20, generation.TokenCost);
+        Assert.NotNull(generation.SourceImageAsset);
+        Assert.Equal("pet.jpg", generation.SourceImageAsset!.FileName);
+        Assert.Null(generation.NormalizedImageUrl);
+        Assert.Null(generation.ReferenceMotionUrl);
+        Assert.EndsWith($"generated-{generation.GenerationId:N}.png", generation.OutputUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("openai/gpt-image-2/edit", generation.UsedPreprocessingModel);
+        Assert.Null(generation.UsedKlingModel);
+        Assert.NotNull(generation.PreprocessingCompletedAtUtc);
+        Assert.Null(generation.MotionGenerationCompletedAtUtc);
+        Assert.Equal(0.219m, generation.MotionProviderCostUsd);
         Assert.Null(generation.FailureCode);
         Assert.Empty(application.Billing.RefundedGenerationIds);
 
@@ -739,8 +811,13 @@ public sealed class TemplatesApiIntegrationTests
             {
                 PublicBaseUrl = "http://localhost:5000",
                 LocalMediaRootPath = "wwwroot/templates-media",
+                DefaultImagePrompt = "Create a themed pet portrait.",
                 DefaultPreprocessingPrompt = "Keep the same pet.",
                 DefaultKlingPrompt = "Funny dance.",
+                AllowedImageModels = [
+                    "openai/gpt-image-2/edit",
+                    "fal-ai/nano-banana-pro/edit"
+                ],
                 AllowedPreprocessingModels = [
                     "openai/gpt-image-2/edit",
                     "fal-ai/nano-banana-pro/edit"
@@ -762,6 +839,7 @@ public sealed class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<IMediaMetadataReader, TestMediaMetadataReader>();
             builder.Services.AddSingleton<ITemplateMediaUploadPolicy>(new FixedTemplateMediaUploadPolicy());
             builder.Services.AddSingleton<IImagePreprocessor, TestImagePreprocessor>();
+            builder.Services.AddSingleton<IImageGenerator, TestImageGenerator>();
             builder.Services.AddSingleton<IVideoMotionGenerator, TestVideoMotionGenerator>();
             builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
@@ -849,6 +927,14 @@ public sealed class TemplatesApiIntegrationTests
         }
     }
 
+    private sealed class TestImageGenerator : IImageGenerator
+    {
+        public Task<Result<ImageGenerationResult>> CreateAsync(string sourceImageUrl, string prompt, string model, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new ImageGenerationResult($"https://fal.example.test/generated/{Guid.NewGuid():N}.png", null, null)));
+        }
+    }
+
     private sealed class TestVideoMotionGenerator : IVideoMotionGenerator
     {
         public Task<Result<VideoMotionGenerationResult>> CreateAsync(
@@ -875,6 +961,18 @@ public sealed class TemplatesApiIntegrationTests
 
             return mediaStorage.StoreAsync(
                 new MediaUploadCommand($"generated-{generationId:N}.mp4", "video/mp4", "generated-video-content"u8.ToArray()),
+                cancellationToken);
+        }
+
+        public Task<Result<StoredMediaResponse>> ImportImageAsync(string generatedImageUrl, Guid generationId, CancellationToken cancellationToken)
+        {
+            if (shouldFail)
+            {
+                return Task.FromResult(Result.Failure<StoredMediaResponse>(new Error("templates.generated_media_import_failed", "Generated media import failed.")));
+            }
+
+            return mediaStorage.StoreAsync(
+                new MediaUploadCommand($"generated-{generationId:N}.png", "image/png", "generated-image-content"u8.ToArray()),
                 cancellationToken);
         }
     }

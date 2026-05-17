@@ -5,6 +5,11 @@ public sealed record ImagePreprocessResult(
     string? ProviderRequestId,
     double? InferenceTimeSeconds);
 
+public sealed record ImageGenerationResult(
+    string ImageUrl,
+    string? ProviderRequestId,
+    double? InferenceTimeSeconds);
+
 public sealed record VideoMotionGenerationResult(
     string VideoUrl,
     string? ProviderRequestId,

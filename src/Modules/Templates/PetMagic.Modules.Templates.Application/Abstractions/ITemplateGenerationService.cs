@@ -5,7 +5,7 @@ namespace PetMagic.Modules.Templates.Application.Abstractions;
 
 public interface ITemplateGenerationService
 {
-    Task<Result<TemplateGenerationResponse>> StartVideoAsync(StartTemplateGenerationCommand command, CancellationToken cancellationToken);
+    Task<Result<TemplateGenerationResponse>> StartAsync(StartTemplateGenerationCommand command, CancellationToken cancellationToken);
 
     Task<Result<TemplateGenerationResponse>> StartAdminTestAsync(Guid templateId, TemplateAssetCommand sourceImageAsset, CancellationToken cancellationToken);
 

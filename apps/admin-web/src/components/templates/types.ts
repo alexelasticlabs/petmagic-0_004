@@ -18,6 +18,8 @@ export type TemplateFormState = {
   referenceContentType: string;
   referenceFileSizeBytes: string;
   referenceDurationSeconds: string;
+  imageModel: string;
+  imagePrompt: string;
   preprocessingModel: string;
   preprocessingPrompt: string;
   klingModel: string;

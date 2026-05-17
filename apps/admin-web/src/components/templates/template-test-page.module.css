@@ -27,6 +27,15 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  min-width: 0;
+}
+
+.breadcrumbs > *,
+.pillRow > *,
+.headerActions > *,
+.uploadActions > *,
+.resultHeaderActions > * {
+  min-width: 0;
 }
 
 .breadcrumbs {
@@ -193,7 +202,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.8rem;
+  min-width: 0;
+}
+
+.stepHeader > *,
+.sectionHeaderRow > *,
+.mediaHeading > *,
+.toggleLine > *,
+.detailRow > *,
+.detailRowMultiline > *,
+.readonlyField > * {
+  min-width: 0;
 }
 
 .sectionHeaderRow {
@@ -353,6 +374,10 @@
   justify-content: center;
 }
 
+.mediaGridImage {
+  justify-items: stretch;
+}
+
 .mediaConnector {
   position: relative;
   display: flex;
@@ -471,7 +496,13 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
+}
+
+.sourceUploadFooter > * {
+  min-width: 0;
 }
 
 .sourceUploadMeta {
@@ -525,7 +556,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
+}
+
+.mediaCardHeader > * {
+  min-width: 0;
 }
 
 .mediaCardHeader strong {
@@ -632,7 +669,13 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 0.6rem;
+  min-width: 0;
+}
+
+.mediaFooter > * {
+  min-width: 0;
 }
 
 .mediaActions {
@@ -693,10 +736,15 @@
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 0.8rem;
   align-items: center;
+  min-width: 0;
   border: 1px solid var(--border-soft);
   border-radius: 0.69rem;
   padding: 0.8rem 0.9rem;
   background: rgba(8, 15, 27, 0.34);
+}
+
+.timelineItem > * {
+  min-width: 0;
 }
 
 .timelineItem:last-child {
@@ -745,6 +793,8 @@
 .detailRow strong,
 .detailRowMultiline strong {
   text-align: right;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .detailRowMultiline {
@@ -777,6 +827,11 @@
     grid-template-columns: minmax(0, 19rem) clamp(4.2rem, 4.8vw, 5.4rem) minmax(0, 19rem) clamp(4.2rem, 4.8vw, 5.4rem) minmax(0, 19rem);
     justify-content: space-between;
     align-items: center;
+  }
+
+  .mediaGridImage {
+    grid-template-columns: minmax(0, 21rem) clamp(4.2rem, 4.8vw, 5.4rem) minmax(0, 21rem);
+    justify-content: center;
   }
 
   .mediaConnector {

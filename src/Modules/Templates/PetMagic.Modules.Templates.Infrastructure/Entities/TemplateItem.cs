@@ -30,6 +30,10 @@ public sealed class TemplateItem
 
     public CharacterOrientation? CharacterOrientation { get; set; }
 
+    public string? ImageModel { get; set; }
+
+    public string? ImagePrompt { get; set; }
+
     public string? PreprocessingModel { get; set; }
 
     public string? PreprocessingPrompt { get; set; }

@@ -25,6 +25,8 @@ public sealed class CreateImageTemplateCommandValidator : AbstractValidator<Crea
         RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
         RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("Promo badge mode is invalid.");
+        RuleFor(x => x.ImageModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.ImagePrompt).MaximumLength(1000);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(32);
@@ -42,6 +44,8 @@ public sealed class UpdateImageTemplateCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
         RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("Promo badge mode is invalid.");
+        RuleFor(x => x.ImageModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.ImagePrompt).MaximumLength(1000);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(32);

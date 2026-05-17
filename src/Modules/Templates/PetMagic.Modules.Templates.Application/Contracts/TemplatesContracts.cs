@@ -21,6 +21,8 @@ public sealed record CreateImageTemplateCommand(
     int TokenCost,
     string PromoBadgeMode,
     TemplateAssetCommand? PreviewAsset,
+    string ImageModel,
+    string ImagePrompt,
     string? Status = null);
 
 public sealed record UpdateImageTemplateCommand(
@@ -33,6 +35,8 @@ public sealed record UpdateImageTemplateCommand(
     int TokenCost,
     string PromoBadgeMode,
     TemplateAssetCommand? PreviewAsset,
+    string ImageModel,
+    string ImagePrompt,
     string? Status = null);
 
 public sealed record CreateVideoTemplateCommand(
@@ -156,6 +160,8 @@ public sealed record AdminTemplateResponse(
     TemplateAssetResponse? ReferenceMotionAsset,
     double? ReferenceVideoDurationSeconds,
     string? CharacterOrientation,
+    string? ImageModel,
+    string? ImagePrompt,
     string? PreprocessingModel,
     string? PreprocessingPrompt,
     string? KlingModel,

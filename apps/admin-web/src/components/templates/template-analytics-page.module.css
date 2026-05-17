@@ -445,10 +445,33 @@
   background: rgba(8, 15, 27, 0.42);
 }
 
+.summaryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.summaryRow span,
+.summaryRow strong {
+  min-width: 0;
+}
+
+.summaryRow span {
+  overflow-wrap: anywhere;
+}
+
 .summaryRow strong,
 .breakdownItem strong {
   text-align: right;
   font-size: 0.92rem;
+}
+
+.summaryRow strong {
+  max-width: 100%;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .breakdownItem span {

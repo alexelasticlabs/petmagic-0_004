@@ -14,7 +14,7 @@ internal sealed class TemplateGenerationService(
 {
     internal static readonly Guid AdminTestUserId = Guid.Empty;
 
-    public async Task<Result<TemplateGenerationResponse>> StartVideoAsync(StartTemplateGenerationCommand command, CancellationToken cancellationToken)
+    public async Task<Result<TemplateGenerationResponse>> StartAsync(StartTemplateGenerationCommand command, CancellationToken cancellationToken)
     {
         var template = await dbContext.TemplateItems
             .Include(x => x.Assets)
@@ -32,7 +32,6 @@ internal sealed class TemplateGenerationService(
         }
 
         var now = DateTime.UtcNow;
-        var referenceMotion = GetAsset(template, TemplateAssetKind.ReferenceMotion)!;
         var job = new TemplateGenerationJob
         {
             Id = Guid.NewGuid(),
@@ -44,7 +43,7 @@ internal sealed class TemplateGenerationService(
             SourceImageFileName = command.SourceImageAsset.FileName,
             SourceImageContentType = command.SourceImageAsset.ContentType,
             SourceImageFileSizeBytes = command.SourceImageAsset.FileSizeBytes,
-            ReferenceMotionUrl = referenceMotion.Url,
+            ReferenceMotionUrl = GetAsset(template, TemplateAssetKind.ReferenceMotion)?.Url,
             CreatedAtUtc = now,
             QueuedAtUtc = now,
             UpdatedAtUtc = now
@@ -89,7 +88,6 @@ internal sealed class TemplateGenerationService(
             return Result.Failure<TemplateGenerationResponse>(readiness);
         }
 
-        var referenceMotion = GetAsset(template, TemplateAssetKind.ReferenceMotion)!;
         var now = DateTime.UtcNow;
         var job = new TemplateGenerationJob
         {
@@ -102,7 +100,7 @@ internal sealed class TemplateGenerationService(
             SourceImageFileName = sourceImageAsset.FileName,
             SourceImageContentType = sourceImageAsset.ContentType,
             SourceImageFileSizeBytes = sourceImageAsset.FileSizeBytes,
-            ReferenceMotionUrl = referenceMotion.Url,
+            ReferenceMotionUrl = GetAsset(template, TemplateAssetKind.ReferenceMotion)?.Url,
             CreatedAtUtc = now,
             QueuedAtUtc = now,
             UpdatedAtUtc = now
@@ -141,6 +139,13 @@ internal sealed class TemplateGenerationService(
         if (template.Status != TemplateStatus.Active)
         {
             return TemplatesErrors.InvalidStatus;
+        }
+
+        if (template.TemplateType == TemplateType.Image)
+        {
+            return string.IsNullOrWhiteSpace(template.ImageModel)
+                ? TemplatesErrors.MissingImageModel
+                : null;
         }
 
         if (template.TemplateType != TemplateType.Video)

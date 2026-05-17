@@ -298,7 +298,7 @@ function FeedbackFeedPanel({ items, locale, text }: { items: readonly AdminTempl
       {items.map((item) => {
         const templatePath = item.templateType === "Video"
           ? `/${locale}/templates/video/analytics/${item.templateId}`
-          : `/${locale}/templates/image/editor?templateId=${item.templateId}`;
+          : `/${locale}/templates/image/analytics/${item.templateId}`;
 
         return (
           <article key={item.eventId} className={styles.feedbackItem}>
@@ -542,11 +542,7 @@ function TemplatesTable({ rows, locale, text }: { rows: AdminTemplatesAnalyticsT
               <td>{formatTokens(row.totalTokenCost, locale === "ru")}</td>
               <td>{formatMoney(row.totalProviderCostUsd, locale)}</td>
               <td>
-                {row.templateType === "Video" ? (
-                  <Link className={styles.inlineAction} href={`/${locale}/templates/video/analytics/${row.templateId}`}>{text.openAnalytics}</Link>
-                ) : (
-                  <Link className={styles.inlineAction} href={`/${locale}/templates/image/editor?templateId=${row.templateId}`}>{text.openEditor}</Link>
-                )}
+                <Link className={styles.inlineAction} href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${row.templateId}`}>{text.openAnalytics}</Link>
               </td>
             </tr>
           ))}

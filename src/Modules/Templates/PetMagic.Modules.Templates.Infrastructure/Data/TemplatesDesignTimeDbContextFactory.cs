@@ -9,7 +9,7 @@ public sealed class TemplatesDesignTimeDbContextFactory : IDesignTimeDbContextFa
     {
         var optionsBuilder = new DbContextOptionsBuilder<TemplatesDbContext>();
         var connectionString = Environment.GetEnvironmentVariable("PETMAGIC_TEMPLATES_MIGRATIONS_CONNECTION_STRING")
-            ?? "Host=localhost;Database=petmagic_templates;Username=postgres;Password=postgres";
+            ?? "Host=localhost;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=PetMagic_DevPassword123";
 
         optionsBuilder.UseNpgsql(connectionString);
         return new TemplatesDbContext(optionsBuilder.Options);

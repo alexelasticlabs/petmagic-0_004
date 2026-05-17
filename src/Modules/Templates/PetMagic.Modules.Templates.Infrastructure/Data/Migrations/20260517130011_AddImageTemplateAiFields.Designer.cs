@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PetMagic.Modules.Templates.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PetMagic.Modules.Templates.Infrastructure.Data;
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TemplatesDbContext))]
-    partial class TemplatesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260517130011_AddImageTemplateAiFields")]
+    partial class AddImageTemplateAiFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

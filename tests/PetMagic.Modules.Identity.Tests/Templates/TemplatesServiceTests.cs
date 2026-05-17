@@ -87,7 +87,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg")),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -148,7 +150,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg")),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -211,7 +215,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg")),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         var draftVideo = await service.CreateVideoAsync(
@@ -265,7 +271,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/old-preview.jpg", "old-preview.jpg", "image/jpeg")),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/old-preview.jpg", "old-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -280,7 +288,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/new-preview.jpg", "new-preview.jpg", "image/jpeg")),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/new-preview.jpg", "new-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         Assert.True(updated.IsSuccess);
@@ -417,7 +427,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                preview),
+                preview,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -432,7 +444,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                preview),
+                preview,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         Assert.True(updated.IsSuccess);
@@ -492,7 +506,9 @@ public sealed class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
-                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/preview.jpg", "preview.jpg", "image/jpeg")),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/preview.jpg", "preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -908,6 +924,8 @@ public sealed class TemplatesServiceTests
                 30,
                 TemplatePromoBadgeMode.Auto.ToString(),
                 CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
                 TemplateStatus.Active.ToString()),
             CancellationToken.None);
 
@@ -1186,8 +1204,13 @@ public sealed class TemplatesServiceTests
         {
             PublicBaseUrl = "http://localhost:5000",
             LocalMediaRootPath = "wwwroot/templates-media",
+            DefaultImagePrompt = "Create a themed pet portrait.",
             DefaultPreprocessingPrompt = "Keep the same pet.",
             DefaultKlingPrompt = "Funny dance.",
+            AllowedImageModels = [
+                "openai/gpt-image-2/edit",
+                "fal-ai/nano-banana-pro/edit"
+            ],
             AllowedPreprocessingModels = [
                 "openai/gpt-image-2/edit",
                 "fal-ai/nano-banana-pro/edit"
