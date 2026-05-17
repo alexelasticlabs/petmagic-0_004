@@ -305,6 +305,27 @@ internal sealed class TemplatesService(
         return Result.Success<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(recent);
     }
 
+    public async Task<Result<IReadOnlyList<TemplateGenerationResponse>>> GetAdminTestHistoryAsync(Guid templateId, int take, CancellationToken cancellationToken)
+    {
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
+        {
+            return Result.Failure<IReadOnlyList<TemplateGenerationResponse>>(TemplatesErrors.NotFound);
+        }
+
+        var jobs = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId && x.UserId == TemplateGenerationService.AdminTestUserId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .ToArrayAsync(cancellationToken);
+
+        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>(jobs.Select(TemplateGenerationService.MapResponse).ToArray());
+    }
+
     public async Task<Result<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>> GetAdminFailureBreakdownAsync(Guid templateId, CancellationToken cancellationToken)
     {
         var jobs = await GetAnalyticsProjectionsAsync(templateId, cancellationToken);
@@ -1490,6 +1511,20 @@ internal sealed class TemplatesService(
     {
         var effectivePromoBadge = ResolveEffectivePromoBadge(template, DateTime.UtcNow);
 
+        // Calculate estimated USD cost based on template models
+        decimal? estimatedCostUsd = null;
+        if (template.TemplateType == TemplateType.Image)
+        {
+            estimatedCostUsd = FalModelPricing.TryGetImageGenerationCostUsd(template.ImageModel);
+        }
+        else if (template.TemplateType == TemplateType.Video)
+        {
+            estimatedCostUsd = FalModelPricing.TryCalculateEstimatedGenerationCostUsd(
+                template.PreprocessingModel,
+                template.KlingModel,
+                template.ReferenceVideoDurationSeconds);
+        }
+
         return new AdminTemplateListItemResponse(
             template.Id,
             template.TemplateType.ToString(),
@@ -1503,11 +1538,12 @@ internal sealed class TemplatesService(
             template.TokenCost,
             DeserializeTags(template.Tags),
             GetAsset(template, TemplateAssetKind.Preview),
-                template.MusicDescription,
+            template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
             template.CharacterOrientation?.ToString(),
             template.CreatedAtUtc,
-            template.UpdatedAtUtc);
+            template.UpdatedAtUtc,
+            estimatedCostUsd);
     }
 
     private static AdminTemplateCategoryListItemResponse MapAdminCategory(TemplateCategory category, IReadOnlyCollection<TemplateItem> templates)

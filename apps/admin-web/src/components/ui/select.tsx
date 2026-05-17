@@ -9,6 +9,7 @@ export type SelectOption = {
   description?: string;
   badge?: string;
   tone?: "recommended" | "fast" | "premium" | "neutral";
+  price?: string;
 };
 
 type SelectProps = {
@@ -136,7 +137,10 @@ export function Select({ value, options, onChange, ariaLabel, showSelectedDescri
         <span className={styles.triggerContent}>
           <span className={styles.triggerTopRow}>
             <span className={styles.value}>{selectedOption?.label ?? value}</span>
-            {selectedOption?.badge ? <span className={`${styles.badge} ${getBadgeToneClassName(selectedOption.tone)}`.trim()}>{selectedOption.badge}</span> : null}
+            <span className={styles.triggerMeta}>
+              {selectedOption?.price ? <span className={styles.triggerPrice}>{selectedOption.price}</span> : null}
+              {selectedOption?.badge ? <span className={`${styles.badge} ${getBadgeToneClassName(selectedOption.tone)}`.trim()}>{selectedOption.badge}</span> : null}
+            </span>
           </span>
           {showSelectedDescription && selectedOption?.description ? <span className={styles.triggerDescription}>{selectedOption.description}</span> : null}
         </span>
@@ -202,6 +206,7 @@ export function Select({ value, options, onChange, ariaLabel, showSelectedDescri
                   <span className={styles.optionTopRow}>
                     <span className={styles.optionLabel}>{option.label}</span>
                     <span className={styles.optionMeta}>
+                      {option.price ? <span className={styles.optionPrice}>{option.price}</span> : null}
                       {option.badge ? <span className={`${styles.badge} ${getBadgeToneClassName(option.tone)}`.trim()}>{option.badge}</span> : null}
                       {isSelected ? <span className={styles.optionIndicator} aria-hidden="true" /> : null}
                     </span>

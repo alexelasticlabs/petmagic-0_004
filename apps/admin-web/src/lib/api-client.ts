@@ -71,6 +71,7 @@ export type AdminTemplateListItem = {
   characterOrientation?: string;
   createdAtUtc: string;
   updatedAtUtc: string;
+  estimatedCostUsd?: number;
 };
 
 export type AdminTemplateCategory = {
@@ -814,6 +815,11 @@ export async function startAdminTemplateTest(templateId: string, file: File): Pr
 
 export async function fetchAdminTemplateTest(generationId: string): Promise<AdminTemplateTestRun> {
   return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/tests/${generationId}`, { method: "GET" });
+}
+
+export async function fetchAdminTemplateTestHistory(templateId: string, take?: number): Promise<AdminTemplateTestRun[]> {
+  const query = typeof take === "number" ? `?take=${encodeURIComponent(String(take))}` : "";
+  return apiRequest<AdminTemplateTestRun[]>(`/api/admin/templates/${templateId}/tests${query}`, { method: "GET" });
 }
 
 export async function createImageTemplate(payload: ImageTemplatePayload): Promise<AdminTemplate> {

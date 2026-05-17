@@ -112,8 +112,12 @@ export function TemplatePreviewCard({
           ) : null}
 
           <div className={styles.phoneMetaRow}>
-            <span>{formatDuration(referenceDurationSeconds)}</span>
-            <span className={styles.phoneMetaDot} aria-hidden="true" />
+            {resolvedTemplateKind === "video" && (
+              <>
+                <span>{formatDuration(referenceDurationSeconds)}</span>
+                <span className={styles.phoneMetaDot} aria-hidden="true" />
+              </>
+            )}
             <span>{normalizedCategory}</span>
             <span className={styles.phoneMetaSpacer} />
             <span className={joinClassNames(styles.phoneAccessTag, isPremium ? styles.phoneAccessTagPremium : styles.phoneAccessTagFree)}>

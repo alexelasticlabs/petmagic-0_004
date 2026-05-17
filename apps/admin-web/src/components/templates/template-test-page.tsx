@@ -1,25 +1,26 @@
 "use client";
 
 import {
-  CalendarIcon,
-  ChartIcon,
-  ClockIcon,
-  DownloadIcon,
-  ImageIcon,
-  PlayCircleIcon,
-  RefreshIcon,
-  TableIcon,
-  VideoIcon,
+    CalendarIcon,
+    ChartIcon,
+    ClockIcon,
+    DownloadIcon,
+    ImageIcon,
+    PlayCircleIcon,
+    RefreshIcon,
+    TableIcon,
+    VideoIcon,
 } from "@/components/admin/admin-icons";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/templates/template-test-page.module.css";
 import { Button } from "@/components/ui/button";
 import {
-  fetchAdminTemplate,
-  fetchAdminTemplateTest,
-  startAdminTemplateTest,
-  type AdminTemplate,
-  type AdminTemplateTestRun,
+    fetchAdminTemplate,
+    fetchAdminTemplateTest,
+    fetchAdminTemplateTestHistory,
+    startAdminTemplateTest,
+    type AdminTemplate,
+    type AdminTemplateTestRun,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
@@ -63,6 +64,8 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const [selectedFilePreviewUrl, setSelectedFilePreviewUrl] = useState<string | null>(null);
   const selectedFilePreviewObjectUrlRef = useRef<string | null>(null);
   const [run, setRun] = useState<AdminTemplateTestRun | null>(null);
+  const [history, setHistory] = useState<AdminTemplateTestRun[]>([]);
+  const [selectedHistoryGenerationId, setSelectedHistoryGenerationId] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSourceDragActive, setIsSourceDragActive] = useState(false);
@@ -82,6 +85,19 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         const response = await fetchAdminTemplate(templateId);
         if (!isCancelled) {
           setTemplate(response);
+        }
+
+        try {
+          const historyResponse = await fetchAdminTemplateTestHistory(templateId, 12);
+          if (!isCancelled) {
+            setHistory(historyResponse);
+            setRun(historyResponse[0] ?? null);
+            setSelectedHistoryGenerationId(null);
+          }
+        } catch {
+          if (!isCancelled) {
+            setHistory([]);
+          }
         }
       } catch {
         if (!isCancelled) {
@@ -110,6 +126,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       try {
         const latest = await fetchAdminTemplateTest(run.generationId);
         setRun(latest);
+        setHistory((current) => [latest, ...current.filter((item) => item.generationId !== latest.generationId)].slice(0, 12));
       } catch {
         setRunError(isRu ? "Не удалось обновить статус теста." : "Failed to refresh test status.");
       }
@@ -138,6 +155,8 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     try {
       const started = await startAdminTemplateTest(templateId, selectedFile);
       setRun(started);
+      setSelectedHistoryGenerationId(null);
+      setHistory((current) => [started, ...current.filter((item) => item.generationId !== started.generationId)].slice(0, 12));
     } catch (error) {
       setRunError(getStartTestErrorMessage(error, isRu, template?.templateType === "Video"));
     } finally {
@@ -161,6 +180,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     setSelectedFile(file);
     setSelectedFilePreviewUrl(objectUrl);
     setRun(null);
+    setSelectedHistoryGenerationId(null);
     setRunError(null);
   }
 
@@ -168,6 +188,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     clearSelectedFilePreviewUrl();
     setSelectedFile(null);
     setRun(null);
+    setSelectedHistoryGenerationId(null);
     setRunError(null);
   }
 
@@ -182,31 +203,38 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
   const isVideoTemplate = template?.templateType !== "Image";
   const templateSlug = isVideoTemplate ? "video" : "image";
-  const timeline = useMemo(() => buildTimeline(run, locale, isVideoTemplate), [isVideoTemplate, locale, run]);
+  const activeRun = useMemo(() => {
+    if (!selectedHistoryGenerationId) {
+      return run;
+    }
+
+    return history.find((item) => item.generationId === selectedHistoryGenerationId) ?? run;
+  }, [history, run, selectedHistoryGenerationId]);
+  const timeline = useMemo(() => buildTimeline(activeRun, locale, isVideoTemplate), [activeRun, isVideoTemplate, locale]);
   const catalogPath = `/${locale}/templates/${templateSlug}`;
   const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${templateId}`;
-  const sourceImageUrl = selectedFilePreviewUrl ?? run?.sourceImageAsset?.url ?? undefined;
-  const selectedFileName = selectedFile?.name ?? run?.sourceImageAsset?.fileName ?? (isRu ? "Фото не выбрано" : "No photo selected");
+  const sourceImageUrl = selectedFilePreviewUrl ?? activeRun?.sourceImageAsset?.url ?? undefined;
+  const selectedFileName = selectedFile?.name ?? activeRun?.sourceImageAsset?.fileName ?? (isRu ? "Фото не выбрано" : "No photo selected");
   const selectedFileMeta = selectedFile
     ? `${formatBytes(selectedFile.size)} • ${selectedFile.type || "image/*"}`
-    : run?.sourceImageAsset?.fileSizeBytes
-      ? `${formatBytes(run.sourceImageAsset.fileSizeBytes)} • ${run.sourceImageAsset.contentType}`
+    : activeRun?.sourceImageAsset?.fileSizeBytes
+      ? `${formatBytes(activeRun.sourceImageAsset.fileSizeBytes)} • ${activeRun.sourceImageAsset.contentType}`
       : (isRu ? "Выберите image/* файл" : "Choose an image/* file");
-  const generationDuration = formatGenerationDuration(run, isRu);
+  const generationDuration = formatGenerationDuration(activeRun, isRu);
   const petMagicBillingLabel = isRu ? "Стоимость PetMagic" : "PetMagic billing";
   const falProviderCostLabel = isRu ? "Стоимость Fal" : (isVideoTemplate ? "Fal motion cost" : "Fal image cost");
   const falInferenceLabel = isRu ? "Fal inference" : (isVideoTemplate ? "Fal inference time" : "Fal image inference");
-  const internalTokenCost = run?.tokenCost ?? template?.tokenCost ?? 0;
+  const internalTokenCost = activeRun?.tokenCost ?? template?.tokenCost ?? 0;
   const internalBillingText = formatTokenCost(internalTokenCost, isRu);
-  const providerCostText = formatProviderCost(run, locale);
-  const providerInferenceText = formatProviderInference(run, isRu, isVideoTemplate);
-  const statusText = run?.status ?? (isRu ? "Ожидает запуска" : "Waiting to start");
-  const lastUpdateText = run ? formatDateTime(run.updatedAtUtc, locale, true) : "-";
-  const finalDownloadName = run && template
-    ? buildGeneratedDownloadName(template.title, run.generationId, isVideoTemplate ? ".mp4" : ".png")
+  const providerCostText = formatProviderCost(activeRun, locale);
+  const providerInferenceText = formatProviderInference(activeRun, isRu, isVideoTemplate);
+  const statusText = activeRun?.status ?? (isRu ? "Ожидает запуска" : "Waiting to start");
+  const lastUpdateText = activeRun ? formatDateTime(activeRun.updatedAtUtc, locale, true) : "-";
+  const finalDownloadName = activeRun && template
+    ? buildGeneratedDownloadName(template.title, activeRun.generationId, isVideoTemplate ? ".mp4" : ".png")
     : undefined;
   const runDetails = buildRunDetails({
-    run,
+    run: activeRun,
     locale,
     isRu,
     isVideoTemplate,
@@ -302,7 +330,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
             <div className={styles.sectionHeaderRow}>
               <StepHeader number="1" title={isRu ? "Результат генерации" : "Generation result"} />
               <div className={styles.resultHeaderActions}>
-                <StatusPill tone={run?.status === "Completed" ? "success" : run?.status === "Failed" ? "danger" : run ? "info" : "muted"}>
+                <StatusPill tone={activeRun?.status === "Completed" ? "success" : activeRun?.status === "Failed" ? "danger" : activeRun ? "info" : "muted"}>
                   {statusText}
                 </StatusPill>
                 <Button variant="primary" disabled={isSubmitting} onClick={() => void handleStartTest()}>
@@ -394,6 +422,48 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 <DetailRow key={item.label} label={item.label} value={item.value} multiline={item.multiline} />
               ))}
             </div>
+          </section>
+
+          <section className={styles.card}>
+            <StepHeader number="4" title={isRu ? "История тестов" : "Test history"} badge={history.length ? String(history.length) : undefined} />
+            {history.length ? (
+              <div className={styles.historyList}>
+                {history.map((item) => {
+                  const isCurrent = activeRun?.generationId === item.generationId;
+                  const sourceLabel = item.sourceImageAsset?.fileName ?? (isRu ? "Фото не выбрано" : "No photo selected");
+
+                  return (
+                    <button
+                      key={item.generationId}
+                      type="button"
+                      className={`${styles.historyItem} ${isCurrent ? styles.historyItemCurrent : ""}`}
+                      onClick={() => {
+                        setSelectedHistoryGenerationId(item.generationId);
+                        setRunError(null);
+                      }}
+                    >
+                      <div className={styles.historyItemHeader}>
+                        <div className={styles.historyItemTitleBlock}>
+                          <strong>{formatDateTime(item.createdAtUtc, locale, true)}</strong>
+                          <span>{sourceLabel}</span>
+                        </div>
+                        <StatusPill tone={item.status === "Completed" ? "success" : item.status === "Failed" ? "danger" : item.status === "Queued" ? "info" : "muted"}>
+                          {item.status}
+                        </StatusPill>
+                      </div>
+                      <div className={styles.historyItemMeta}>
+                        <span>{isRu ? "Попытка" : "Attempt"}: {item.attemptCount}</span>
+                        <span>{isRu ? "Токены" : "Tokens"}: {item.tokenCost}</span>
+                        <span>{isRu ? "Старт" : "Started"}: {formatDateTime(item.startedAtUtc, locale, true)}</span>
+                        <span>{isRu ? "Завершён" : "Completed"}: {formatDateTime(item.completedAtUtc, locale, true)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className={styles.infoText}>{isRu ? "История тестовых запусков появится после первого запуска." : "Test run history will appear after the first run starts."}</p>
+            )}
           </section>
         </div>
       </div>
@@ -614,6 +684,28 @@ function MediaPreviewCard({
 }) {
   const previewUrl = videoUrl ?? imageUrl;
 
+  async function handleDownload() {
+    if (!previewUrl) {
+      return;
+    }
+
+    const response = await fetch(previewUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download asset: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = downloadName ?? (videoUrl ? "template-test.mp4" : "template-test.png");
+    anchor.rel = "noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+
   return (
     <section className={`${styles.mediaPreviewCard} ${styles[`mediaPreviewCard_${accent}`]}`}>
       <div className={styles.mediaCardHeader}>
@@ -622,7 +714,7 @@ function MediaPreviewCard({
       </div>
 
       {videoUrl ? (
-        <video src={videoUrl} controls className={styles.mediaAsset} />
+        <video src={videoUrl} controls muted playsInline preload="metadata" className={styles.mediaAsset} />
       ) : imageUrl ? (
         <div role="img" aria-label={title} className={`${styles.mediaAsset} ${styles.mediaAssetImage}`} style={{ backgroundImage: toCssImageUrl(imageUrl) }} />
       ) : (
@@ -643,10 +735,10 @@ function MediaPreviewCard({
               {videoUrl ? <PlayCircleIcon className={styles.inlineIcon} /> : <ImageIcon className={styles.inlineIcon} />}
               <span>{openLabel ?? "Open"}</span>
             </a>
-            <a href={previewUrl} download={downloadName} className={`${styles.mediaActionLink} ${styles.mediaActionLinkPrimary}`}>
+            <button type="button" onClick={() => void handleDownload()} className={`${styles.mediaActionLink} ${styles.mediaActionLinkPrimary}`}>
               <DownloadIcon className={styles.inlineIcon} />
               <span>{downloadLabel ?? "Download"}</span>
-            </a>
+            </button>
           </div>
         ) : null}
       </div>

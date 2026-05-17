@@ -3,6 +3,7 @@ import type { SetTemplateFormState, TemplateFormState } from "@/components/templ
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
+import { getImageModelPrice, getMotionModelPrice, formatPrice } from "@/lib/model-pricing";
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
@@ -293,6 +294,9 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
   const lower = model.toLowerCase();
 
   if (kind === "motion") {
+    const price = getMotionModelPrice(model);
+    const priceStr = price !== null ? `${formatPrice(price)}/sec` : null;
+
     if (lower.includes("/pro/")) {
       return {
         value: model,
@@ -300,6 +304,7 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
         description: "Motion control for highest-fidelity generation.",
         badge: "Premium",
         tone: "premium",
+        price: priceStr ?? undefined,
       };
     }
 
@@ -309,8 +314,12 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
       description: "Motion control tuned for quicker iteration.",
       badge: "Fast",
       tone: "fast",
+      price: priceStr ?? undefined,
     };
   }
+
+  const price = getImageModelPrice(model);
+  const priceStr = price !== null ? formatPrice(price) : null;
 
   if (lower.includes("gpt-image-2") || lower.includes("nano-banana-2")) {
     return {
@@ -319,6 +328,7 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
       description: "Image edit pass for balanced fidelity and consistency.",
       badge: "Recommended",
       tone: "recommended",
+      price: priceStr ?? undefined,
     };
   }
 
@@ -329,6 +339,7 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
       description: "Image edit pass focused on premium detail retention.",
       badge: "Premium",
       tone: "premium",
+      price: priceStr ?? undefined,
     };
   }
 
@@ -338,5 +349,6 @@ function buildModelOption(model: string, kind: "preprocess" | "motion"): SelectO
     description: "Image edit pass optimized for faster turnaround.",
     badge: "Fast",
     tone: "fast",
+    price: priceStr ?? undefined,
   };
 }

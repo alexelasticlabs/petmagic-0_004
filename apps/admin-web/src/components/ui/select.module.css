@@ -183,6 +183,27 @@
   flex: 0 0 auto;
 }
 
+.optionPrice {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #7dd3fc;
+  white-space: nowrap;
+}
+
+.triggerMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  flex: 0 0 auto;
+}
+
+.triggerPrice {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #7dd3fc;
+  white-space: nowrap;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -249,5 +270,3 @@
     align-self: flex-start;
   }
 }
-
-

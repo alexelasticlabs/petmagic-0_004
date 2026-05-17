@@ -1,36 +1,36 @@
 "use client";
 
 import {
-    CalendarIcon,
-    CancelCircleIcon,
-    ChartIcon,
-    ImageIcon,
-    PencilIcon,
-    PlayCircleIcon,
-    RefreshIcon,
-    VideoIcon,
+  CalendarIcon,
+  CancelCircleIcon,
+  ChartIcon,
+  ImageIcon,
+  PencilIcon,
+  PlayCircleIcon,
+  RefreshIcon,
+  VideoIcon,
 } from "@/components/admin/admin-icons";
 import { AdminCard, AdminFilterBar, AdminPage, AdminPageGrid, AdminStateCard, AdminStatusBadge, AdminToolbar, adminTableStyles } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import {
-    getCharacterOrientationLabel,
-    getTemplateAccessLabel,
-    getTemplateStatusLabel,
-    getTemplateTypeLabel,
+  getCharacterOrientationLabel,
+  getTemplateAccessLabel,
+  getTemplateStatusLabel,
+  getTemplateTypeLabel,
 } from "@/components/templates/template-admin-shared";
 import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import {
-    changeTemplateStatus,
-    deleteTemplate,
-    fetchAdminTemplates,
-    fetchAdminTemplatesAnalyticsOverview,
-    type AdminTemplateListItem,
-    type AdminTemplatesAnalyticsTemplateRow,
-    type TemplateStatus,
-    type TemplateType,
+  changeTemplateStatus,
+  deleteTemplate,
+  fetchAdminTemplates,
+  fetchAdminTemplatesAnalyticsOverview,
+  type AdminTemplateListItem,
+  type AdminTemplatesAnalyticsTemplateRow,
+  type TemplateStatus,
+  type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Image from "next/image";
@@ -242,13 +242,13 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
       return matchesSearch && matchesCategory && matchesAccess && matchesStatus;
     })
     .sort((firstTemplate, secondTemplate) => compareTemplates(firstTemplate, secondTemplate, sortMode)), [
-      accessFilter,
-      categoryFilter,
-      normalizedSearch,
-      sortMode,
-      statusFilter,
-      visiblePool,
-    ]);
+    accessFilter,
+    categoryFilter,
+    normalizedSearch,
+    sortMode,
+    statusFilter,
+    visiblePool,
+  ]);
 
   if (isLoading) {
     return (
@@ -758,10 +758,19 @@ function getSuccessRatePercent(analytics?: AdminTemplatesAnalyticsTemplateRow) {
 
 function getTemplateCardMetrics(template: AdminTemplateListItem, analytics: AdminTemplatesAnalyticsTemplateRow | undefined, locale: Locale) {
   const isRu = locale === "ru";
+
+  // Format cost in USD if available, otherwise show token cost
+  let costValue: string;
+  if (template.estimatedCostUsd !== undefined && template.estimatedCostUsd !== null) {
+    costValue = `$${template.estimatedCostUsd.toFixed(3)}`;
+  } else {
+    costValue = `${formatAnalyticsInteger(template.tokenCost)} ${isRu ? "ток." : "tok."}`;
+  }
+
   const metrics = [
     {
       label: isRu ? "Стоимость" : "Template cost",
-      value: `${formatAnalyticsInteger(template.tokenCost)} ${isRu ? "ток." : "tok."}`,
+      value: costValue,
       tone: "cardMetric_primary",
     },
     {

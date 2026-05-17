@@ -126,7 +126,8 @@ public sealed record AdminTemplateListItemResponse(
     double? ReferenceVideoDurationSeconds,
     string? CharacterOrientation,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    decimal? EstimatedCostUsd = null);
 
 public sealed record AdminTemplateCategoryListItemResponse(
     Guid CategoryId,
