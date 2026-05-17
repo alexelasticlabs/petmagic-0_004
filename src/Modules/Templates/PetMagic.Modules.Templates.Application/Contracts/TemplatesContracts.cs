@@ -74,6 +74,17 @@ public sealed record UpdateVideoTemplateCommand(
 
 public sealed record ChangeTemplateStatusCommand(Guid TemplateId, string Status);
 
+public sealed record CreateTemplateCategoryCommand(
+    string Name);
+
+public sealed record UpdateTemplateCategoryCommand(
+    Guid CategoryId,
+    string Name);
+
+public sealed record ChangeTemplateCategoryArchiveStateCommand(
+    Guid CategoryId,
+    bool IsArchived);
+
 public sealed record StartTemplateGenerationCommand(
     Guid UserId,
     Guid TemplateId,
@@ -110,6 +121,21 @@ public sealed record AdminTemplateListItemResponse(
     string? MusicDescription,
     double? ReferenceVideoDurationSeconds,
     string? CharacterOrientation,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record AdminTemplateCategoryListItemResponse(
+    Guid CategoryId,
+    string Name,
+    bool IsArchived,
+    int TotalTemplates,
+    int VideoTemplates,
+    int ImageTemplates,
+    int ActiveTemplates,
+    int DraftTemplates,
+    int ArchivedTemplates,
+    int PremiumTemplates,
+    string[] Tags,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 

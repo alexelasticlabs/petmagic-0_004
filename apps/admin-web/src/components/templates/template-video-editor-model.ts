@@ -1,9 +1,8 @@
 import { parseNumber, parseOptionalDecimal } from "@/components/templates/template-form-mappers";
+import { resolveAutoPromoBadge } from "@/components/templates/template-promo-badge-rules";
 import { type TemplateFormState } from "@/components/templates/types";
 import { type AdminTemplate, type TemplatePromoBadgeMode } from "@/lib/api-client";
 import { type Dictionary } from "@/lib/i18n";
-
-const FUNNY_PROMO_BADGE_KEYWORDS = ["funny", "meme", "viral", "dance", "lol", "cute"];
 
 export type ChecklistItem = {
   label: string;
@@ -141,33 +140,14 @@ function resolveEffectivePromoBadge(
     return form.promoBadgeMode as Exclude<TemplatePromoBadgeMode, "Auto">;
   }
 
-  if (selectedTemplate) {
-    const createdAt = new Date(selectedTemplate.createdAtUtc).getTime();
-    const updatedAt = new Date(selectedTemplate.updatedAtUtc).getTime();
-    const now = Date.now();
-
-    if (createdAt >= now - 30 * 24 * 60 * 60 * 1000) {
-      return "New";
-    }
-
-    if (selectedTemplate.status === "Active" && updatedAt >= now - 14 * 24 * 60 * 60 * 1000) {
-      return "Trending";
-    }
-  }
-
-  const searchText = [form.title, form.shortDescription, form.category, form.tags, form.musicDescription, form.klingPrompt]
-    .join(" ")
-    .toLowerCase();
-
-  if (parseNumber(form.tokenCost) >= 60 || form.isPremium) {
-    return "Popular";
-  }
-
-  if (FUNNY_PROMO_BADGE_KEYWORDS.some((keyword) => searchText.includes(keyword))) {
-    return "Funny";
-  }
-
-  return "New";
+  return resolveAutoPromoBadge({
+    createdAtUtc: selectedTemplate?.createdAtUtc,
+    updatedAtUtc: selectedTemplate?.updatedAtUtc,
+    status: selectedTemplate?.status,
+    isPremium: form.isPremium,
+    tokenCost: parseNumber(form.tokenCost),
+    searchFragments: [form.title, form.shortDescription, form.category, form.tags, form.musicDescription, form.klingPrompt],
+  });
 }
 
 function inferCharacterOrientation(duration?: number): string {

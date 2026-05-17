@@ -1336,32 +1336,20 @@ internal sealed class TemplatesService(
             return template.PromoBadgeMode.ToString();
         }
 
-        if (template.CreatedAtUtc >= utcNow.AddDays(-30))
-        {
-            return TemplatePromoBadgeMode.New.ToString();
-        }
-
-        if (template.Status == TemplateStatus.Active && template.UpdatedAtUtc >= utcNow.AddDays(-14))
-        {
-            return TemplatePromoBadgeMode.Trending.ToString();
-        }
-
-        if (template.Status == TemplateStatus.Active && (template.IsPremium || template.TokenCost >= 60))
-        {
-            return TemplatePromoBadgeMode.Popular.ToString();
-        }
-
-        var searchText = string.Join(' ', [
-            template.Title,
-            template.ShortDescription,
-            template.Category,
-            template.Tags,
-            template.MusicDescription ?? string.Empty,
-            template.KlingPrompt ?? string.Empty
-        ]).ToLowerInvariant();
-
-        return TemplatePromoBadgeRules.FunnyKeywords.Any(keyword => searchText.Contains(keyword, StringComparison.Ordinal))
-            ? TemplatePromoBadgeMode.Funny.ToString()
-            : null;
+        return TemplatePromoBadgeRules.ResolveAutoBadge(
+            template.CreatedAtUtc,
+            template.UpdatedAtUtc,
+            template.Status,
+            template.IsPremium,
+            template.TokenCost,
+            [
+                template.Title,
+                template.ShortDescription,
+                template.Category,
+                template.Tags,
+                template.MusicDescription,
+                template.KlingPrompt
+            ],
+            utcNow);
     }
 }
