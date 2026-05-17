@@ -736,6 +736,34 @@
   gap: 0.72rem;
 }
 
+.feedbackToolbar {
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: end;
+}
+
+.feedbackSearchInput {
+  width: min(22rem, 100%);
+  min-height: 2.15rem;
+  border: 1px solid #25354a;
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.72rem;
+  background: rgba(12, 22, 36, 0.86);
+  color: #dbe8f8;
+  font-size: 0.78rem;
+}
+
+.feedbackSearchInput::placeholder {
+  color: #70859f;
+}
+
+.feedbackSearchInput:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.18);
+}
+
 .feedbackItem {
   display: grid;
   gap: 0.58rem;
@@ -907,6 +935,15 @@
 
   .summaryGrid {
     grid-template-columns: 1fr;
+  }
+
+  .feedbackToolbar {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .feedbackSearchInput {
+    width: 100%;
   }
 
   .chartSummaryRow {

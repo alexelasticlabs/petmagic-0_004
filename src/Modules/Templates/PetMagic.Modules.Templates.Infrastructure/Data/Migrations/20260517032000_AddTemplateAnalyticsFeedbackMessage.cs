@@ -1,9 +1,13 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using PetMagic.Modules.Templates.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
+    [DbContext(typeof(TemplatesDbContext))]
+    [Migration("20260517032000_AddTemplateAnalyticsFeedbackMessage")]
     public partial class AddTemplateAnalyticsFeedbackMessage : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)

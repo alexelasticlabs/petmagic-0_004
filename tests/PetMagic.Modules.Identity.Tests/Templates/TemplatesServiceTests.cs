@@ -735,12 +735,54 @@ public sealed class TemplatesServiceTests
         await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "complaint", "profile", "web", "de", Guid.NewGuid(), null, "Видео зависло на обработке"), CancellationToken.None);
         await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "feedback", "home", "ios", "us", Guid.NewGuid(), Guid.NewGuid(), "Хочу больше вариантов музыки"), CancellationToken.None);
 
-        var feedback = await service.GetAdminFeedbackAsync(created.Value.TemplateId, 10, CancellationToken.None);
+        var feedback = await service.GetAdminFeedbackAsync(created.Value.TemplateId, new AdminTemplateFeedbackQuery(null, null, 10), CancellationToken.None);
 
         Assert.True(feedback.IsSuccess);
         Assert.Equal(2, feedback.Value.Count);
         Assert.Contains(feedback.Value, x => x.EventType == "complaint" && x.FeedbackMessage == "Видео зависло на обработке");
         Assert.Contains(feedback.Value, x => x.EventType == "feedback" && x.FeedbackMessage == "Хочу больше вариантов музыки");
+    }
+
+    [Fact]
+    public async Task GetAdminFeedbackAsync_ShouldFilterByTypeAndSearchMessage()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Feedback Filters",
+                "Template with searchable feedback",
+                "Dance",
+                ["feedback"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "complaint", "profile", "web", "de", Guid.NewGuid(), null, "Видео зависло на обработке"), CancellationToken.None);
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "feedback", "home", "ios", "us", Guid.NewGuid(), Guid.NewGuid(), "Хочу больше вариантов музыки"), CancellationToken.None);
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "feedback", "home", "web", "us", Guid.NewGuid(), Guid.NewGuid(), "Нужен более быстрый рендер"), CancellationToken.None);
+
+        var filtered = await service.GetAdminFeedbackAsync(
+            created.Value.TemplateId,
+            new AdminTemplateFeedbackQuery("feedback", "музыки", 10),
+            CancellationToken.None);
+
+        Assert.True(filtered.IsSuccess);
+        var item = Assert.Single(filtered.Value);
+        Assert.Equal("feedback", item.EventType);
+        Assert.Equal("Хочу больше вариантов музыки", item.FeedbackMessage);
     }
 
     [Fact]

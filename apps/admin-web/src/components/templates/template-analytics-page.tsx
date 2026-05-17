@@ -52,6 +52,7 @@ type PeriodKey = "7d" | "30d" | "90d" | "all";
 type TrendMetricKey = "totalRuns" | "completedRuns" | "failedRuns" | "totalTokenCost" | "averageGenerationSeconds";
 type MetricAccent = "blue" | "green" | "red" | "cyan" | "neutral";
 type RecentRunsMode = "latest" | "all" | "failed";
+type FeedbackFilterKey = "all" | "complaint" | "feedback";
 
 const RECENT_RUNS_PREVIEW_LIMIT = 8;
 
@@ -103,6 +104,11 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
   const [recentRunsError, setRecentRunsError] = useState<string | null>(null);
   const [failureBreakdown, setFailureBreakdown] = useState<AdminTemplateFailureBreakdownItem[]>([]);
   const [feedbackItems, setFeedbackItems] = useState<AdminTemplateFeedbackItem[]>([]);
+  const [feedbackFilter, setFeedbackFilter] = useState<FeedbackFilterKey>("all");
+  const [feedbackSearchInput, setFeedbackSearchInput] = useState("");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [eventAnalytics, setEventAnalytics] = useState<AdminTemplateEventAnalytics | null>(null);
   const [period, setPeriod] = useState<PeriodKey>("30d");
   const [chartMetric, setChartMetric] = useState<TrendMetricKey>("totalRuns");
@@ -111,6 +117,11 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
   const [error, setError] = useState<string | null>(null);
 
   const periodAnalytics = useMemo(() => buildPeriodAnalytics(trendPoints, period), [trendPoints, period]);
+  const feedbackOptions: Array<{ key: FeedbackFilterKey; label: string }> = [
+    { key: "all", label: text.feedbackFilterAll },
+    { key: "complaint", label: text.feedbackFilterComplaint },
+    { key: "feedback", label: text.feedbackFilterFeedback },
+  ];
   const visibleRecentRuns = useMemo(() => {
     const allRuns = allRecentRuns ?? recentRunsPreview;
     if (recentRunsMode === "all") {
@@ -123,6 +134,17 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 
     return recentRunsPreview;
   }, [allRecentRuns, recentRunsMode, recentRunsPreview]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setFeedbackSearch(feedbackSearchInput.trim());
+    }, 250);
+
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [feedbackSearchInput]);
+
   useEffect(() => {
     let isCancelled = false;
 
@@ -144,7 +166,6 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
           trendResponse,
           recentResponse,
           failureResponse,
-          feedbackResponse,
           eventResponse,
         ] = await Promise.all([
           fetchAdminTemplate(templateId),
@@ -152,7 +173,6 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
           fetchAdminTemplateTrends(templateId),
           fetchAdminTemplateRecentGenerations(templateId, RECENT_RUNS_PREVIEW_LIMIT),
           fetchAdminTemplateFailureBreakdown(templateId),
-          fetchAdminTemplateFeedback(templateId),
           fetchAdminTemplateEventAnalytics(templateId),
         ]);
 
@@ -165,7 +185,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
         setTrendPoints(trendResponse);
         setRecentRunsPreview(recentResponse);
         setFailureBreakdown(failureResponse);
-        setFeedbackItems(feedbackResponse);
+        setFeedbackItems([]);
         setEventAnalytics(eventResponse);
       } catch {
         if (!isCancelled) {
@@ -184,6 +204,41 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
       isCancelled = true;
     };
   }, [locale, router, templateId, text.loadError]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadFeedback() {
+      setIsFeedbackLoading(true);
+      setFeedbackError(null);
+
+      try {
+        const items = await fetchAdminTemplateFeedback(templateId, {
+          take: 50,
+          type: feedbackFilter === "all" ? undefined : feedbackFilter,
+          search: feedbackSearch || undefined,
+        });
+
+        if (!isCancelled) {
+          setFeedbackItems(items);
+        }
+      } catch {
+        if (!isCancelled) {
+          setFeedbackError(text.feedbackLoadError);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsFeedbackLoading(false);
+        }
+      }
+    }
+
+    void loadFeedback();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [feedbackFilter, feedbackSearch, templateId, text.feedbackLoadError]);
 
   if (isLoading) {
     return (
@@ -505,11 +560,36 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
       </div>
 
       <section className={styles.sectionCard}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitleWithIcon}><ChartIcon className={styles.sectionTitleIcon} /><span>{text.feedbackTitle}</span></h2>
-          <p>{text.feedbackHint}</p>
+        <div className={styles.sectionHeaderRow}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitleWithIcon}><ChartIcon className={styles.sectionTitleIcon} /><span>{text.feedbackTitle}</span></h2>
+            <p>{text.feedbackHint}</p>
+          </div>
+          <div className={styles.feedbackToolbar}>
+            <div className={styles.chartTabs} aria-label={text.feedbackFilterLabel}>
+              {feedbackOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={feedbackFilter === option.key ? styles.chartTabActive : styles.chartTab}
+                  onClick={() => setFeedbackFilter(option.key)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+            <input
+              type="search"
+              value={feedbackSearchInput}
+              onChange={(event) => setFeedbackSearchInput(event.target.value)}
+              className={styles.feedbackSearchInput}
+              placeholder={text.feedbackSearchPlaceholder}
+              aria-label={text.feedbackSearchLabel}
+            />
+          </div>
         </div>
-        <FeedbackList locale={locale} items={feedbackItems} text={text} />
+        {feedbackError ? <p className={styles.emptyState}>{feedbackError}</p> : null}
+        <FeedbackList locale={locale} items={feedbackItems} text={text} isLoading={isFeedbackLoading} hasActiveFilter={feedbackFilter !== "all" || feedbackSearch.length > 0} />
       </section>
 
       <section className={styles.sectionCard}>
@@ -939,9 +1019,25 @@ function FailureBreakdownList({ locale, items, text }: { locale: Locale; items: 
   );
 }
 
-function FeedbackList({ locale, items, text }: { locale: Locale; items: readonly AdminTemplateFeedbackItem[]; text: AnalyticsCopy }) {
+function FeedbackList({
+  locale,
+  items,
+  text,
+  isLoading,
+  hasActiveFilter,
+}: {
+  locale: Locale;
+  items: readonly AdminTemplateFeedbackItem[];
+  text: AnalyticsCopy;
+  isLoading: boolean;
+  hasActiveFilter: boolean;
+}) {
+  if (isLoading) {
+    return <p className={styles.emptyState}>{text.feedbackLoading}</p>;
+  }
+
   if (!items.length) {
-    return <p className={styles.emptyState}>{text.feedbackEmpty}</p>;
+    return <p className={styles.emptyState}>{hasActiveFilter ? text.feedbackFilteredEmpty : text.feedbackEmpty}</p>;
   }
 
   const isRu = locale === "ru";
@@ -1027,7 +1123,16 @@ function getAnalyticsCopy(locale: Locale) {
     complaintsHint: isRu ? "События complaint из публичного analytics endpoint." : "Complaint events from the public analytics endpoint.",
     feedbackTitle: isRu ? "Жалобы и фидбек" : "Complaints and feedback",
     feedbackHint: isRu ? "Последние обращения пользователей по шаблону: complaint и feedback события с текстом и метаданными." : "Latest user complaints and feedback for this template with message text and event metadata.",
+    feedbackFilterLabel: isRu ? "Фильтр фидбека" : "Feedback filter",
+    feedbackFilterAll: isRu ? "Все" : "All",
+    feedbackFilterComplaint: isRu ? "Жалобы" : "Complaints",
+    feedbackFilterFeedback: isRu ? "Фидбек" : "Feedback",
+    feedbackSearchLabel: isRu ? "Поиск по тексту фидбека" : "Search feedback text",
+    feedbackSearchPlaceholder: isRu ? "Поиск по тексту сообщения" : "Search message text",
+    feedbackLoading: isRu ? "Загрузка обращений..." : "Loading feedback...",
     feedbackEmpty: isRu ? "Пока нет пользовательских жалоб или фидбека по этому шаблону." : "There is no user complaint or feedback for this template yet.",
+    feedbackFilteredEmpty: isRu ? "По текущему фильтру и поиску ничего не найдено." : "No items matched the current filter and search.",
+    feedbackLoadError: isRu ? "Не удалось загрузить жалобы и фидбек." : "Failed to load complaints and feedback.",
     feedbackMessageMissing: isRu ? "Без текста сообщения." : "No message text provided.",
     feedbackTypeComplaint: isRu ? "Жалоба" : "Complaint",
     feedbackTypeFeedback: isRu ? "Фидбек" : "Feedback",

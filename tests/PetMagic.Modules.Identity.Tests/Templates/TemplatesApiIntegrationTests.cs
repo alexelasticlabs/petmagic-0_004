@@ -345,7 +345,7 @@ public sealed class TemplatesApiIntegrationTests
 
         var items = await GetFromJsonAsync<IReadOnlyList<AdminTemplateFeedbackItemResponse>>(
             application.Client,
-            $"/api/admin/templates/{created.TemplateId}/statistics/feedback");
+            $"/api/admin/templates/{created.TemplateId}/statistics/feedback?type=feedback&search=%D0%BF%D1%80%D0%B5%D0%B4%D0%BF%D1%80%D0%BE%D1%81%D0%BC%D0%BE%D1%82%D1%80");
 
         var item = Assert.Single(items);
         Assert.Equal("feedback", item.EventType);

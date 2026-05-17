@@ -68,6 +68,8 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("TemplateId", "CountryCode");
 
+                    b.HasIndex("TemplateId", "CreatedAtUtc");
+
                     b.HasIndex("TemplateId", "DeviceClass");
 
                     b.HasIndex("TemplateId", "Source");

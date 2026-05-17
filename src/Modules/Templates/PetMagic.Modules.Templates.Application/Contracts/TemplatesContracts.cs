@@ -223,6 +223,11 @@ public sealed record AdminTemplateFeedbackItemResponse(
     Guid? GenerationId,
     DateTime CreatedAtUtc);
 
+public sealed record AdminTemplateFeedbackQuery(
+    string? Type,
+    string? Search,
+    int? Take);
+
 public sealed record AdminTemplatesAnalyticsFeedbackItemResponse(
     Guid EventId,
     Guid TemplateId,

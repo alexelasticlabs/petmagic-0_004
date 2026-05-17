@@ -162,12 +162,16 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<IReadOnlyList<AdminTemplateFeedbackItemResponse>>, ProblemHttpResult>> GetFeedbackAsync(
         Guid templateId,
+        [FromQuery] string? type,
+        [FromQuery] string? search,
         [FromQuery] int? take,
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var size = Math.Clamp(take ?? 50, 1, 200);
-        var result = await service.GetAdminFeedbackAsync(templateId, size, cancellationToken);
+        var result = await service.GetAdminFeedbackAsync(
+            templateId,
+            new AdminTemplateFeedbackQuery(type, search, take),
+            cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);

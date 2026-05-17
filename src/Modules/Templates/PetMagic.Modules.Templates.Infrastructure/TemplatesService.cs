@@ -229,7 +229,7 @@ internal sealed class TemplatesService(
         return Result.Success(response);
     }
 
-    public async Task<Result<IReadOnlyList<AdminTemplateFeedbackItemResponse>>> GetAdminFeedbackAsync(Guid templateId, int take, CancellationToken cancellationToken)
+    public async Task<Result<IReadOnlyList<AdminTemplateFeedbackItemResponse>>> GetAdminFeedbackAsync(Guid templateId, AdminTemplateFeedbackQuery query, CancellationToken cancellationToken)
     {
         var templateExists = await dbContext.TemplateItems
             .AsNoTracking()
@@ -240,10 +240,26 @@ internal sealed class TemplatesService(
             return Result.Failure<IReadOnlyList<AdminTemplateFeedbackItemResponse>>(TemplatesErrors.NotFound);
         }
 
-        var items = await dbContext.TemplateAnalyticsEvents
+        var take = Math.Clamp(query.Take ?? 50, 1, 200);
+        var eventType = NormalizeAnalyticsFilter(query.Type);
+        var search = NormalizeOptionalText(query.Search, 200)?.ToLowerInvariant();
+
+        var feedbackQuery = dbContext.TemplateAnalyticsEvents
             .AsNoTracking()
             .Where(x => x.TemplateId == templateId)
-            .Where(x => x.EventType == AnalyticsEventTypeComplaint || x.EventType == AnalyticsEventTypeFeedback)
+            .Where(x => x.EventType == AnalyticsEventTypeComplaint || x.EventType == AnalyticsEventTypeFeedback);
+
+        if (eventType is AnalyticsEventTypeComplaint or AnalyticsEventTypeFeedback)
+        {
+            feedbackQuery = feedbackQuery.Where(x => x.EventType == eventType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            feedbackQuery = feedbackQuery.Where(x => x.FeedbackMessage != null && x.FeedbackMessage.ToLower().Contains(search));
+        }
+
+        var items = await feedbackQuery
             .OrderByDescending(x => x.CreatedAtUtc)
             .Take(take)
             .Select(x => new AdminTemplateFeedbackItemResponse(

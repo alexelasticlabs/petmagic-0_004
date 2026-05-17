@@ -181,6 +181,12 @@ export type AdminTemplateFeedbackItem = {
   createdAtUtc: string;
 };
 
+export type AdminTemplateFeedbackQuery = {
+  take?: number;
+  type?: "complaint" | "feedback";
+  search?: string;
+};
+
 export type AdminTemplatesAnalyticsFeedbackItem = {
   eventId: string;
   templateId: string;
@@ -658,8 +664,13 @@ export async function fetchAdminTemplateEventAnalytics(templateId: string): Prom
   return apiRequest<AdminTemplateEventAnalytics>(`/api/admin/templates/${templateId}/statistics/events`, { method: "GET" });
 }
 
-export async function fetchAdminTemplateFeedback(templateId: string, take = 50): Promise<AdminTemplateFeedbackItem[]> {
-  return apiRequest<AdminTemplateFeedbackItem[]>(`/api/admin/templates/${templateId}/statistics/feedback?take=${encodeURIComponent(String(take))}`, { method: "GET" });
+export async function fetchAdminTemplateFeedback(templateId: string, query: AdminTemplateFeedbackQuery = {}): Promise<AdminTemplateFeedbackItem[]> {
+  const params = new URLSearchParams();
+  if (query.take) params.set("take", String(query.take));
+  if (query.type) params.set("type", query.type);
+  if (query.search?.trim()) params.set("search", query.search.trim());
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return apiRequest<AdminTemplateFeedbackItem[]>(`/api/admin/templates/${templateId}/statistics/feedback${suffix}`, { method: "GET" });
 }
 
 export async function fetchAdminTemplatesAnalyticsOverview(query: AdminTemplatesAnalyticsQuery = {}): Promise<AdminTemplatesAnalyticsOverview> {
