@@ -717,7 +717,7 @@ function getCopy(locale: AppLocale) {
     topTitle: isRu ? "Топ шаблонов" : "Top templates",
     topHint: isRu ? "Сортировка синхронизирована с выбранными фильтрами." : "Sorted by the backend query.",
     tableTitle: isRu ? "Все шаблоны" : "All templates",
-    tableHint: isRu ? "Строки приходят из общего серверного API; admin UI не обращается к базе напрямую." : "Rows come from the aggregate endpoint, with no direct DB access from admin UI.",
+    tableHint: isRu ? "Сводная таблица шаблонов по просмотрам, генерациям, ошибкам и реальным затратам." : "Template table with views, generations, failures, and real provider costs.",
     templateCountLabel: isRu ? "шаблонов" : "templates",
     refreshing: isRu ? "обновляется" : "refreshing",
     templateColumn: isRu ? "Шаблон" : "Template",

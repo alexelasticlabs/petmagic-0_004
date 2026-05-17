@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 
 namespace PetMagic.Modules.Templates.Api.Endpoints;
@@ -56,7 +57,7 @@ public static class PublicTemplateEndpoints
         await service.RecordAnalyticsEventAsync(
             new RecordTemplateAnalyticsEventCommand(
                 templateId,
-                "view",
+                TemplateAnalyticsEventTypes.View,
                 source,
                 DetectDeviceClass(httpContext),
                 ResolveCountryCode(httpContext),
@@ -99,10 +100,10 @@ public static class PublicTemplateEndpoints
     {
         return eventType?.Trim().ToLowerInvariant() switch
         {
-            "video_view" => "video_view",
-            "complaint" => "complaint",
-            "feedback" => "feedback",
-            _ => "view"
+            TemplateAnalyticsEventTypes.VideoView => TemplateAnalyticsEventTypes.VideoView,
+            TemplateAnalyticsEventTypes.Complaint => TemplateAnalyticsEventTypes.Complaint,
+            TemplateAnalyticsEventTypes.Feedback => TemplateAnalyticsEventTypes.Feedback,
+            _ => TemplateAnalyticsEventTypes.View
         };
     }
 

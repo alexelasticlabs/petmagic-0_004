@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
@@ -17,12 +18,6 @@ internal sealed class TemplatesService(
     IMediaStorage mediaStorage,
     ITemplateMediaLifecycleService mediaLifecycleService) : ITemplatesService
 {
-    private static readonly string[] FunnyKeywords = ["funny", "meme", "viral", "dance", "lol", "cute"];
-    private const string AnalyticsEventTypeView = "view";
-    private const string AnalyticsEventTypeVideoView = "video_view";
-    private const string AnalyticsEventTypeComplaint = "complaint";
-    private const string AnalyticsEventTypeFeedback = "feedback";
-
     private sealed record GenerationStatisticsProjection(
         TemplateGenerationStatus Status,
         int TokenCost,
@@ -214,9 +209,9 @@ internal sealed class TemplatesService(
             .Where(x => x.TemplateId == templateId)
             .ToArrayAsync(cancellationToken);
 
-        var viewEvents = events.Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeView)).ToArray();
-        var videoViewEvents = events.Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeVideoView)).ToArray();
-        var complaintEvents = events.Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeComplaint)).ToArray();
+        var viewEvents = events.Where(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.View)).ToArray();
+        var videoViewEvents = events.Where(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.VideoView)).ToArray();
+        var complaintEvents = events.Where(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.Complaint)).ToArray();
 
         var response = new AdminTemplateEventAnalyticsResponse(
             viewEvents.Length,
@@ -247,9 +242,9 @@ internal sealed class TemplatesService(
         var feedbackQuery = dbContext.TemplateAnalyticsEvents
             .AsNoTracking()
             .Where(x => x.TemplateId == templateId)
-            .Where(x => x.EventType == AnalyticsEventTypeComplaint || x.EventType == AnalyticsEventTypeFeedback);
+            .Where(x => x.EventType == TemplateAnalyticsEventTypes.Complaint || x.EventType == TemplateAnalyticsEventTypes.Feedback);
 
-        if (eventType is AnalyticsEventTypeComplaint or AnalyticsEventTypeFeedback)
+        if (eventType is TemplateAnalyticsEventTypes.Complaint or TemplateAnalyticsEventTypes.Feedback)
         {
             feedbackQuery = feedbackQuery.Where(x => x.EventType == eventType);
         }
@@ -349,9 +344,9 @@ internal sealed class TemplatesService(
         var totalTokenCost = rows.Sum(x => x.TotalTokenCost);
         var totalProviderCostUsd = rows.Sum(x => x.TotalProviderCostUsd);
         var totalViews = rows.Sum(x => x.Views);
-        var totalComplaints = events.Count(x => IsAnalyticsEventType(x, AnalyticsEventTypeComplaint));
+        var totalComplaints = events.Count(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.Complaint));
         var viewEvents = events
-            .Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeView))
+            .Where(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.View))
             .ToArray();
         var feedbackItems = events
             .Where(IsFeedbackEvent)
@@ -436,7 +431,7 @@ internal sealed class TemplatesService(
             TemplateId = command.TemplateId,
             UserId = command.UserId,
             GenerationId = command.GenerationId,
-            EventType = NormalizeAnalyticsValue(command.EventType, AnalyticsEventTypeView, 64),
+            EventType = NormalizeAnalyticsValue(command.EventType, TemplateAnalyticsEventTypes.View, 64),
             Source = NormalizeAnalyticsValue(command.Source, "direct", 64),
             DeviceClass = NormalizeAnalyticsValue(command.DeviceClass, "unknown", 32),
             CountryCode = NormalizeAnalyticsValue(command.CountryCode, "unknown", 8).ToUpperInvariant(),
@@ -943,7 +938,7 @@ internal sealed class TemplatesService(
             template.IsPremium,
             template.TokenCost,
             GetAsset(template, TemplateAssetKind.Preview),
-            events.Count(x => IsAnalyticsEventType(x, AnalyticsEventTypeView)),
+            events.Count(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.View)),
             starts,
             completed,
             failed,
@@ -977,7 +972,7 @@ internal sealed class TemplatesService(
 
                 return new AdminTemplatesAnalyticsTrendPointResponse(
                     DateTime.SpecifyKind(day, DateTimeKind.Utc),
-                    dayEvents.Count(x => IsAnalyticsEventType(x, AnalyticsEventTypeView)),
+                    dayEvents.Count(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.View)),
                     dayJobs.Length,
                     dayJobs.Count(x => x.Status == TemplateGenerationStatus.Completed),
                     dayJobs.Count(x => x.Status == TemplateGenerationStatus.Failed),
@@ -1064,8 +1059,8 @@ internal sealed class TemplatesService(
 
     private static bool IsFeedbackEvent(TemplateAnalyticsEvent analyticsEvent)
     {
-        return IsAnalyticsEventType(analyticsEvent, AnalyticsEventTypeComplaint)
-            || IsAnalyticsEventType(analyticsEvent, AnalyticsEventTypeFeedback);
+        return IsAnalyticsEventType(analyticsEvent, TemplateAnalyticsEventTypes.Complaint)
+            || IsAnalyticsEventType(analyticsEvent, TemplateAnalyticsEventTypes.Feedback);
     }
 
     private async Task<GenerationAnalyticsProjection[]?> GetAnalyticsProjectionsAsync(Guid templateId, CancellationToken cancellationToken)
@@ -1365,7 +1360,7 @@ internal sealed class TemplatesService(
             template.KlingPrompt ?? string.Empty
         ]).ToLowerInvariant();
 
-        return FunnyKeywords.Any(keyword => searchText.Contains(keyword, StringComparison.Ordinal))
+        return TemplatePromoBadgeRules.FunnyKeywords.Any(keyword => searchText.Contains(keyword, StringComparison.Ordinal))
             ? TemplatePromoBadgeMode.Funny.ToString()
             : null;
     }

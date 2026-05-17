@@ -3,6 +3,8 @@ import { type TemplateFormState } from "@/components/templates/types";
 import { type AdminTemplate, type TemplatePromoBadgeMode } from "@/lib/api-client";
 import { type Dictionary } from "@/lib/i18n";
 
+const FUNNY_PROMO_BADGE_KEYWORDS = ["funny", "meme", "viral", "dance", "lol", "cute"];
+
 export type ChecklistItem = {
   label: string;
   detail: string;
@@ -161,7 +163,7 @@ function resolveEffectivePromoBadge(
     return "Popular";
   }
 
-  if (searchText.includes("funny") || searchText.includes("meme") || searchText.includes("viral") || searchText.includes("dance")) {
+  if (FUNNY_PROMO_BADGE_KEYWORDS.some((keyword) => searchText.includes(keyword))) {
     return "Funny";
   }
 
