@@ -36,7 +36,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactElement } from "react";
 
 type TemplatesCatalogViewProps = {
   locale: Locale;
@@ -55,7 +55,7 @@ const statusColors: Record<TemplateStatus, string> = {
   Archived: "#94a3b8",
 };
 
-const METRIC_ICONS: Record<string, JSX.Element> = {
+const METRIC_ICONS: Record<string, ReactElement> = {
   cardMetric_primary: (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}>
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
@@ -442,7 +442,7 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                                   template.templateType === "Video" ? <VideoIcon className={styles.listTemplateThumbIcon} /> : <ImageIcon className={styles.listTemplateThumbIcon} />
                                 )}
                               </div>
-                              <div className={styles.titleCell}>
+                              <div className={styles.titleCell} title={template.shortDescription}>
                                 <strong>{template.title}</strong>
                                 <span>{template.shortDescription}</span>
                                 <small className={styles.templateMetaId}>ID: {template.templateId.slice(0, 12)}</small>

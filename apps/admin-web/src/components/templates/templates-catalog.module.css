@@ -566,47 +566,72 @@
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table) {
-  min-width: 96rem;
+  min-width: 76rem;
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table th) {
-  padding: 0 0.7rem 0.9rem;
+  padding: 0 0.68rem 0.58rem;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table td) {
-  padding: 0.95rem 0.7rem;
-  border-bottom-color: rgba(33, 51, 45, 0.7);
+  padding: 0.54rem 0.68rem;
+  border-bottom-color: rgba(33, 51, 45, 0.55);
+  vertical-align: middle;
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table tbody tr) {
   background: linear-gradient(180deg, rgba(10, 15, 13, 0.9) 0%, rgba(5, 8, 7, 0.98) 100%);
+  transition: background 100ms ease, box-shadow 100ms ease;
+  cursor: default;
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:hover) {
-  background: linear-gradient(180deg, rgba(20, 33, 28, 0.9) 0%, rgba(10, 15, 13, 1) 100%);
+  background: linear-gradient(180deg, rgba(20, 36, 30, 0.96) 0%, rgba(12, 20, 16, 1) 100%);
+  box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px rgba(52, 211, 153, 0.06);
+}
+
+.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:last-child td) {
+  border-bottom: none;
+}
+
+/* sticky actions column */
+.listCard :global(.admin-primitives-module__gNhzuG__table thead tr th:last-child),
+.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr td:last-child) {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: #070d0b;
+  border-left: 1px solid rgba(33, 51, 45, 0.55);
+  box-shadow: -4px 0 10px rgba(0, 0, 0, 0.35);
+}
+
+.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:hover td:last-child) {
+  background: #0d1c17;
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__statusBadge) {
-  min-height: 1.7rem;
-  padding-inline: 0.7rem;
+  min-height: 1.4rem;
+  padding-inline: 0.55rem;
+  font-size: 0.68rem;
 }
 
 .listTemplateCell {
   min-width: 0;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.8rem;
+  flex-wrap: nowrap;
+  gap: 0.6rem;
 }
 
 .listTemplateThumb {
   position: relative;
-  width: 3.4rem;
-  height: 3.4rem;
-  flex: 0 0 3.4rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: 0 0 2.6rem;
   display: grid;
   place-items: center;
   border: 1px solid var(--border-soft);
@@ -620,10 +645,10 @@
 }
 
 .listTemplateThumbVideo {
-  width: 1.95rem;
+  width: 1.5rem;
   height: auto;
   aspect-ratio: var(--template-video-aspect-ratio);
-  flex-basis: 1.95rem;
+  flex-basis: 1.5rem;
 }
 
 .listTemplateMedia {
@@ -647,16 +672,16 @@
 
 .titleCell strong {
   color: var(--text-strong);
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   line-height: 1.2;
 }
 
 .titleCell span {
   color: var(--text-muted);
-  font-size: 0.76rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  line-height: 1.3;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -678,15 +703,15 @@
 .typeBadge {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   width: fit-content;
-  min-height: 1.7rem;
+  min-height: 1.4rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  padding: 0.24rem 0.58rem;
+  padding: 0.18rem 0.46rem;
   background: rgba(5, 8, 7, 0.86);
   color: var(--text-strong);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 900;
 }
 
@@ -707,10 +732,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.7rem;
+  min-height: 1.4rem;
   border-radius: var(--radius-sm);
-  padding: 0.24rem 0.62rem;
-  font-size: 0.74rem;
+  padding: 0.16rem 0.5rem;
+  font-size: 0.68rem;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -765,12 +790,14 @@
 }
 
 .tableActionsCell {
-  min-width: 13.5rem;
+  min-width: 11rem;
+  padding-inline: 0.5rem !important;
 }
 
 .tableActions {
   justify-content: flex-end;
   flex-wrap: nowrap;
+  gap: 0.28rem;
 }
 
 .categoryToolbar {

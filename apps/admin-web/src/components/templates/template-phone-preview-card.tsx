@@ -45,7 +45,8 @@ export function TemplatePreviewCard({
   const normalizedMusicDescription = musicDescription?.trim();
   const normalizedTags = (tags ?? []).map((tag) => tag.trim()).filter(Boolean).slice(0, 4);
   const resolvedTemplateKind = templateKind ?? inferTemplateMediaKind(previewContentType?.trim() ?? "", previewUrl?.trim() ?? "");
-  const resolvedTemplateKindLabel = templateKindLabel.trim();
+  const originalTemplateKindLabel = templateKindLabel.trim();
+  const resolvedTemplateKindLabel = (resolvedTemplateKind === "video" ? "Video" : "Image");
   const resolvedAccessLabel = accessLabel.trim();
 
   return (
@@ -73,7 +74,7 @@ export function TemplatePreviewCard({
                   </svg>
                 )}
               </span>
-              <span>{resolvedTemplateKindLabel}</span>
+              <span title={originalTemplateKindLabel || undefined}>{resolvedTemplateKindLabel}</span>
             </span>
           </div>
         ) : null}
