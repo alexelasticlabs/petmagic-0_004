@@ -20,13 +20,14 @@ public static class AdminTemplateEndpoints
             .RequireRateLimiting("templates");
 
         group.MapGet("/", ListAsync);
-    group.MapGet("/analytics", GetAnalyticsOverviewAsync);
+        group.MapGet("/analytics", GetAnalyticsOverviewAsync);
         group.MapGet("/{templateId:guid}", GetAsync);
         group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
         group.MapGet("/{templateId:guid}/statistics/trends", GetTrendAsync);
         group.MapGet("/{templateId:guid}/statistics/recent", GetRecentAsync);
         group.MapGet("/{templateId:guid}/statistics/failures", GetFailureBreakdownAsync);
         group.MapGet("/{templateId:guid}/statistics/events", GetEventAnalyticsAsync);
+        group.MapGet("/{templateId:guid}/statistics/feedback", GetFeedbackAsync);
         group.MapPost("/{templateId:guid}/test", StartAdminTestAsync)
             .DisableAntiforgery();
         group.MapGet("/tests/{generationId:guid}", GetAdminTestAsync);
@@ -121,7 +122,7 @@ public static class AdminTemplateEndpoints
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var size = Math.Clamp(take ?? 8, 1, 24);
+        var size = take.HasValue ? Math.Clamp(take.Value, 1, 250) : int.MaxValue;
         var result = await service.GetAdminRecentGenerationsAsync(templateId, size, cancellationToken);
         if (result.IsFailure)
         {
@@ -151,6 +152,22 @@ public static class AdminTemplateEndpoints
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminEventAnalyticsAsync(templateId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<AdminTemplateFeedbackItemResponse>>, ProblemHttpResult>> GetFeedbackAsync(
+        Guid templateId,
+        [FromQuery] int? take,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var size = Math.Clamp(take ?? 50, 1, 200);
+        var result = await service.GetAdminFeedbackAsync(templateId, size, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);

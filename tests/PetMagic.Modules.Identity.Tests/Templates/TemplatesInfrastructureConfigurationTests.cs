@@ -31,6 +31,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TemplateAiProviders.Fake, options.AiProvider);
         Assert.True(options.GenerationWorkerEnabled);
         Assert.Equal(1_000, options.GenerationWorkerPollIntervalMilliseconds);
+        Assert.Equal(900_000, options.StaleProcessingRecoveryDelayMilliseconds);
         Assert.Equal(3, options.MaxGenerationAttempts);
         Assert.Equal(5, options.MaxRefundAttempts);
         Assert.Equal(30_000, options.RefundRetryDelayMilliseconds);
@@ -67,6 +68,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:Fal:ApiKey"] = "test-fal-key",
             ["Templates:Fal:QueueBaseUrl"] = "https://queue.fal.run",
             ["Templates:GenerationWorkerPollIntervalMilliseconds"] = "250",
+            ["Templates:StaleProcessingRecoveryDelayMilliseconds"] = "600000",
             ["Templates:MaxGenerationAttempts"] = "4",
             ["Templates:MaxRefundAttempts"] = "6",
             ["Templates:RefundRetryDelayMilliseconds"] = "125",
@@ -95,6 +97,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal("petmagic-test", options.R2.BucketName);
         Assert.Equal("test-fal-key", options.Fal.ApiKey);
         Assert.Equal(250, options.GenerationWorkerPollIntervalMilliseconds);
+        Assert.Equal(600_000, options.StaleProcessingRecoveryDelayMilliseconds);
         Assert.Equal(4, options.MaxGenerationAttempts);
         Assert.Equal(6, options.MaxRefundAttempts);
         Assert.Equal(125, options.RefundRetryDelayMilliseconds);

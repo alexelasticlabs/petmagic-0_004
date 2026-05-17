@@ -61,6 +61,7 @@ public static class PublicTemplateEndpoints
                 DetectDeviceClass(httpContext),
                 ResolveCountryCode(httpContext),
                 ResolveUserId(httpContext),
+                null,
                 null),
             cancellationToken);
 
@@ -82,7 +83,8 @@ public static class PublicTemplateEndpoints
                 string.IsNullOrWhiteSpace(request.DeviceClass) ? DetectDeviceClass(httpContext) : request.DeviceClass,
                 string.IsNullOrWhiteSpace(request.CountryCode) ? ResolveCountryCode(httpContext) : request.CountryCode,
                 ResolveUserId(httpContext),
-                request.GenerationId),
+                request.GenerationId,
+                request.FeedbackMessage),
             cancellationToken);
 
         if (result.IsFailure)
@@ -99,6 +101,7 @@ public static class PublicTemplateEndpoints
         {
             "video_view" => "video_view",
             "complaint" => "complaint",
+            "feedback" => "feedback",
             _ => "view"
         };
     }
@@ -151,5 +154,5 @@ public static class PublicTemplateEndpoints
         return Guid.TryParse(raw, out var userId) ? userId : null;
     }
 
-    private sealed record RecordTemplateAnalyticsEventRequest(string? EventType, string? Source, string? DeviceClass, string? CountryCode, Guid? GenerationId);
+    private sealed record RecordTemplateAnalyticsEventRequest(string? EventType, string? Source, string? DeviceClass, string? CountryCode, Guid? GenerationId, string? FeedbackMessage);
 }

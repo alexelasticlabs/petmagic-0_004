@@ -280,8 +280,39 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.76rem;
-  padding: 0.85rem 0.9rem 0.95rem;
+  gap: 0.68rem;
+  padding: 0.78rem 0.82rem 0.88rem;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.cardTimestamp {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  padding: 0.26rem 0.58rem;
+  border: 1px solid rgba(42, 60, 84, 0.88);
+  border-radius: 999px;
+  background: rgba(9, 16, 28, 0.82);
+  color: #91a6c0;
+  font-size: 0.71rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardFooter :global(.admin-primitives-module__gNhzuG__statusBadge) {
+  min-height: 1.8rem;
+  padding-inline: 0.7rem;
+  flex: 0 0 auto;
 }
 
 .cardTitleRow {
@@ -355,27 +386,28 @@
   margin-top: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
+  gap: 0.38rem;
 }
 
 .cardMetric {
   min-width: 0;
-  min-height: 3rem;
+  min-height: 3.15rem;
   display: grid;
   align-content: center;
-  gap: 0.1rem;
-  border: 1px solid #1f2e43;
-  border-radius: 0.58rem;
-  padding: 0.5rem 0.58rem;
-  background: linear-gradient(180deg, rgba(10, 17, 29, 0.84) 0%, rgba(11, 20, 33, 0.96) 100%);
+  gap: 0.14rem;
+  border: 1px solid #213248;
+  border-radius: 0.68rem;
+  padding: 0.54rem 0.6rem;
+  background: radial-gradient(circle at top left, rgba(37, 58, 84, 0.18) 0%, rgba(11, 20, 33, 0) 42%), linear-gradient(180deg, rgba(10, 17, 29, 0.88) 0%, rgba(11, 20, 33, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .cardMetric strong {
   min-width: 0;
   color: #eef5ff;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 900;
-  line-height: 1.15;
+  line-height: 1.1;
   letter-spacing: 0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -383,11 +415,43 @@
 }
 
 .cardMetric span {
-  color: #7e93ae;
-  font-size: 0.68rem;
+  color: #7890ad;
+  font-size: 0.64rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.cardMetric_primary {
+  border-color: rgba(125, 211, 252, 0.22);
+}
+
+.cardMetric_primary strong {
+  color: #d9f3ff;
+}
+
+.cardMetric_info {
+  border-color: rgba(56, 189, 248, 0.18);
+}
+
+.cardMetric_info strong {
+  color: #c8efff;
+}
+
+.cardMetric_success {
+  border-color: rgba(74, 222, 128, 0.2);
+}
+
+.cardMetric_success strong {
+  color: #d7ffe6;
+}
+
+.cardMetric_danger {
+  border-color: rgba(248, 113, 113, 0.24);
+}
+
+.cardMetric_danger strong {
+  color: #ffd5d5;
 }
 
 .cardActions {

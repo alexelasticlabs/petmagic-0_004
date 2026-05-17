@@ -66,6 +66,7 @@ export type AdminTemplateListItem = {
   tokenCost: number;
   tags: string[];
   previewAsset?: TemplateAsset;
+  musicDescription?: string;
   referenceVideoDurationSeconds?: number;
   characterOrientation?: string;
   createdAtUtc: string;
@@ -94,6 +95,7 @@ export type AdminTemplate = {
   klingModel?: string;
   klingPrompt?: string;
   keepOriginalSound?: boolean;
+  estimatedProviderCostUsd?: number;
   createdAtUtc: string;
   updatedAtUtc: string;
 };
@@ -167,13 +169,40 @@ export type AdminTemplateEventAnalytics = {
   geography: AdminTemplateAnalyticsDimension[];
 };
 
+export type AdminTemplateFeedbackItem = {
+  eventId: string;
+  eventType: string;
+  feedbackMessage?: string | null;
+  source: string;
+  deviceClass: string;
+  countryCode: string;
+  userId?: string | null;
+  generationId?: string | null;
+  createdAtUtc: string;
+};
+
+export type AdminTemplatesAnalyticsFeedbackItem = {
+  eventId: string;
+  templateId: string;
+  templateTitle: string;
+  templateType: TemplateType;
+  eventType: string;
+  feedbackMessage?: string | null;
+  source: string;
+  deviceClass: string;
+  countryCode: string;
+  userId?: string | null;
+  generationId?: string | null;
+  createdAtUtc: string;
+};
+
 export type AdminTemplatesAnalyticsQuery = {
   periodDays?: number;
   templateType?: TemplateType | "All";
   category?: string;
   status?: TemplateStatus | "All";
   access?: "all" | "free" | "premium";
-  sort?: "views" | "starts" | "conversion" | "revenue" | "cost" | "tokens" | "updated";
+  sort?: "views" | "starts" | "conversion" | "cost" | "tokens" | "updated";
   take?: number;
 };
 
@@ -191,8 +220,6 @@ export type AdminTemplatesAnalyticsSummary = {
   totalTokenCost: number;
   averageTokenCost: number;
   totalProviderCostUsd: number;
-  estimatedRevenueUsd: number;
-  estimatedGrossMarginUsd: number;
   totalComplaints: number;
 };
 
@@ -204,7 +231,6 @@ export type AdminTemplatesAnalyticsTrendPoint = {
   failedGenerations: number;
   totalTokenCost: number;
   totalProviderCostUsd: number;
-  estimatedRevenueUsd: number;
 };
 
 export type AdminTemplatesAnalyticsTemplateRow = {
@@ -223,7 +249,6 @@ export type AdminTemplatesAnalyticsTemplateRow = {
   conversionPercent: number;
   totalTokenCost: number;
   totalProviderCostUsd: number;
-  estimatedRevenueUsd: number;
   updatedAtUtc: string;
 };
 
@@ -237,7 +262,6 @@ export type AdminTemplatesAnalyticsBreakdown = {
   conversionPercent: number;
   totalTokenCost: number;
   totalProviderCostUsd: number;
-  estimatedRevenueUsd: number;
 };
 
 export type AdminTemplatesAnalyticsFunnel = {
@@ -257,6 +281,7 @@ export type AdminTemplatesAnalyticsOverview = {
   sources: AdminTemplateAnalyticsDimension[];
   devices: AdminTemplateAnalyticsDimension[];
   geography: AdminTemplateAnalyticsDimension[];
+  feedbackItems: AdminTemplatesAnalyticsFeedbackItem[];
   conversionFunnel: AdminTemplatesAnalyticsFunnel;
   templates: AdminTemplatesAnalyticsTemplateRow[];
   availableCategories: string[];
@@ -620,8 +645,9 @@ export async function fetchAdminTemplateTrends(templateId: string): Promise<Admi
   return apiRequest<AdminTemplateTrendPoint[]>(`/api/admin/templates/${templateId}/statistics/trends`, { method: "GET" });
 }
 
-export async function fetchAdminTemplateRecentGenerations(templateId: string, take = 8): Promise<AdminTemplateRecentGeneration[]> {
-  return apiRequest<AdminTemplateRecentGeneration[]>(`/api/admin/templates/${templateId}/statistics/recent?take=${encodeURIComponent(String(take))}`, { method: "GET" });
+export async function fetchAdminTemplateRecentGenerations(templateId: string, take?: number): Promise<AdminTemplateRecentGeneration[]> {
+  const query = typeof take === "number" ? `?take=${encodeURIComponent(String(take))}` : "";
+  return apiRequest<AdminTemplateRecentGeneration[]>(`/api/admin/templates/${templateId}/statistics/recent${query}`, { method: "GET" });
 }
 
 export async function fetchAdminTemplateFailureBreakdown(templateId: string): Promise<AdminTemplateFailureBreakdownItem[]> {
@@ -630,6 +656,10 @@ export async function fetchAdminTemplateFailureBreakdown(templateId: string): Pr
 
 export async function fetchAdminTemplateEventAnalytics(templateId: string): Promise<AdminTemplateEventAnalytics> {
   return apiRequest<AdminTemplateEventAnalytics>(`/api/admin/templates/${templateId}/statistics/events`, { method: "GET" });
+}
+
+export async function fetchAdminTemplateFeedback(templateId: string, take = 50): Promise<AdminTemplateFeedbackItem[]> {
+  return apiRequest<AdminTemplateFeedbackItem[]>(`/api/admin/templates/${templateId}/statistics/feedback?take=${encodeURIComponent(String(take))}`, { method: "GET" });
 }
 
 export async function fetchAdminTemplatesAnalyticsOverview(query: AdminTemplatesAnalyticsQuery = {}): Promise<AdminTemplatesAnalyticsOverview> {

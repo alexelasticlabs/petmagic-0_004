@@ -30,6 +30,8 @@ public sealed class TemplatesOptions
 
     public int GenerationWorkerPollIntervalMilliseconds { get; init; } = 1_000;
 
+    public int StaleProcessingRecoveryDelayMilliseconds { get; init; } = 900_000;
+
     public int MaxGenerationAttempts { get; init; } = 3;
 
     public int MaxRefundAttempts { get; init; } = 5;

@@ -18,6 +18,7 @@ import {
     fetchAdminTemplatesAnalyticsOverview,
     type AdminTemplateAnalyticsDimension,
     type AdminTemplatesAnalyticsBreakdown,
+    type AdminTemplatesAnalyticsFeedbackItem,
     type AdminTemplatesAnalyticsOverview,
     type AdminTemplatesAnalyticsQuery,
     type AdminTemplatesAnalyticsTemplateRow,
@@ -36,7 +37,7 @@ type TemplatesAnalyticsHubPageProps = {
 };
 
 type PeriodKey = "7" | "30" | "90" | "all";
-type TrendMetricKey = "totalViews" | "totalGenerationStarts" | "completedGenerations" | "estimatedRevenueUsd" | "totalProviderCostUsd";
+type TrendMetricKey = "totalViews" | "totalGenerationStarts" | "completedGenerations" | "totalProviderCostUsd";
 
 type Copy = ReturnType<typeof getCopy>;
 
@@ -136,7 +137,6 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     { label: text.completed, value: formatNumber(summary.completedGenerations, locale), hint: text.completedHint, tone: "green" },
     { label: text.conversion, value: formatPercent(summary.conversionPercent, isRu), hint: text.conversionHint, tone: "blue" },
     { label: text.tokens, value: formatTokens(summary.totalTokenCost, isRu), hint: text.tokensHint, tone: "amber" },
-    { label: text.revenue, value: formatMoney(summary.estimatedRevenueUsd, locale), hint: text.revenueHint, tone: "green" },
     { label: text.providerSpend, value: formatMoney(summary.totalProviderCostUsd, locale), hint: text.providerSpendHint, tone: "red" },
     { label: text.complaints, value: formatNumber(summary.totalComplaints, locale), hint: text.complaintsHint, tone: summary.totalComplaints > 0 ? "red" : "neutral" },
   ];
@@ -144,7 +144,6 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     { key: "totalViews", label: text.chartViews },
     { key: "totalGenerationStarts", label: text.chartStarts },
     { key: "completedGenerations", label: text.chartCompleted },
-    { key: "estimatedRevenueUsd", label: text.chartRevenue },
     { key: "totalProviderCostUsd", label: text.chartCost },
   ];
 
@@ -154,7 +153,6 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         eyebrow={text.eyebrow}
         title={text.title}
         description={text.description}
-        badge={<span className={styles.heroBadge}>{text.liveBadge}</span>}
         actions={(
           <div className={styles.heroActions}>
             <Link href={`/${locale}/templates/video`} className={styles.secondaryLink}><TableIcon className={styles.controlIcon} /><span>{text.catalog}</span></Link>
@@ -173,8 +171,6 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         items={[
           { label: text.active, value: formatNumber(summary.activeTemplates, locale) },
           { label: text.premium, value: formatNumber(summary.premiumTemplates, locale) },
-          { label: text.margin, value: formatMoney(summary.estimatedGrossMarginUsd, locale) },
-          { label: text.averageTokenCost, value: formatTokens(summary.averageTokenCost, isRu) },
         ]}
       />
 
@@ -193,7 +189,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           <SelectBox label={text.categoryFilter} value={category} onChange={setCategory} options={[{ value: "", label: text.allCategories }, ...overview.availableCategories.map((value) => ({ value, label: value }))]} />
           <SelectBox label={text.statusFilter} value={status} onChange={(value) => setStatus(value as TemplateStatus | "All")} options={[{ value: "All", label: text.allStatuses }, { value: "Active", label: getTemplateStatusLabel("Active", locale) }, { value: "Draft", label: getTemplateStatusLabel("Draft", locale) }, { value: "Archived", label: getTemplateStatusLabel("Archived", locale) }]} />
           <SelectBox label={text.accessFilter} value={access} onChange={(value) => setAccess(value as "all" | "free" | "premium")} options={[{ value: "all", label: text.allAccess }, { value: "free", label: getTemplateAccessLabel(false, dictionary) }, { value: "premium", label: getTemplateAccessLabel(true, dictionary) }]} />
-          <SelectBox label={text.sortFilter} value={sort} onChange={(value) => setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>)} options={[{ value: "views", label: text.sortViews }, { value: "starts", label: text.sortStarts }, { value: "conversion", label: text.sortConversion }, { value: "revenue", label: text.sortRevenue }, { value: "cost", label: text.sortCost }, { value: "updated", label: text.sortUpdated }]} />
+          <SelectBox label={text.sortFilter} value={sort} onChange={(value) => setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>)} options={[{ value: "views", label: text.sortViews }, { value: "starts", label: text.sortStarts }, { value: "conversion", label: text.sortConversion }, { value: "cost", label: text.sortCost }, { value: "updated", label: text.sortUpdated }]} />
         </div>
       </div>
 
@@ -234,6 +230,14 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         <TopTemplatesPanel rows={overview.topTemplates} locale={locale} text={text} />
       </div>
 
+      <section className={styles.panel}>
+        <div className={styles.panelHeader}>
+          <h2 className={styles.panelTitle}><ChartIcon className={styles.panelIcon} />{text.feedbackTitle}</h2>
+          <p>{text.feedbackHint}</p>
+        </div>
+        <FeedbackFeedPanel items={overview.feedbackItems} locale={locale} text={text} />
+      </section>
+
       <div className={styles.dimensionGrid}>
         <EventDimensionPanel title={text.sourcesTitle} hint={text.sourcesHint} rows={overview.sources} locale={locale} />
         <EventDimensionPanel title={text.devicesTitle} hint={text.devicesHint} rows={overview.devices} locale={locale} />
@@ -272,6 +276,46 @@ function KpiCard({ label, value, hint, tone }: { label: string; value: string; h
       <strong>{value}</strong>
       <p>{hint}</p>
     </article>
+  );
+}
+
+function FeedbackFeedPanel({ items, locale, text }: { items: readonly AdminTemplatesAnalyticsFeedbackItem[]; locale: AppLocale; text: Copy }) {
+  const isRu = locale === "ru";
+
+  if (!items.length) {
+    return <div className={styles.emptyState}>{text.feedbackEmpty}</div>;
+  }
+
+  return (
+    <div className={styles.feedbackList}>
+      {items.map((item) => {
+        const templatePath = item.templateType === "Video"
+          ? `/${locale}/templates/video/analytics/${item.templateId}`
+          : `/${locale}/templates/image/editor?templateId=${item.templateId}`;
+
+        return (
+          <article key={item.eventId} className={styles.feedbackItem}>
+            <div className={styles.feedbackHeader}>
+              <div className={styles.feedbackTitleBlock}>
+                <span className={`${styles.statusBadge} ${styles[item.eventType === "complaint" ? "status_failed" : "status_active"]}`}>
+                  {item.eventType === "complaint" ? text.feedbackTypeComplaint : text.feedbackTypeFeedback}
+                </span>
+                <Link href={templatePath} className={styles.feedbackTemplateLink}>{item.templateTitle}</Link>
+              </div>
+              <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
+            </div>
+            <p className={styles.feedbackMessage}>{item.feedbackMessage?.trim() || text.feedbackMessageMissing}</p>
+            <div className={styles.feedbackMeta}>
+              <span>{text.feedbackSourceLabel}: {formatAnalyticsValue(item.source)}</span>
+              <span>{text.feedbackDeviceLabel}: {formatAnalyticsValue(item.deviceClass)}</span>
+              <span>{text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}</span>
+              <span>{text.feedbackUserLabel}: {item.userId ? shortId(item.userId) : (isRu ? "анон" : "guest")}</span>
+              {item.generationId ? <span>{text.feedbackGenerationLabel}: {shortId(item.generationId)}</span> : null}
+            </div>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 
@@ -397,7 +441,7 @@ function TypePanel({ rows, locale, text }: { rows: AdminTemplatesAnalyticsBreakd
             <span>{getTemplateTypeLabel(row.key === "image" ? "Image" : "Video", dictionary)}</span>
             <strong>{formatNumber(row.views, locale)}</strong>
             <p>{formatNumber(row.generationStarts, locale)} {text.startsShort} · {formatPercent(row.conversionPercent, locale === "ru")}</p>
-            <p>{formatMoney(row.estimatedRevenueUsd, locale)} · {formatMoney(row.totalProviderCostUsd, locale)}</p>
+            <p>{formatTokens(row.totalTokenCost, locale === "ru")} · {formatMoney(row.totalProviderCostUsd, locale)}</p>
           </article>
         ))}
       </div>
@@ -449,7 +493,7 @@ function TopTemplatesPanel({ rows, locale, text }: { rows: AdminTemplatesAnalyti
               <span>{getTemplateTypeLabel(row.templateType, dictionary)} · {row.category}</span>
             </div>
             <span>{formatNumber(row.views, locale)}</span>
-            <span>{formatMoney(row.estimatedRevenueUsd, locale)}</span>
+            <span>{formatNumber(row.generationStarts, locale)}</span>
           </div>
         ))}
       </div>
@@ -474,7 +518,6 @@ function TemplatesTable({ rows, locale, text }: { rows: AdminTemplatesAnalyticsT
             <th>{text.conversionColumn}</th>
             <th>{text.tokensColumn}</th>
             <th>{text.costColumn}</th>
-            <th>{text.revenueColumn}</th>
             <th>{text.actionsColumn}</th>
           </tr>
         </thead>
@@ -491,7 +534,6 @@ function TemplatesTable({ rows, locale, text }: { rows: AdminTemplatesAnalyticsT
               <td>{formatPercent(row.conversionPercent, locale === "ru")}</td>
               <td>{formatTokens(row.totalTokenCost, locale === "ru")}</td>
               <td>{formatMoney(row.totalProviderCostUsd, locale)}</td>
-              <td>{formatMoney(row.estimatedRevenueUsd, locale)}</td>
               <td>
                 {row.templateType === "Video" ? (
                   <Link className={styles.inlineAction} href={`/${locale}/templates/video/analytics/${row.templateId}`}>{text.openAnalytics}</Link>
@@ -522,7 +564,7 @@ function getTrendValue(point: AdminTemplatesAnalyticsTrendPoint, metric: TrendMe
 }
 
 function formatTrendValue(value: number, metric: TrendMetricKey, locale: AppLocale) {
-  if (metric === "estimatedRevenueUsd" || metric === "totalProviderCostUsd") {
+  if (metric === "totalProviderCostUsd") {
     return formatMoney(value, locale);
   }
 
@@ -581,6 +623,11 @@ function shortId(value: string) {
   return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
+function formatAnalyticsValue(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized : "-";
+}
+
 function getCopy(locale: AppLocale) {
   const isRu = locale === "ru";
 
@@ -588,7 +635,6 @@ function getCopy(locale: AppLocale) {
     eyebrow: isRu ? "Интеллект шаблонов" : "Template intelligence",
     title: isRu ? "Аналитика шаблонов" : "Template analytics",
     description: isRu ? "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов." : "Global view of template views, generations, spend, and performance.",
-    liveBadge: isRu ? "Данные с сервера" : "Live backend data",
     catalog: isRu ? "Каталог" : "Catalog",
     export: isRu ? "Экспорт" : "Export",
     templates: isRu ? "Шаблонов" : "Templates",
@@ -598,8 +644,6 @@ function getCopy(locale: AppLocale) {
     active: isRu ? "Активные" : "Active",
     premium: "Premium",
     free: "Free",
-    margin: isRu ? "Маржа" : "Margin",
-    averageTokenCost: isRu ? "Средний расход" : "Average spend",
     loading: isRu ? "Загрузка аналитики шаблонов..." : "Loading template analytics...",
     loadError: isRu ? "Не удалось загрузить аналитику шаблонов." : "Failed to load template analytics.",
     periodLabel: isRu ? "Период" : "Period",
@@ -617,7 +661,6 @@ function getCopy(locale: AppLocale) {
     sortViews: isRu ? "Просмотры" : "Views",
     sortStarts: isRu ? "Запуски" : "Starts",
     sortConversion: isRu ? "Конверсия" : "Conversion",
-    sortRevenue: isRu ? "Доход" : "Revenue",
     sortCost: isRu ? "Затраты" : "Cost",
     sortUpdated: isRu ? "Обновление" : "Updated",
     views: isRu ? "Просмотры шаблонов" : "Template views",
@@ -630,19 +673,27 @@ function getCopy(locale: AppLocale) {
     conversionHint: isRu ? "Успешные генерации от всех запусков." : "Completed jobs divided by starts.",
     tokens: isRu ? "Потрачено токенов" : "Token spend",
     tokensHint: isRu ? "Суммарный расход пользователей на генерации." : "Total user token spend for generations.",
-    revenue: isRu ? "Доход (оценка)" : "Revenue estimate",
-    revenueHint: isRu ? "Оценка по токенам, пока без платежной модели." : "Estimated from tokens until payment data exists.",
     providerSpend: isRu ? "Наши затраты" : "Provider spend",
     providerSpendHint: isRu ? "Реальные USD-затраты на AI-провайдера." : "Real AI provider USD costs from jobs.",
     complaints: isRu ? "Жалобы" : "Complaints",
-    complaintsHint: isRu ? "Жалобы из событий аналитики." : "Complaint events from analytics endpoint.",
+    complaintsHint: isRu ? "Количество complaint событий; ниже доступен список самих обращений." : "Complaint event count; see the feed below for actual messages.",
+    feedbackTitle: isRu ? "Жалобы и фидбек" : "Complaints and feedback",
+    feedbackHint: isRu ? "Последние complaint и feedback события по выбранным шаблонам с текстом сообщения и переходом в конкретный шаблон." : "Latest complaint and feedback events for the selected templates with message text and a link to the specific template.",
+    feedbackEmpty: isRu ? "По выбранным фильтрам пока нет жалоб или фидбека." : "There are no complaints or feedback items for the current filters yet.",
+    feedbackMessageMissing: isRu ? "Без текста сообщения." : "No message text provided.",
+    feedbackTypeComplaint: isRu ? "Жалоба" : "Complaint",
+    feedbackTypeFeedback: isRu ? "Фидбек" : "Feedback",
+    feedbackSourceLabel: isRu ? "Источник" : "Source",
+    feedbackDeviceLabel: isRu ? "Устройство" : "Device",
+    feedbackCountryLabel: isRu ? "Страна" : "Country",
+    feedbackUserLabel: isRu ? "Пользователь" : "User",
+    feedbackGenerationLabel: isRu ? "Генерация" : "Generation",
     chartViews: isRu ? "Просмотры" : "Views",
     chartStarts: isRu ? "Запуски" : "Starts",
     chartCompleted: isRu ? "Успех" : "Completed",
-    chartRevenue: isRu ? "Доход" : "Revenue",
     chartCost: isRu ? "Затраты" : "Cost",
     trendTitle: isRu ? "Динамика по времени" : "Trend over time",
-    trendHint: isRu ? "Дневная динамика просмотров, запусков, дохода и реальных затрат." : "Daily backend buckets for views, starts, revenue, and real spend.",
+    trendHint: isRu ? "Дневная динамика просмотров, запусков, успешных генераций и реальных затрат." : "Daily backend buckets for views, starts, completions, and real spend.",
     noTrend: isRu ? "Пока нет точек тренда." : "No trend points yet.",
     currentMetric: isRu ? "Сумма выбранной метрики" : "Selected metric total",
     funnelTitle: isRu ? "Воронка конверсии" : "Conversion funnel",
@@ -679,7 +730,6 @@ function getCopy(locale: AppLocale) {
     conversionColumn: isRu ? "Конверсия" : "Conversion",
     tokensColumn: isRu ? "Токены" : "Tokens",
     costColumn: isRu ? "Затраты" : "Cost",
-    revenueColumn: isRu ? "Доход" : "Revenue",
     actionsColumn: isRu ? "Действия" : "Actions",
     openAnalytics: isRu ? "Аналитика" : "Analytics",
     openEditor: isRu ? "Редактор" : "Editor",

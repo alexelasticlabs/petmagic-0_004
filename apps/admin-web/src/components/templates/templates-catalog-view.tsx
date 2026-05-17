@@ -332,6 +332,7 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                   key={template.templateId}
                   locale={locale}
                   template={template}
+                  analytics={analyticsRows[template.templateId]}
                   editorBasePath={editorBasePath}
                   analyticsBasePath={analyticsBasePath}
                   testBasePath={testBasePath}
@@ -517,6 +518,7 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
 type TemplateCatalogCardProps = {
   locale: Locale;
   template: AdminTemplateListItem;
+  analytics?: AdminTemplatesAnalyticsTemplateRow;
   editorBasePath: string;
   analyticsBasePath: string;
   testBasePath: string;
@@ -525,7 +527,7 @@ type TemplateCatalogCardProps = {
   onDeleteTemplate: (templateId: string) => void;
 };
 
-function TemplateCatalogCard({ locale, template, editorBasePath, analyticsBasePath, testBasePath, busyTemplateId, onStatusChange, onDeleteTemplate }: TemplateCatalogCardProps) {
+function TemplateCatalogCard({ locale, template, analytics, editorBasePath, analyticsBasePath, testBasePath, busyTemplateId, onStatusChange, onDeleteTemplate }: TemplateCatalogCardProps) {
   const text = getDictionary(locale);
   const copy = getCatalogCopy(locale, template.templateType);
   const isBusy = busyTemplateId === template.templateId;
@@ -547,6 +549,7 @@ function TemplateCatalogCard({ locale, template, editorBasePath, analyticsBasePa
         accessLabel={getTemplateAccessLabel(template.isPremium, text)}
         referenceDurationSeconds={template.referenceVideoDurationSeconds}
         promoBadge={template.effectivePromoBadge}
+        musicDescription={template.musicDescription}
       />
       <div className={styles.cardBody}>
         <div className={styles.cardFooter}>
@@ -554,27 +557,63 @@ function TemplateCatalogCard({ locale, template, editorBasePath, analyticsBasePa
           <AdminStatusBadge color={statusColors[template.status]}>{getTemplateStatusLabel(template.status, locale)}</AdminStatusBadge>
         </div>
         <div className={styles.cardMetrics}>
-          {getTemplateCardMetrics(template, locale).map((metric) => (
-            <div key={metric.label} className={styles.cardMetric}>
+          {getTemplateCardMetrics(template, analytics, locale).map((metric) => (
+            <div key={metric.label} className={`${styles.cardMetric} ${styles[metric.tone]}`}>
               <strong>{metric.value}</strong>
               <span>{metric.label}</span>
             </div>
           ))}
         </div>
         <div className={styles.cardActions}>
-          <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={`${styles.compactLink} ${styles.cardActionLink}`}>{text.editTemplate}</Link>
+          <Link href={`${editorBasePath}?templateId=${template.templateId}`} className={styles.cardActionIconButton} aria-label={text.editTemplate} title={text.editTemplate}>
+            <PencilIcon className={styles.actionIcon} />
+          </Link>
           {template.templateType === "Video" ? (
             <>
-              <Link href={`${analyticsBasePath}/${template.templateId}`} className={`${styles.compactLink} ${styles.cardActionLink}`}>{copy.analyticsAction}</Link>
-              <Link href={`${testBasePath}/${template.templateId}`} className={`${styles.compactLink} ${styles.cardActionLink}`}>{copy.testAction}</Link>
+              <Link href={`${analyticsBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.analyticsAction} title={copy.analyticsAction}>
+                <ChartIcon className={styles.actionIcon} />
+              </Link>
+              <Link href={`${testBasePath}/${template.templateId}`} className={styles.cardActionIconButton} aria-label={copy.testAction} title={copy.testAction}>
+                <PlayCircleIcon className={styles.actionIcon} />
+              </Link>
             </>
           ) : null}
           {template.status !== "Active" ? (
-            <Button size="sm" variant="ghost" className={styles.cardActionButton} disabled={isBusy} onClick={() => onStatusChange(template.templateId, "Active")}>{text.activate}</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={styles.cardActionIconButton}
+              disabled={isBusy}
+              aria-label={text.activate}
+              title={text.activate}
+              onClick={() => onStatusChange(template.templateId, "Active")}
+            >
+              <RefreshIcon className={styles.actionIcon} />
+            </Button>
           ) : (
-            <Button size="sm" variant="ghost" className={styles.cardActionButton} disabled={isBusy} onClick={() => onStatusChange(template.templateId, "Archived")}>{text.archive}</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+              disabled={isBusy}
+              aria-label={text.archive}
+              title={text.archive}
+              onClick={() => onStatusChange(template.templateId, "Archived")}
+            >
+              <RefreshIcon className={styles.actionIcon} />
+            </Button>
           )}
-          <Button size="sm" variant="danger" className={`${styles.cardActionButton} ${styles.cardActionDanger}`} disabled={isBusy} onClick={() => onDeleteTemplate(template.templateId)}>{text.deleteTemplate}</Button>
+          <Button
+            size="sm"
+            variant="danger"
+            className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+            disabled={isBusy}
+            aria-label={text.deleteTemplate}
+            title={text.deleteTemplate}
+            onClick={() => onDeleteTemplate(template.templateId)}
+          >
+            <CancelCircleIcon className={styles.actionIcon} />
+          </Button>
         </div>
       </div>
     </article>
@@ -707,53 +746,32 @@ function getSuccessRatePercent(analytics?: AdminTemplatesAnalyticsTemplateRow) {
   return (analytics.completedGenerations / finishedCount) * 100;
 }
 
-function getTemplateCardMetrics(template: AdminTemplateListItem, locale: Locale) {
+function getTemplateCardMetrics(template: AdminTemplateListItem, analytics: AdminTemplatesAnalyticsTemplateRow | undefined, locale: Locale) {
   const isRu = locale === "ru";
   const metrics = [
     {
-      label: isRu ? "Теги" : "Tags",
-      value: String(template.tags.length),
+      label: isRu ? "Стоимость" : "Template cost",
+      value: `${formatAnalyticsInteger(template.tokenCost)} ${isRu ? "ток." : "tok."}`,
+      tone: "cardMetric_primary",
     },
     {
-      label: isRu ? "Превью" : "Preview",
-      value: template.previewAsset?.url ? (isRu ? "Готово" : "Ready") : (isRu ? "Пусто" : "Missing"),
+      label: isRu ? "Просмотры" : "Views",
+      value: formatAnalyticsInteger(analytics?.views ?? 0),
+      tone: "cardMetric_info",
     },
     {
-      label: isRu ? "Бейдж" : "Badge",
-      value: formatPromoBadgeMetric(template.effectivePromoBadge, locale),
+      label: isRu ? "Генерации" : "Generations",
+      value: formatAnalyticsInteger(analytics?.generationStarts ?? 0),
+      tone: "cardMetric_success",
     },
-    template.templateType === "Video"
-      ? {
-          label: isRu ? "Референс" : "Reference",
-          value: formatDuration(template.referenceVideoDurationSeconds),
-        }
-      : {
-          label: isRu ? "Создан" : "Created",
-          value: formatDate(template.createdAtUtc, locale),
-        },
+    {
+      label: isRu ? "Ошибки" : "Errors",
+      value: formatAnalyticsInteger(analytics?.failedGenerations ?? 0),
+      tone: "cardMetric_danger",
+    },
   ];
 
   return metrics;
-}
-
-function formatPromoBadgeMetric(value: AdminTemplateListItem["effectivePromoBadge"], locale: Locale) {
-  if (!value) {
-    return locale === "ru" ? "Нет" : "None";
-  }
-
-  if (value === "Trending") {
-    return "Trending";
-  }
-
-  if (value === "Popular") {
-    return "Popular";
-  }
-
-  if (value === "Funny") {
-    return "Funny";
-  }
-
-  return "New";
 }
 
 function getCatalogCopy(locale: Locale, templateType: TemplateType) {

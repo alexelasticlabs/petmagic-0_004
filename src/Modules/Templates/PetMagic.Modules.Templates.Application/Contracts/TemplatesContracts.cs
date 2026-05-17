@@ -107,6 +107,7 @@ public sealed record AdminTemplateListItemResponse(
     int TokenCost,
     string[] Tags,
     TemplateAssetResponse? PreviewAsset,
+    string? MusicDescription,
     double? ReferenceVideoDurationSeconds,
     string? CharacterOrientation,
     DateTime CreatedAtUtc,
@@ -134,6 +135,7 @@ public sealed record AdminTemplateResponse(
     string? KlingModel,
     string? KlingPrompt,
     bool? KeepOriginalSound,
+    decimal? EstimatedProviderCostUsd,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 
@@ -193,7 +195,8 @@ public sealed record RecordTemplateAnalyticsEventCommand(
     string? DeviceClass,
     string? CountryCode,
     Guid? UserId,
-    Guid? GenerationId);
+    Guid? GenerationId,
+    string? FeedbackMessage = null);
 
 public sealed record AdminTemplateAnalyticsDimensionResponse(
     string Key,
@@ -208,6 +211,31 @@ public sealed record AdminTemplateEventAnalyticsResponse(
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Sources,
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Devices,
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Geography);
+
+public sealed record AdminTemplateFeedbackItemResponse(
+    Guid EventId,
+    string EventType,
+    string? FeedbackMessage,
+    string Source,
+    string DeviceClass,
+    string CountryCode,
+    Guid? UserId,
+    Guid? GenerationId,
+    DateTime CreatedAtUtc);
+
+public sealed record AdminTemplatesAnalyticsFeedbackItemResponse(
+    Guid EventId,
+    Guid TemplateId,
+    string TemplateTitle,
+    string TemplateType,
+    string EventType,
+    string? FeedbackMessage,
+    string Source,
+    string DeviceClass,
+    string CountryCode,
+    Guid? UserId,
+    Guid? GenerationId,
+    DateTime CreatedAtUtc);
 
 public sealed record AdminTemplatesAnalyticsQuery(
     int? PeriodDays,
@@ -232,8 +260,6 @@ public sealed record AdminTemplatesAnalyticsSummaryResponse(
     int TotalTokenCost,
     double AverageTokenCost,
     decimal TotalProviderCostUsd,
-    decimal EstimatedRevenueUsd,
-    decimal EstimatedGrossMarginUsd,
     int TotalComplaints);
 
 public sealed record AdminTemplatesAnalyticsTrendPointResponse(
@@ -243,8 +269,7 @@ public sealed record AdminTemplatesAnalyticsTrendPointResponse(
     int CompletedGenerations,
     int FailedGenerations,
     int TotalTokenCost,
-    decimal TotalProviderCostUsd,
-    decimal EstimatedRevenueUsd);
+    decimal TotalProviderCostUsd);
 
 public sealed record AdminTemplatesAnalyticsTemplateRowResponse(
     Guid TemplateId,
@@ -262,7 +287,6 @@ public sealed record AdminTemplatesAnalyticsTemplateRowResponse(
     double ConversionPercent,
     int TotalTokenCost,
     decimal TotalProviderCostUsd,
-    decimal EstimatedRevenueUsd,
     DateTime UpdatedAtUtc);
 
 public sealed record AdminTemplatesAnalyticsBreakdownResponse(
@@ -274,8 +298,7 @@ public sealed record AdminTemplatesAnalyticsBreakdownResponse(
     int CompletedGenerations,
     double ConversionPercent,
     int TotalTokenCost,
-    decimal TotalProviderCostUsd,
-    decimal EstimatedRevenueUsd);
+    decimal TotalProviderCostUsd);
 
 public sealed record AdminTemplatesAnalyticsFunnelResponse(
     int Views,
@@ -293,6 +316,7 @@ public sealed record AdminTemplatesAnalyticsOverviewResponse(
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Sources,
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Devices,
     IReadOnlyList<AdminTemplateAnalyticsDimensionResponse> Geography,
+    IReadOnlyList<AdminTemplatesAnalyticsFeedbackItemResponse> FeedbackItems,
     AdminTemplatesAnalyticsFunnelResponse ConversionFunnel,
     IReadOnlyList<AdminTemplatesAnalyticsTemplateRowResponse> Templates,
     string[] AvailableCategories,

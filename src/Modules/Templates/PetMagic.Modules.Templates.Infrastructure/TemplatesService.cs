@@ -18,10 +18,10 @@ internal sealed class TemplatesService(
     ITemplateMediaLifecycleService mediaLifecycleService) : ITemplatesService
 {
     private static readonly string[] FunnyKeywords = ["funny", "meme", "viral", "dance", "lol", "cute"];
-    private const decimal EstimatedUsdPerToken = 0.01m;
     private const string AnalyticsEventTypeView = "view";
     private const string AnalyticsEventTypeVideoView = "video_view";
     private const string AnalyticsEventTypeComplaint = "complaint";
+    private const string AnalyticsEventTypeFeedback = "feedback";
 
     private sealed record GenerationStatisticsProjection(
         TemplateGenerationStatus Status,
@@ -229,6 +229,38 @@ internal sealed class TemplatesService(
         return Result.Success(response);
     }
 
+    public async Task<Result<IReadOnlyList<AdminTemplateFeedbackItemResponse>>> GetAdminFeedbackAsync(Guid templateId, int take, CancellationToken cancellationToken)
+    {
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
+        {
+            return Result.Failure<IReadOnlyList<AdminTemplateFeedbackItemResponse>>(TemplatesErrors.NotFound);
+        }
+
+        var items = await dbContext.TemplateAnalyticsEvents
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId)
+            .Where(x => x.EventType == AnalyticsEventTypeComplaint || x.EventType == AnalyticsEventTypeFeedback)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .Select(x => new AdminTemplateFeedbackItemResponse(
+                x.Id,
+                x.EventType,
+                x.FeedbackMessage,
+                x.Source,
+                x.DeviceClass,
+                x.CountryCode,
+                x.UserId,
+                x.GenerationId,
+                x.CreatedAtUtc))
+            .ToArrayAsync(cancellationToken);
+
+        return Result.Success<IReadOnlyList<AdminTemplateFeedbackItemResponse>>(items);
+    }
+
     public async Task<Result<AdminTemplatesAnalyticsOverviewResponse>> GetAdminTemplatesAnalyticsAsync(AdminTemplatesAnalyticsQuery query, CancellationToken cancellationToken)
     {
         var generatedAtUtc = DateTime.UtcNow;
@@ -287,6 +319,7 @@ internal sealed class TemplatesService(
 
         var jobsByTemplate = jobs.GroupBy(x => x.TemplateId).ToDictionary(x => x.Key, x => x.ToArray());
         var eventsByTemplate = events.GroupBy(x => x.TemplateId).ToDictionary(x => x.Key, x => x.ToArray());
+        var templatesById = templates.ToDictionary(x => x.Id);
         var rows = templates
             .Select(template => BuildTemplatesAnalyticsRow(
                 template,
@@ -299,11 +332,33 @@ internal sealed class TemplatesService(
         var completed = rows.Sum(x => x.CompletedGenerations);
         var totalTokenCost = rows.Sum(x => x.TotalTokenCost);
         var totalProviderCostUsd = rows.Sum(x => x.TotalProviderCostUsd);
-        var estimatedRevenueUsd = rows.Sum(x => x.EstimatedRevenueUsd);
         var totalViews = rows.Sum(x => x.Views);
         var totalComplaints = events.Count(x => IsAnalyticsEventType(x, AnalyticsEventTypeComplaint));
         var viewEvents = events
             .Where(x => IsAnalyticsEventType(x, AnalyticsEventTypeView))
+            .ToArray();
+        var feedbackItems = events
+            .Where(IsFeedbackEvent)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(20)
+            .Select(x =>
+            {
+                var template = templatesById[x.TemplateId];
+
+                return new AdminTemplatesAnalyticsFeedbackItemResponse(
+                    x.Id,
+                    x.TemplateId,
+                    template.Title,
+                    template.TemplateType.ToString(),
+                    x.EventType,
+                    x.FeedbackMessage,
+                    x.Source,
+                    x.DeviceClass,
+                    x.CountryCode,
+                    x.UserId,
+                    x.GenerationId,
+                    x.CreatedAtUtc);
+            })
             .ToArray();
 
         var response = new AdminTemplatesAnalyticsOverviewResponse(
@@ -321,8 +376,6 @@ internal sealed class TemplatesService(
                 totalTokenCost,
                 totalStarts == 0 ? 0 : Math.Round((double)totalTokenCost / totalStarts, 1, MidpointRounding.AwayFromZero),
                 Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
-                Math.Round(estimatedRevenueUsd, 4, MidpointRounding.AwayFromZero),
-                Math.Round(estimatedRevenueUsd - totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
                 totalComplaints),
             BuildTemplatesAnalyticsTrend(jobs, events),
             sortedRows.Take(5).ToArray(),
@@ -331,6 +384,7 @@ internal sealed class TemplatesService(
             BuildDimension(viewEvents, x => x.Source, "direct"),
             BuildDimension(viewEvents, x => x.DeviceClass, "unknown"),
             BuildDimension(viewEvents, x => x.CountryCode, "unknown"),
+            feedbackItems,
             new AdminTemplatesAnalyticsFunnelResponse(
                 totalViews,
                 totalStarts,
@@ -370,6 +424,7 @@ internal sealed class TemplatesService(
             Source = NormalizeAnalyticsValue(command.Source, "direct", 64),
             DeviceClass = NormalizeAnalyticsValue(command.DeviceClass, "unknown", 32),
             CountryCode = NormalizeAnalyticsValue(command.CountryCode, "unknown", 8).ToUpperInvariant(),
+            FeedbackMessage = NormalizeOptionalText(command.FeedbackMessage, 2000),
             CreatedAtUtc = DateTime.UtcNow
         });
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -862,7 +917,6 @@ internal sealed class TemplatesService(
         var failed = jobs.Count(x => x.Status == TemplateGenerationStatus.Failed);
         var totalTokenCost = jobs.Sum(x => x.TokenCost);
         var totalProviderCostUsd = jobs.Sum(x => x.MotionProviderCostUsd ?? 0m);
-        var estimatedRevenueUsd = totalTokenCost * EstimatedUsdPerToken;
 
         return new AdminTemplatesAnalyticsTemplateRowResponse(
             template.Id,
@@ -880,7 +934,6 @@ internal sealed class TemplatesService(
             CalculatePercent(completed, starts),
             totalTokenCost,
             Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
-            Math.Round(estimatedRevenueUsd, 4, MidpointRounding.AwayFromZero),
             template.UpdatedAtUtc);
     }
 
@@ -913,8 +966,7 @@ internal sealed class TemplatesService(
                     dayJobs.Count(x => x.Status == TemplateGenerationStatus.Completed),
                     dayJobs.Count(x => x.Status == TemplateGenerationStatus.Failed),
                     totalTokenCost,
-                    Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
-                    Math.Round(totalTokenCost * EstimatedUsdPerToken, 4, MidpointRounding.AwayFromZero));
+                    Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero));
             })
             .ToArray();
     }
@@ -934,7 +986,6 @@ internal sealed class TemplatesService(
                 var completed = group.Sum(x => x.CompletedGenerations);
                 var totalTokenCost = group.Sum(x => x.TotalTokenCost);
                 var totalProviderCostUsd = group.Sum(x => x.TotalProviderCostUsd);
-                var estimatedRevenueUsd = group.Sum(x => x.EstimatedRevenueUsd);
 
                 return new AdminTemplatesAnalyticsBreakdownResponse(
                     group.Key,
@@ -945,8 +996,7 @@ internal sealed class TemplatesService(
                     completed,
                     CalculatePercent(completed, starts),
                     totalTokenCost,
-                    Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
-                    Math.Round(estimatedRevenueUsd, 4, MidpointRounding.AwayFromZero));
+                        Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero));
             })
             .ToArray();
     }
@@ -960,7 +1010,6 @@ internal sealed class TemplatesService(
         {
             "starts" => rows.OrderByDescending(x => x.GenerationStarts),
             "conversion" => rows.OrderByDescending(x => x.ConversionPercent),
-            "revenue" => rows.OrderByDescending(x => x.EstimatedRevenueUsd),
             "cost" => rows.OrderByDescending(x => x.TotalProviderCostUsd),
             "tokens" => rows.OrderByDescending(x => x.TotalTokenCost),
             "updated" => rows.OrderByDescending(x => x.UpdatedAtUtc),
@@ -995,6 +1044,12 @@ internal sealed class TemplatesService(
     private static bool IsAnalyticsEventType(TemplateAnalyticsEvent analyticsEvent, string eventType)
     {
         return string.Equals(analyticsEvent.EventType, eventType, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFeedbackEvent(TemplateAnalyticsEvent analyticsEvent)
+    {
+        return IsAnalyticsEventType(analyticsEvent, AnalyticsEventTypeComplaint)
+            || IsAnalyticsEventType(analyticsEvent, AnalyticsEventTypeFeedback);
     }
 
     private async Task<GenerationAnalyticsProjection[]?> GetAnalyticsProjectionsAsync(Guid templateId, CancellationToken cancellationToken)
@@ -1060,6 +1115,17 @@ internal sealed class TemplatesService(
             ? fallback
             : value.Trim().ToLowerInvariant();
 
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    private static string? NormalizeOptionalText(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
         return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
     }
 
@@ -1171,6 +1237,7 @@ internal sealed class TemplatesService(
             template.TokenCost,
             DeserializeTags(template.Tags),
             GetAsset(template, TemplateAssetKind.Preview),
+                template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
             template.CharacterOrientation?.ToString(),
             template.CreatedAtUtc,
@@ -1203,6 +1270,10 @@ internal sealed class TemplatesService(
             template.KlingModel,
             template.KlingPrompt,
             template.KeepOriginalSound,
+            FalModelPricing.TryCalculateEstimatedGenerationCostUsd(
+                template.PreprocessingModel,
+                template.KlingModel,
+                template.ReferenceVideoDurationSeconds),
             template.CreatedAtUtc,
             template.UpdatedAtUtc);
     }

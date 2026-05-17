@@ -46,6 +46,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("FeedbackMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<Guid?>("GenerationId")
                         .HasColumnType("uuid");
 

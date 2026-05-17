@@ -39,6 +39,7 @@ public sealed class TemplatesServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Image", result.Value.CharacterOrientation);
         Assert.Equal(9.8, result.Value.ReferenceVideoDurationSeconds);
+        Assert.Equal(1.8654m, result.Value.EstimatedProviderCostUsd);
     }
 
     [Fact]
@@ -705,6 +706,44 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetAdminFeedbackAsync_ShouldReturnLatestComplaintAndFeedbackItems()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Feedback Events",
+                "Template with user feedback",
+                "Dance",
+                ["feedback"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "complaint", "profile", "web", "de", Guid.NewGuid(), null, "Видео зависло на обработке"), CancellationToken.None);
+        await service.RecordAnalyticsEventAsync(new RecordTemplateAnalyticsEventCommand(created.Value.TemplateId, "feedback", "home", "ios", "us", Guid.NewGuid(), Guid.NewGuid(), "Хочу больше вариантов музыки"), CancellationToken.None);
+
+        var feedback = await service.GetAdminFeedbackAsync(created.Value.TemplateId, 10, CancellationToken.None);
+
+        Assert.True(feedback.IsSuccess);
+        Assert.Equal(2, feedback.Value.Count);
+        Assert.Contains(feedback.Value, x => x.EventType == "complaint" && x.FeedbackMessage == "Видео зависло на обработке");
+        Assert.Contains(feedback.Value, x => x.EventType == "feedback" && x.FeedbackMessage == "Хочу больше вариантов музыки");
+    }
+
+    [Fact]
     public async Task GetAdminTemplatesAnalyticsAsync_ShouldAggregateTemplatesJobsEventsAndCosts()
     {
         await using var dbContext = CreateDbContext();
@@ -821,8 +860,6 @@ public sealed class TemplatesServiceTests
         Assert.Equal(66.7, overview.Value.Summary.ConversionPercent);
         Assert.Equal(150, overview.Value.Summary.TotalTokenCost);
         Assert.Equal(0.6200m, overview.Value.Summary.TotalProviderCostUsd);
-        Assert.Equal(1.5000m, overview.Value.Summary.EstimatedRevenueUsd);
-        Assert.Equal(0.8800m, overview.Value.Summary.EstimatedGrossMarginUsd);
         Assert.Equal(1, overview.Value.Summary.TotalComplaints);
         Assert.Equal(video.Value.TemplateId, overview.Value.TopTemplates[0].TemplateId);
         Assert.Contains(overview.Value.Categories, x => x.Key == "dance" && x.Views == 2 && x.GenerationStarts == 2);
@@ -831,6 +868,8 @@ public sealed class TemplatesServiceTests
         Assert.Contains(overview.Value.Devices, x => x.Key == "ios" && x.Count == 1);
         Assert.Contains(overview.Value.Geography, x => x.Key == "us" && x.Count == 2);
         Assert.Equal(2, overview.Value.TrendPoints.Count);
+        Assert.Single(overview.Value.FeedbackItems);
+        Assert.Equal("complaint", overview.Value.FeedbackItems[0].EventType);
         Assert.Contains("Dance", overview.Value.AvailableCategories);
         Assert.Contains("Portrait", overview.Value.AvailableCategories);
     }

@@ -165,6 +165,110 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Null(persisted.RefundedAtUtc);
     }
 
+    [Fact]
+    public async Task ProcessNextAsync_ShouldRecoverStaleProcessingJob_AndRetryIt()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var now = DateTime.UtcNow;
+        var referenceMotion = template.Assets.Single(x => x.AssetKind == TemplateAssetKind.ReferenceMotion);
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = TemplateGenerationService.AdminTestUserId,
+            TemplateId = template.Id,
+            Status = TemplateGenerationStatus.Processing,
+            TokenCost = template.TokenCost,
+            SourceImageUrl = "http://localhost:5000/templates-media/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 1024,
+            ReferenceMotionUrl = referenceMotion.Url,
+            AttemptCount = 1,
+            CreatedAtUtc = now.AddMinutes(-25),
+            QueuedAtUtc = now.AddMinutes(-25),
+            LastAttemptAtUtc = now.AddMinutes(-20),
+            StartedAtUtc = now.AddMinutes(-20),
+            UpdatedAtUtc = now.AddMinutes(-20),
+            NormalizedImageUrl = "http://localhost:5000/templates-media/stale-normalized.jpg",
+            PreprocessingCompletedAtUtc = now.AddMinutes(-19),
+            UsedPreprocessingModel = "stale-model"
+        };
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var imagePreprocessor = new TrackingImagePreprocessor();
+        var videoMotionGenerator = new TrackingVideoMotionGenerator();
+        var generatedMediaImporter = new TrackingGeneratedMediaImporter();
+        var processor = CreateProcessor(
+            dbContext,
+            imagePreprocessor: imagePreprocessor,
+            videoMotionGenerator: videoMotionGenerator,
+            generatedMediaImporter: generatedMediaImporter,
+            options: CreateOptions(staleProcessingRecoveryDelayMilliseconds: 0));
+
+        var processed = await processor.ProcessNextAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(processed);
+        Assert.Equal(TemplateGenerationStatus.Completed, persisted.Status);
+        Assert.Equal(2, persisted.AttemptCount);
+        Assert.NotNull(persisted.StartedAtUtc);
+        Assert.True(persisted.StartedAtUtc > now.AddMinutes(-5));
+        Assert.Equal(template.PreprocessingModel, persisted.UsedPreprocessingModel);
+        Assert.NotNull(persisted.PreprocessingCompletedAtUtc);
+        Assert.NotNull(persisted.CompletedAtUtc);
+    }
+
+    [Fact]
+    public async Task ProcessNextAsync_ShouldFailStaleProcessingJob_WhenAttemptsAreExhausted()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = template.Id,
+            Status = TemplateGenerationStatus.Processing,
+            TokenCost = template.TokenCost,
+            SourceImageUrl = "http://localhost:5000/templates-media/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 1024,
+            AttemptCount = 3,
+            CreatedAtUtc = now.AddMinutes(-30),
+            QueuedAtUtc = now.AddMinutes(-30),
+            LastAttemptAtUtc = now.AddMinutes(-20),
+            StartedAtUtc = now.AddMinutes(-20),
+            UpdatedAtUtc = now.AddMinutes(-20),
+            ChargedAtUtc = now.AddMinutes(-30)
+        };
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var billing = new TestTemplateGenerationBilling();
+        var processor = CreateProcessor(
+            dbContext,
+            billing: billing,
+            options: CreateOptions(staleProcessingRecoveryDelayMilliseconds: 0));
+
+        var processed = await processor.ProcessNextAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.True(processed);
+        Assert.Equal(TemplateGenerationStatus.Failed, persisted.Status);
+        Assert.Equal(TemplatesErrors.GenerationAttemptsExceeded.Code, persisted.FailureCode);
+        Assert.NotNull(persisted.CompletedAtUtc);
+        Assert.NotNull(persisted.RefundedAtUtc);
+        Assert.Contains(job.Id, billing.RefundedGenerationIds);
+    }
+
     private static TemplatesDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<TemplatesDbContext>()
@@ -195,7 +299,7 @@ public sealed class TemplateGenerationJobProcessorTests
             NullLogger<TemplateGenerationJobProcessor>.Instance);
     }
 
-    private static TemplatesOptions CreateOptions(int refundRetryDelayMilliseconds = 30_000, int retentionDays = 7)
+    private static TemplatesOptions CreateOptions(int refundRetryDelayMilliseconds = 30_000, int retentionDays = 7, int staleProcessingRecoveryDelayMilliseconds = 900_000)
     {
         return new TemplatesOptions
         {
@@ -205,6 +309,7 @@ public sealed class TemplateGenerationJobProcessorTests
             DefaultKlingPrompt = "Funny dance.",
             AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
             AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
+            StaleProcessingRecoveryDelayMilliseconds = staleProcessingRecoveryDelayMilliseconds,
             MaxGenerationAttempts = 3,
             MaxRefundAttempts = 3,
             RefundRetryDelayMilliseconds = refundRetryDelayMilliseconds,

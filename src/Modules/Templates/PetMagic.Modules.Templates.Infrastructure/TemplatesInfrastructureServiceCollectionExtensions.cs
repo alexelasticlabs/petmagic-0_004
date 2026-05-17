@@ -51,6 +51,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], true),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
             GenerationWorkerPollIntervalMilliseconds = ParseInt(section["GenerationWorkerPollIntervalMilliseconds"], 1_000),
+            StaleProcessingRecoveryDelayMilliseconds = ParsePositiveInt(section["StaleProcessingRecoveryDelayMilliseconds"], 900_000),
             MaxGenerationAttempts = ParsePositiveInt(section["MaxGenerationAttempts"], 3),
             MaxRefundAttempts = ParsePositiveInt(section["MaxRefundAttempts"], 5),
             RefundRetryDelayMilliseconds = ParseNonNegativeInt(section["RefundRetryDelayMilliseconds"], 30_000),

@@ -81,6 +81,7 @@ public sealed class TemplatesApiIntegrationTests
 
         var persistedDraftItem = Assert.Single(adminDraftList);
         var templateId = persistedDraftItem.TemplateId;
+        Assert.Equal("Meme soundtrack", persistedDraftItem.MusicDescription);
 
         var publicBeforeActivation = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
             application.Client,
@@ -134,6 +135,7 @@ public sealed class TemplatesApiIntegrationTests
         var listedAdminItem = Assert.Single(adminActiveList);
         Assert.Equal(templateId, listedAdminItem.TemplateId);
         Assert.Equal("Viral Dance Deluxe", listedAdminItem.Title);
+        Assert.Equal("Updated soundtrack", listedAdminItem.MusicDescription);
 
         var publicAfterActivation = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
             application.Client,
@@ -225,6 +227,7 @@ public sealed class TemplatesApiIntegrationTests
         var listedAdminItem = Assert.Single(adminList);
         Assert.Equal(templateId, listedAdminItem.TemplateId);
         Assert.Equal("Cozy Portrait Plus", listedAdminItem.Title);
+        Assert.Null(listedAdminItem.MusicDescription);
 
         var publicList = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
             application.Client,
@@ -284,6 +287,72 @@ public sealed class TemplatesApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("templates.reference_duration_required", body);
+    }
+
+    [Fact]
+    public async Task AnalyticsFeedbackFlow_ShouldRecordPublicFeedbackAndExposeItInAdmin()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "preview.mp4",
+            "video/mp4",
+            TemplateAssetKind.Preview,
+            "preview-video-content"u8.ToArray());
+
+        var referenceAsset = await UploadMediaAsync(
+            application.Client,
+            "reference.mp4",
+            "video/mp4",
+            TemplateAssetKind.ReferenceMotion,
+            "reference-video-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/video",
+            new CreateVideoTemplateCommand(
+                "Feedback Dance",
+                "Template with feedback flow",
+                "Dance",
+                ["feedback"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                new TemplateAssetCommand(referenceAsset.Url, referenceAsset.FileName, referenceAsset.ContentType, referenceAsset.FileSizeBytes, referenceAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "Feedback dance.",
+                true,
+                TemplateStatus.Active.ToString()));
+
+        using var postResponse = await application.Client.PostAsJsonAsync(
+            $"/api/templates/{created.TemplateId}/analytics/events",
+            new
+            {
+                eventType = "feedback",
+                source = "profile",
+                deviceClass = "web",
+                countryCode = "DE",
+                generationId = Guid.NewGuid(),
+                feedbackMessage = "Добавьте предпросмотр результата до оплаты"
+            });
+
+        Assert.Equal(HttpStatusCode.NoContent, postResponse.StatusCode);
+
+        var items = await GetFromJsonAsync<IReadOnlyList<AdminTemplateFeedbackItemResponse>>(
+            application.Client,
+            $"/api/admin/templates/{created.TemplateId}/statistics/feedback");
+
+        var item = Assert.Single(items);
+        Assert.Equal("feedback", item.EventType);
+        Assert.Equal("Добавьте предпросмотр результата до оплаты", item.FeedbackMessage);
+        Assert.Equal("profile", item.Source);
+        Assert.Equal("web", item.DeviceClass);
+        Assert.Equal("DE", item.CountryCode);
     }
 
     [Fact]

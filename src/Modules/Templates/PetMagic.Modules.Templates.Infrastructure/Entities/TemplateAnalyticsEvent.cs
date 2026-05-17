@@ -18,6 +18,8 @@ public sealed class TemplateAnalyticsEvent
 
     public string CountryCode { get; set; } = string.Empty;
 
+    public string? FeedbackMessage { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     public TemplateItem Template { get; set; } = null!;

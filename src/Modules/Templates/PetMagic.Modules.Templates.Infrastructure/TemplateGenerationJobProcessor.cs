@@ -23,14 +23,47 @@ internal sealed class TemplateGenerationJobProcessor(
 
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
+        var recoveredStaleJob = await RecoverNextStaleProcessingJobAsync(cancellationToken);
         var job = await ClaimNextAsync(cancellationToken);
 
         if (job is null)
         {
-            return await FailNextExhaustedQueuedJobAsync(cancellationToken);
+            if (await FailNextExhaustedQueuedJobAsync(cancellationToken))
+            {
+                return true;
+            }
+
+            return recoveredStaleJob;
         }
 
         await ProcessAsync(job, cancellationToken);
+        return true;
+    }
+
+    private async Task<bool> RecoverNextStaleProcessingJobAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var staleThreshold = now.AddMilliseconds(-options.StaleProcessingRecoveryDelayMilliseconds);
+        var staleJob = await dbContext.TemplateGenerationJobs
+            .Where(x => x.Status == TemplateGenerationStatus.Processing
+                && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
+                && (x.LastAttemptAtUtc ?? x.StartedAtUtc ?? x.UpdatedAtUtc) <= staleThreshold)
+            .OrderBy(x => x.LastAttemptAtUtc ?? x.StartedAtUtc ?? x.UpdatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (staleJob is null)
+        {
+            return false;
+        }
+
+        if (staleJob.AttemptCount >= options.MaxGenerationAttempts)
+        {
+            await MarkFailedAsync(staleJob, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken);
+            return true;
+        }
+
+        MarkQueuedForRecovery(staleJob, now);
+        await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
 
@@ -124,6 +157,20 @@ internal sealed class TemplateGenerationJobProcessor(
         job.LastAttemptAtUtc = now;
         job.StartedAtUtc ??= now;
         job.UpdatedAtUtc = now;
+        ResetAttemptState(job);
+    }
+
+    private static void MarkQueuedForRecovery(TemplateGenerationJob job, DateTime now)
+    {
+        job.Status = TemplateGenerationStatus.Queued;
+        job.QueuedAtUtc = now;
+        job.UpdatedAtUtc = now;
+        job.StartedAtUtc = null;
+        ResetAttemptState(job);
+    }
+
+    private static void ResetAttemptState(TemplateGenerationJob job)
+    {
         job.NormalizedImageUrl = null;
         job.OutputUrl = null;
         job.UsedPreprocessingModel = null;
@@ -139,6 +186,7 @@ internal sealed class TemplateGenerationJobProcessor(
         job.MediaImportCompletedAtUtc = null;
         job.FailureCode = null;
         job.FailureMessage = null;
+        job.CompletedAtUtc = null;
     }
 
     public async Task<bool> RetryNextRefundAsync(CancellationToken cancellationToken)

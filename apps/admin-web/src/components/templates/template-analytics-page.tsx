@@ -16,16 +16,19 @@ import { AdminMetricStrip } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateAccessLabel, getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
 import styles from "@/components/templates/template-analytics-page.module.css";
+import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import {
     fetchAdminTemplate,
     fetchAdminTemplateEventAnalytics,
     fetchAdminTemplateFailureBreakdown,
+    fetchAdminTemplateFeedback,
     fetchAdminTemplateRecentGenerations,
     fetchAdminTemplateStatistics,
     fetchAdminTemplateTrends,
     type AdminTemplate,
     type AdminTemplateEventAnalytics,
     type AdminTemplateFailureBreakdownItem,
+    type AdminTemplateFeedbackItem,
     type AdminTemplateRecentGeneration,
     type AdminTemplateStatistics,
     type AdminTemplateTrendPoint,
@@ -46,8 +49,11 @@ type TemplateAnalyticsPageProps = {
 type AnalyticsCopy = ReturnType<typeof getAnalyticsCopy>;
 
 type PeriodKey = "7d" | "30d" | "90d" | "all";
-type TrendMetricKey = "totalRuns" | "completedRuns" | "failedRuns" | "totalTokenCost" | "totalProviderCostUsd" | "averageGenerationSeconds";
-type MetricAccent = "blue" | "green" | "red" | "cyan" | "amber" | "violet" | "neutral";
+type TrendMetricKey = "totalRuns" | "completedRuns" | "failedRuns" | "totalTokenCost" | "averageGenerationSeconds";
+type MetricAccent = "blue" | "green" | "red" | "cyan" | "neutral";
+type RecentRunsMode = "latest" | "all" | "failed";
+
+const RECENT_RUNS_PREVIEW_LIMIT = 8;
 
 type TrendTotals = {
   totalRuns: number;
@@ -68,7 +74,6 @@ type PeriodAnalytics = {
   previous: TrendTotals | null;
 };
 
-const ESTIMATED_USD_PER_TOKEN = 0.01;
 const PERIOD_DAY_COUNTS: Record<Exclude<PeriodKey, "all">, number> = {
   "7d": 7,
   "30d": 30,
@@ -91,8 +96,13 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
   const [template, setTemplate] = useState<AdminTemplate | null>(null);
   const [statistics, setStatistics] = useState<AdminTemplateStatistics | null>(null);
   const [trendPoints, setTrendPoints] = useState<AdminTemplateTrendPoint[]>([]);
-  const [recentRuns, setRecentRuns] = useState<AdminTemplateRecentGeneration[]>([]);
+  const [recentRunsPreview, setRecentRunsPreview] = useState<AdminTemplateRecentGeneration[]>([]);
+  const [allRecentRuns, setAllRecentRuns] = useState<AdminTemplateRecentGeneration[] | null>(null);
+  const [recentRunsMode, setRecentRunsMode] = useState<RecentRunsMode>("latest");
+  const [isRecentRunsLoading, setIsRecentRunsLoading] = useState(false);
+  const [recentRunsError, setRecentRunsError] = useState<string | null>(null);
   const [failureBreakdown, setFailureBreakdown] = useState<AdminTemplateFailureBreakdownItem[]>([]);
+  const [feedbackItems, setFeedbackItems] = useState<AdminTemplateFeedbackItem[]>([]);
   const [eventAnalytics, setEventAnalytics] = useState<AdminTemplateEventAnalytics | null>(null);
   const [period, setPeriod] = useState<PeriodKey>("30d");
   const [chartMetric, setChartMetric] = useState<TrendMetricKey>("totalRuns");
@@ -101,18 +111,27 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
   const [error, setError] = useState<string | null>(null);
 
   const periodAnalytics = useMemo(() => buildPeriodAnalytics(trendPoints, period), [trendPoints, period]);
-  const recentProviderCostUsd = useMemo(
-    () => recentRuns.reduce((total, run) => total + (run.motionProviderCostUsd ?? 0), 0),
-    [recentRuns],
-  );
-  const recentUniqueUsers = useMemo(() => new Set(recentRuns.map((run) => run.userId)).size, [recentRuns]);
+  const visibleRecentRuns = useMemo(() => {
+    const allRuns = allRecentRuns ?? recentRunsPreview;
+    if (recentRunsMode === "all") {
+      return allRuns;
+    }
 
+    if (recentRunsMode === "failed") {
+      return allRuns.filter((run) => run.status === "Failed" || Boolean(run.failureCode) || Boolean(run.failureMessage));
+    }
+
+    return recentRunsPreview;
+  }, [allRecentRuns, recentRunsMode, recentRunsPreview]);
   useEffect(() => {
     let isCancelled = false;
 
     async function loadAnalytics() {
       setIsLoading(true);
       setError(null);
+      setRecentRunsError(null);
+      setRecentRunsMode("latest");
+      setAllRecentRuns(null);
 
       try {
         if (!ensureAdminSession(locale, router)) {
@@ -125,13 +144,15 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
           trendResponse,
           recentResponse,
           failureResponse,
+          feedbackResponse,
           eventResponse,
         ] = await Promise.all([
           fetchAdminTemplate(templateId),
           fetchAdminTemplateStatistics(templateId),
           fetchAdminTemplateTrends(templateId),
-          fetchAdminTemplateRecentGenerations(templateId, 8),
+          fetchAdminTemplateRecentGenerations(templateId, RECENT_RUNS_PREVIEW_LIMIT),
           fetchAdminTemplateFailureBreakdown(templateId),
+          fetchAdminTemplateFeedback(templateId),
           fetchAdminTemplateEventAnalytics(templateId),
         ]);
 
@@ -142,8 +163,9 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
         setTemplate(templateResponse);
         setStatistics(statisticsResponse);
         setTrendPoints(trendResponse);
-        setRecentRuns(recentResponse);
+        setRecentRunsPreview(recentResponse);
         setFailureBreakdown(failureResponse);
+        setFeedbackItems(feedbackResponse);
         setEventAnalytics(eventResponse);
       } catch {
         if (!isCancelled) {
@@ -182,15 +204,38 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
   const catalogPath = `/${locale}/templates/video`;
   const editorPath = `/${locale}/templates/video/editor?templateId=${templateId}`;
   const activeRuns = statistics.queuedRuns + statistics.processingRuns;
+  const canShowAllRecentRuns = statistics.totalRuns > RECENT_RUNS_PREVIEW_LIMIT;
+  const canShowFailedRecentRuns = statistics.failedRuns > 0;
+  const shouldShowRecentRunModes = canShowAllRecentRuns || canShowFailedRecentRuns;
   const events = eventAnalytics ?? EMPTY_EVENT_ANALYTICS;
   const selectedTotals = period === "all" ? totalsFromStatistics(statistics) : periodAnalytics.current;
   const previousTotals = isComparisonEnabled && period !== "all" ? periodAnalytics.previous : null;
   const chartPoints = period === "all" ? trendPoints : periodAnalytics.currentPoints;
-  const estimatedRevenueUsd = selectedTotals.totalTokenCost * ESTIMATED_USD_PER_TOKEN;
-  const realProviderCostUsd = selectedTotals.totalProviderCostUsd;
-  const estimatedGrossMarginUsd = estimatedRevenueUsd - realProviderCostUsd;
-  const estimatedGrossMarginPercent = estimatedRevenueUsd > 0 ? (estimatedGrossMarginUsd / estimatedRevenueUsd) * 100 : 0;
-  const averageProviderCostUsd = selectedTotals.totalRuns > 0 ? realProviderCostUsd / selectedTotals.totalRuns : 0;
+
+  async function handleRecentRunsModeChange(mode: RecentRunsMode) {
+    setRecentRunsError(null);
+
+    if (mode === "latest") {
+      setRecentRunsMode("latest");
+      return;
+    }
+
+    setRecentRunsMode(mode);
+    if (allRecentRuns || isRecentRunsLoading || !canShowAllRecentRuns) {
+      return;
+    }
+
+    try {
+      setIsRecentRunsLoading(true);
+      const response = await fetchAdminTemplateRecentGenerations(templateId);
+      setAllRecentRuns(response);
+    } catch {
+      setRecentRunsMode("latest");
+      setRecentRunsError(text.recentRunsExpandError);
+    } finally {
+      setIsRecentRunsLoading(false);
+    }
+  }
   const kpiCards = [
     {
       label: text.views,
@@ -227,30 +272,6 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
       delta: calculateChange(selectedTotals.totalTokenCost, previousTotals?.totalTokenCost),
     },
     {
-      label: text.estimatedRevenue,
-      value: formatCurrency(estimatedRevenueUsd, locale),
-      hint: text.estimatedRevenueHint,
-      accent: "amber" as MetricAccent,
-      delta: calculateChange(estimatedRevenueUsd, previousTotals ? previousTotals.totalTokenCost * ESTIMATED_USD_PER_TOKEN : undefined),
-    },
-    {
-      label: text.realProviderSpend,
-      value: formatProviderMoney(realProviderCostUsd, locale),
-      hint: text.realProviderSpendHint,
-      accent: realProviderCostUsd > 0 ? "red" as MetricAccent : "neutral" as MetricAccent,
-      delta: calculateChange(realProviderCostUsd, previousTotals?.totalProviderCostUsd),
-    },
-    {
-      label: text.averageGenerationCost,
-      value: formatTokens(selectedTotals.totalRuns > 0 ? selectedTotals.totalTokenCost / selectedTotals.totalRuns : 0, isRu),
-      hint: text.averageGenerationCostHint,
-      accent: "violet" as MetricAccent,
-      delta: calculateChange(
-        selectedTotals.totalRuns > 0 ? selectedTotals.totalTokenCost / selectedTotals.totalRuns : 0,
-        previousTotals && previousTotals.totalRuns > 0 ? previousTotals.totalTokenCost / previousTotals.totalRuns : undefined,
-      ),
-    },
-    {
       label: text.complaints,
       value: formatNumber(events.totalComplaints, locale),
       hint: text.complaintsHint,
@@ -268,7 +289,6 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
     { key: "completedRuns", label: text.chartCompleted },
     { key: "failedRuns", label: text.chartFailed },
     { key: "totalTokenCost", label: text.chartTokens },
-    { key: "totalProviderCostUsd", label: text.chartProviderCost },
     { key: "averageGenerationSeconds", label: text.chartDuration },
   ];
 
@@ -284,7 +304,7 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
       statistics,
       selectedTotals,
       trendPoints: chartPoints,
-      recentRuns,
+      recentRuns: visibleRecentRuns,
       failureBreakdown,
       eventAnalytics: events,
     };
@@ -319,8 +339,8 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
         items={[
           { label: text.lastRun, value: formatDateTime(statistics.lastRunAtUtc, locale) },
           { label: text.lastCompleted, value: formatDateTime(statistics.lastCompletedAtUtc, locale) },
-          { label: text.activeQueue, value: String(activeRuns) },
           { label: text.averageGenerationTime, value: formatDuration(statistics.averageGenerationSeconds, isRu) },
+          { label: text.activeQueue, value: String(activeRuns) },
         ]}
       />
 
@@ -399,7 +419,6 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
           </div>
           <TrendChart points={chartPoints} metric={chartMetric} locale={locale} emptyLabel={text.trendEmpty} text={text} />
         </section>
-
         <section className={styles.sectionCard}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitleWithIcon}><DashboardIcon className={styles.sectionTitleIcon} /><span>{text.statusBreakdownTitle}</span></h2>
@@ -436,11 +455,44 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 
       <div className={styles.detailsGrid}>
         <section className={`${styles.sectionCard} ${styles.sectionCardWide}`}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitleWithIcon}><TableIcon className={styles.sectionTitleIcon} /><span>{text.recentRunsTitle}</span></h2>
-            <p>{text.recentRunsHint}</p>
+          <div className={styles.sectionHeaderRow}>
+            <div className={styles.sectionHeader}>
+              <h2 className={styles.sectionTitleWithIcon}><TableIcon className={styles.sectionTitleIcon} /><span>{text.recentRunsTitle}</span></h2>
+              <p>{recentRunsMode === "all" ? text.recentRunsAllHint : recentRunsMode === "failed" ? text.failedRunsHint : text.recentRunsHint}</p>
+            </div>
+
+            {shouldShowRecentRunModes ? (
+              <div className={styles.chartTabs} aria-label={text.recentRunsTitle}>
+                <button
+                  type="button"
+                  className={recentRunsMode === "latest" ? styles.chartTabActive : styles.chartTab}
+                  onClick={() => void handleRecentRunsModeChange("latest")}
+                >
+                  <span>{text.recentRunsLatest}</span>
+                </button>
+                <button
+                  type="button"
+                  className={recentRunsMode === "all" ? styles.chartTabActive : styles.chartTab}
+                  onClick={() => void handleRecentRunsModeChange("all")}
+                  disabled={isRecentRunsLoading}
+                >
+                  <span>{isRecentRunsLoading ? text.recentRunsLoading : text.recentRunsAll}</span>
+                </button>
+                {canShowFailedRecentRuns ? (
+                  <button
+                    type="button"
+                    className={recentRunsMode === "failed" ? styles.chartTabActive : styles.chartTab}
+                    onClick={() => void handleRecentRunsModeChange("failed")}
+                    disabled={isRecentRunsLoading}
+                  >
+                    <span>{text.recentRunsFailed}</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-          <RecentRunsTable locale={locale} items={recentRuns} text={text} />
+          {recentRunsError ? <p className={styles.emptyState}>{recentRunsError}</p> : null}
+          <RecentRunsTable locale={locale} items={visibleRecentRuns} text={text} mode={recentRunsMode} />
         </section>
 
         <section className={styles.sectionCard}>
@@ -454,25 +506,10 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 
       <section className={styles.sectionCard}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitleWithIcon}><VideoIcon className={styles.sectionTitleIcon} /><span>{text.providerTitle}</span></h2>
-          <p>{text.providerHint}</p>
+          <h2 className={styles.sectionTitleWithIcon}><ChartIcon className={styles.sectionTitleIcon} /><span>{text.feedbackTitle}</span></h2>
+          <p>{text.feedbackHint}</p>
         </div>
-
-        <div className={styles.moneyGrid}>
-          <MoneyMetricCard label={text.estimatedRevenue} value={formatCurrency(estimatedRevenueUsd, locale)} hint={text.estimatedRevenueHint} accent="green" />
-          <MoneyMetricCard label={text.realProviderSpend} value={formatProviderMoney(realProviderCostUsd, locale)} hint={text.realProviderSpendHint} accent="red" />
-          <MoneyMetricCard label={text.estimatedGrossMargin} value={formatProviderMoney(estimatedGrossMarginUsd, locale)} hint={formatPercent(estimatedGrossMarginPercent, isRu)} accent={estimatedGrossMarginUsd >= 0 ? "green" : "red"} />
-          <MoneyMetricCard label={text.averageProviderCost} value={formatProviderMoney(averageProviderCostUsd, locale)} hint={text.averageProviderCostHint} accent="cyan" />
-        </div>
-
-        <div className={styles.summaryGrid}>
-          <SummaryRow label={text.totalProviderCost} value={formatProviderMoney(statistics.totalProviderCostUsd, locale)} />
-          <SummaryRow label={text.averageProviderCost} value={formatProviderMoney(statistics.averageProviderCostUsd, locale)} />
-          <SummaryRow label={text.recentProviderCost} value={formatProviderMoney(recentProviderCostUsd, locale)} />
-          <SummaryRow label={text.recentUniqueUsers} value={formatNumber(recentUniqueUsers, locale)} />
-          <SummaryRow label={text.preprocessingModel} value={formatModelValue(template.preprocessingModel)} />
-          <SummaryRow label={text.motionModel} value={formatModelValue(template.klingModel)} />
-        </div>
+        <FeedbackList locale={locale} items={feedbackItems} text={text} />
       </section>
 
       <section className={styles.sectionCard}>
@@ -494,6 +531,9 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
           <SummaryRow label={text.lastRun} value={formatDateTime(statistics.lastRunAtUtc, locale)} />
           <SummaryRow label={text.lastCompleted} value={formatDateTime(statistics.lastCompletedAtUtc, locale)} />
           <SummaryRow label={text.activeQueue} value={String(activeRuns)} />
+          <SummaryRow label={text.estimatedTemplateCostLabel} value={formatUsd(template.estimatedProviderCostUsd, locale)} />
+          <SummaryRow label={text.preprocessingModel} value={formatModelValue(template.preprocessingModel)} />
+          <SummaryRow label={text.motionModel} value={formatModelValue(template.klingModel)} />
         </div>
 
         {!statistics.totalRuns ? <p className={styles.emptyState}>{text.noData}</p> : null}
@@ -505,6 +545,8 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 function TemplateProfileCard({ template, locale, text, isRu }: { template: AdminTemplate; locale: Locale; text: AnalyticsCopy; isRu: boolean }) {
   const dictionary = getDictionary(locale);
   const previewUrl = template.previewAsset?.url;
+  const previewContentType = template.previewAsset?.contentType ?? "";
+  const previewKind = previewUrl ? inferTemplateMediaKind(previewContentType, previewUrl) : null;
   const [brokenPreviewUrl, setBrokenPreviewUrl] = useState<string | null>(null);
   const isPreviewBroken = previewUrl === brokenPreviewUrl;
 
@@ -512,7 +554,20 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
     <article className={styles.templateCard}>
       <div className={styles.templatePreviewWrap}>
         {previewUrl && !isPreviewBroken ? (
-          <Image src={previewUrl} alt="" width={480} height={600} unoptimized className={styles.templatePreviewImage} onError={() => setBrokenPreviewUrl(previewUrl)} />
+          previewKind === "video" ? (
+            <video
+              src={previewUrl}
+              className={styles.templatePreviewImage}
+              muted
+              playsInline
+              autoPlay
+              loop
+              preload="metadata"
+              onError={() => setBrokenPreviewUrl(previewUrl)}
+            />
+          ) : (
+            <Image src={previewUrl} alt="" width={480} height={600} unoptimized className={styles.templatePreviewImage} onError={() => setBrokenPreviewUrl(previewUrl)} />
+          )
         ) : (
           <div className={styles.templatePreviewFallback}>{template.title.slice(0, 1)}</div>
         )}
@@ -534,6 +589,7 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
           <SummaryRow label={text.categoryLabel} value={template.category} />
           <SummaryRow label={text.priceLabel} value={getTemplateAccessLabel(template.isPremium, dictionary)} />
           <SummaryRow label={text.tokenCostLabel} value={formatTokens(template.tokenCost, isRu)} />
+          <SummaryRow label={text.estimatedTemplateCostLabel} value={formatUsd(template.estimatedProviderCostUsd, locale)} />
           <SummaryRow label={text.createdLabel} value={formatDateTime(template.createdAtUtc, locale)} />
           <SummaryRow label={text.updatedLabel} value={formatDateTime(template.updatedAtUtc, locale)} />
         </div>
@@ -571,16 +627,6 @@ function KpiCard({
       ) : (
         <small className={styles.deltaMuted}>{text.compareNoBase}</small>
       )}
-    </article>
-  );
-}
-
-function MoneyMetricCard({ label, value, hint, accent }: { label: string; value: string; hint: string; accent: "green" | "red" | "cyan" }) {
-  return (
-    <article className={`${styles.moneyCard} ${styles[`moneyCard_${accent}`]}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{hint}</p>
     </article>
   );
 }
@@ -760,7 +806,6 @@ function TrendChart({
     </div>
   );
 }
-
 function StatusRing({ statistics, text, isRu }: { statistics: AdminTemplateStatistics; text: AnalyticsCopy; isRu: boolean }) {
   const total = Math.max(statistics.totalRuns, 1);
   const segments = [
@@ -807,12 +852,13 @@ function StatusRing({ statistics, text, isRu }: { statistics: AdminTemplateStati
   );
 }
 
-function RecentRunsTable({ locale, items, text }: { locale: Locale; items: readonly AdminTemplateRecentGeneration[]; text: AnalyticsCopy }) {
-  if (!items.length) {
-    return <p className={styles.emptyState}>{text.recentRunsEmpty}</p>;
-  }
-
+function RecentRunsTable({ locale, items, text, mode }: { locale: Locale; items: readonly AdminTemplateRecentGeneration[]; text: AnalyticsCopy; mode: RecentRunsMode }) {
   const isRu = locale === "ru";
+  const hasFailureDetails = items.some((item) => item.status === "Failed" || Boolean(item.failureCode) || Boolean(item.failureMessage));
+
+  if (!items.length) {
+    return <p className={styles.emptyState}>{mode === "failed" ? text.failedRunsEmpty : text.recentRunsEmpty}</p>;
+  }
 
   return (
     <div className={styles.tableWrap}>
@@ -823,10 +869,11 @@ function RecentRunsTable({ locale, items, text }: { locale: Locale; items: reado
             <th>{text.userHeader}</th>
             <th>{text.recentCreated}</th>
             <th>{text.recentStatus}</th>
-            <th>{text.deviceHeader}</th>
             <th>{text.recentTokens}</th>
             <th>{text.recentDuration}</th>
             <th>{text.recentModels}</th>
+            {hasFailureDetails ? <th>{text.failureCodeHeader}</th> : null}
+            {hasFailureDetails ? <th>{text.failureReasonHeader}</th> : null}
             <th>{text.recentOutput}</th>
           </tr>
         </thead>
@@ -841,10 +888,19 @@ function RecentRunsTable({ locale, items, text }: { locale: Locale; items: reado
                   {formatJobStatus(item.status, isRu)}
                 </span>
               </td>
-              <td><span className={styles.mutedCell}>{text.devicePending}</span></td>
               <td>{formatTokens(item.tokenCost, isRu)}</td>
               <td>{formatRangeDuration(item.startedAtUtc, item.completedAtUtc, isRu)}</td>
               <td>{formatModelSummary(item.usedPreprocessingModel, item.usedKlingModel)}</td>
+              {hasFailureDetails ? (
+                <td>
+                  {item.failureCode ? <span className={styles.failureCodeCell}>{formatFailureCode(item.failureCode, text)}</span> : <span className={styles.mutedCell}>-</span>}
+                </td>
+              ) : null}
+              {hasFailureDetails ? (
+                <td>
+                  {item.failureMessage ? <span className={styles.failureReasonCell}>{item.failureMessage}</span> : <span className={styles.mutedCell}>-</span>}
+                </td>
+              ) : null}
               <td>
                 {item.outputUrl ? (
                   <a href={item.outputUrl} target="_blank" rel="noreferrer" className={styles.inlineLink}>
@@ -883,6 +939,37 @@ function FailureBreakdownList({ locale, items, text }: { locale: Locale; items: 
   );
 }
 
+function FeedbackList({ locale, items, text }: { locale: Locale; items: readonly AdminTemplateFeedbackItem[]; text: AnalyticsCopy }) {
+  if (!items.length) {
+    return <p className={styles.emptyState}>{text.feedbackEmpty}</p>;
+  }
+
+  const isRu = locale === "ru";
+
+  return (
+    <div className={styles.feedbackList}>
+      {items.map((item) => (
+        <article key={item.eventId} className={styles.feedbackItem}>
+          <div className={styles.feedbackHeader}>
+            <span className={`${styles.statusChip} ${styles[item.eventType === "complaint" ? "statusChip_danger" : "statusChip_info"]}`}>
+              {item.eventType === "complaint" ? text.feedbackTypeComplaint : text.feedbackTypeFeedback}
+            </span>
+            <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
+          </div>
+          <p className={styles.feedbackMessage}>{item.feedbackMessage?.trim() || text.feedbackMessageMissing}</p>
+          <div className={styles.feedbackMeta}>
+            <span>{text.feedbackSourceLabel}: {formatAnalyticsValue(item.source)}</span>
+            <span>{text.feedbackDeviceLabel}: {formatAnalyticsValue(item.deviceClass)}</span>
+            <span>{text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}</span>
+            <span>{text.userHeader}: {item.userId ? shortenId(item.userId) : (isRu ? "анон" : "guest")}</span>
+            {item.generationId ? <span>{text.generationIdHeader}: {shortenId(item.generationId)}</span> : null}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function getAnalyticsCopy(locale: Locale) {
   const isRu = locale === "ru";
 
@@ -911,6 +998,7 @@ function getAnalyticsCopy(locale: Locale) {
     categoryLabel: isRu ? "Категория" : "Category",
     priceLabel: isRu ? "Доступ" : "Access",
     tokenCostLabel: isRu ? "Цена запуска" : "Run price",
+    estimatedTemplateCostLabel: isRu ? "Себестоимость, $" : "Provider cost, $",
     createdLabel: isRu ? "Создан" : "Created",
     updatedLabel: isRu ? "Обновлён" : "Updated",
     totalRuns: isRu ? "Всего запусков" : "Total runs",
@@ -929,17 +1017,23 @@ function getAnalyticsCopy(locale: Locale) {
     generationConversionHint: isRu ? "Доля успешных jobs среди запусков." : "Completed jobs as a share of started jobs.",
     tokenSpend: isRu ? "Потрачено токенов" : "Token spend",
     tokenSpendHint: isRu ? "Суммарная стоимость запусков в токенах." : "Total token cost of runs.",
-    estimatedRevenue: isRu ? "Доход (оценка)" : "Revenue estimate",
-    estimatedRevenueHint: isRu ? "Оценка по расходу токенов, без привязки к конкретной покупке." : "Estimated from token spend, not tied to a purchase order.",
     realProviderSpend: isRu ? "Наши затраты" : "Provider spend",
     realProviderSpendHint: isRu ? "Реальные USD-затраты, сохранённые от AI provider по jobs." : "Real USD costs persisted from the AI provider jobs.",
-    estimatedGrossMargin: isRu ? "Валовая маржа" : "Gross margin",
     averageProviderCost: isRu ? "Средняя AI-стоимость" : "Average AI cost",
     averageProviderCostHint: isRu ? "Средняя реальная provider стоимость на запуск." : "Average real provider cost per run.",
     averageGenerationCost: isRu ? "Средняя стоимость" : "Average cost",
     averageGenerationCostHint: isRu ? "Средние токены на один запуск." : "Average tokens per generation start.",
     complaints: isRu ? "Жалобы" : "Complaints",
     complaintsHint: isRu ? "События complaint из публичного analytics endpoint." : "Complaint events from the public analytics endpoint.",
+    feedbackTitle: isRu ? "Жалобы и фидбек" : "Complaints and feedback",
+    feedbackHint: isRu ? "Последние обращения пользователей по шаблону: complaint и feedback события с текстом и метаданными." : "Latest user complaints and feedback for this template with message text and event metadata.",
+    feedbackEmpty: isRu ? "Пока нет пользовательских жалоб или фидбека по этому шаблону." : "There is no user complaint or feedback for this template yet.",
+    feedbackMessageMissing: isRu ? "Без текста сообщения." : "No message text provided.",
+    feedbackTypeComplaint: isRu ? "Жалоба" : "Complaint",
+    feedbackTypeFeedback: isRu ? "Фидбек" : "Feedback",
+    feedbackSourceLabel: isRu ? "Источник" : "Source",
+    feedbackDeviceLabel: isRu ? "Устройство" : "Device",
+    feedbackCountryLabel: isRu ? "Страна" : "Country",
     activeQueue: isRu ? "Активная очередь" : "Active queue",
     averageGenerationTime: isRu ? "Среднее время" : "Average generation time",
     lastRun: isRu ? "Последний запуск" : "Last run",
@@ -961,7 +1055,7 @@ function getAnalyticsCopy(locale: Locale) {
     runsInQueue: isRu ? "В очереди" : "Queued",
     processingNow: isRu ? "В обработке" : "Processing",
     sourcesTitle: isRu ? "Источники просмотров" : "View sources",
-    sourcesHint: isRu ? "Будет заполняться из template view events." : "Will be populated from template view events.",
+    sourcesHint: isRu ? "Реальные source breakdown из template view events." : "Real source breakdown from template view events.",
     instrumentationPending: isRu ? "Нужна запись событий в публичном приложении/API, чтобы показывать эти метрики без догадок." : "Public app/API instrumentation is required to show this without guessing.",
     sourceHome: isRu ? "Главная" : "Home",
     sourceCategories: isRu ? "Категории" : "Categories",
@@ -974,28 +1068,36 @@ function getAnalyticsCopy(locale: Locale) {
     funnelFailed: isRu ? "Получили ошибку" : "Failed",
     funnelActive: isRu ? "Ещё в работе" : "Still active",
     geographyTitle: isRu ? "География пользователей" : "User geography",
-    geographyHint: isRu ? "Нужны country headers/events на public traffic." : "Requires country headers/events from public traffic.",
+    geographyHint: isRu ? "Реальная география из событий public traffic, если страна была записана." : "Real geography from public traffic events when country was captured.",
     countryUnknown: isRu ? "Страна не определена" : "Country unknown",
     countryHeader: isRu ? "Страна" : "Country",
     viewsHeader: isRu ? "Просмотры" : "Views",
     startsHeader: isRu ? "Запуски" : "Starts",
     devicesTitle: isRu ? "Устройства" : "Devices",
-    devicesHint: isRu ? "Нужен user-agent capture при просмотре/запуске." : "Requires user-agent capture on views/runs.",
+    devicesHint: isRu ? "Реальное распределение устройств из записанных analytics events." : "Real device distribution from recorded analytics events.",
     deviceIos: "iOS",
     deviceAndroid: "Android",
     deviceWeb: "Web",
     recentRunsTitle: isRu ? "Последние генерации" : "Recent generations",
     recentRunsHint: isRu ? "Последние задания по этому шаблону с минимальным operational срезом." : "Latest jobs for this template with a compact operational snapshot.",
+    recentRunsAllHint: isRu ? "Все доступные генерации по этому шаблону за весь период, который хранится в системе." : "All available generations for this template across the full retained history.",
+    recentRunsLatest: isRu ? "Последние" : "Latest",
+    recentRunsAll: isRu ? "Все генерации" : "All generations",
+    recentRunsFailed: isRu ? "Ошибочные" : "Failed only",
+    recentRunsLoading: isRu ? "Загрузка..." : "Loading...",
+    recentRunsExpandError: isRu ? "Не удалось загрузить полный список генераций." : "Failed to load the full generation history.",
     recentRunsEmpty: isRu ? "У шаблона пока нет недавних генераций." : "This template has no recent generations yet.",
+    failedRunsHint: isRu ? "Все завершившиеся с ошибкой генерации по шаблону с кодом и текстом причины." : "All failed generations for this template with failure code and reason text.",
+    failedRunsEmpty: isRu ? "По этому шаблону пока нет ошибочных генераций." : "There are no failed generations for this template yet.",
     generationIdHeader: isRu ? "ID генерации" : "Generation ID",
     userHeader: isRu ? "Пользователь" : "User",
-    deviceHeader: isRu ? "Устройство" : "Device",
-    devicePending: isRu ? "не пишется" : "not tracked",
     recentCreated: isRu ? "Создан" : "Created",
     recentStatus: isRu ? "Статус" : "Status",
     recentTokens: isRu ? "Токены" : "Tokens",
     recentDuration: isRu ? "Время" : "Duration",
     recentModels: isRu ? "Модели" : "Models",
+    failureCodeHeader: isRu ? "Код ошибки" : "Failure code",
+    failureReasonHeader: isRu ? "Причина" : "Reason",
     recentOutput: isRu ? "Выход" : "Output",
     openOutput: isRu ? "Открыть" : "Open",
     noOutput: isRu ? "Нет" : "None",
@@ -1004,11 +1106,8 @@ function getAnalyticsCopy(locale: Locale) {
     failuresEmpty: isRu ? "Пока нет зарегистрированных ошибок по этому шаблону." : "There are no recorded failures for this template yet.",
     lastFailure: isRu ? "Последняя" : "Last",
     unknownFailure: isRu ? "Неизвестная ошибка" : "Unknown failure",
-    providerTitle: isRu ? "Юнит-экономика шаблона" : "Template unit economics",
-    providerHint: isRu ? "Реальные AI provider затраты из сохранённых jobs плюс оценка выручки по расходу токенов." : "Real AI provider costs from persisted jobs plus revenue estimate from token spend.",
     totalProviderCost: isRu ? "Всего реальных затрат" : "Total real spend",
     recentProviderCost: isRu ? "Затраты в последних jobs" : "Cost in recent jobs",
-    recentUniqueUsers: isRu ? "Уникальные users в последних jobs" : "Unique users in recent jobs",
     preprocessingModel: isRu ? "Image model" : "Image model",
     motionModel: isRu ? "Motion model" : "Motion model",
     noData: isRu ? "У шаблона пока нет запусков. После первых генераций здесь появятся полноценные метрики." : "This template has no runs yet. Full metrics will appear here after the first generations.",
@@ -1139,10 +1238,6 @@ function getTrendMetricValue(point: AdminTemplateTrendPoint, metric: TrendMetric
     return point.averageGenerationSeconds ?? 0;
   }
 
-  if (metric === "totalProviderCostUsd") {
-    return point.totalProviderCostUsd;
-  }
-
   return point[metric];
 }
 
@@ -1161,10 +1256,6 @@ function buildChartTicks(maxValue: number) {
 function formatTrendValue(value: number, metric: TrendMetricKey, locale: Locale, text: AnalyticsCopy) {
   if (metric === "totalTokenCost") {
     return formatTokens(value, locale === "ru");
-  }
-
-  if (metric === "totalProviderCostUsd") {
-    return formatProviderMoney(value, locale);
   }
 
   if (metric === "averageGenerationSeconds") {
@@ -1230,6 +1321,16 @@ function formatFailureCode(value: string, text: AnalyticsCopy) {
   return value;
 }
 
+function formatAnalyticsValue(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+
+  return value.toUpperCase() === value && value.length <= 3
+    ? value
+    : value.replace(/[_-]+/g, " ");
+}
+
 function formatPercent(value: number, isRu: boolean) {
   const formatter = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", {
     minimumFractionDigits: value % 1 === 0 ? 0 : 1,
@@ -1250,29 +1351,25 @@ function formatNumber(value: number, locale: Locale) {
   }).format(value);
 }
 
-function formatCurrency(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatProviderMoney(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: value > 0 && value < 1 ? 4 : 2,
-    maximumFractionDigits: value > 0 && value < 1 ? 4 : 2,
-  }).format(value);
-}
-
 function formatTokens(value: number, isRu: boolean) {
   const formatter = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
   });
 
   return `${formatter.format(value)} ${isRu ? "токенов" : "tokens"}`;
+}
+
+function formatUsd(value: number | null | undefined, locale: Locale) {
+  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat(locale === "ru" ? "en-US" : "en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(value);
 }
 
 function formatDuration(value: number | null | undefined, isRu: boolean) {
