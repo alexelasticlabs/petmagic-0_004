@@ -389,7 +389,7 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
                         <tr key={template.templateId}>
                           <td data-label={isRu ? "Шаблон" : "Template"}>
                             <div className={styles.listTemplateCell}>
-                              <div className={styles.listTemplateThumb} aria-hidden="true">
+                              <div className={`${styles.listTemplateThumb} ${template.templateType === "Video" ? styles.listTemplateThumbVideo : ""}`.trim()} aria-hidden="true">
                                 {template.previewAsset?.url ? (
                                   template.previewAsset.contentType?.startsWith("video/") ? (
                                     <video

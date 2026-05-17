@@ -267,11 +267,15 @@
 
 .templatePreviewWrap {
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: var(--template-image-aspect-ratio);
   overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: 0.65rem;
   background: var(--surface-0);
+}
+
+.templatePreviewWrapVideo {
+  aspect-ratio: var(--template-video-aspect-ratio);
 }
 
 .templatePreviewImage,
@@ -327,8 +331,24 @@
 
 .templateMetaGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
   gap: 0.48rem;
+}
+
+.templateMetaGrid .summaryRow {
+  grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr);
+  align-items: center;
+}
+
+.templateMetaGrid .summaryRow span {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.templateMetaGrid .summaryRow strong {
+  text-align: left;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .statCard span,

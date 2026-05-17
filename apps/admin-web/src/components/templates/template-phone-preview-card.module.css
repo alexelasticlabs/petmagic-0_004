@@ -4,10 +4,19 @@
   min-width: 0;
 }
 
+.phonePreviewVideo {
+  --phone-preview-aspect-ratio: var(--template-video-aspect-ratio);
+}
+
+.phonePreviewImage {
+  --phone-preview-aspect-ratio: var(--template-image-aspect-ratio);
+}
+
 .phoneMedia {
   position: relative;
-  height: var(--phone-preview-min-height);
-  min-height: var(--phone-preview-min-height);
+  aspect-ratio: var(--phone-preview-aspect-ratio, var(--template-image-aspect-ratio));
+  height: auto;
+  min-height: 0;
   overflow: hidden;
   border: 1px solid rgba(140, 156, 176, 0.14);
   border-radius: 1.28rem;

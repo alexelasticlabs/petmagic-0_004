@@ -41,6 +41,8 @@
   --scrollbar-track: rgba(5, 12, 23, 0.9);
   --scrollbar-thumb: rgba(82, 113, 151, 0.9);
   --scrollbar-thumb-hover: rgba(123, 160, 202, 0.96);
+  --template-image-aspect-ratio: 4 / 5;
+  --template-video-aspect-ratio: 9 / 16;
 }
 
 * {

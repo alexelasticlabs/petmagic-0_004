@@ -636,7 +636,7 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
 
   return (
     <article className={styles.templateCard}>
-      <div className={styles.templatePreviewWrap}>
+      <div className={`${styles.templatePreviewWrap} ${previewKind === "video" ? styles.templatePreviewWrapVideo : ""}`.trim()}>
         {previewUrl && !isPreviewBroken ? (
           previewKind === "video" ? (
             <video

@@ -49,7 +49,7 @@ export function TemplatePreviewCard({
   const resolvedAccessLabel = accessLabel.trim();
 
   return (
-    <div className={joinClassNames(styles.phonePreview, className)}>
+    <div className={joinClassNames(styles.phonePreview, resolvedTemplateKind === "video" ? styles.phonePreviewVideo : styles.phonePreviewImage, className)}>
       <div className={styles.phoneMedia}>
         {renderPhonePreviewMedia(previewUrl, previewContentType, normalizedTitle || "Template preview")}
         {promoBadge || resolvedTemplateKindLabel ? (

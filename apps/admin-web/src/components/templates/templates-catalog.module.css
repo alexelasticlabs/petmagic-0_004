@@ -594,6 +594,13 @@
   overflow: hidden;
 }
 
+.listTemplateThumbVideo {
+  width: 1.95rem;
+  height: auto;
+  aspect-ratio: var(--template-video-aspect-ratio);
+  flex-basis: 1.95rem;
+}
+
 .listTemplateMedia {
   width: 100%;
   height: 100%;
@@ -893,6 +900,12 @@
     width: 2.9rem;
     height: 2.9rem;
     flex-basis: 2.9rem;
+  }
+
+  .listTemplateThumbVideo {
+    width: 1.66rem;
+    height: auto;
+    flex-basis: 1.66rem;
   }
 }
 
