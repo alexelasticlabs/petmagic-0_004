@@ -38,7 +38,7 @@ class _BottomNavBackdrop extends StatelessWidget {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          height: 136 + bottomPadding,
+          height: 104 + bottomPadding,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -77,31 +77,29 @@ class _FloatingBottomNav extends StatelessWidget {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(14, 0, 14, bottomPadding == 0 ? 12 : 8),
+        padding: EdgeInsets.fromLTRB(18, 0, 18, bottomPadding == 0 ? 10 : 6),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(22),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: colors.surfaceGlass.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(
-                  color: colors.border.withValues(alpha: 0.24),
-                ),
+                color: colors.surfaceGlass.withValues(alpha: 0.66),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.border.withValues(alpha: 0.2)),
                 boxShadow: [
                   BoxShadow(
                     color: colors.shadow.withValues(alpha: 0.72),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: SafeArea(
                 top: false,
-                minimum: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+                minimum: const EdgeInsets.fromLTRB(6, 4, 6, 4),
                 child: SizedBox(
-                  height: 62,
+                  height: 48,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -147,15 +145,15 @@ class _BottomNavButton extends StatelessWidget {
       button: true,
       label: item.label,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minWidth: 84),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          constraints: const BoxConstraints(minWidth: 80),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             color: selected
                 ? colors.accent.withValues(alpha: 0.15)
                 : Colors.transparent,
@@ -170,9 +168,9 @@ class _BottomNavButton extends StatelessWidget {
               Icon(
                 item.icon,
                 color: selected ? colors.accent : colors.textMuted,
-                size: 22,
+                size: 20,
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 1),
               Text(
                 item.label,
                 maxLines: 1,
@@ -180,7 +178,7 @@ class _BottomNavButton extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: selected ? colors.accent : colors.textMuted,
-                  fontSize: 9.8,
+                  fontSize: 8.8,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                   letterSpacing: 0.05,
                 ),
