@@ -1,0 +1,133 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for Spanish Castilian (`es`).
+class AppLocalizationsEs extends AppLocalizations {
+  AppLocalizationsEs([String locale = 'es']) : super(locale);
+
+  @override
+  String get navTemplates => 'Plantillas';
+
+  @override
+  String get navCreations => 'Creaciones';
+
+  @override
+  String get navProfile => 'Perfil';
+
+  @override
+  String get comingSoonMessage =>
+      'Esta seccion esta preparada para la siguiente fase del producto.';
+
+  @override
+  String get createMagicTitle => 'Crear magia';
+
+  @override
+  String get pickTemplateSubtitle => 'Elige una plantilla para tu mascota';
+
+  @override
+  String get searchTemplates => 'Buscar plantillas';
+
+  @override
+  String get allFilter => 'Todo';
+
+  @override
+  String get videosFilter => 'Videos';
+
+  @override
+  String get imagesFilter => 'Imagenes';
+
+  @override
+  String get trendingFilter => '🔥 Tendencias';
+
+  @override
+  String get funnyFilter => '😂 Divertido';
+
+  @override
+  String get danceFilter => '🕺 Baile';
+
+  @override
+  String get magicFilter => '✣ Magia';
+
+  @override
+  String get adventureFilter => '🌄 Aventura';
+
+  @override
+  String get filtersTooltip => 'Filtros';
+
+  @override
+  String get giftTooltip => 'Recompensas';
+
+  @override
+  String get addTokensTooltip => 'Anadir PawSpark';
+
+  @override
+  String get premiumLabel => 'Premium';
+
+  @override
+  String get freeLabel => 'Free';
+
+  @override
+  String get profileTitle => 'Your Profile';
+
+  @override
+  String get profileSubtitle => 'Manage sign-in and your public avatar.';
+
+  @override
+  String get profileSignInTitle => 'Sign in to continue';
+
+  @override
+  String get profileSignInHint =>
+      'Use your PetMagic account to load your profile and manage the avatar visible in admin.';
+
+  @override
+  String get profileEmailLabel => 'Email';
+
+  @override
+  String get profilePasswordLabel => 'Password';
+
+  @override
+  String get profileSignInAction => 'Sign in';
+
+  @override
+  String get profileSignOutAction => 'Sign out';
+
+  @override
+  String get profileLoadingAction => 'Working...';
+
+  @override
+  String get profileAvatarUpload => 'Upload avatar';
+
+  @override
+  String get profileAvatarRemove => 'Remove avatar';
+
+  @override
+  String get profileEmailConfirmed => 'Email confirmed';
+
+  @override
+  String get profileEmailPending => 'Email not confirmed';
+
+  @override
+  String get profileSignedOut => 'Signed out on this device.';
+
+  @override
+  String get videoLabel => 'Video';
+
+  @override
+  String get imageLabel => 'Imagen';
+
+  @override
+  String get templatesErrorTitle => 'No se cargaron las plantillas';
+
+  @override
+  String get retryAction => 'Reintentar';
+
+  @override
+  String get emptyTemplatesTitle => 'Aun no hay plantillas';
+
+  @override
+  String get emptyTemplatesMessage =>
+      'Prueba otro filtro o actualiza el catalogo.';
+}
