@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -14,7 +12,6 @@ class TemplateCard extends StatefulWidget {
   final TemplateItem template;
 
   @override
-  State<TemplateCard> createState() => _TemplateCardState();
 }
 
 class _TemplateCardState extends State<TemplateCard> {
@@ -31,12 +28,10 @@ class _TemplateCardState extends State<TemplateCard> {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return VisibilityDetector(
-      key: ValueKey('template-card-${widget.template.templateId}'),
-      onVisibilityChanged: _handleVisibility,
-      child: AnimatedScale(
-        scale: _isVisible ? 1 : 0.992,
-        duration: const Duration(milliseconds: 180),
+    return RepaintBoundary(
+      child: VisibilityDetector(
+        key: ValueKey('template-card-${widget.template.templateId}'),
+        onVisibilityChanged: _handleVisibility,
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
@@ -60,25 +55,31 @@ class _TemplateCardState extends State<TemplateCard> {
                 ),
                 const _TemplateShadeOverlay(),
                 Positioned(
-                  top: 10,
-                  left: 10,
-                  right: 10,
+                  top: 8,
+                  left: 8,
+                  right: 8,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (widget.template.effectivePromoBadge != null)
-                        _PromoBadge(value: widget.template.effectivePromoBadge!)
-                      else
-                        const Spacer(),
-                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: widget.template.effectivePromoBadge != null
+                              ? _PromoBadge(
+                                  value: widget.template.effectivePromoBadge!,
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       _MediaTypeBadge(type: widget.template.templateType),
                     ],
                   ),
                 ),
                 Positioned(
-                  left: 10,
-                  right: 10,
-                  bottom: 10,
+                  left: 8,
+                  right: 8,
+                  bottom: 8,
                   child: _TemplateDetails(template: widget.template),
                 ),
               ],
@@ -94,9 +95,13 @@ class _TemplateCardState extends State<TemplateCard> {
         info.visibleFraction > 0.58 &&
         widget.template.isVideo &&
         isVideoPreview(widget.template.previewAsset);
-    _isVisible = info.visibleFraction > 0.05;
-    if (!mounted) return;
-    setState(() {});
+    final nextVisible = info.visibleFraction > 0.05;
+
+    if (_isVisible != nextVisible && mounted) {
+      setState(() => _isVisible = nextVisible);
+    } else {
+      _isVisible = nextVisible;
+    }
 
     if (shouldPlay) {
       _ensureVideoController();
@@ -130,7 +135,9 @@ class _TemplateCardState extends State<TemplateCard> {
       await controller.play();
     } catch (_) {
       await controller.dispose();
-      if (mounted) setState(() => _videoController = null);
+      if (mounted) {
+        setState(() => _videoController = null);
+      }
     }
   }
 }
@@ -178,31 +185,23 @@ class _TemplateShadeOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
     return IgnorePointer(
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colors.surfaceGlass.withValues(alpha: 0.02),
-                  colors.surfaceGlass.withValues(alpha: 0.08),
-                  colors.surfaceGlass.withValues(alpha: 0.2),
-                  colors.surfaceGlass.withValues(alpha: 0.42),
-                  Colors.black.withValues(alpha: 0.38),
-                  Colors.black.withValues(alpha: 0.58),
-                ],
-                stops: const [0, 0.16, 0.38, 0.62, 0.84, 1],
-              ),
-            ),
-            child: const SizedBox.expand(),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.transparent,
+              Colors.black.withValues(alpha: 0.12),
+              Colors.black.withValues(alpha: 0.38),
+              Colors.black.withValues(alpha: 0.72),
+            ],
+            stops: const [0, 0.48, 0.68, 0.84, 1],
           ),
         ),
+        child: const SizedBox.expand(),
       ),
     );
   }
@@ -216,23 +215,22 @@ class _TemplateDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final tags = template.tags.take(4).toList(growable: false);
-    final showPremiumTag = template.isPremium;
+    final tags = template.tags.take(3).toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [_TokenChip(cost: template.tokenCost)]),
-        const SizedBox(height: 7),
+        const SizedBox(height: 6),
         Text(
           template.title,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 17,
+            fontSize: 16,
             fontWeight: FontWeight.w900,
-            height: 0.98,
+            height: 1.02,
             letterSpacing: -0.02,
             shadows: [
               Shadow(
@@ -243,33 +241,10 @@ class _TemplateDetails extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          template.shortDescription,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color.fromRGBO(236, 244, 255, 0.9),
-            fontSize: 11,
-            height: 1.28,
-            fontWeight: FontWeight.w500,
-            shadows: [
-              Shadow(
-                color: Color.fromRGBO(3, 7, 15, 0.48),
-                blurRadius: 16,
-                offset: Offset(0, 6),
-              ),
-            ],
-          ),
-        ),
-        if (template.musicDescription?.trim().isNotEmpty ?? false) ...[
-          const SizedBox(height: 6),
-          _MusicDescription(text: template.musicDescription!.trim()),
-        ],
         if (tags.isNotEmpty) ...[
           const SizedBox(height: 5),
           SizedBox(
-            height: 24,
+            height: 22,
             child: ClipRect(
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -286,7 +261,7 @@ class _TemplateDetails extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Row(
           children: [
             if (template.isVideo) ...[
@@ -294,13 +269,13 @@ class _TemplateDetails extends StatelessWidget {
                 formatDuration(template.referenceVideoDurationSeconds),
                 style: const TextStyle(
                   color: Color.fromRGBO(228, 238, 251, 0.9),
-                  fontSize: 11.5,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               const _MetaDot(),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
             ],
             Flexible(
               child: Text(
@@ -309,14 +284,14 @@ class _TemplateDetails extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Color.fromRGBO(228, 238, 251, 0.9),
-                  fontSize: 11.5,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            if (showPremiumTag) ...[
-              const SizedBox(width: 8),
-              _AccessTag(label: text.premiumLabel, premium: true),
+            if (template.isPremium) ...[
+              const SizedBox(width: 6),
+              _AccessTag(label: text.premiumLabel),
             ],
           ],
         ),
@@ -369,19 +344,19 @@ class _PromoBadge extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: tone,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
         boxShadow: [
-          BoxShadow(color: tone.withValues(alpha: 0.24), blurRadius: 12),
+          BoxShadow(color: tone.withValues(alpha: 0.2), blurRadius: 10),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Text(
           value.toUpperCase(),
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 10.5,
+            fontSize: 9,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -397,10 +372,7 @@ class _MediaTypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final label = type == TemplateType.video
-        ? text.videoLabel
-        : text.imageLabel;
+    final label = type == TemplateType.video ? 'VIDEO' : 'IMAGE';
     final icon = type == TemplateType.video
         ? Icons.play_circle_outline_rounded
         : Icons.image_outlined;
@@ -419,21 +391,21 @@ class _MediaKindBadge extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color.fromRGBO(8, 11, 18, 0.48),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white, size: 14),
-            const SizedBox(width: 4),
+            Icon(icon, color: Colors.white, size: 12),
+            const SizedBox(width: 3),
             Text(
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: 9,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -454,78 +426,27 @@ class _TokenChip extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color.fromRGBO(15, 24, 37, 0.28),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.pets_rounded, color: Color(0xFF73DD8C), size: 16),
-            const SizedBox(width: 5),
+            const Icon(Icons.pets_rounded, color: Color(0xFF73DD8C), size: 14),
+            const SizedBox(width: 4),
             Text(
               '$cost',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w900,
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _MusicDescription extends StatelessWidget {
-  const _MusicDescription({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color.fromRGBO(251, 191, 36, 0.2)),
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.fromRGBO(251, 191, 36, 0.18),
-                Color.fromRGBO(217, 119, 6, 0.1),
-              ],
-            ),
-          ),
-          child: const Padding(
-            padding: EdgeInsets.all(6),
-            child: Icon(
-              Icons.music_note_rounded,
-              color: Color(0xFFFFE49D),
-              size: 12,
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color.fromRGBO(223, 233, 246, 0.88),
-              fontSize: 11,
-              height: 1.42,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -540,16 +461,16 @@ class _TagChip extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color.fromRGBO(10, 18, 31, 0.34),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(color: const Color.fromRGBO(125, 211, 252, 0.18)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         child: Text(
           '#$label',
           style: const TextStyle(
             color: Color.fromRGBO(183, 227, 255, 0.94),
-            fontSize: 10.5,
+            fontSize: 9.5,
             fontWeight: FontWeight.w800,
             height: 1,
           ),
@@ -576,63 +497,47 @@ class _MetaDot extends StatelessWidget {
 }
 
 class _AccessTag extends StatelessWidget {
-  const _AccessTag({required this.label, required this.premium});
+  const _AccessTag({required this.label});
 
   final String label;
-  final bool premium;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = premium
-        ? const Color.fromRGBO(245, 208, 101, 0.5)
-        : const Color.fromRGBO(74, 222, 128, 0.45);
-    final background = premium
-        ? const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color.fromRGBO(133, 77, 14, 0.58),
-              Color.fromRGBO(63, 43, 12, 0.38),
-            ],
-          )
-        : const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color.fromRGBO(22, 101, 52, 0.58),
-              Color.fromRGBO(8, 43, 29, 0.38),
-            ],
-          );
+    const borderColor = Color.fromRGBO(245, 208, 101, 0.5);
+    const background = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Color.fromRGBO(133, 77, 14, 0.58),
+        Color.fromRGBO(63, 43, 12, 0.38),
+      ],
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: background,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: borderColor),
         boxShadow: [
-          BoxShadow(color: borderColor.withValues(alpha: 0.35), blurRadius: 14),
+          BoxShadow(color: borderColor.withValues(alpha: 0.3), blurRadius: 10),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.hexagon_outlined,
-              size: 11,
-              color: premium
-                  ? const Color(0xFFF2C96A)
-                  : const Color(0xFF6AE394),
+              size: 10,
+              color: Color(0xFFF2C96A),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             Text(
               label,
-              style: TextStyle(
-                color: premium
-                    ? const Color(0xFFFFE89E)
-                    : const Color(0xFFA8FFC8),
-                fontSize: 11,
+              style: const TextStyle(
+                color: Color(0xFFFFE89E),
+                fontSize: 9.5,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.03,
               ),
@@ -643,3 +548,4 @@ class _AccessTag extends StatelessWidget {
     );
   }
 }
+              ),

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -61,6 +60,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         color: colors.accent,
         child: CustomScrollView(
           controller: _scrollController,
+          cacheExtent: 900,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
@@ -69,17 +69,17 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const _TopBar(tokenBalance: 125),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Text(
                         text.createMagicTitle,
                         style: TextStyle(
                           color: colors.textStrong,
-                          fontSize: 23,
+                          fontSize: 21,
                           height: 1.02,
                           fontWeight: FontWeight.w900,
                         ),
@@ -89,16 +89,16 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                         text.pickTemplateSubtitle,
                         style: TextStyle(
                           color: colors.textSoft,
-                          fontSize: 11.5,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       _SearchField(
                         controller: _searchController,
                         onChanged: _handleSearchChanged,
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       TemplateTypeFilters(
                         selectedType: state.query.type,
                         categories: state.categories,
@@ -137,26 +137,23 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               )
             else ...[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
                 sliver: SliverGrid.builder(
                   itemCount: state.items.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.675,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.72,
                   ),
                   itemBuilder: (context, index) {
-                    return TemplateCard(template: state.items[index])
-                        .animate()
-                        .fadeIn(duration: 220.ms)
-                        .slideY(begin: 0.035, end: 0);
+                    return TemplateCard(template: state.items[index]);
                   },
                 ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 116),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 96),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     child: state.isLoadingMore
@@ -375,22 +372,23 @@ class _SearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       style: TextStyle(
         color: colors.textStrong,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
         hintText: text.searchTemplates,
         hintStyle: TextStyle(
           color: colors.textMuted,
-          fontSize: 11.5,
+          fontSize: 10.5,
           fontWeight: FontWeight.w600,
         ),
         prefixIcon: Icon(
           Icons.search_rounded,
           color: colors.textMuted,
-          size: 17,
+          size: 16,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       ),
     );
   }
