@@ -19,6 +19,8 @@ public static class AdminUserEndpoints
             .RequireAuthorization("ModeratorOrAdmin");
 
         group.MapGet("/", ListUsersAsync);
+        group.MapGet("/{userId:guid}", GetUserAsync);
+        group.MapGet("/{userId:guid}/analytics", GetUserAnalyticsAsync);
         group.MapPost("/emails", SendBulkEmailAsync).RequireAuthorization("AdminOnly");
         group.MapPut("/{userId:guid}/role", AssignRoleAsync).RequireAuthorization("AdminOnly");
         group.MapDelete("/{userId:guid}/role", RevokeRoleAsync).RequireAuthorization("AdminOnly");
@@ -36,6 +38,40 @@ public static class AdminUserEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminUserDetailResponse>, ProblemHttpResult>> GetUserAsync(
+        [FromRoute] Guid userId,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminUserAsync(userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminUserAnalyticsResponse>, ProblemHttpResult>> GetUserAnalyticsAsync(
+        [FromRoute] Guid userId,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminUserAnalyticsAsync(userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: StatusCodes.Status404NotFound);
         }
 
         return TypedResults.Ok(result.Value);

@@ -28,13 +28,21 @@ public sealed record TokenPairResponse(
     DateTime ExpiresAtUtc,
     UserProfileResponse User);
 
+public sealed record UserAvatarResponse(
+    string Url,
+    string FileName,
+    string ContentType,
+    long? FileSizeBytes,
+    DateTime? UpdatedAtUtc);
+
 public sealed record UserProfileResponse(
     Guid UserId,
     string Email,
     string? DisplayName,
     bool IsPremium,
     bool EmailConfirmed,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles,
+    UserAvatarResponse? Avatar);
 
 public sealed record UserListItemResponse(
     Guid UserId,
@@ -44,7 +52,8 @@ public sealed record UserListItemResponse(
     bool IsActive,
     bool EmailConfirmed,
     IReadOnlyList<string> Roles,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    UserAvatarResponse? Avatar);
 
 public sealed record SendBulkEmailCommand(
     string Audience,

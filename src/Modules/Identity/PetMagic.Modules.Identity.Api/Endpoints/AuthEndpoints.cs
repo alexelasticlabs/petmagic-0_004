@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
@@ -48,6 +49,13 @@ public static class AuthEndpoints
             .RequireAuthorization();
 
         group.MapGet("/me", MeAsync)
+            .RequireAuthorization();
+
+        group.MapPut("/me/avatar", UpdateAvatarAsync)
+            .RequireAuthorization()
+            .DisableAntiforgery();
+
+        group.MapDelete("/me/avatar", RemoveAvatarAsync)
             .RequireAuthorization();
 
         group.MapGet("/external/{provider}", ExternalChallengeAsync)
@@ -325,6 +333,61 @@ public static class AuthEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<UserProfileResponse>, ValidationProblem, ProblemHttpResult>> UpdateAvatarAsync(
+        HttpContext context,
+        IIdentityService service,
+        [FromForm] IFormFile? file,
+        CancellationToken cancellationToken)
+    {
+        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(subject, out var userId))
+        {
+            return TypedResults.Problem(title: InvalidSubjectCode, detail: "Invalid access token subject.", statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(file)] = ["Avatar file is required."]
+            });
+        }
+
+        await using var stream = file.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, cancellationToken);
+
+        var result = await service.UpdateUserAvatarAsync(
+            new UpdateUserAvatarCommand(userId, Path.GetFileName(file.FileName), file.ContentType ?? "application/octet-stream", memoryStream.ToArray()),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<UserProfileResponse>, ProblemHttpResult>> RemoveAvatarAsync(
+        HttpContext context,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(subject, out var userId))
+        {
+            return TypedResults.Problem(title: InvalidSubjectCode, detail: "Invalid access token subject.", statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.RemoveUserAvatarAsync(new RemoveUserAvatarCommand(userId), cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
