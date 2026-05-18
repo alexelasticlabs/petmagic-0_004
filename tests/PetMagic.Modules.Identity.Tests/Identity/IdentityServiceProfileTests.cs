@@ -5,8 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Data;
+using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
+using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
@@ -176,6 +179,37 @@ public sealed class IdentityServiceProfileTests
             Balance = 420,
             UpdatedAtUtc = DateTime.UtcNow.AddHours(-2)
         });
+        economyDb.WalletLedgerEntries.AddRange(
+            new WalletLedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                UserId = targetUserId,
+                Delta = 300,
+                BalanceAfter = 300,
+                Source = "pack_purchase",
+                Reason = "purchase",
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-2)
+            },
+            new WalletLedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                UserId = targetUserId,
+                Delta = 150,
+                BalanceAfter = 450,
+                Source = "admin_grant",
+                Reason = "retention",
+                CreatedAtUtc = DateTime.UtcNow.AddHours(-4)
+            },
+            new WalletLedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                UserId = targetUserId,
+                Delta = -30,
+                BalanceAfter = 420,
+                Source = "admin_debit",
+                Reason = "manual correction",
+                CreatedAtUtc = DateTime.UtcNow.AddHours(-3)
+            });
         economyDb.PurchaseOrders.AddRange(
             new PurchaseOrder
             {
@@ -298,13 +332,65 @@ public sealed class IdentityServiceProfileTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(420, result.Value.Summary.WalletBalance);
+        Assert.Equal(450, result.Value.Summary.TotalTokensCredited);
+        Assert.Equal(30, result.Value.Summary.TotalTokensSpent);
+        Assert.Equal(150, result.Value.Summary.ManualTokensGranted);
+        Assert.Equal(30, result.Value.Summary.ManualTokensDebited);
         Assert.Equal(1, result.Value.Summary.TotalPurchases);
         Assert.Equal(300, result.Value.Summary.TotalPurchasedSpark);
         Assert.Equal(2, result.Value.Summary.TotalGenerations);
         Assert.Equal(1, result.Value.Summary.CompletedGenerations);
         Assert.Equal(1, result.Value.Summary.FailedGenerations);
+        Assert.Equal(1, result.Value.Summary.TotalViews);
+        Assert.Equal(0, result.Value.Summary.TotalVideoViews);
+        Assert.Single(result.Value.RecentWalletLedger);
         Assert.Single(result.Value.FailureBreakdown);
         Assert.Single(result.Value.RecentTemplateEvents);
+    }
+
+    [Fact]
+    public async Task AdjustAdminUserWalletAsync_ShouldCreditAndDebitWalletWithAdminSources()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+
+        var userId = Guid.NewGuid();
+        identityDb.Users.Add(new AppUser
+        {
+            Id = userId,
+            Email = "wallet@petmagic.app",
+            UserName = "wallet@petmagic.app",
+            EmailConfirmed = true,
+            IsActive = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await identityDb.SaveChangesAsync();
+
+        var credit = await service.AdjustAdminUserWalletAsync(
+            new AdminAdjustUserWalletCommand(userId, "credit", 80, "bonus"),
+            CancellationToken.None);
+        var debit = await service.AdjustAdminUserWalletAsync(
+            new AdminAdjustUserWalletCommand(userId, "debit", 30, "correction"),
+            CancellationToken.None);
+
+        Assert.True(credit.IsSuccess);
+        Assert.True(debit.IsSuccess);
+        Assert.Equal(80, credit.Value.NewBalance);
+        Assert.Equal(50, debit.Value.NewBalance);
+        Assert.Equal("admin_grant", credit.Value.Source);
+        Assert.Equal("admin_debit", debit.Value.Source);
+
+        var ledger = await economyDb.WalletLedgerEntries
+            .Where(x => x.UserId == userId)
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToListAsync();
+
+        Assert.Equal(2, ledger.Count);
+        Assert.Equal("admin_grant", ledger[0].Source);
+        Assert.Equal("admin_debit", ledger[1].Source);
     }
 
     private static IdentityModuleDbContext CreateIdentityDbContext()
@@ -387,6 +473,7 @@ public sealed class IdentityServiceProfileTests
             roleManager,
             identityDbContext,
             economyDbContext,
+            CreateEconomyService(economyDbContext),
             templatesDbContext,
             new StubEmailTemplateRenderer(),
             avatarStorage,
@@ -404,6 +491,24 @@ public sealed class IdentityServiceProfileTests
                 MaxFileSizeBytes = maxAvatarSizeBytes
             },
             Options.Create(new JwtOptions()));
+    }
+
+    private static IEconomyService CreateEconomyService(EconomyDbContext dbContext)
+    {
+        return new EconomyService(
+            dbContext,
+            new FakePaymentGateway(),
+            Options.Create(new EconomyOptions
+            {
+                WeeklyFreeSpark = 100,
+                WeeklyPremiumSpark = 250,
+                AdRewardSpark = 15,
+                AdRewardDailyLimit = 5,
+                StripeSecretKey = "test_stripe_secret_key",
+                StripeWebhookSecret = "test_webhook_secret",
+                StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
+                StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel"
+            }));
     }
 
     private sealed class StubEmailTemplateRenderer : IIdentityEmailTemplateRenderer
@@ -442,6 +547,14 @@ public sealed class IdentityServiceProfileTests
             }
 
             return Task.FromResult(Result.Success());
+        }
+    }
+
+    private sealed class FakePaymentGateway : IPaymentGateway
+    {
+        public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new PaymentCreateResponse($"cs_test_{request.OrderId:N}", $"https://checkout.stripe.com/pay/{request.OrderId:N}")));
         }
     }
 }

@@ -27,6 +27,10 @@ export type Dictionary = {
   emailConfirmedLabel: string;
   createdAtLabel: string;
   userDetailOpen: string;
+  userInlineAnalyticsTitle: string;
+  userInlineAnalyticsDescription: string;
+  userOpenFullProfile: string;
+  userSelectForAnalytics: string;
   userDetailsTitle: string;
   userDetailsEyebrow: string;
   userDetailsDescription: string;
@@ -216,6 +220,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     emailConfirmedLabel: "Email подтвержден",
     createdAtLabel: "Создан",
     userDetailOpen: "Открыть карточку",
+    userInlineAnalyticsTitle: "Аналитика выбранного пользователя",
+    userInlineAnalyticsDescription: "Живая сводка по покупкам, генерациям, активности и событиям прямо на странице пользователей.",
+    userOpenFullProfile: "Полный профиль",
+    userSelectForAnalytics: "Выберите пользователя, чтобы справа появилась аналитика и история активности.",
     userDetailsTitle: "Карточка пользователя",
     userDetailsEyebrow: "Профиль и аналитика",
     userDetailsDescription: "Подробная сводка по профилю, покупкам, генерациям и действиям пользователя.",
@@ -403,6 +411,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     emailConfirmedLabel: "Email confirmed",
     createdAtLabel: "Created",
     userDetailOpen: "Open profile",
+    userInlineAnalyticsTitle: "Selected user analytics",
+    userInlineAnalyticsDescription: "Live summary of purchases, generations, activity, and events directly on the users page.",
+    userOpenFullProfile: "Full profile",
+    userSelectForAnalytics: "Select a user to load analytics and recent activity on this page.",
     userDetailsTitle: "User detail",
     userDetailsEyebrow: "Profile and analytics",
     userDetailsDescription: "Detailed summary of profile, purchases, generations, and user activity.",

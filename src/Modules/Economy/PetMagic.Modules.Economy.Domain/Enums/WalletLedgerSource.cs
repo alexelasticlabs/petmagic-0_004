@@ -11,4 +11,8 @@ public static class WalletLedgerSource
     public const string GenerationRefund = "generation_refund";
 
     public const string PackPurchase = "pack_purchase";
+
+    public const string AdminGrant = "admin_grant";
+
+    public const string AdminDebit = "admin_debit";
 }

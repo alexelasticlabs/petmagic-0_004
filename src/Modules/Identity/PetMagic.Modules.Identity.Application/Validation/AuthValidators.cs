@@ -139,6 +139,26 @@ public sealed class SetUserActiveStatusCommandValidator : AbstractValidator<SetU
     }
 }
 
+public sealed class AdminAdjustUserWalletCommandValidator : AbstractValidator<AdminAdjustUserWalletCommand>
+{
+    private static readonly string[] SupportedOperations = ["credit", "debit"];
+
+    public AdminAdjustUserWalletCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Operation)
+            .NotEmpty()
+            .Must(operation => SupportedOperations.Contains(operation, StringComparer.OrdinalIgnoreCase))
+            .WithMessage("Wallet operation is not supported.");
+        RuleFor(x => x.Amount)
+            .GreaterThan(0)
+            .LessThanOrEqualTo(100_000);
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .MaximumLength(120);
+    }
+}
+
 public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEmailCommand>
 {
     public SendBulkEmailCommandValidator()

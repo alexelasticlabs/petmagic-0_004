@@ -113,6 +113,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileSignedOut => 'Signed out on this device.';
 
   @override
+  String get magicLoadingPreparing => 'Preparing the magic...';
+
+  @override
+  String get magicLoadingCutestAngle => 'Finding the cutest angle...';
+
+  @override
+  String get magicLoadingAiPaws => 'Warming up AI paws...';
+
+  @override
+  String get magicLoadingCreatingAdorable => 'Creating something adorable...';
+
+  @override
+  String get magicLoadingAlmostReady => 'Almost ready...';
+
+  @override
   String get videoLabel => 'Video';
 
   @override
@@ -239,6 +254,21 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get profileSignedOut => 'Signed out on this device.';
+
+  @override
+  String get magicLoadingPreparing => 'Preparing the magic...';
+
+  @override
+  String get magicLoadingCutestAngle => 'Finding the cutest angle...';
+
+  @override
+  String get magicLoadingAiPaws => 'Warming up AI paws...';
+
+  @override
+  String get magicLoadingCreatingAdorable => 'Creating something adorable...';
+
+  @override
+  String get magicLoadingAlmostReady => 'Almost ready...';
 
   @override
   String get videoLabel => 'Video';

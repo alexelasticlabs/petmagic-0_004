@@ -114,6 +114,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileSignedOut => 'Вы вышли на этом устройстве.';
 
   @override
+  String get magicLoadingPreparing => 'Готовим магию...';
+
+  @override
+  String get magicLoadingCutestAngle => 'Ищем самый милый ракурс...';
+
+  @override
+  String get magicLoadingAiPaws => 'Запускаем AI-лапки...';
+
+  @override
+  String get magicLoadingCreatingAdorable => 'Создаём что-то красивое...';
+
+  @override
+  String get magicLoadingAlmostReady => 'Почти готово...';
+
+  @override
   String get videoLabel => 'Видео';
 
   @override

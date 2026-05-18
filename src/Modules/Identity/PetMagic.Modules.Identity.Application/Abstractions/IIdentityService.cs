@@ -35,6 +35,8 @@ public interface IIdentityService
 
     Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken);
 
+    Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken);
+
     Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken);
 
     Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken);

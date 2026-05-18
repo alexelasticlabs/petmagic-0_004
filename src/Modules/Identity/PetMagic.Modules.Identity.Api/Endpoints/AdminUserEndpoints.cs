@@ -21,6 +21,7 @@ public static class AdminUserEndpoints
         group.MapGet("/", ListUsersAsync);
         group.MapGet("/{userId:guid}", GetUserAsync);
         group.MapGet("/{userId:guid}/analytics", GetUserAnalyticsAsync);
+        group.MapPost("/{userId:guid}/wallet", AdjustWalletAsync);
         group.MapPost("/emails", SendBulkEmailAsync).RequireAuthorization("AdminOnly");
         group.MapPut("/{userId:guid}/role", AssignRoleAsync).RequireAuthorization("AdminOnly");
         group.MapDelete("/{userId:guid}/role", RevokeRoleAsync).RequireAuthorization("AdminOnly");
@@ -38,6 +39,36 @@ public static class AdminUserEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminUserWalletOperationResponse>, ValidationProblem, ProblemHttpResult>> AdjustWalletAsync(
+        [FromRoute] Guid userId,
+        [FromBody] AdjustWalletRequest request,
+        [FromServices] IValidator<AdminAdjustUserWalletCommand> validator,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new AdminAdjustUserWalletCommand(userId, request.Operation, request.Amount, request.Reason);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.AdjustAdminUserWalletAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                "users.not_found" => StatusCodes.Status404NotFound,
+                "economy.insufficient_balance" => StatusCodes.Status409Conflict,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
         return TypedResults.Ok(result.Value);
@@ -213,4 +244,6 @@ public static class AdminUserEndpoints
     public sealed record SetActiveStatusRequest(bool IsActive);
 
     public sealed record SendBulkEmailRequest(string Audience, string Subject, string Body, IReadOnlyList<Guid>? UserIds);
+
+    public sealed record AdjustWalletRequest(string Operation, int Amount, string Reason);
 }

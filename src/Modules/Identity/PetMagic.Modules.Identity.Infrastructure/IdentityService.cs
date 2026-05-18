@@ -8,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Application.Abstractions;
@@ -27,6 +30,7 @@ public sealed class IdentityService(
     RoleManager<IdentityRole<Guid>> roleManager,
     IdentityDbContext dbContext,
     EconomyDbContext economyDbContext,
+    IEconomyService economyService,
     TemplatesDbContext templatesDbContext,
     IIdentityEmailTemplateRenderer emailTemplateRenderer,
     IAvatarStorage avatarStorage,
@@ -510,6 +514,12 @@ public sealed class IdentityService(
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
+        var walletLedger = await economyDbContext.WalletLedgerEntries
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
         var generations = await templatesDbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.UserId == userId)
@@ -538,22 +548,44 @@ public sealed class IdentityService(
             .OrderByDescending(x => x.OccurredAtUtc)
             .ToListAsync(cancellationToken);
 
+        var totalTokensCredited = walletLedger.Where(x => x.Delta > 0).Sum(x => x.Delta);
+        var totalTokensSpent = walletLedger.Where(x => x.Delta < 0).Sum(x => Math.Abs(x.Delta));
+        var manualTokensGranted = walletLedger
+            .Where(x => string.Equals(x.Source, WalletLedgerSource.AdminGrant, StringComparison.OrdinalIgnoreCase))
+            .Sum(x => Math.Max(x.Delta, 0));
+        var manualTokensDebited = walletLedger
+            .Where(x => string.Equals(x.Source, WalletLedgerSource.AdminDebit, StringComparison.OrdinalIgnoreCase))
+            .Sum(x => Math.Abs(Math.Min(x.Delta, 0)));
         var successfulPurchases = purchases.Count(x => string.Equals(x.Status, "succeeded", StringComparison.OrdinalIgnoreCase));
         var totalPurchasedSpark = purchases
             .Where(x => string.Equals(x.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
             .Sum(x => x.SparkToGrant);
         var completedGenerations = generations.Count(x => x.Generation.Status == TemplateGenerationStatus.Completed);
         var failedGenerations = generations.Count(x => x.Generation.Status == TemplateGenerationStatus.Failed);
+        var totalViews = templateEvents.Count(x => IsTemplateViewEvent(x.Event.EventType));
+        var totalVideoViews = templateEvents.Count(x => IsTemplateVideoViewEvent(x.Event.EventType));
+        var successfulLogins = auditEvents.Count(x => IsSuccessfulLoginAction(x.Action));
+        var failedLogins = auditEvents.Count(x => IsFailedLoginAction(x.Action));
+        var lastLoginAtUtc = auditEvents
+            .Where(x => IsSuccessfulLoginAction(x.Action))
+            .Select(x => x.OccurredAtUtc)
+            .Cast<DateTime?>()
+            .FirstOrDefault();
         var activityMoments = new[]
         {
             auditEvents.FirstOrDefault()?.OccurredAtUtc,
             purchases.FirstOrDefault()?.CreatedAtUtc,
+            walletLedger.FirstOrDefault()?.CreatedAtUtc,
             generations.FirstOrDefault()?.Generation.CreatedAtUtc,
             templateEvents.FirstOrDefault()?.Event.CreatedAtUtc,
         }.Where(x => x.HasValue).Select(x => x!.Value).ToArray();
 
         var summary = new AdminUserAnalyticsSummaryResponse(
             wallet?.Balance ?? 0,
+            totalTokensCredited,
+            totalTokensSpent,
+            manualTokensGranted,
+            manualTokensDebited,
             purchases.Count,
             successfulPurchases,
             totalPurchasedSpark,
@@ -566,6 +598,11 @@ public sealed class IdentityService(
             completedGenerations,
             failedGenerations,
             generations.Select(x => x.Generation.CreatedAtUtc).Cast<DateTime?>().FirstOrDefault(),
+            totalViews,
+            totalVideoViews,
+            successfulLogins,
+            failedLogins,
+            lastLoginAtUtc,
             templateEvents.Count,
             auditEvents.Count,
             activityMoments.Length > 0 ? activityMoments.Max() : null);
@@ -619,6 +656,17 @@ public sealed class IdentityService(
                 x.Event.CreatedAtUtc))
             .ToList();
 
+        var recentWalletLedger = walletLedger
+            .Take(12)
+            .Select(x => new AdminUserWalletLedgerItemResponse(
+                x.Id,
+                x.Delta,
+                x.BalanceAfter,
+                x.Source,
+                x.Reason,
+                x.CreatedAtUtc))
+            .ToList();
+
         var failureBreakdown = generations
             .Where(x => x.Generation.Status == TemplateGenerationStatus.Failed && !string.IsNullOrWhiteSpace(x.Generation.FailureCode))
             .GroupBy(x => x.Generation.FailureCode!, StringComparer.OrdinalIgnoreCase)
@@ -637,6 +685,11 @@ public sealed class IdentityService(
                 $"Purchase {x.Status}",
                 $"{x.SparkToGrant} spark • {x.PriceAmount} {x.CurrencyCode}",
                 x.ConfirmedAtUtc ?? x.CreatedAtUtc)))
+            .Concat(walletLedger.Select(x => new AdminUserActivityItemResponse(
+                "wallet",
+                DescribeWalletLedgerTitle(x),
+                $"{DescribeWalletLedgerAmount(x.Delta)} • {x.Reason}",
+                x.CreatedAtUtc)))
             .Concat(generations.Select(x => new AdminUserActivityItemResponse(
                 "generation",
                 $"Generation {x.Generation.Status}",
@@ -658,7 +711,63 @@ public sealed class IdentityService(
             recentPurchases,
             recentGenerations,
             recentTemplateEvents,
+            recentWalletLedger,
             failureBreakdown));
+    }
+
+    public async Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(command.UserId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<AdminUserWalletOperationResponse>(IdentityErrors.UserNotFound);
+        }
+
+        var normalizedOperation = command.Operation.Trim().ToLowerInvariant();
+        Result<WalletOperationResponse> operationResult = normalizedOperation switch
+        {
+            "credit" => await economyService.CreditAsync(
+                new CreditBalanceCommand(command.UserId, command.Amount, WalletLedgerSource.AdminGrant, command.Reason.Trim()),
+                cancellationToken),
+            "debit" => await economyService.SpendAsync(
+                new SpendBalanceCommand(command.UserId, command.Amount, command.Reason.Trim()),
+                cancellationToken),
+            _ => Result.Failure<WalletOperationResponse>(IdentityErrors.OperationFailed)
+        };
+
+        if (operationResult.IsFailure)
+        {
+            return Result.Failure<AdminUserWalletOperationResponse>(operationResult.Error);
+        }
+
+        var source = normalizedOperation == "credit" ? WalletLedgerSource.AdminGrant : WalletLedgerSource.AdminDebit;
+        if (normalizedOperation == "debit")
+        {
+            var latestDebitEntry = await economyDbContext.WalletLedgerEntries
+                .Where(x => x.UserId == command.UserId)
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .FirstAsync(cancellationToken);
+
+            latestDebitEntry.Source = WalletLedgerSource.AdminDebit;
+            latestDebitEntry.Reason = command.Reason.Trim();
+            await economyDbContext.SaveChangesAsync(cancellationToken);
+            source = latestDebitEntry.Source;
+        }
+
+        await WriteAuditAsync(
+            command.UserId,
+            normalizedOperation == "credit" ? "admin.user.wallet.credited" : "admin.user.wallet.debited",
+            $"{command.Amount} tokens. Reason: {command.Reason.Trim()}",
+            cancellationToken);
+
+        return Result.Success(new AdminUserWalletOperationResponse(
+            command.UserId,
+            normalizedOperation,
+            normalizedOperation == "credit" ? command.Amount : -command.Amount,
+            operationResult.Value.NewBalance,
+            source,
+            command.Reason.Trim(),
+            operationResult.Value.OccurredAtUtc));
     }
 
     public async Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken)
@@ -953,6 +1062,49 @@ public sealed class IdentityService(
         {
             session.RevokedAtUtc = revokedAtUtc;
         }
+    }
+
+    private static bool IsSuccessfulLoginAction(string action)
+    {
+        return string.Equals(action, "auth.login.succeeded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action, "auth.external_login.succeeded", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFailedLoginAction(string action)
+    {
+        return string.Equals(action, "auth.login.failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action, "auth.login.denied", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTemplateViewEvent(string eventType)
+    {
+        return string.Equals(eventType, "view", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTemplateVideoViewEvent(string eventType)
+    {
+        return string.Equals(eventType, "video_view", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DescribeWalletLedgerTitle(WalletLedgerEntry entry)
+    {
+        return entry.Source switch
+        {
+            WalletLedgerSource.AdminGrant => "Admin token grant",
+            WalletLedgerSource.AdminDebit => "Admin token debit",
+            WalletLedgerSource.PackPurchase => "Pack purchase credited",
+            WalletLedgerSource.AdReward => "Ad reward credited",
+            WalletLedgerSource.WeeklyGrant => "Weekly grant credited",
+            WalletLedgerSource.GenerationRefund => "Generation refunded",
+            WalletLedgerSource.GenerationSpend => "Generation spend",
+            _ => entry.Source
+        };
+    }
+
+    private static string DescribeWalletLedgerAmount(int delta)
+    {
+        var sign = delta > 0 ? "+" : string.Empty;
+        return $"{sign}{delta} tokens";
     }
 
     private static string CreateVerificationCode(int length)

@@ -113,6 +113,23 @@ class AppLocalizationsFr extends AppLocalizations {
   String get profileSignedOut => 'Signed out on this device.';
 
   @override
+  String get magicLoadingPreparing => 'Preparation de la magie...';
+
+  @override
+  String get magicLoadingCutestAngle =>
+      'Recherche de l\'angle le plus mignon...';
+
+  @override
+  String get magicLoadingAiPaws => 'Activation des pattes AI...';
+
+  @override
+  String get magicLoadingCreatingAdorable =>
+      'Creation de quelque chose d\'adorable...';
+
+  @override
+  String get magicLoadingAlmostReady => 'Presque pret...';
+
+  @override
   String get videoLabel => 'Video';
 
   @override

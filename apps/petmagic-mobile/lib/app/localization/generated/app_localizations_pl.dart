@@ -113,6 +113,21 @@ class AppLocalizationsPl extends AppLocalizations {
   String get profileSignedOut => 'Signed out on this device.';
 
   @override
+  String get magicLoadingPreparing => 'Przygotowujemy magie...';
+
+  @override
+  String get magicLoadingCutestAngle => 'Szukamy najslodszego ujecia...';
+
+  @override
+  String get magicLoadingAiPaws => 'Rozgrzewamy lapki AI...';
+
+  @override
+  String get magicLoadingCreatingAdorable => 'Tworzymy cos uroczego...';
+
+  @override
+  String get magicLoadingAlmostReady => 'Prawie gotowe...';
+
+  @override
   String get videoLabel => 'Wideo';
 
   @override

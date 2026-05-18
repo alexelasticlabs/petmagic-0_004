@@ -55,6 +55,24 @@
   min-width: 0;
 }
 
+.userAnchor {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.userAnchor:hover,
+.userAnchorActive {
+  color: var(--text-strong);
+  transform: translateX(1px);
+}
+
 .inlineLink {
   display: inline-flex;
   align-items: center;
@@ -76,6 +94,11 @@
   background: rgba(37, 99, 235, 0.18);
   color: #dbeafe;
   transform: translateY(-1px);
+}
+
+.analyticsButton {
+  appearance: none;
+  cursor: pointer;
 }
 
 .actions > * {

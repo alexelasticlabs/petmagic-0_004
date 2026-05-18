@@ -1,0 +1,187 @@
+"use client";
+
+import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
+import { UserAvatarView } from "@/components/users/user-avatar";
+import { fetchAdminUser, fetchAdminUserAnalytics, type AdminUserAnalytics, type AdminUserDetail } from "@/lib/api-client";
+import { getDictionary, type Locale } from "@/lib/i18n";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import styles from "@/components/users/user-inline-analytics.module.css";
+
+type UserInlineAnalyticsProps = {
+  locale: Locale;
+  userId: string | null;
+};
+
+export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps) {
+  const text = getDictionary(locale);
+  const [user, setUser] = useState<AdminUserDetail | null>(null);
+  const [analytics, setAnalytics] = useState<AdminUserAnalytics | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!userId) {
+        setUser(null);
+        setAnalytics(null);
+        setError(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const [nextUser, nextAnalytics] = await Promise.all([
+          fetchAdminUser(userId),
+          fetchAdminUserAnalytics(userId),
+        ]);
+
+        if (!cancelled) {
+          setUser(nextUser);
+          setAnalytics(nextAnalytics);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(text.userAnalyticsLoadError);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [text.userAnalyticsLoadError, userId]);
+
+  if (!userId) {
+    return (
+      <AdminStateCard tone="info" title={text.userInlineAnalyticsTitle} description={text.userSelectForAnalytics} />
+    );
+  }
+
+  if (isLoading) {
+    return <AdminStateCard tone="info" title={text.userInlineAnalyticsTitle} description={text.loading} />;
+  }
+
+  if (error || !user || !analytics) {
+    return <AdminStateCard tone="danger" title={error ?? text.userAnalyticsLoadError} />;
+  }
+
+  return (
+    <AdminCard
+      title={text.userInlineAnalyticsTitle}
+      description={text.userInlineAnalyticsDescription}
+      action={<Link href={`/${locale}/users/${user.userId}`} className={styles.profileLink}>{text.userOpenFullProfile}</Link>}
+    >
+      <div className={styles.header}>
+        <UserAvatarView avatar={user.avatar} label={`${text.avatarLabel}: ${user.displayName ?? user.email}`} fallbackLabel={user.displayName ?? user.email} size="lg" />
+        <div className={styles.identity}>
+          <h3>{user.displayName?.trim() || user.email}</h3>
+          <p>{user.email}</p>
+          <div className={styles.badges}>
+            <AdminBadge tone={user.isActive ? "success" : "danger"}>{user.isActive ? text.activeLabel : text.deactivate}</AdminBadge>
+            <AdminBadge tone={user.isPremium ? "warning" : "neutral"}>{user.isPremium ? text.premiumLabel : text.freeLabel}</AdminBadge>
+            <AdminBadge tone={user.emailConfirmed ? "info" : "neutral"}>{user.emailConfirmed ? text.emailConfirmedLabel : text.noLabel}</AdminBadge>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.kpiGrid}>
+        <AdminKpiCard label={text.walletBalanceLabel} value={String(analytics.summary.walletBalance)} tone="primary" />
+        <AdminKpiCard label={text.totalPurchasesLabel} value={String(analytics.summary.totalPurchases)} hint={`${text.successfulPurchasesLabel}: ${analytics.summary.successfulPurchases}`} tone="info" />
+        <AdminKpiCard label={text.totalGenerationsLabel} value={String(analytics.summary.totalGenerations)} hint={`${text.completedGenerationsLabel}: ${analytics.summary.completedGenerations}`} tone="success" />
+        <AdminKpiCard label={text.failedGenerationsLabel} value={String(analytics.summary.failedGenerations)} hint={`${text.templateEventsLabel}: ${analytics.summary.templateAnalyticsEvents}`} tone="danger" />
+      </div>
+
+      <div className={styles.section}>
+        <h4>{text.userActivityTitle}</h4>
+        {analytics.recentActivity.length ? (
+          <div className={styles.timeline}>
+            {analytics.recentActivity.slice(0, 6).map((item) => (
+              <article key={`${item.kind}:${item.occurredAtUtc}:${item.title}`} className={styles.timelineItem}>
+                <div className={styles.timelineHeader}>
+                  <strong>{item.title}</strong>
+                  <span>{formatDateTime(item.occurredAtUtc, locale)}</span>
+                </div>
+                {item.details ? <p>{item.details}</p> : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <AdminStateCard tone="info" title={text.userNoActivity} />
+        )}
+      </div>
+
+      <div className={styles.dualGrid}>
+        <section className={styles.section}>
+          <h4>{text.userPurchasesTitle}</h4>
+          {analytics.recentPurchases.length ? (
+            <div className={styles.list}>
+              {analytics.recentPurchases.slice(0, 4).map((purchase) => (
+                <article key={purchase.orderId} className={styles.compactCard}>
+                  <strong>{purchase.sparkToGrant} spark</strong>
+                  <span>{purchase.priceAmount} {purchase.currencyCode}</span>
+                  <span>{formatDateTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <AdminStateCard tone="info" title={text.userNoPurchases} />
+          )}
+        </section>
+
+        <section className={styles.section}>
+          <h4>{text.userGenerationsTitle}</h4>
+          {analytics.recentGenerations.length ? (
+            <div className={styles.list}>
+              {analytics.recentGenerations.slice(0, 4).map((generation) => (
+                <article key={generation.generationId} className={styles.compactCard}>
+                  <strong>{generation.templateTitle}</strong>
+                  <span>{generation.status} • {generation.tokenCost}</span>
+                  <span>{formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <AdminStateCard tone="info" title={text.userNoGenerations} />
+          )}
+        </section>
+      </div>
+
+      <div className={styles.section}>
+        <h4>{text.userFailureBreakdownTitle}</h4>
+        {analytics.failureBreakdown.length ? (
+          <AdminMetricStrip
+            items={analytics.failureBreakdown.map((item) => ({
+              label: item.failureCode,
+              value: `${item.count} • ${formatDateTime(item.lastOccurredAtUtc, locale)}`,
+            }))}
+          />
+        ) : (
+          <AdminStateCard tone="success" title={text.userNoFailures} />
+        )}
+      </div>
+    </AdminCard>
+  );
+}
+
+function formatDateTime(value: string | null | undefined, locale: Locale) {
+  if (!value) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}

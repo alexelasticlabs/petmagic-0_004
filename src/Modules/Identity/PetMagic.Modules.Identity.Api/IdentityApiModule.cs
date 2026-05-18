@@ -25,6 +25,7 @@ public static class IdentityApiModule
         services.AddScoped<IValidator<RevokeRoleCommand>, RevokeRoleCommandValidator>();
         services.AddScoped<IValidator<SetPremiumStatusCommand>, SetPremiumStatusCommandValidator>();
         services.AddScoped<IValidator<SetUserActiveStatusCommand>, SetUserActiveStatusCommandValidator>();
+        services.AddScoped<IValidator<AdminAdjustUserWalletCommand>, AdminAdjustUserWalletCommandValidator>();
 
         return services;
     }

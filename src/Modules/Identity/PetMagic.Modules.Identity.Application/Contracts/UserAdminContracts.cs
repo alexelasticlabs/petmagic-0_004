@@ -19,8 +19,27 @@ public sealed record AdminUserDetailResponse(
     DateTime CreatedAtUtc,
     UserAvatarResponse? Avatar);
 
+public sealed record AdminAdjustUserWalletCommand(
+    Guid UserId,
+    string Operation,
+    int Amount,
+    string Reason);
+
+public sealed record AdminUserWalletOperationResponse(
+    Guid UserId,
+    string Operation,
+    int Delta,
+    int NewBalance,
+    string Source,
+    string Reason,
+    DateTime OccurredAtUtc);
+
 public sealed record AdminUserAnalyticsSummaryResponse(
     int WalletBalance,
+    int TotalTokensCredited,
+    int TotalTokensSpent,
+    int ManualTokensGranted,
+    int ManualTokensDebited,
     int TotalPurchases,
     int SuccessfulPurchases,
     int TotalPurchasedSpark,
@@ -29,6 +48,11 @@ public sealed record AdminUserAnalyticsSummaryResponse(
     int CompletedGenerations,
     int FailedGenerations,
     DateTime? LastGenerationAtUtc,
+    int TotalViews,
+    int TotalVideoViews,
+    int SuccessfulLogins,
+    int FailedLogins,
+    DateTime? LastLoginAtUtc,
     int TemplateAnalyticsEvents,
     int AuditEvents,
     DateTime? LastActivityAtUtc);
@@ -79,6 +103,14 @@ public sealed record AdminUserFailureBreakdownItemResponse(
     int Count,
     DateTime? LastOccurredAtUtc);
 
+public sealed record AdminUserWalletLedgerItemResponse(
+    Guid EntryId,
+    int Delta,
+    int BalanceAfter,
+    string Source,
+    string Reason,
+    DateTime CreatedAtUtc);
+
 public sealed record AdminUserActivityItemResponse(
     string Kind,
     string Title,
@@ -92,4 +124,5 @@ public sealed record AdminUserAnalyticsResponse(
     IReadOnlyList<AdminUserPurchaseResponse> RecentPurchases,
     IReadOnlyList<AdminUserGenerationResponse> RecentGenerations,
     IReadOnlyList<AdminUserTemplateEventResponse> RecentTemplateEvents,
+    IReadOnlyList<AdminUserWalletLedgerItemResponse> RecentWalletLedger,
     IReadOnlyList<AdminUserFailureBreakdownItemResponse> FailureBreakdown);

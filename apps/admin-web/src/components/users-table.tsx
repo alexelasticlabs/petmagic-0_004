@@ -10,6 +10,7 @@ import { AdminBadge, AdminCard, AdminPage, AdminPageHero, AdminStateCard, AdminS
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import { UserInlineAnalytics } from "@/components/users/user-inline-analytics";
 import styles from "@/components/users-table.module.css";
 import { useUsersAdmin } from "@/components/users/use-users-admin";
 import {
@@ -20,6 +21,7 @@ import {
 } from "@/lib/api-client";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
+import { useState } from "react";
 
 type UsersTableProps = {
   locale: Locale;
@@ -52,6 +54,12 @@ function getUserRoleTone(role: string): AdminTone {
 export function UsersTable({ locale }: UsersTableProps) {
   const text = getDictionary(locale);
   const { busyUserId, canManageRoles, error, isLoading, runAction, toast, users } = useUsersAdmin(locale);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const effectiveSelectedUserId = !users.length
+    ? null
+    : selectedUserId && users.some((user) => user.userId === selectedUserId)
+      ? selectedUserId
+      : users[0].userId;
   const hero = (
     <AdminPageHero
       eyebrow={text.usersHeroEyebrow}
@@ -122,7 +130,11 @@ export function UsersTable({ locale }: UsersTableProps) {
                         fallbackLabel={user.displayName ?? user.email}
                       />
                     </td>
-                    <td data-label={text.emailLabel}>{user.email}</td>
+                    <td data-label={text.emailLabel}>
+                      <button type="button" className={`${styles.userAnchor} ${effectiveSelectedUserId === user.userId ? styles.userAnchorActive : ""}`} onClick={() => setSelectedUserId(user.userId)}>
+                        <span>{user.email}</span>
+                      </button>
+                    </td>
                     <td data-label={text.roleLabel}>
                       <div className={styles.roleList}>
                         {user.roles.map((role) => (
@@ -197,6 +209,9 @@ export function UsersTable({ locale }: UsersTableProps) {
                         <Link href={`/${locale}/users/${user.userId}`} className={styles.inlineLink}>
                           <span>{text.openLabel}</span>
                         </Link>
+                        <button type="button" className={`${styles.inlineLink} ${styles.analyticsButton}`} onClick={() => setSelectedUserId(user.userId)}>
+                          <span>{text.userDetailOpen}</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -207,6 +222,8 @@ export function UsersTable({ locale }: UsersTableProps) {
           </div>
         )}
       </AdminCard>
+
+      <UserInlineAnalytics locale={locale} userId={effectiveSelectedUserId} />
 
       {toast ? <Toast message={toast.message} type={toast.type} /> : null}
     </AdminPage>

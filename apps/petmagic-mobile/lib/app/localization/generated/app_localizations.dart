@@ -313,6 +313,36 @@ abstract class AppLocalizations {
   /// **'Signed out on this device.'**
   String get profileSignedOut;
 
+  /// No description provided for @magicLoadingPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the magic...'**
+  String get magicLoadingPreparing;
+
+  /// No description provided for @magicLoadingCutestAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding the cutest angle...'**
+  String get magicLoadingCutestAngle;
+
+  /// No description provided for @magicLoadingAiPaws.
+  ///
+  /// In en, this message translates to:
+  /// **'Warming up AI paws...'**
+  String get magicLoadingAiPaws;
+
+  /// No description provided for @magicLoadingCreatingAdorable.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating something adorable...'**
+  String get magicLoadingCreatingAdorable;
+
+  /// No description provided for @magicLoadingAlmostReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Almost ready...'**
+  String get magicLoadingAlmostReady;
+
   /// No description provided for @videoLabel.
   ///
   /// In en, this message translates to:

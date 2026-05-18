@@ -7,7 +7,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
-import 'package:petmagic_mobile/features/templates/presentation/widgets/templates_skeleton.dart';
+import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
   const TemplatesPage({super.key});
@@ -112,7 +112,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               ),
             ),
             if (state.isInitialLoading)
-              const TemplatesSkeleton()
+              const SliverMagicLoadingScreen()
             else if (state.errorMessage != null && state.items.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
