@@ -42,6 +42,7 @@ docker-compose up --build
 | **PostgreSQL 16** | 5432 | Persistent data store | Alpine image, volume backup |
 | **Backend API** | 5000 | REST API, JWT auth, business logic | .NET 10, EF Core 10, Serilog, OpenTelemetry |
 | **Admin Web** | 3000 | Admin dashboard for user management | Next.js 16, TypeScript, RU/EN localization |
+| **Mobile App** | Simulator / device | iOS and Android client | Flutter 3, Riverpod, RU/EN/EU localization |
 
 ### Project Structure
 
@@ -51,6 +52,7 @@ petmagic-0_004/
 ├── Dockerfile.api              # Backend multi-stage build
 ├── apps/admin-web/
 │   └── Dockerfile              # Frontend build
+├── apps/petmagic-mobile/       # Flutter iOS/Android app
 ├── src/
 │   ├── Host/                   # Application entry point
 │   ├── Modules/Identity/       # Authentication module (DDD vertical slice)
@@ -120,6 +122,12 @@ dotnet run
 cd apps/admin-web
 npm install
 npm run dev
+
+# In another terminal, run mobile app
+cd apps/petmagic-mobile
+flutter pub get
+flutter gen-l10n
+flutter run --dart-define=API_BASE_URL=http://localhost:5000
 `
 
 ---

@@ -24,6 +24,16 @@ coverage/
 node_modules/
 *.tsbuildinfo
 
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+
 # IDE
 .vs/
 .vscode/

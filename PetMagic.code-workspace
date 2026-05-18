@@ -11,13 +11,16 @@
     "files.exclude": {
       "**/bin": true,
       "**/obj": true,
-      "**/.next": true
+      "**/.next": true,
+      "**/.dart_tool": true
     },
     "search.exclude": {
       "**/node_modules": true,
       "**/bin": true,
       "**/obj": true,
-      "**/.next": true
+      "**/.next": true,
+      "**/.dart_tool": true,
+      "**/build": true
     },
     "[csharp]": {
       "editor.defaultFormatter": "ms-dotnettools.csharp"
@@ -27,6 +30,9 @@
     },
     "[javascript]": {
       "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[dart]": {
+      "editor.defaultFormatter": "Dart-Code.dart-code"
     }
   }
 }
