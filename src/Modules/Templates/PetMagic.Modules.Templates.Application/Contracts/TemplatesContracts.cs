@@ -1,3 +1,5 @@
+using PetMagic.Modules.Templates.Domain.Enums;
+
 namespace PetMagic.Modules.Templates.Application.Contracts;
 
 public sealed record MediaUploadCommand(
@@ -371,7 +373,26 @@ public sealed record PublicTemplateListItemResponse(
     bool IsPremium,
     int TokenCost,
     TemplateAssetResponse? PreviewAsset,
+    string? MusicDescription,
     double? ReferenceVideoDurationSeconds);
+
+public sealed record PublicTemplateCategoryResponse(
+    string Name);
+
+public sealed record PublicTemplatesFeedQuery(
+    TemplateType? Type,
+    string? Category,
+    string[] Tags,
+    bool? PremiumOnly,
+    string? Search,
+    int? Take,
+    string? Cursor);
+
+public sealed record PublicTemplatesFeedResponse(
+    IReadOnlyList<PublicTemplateListItemResponse> Items,
+    string? NextCursor,
+    bool HasMore,
+    DateTime GeneratedAtUtc);
 
 public sealed record PublicTemplateResponse(
     Guid TemplateId,

@@ -20,6 +20,8 @@ public static class PublicTemplateEndpoints
             .RequireRateLimiting("templates");
 
         group.MapGet("/", ListAsync).AllowAnonymous();
+        group.MapGet("/categories", ListCategoriesAsync).AllowAnonymous();
+        group.MapGet("/feed", ListFeedAsync).AllowAnonymous();
         group.MapGet("/{templateId:guid}", GetAsync).AllowAnonymous();
         group.MapPost("/{templateId:guid}/analytics/events", RecordAnalyticsEventAsync).AllowAnonymous();
 
@@ -38,6 +40,43 @@ public static class PublicTemplateEndpoints
             ? parsedType
             : null;
         var result = await service.ListPublicAsync(templateType, category, tags, premiumOnly, cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<IReadOnlyList<PublicTemplateCategoryResponse>>> ListCategoriesAsync(
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListPublicCategoriesAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<PublicTemplatesFeedResponse>> ListFeedAsync(
+        [FromQuery] string? type,
+        [FromQuery] string? category,
+        [FromQuery] string[]? tags,
+        [FromQuery] bool? premiumOnly,
+        [FromQuery] string? search,
+        [FromQuery] int? take,
+        [FromQuery] string? cursor,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        TemplateType? templateType = Enum.TryParse<TemplateType>(type, true, out var parsedType)
+            ? parsedType
+            : null;
+
+        var result = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(
+                templateType,
+                category,
+                tags ?? [],
+                premiumOnly,
+                search,
+                take,
+                cursor),
+            cancellationToken);
+
         return TypedResults.Ok(result.Value);
     }
 

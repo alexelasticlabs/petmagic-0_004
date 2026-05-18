@@ -18,6 +18,11 @@ internal sealed class TemplatesService(
     IMediaStorage mediaStorage,
     ITemplateMediaLifecycleService mediaLifecycleService) : ITemplatesService
 {
+    private const int PublicFeedDefaultTake = 20;
+    private const int PublicFeedMaxTake = 50;
+
+    private sealed record PublicFeedCursor(DateTime UpdatedAtUtc, Guid TemplateId);
+
     private sealed record GenerationStatisticsProjection(
         TemplateGenerationStatus Status,
         int TokenCost,
@@ -981,6 +986,57 @@ internal sealed class TemplatesService(
         return Result.Success<IReadOnlyList<PublicTemplateListItemResponse>>(filtered);
     }
 
+    public async Task<Result<IReadOnlyList<PublicTemplateCategoryResponse>>> ListPublicCategoriesAsync(CancellationToken cancellationToken)
+    {
+        var categories = await dbContext.TemplateCategories
+            .AsNoTracking()
+            .Where(x => !x.IsArchived)
+            .OrderBy(x => x.Name)
+            .Select(x => new PublicTemplateCategoryResponse(x.Name))
+            .ToArrayAsync(cancellationToken);
+
+        return Result.Success<IReadOnlyList<PublicTemplateCategoryResponse>>(categories);
+    }
+
+    public async Task<Result<PublicTemplatesFeedResponse>> ListPublicFeedAsync(PublicTemplatesFeedQuery query, CancellationToken cancellationToken)
+    {
+        var take = NormalizePublicFeedTake(query.Take);
+        var cursor = TryParsePublicFeedCursor(query.Cursor);
+        var normalizedCategory = query.Category?.Trim();
+        var normalizedSearch = query.Search?.Trim();
+        var normalizedTags = NormalizeTags(query.Tags);
+
+        var items = await dbContext.TemplateItems
+            .AsNoTracking()
+            .Include(x => x.Assets)
+            .Where(x => x.Status == TemplateStatus.Active)
+            .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
+            .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium)
+            .ToArrayAsync(cancellationToken);
+
+        var filtered = items
+            .Where(template => string.IsNullOrWhiteSpace(normalizedCategory) || string.Equals(template.Category, normalizedCategory, StringComparison.OrdinalIgnoreCase))
+            .Where(template => normalizedTags.Length == 0 || normalizedTags.All(tag => DeserializeTags(template.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)))
+            .Where(template => MatchesPublicFeedSearch(template, normalizedSearch))
+            .OrderByDescending(template => template.UpdatedAtUtc)
+            .ThenByDescending(template => template.Id)
+            .Where(template => cursor is null || IsAfterPublicFeedCursor(template, cursor))
+            .Take(take + 1)
+            .ToArray();
+
+        var pageItems = filtered.Take(take).ToArray();
+        var hasMore = filtered.Length > take;
+        var nextCursor = hasMore && pageItems.Length > 0
+            ? FormatPublicFeedCursor(pageItems[^1])
+            : null;
+
+        return Result.Success(new PublicTemplatesFeedResponse(
+            pageItems.Select(MapPublicListItem).ToArray(),
+            nextCursor,
+            hasMore,
+            DateTime.UtcNow));
+    }
+
     public async Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, CancellationToken cancellationToken)
     {
         var template = await FindTemplateAsync(templateId, cancellationToken);
@@ -1141,6 +1197,60 @@ internal sealed class TemplatesService(
         return dbContext.TemplateItems
             .Include(x => x.Assets)
             .FirstOrDefaultAsync(x => x.Id == templateId, cancellationToken);
+    }
+
+    private static int NormalizePublicFeedTake(int? take)
+    {
+        if (!take.HasValue || take.Value <= 0)
+        {
+            return PublicFeedDefaultTake;
+        }
+
+        return Math.Min(take.Value, PublicFeedMaxTake);
+    }
+
+    private static PublicFeedCursor? TryParsePublicFeedCursor(string? rawCursor)
+    {
+        if (string.IsNullOrWhiteSpace(rawCursor))
+        {
+            return null;
+        }
+
+        var parts = rawCursor.Trim().Split(':', 2, StringSplitOptions.TrimEntries);
+        if (parts.Length != 2 || !long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks) || !Guid.TryParseExact(parts[1], "N", out var templateId))
+        {
+            return null;
+        }
+
+        return new PublicFeedCursor(new DateTime(ticks, DateTimeKind.Utc), templateId);
+    }
+
+    private static string FormatPublicFeedCursor(TemplateItem template)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"{template.UpdatedAtUtc.Ticks}:{template.Id:N}");
+    }
+
+    private static bool IsAfterPublicFeedCursor(TemplateItem template, PublicFeedCursor cursor)
+    {
+        if (template.UpdatedAtUtc < cursor.UpdatedAtUtc)
+        {
+            return true;
+        }
+
+        return template.UpdatedAtUtc == cursor.UpdatedAtUtc && template.Id.CompareTo(cursor.TemplateId) < 0;
+    }
+
+    private static bool MatchesPublicFeedSearch(TemplateItem template, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return true;
+        }
+
+        return template.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || template.ShortDescription.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || template.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || DeserializeTags(template.Tags).Any(tag => tag.Contains(search, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string[] NormalizeTags(IEnumerable<string> tags)
@@ -1675,6 +1785,7 @@ internal sealed class TemplatesService(
             template.IsPremium,
             template.TokenCost,
             GetAsset(template, TemplateAssetKind.Preview),
+            template.MusicDescription,
             template.ReferenceVideoDurationSeconds);
     }
 
