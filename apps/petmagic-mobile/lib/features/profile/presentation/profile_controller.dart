@@ -1,0 +1,200 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+
+final profileControllerProvider =
+    NotifierProvider<ProfileController, ProfileState>(ProfileController.new);
+
+class ProfileState {
+  const ProfileState({
+    required this.isLoading,
+    required this.isSaving,
+    required this.email,
+    required this.password,
+    this.session,
+    this.profile,
+    this.errorMessage,
+    this.successMessage,
+  });
+
+  const ProfileState.initial()
+    : this(isLoading: true, isSaving: false, email: '', password: '');
+
+  final bool isLoading;
+  final bool isSaving;
+  final String email;
+  final String password;
+  final AuthSession? session;
+  final MobileUserProfile? profile;
+  final String? errorMessage;
+  final String? successMessage;
+
+  bool get isAuthenticated => session != null;
+
+  ProfileState copyWith({
+    bool? isLoading,
+    bool? isSaving,
+    String? email,
+    String? password,
+    AuthSession? session,
+    MobileUserProfile? profile,
+    String? errorMessage,
+    String? successMessage,
+    bool clearError = false,
+    bool clearSuccess = false,
+    bool clearSession = false,
+    bool clearProfile = false,
+  }) {
+    return ProfileState(
+      isLoading: isLoading ?? this.isLoading,
+      isSaving: isSaving ?? this.isSaving,
+      email: email ?? this.email,
+      password: password ?? this.password,
+      session: clearSession ? null : (session ?? this.session),
+      profile: clearProfile ? null : (profile ?? this.profile),
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      successMessage: clearSuccess
+          ? null
+          : (successMessage ?? this.successMessage),
+    );
+  }
+}
+
+class ProfileController extends Notifier<ProfileState> {
+  late final ProfileRepository _repository;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  ProfileState build() {
+    _repository = ref.watch(profileRepositoryProvider);
+    return const ProfileState.initial();
+  }
+
+  Future<void> initialize() async {
+    state = state.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      final session = await _repository.readSession();
+      if (session == null) {
+        state = state.copyWith(
+          isLoading: false,
+          clearSession: true,
+          clearProfile: true,
+        );
+        return;
+      }
+
+      final profile = await _repository.fetchProfile();
+      state = state.copyWith(
+        isLoading: false,
+        session: session,
+        profile: profile,
+        email: session.user.email,
+        clearError: true,
+      );
+    } on AppException catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.message,
+        clearSession: true,
+        clearProfile: true,
+      );
+    }
+  }
+
+  void updateEmail(String value) {
+    state = state.copyWith(email: value, clearError: true, clearSuccess: true);
+  }
+
+  void updatePassword(String value) {
+    state = state.copyWith(
+      password: value,
+      clearError: true,
+      clearSuccess: true,
+    );
+  }
+
+  Future<void> login() async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      final session = await _repository.login(
+        email: state.email,
+        password: state.password,
+      );
+      final profile = await _repository.fetchProfile();
+      state = state.copyWith(
+        isSaving: false,
+        session: session,
+        profile: profile,
+        password: '',
+      );
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    }
+  }
+
+  Future<void> logout() async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    await _repository.logout();
+    state = state.copyWith(
+      isSaving: false,
+      clearSession: true,
+      clearProfile: true,
+      password: '',
+      successMessage: 'logout',
+    );
+  }
+
+  Future<void> uploadAvatar() async {
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 90,
+    );
+    if (file == null) {
+      return;
+    }
+
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    try {
+      final profile = await _repository.uploadAvatar(file.path);
+      state = state.copyWith(isSaving: false, profile: profile);
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    }
+  }
+
+  Future<void> removeAvatar() async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    try {
+      final profile = await _repository.removeAvatar();
+      state = state.copyWith(isSaving: false, profile: profile);
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    }
+  }
+}
