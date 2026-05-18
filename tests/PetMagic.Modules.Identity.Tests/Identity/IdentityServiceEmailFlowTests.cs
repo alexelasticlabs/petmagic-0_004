@@ -6,12 +6,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
+using PetMagic.Modules.Templates.Infrastructure.Data;
 
 using IdentityModuleDbContext = PetMagic.Modules.Identity.Infrastructure.Data.IdentityDbContext;
 
@@ -248,7 +251,10 @@ public sealed class IdentityServiceEmailFlowTests
             userManager,
             roleManager,
             dbContext,
+            CreateEconomyDbContext(),
+            CreateTemplatesDbContext(),
             new StubEmailTemplateRenderer(),
+            new InMemoryAvatarStorage(),
             new EmailOptions
             {
                 DispatchWorkerEnabled = false,
@@ -258,7 +264,26 @@ public sealed class IdentityServiceEmailFlowTests
                 VerificationCodeTtlMinutes = 15,
                 PasswordResetCodeTtlMinutes = 15
             },
+            new AvatarStorageOptions(),
             Options.Create(new JwtOptions()));
+    }
+
+    private static EconomyDbContext CreateEconomyDbContext()
+    {
+        var options = new DbContextOptionsBuilder<EconomyDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new EconomyDbContext(options);
+    }
+
+    private static TemplatesDbContext CreateTemplatesDbContext()
+    {
+        var options = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new TemplatesDbContext(options);
     }
 
     private static string HashValue(string value)
@@ -277,6 +302,25 @@ public sealed class IdentityServiceEmailFlowTests
         public RenderedEmailMessage RenderPasswordReset(string? displayName, string code, DateTime expiresAtUtc)
         {
             return new RenderedEmailMessage("Reset", $"<p>{code}</p>", code);
+        }
+    }
+
+    private sealed class InMemoryAvatarStorage : IAvatarStorage
+    {
+        public Task<Result<StoredAvatarResponse>> StoreAsync(AvatarUploadCommand avatar, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new StoredAvatarResponse(
+                $"http://localhost:5000/user-avatars/{Guid.NewGuid():N}/{avatar.FileName}",
+                $"user-avatars/{avatar.FileName}",
+                avatar.FileName,
+                avatar.ContentType,
+                avatar.Content.LongLength,
+                null)));
+        }
+
+        public Task<Result> DeleteAsync(string? avatarUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success());
         }
     }
 }

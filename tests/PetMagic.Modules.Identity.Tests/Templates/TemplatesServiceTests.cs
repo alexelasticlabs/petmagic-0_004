@@ -256,6 +256,60 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListPublicFeedAsync_ShouldPageActiveTemplatesWithStableCursor()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var utcNow = DateTime.UtcNow;
+
+        var oldestId = await CreateActiveImageTemplateAsync(service, "Old Portrait", "Portrait", ["cozy"]);
+        var middleId = await CreateActiveImageTemplateAsync(service, "Middle Portrait", "Portrait", ["cozy"]);
+        var newestId = await CreateActiveImageTemplateAsync(service, "New Portrait", "Portrait", ["cozy"]);
+
+        await SetUpdatedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetUpdatedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetUpdatedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+
+        var firstPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, null),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.True(firstPage.Value.HasMore);
+        Assert.NotNull(firstPage.Value.NextCursor);
+        Assert.Equal([newestId, middleId], firstPage.Value.Items.Select(item => item.TemplateId).ToArray());
+
+        var secondPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, firstPage.Value.NextCursor),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.False(secondPage.Value.HasMore);
+        Assert.Null(secondPage.Value.NextCursor);
+        var item = Assert.Single(secondPage.Value.Items);
+        Assert.Equal(oldestId, item.TemplateId);
+    }
+
+    [Fact]
+    public async Task ListPublicCategoriesAsync_ShouldReturnNonArchivedSortedCategories()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        await CreateActiveImageTemplateAsync(service, "Magic Portrait", "Magic", ["spark"]);
+        await CreateActiveImageTemplateAsync(service, "Adventure Portrait", "Adventure", ["story"]);
+
+        var archived = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Adventure");
+        archived.IsArchived = true;
+        await dbContext.SaveChangesAsync();
+
+        var categories = await service.ListPublicCategoriesAsync(CancellationToken.None);
+
+        Assert.True(categories.IsSuccess);
+        Assert.Equal(["Magic"], categories.Value.Select(x => x.Name).ToArray());
+    }
+
+    [Fact]
     public async Task UpdateImageAsync_ShouldDeletePreviousPreview_WhenPreviewUrlChanges()
     {
         await using var dbContext = CreateDbContext();
@@ -1225,6 +1279,35 @@ public sealed class TemplatesServiceTests
         IMediaMetadataReader metadataReader = new TestMediaMetadataReader();
         ITemplateMediaLifecycleService lifecycleService = new TemplateMediaLifecycleService(dbContext, options);
         return new TemplatesService(dbContext, options, metadataReader, mediaStorage ?? new RecordingMediaStorage(), lifecycleService);
+    }
+
+    private static async Task<Guid> CreateActiveImageTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
+    {
+        var slug = title.ToLowerInvariant().Replace(' ', '-');
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                title,
+                $"{title} description",
+                category,
+                tags,
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset($"https://cdn.example.com/{slug}.jpg", $"{slug}.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        return created.Value.TemplateId;
+    }
+
+    private static async Task SetUpdatedAtUtcAsync(TemplatesDbContext dbContext, Guid templateId, DateTime updatedAtUtc)
+    {
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        template.UpdatedAtUtc = updatedAtUtc;
+        await dbContext.SaveChangesAsync();
     }
 
     private static TemplateGenerationService CreateGenerationService(TemplatesDbContext dbContext)

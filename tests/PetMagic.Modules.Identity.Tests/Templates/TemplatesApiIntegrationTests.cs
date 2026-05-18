@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
@@ -253,6 +254,54 @@ public sealed class TemplatesApiIntegrationTests
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
         Assert.Single(application.MediaStorage.DeletedUrls);
         Assert.Contains(previewAsset.Url, application.MediaStorage.DeletedUrls);
+    }
+
+    [Fact]
+    public async Task PublicTemplatesFeed_ShouldPageAndFilterActiveTemplatesForAnonymousUsers()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var first = await CreateActiveImageTemplateAsync(application.Client, "Magic Cozy One", "Magic", ["cozy", "magic"]);
+        var second = await CreateActiveImageTemplateAsync(application.Client, "Magic Cozy Two", "Magic", ["cozy", "premium"]);
+        await CreateActiveImageTemplateAsync(application.Client, "Surf Buddy", "Fun", ["surf"]);
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        var firstPage = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
+            application.Client,
+            "/api/templates/feed?type=Image&take=1&tags=cozy&search=magic");
+
+        Assert.True(firstPage.HasMore);
+        Assert.NotNull(firstPage.NextCursor);
+        var firstPageItem = Assert.Single(firstPage.Items);
+        Assert.Contains(firstPageItem.TemplateId, new[] { first.TemplateId, second.TemplateId });
+        Assert.Contains("cozy", firstPageItem.Tags, StringComparer.OrdinalIgnoreCase);
+
+        var secondPage = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
+            application.Client,
+            $"/api/templates/feed?type=Image&take=1&tags=cozy&search=magic&cursor={Uri.EscapeDataString(firstPage.NextCursor!)}");
+
+        Assert.False(secondPage.HasMore);
+        Assert.Null(secondPage.NextCursor);
+        var secondPageItem = Assert.Single(secondPage.Items);
+        Assert.Contains(secondPageItem.TemplateId, new[] { first.TemplateId, second.TemplateId });
+        Assert.NotEqual(firstPageItem.TemplateId, secondPageItem.TemplateId);
+    }
+
+    [Fact]
+    public async Task PublicTemplateCategories_ShouldReturnNonArchivedCategoriesForAnonymousUsers()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        await CreateActiveImageTemplateAsync(application.Client, "Magic Cozy", "Magic", ["cozy"]);
+        await CreateActiveImageTemplateAsync(application.Client, "Adventure Buddy", "Adventure", ["story"]);
+
+        var categories = await GetFromJsonAsync<IReadOnlyList<PublicTemplateCategoryResponse>>(
+            application.Client,
+            "/api/templates/categories");
+
+        Assert.Contains(categories, x => x.Name == "Magic");
+        Assert.Contains(categories, x => x.Name == "Adventure");
     }
 
     [Fact]
@@ -675,6 +724,33 @@ public sealed class TemplatesApiIntegrationTests
         response.EnsureSuccessStatusCode();
 
         return await ReadJsonAsync<TemplateAssetResponse>(response);
+    }
+
+    private static async Task<AdminTemplateResponse> CreateActiveImageTemplateAsync(HttpClient client, string title, string category, string[] tags)
+    {
+        var slug = title.ToLowerInvariant().Replace(' ', '-');
+        var previewAsset = await UploadMediaAsync(
+            client,
+            $"{slug}.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            Encoding.UTF8.GetBytes($"{slug}-image-content"));
+
+        return await PostAsJsonAsync<AdminTemplateResponse>(
+            client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                title,
+                $"{title} description",
+                category,
+                tags,
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()));
     }
 
     private static async Task<TemplateGenerationResponse> UploadGenerationSourceAsync(
