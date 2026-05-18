@@ -291,6 +291,42 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListPublicFeedAsync_ShouldApplySearchCategoryAndCursorWithoutTags()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var utcNow = DateTime.UtcNow;
+
+        var oldestId = await CreateActiveImageTemplateAsync(service, "Portrait Breeze", "Portrait", ["soft"]);
+        var middleId = await CreateActiveImageTemplateAsync(service, "Portrait Glow", "Portrait", ["shine"]);
+        await CreateActiveImageTemplateAsync(service, "Dance Burst", "Dance", ["loud"]);
+        var newestId = await CreateActiveImageTemplateAsync(service, "PORTRAIT Neon", "Portrait", ["bright"]);
+
+        await SetUpdatedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetUpdatedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetUpdatedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+
+        var firstPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "portrait", [], null, "portrait", 2, null),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.True(firstPage.Value.HasMore);
+        Assert.NotNull(firstPage.Value.NextCursor);
+        Assert.Equal([newestId, middleId], firstPage.Value.Items.Select(item => item.TemplateId).ToArray());
+
+        var secondPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "PORTRAIT", [], null, "PoRtRaIt", 2, firstPage.Value.NextCursor),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.False(secondPage.Value.HasMore);
+        Assert.Null(secondPage.Value.NextCursor);
+        var item = Assert.Single(secondPage.Value.Items);
+        Assert.Equal(oldestId, item.TemplateId);
+    }
+
+    [Fact]
     public async Task ListPublicCategoriesAsync_ShouldReturnNonArchivedSortedCategories()
     {
         await using var dbContext = CreateDbContext();

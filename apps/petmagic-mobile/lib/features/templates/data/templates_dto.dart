@@ -106,6 +106,7 @@ class TemplateItemDto {
     'isPremium': isPremium,
     'tokenCost': tokenCost,
     'previewAsset': previewAsset?.toJson(),
+    'musicDescription': musicDescription,
     'referenceVideoDurationSeconds': referenceVideoDurationSeconds,
   };
 

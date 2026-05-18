@@ -22,60 +22,72 @@ class TemplateTypeFilters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final normalizedCategories = <String>[];
+    final seen = <String>{};
+
+    for (final category in categories) {
+      final normalized = category.trim();
+      if (normalized.isEmpty) {
+        continue;
+      }
+
+      if (seen.add(normalized.toLowerCase())) {
+        normalizedCategories.add(normalized);
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: [
-              _FilterPill(
+        Row(
+          children: [
+            Expanded(
+              child: _FilterPill(
                 label: text.allFilter,
                 selected: selectedType == null,
                 onTap: () => onTypeSelected(null),
+                compact: true,
               ),
-              const SizedBox(width: 8),
-              _FilterPill(
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _FilterPill(
                 label: text.videosFilter,
                 icon: Icons.play_circle_outline_rounded,
                 selected: selectedType == TemplateType.video,
                 onTap: () => onTypeSelected(TemplateType.video),
+                compact: true,
               ),
-              const SizedBox(width: 8),
-              _FilterPill(
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _FilterPill(
                 label: text.imagesFilter,
                 icon: Icons.image_outlined,
                 selected: selectedType == TemplateType.image,
                 onTap: () => onTypeSelected(TemplateType.image),
+                compact: true,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _FilterPill(
+              label: text.allFilter,
+              selected: selectedCategory == null,
+              onTap: () => onCategorySelected(null),
+            ),
+            for (final category in normalizedCategories)
               _FilterPill(
-                label: text.allFilter,
-                selected: selectedCategory == null,
-                onTap: () => onCategorySelected(null),
+                label: category,
+                selected: selectedCategory == category,
+                onTap: () => onCategorySelected(category),
               ),
-              for (final category in categories) ...[
-                const SizedBox(width: 8),
-                _FilterPill(
-                  label: category,
-                  selected: selectedCategory == category,
-                  onTap: () => onCategorySelected(
-                    selectedCategory == category ? null : category,
-                  ),
-                ),
-              ],
-            ],
-          ),
+          ],
         ),
       ],
     );
@@ -88,12 +100,14 @@ class _FilterPill extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.icon,
+    this.compact = false,
   });
 
   final String label;
   final IconData? icon;
   final bool selected;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -106,9 +120,14 @@ class _FilterPill extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 12,
+            vertical: compact ? 9 : 7,
+          ),
           decoration: BoxDecoration(
-            color: selected ? colors.accent : colors.surfaceGlass,
+            color: selected
+                ? colors.accent.withValues(alpha: 0.96)
+                : colors.surfaceGlass,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: selected ? colors.accent : colors.border),
             boxShadow: selected
@@ -122,11 +141,12 @@ class _FilterPill extends StatelessWidget {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
                 Icon(
                   icon,
-                  size: 16,
+                  size: compact ? 15 : 16,
                   color: selected ? Colors.white : colors.textStrong,
                 ),
                 const SizedBox(width: 5),
@@ -135,9 +155,10 @@ class _FilterPill extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: selected ? Colors.white : colors.textStrong,
-                  fontSize: 12,
+                  fontSize: compact ? 11 : 11.5,
                   fontWeight: FontWeight.w800,
                 ),
               ),

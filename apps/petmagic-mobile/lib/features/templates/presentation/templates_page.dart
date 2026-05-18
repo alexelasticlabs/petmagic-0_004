@@ -69,36 +69,36 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 1),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const _TopBar(tokenBalance: 125),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
                       Text(
                         text.createMagicTitle,
                         style: TextStyle(
                           color: colors.textStrong,
-                          fontSize: 21,
+                          fontSize: 18,
                           height: 1.02,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
                         text.pickTemplateSubtitle,
                         style: TextStyle(
                           color: colors.textSoft,
-                          fontSize: 10.5,
+                          fontSize: 10,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 5),
                       _SearchField(
                         controller: _searchController,
                         onChanged: _handleSearchChanged,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       TemplateTypeFilters(
                         selectedType: state.query.type,
                         categories: state.categories,
@@ -153,7 +153,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 96),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 90),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     child: state.isLoadingMore
@@ -209,8 +209,8 @@ class _TopBar extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(Icons.pets_rounded, color: colors.accent, size: 32),
-        const SizedBox(width: 8),
+        Icon(Icons.pets_rounded, color: colors.accent, size: 28),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             'PetMagic',
@@ -218,13 +218,13 @@ class _TopBar extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: colors.textStrong,
-              fontSize: 21,
+              fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
         ),
         _GiftButton(tooltip: text.giftTooltip),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         _TokenBalance(balance: tokenBalance, addTooltip: text.addTokensTooltip),
       ],
     );
@@ -293,32 +293,32 @@ class _TokenBalance extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.pets_rounded, color: colors.accent, size: 20),
-                const SizedBox(width: 7),
+                Icon(Icons.pets_rounded, color: colors.accent, size: 18),
+                const SizedBox(width: 6),
                 Text(
                   '$balance',
                   style: TextStyle(
                     color: colors.textStrong,
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
           ),
-          Container(width: 1, height: 38, color: colors.border),
+          Container(width: 1, height: 32, color: colors.border),
           Tooltip(
             message: addTooltip,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Icon(
                 Icons.add_rounded,
                 color: colors.textStrong,
-                size: 22,
+                size: 19,
               ),
             ),
           ),
@@ -348,8 +348,8 @@ class _HeaderButton extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Icon(icon, color: color, size: 23),
+        padding: const EdgeInsets.all(10),
+        child: Icon(icon, color: color, size: 20),
       ),
     );
   }
@@ -372,23 +372,23 @@ class _SearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       style: TextStyle(
         color: colors.textStrong,
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
         hintText: text.searchTemplates,
         hintStyle: TextStyle(
           color: colors.textMuted,
-          fontSize: 10.5,
+          fontSize: 10,
           fontWeight: FontWeight.w600,
         ),
         prefixIcon: Icon(
           Icons.search_rounded,
           color: colors.textMuted,
-          size: 16,
+          size: 15,
         ),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       ),
     );
   }

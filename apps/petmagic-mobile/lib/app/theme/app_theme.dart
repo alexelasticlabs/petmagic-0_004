@@ -140,22 +140,22 @@ class AppTheme {
 
   static ThemeData dark() {
     const colors = PetMagicColors(
-      backgroundTop: Color(0xFF020811),
-      backgroundBottom: Color(0xFF07111E),
-      surface: Color(0xFF101A27),
-      surfaceGlass: Color(0xD9142233),
-      surfaceStrong: Color(0xFF182434),
-      border: Color(0xFF263445),
+      backgroundTop: Color(0xFF000306),
+      backgroundBottom: Color(0xFF04070D),
+      surface: Color(0xFF0A121B),
+      surfaceGlass: Color(0xCC101925),
+      surfaceStrong: Color(0xFF141E2A),
+      border: Color(0xFF1E2A38),
       textStrong: Color(0xFFF8FBFF),
-      textSoft: Color(0xFFD6E0EC),
-      textMuted: Color(0xFF8A99AA),
+      textSoft: Color(0xFFD0DAE6),
+      textMuted: Color(0xFF7F8EA0),
       accent: _accent,
-      accentSoft: Color(0x3322C55E),
+      accentSoft: Color(0x2622C55E),
       gold: Color(0xFFFFC107),
       purple: Color(0xFFB56BFF),
       blue: Color(0xFF38BDF8),
       danger: Color(0xFFFB7185),
-      shadow: Color(0x99000612),
+      shadow: Color(0xCC00040A),
     );
     return _base(Brightness.dark, colors);
   }

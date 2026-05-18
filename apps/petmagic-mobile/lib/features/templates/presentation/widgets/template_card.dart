@@ -12,6 +12,7 @@ class TemplateCard extends StatefulWidget {
   final TemplateItem template;
 
   @override
+  State<TemplateCard> createState() => _TemplateCardState();
 }
 
 class _TemplateCardState extends State<TemplateCard> {
@@ -27,6 +28,12 @@ class _TemplateCardState extends State<TemplateCard> {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final premiumBorder = widget.template.isPremium
+        ? colors.gold.withValues(alpha: 0.58)
+        : colors.border.withValues(alpha: 0.28);
+    final premiumGlow = widget.template.isPremium
+        ? colors.gold.withValues(alpha: 0.16)
+        : colors.shadow;
 
     return RepaintBoundary(
       child: VisibilityDetector(
@@ -35,10 +42,10 @@ class _TemplateCardState extends State<TemplateCard> {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colors.border.withValues(alpha: 0.28)),
+            border: Border.all(color: premiumBorder, width: 1.15),
             boxShadow: [
               BoxShadow(
-                color: colors.shadow,
+                color: premiumGlow,
                 blurRadius: 18,
                 offset: const Offset(0, 10),
               ),
@@ -106,7 +113,20 @@ class _TemplateCardState extends State<TemplateCard> {
     if (shouldPlay) {
       _ensureVideoController();
     } else {
-      _videoController?.pause();
+      _disposeVideoController();
+    }
+  }
+
+  Future<void> _disposeVideoController() async {
+    final controller = _videoController;
+    if (controller == null) {
+      return;
+    }
+
+    _videoController = null;
+    await controller.dispose();
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -128,6 +148,10 @@ class _TemplateCardState extends State<TemplateCard> {
     try {
       await controller.initialize();
       if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      if (_videoController != controller) {
         await controller.dispose();
         return;
       }
@@ -193,12 +217,12 @@ class _TemplateShadeOverlay extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              Colors.transparent,
-              Colors.black.withValues(alpha: 0.12),
-              Colors.black.withValues(alpha: 0.38),
-              Colors.black.withValues(alpha: 0.72),
+              Colors.black.withValues(alpha: 0.08),
+              Colors.black.withValues(alpha: 0.32),
+              Colors.black.withValues(alpha: 0.68),
+              Colors.black.withValues(alpha: 0.94),
             ],
-            stops: const [0, 0.48, 0.68, 0.84, 1],
+            stops: const [0, 0.34, 0.56, 0.8, 1],
           ),
         ),
         child: const SizedBox.expand(),
@@ -216,6 +240,11 @@ class _TemplateDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final tags = template.tags.take(3).toList(growable: false);
+    final musicDescription = template.musicDescription?.trim();
+    final showMusicDescription =
+        template.isVideo &&
+        musicDescription != null &&
+        musicDescription.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,6 +270,10 @@ class _TemplateDetails extends StatelessWidget {
             ],
           ),
         ),
+        if (showMusicDescription) ...[
+          const SizedBox(height: 4),
+          _MusicDescription(text: musicDescription),
+        ],
         if (tags.isNotEmpty) ...[
           const SizedBox(height: 5),
           SizedBox(
@@ -425,22 +458,29 @@ class _TokenChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color.fromRGBO(15, 24, 37, 0.28),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+        color: const Color.fromRGBO(17, 26, 39, 0.54),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color.fromRGBO(255, 216, 123, 0.22)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.pets_rounded, color: Color(0xFF73DD8C), size: 14),
-            const SizedBox(width: 4),
+            const Icon(Icons.pets_rounded, color: Color(0xFFF1CB73), size: 15),
+            const SizedBox(width: 5),
             Text(
               '$cost',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -476,6 +516,47 @@ class _TagChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MusicDescription extends StatelessWidget {
+  const _MusicDescription({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.music_note_rounded,
+          size: 13,
+          color: Color.fromRGBO(255, 219, 135, 0.96),
+        ),
+        const SizedBox(width: 4),
+        const Text(
+          'Music:',
+          style: TextStyle(
+            color: Color.fromRGBO(255, 219, 135, 0.96),
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color.fromRGBO(247, 233, 198, 0.92),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -548,4 +629,3 @@ class _AccessTag extends StatelessWidget {
     );
   }
 }
-              ),

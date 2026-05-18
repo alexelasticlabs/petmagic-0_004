@@ -1006,23 +1006,55 @@ internal sealed class TemplatesService(
         var normalizedSearch = query.Search?.Trim();
         var normalizedTags = NormalizeTags(query.Tags);
 
-        var items = await dbContext.TemplateItems
+        var filteredQuery = dbContext.TemplateItems
             .AsNoTracking()
             .Include(x => x.Assets)
             .Where(x => x.Status == TemplateStatus.Active)
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
-            .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium)
-            .ToArrayAsync(cancellationToken);
+            .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium);
 
-        var filtered = items
-            .Where(template => string.IsNullOrWhiteSpace(normalizedCategory) || string.Equals(template.Category, normalizedCategory, StringComparison.OrdinalIgnoreCase))
-            .Where(template => normalizedTags.Length == 0 || normalizedTags.All(tag => DeserializeTags(template.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)))
-            .Where(template => MatchesPublicFeedSearch(template, normalizedSearch))
+        if (!string.IsNullOrWhiteSpace(normalizedCategory))
+        {
+            var normalizedCategoryUpper = normalizedCategory.ToUpperInvariant();
+            filteredQuery = filteredQuery.Where(template => template.Category.ToUpper() == normalizedCategoryUpper);
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            var normalizedSearchLower = normalizedSearch.ToLowerInvariant();
+            filteredQuery = filteredQuery.Where(template =>
+                template.Title.ToLower().Contains(normalizedSearchLower)
+                || template.ShortDescription.ToLower().Contains(normalizedSearchLower)
+                || template.Category.ToLower().Contains(normalizedSearchLower)
+                || template.Tags.ToLower().Contains(normalizedSearchLower));
+        }
+
+        if (cursor is not null)
+        {
+            filteredQuery = filteredQuery.Where(template =>
+                template.UpdatedAtUtc < cursor.UpdatedAtUtc
+                || (template.UpdatedAtUtc == cursor.UpdatedAtUtc && template.Id.CompareTo(cursor.TemplateId) < 0));
+        }
+
+        var orderedQuery = filteredQuery
             .OrderByDescending(template => template.UpdatedAtUtc)
-            .ThenByDescending(template => template.Id)
-            .Where(template => cursor is null || IsAfterPublicFeedCursor(template, cursor))
-            .Take(take + 1)
-            .ToArray();
+            .ThenByDescending(template => template.Id);
+
+        TemplateItem[] filtered;
+
+        if (normalizedTags.Length == 0)
+        {
+            filtered = await orderedQuery
+                .Take(take + 1)
+                .ToArrayAsync(cancellationToken);
+        }
+        else
+        {
+            filtered = (await orderedQuery.ToArrayAsync(cancellationToken))
+                .Where(template => normalizedTags.All(tag => DeserializeTags(template.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)))
+                .Take(take + 1)
+                .ToArray();
+        }
 
         var pageItems = filtered.Take(take).ToArray();
         var hasMore = filtered.Length > take;

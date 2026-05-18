@@ -9,20 +9,32 @@ import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
   ref,
 ) {
-  return TemplatesRemoteDataSource(ref.watch(dioProvider));
+  final dataSource = TemplatesRemoteDataSource(ref.watch(dioProvider));
+  ref.onDispose(dataSource.cancelPendingFeedRequest);
+  return dataSource;
 });
 
 class TemplatesRemoteDataSource {
-  const TemplatesRemoteDataSource(this._dio);
+  TemplatesRemoteDataSource(this._dio);
 
   final Dio _dio;
+  CancelToken? _feedCancelToken;
 
   Future<TemplatesFeedDto> fetchFeed(TemplatesQuery query) async {
+    cancelPendingFeedRequest();
+    final cancelToken = CancelToken();
+    _feedCancelToken = cancelToken;
+
     final response = await _getWithFallback<Map<String, Object?>>(
       '/api/templates/feed',
       queryParameters: query.toQueryParameters(),
       options: Options(listFormat: ListFormat.multi),
+      cancelToken: cancelToken,
     );
+
+    if (identical(_feedCancelToken, cancelToken)) {
+      _feedCancelToken = null;
+    }
 
     final data = response.data;
     if (data == null) {
@@ -59,6 +71,7 @@ class TemplatesRemoteDataSource {
     String path, {
     Map<String, Object?>? queryParameters,
     Options? options,
+    CancelToken? cancelToken,
   }) async {
     DioException? lastConnectionError;
 
@@ -68,8 +81,13 @@ class TemplatesRemoteDataSource {
           '$baseUrl$path',
           queryParameters: queryParameters,
           options: options,
+          cancelToken: cancelToken,
         );
       } on DioException catch (error) {
+        if (CancelToken.isCancel(error)) {
+          throw const RequestCancelledException();
+        }
+
         final isConnectionFailure =
             error.type == DioExceptionType.connectionTimeout ||
             error.type == DioExceptionType.connectionError;
@@ -95,6 +113,16 @@ class TemplatesRemoteDataSource {
     }
 
     throw const AppException('Templates feed request failed.');
+  }
+
+  void cancelPendingFeedRequest() {
+    final cancelToken = _feedCancelToken;
+    if (cancelToken == null || cancelToken.isCancelled) {
+      return;
+    }
+
+    cancelToken.cancel('Superseded by a newer templates feed request.');
+    _feedCancelToken = null;
   }
 
   String _mapMessage(DioException error) {

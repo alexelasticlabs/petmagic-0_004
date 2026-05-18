@@ -8,3 +8,9 @@ class AppException implements Exception {
   @override
   String toString() => 'AppException($statusCode): $message';
 }
+
+class RequestCancelledException extends AppException {
+  const RequestCancelledException([
+    super.message = 'Request cancelled.',
+  ]);
+}

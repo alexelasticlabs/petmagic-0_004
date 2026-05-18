@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
@@ -72,6 +73,34 @@ class TemplatesController extends Notifier<TemplatesState> {
   late final RealtimeClient _realtimeClient;
   int _requestVersion = 0;
 
+  static String? _normalizeCategory(String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+
+    return normalized;
+  }
+
+  static List<String> _normalizeCategories(List<String> values) {
+    final unique = <String>{};
+    final ordered = <String>[];
+
+    for (final value in values) {
+      final normalized = _normalizeCategory(value);
+      if (normalized == null) {
+        continue;
+      }
+
+      final key = normalized.toLowerCase();
+      if (unique.add(key)) {
+        ordered.add(normalized);
+      }
+    }
+
+    return ordered;
+  }
+
   @override
   TemplatesState build() {
     _repository = ref.watch(templatesRepositoryProvider);
@@ -109,7 +138,9 @@ class TemplatesController extends Notifier<TemplatesState> {
 
     try {
       if (state.categories.isEmpty || forceRefresh) {
-        final categories = await _repository.fetchCategories();
+        final categories = _normalizeCategories(
+          await _repository.fetchCategories(),
+        );
         if (requestVersion == _requestVersion) {
           state = state.copyWith(categories: categories);
         }
@@ -126,6 +157,9 @@ class TemplatesController extends Notifier<TemplatesState> {
         isRefreshing: false,
         clearError: true,
       );
+    } on RequestCancelledException {
+      if (requestVersion != _requestVersion) return;
+      state = state.copyWith(isLoading: false, isRefreshing: false);
     } catch (error) {
       if (requestVersion != _requestVersion) return;
       state = state.copyWith(
@@ -166,6 +200,12 @@ class TemplatesController extends Notifier<TemplatesState> {
         isLoadingMore: false,
         clearError: true,
       );
+    } on RequestCancelledException {
+      if (requestVersion != _requestVersion) {
+        return;
+      }
+
+      state = state.copyWith(isLoadingMore: false);
     } catch (error) {
       if (requestVersion != _requestVersion) {
         return;
@@ -181,6 +221,10 @@ class TemplatesController extends Notifier<TemplatesState> {
   Future<void> refresh() => loadInitial(forceRefresh: true);
 
   void setType(TemplateType? type) {
+    if (state.query.type == type) {
+      return;
+    }
+
     state = state.copyWith(
       query: state.query.copyWith(
         type: type,
@@ -193,11 +237,16 @@ class TemplatesController extends Notifier<TemplatesState> {
   }
 
   void setCategory(String? category) {
-    final normalized = category?.trim();
+    final normalized = _normalizeCategory(category);
+
+    if (state.query.category == normalized) {
+      return;
+    }
+
     state = state.copyWith(
       query: state.query.copyWith(
         category: normalized,
-        clearCategory: normalized == null || normalized.isEmpty,
+        clearCategory: normalized == null,
         clearCursor: true,
       ),
       clearNextCursor: true,
@@ -207,9 +256,15 @@ class TemplatesController extends Notifier<TemplatesState> {
 
   void setSearch(String value) {
     final normalized = value.trim();
+    final nextSearch = normalized.isEmpty ? null : normalized;
+
+    if (state.query.search == nextSearch) {
+      return;
+    }
+
     state = state.copyWith(
       query: state.query.copyWith(
-        search: normalized.isEmpty ? null : normalized,
+        search: nextSearch,
         clearSearch: normalized.isEmpty,
         clearCursor: true,
       ),
