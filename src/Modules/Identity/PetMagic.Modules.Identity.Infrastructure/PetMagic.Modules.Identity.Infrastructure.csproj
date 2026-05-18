@@ -1,6 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Economy\PetMagic.Modules.Economy.Infrastructure\PetMagic.Modules.Economy.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Templates\PetMagic.Modules.Templates.Infrastructure\PetMagic.Modules.Templates.Infrastructure.csproj" />
     <ProjectReference Include="..\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
     <ProjectReference Include="..\PetMagic.Modules.Identity.Domain\PetMagic.Modules.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />

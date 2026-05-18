@@ -27,6 +27,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         var externalAuth = configuration.GetSection(ExternalAuthOptions.SectionName).Get<ExternalAuthOptions>() ?? new ExternalAuthOptions();
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         var emailOptions = BuildEmailOptions(configuration.GetSection(EmailOptions.SectionName));
+        var avatarStorageOptions = BuildAvatarStorageOptions(configuration.GetSection(AvatarStorageOptions.SectionName));
 
         services.AddDbContext<IdentityDbContext>(options =>
         {
@@ -78,7 +79,9 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         ValidateProductionEmailConfiguration(emailOptions, environment);
 
         services.AddSingleton(emailOptions);
+        services.AddSingleton(avatarStorageOptions);
         services.AddSingleton<IIdentityEmailTemplateRenderer, IdentityEmailTemplateRenderer>();
+        services.AddSingleton<IAvatarStorage, LocalAvatarStorage>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<EmailDispatchProcessor>();
         services.AddHostedService<EmailDispatchWorker>();
@@ -219,6 +222,16 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         };
     }
 
+    private static AvatarStorageOptions BuildAvatarStorageOptions(IConfigurationSection section)
+    {
+        return new AvatarStorageOptions
+        {
+            PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
+            LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "user-avatars"),
+            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], 5 * 1024 * 1024)
+        };
+    }
+
     private static string? ReadValue(IConfigurationSection section, string key, string environmentVariableName)
     {
         var configured = section[key];
@@ -238,6 +251,11 @@ public static class IdentityInfrastructureServiceCollectionExtensions
     private static int ParsePositiveInt(string? rawValue, int fallback)
     {
         return int.TryParse(rawValue, out var parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private static long ParsePositiveLong(string? rawValue, long fallback)
+    {
+        return long.TryParse(rawValue, out var parsed) && parsed > 0 ? parsed : fallback;
     }
 
     private static int ParseNonNegativeInt(string? rawValue, int fallback)

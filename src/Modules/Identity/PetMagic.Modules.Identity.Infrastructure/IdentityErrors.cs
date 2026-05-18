@@ -32,6 +32,14 @@ public static class IdentityErrors
 
     public static readonly Error CannotRevokeBaseRole = new("users.cannot_revoke_base_role", "User role cannot be removed.");
 
+    public static readonly Error InvalidAvatarUpload = new("users.avatar_invalid_upload", "Avatar upload is invalid.");
+
+    public static readonly Error AvatarContentTypeNotAllowed = new("users.avatar_content_type_not_allowed", "Avatar content type is not allowed.");
+
+    public static readonly Error AvatarFileTooLarge = new("users.avatar_file_too_large", "Avatar file exceeds the maximum allowed size.");
+
+    public static readonly Error AvatarStorageFailed = new("users.avatar_storage_failed", "Avatar upload could not be stored.");
+
     public static readonly Error RefreshTokenOwnershipViolation = new("auth.refresh_token_not_owned", "Refresh token does not belong to current user.");
 
     public static readonly Error OperationFailed = new("common.operation_failed", "Operation failed.");

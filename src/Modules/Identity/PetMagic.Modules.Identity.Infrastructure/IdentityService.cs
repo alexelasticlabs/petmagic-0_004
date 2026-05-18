@@ -8,12 +8,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Infrastructure.Data;
+using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
+using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
 
@@ -21,8 +26,12 @@ public sealed class IdentityService(
     UserManager<AppUser> userManager,
     RoleManager<IdentityRole<Guid>> roleManager,
     IdentityDbContext dbContext,
+    EconomyDbContext economyDbContext,
+    TemplatesDbContext templatesDbContext,
     IIdentityEmailTemplateRenderer emailTemplateRenderer,
+    IAvatarStorage avatarStorage,
     EmailOptions emailOptions,
+    AvatarStorageOptions avatarStorageOptions,
     IOptions<JwtOptions> jwtOptions) : IIdentityService
 {
     public async Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken)
@@ -362,6 +371,89 @@ public sealed class IdentityService(
         return Result.Success(ToUserProfileResponse(user, roles));
     }
 
+    public async Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken)
+    {
+        if (command.Content.Length == 0)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.InvalidAvatarUpload);
+        }
+
+        if (!command.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.AvatarContentTypeNotAllowed);
+        }
+
+        if (command.Content.LongLength > avatarStorageOptions.MaxFileSizeBytes)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.AvatarFileTooLarge);
+        }
+
+        var user = await userManager.FindByIdAsync(command.UserId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.UserNotFound);
+        }
+
+        var previousAvatarUrl = user.AvatarUrl;
+        var storeResult = await avatarStorage.StoreAsync(
+            new AvatarUploadCommand(command.FileName, command.ContentType, command.Content),
+            cancellationToken);
+        if (storeResult.IsFailure)
+        {
+            return Result.Failure<UserProfileResponse>(storeResult.Error);
+        }
+
+        user.AvatarUrl = storeResult.Value.Url;
+        user.AvatarFileName = storeResult.Value.FileName;
+        user.AvatarContentType = storeResult.Value.ContentType;
+        user.AvatarFileSizeBytes = storeResult.Value.FileSizeBytes;
+        user.AvatarUpdatedAtUtc = DateTime.UtcNow;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            await avatarStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+            return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousAvatarUrl)
+            && !string.Equals(previousAvatarUrl, storeResult.Value.Url, StringComparison.OrdinalIgnoreCase))
+        {
+            await avatarStorage.DeleteAsync(previousAvatarUrl, CancellationToken.None);
+        }
+
+        await WriteAuditAsync(user.Id, "user.avatar.updated", "User avatar uploaded or replaced.", cancellationToken);
+        var roles = await userManager.GetRolesAsync(user);
+        return Result.Success(ToUserProfileResponse(user, roles));
+    }
+
+    public async Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(command.UserId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.UserNotFound);
+        }
+
+        var previousAvatarUrl = user.AvatarUrl;
+        user.AvatarUrl = null;
+        user.AvatarFileName = null;
+        user.AvatarContentType = null;
+        user.AvatarFileSizeBytes = null;
+        user.AvatarUpdatedAtUtc = null;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
+        }
+
+        await avatarStorage.DeleteAsync(previousAvatarUrl, CancellationToken.None);
+        await WriteAuditAsync(user.Id, "user.avatar.removed", "User avatar removed.", cancellationToken);
+        var roles = await userManager.GetRolesAsync(user);
+        return Result.Success(ToUserProfileResponse(user, roles));
+    }
+
     public async Task<Result<IReadOnlyList<UserListItemResponse>>> ListUsersAsync(CancellationToken cancellationToken)
     {
         var users = await userManager.Users
@@ -381,10 +473,192 @@ public sealed class IdentityService(
                 user.IsActive,
                 user.EmailConfirmed,
                 roles.ToList(),
-                user.CreatedAtUtc));
+                user.CreatedAtUtc,
+                ToAvatarResponse(user)));
         }
 
         return Result.Success<IReadOnlyList<UserListItemResponse>>(output);
+    }
+
+    public async Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<AdminUserDetailResponse>(IdentityErrors.UserNotFound);
+        }
+
+        var roles = await userManager.GetRolesAsync(user);
+        return Result.Success(ToAdminUserDetailResponse(user, roles));
+    }
+
+    public async Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var userExists = await userManager.Users.AnyAsync(x => x.Id == userId, cancellationToken);
+        if (!userExists)
+        {
+            return Result.Failure<AdminUserAnalyticsResponse>(IdentityErrors.UserNotFound);
+        }
+
+        var wallet = await economyDbContext.Wallets
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+
+        var purchases = await economyDbContext.PurchaseOrders
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var generations = await templatesDbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Join(
+                templatesDbContext.TemplateItems.AsNoTracking(),
+                generation => generation.TemplateId,
+                template => template.Id,
+                (generation, template) => new { Generation = generation, Template = template })
+            .OrderByDescending(x => x.Generation.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var templateEvents = await templatesDbContext.TemplateAnalyticsEvents
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Join(
+                templatesDbContext.TemplateItems.AsNoTracking(),
+                templateEvent => templateEvent.TemplateId,
+                template => template.Id,
+                (templateEvent, template) => new { Event = templateEvent, Template = template })
+            .OrderByDescending(x => x.Event.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var auditEvents = await dbContext.AuditEvents
+            .AsNoTracking()
+            .Where(x => x.SubjectUserId == userId)
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var successfulPurchases = purchases.Count(x => string.Equals(x.Status, "succeeded", StringComparison.OrdinalIgnoreCase));
+        var totalPurchasedSpark = purchases
+            .Where(x => string.Equals(x.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            .Sum(x => x.SparkToGrant);
+        var completedGenerations = generations.Count(x => x.Generation.Status == TemplateGenerationStatus.Completed);
+        var failedGenerations = generations.Count(x => x.Generation.Status == TemplateGenerationStatus.Failed);
+        var activityMoments = new[]
+        {
+            auditEvents.FirstOrDefault()?.OccurredAtUtc,
+            purchases.FirstOrDefault()?.CreatedAtUtc,
+            generations.FirstOrDefault()?.Generation.CreatedAtUtc,
+            templateEvents.FirstOrDefault()?.Event.CreatedAtUtc,
+        }.Where(x => x.HasValue).Select(x => x!.Value).ToArray();
+
+        var summary = new AdminUserAnalyticsSummaryResponse(
+            wallet?.Balance ?? 0,
+            purchases.Count,
+            successfulPurchases,
+            totalPurchasedSpark,
+            purchases
+                .Where(x => string.Equals(x.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.ConfirmedAtUtc ?? x.CreatedAtUtc)
+                .Cast<DateTime?>()
+                .FirstOrDefault(),
+            generations.Count,
+            completedGenerations,
+            failedGenerations,
+            generations.Select(x => x.Generation.CreatedAtUtc).Cast<DateTime?>().FirstOrDefault(),
+            templateEvents.Count,
+            auditEvents.Count,
+            activityMoments.Length > 0 ? activityMoments.Max() : null);
+
+        var recentAuditEvents = auditEvents
+            .Take(12)
+            .Select(x => new AdminUserAuditEventResponse(x.Id, x.Action, x.Details, x.OccurredAtUtc))
+            .ToList();
+
+        var recentPurchases = purchases
+            .Take(10)
+            .Select(x => new AdminUserPurchaseResponse(
+                x.Id,
+                x.Status,
+                x.PriceAmount,
+                x.CurrencyCode,
+                x.SparkToGrant,
+                x.PaymentProvider,
+                x.CreatedAtUtc,
+                x.ConfirmedAtUtc))
+            .ToList();
+
+        var recentGenerations = generations
+            .Take(10)
+            .Select(x => new AdminUserGenerationResponse(
+                x.Generation.Id,
+                x.Generation.TemplateId,
+                x.Template.Title,
+                x.Template.TemplateType.ToString(),
+                x.Generation.Status.ToString(),
+                x.Generation.TokenCost,
+                x.Generation.FailureCode,
+                x.Generation.FailureMessage,
+                x.Generation.OutputUrl,
+                x.Generation.CreatedAtUtc,
+                x.Generation.CompletedAtUtc))
+            .ToList();
+
+        var recentTemplateEvents = templateEvents
+            .Take(10)
+            .Select(x => new AdminUserTemplateEventResponse(
+                x.Event.Id,
+                x.Event.TemplateId,
+                x.Template.Title,
+                x.Event.EventType,
+                x.Event.Source,
+                x.Event.DeviceClass,
+                x.Event.CountryCode,
+                x.Event.GenerationId,
+                x.Event.FeedbackMessage,
+                x.Event.CreatedAtUtc))
+            .ToList();
+
+        var failureBreakdown = generations
+            .Where(x => x.Generation.Status == TemplateGenerationStatus.Failed && !string.IsNullOrWhiteSpace(x.Generation.FailureCode))
+            .GroupBy(x => x.Generation.FailureCode!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new AdminUserFailureBreakdownItemResponse(
+                group.Key,
+                group.Count(),
+                group.Max(x => x.Generation.CompletedAtUtc ?? x.Generation.UpdatedAtUtc)))
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.FailureCode, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var recentActivity = auditEvents
+            .Select(x => new AdminUserActivityItemResponse("audit", x.Action, x.Details, x.OccurredAtUtc))
+            .Concat(purchases.Select(x => new AdminUserActivityItemResponse(
+                "purchase",
+                $"Purchase {x.Status}",
+                $"{x.SparkToGrant} spark • {x.PriceAmount} {x.CurrencyCode}",
+                x.ConfirmedAtUtc ?? x.CreatedAtUtc)))
+            .Concat(generations.Select(x => new AdminUserActivityItemResponse(
+                "generation",
+                $"Generation {x.Generation.Status}",
+                x.Template.Title,
+                x.Generation.CompletedAtUtc ?? x.Generation.CreatedAtUtc)))
+            .Concat(templateEvents.Select(x => new AdminUserActivityItemResponse(
+                "template-event",
+                x.Event.EventType,
+                x.Template.Title,
+                x.Event.CreatedAtUtc)))
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .Take(20)
+            .ToList();
+
+        return Result.Success(new AdminUserAnalyticsResponse(
+            summary,
+            recentActivity,
+            recentAuditEvents,
+            recentPurchases,
+            recentGenerations,
+            recentTemplateEvents,
+            failureBreakdown));
     }
 
     public async Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken)
@@ -718,6 +992,35 @@ public sealed class IdentityService(
         return Convert.ToHexString(bytes);
     }
 
+    private static UserAvatarResponse? ToAvatarResponse(AppUser user)
+    {
+        if (string.IsNullOrWhiteSpace(user.AvatarUrl)
+            || string.IsNullOrWhiteSpace(user.AvatarFileName)
+            || string.IsNullOrWhiteSpace(user.AvatarContentType))
+        {
+            return null;
+        }
+
+        return new UserAvatarResponse(
+            user.AvatarUrl,
+            user.AvatarFileName,
+            user.AvatarContentType,
+            user.AvatarFileSizeBytes,
+            user.AvatarUpdatedAtUtc);
+    }
+
+    private static AdminUserDetailResponse ToAdminUserDetailResponse(AppUser user, IEnumerable<string> roles) =>
+        new(
+            user.Id,
+            user.Email ?? string.Empty,
+            user.DisplayName,
+            user.IsPremium,
+            user.IsActive,
+            user.EmailConfirmed,
+            roles.ToList(),
+            user.CreatedAtUtc,
+            ToAvatarResponse(user));
+
     private static UserProfileResponse ToUserProfileResponse(AppUser user, IEnumerable<string> roles) =>
         new(
             user.Id,
@@ -725,5 +1028,6 @@ public sealed class IdentityService(
             user.DisplayName,
             user.IsPremium,
             user.EmailConfirmed,
-            roles.ToList());
+            roles.ToList(),
+            ToAvatarResponse(user));
 }
