@@ -7,9 +7,16 @@ import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 class TemplateCard extends StatefulWidget {
-  const TemplateCard({required this.template, super.key});
+  const TemplateCard({
+    required this.template,
+    this.onPressed,
+    this.showGuestPreview = false,
+    super.key,
+  });
 
   final TemplateItem template;
+  final VoidCallback? onPressed;
+  final bool showGuestPreview;
 
   @override
   State<TemplateCard> createState() => _TemplateCardState();
@@ -53,43 +60,53 @@ class _TemplateCardState extends State<TemplateCard> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _TemplateMedia(
-                  template: widget.template,
-                  controller: _videoController,
-                ),
-                const _TemplateShadeOverlay(),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  right: 8,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: widget.template.effectivePromoBadge != null
-                              ? _PromoBadge(
-                                  value: widget.template.effectivePromoBadge!,
-                                )
-                              : const SizedBox.shrink(),
-                        ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onPressed,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _TemplateMedia(
+                      template: widget.template,
+                      controller: _videoController,
+                    ),
+                    const _TemplateShadeOverlay(),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      right: 8,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: widget.template.effectivePromoBadge != null
+                                  ? _PromoBadge(
+                                      value: widget.template.effectivePromoBadge!,
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          _MediaTypeBadge(type: widget.template.templateType),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      _MediaTypeBadge(type: widget.template.templateType),
-                    ],
-                  ),
+                    ),
+                    Positioned(
+                      left: 8,
+                      right: 8,
+                      bottom: 8,
+                      child: _TemplateDetails(
+                        template: widget.template,
+                        showGuestPreview: widget.showGuestPreview,
+                        onPressed: widget.onPressed,
+                      ),
+                    ),
+                  ],
                 ),
-                Positioned(
-                  left: 8,
-                  right: 8,
-                  bottom: 8,
-                  child: _TemplateDetails(template: widget.template),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -232,9 +249,15 @@ class _TemplateShadeOverlay extends StatelessWidget {
 }
 
 class _TemplateDetails extends StatelessWidget {
-  const _TemplateDetails({required this.template});
+  const _TemplateDetails({
+    required this.template,
+    required this.showGuestPreview,
+    required this.onPressed,
+  });
 
   final TemplateItem template;
+  final bool showGuestPreview;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +272,15 @@ class _TemplateDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [_TokenChip(cost: template.tokenCost)]),
+        Row(
+          children: [
+            _TokenChip(cost: template.tokenCost),
+            if (showGuestPreview) ...[
+              const SizedBox(width: 6),
+              _TemplateStatusChip(label: text.templateGuestPreview),
+            ],
+          ],
+        ),
         const SizedBox(height: 6),
         Text(
           template.title,
@@ -328,7 +359,86 @@ class _TemplateDetails extends StatelessWidget {
             ],
           ],
         ),
+        const SizedBox(height: 8),
+        _TemplateActionButton(
+          label: text.templateTryAction,
+          onPressed: onPressed,
+        ),
       ],
+    );
+  }
+}
+
+class _TemplateActionButton extends StatelessWidget {
+  const _TemplateActionButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onPressed,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+                size: 17,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateStatusChip extends StatelessWidget {
+  const _TemplateStatusChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colors.accent.withValues(alpha: 0.24)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: colors.accent,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -146,4 +146,135 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get emptyTemplatesMessage =>
       'Попробуйте другой фильтр или обновите каталог.';
+
+  @override
+  String get startupOnboardingActionContinueGuest => 'Продолжить как гость';
+
+  @override
+  String get startupOnboardingActionNext => 'Далее';
+
+  @override
+  String get startupOnboardingActionStart => 'Начать';
+
+  @override
+  String get startupOnboardingPageOneTitle =>
+      'Создавайте магические моменты с питомцем';
+
+  @override
+  String get startupOnboardingPageOneSubtitle =>
+      'Превращайте обычные кадры в яркие вирусные истории с шаблонами, созданными для питомцев.';
+
+  @override
+  String get startupOnboardingPageOneHighlightOne => 'Трендовые шаблоны';
+
+  @override
+  String get startupOnboardingPageOneHighlightTwo => 'Быстрый старт';
+
+  @override
+  String get startupOnboardingPageOneHighlightThree => 'Тёплый pet-style';
+
+  @override
+  String get startupOnboardingPageTwoTitle =>
+      'Сначала смотрите, потом открывайте больше';
+
+  @override
+  String get startupOnboardingPageTwoSubtitle =>
+      'Листайте каталог как гость, а вход выполните тогда, когда захотите рендерить, сохранять и открывать premium.';
+
+  @override
+  String get startupOnboardingPageTwoHighlightOne => 'Гостевой просмотр';
+
+  @override
+  String get startupOnboardingPageTwoHighlightTwo => 'Вход в один тап';
+
+  @override
+  String get startupOnboardingPageTwoHighlightThree => 'Плавный переход';
+
+  @override
+  String get startupOnboardingPageThreeTitle => 'Токены и premium ждут позже';
+
+  @override
+  String get startupOnboardingPageThreeSubtitle =>
+      'Первое знакомство должно быть лёгким. Токены, награды и premium-действия откроются после аккуратной авторизации.';
+
+  @override
+  String get startupOnboardingPageThreeHighlightOne => 'Premium-фишки';
+
+  @override
+  String get startupOnboardingPageThreeHighlightTwo => 'Баланс токенов';
+
+  @override
+  String get startupOnboardingPageThreeHighlightThree => 'Бонусы автора';
+
+  @override
+  String get startupMiniFeatureFastStart => 'Быстрый старт';
+
+  @override
+  String get startupMiniFeaturePetFirst => 'Pet-first';
+
+  @override
+  String get startupMiniFeatureUpgradeLater => 'Апгрейд позже';
+
+  @override
+  String get startupWelcomeViewOnboarding => 'Показать onboarding';
+
+  @override
+  String get startupWelcomeTitle => 'С возвращением в PetMagic';
+
+  @override
+  String get startupWelcomeSubtitle =>
+      'Продолжайте как гость или войдите перед рендером шаблонов, наградами и сохранением своих созданий.';
+
+  @override
+  String get startupWelcomeContinueGuest => 'Продолжить как гость';
+
+  @override
+  String get startupWelcomeTemplatesTitle => 'Вирусные шаблоны';
+
+  @override
+  String get startupWelcomeTemplatesSubtitle => 'Смотрите весь каталог';
+
+  @override
+  String get startupWelcomeAiTitle => 'AI Magic';
+
+  @override
+  String get startupWelcomeAiSubtitle => 'Откроется после входа';
+
+  @override
+  String get startupWelcomeShareTitle => 'Share & Enjoy';
+
+  @override
+  String get startupWelcomeShareSubtitle => 'Сохраняйте избранное позже';
+
+  @override
+  String get authEntryTitle => 'Войти';
+
+  @override
+  String get authEntrySubtitle =>
+      'Откройте шаблоны, токены и премиальную магию для питомцев.';
+
+  @override
+  String get authRequiredTitle => 'Войдите, чтобы открыть это действие';
+
+  @override
+  String get authRequiredMessage =>
+      'Гость может изучать приложение, но действия с шаблонами, наградами и токенами требуют аккаунт PetMagic.';
+
+  @override
+  String get authRequiredContinueBrowsing => 'Продолжить просмотр';
+
+  @override
+  String get templateTryAction => 'Попробовать шаблон';
+
+  @override
+  String get templateGuestPreview => 'Гостевой просмотр';
+
+  @override
+  String get templateActionComingSoon => 'Студия шаблонов скоро появится.';
+
+  @override
+  String get tokensActionComingSoon => 'Кошелёк токенов скоро появится.';
+
+  @override
+  String get rewardsActionComingSoon => 'Центр наград скоро появится.';
 }

@@ -378,6 +378,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try another filter or refresh the catalog.'**
   String get emptyTemplatesMessage;
+
+  /// No description provided for @startupOnboardingActionContinueGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue as guest'**
+  String get startupOnboardingActionContinueGuest;
+
+  /// No description provided for @startupOnboardingActionNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get startupOnboardingActionNext;
+
+  /// No description provided for @startupOnboardingActionStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get startupOnboardingActionStart;
+
+  /// No description provided for @startupOnboardingPageOneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create magic moments with your pet'**
+  String get startupOnboardingPageOneTitle;
+
+  /// No description provided for @startupOnboardingPageOneSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn everyday clips into playful viral-ready stories with bright, pet-first templates.'**
+  String get startupOnboardingPageOneSubtitle;
+
+  /// No description provided for @startupOnboardingPageOneHighlightOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Trendy templates'**
+  String get startupOnboardingPageOneHighlightOne;
+
+  /// No description provided for @startupOnboardingPageOneHighlightTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast edits'**
+  String get startupOnboardingPageOneHighlightTwo;
+
+  /// No description provided for @startupOnboardingPageOneHighlightThree.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet-safe vibe'**
+  String get startupOnboardingPageOneHighlightThree;
+
+  /// No description provided for @startupOnboardingPageTwoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse first, unlock when you are ready'**
+  String get startupOnboardingPageTwoTitle;
+
+  /// No description provided for @startupOnboardingPageTwoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore the feed as a guest, then sign in when you want to render, save or go premium.'**
+  String get startupOnboardingPageTwoSubtitle;
+
+  /// No description provided for @startupOnboardingPageTwoHighlightOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest browsing'**
+  String get startupOnboardingPageTwoHighlightOne;
+
+  /// No description provided for @startupOnboardingPageTwoHighlightTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'One-tap sign in'**
+  String get startupOnboardingPageTwoHighlightTwo;
+
+  /// No description provided for @startupOnboardingPageTwoHighlightThree.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth handoff'**
+  String get startupOnboardingPageTwoHighlightThree;
+
+  /// No description provided for @startupOnboardingPageThreeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect tokens and premium perks later'**
+  String get startupOnboardingPageThreeTitle;
+
+  /// No description provided for @startupOnboardingPageThreeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the first impression fun. Tokens, rewards and premium actions wait behind a clean auth step.'**
+  String get startupOnboardingPageThreeSubtitle;
+
+  /// No description provided for @startupOnboardingPageThreeHighlightOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium unlocks'**
+  String get startupOnboardingPageThreeHighlightOne;
+
+  /// No description provided for @startupOnboardingPageThreeHighlightTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'Token balance'**
+  String get startupOnboardingPageThreeHighlightTwo;
+
+  /// No description provided for @startupOnboardingPageThreeHighlightThree.
+  ///
+  /// In en, this message translates to:
+  /// **'Creator perks'**
+  String get startupOnboardingPageThreeHighlightThree;
+
+  /// No description provided for @startupMiniFeatureFastStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast start'**
+  String get startupMiniFeatureFastStart;
+
+  /// No description provided for @startupMiniFeaturePetFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet-first'**
+  String get startupMiniFeaturePetFirst;
+
+  /// No description provided for @startupMiniFeatureUpgradeLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade later'**
+  String get startupMiniFeatureUpgradeLater;
+
+  /// No description provided for @startupWelcomeViewOnboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'View onboarding'**
+  String get startupWelcomeViewOnboarding;
+
+  /// No description provided for @startupWelcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back to PetMagic'**
+  String get startupWelcomeTitle;
+
+  /// No description provided for @startupWelcomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep exploring as a guest or sign in before you render templates, unlock rewards and save your creations.'**
+  String get startupWelcomeSubtitle;
+
+  /// No description provided for @startupWelcomeContinueGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue as guest'**
+  String get startupWelcomeContinueGuest;
+
+  /// No description provided for @startupWelcomeTemplatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Viral Templates'**
+  String get startupWelcomeTemplatesTitle;
+
+  /// No description provided for @startupWelcomeTemplatesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview the full feed'**
+  String get startupWelcomeTemplatesSubtitle;
+
+  /// No description provided for @startupWelcomeAiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Magic'**
+  String get startupWelcomeAiTitle;
+
+  /// No description provided for @startupWelcomeAiSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock on sign in'**
+  String get startupWelcomeAiSubtitle;
+
+  /// No description provided for @startupWelcomeShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share & Enjoy'**
+  String get startupWelcomeShareTitle;
+
+  /// No description provided for @startupWelcomeShareSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save your favorites later'**
+  String get startupWelcomeShareSubtitle;
+
+  /// No description provided for @authEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get authEntryTitle;
+
+  /// No description provided for @authEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock templates, tokens and premium pet magic.'**
+  String get authEntrySubtitle;
+
+  /// No description provided for @authRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to unlock this action'**
+  String get authRequiredTitle;
+
+  /// No description provided for @authRequiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Guests can explore the app, but template actions, rewards and token features require a PetMagic account.'**
+  String get authRequiredMessage;
+
+  /// No description provided for @authRequiredContinueBrowsing.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue browsing'**
+  String get authRequiredContinueBrowsing;
+
+  /// No description provided for @templateTryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try template'**
+  String get templateTryAction;
+
+  /// No description provided for @templateGuestPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest preview'**
+  String get templateGuestPreview;
+
+  /// No description provided for @templateActionComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Template studio is coming soon.'**
+  String get templateActionComingSoon;
+
+  /// No description provided for @tokensActionComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Token wallet is coming soon.'**
+  String get tokensActionComingSoon;
+
+  /// No description provided for @rewardsActionComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards center is coming soon.'**
+  String get rewardsActionComingSoon;
 }
 
 class _AppLocalizationsDelegate

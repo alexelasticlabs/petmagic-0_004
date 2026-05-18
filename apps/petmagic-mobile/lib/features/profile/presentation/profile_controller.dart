@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -139,6 +140,7 @@ class ProfileController extends Notifier<ProfileState> {
         profile: profile,
         password: '',
       );
+      ref.read(appLaunchControllerProvider.notifier).markSignedIn();
     } on AppException catch (error) {
       state = state.copyWith(isSaving: false, errorMessage: error.message);
     }
@@ -159,6 +161,7 @@ class ProfileController extends Notifier<ProfileState> {
       password: '',
       successMessage: 'logout',
     );
+    ref.read(appLaunchControllerProvider.notifier).markSignedOut();
   }
 
   Future<void> uploadAvatar() async {
