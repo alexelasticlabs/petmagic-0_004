@@ -40,6 +40,31 @@ export type Dictionary = {
   userGenerationsTitle: string;
   userEventsTitle: string;
   userFailureBreakdownTitle: string;
+  userWalletTitle: string;
+  userWalletDescription: string;
+  userNoWalletActivity: string;
+  tokenBalanceLabel: string;
+  tokensGrantedLabel: string;
+  tokensSpentLabel: string;
+  manualGrantLabel: string;
+  manualDebitLabel: string;
+  viewsLabel: string;
+  videoViewsLabel: string;
+  loginsLabel: string;
+  failedLoginsLabel: string;
+  lastLoginLabel: string;
+  walletAdjustmentTitle: string;
+  walletAdjustmentHint: string;
+  walletOperationCredit: string;
+  walletOperationDebit: string;
+  walletOperationLabel: string;
+  walletAmountLabel: string;
+  walletReasonLabel: string;
+  walletReasonPlaceholder: string;
+  walletApplyAction: string;
+  walletSaving: string;
+  walletOperationSaved: string;
+  walletOperationError: string;
   userNoAvatar: string;
   userNoActivity: string;
   userNoPurchases: string;
@@ -233,6 +258,31 @@ const dictionaries: Record<Locale, Dictionary> = {
     userGenerationsTitle: "Генерации",
     userEventsTitle: "Template events",
     userFailureBreakdownTitle: "Сбои генераций",
+    userWalletTitle: "Токены и кошелек",
+    userWalletDescription: "Текущий баланс, история движений токенов и ручная выдача или списание прямо из админки.",
+    userNoWalletActivity: "Движений токенов пока нет.",
+    tokenBalanceLabel: "Токены на балансе",
+    tokensGrantedLabel: "Всего начислено",
+    tokensSpentLabel: "Всего списано",
+    manualGrantLabel: "Выдано вручную",
+    manualDebitLabel: "Списано вручную",
+    viewsLabel: "Просмотры",
+    videoViewsLabel: "Видео просмотры",
+    loginsLabel: "Успешные входы",
+    failedLoginsLabel: "Неуспешные входы",
+    lastLoginLabel: "Последний вход",
+    walletAdjustmentTitle: "Управление токенами",
+    walletAdjustmentHint: "Используйте ручную выдачу и списание только для поддержки, компенсаций и корректировок баланса.",
+    walletOperationCredit: "Начислить",
+    walletOperationDebit: "Списать",
+    walletOperationLabel: "Операция",
+    walletAmountLabel: "Количество токенов",
+    walletReasonLabel: "Причина",
+    walletReasonPlaceholder: "Например: бонус за проблему, ручная корректировка",
+    walletApplyAction: "Применить",
+    walletSaving: "Сохранение...",
+    walletOperationSaved: "Баланс пользователя обновлен.",
+    walletOperationError: "Не удалось изменить баланс пользователя.",
     userNoAvatar: "Аватар не установлен",
     userNoActivity: "История активности пока пуста.",
     userNoPurchases: "Покупок пока нет.",
@@ -424,6 +474,31 @@ const dictionaries: Record<Locale, Dictionary> = {
     userGenerationsTitle: "Generations",
     userEventsTitle: "Template events",
     userFailureBreakdownTitle: "Generation failures",
+    userWalletTitle: "Tokens and wallet",
+    userWalletDescription: "Current balance, token movement history, and manual grant or debit controls directly from admin.",
+    userNoWalletActivity: "No token movements yet.",
+    tokenBalanceLabel: "Balance tokens",
+    tokensGrantedLabel: "Total credited",
+    tokensSpentLabel: "Total spent",
+    manualGrantLabel: "Manual grants",
+    manualDebitLabel: "Manual debits",
+    viewsLabel: "Views",
+    videoViewsLabel: "Video views",
+    loginsLabel: "Successful logins",
+    failedLoginsLabel: "Failed logins",
+    lastLoginLabel: "Last login",
+    walletAdjustmentTitle: "Token controls",
+    walletAdjustmentHint: "Use manual grant and debit only for support cases, compensation, and balance corrections.",
+    walletOperationCredit: "Grant",
+    walletOperationDebit: "Debit",
+    walletOperationLabel: "Operation",
+    walletAmountLabel: "Token amount",
+    walletReasonLabel: "Reason",
+    walletReasonPlaceholder: "For example: support bonus, manual correction",
+    walletApplyAction: "Apply",
+    walletSaving: "Saving...",
+    walletOperationSaved: "User balance updated.",
+    walletOperationError: "Failed to update user balance.",
     userNoAvatar: "No avatar yet",
     userNoActivity: "No activity has been recorded yet.",
     userNoPurchases: "No purchases yet.",

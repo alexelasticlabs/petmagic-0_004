@@ -7,7 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Data;
+using PetMagic.Modules.Economy.Infrastructure;
+using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
@@ -209,6 +212,10 @@ public sealed class IdentityServiceEmailFlowTests
     private static async Task<IdentityService> CreateServiceAsync(IdentityModuleDbContext dbContext)
     {
         await dbContext.Database.EnsureCreatedAsync();
+        var economyDbContext = CreateEconomyDbContext();
+        var templatesDbContext = CreateTemplatesDbContext();
+        await economyDbContext.Database.EnsureCreatedAsync();
+        await templatesDbContext.Database.EnsureCreatedAsync();
 
         var identityOptions = new IdentityOptions();
         identityOptions.Password.RequiredLength = 10;
@@ -251,8 +258,9 @@ public sealed class IdentityServiceEmailFlowTests
             userManager,
             roleManager,
             dbContext,
-            CreateEconomyDbContext(),
-            CreateTemplatesDbContext(),
+            economyDbContext,
+            CreateEconomyService(economyDbContext),
+            templatesDbContext,
             new StubEmailTemplateRenderer(),
             new InMemoryAvatarStorage(),
             new EmailOptions
@@ -266,6 +274,24 @@ public sealed class IdentityServiceEmailFlowTests
             },
             new AvatarStorageOptions(),
             Options.Create(new JwtOptions()));
+    }
+
+    private static IEconomyService CreateEconomyService(EconomyDbContext dbContext)
+    {
+        return new EconomyService(
+            dbContext,
+            new FakePaymentGateway(),
+            Options.Create(new EconomyOptions
+            {
+                WeeklyFreeSpark = 100,
+                WeeklyPremiumSpark = 250,
+                AdRewardSpark = 15,
+                AdRewardDailyLimit = 5,
+                StripeSecretKey = "test_stripe_secret_key",
+                StripeWebhookSecret = "test_webhook_secret",
+                StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
+                StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel"
+            }));
     }
 
     private static EconomyDbContext CreateEconomyDbContext()
@@ -321,6 +347,14 @@ public sealed class IdentityServiceEmailFlowTests
         public Task<Result> DeleteAsync(string? avatarUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success());
+        }
+    }
+
+    private sealed class FakePaymentGateway : IPaymentGateway
+    {
+        public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new PaymentCreateResponse($"cs_test_{request.OrderId:N}", $"https://checkout.stripe.com/pay/{request.OrderId:N}")));
         }
     }
 }

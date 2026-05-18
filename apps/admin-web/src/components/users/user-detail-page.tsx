@@ -2,6 +2,7 @@
 
 import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminPage, AdminPageGrid, AdminPageHero, AdminStateCard, AdminStatusBadge } from "@/components/admin/admin-primitives";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import type { AdminUserAnalytics, AdminUserDetail } from "@/lib/api-client";
 import { fetchAdminUser, fetchAdminUserAnalytics } from "@/lib/api-client";
@@ -24,6 +25,16 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  async function loadUserDetails(nextUserId: string) {
+    const [nextUser, nextAnalytics] = await Promise.all([
+      fetchAdminUser(nextUserId),
+      fetchAdminUserAnalytics(nextUserId),
+    ]);
+
+    setUser(nextUser);
+    setAnalytics(nextAnalytics);
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -36,10 +47,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           return;
         }
 
-        const [nextUser, nextAnalytics] = await Promise.all([
-          fetchAdminUser(userId),
-          fetchAdminUserAnalytics(userId),
-        ]);
+        const [nextUser, nextAnalytics] = await Promise.all([fetchAdminUser(userId), fetchAdminUserAnalytics(userId)]);
 
         if (!cancelled) {
           setUser(nextUser);
@@ -70,9 +78,11 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
     return [
       `${text.createdAtLabel}: ${formatDateTime(user.createdAtUtc, locale)}`,
       `${text.lastActivityLabel}: ${formatDateTime(analytics.summary.lastActivityAtUtc, locale)}`,
-      `${text.walletBalanceLabel}: ${analytics.summary.walletBalance}`,
+      `${text.tokenBalanceLabel}: ${analytics.summary.walletBalance}`,
+      `${text.loginsLabel}: ${analytics.summary.successfulLogins}`,
+      `${text.viewsLabel}: ${analytics.summary.totalViews}`,
     ];
-  }, [analytics, locale, text.createdAtLabel, text.lastActivityLabel, text.walletBalanceLabel, user]);
+  }, [analytics, locale, text.createdAtLabel, text.lastActivityLabel, text.loginsLabel, text.tokenBalanceLabel, text.viewsLabel, user]);
 
   if (isLoading) {
     return (
@@ -124,11 +134,22 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
       </AdminCard>
 
       <AdminPageGrid columns="four">
-        <AdminKpiCard label={text.walletBalanceLabel} value={String(analytics.summary.walletBalance)} hint={text.purchasedSparkLabel} tone="primary" />
+        <AdminKpiCard label={text.tokenBalanceLabel} value={String(analytics.summary.walletBalance)} hint={`${text.tokensGrantedLabel}: ${analytics.summary.totalTokensCredited}`} tone="primary" />
+        <AdminKpiCard label={text.loginsLabel} value={String(analytics.summary.successfulLogins)} hint={`${text.failedLoginsLabel}: ${analytics.summary.failedLogins}`} tone="magenta" />
+        <AdminKpiCard label={text.viewsLabel} value={String(analytics.summary.totalViews)} hint={`${text.videoViewsLabel}: ${analytics.summary.totalVideoViews}`} tone="info" />
         <AdminKpiCard label={text.totalPurchasesLabel} value={String(analytics.summary.totalPurchases)} hint={`${text.successfulPurchasesLabel}: ${analytics.summary.successfulPurchases}`} tone="info" />
         <AdminKpiCard label={text.totalGenerationsLabel} value={String(analytics.summary.totalGenerations)} hint={`${text.completedGenerationsLabel}: ${analytics.summary.completedGenerations}`} tone="success" />
         <AdminKpiCard label={text.failedGenerationsLabel} value={String(analytics.summary.failedGenerations)} hint={`${text.templateEventsLabel}: ${analytics.summary.templateAnalyticsEvents}`} tone="danger" />
       </AdminPageGrid>
+
+      <UserWalletPanel
+        locale={locale}
+        userId={user.userId}
+        analytics={analytics}
+        onUpdated={async () => {
+          await loadUserDetails(userId);
+        }}
+      />
 
       <AdminCard title={text.userActivityTitle}>
         {analytics.recentActivity.length ? (

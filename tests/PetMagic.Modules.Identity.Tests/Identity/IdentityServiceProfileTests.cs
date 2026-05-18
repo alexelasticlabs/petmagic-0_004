@@ -343,7 +343,7 @@ public sealed class IdentityServiceProfileTests
         Assert.Equal(1, result.Value.Summary.FailedGenerations);
         Assert.Equal(1, result.Value.Summary.TotalViews);
         Assert.Equal(0, result.Value.Summary.TotalVideoViews);
-        Assert.Single(result.Value.RecentWalletLedger);
+        Assert.Equal(3, result.Value.RecentWalletLedger.Count);
         Assert.Single(result.Value.FailureBreakdown);
         Assert.Single(result.Value.RecentTemplateEvents);
     }

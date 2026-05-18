@@ -53,6 +53,10 @@ export type AdminUserDetail = {
 
 export type AdminUserAnalyticsSummary = {
   walletBalance: number;
+  totalTokensCredited: number;
+  totalTokensSpent: number;
+  manualTokensGranted: number;
+  manualTokensDebited: number;
   totalPurchases: number;
   successfulPurchases: number;
   totalPurchasedSpark: number;
@@ -61,6 +65,11 @@ export type AdminUserAnalyticsSummary = {
   completedGenerations: number;
   failedGenerations: number;
   lastGenerationAtUtc?: string | null;
+  totalViews: number;
+  totalVideoViews: number;
+  successfulLogins: number;
+  failedLogins: number;
+  lastLoginAtUtc?: string | null;
   templateAnalyticsEvents: number;
   auditEvents: number;
   lastActivityAtUtc?: string | null;
@@ -124,6 +133,25 @@ export type AdminUserFailureBreakdownItem = {
   lastOccurredAtUtc?: string | null;
 };
 
+export type AdminUserWalletLedgerItem = {
+  entryId: string;
+  delta: number;
+  balanceAfter: number;
+  source: string;
+  reason: string;
+  createdAtUtc: string;
+};
+
+export type AdminUserWalletOperation = {
+  userId: string;
+  operation: "credit" | "debit";
+  delta: number;
+  newBalance: number;
+  source: string;
+  reason: string;
+  occurredAtUtc: string;
+};
+
 export type AdminUserAnalytics = {
   summary: AdminUserAnalyticsSummary;
   recentActivity: AdminUserActivityItem[];
@@ -131,6 +159,7 @@ export type AdminUserAnalytics = {
   recentPurchases: AdminUserPurchase[];
   recentGenerations: AdminUserGeneration[];
   recentTemplateEvents: AdminUserTemplateEvent[];
+  recentWalletLedger: AdminUserWalletLedgerItem[];
   failureBreakdown: AdminUserFailureBreakdownItem[];
 };
 
@@ -787,6 +816,23 @@ export async function fetchAdminUserAnalytics(userId: string): Promise<AdminUser
     cachedAdminUserAnalytics,
     () => apiRequest<AdminUserAnalytics>(`/api/admin/users/${userId}/analytics`, { method: "GET" }),
   );
+}
+
+export async function adjustAdminUserWallet(
+  userId: string,
+  operation: "credit" | "debit",
+  amount: number,
+  reason: string,
+): Promise<AdminUserWalletOperation> {
+  const result = await apiRequest<AdminUserWalletOperation>(`/api/admin/users/${userId}/wallet`, {
+    method: "POST",
+    body: JSON.stringify({ operation, amount, reason }),
+  });
+
+  cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+  return result;
 }
 
 export async function assignRole(userId: string, role: string): Promise<void> {

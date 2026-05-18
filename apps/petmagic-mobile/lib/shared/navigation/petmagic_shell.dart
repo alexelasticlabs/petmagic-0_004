@@ -38,7 +38,7 @@ class _BottomNavBackdrop extends StatelessWidget {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          height: 70 + bottomPadding,
+          height: 110 + bottomPadding,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -113,16 +113,16 @@ class _FloatingBottomNav extends StatelessWidget {
                     top: false,
                     minimum: const EdgeInsets.fromLTRB(4, 2, 4, 2),
                     child: SizedBox(
-                      height: 44,
+                      height: 50,
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           for (final item in items)
                             Expanded(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                  vertical: 1,
+                                  horizontal: 3,
+                                  vertical: 3,
                                 ),
                                 child: _BottomNavButton(
                                   item: item,
@@ -170,9 +170,6 @@ class _BottomNavButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
-          width: double.infinity,
-          height: double.infinity,
-          constraints: const BoxConstraints(minWidth: 82, minHeight: 36),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
@@ -184,7 +181,6 @@ class _BottomNavButton extends StatelessWidget {
                 : null,
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(

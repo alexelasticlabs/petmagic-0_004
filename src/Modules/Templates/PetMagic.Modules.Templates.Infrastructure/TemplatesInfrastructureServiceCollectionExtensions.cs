@@ -130,6 +130,12 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             return;
         }
 
+        // Idempotent patch: backfill MusicDescription on the seed video template if it was seeded before this field was populated.
+        var seedVideoTemplateId = Guid.Parse("39C5F7A0-74AE-4DE6-84F4-82B842D63FA0");
+        await dbContext.TemplateItems
+            .Where(x => x.Id == seedVideoTemplateId && x.MusicDescription == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.MusicDescription, "Upbeat meme dance track"));
+
         if (await dbContext.TemplateItems.AnyAsync())
         {
             return;

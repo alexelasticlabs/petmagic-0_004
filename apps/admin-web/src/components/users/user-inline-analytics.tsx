@@ -2,6 +2,7 @@
 
 import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { fetchAdminUser, fetchAdminUserAnalytics, type AdminUserAnalytics, type AdminUserDetail } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
@@ -20,6 +21,16 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function loadUserAnalytics(nextUserId: string) {
+    const [nextUser, nextAnalytics] = await Promise.all([
+      fetchAdminUser(nextUserId),
+      fetchAdminUserAnalytics(nextUserId),
+    ]);
+
+    setUser(nextUser);
+    setAnalytics(nextAnalytics);
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -36,11 +47,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
       setError(null);
 
       try {
-        const [nextUser, nextAnalytics] = await Promise.all([
-          fetchAdminUser(userId),
-          fetchAdminUserAnalytics(userId),
-        ]);
-
+        const [nextUser, nextAnalytics] = await Promise.all([fetchAdminUser(userId), fetchAdminUserAnalytics(userId)]);
         if (!cancelled) {
           setUser(nextUser);
           setAnalytics(nextAnalytics);
@@ -97,7 +104,9 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
       </div>
 
       <div className={styles.kpiGrid}>
-        <AdminKpiCard label={text.walletBalanceLabel} value={String(analytics.summary.walletBalance)} tone="primary" />
+        <AdminKpiCard label={text.tokenBalanceLabel} value={String(analytics.summary.walletBalance)} hint={`${text.tokensGrantedLabel}: ${analytics.summary.totalTokensCredited}`} tone="primary" />
+        <AdminKpiCard label={text.loginsLabel} value={String(analytics.summary.successfulLogins)} hint={`${text.failedLoginsLabel}: ${analytics.summary.failedLogins}`} tone="magenta" />
+        <AdminKpiCard label={text.viewsLabel} value={String(analytics.summary.totalViews)} hint={`${text.videoViewsLabel}: ${analytics.summary.totalVideoViews}`} tone="info" />
         <AdminKpiCard label={text.totalPurchasesLabel} value={String(analytics.summary.totalPurchases)} hint={`${text.successfulPurchasesLabel}: ${analytics.summary.successfulPurchases}`} tone="info" />
         <AdminKpiCard label={text.totalGenerationsLabel} value={String(analytics.summary.totalGenerations)} hint={`${text.completedGenerationsLabel}: ${analytics.summary.completedGenerations}`} tone="success" />
         <AdminKpiCard label={text.failedGenerationsLabel} value={String(analytics.summary.failedGenerations)} hint={`${text.templateEventsLabel}: ${analytics.summary.templateAnalyticsEvents}`} tone="danger" />
@@ -171,6 +180,19 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
           <AdminStateCard tone="success" title={text.userNoFailures} />
         )}
       </div>
+
+      <UserWalletPanel
+        locale={locale}
+        userId={user.userId}
+        analytics={analytics}
+        onUpdated={async () => {
+          if (!userId) {
+            return;
+          }
+
+          await loadUserAnalytics(userId);
+        }}
+      />
     </AdminCard>
   );
 }
