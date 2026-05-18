@@ -1,4 +1,6 @@
 :root {
+  --font-manrope: var(--font-admin-body);
+  --font-space-grotesk: var(--font-admin-heading);
   --surface-0: #010302;
   --surface-1: #050806;
   --surface-2: #0a100d;
@@ -92,6 +94,7 @@ body {
   color: var(--text-strong);
   font-family: var(--font-manrope), system-ui, sans-serif;
   font-weight: 500;
+  line-height: 1.5;
   letter-spacing: 0;
   background:
     linear-gradient(90deg, rgba(210, 255, 232, 0.014) 1px, transparent 1px),

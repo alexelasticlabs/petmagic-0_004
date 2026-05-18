@@ -22,6 +22,39 @@ export type Dictionary = {
   usersCardDescription: string;
   usersEmptyDescription: string;
   usersChangesSaved: string;
+  avatarLabel: string;
+  openLabel: string;
+  emailConfirmedLabel: string;
+  createdAtLabel: string;
+  userDetailOpen: string;
+  userDetailsTitle: string;
+  userDetailsEyebrow: string;
+  userDetailsDescription: string;
+  userAnalyticsTitle: string;
+  userActivityTitle: string;
+  userPurchasesTitle: string;
+  userGenerationsTitle: string;
+  userEventsTitle: string;
+  userFailureBreakdownTitle: string;
+  userNoAvatar: string;
+  userNoActivity: string;
+  userNoPurchases: string;
+  userNoGenerations: string;
+  userNoEvents: string;
+  userNoFailures: string;
+  userAnalyticsLoadError: string;
+  walletBalanceLabel: string;
+  totalPurchasesLabel: string;
+  successfulPurchasesLabel: string;
+  purchasedSparkLabel: string;
+  totalGenerationsLabel: string;
+  completedGenerationsLabel: string;
+  failedGenerationsLabel: string;
+  templateEventsLabel: string;
+  auditEventsLabel: string;
+  lastActivityLabel: string;
+  lastPurchaseLabel: string;
+  lastGenerationLabel: string;
   yesLabel: string;
   noLabel: string;
   roleLabel: string;
@@ -178,6 +211,39 @@ const dictionaries: Record<Locale, Dictionary> = {
     usersCardDescription: "Роли, премиум-статус и активность пользователей",
     usersEmptyDescription: "Когда пользователи появятся, здесь будут доступны их роли и переключатели доступа.",
     usersChangesSaved: "Изменения сохранены",
+    avatarLabel: "Аватар",
+    openLabel: "Открыть",
+    emailConfirmedLabel: "Email подтвержден",
+    createdAtLabel: "Создан",
+    userDetailOpen: "Открыть карточку",
+    userDetailsTitle: "Карточка пользователя",
+    userDetailsEyebrow: "Профиль и аналитика",
+    userDetailsDescription: "Подробная сводка по профилю, покупкам, генерациям и действиям пользователя.",
+    userAnalyticsTitle: "Аналитика пользователя",
+    userActivityTitle: "Лента активности",
+    userPurchasesTitle: "Покупки",
+    userGenerationsTitle: "Генерации",
+    userEventsTitle: "Template events",
+    userFailureBreakdownTitle: "Сбои генераций",
+    userNoAvatar: "Аватар не установлен",
+    userNoActivity: "История активности пока пуста.",
+    userNoPurchases: "Покупок пока нет.",
+    userNoGenerations: "Генераций пока нет.",
+    userNoEvents: "Пользовательские template events пока не записаны.",
+    userNoFailures: "Сбоев генераций не найдено.",
+    userAnalyticsLoadError: "Не удалось загрузить аналитику пользователя.",
+    walletBalanceLabel: "Баланс",
+    totalPurchasesLabel: "Покупки",
+    successfulPurchasesLabel: "Успешные покупки",
+    purchasedSparkLabel: "Куплено spark",
+    totalGenerationsLabel: "Генерации",
+    completedGenerationsLabel: "Успешные генерации",
+    failedGenerationsLabel: "Сбои генераций",
+    templateEventsLabel: "Template events",
+    auditEventsLabel: "Audit events",
+    lastActivityLabel: "Последняя активность",
+    lastPurchaseLabel: "Последняя покупка",
+    lastGenerationLabel: "Последняя генерация",
     yesLabel: "Да",
     noLabel: "Нет",
     roleLabel: "Роль",
@@ -332,6 +398,39 @@ const dictionaries: Record<Locale, Dictionary> = {
     usersCardDescription: "Roles, premium status, and user access controls",
     usersEmptyDescription: "User roles and access toggles will appear here once the list is populated.",
     usersChangesSaved: "Changes saved",
+    avatarLabel: "Avatar",
+    openLabel: "Open",
+    emailConfirmedLabel: "Email confirmed",
+    createdAtLabel: "Created",
+    userDetailOpen: "Open profile",
+    userDetailsTitle: "User detail",
+    userDetailsEyebrow: "Profile and analytics",
+    userDetailsDescription: "Detailed summary of profile, purchases, generations, and user activity.",
+    userAnalyticsTitle: "User analytics",
+    userActivityTitle: "Activity timeline",
+    userPurchasesTitle: "Purchases",
+    userGenerationsTitle: "Generations",
+    userEventsTitle: "Template events",
+    userFailureBreakdownTitle: "Generation failures",
+    userNoAvatar: "No avatar yet",
+    userNoActivity: "No activity has been recorded yet.",
+    userNoPurchases: "No purchases yet.",
+    userNoGenerations: "No generations yet.",
+    userNoEvents: "No template events recorded for this user.",
+    userNoFailures: "No generation failures found.",
+    userAnalyticsLoadError: "Failed to load user analytics.",
+    walletBalanceLabel: "Balance",
+    totalPurchasesLabel: "Purchases",
+    successfulPurchasesLabel: "Successful purchases",
+    purchasedSparkLabel: "Purchased spark",
+    totalGenerationsLabel: "Generations",
+    completedGenerationsLabel: "Completed generations",
+    failedGenerationsLabel: "Failed generations",
+    templateEventsLabel: "Template events",
+    auditEventsLabel: "Audit events",
+    lastActivityLabel: "Last activity",
+    lastPurchaseLabel: "Last purchase",
+    lastGenerationLabel: "Last generation",
     yesLabel: "Yes",
     noLabel: "No",
     roleLabel: "Role",

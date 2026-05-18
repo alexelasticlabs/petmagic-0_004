@@ -1,0 +1,120 @@
+.page {
+  width: 100%;
+  max-width: 106rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4rem;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(15, 23, 42, 0.62);
+  color: var(--text-strong);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.profileHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(14rem, 20rem);
+  gap: 1rem;
+  align-items: center;
+}
+
+.profileCopy {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.profileTitle,
+.profileEmail {
+  margin: 0;
+}
+
+.profileTitle {
+  color: var(--text-strong);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.profileEmail {
+  color: var(--text-muted);
+}
+
+.profileBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.profileMeta,
+.metric,
+.timeline,
+.dataList {
+  display: grid;
+}
+
+.profileMeta,
+.dataList {
+  gap: 0.75rem;
+}
+
+.metric {
+  gap: 0.22rem;
+}
+
+.metric span,
+.timelineItem span,
+.dataCard span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.metric strong {
+  color: var(--text-strong);
+}
+
+.timeline {
+  gap: 0.75rem;
+}
+
+.timelineItem,
+.dataCard {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(12, 18, 30, 0.9), rgba(7, 11, 20, 0.96));
+}
+
+.timelineItem p,
+.dataCard p {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.timelineHeader,
+.dataHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.timelineHeader strong,
+.dataHeader strong {
+  color: var(--text-strong);
+}
+
+@media (max-width: 900px) {
+  .profileHeader {
+    grid-template-columns: 1fr;
+  }
+}

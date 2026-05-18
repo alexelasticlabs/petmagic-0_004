@@ -7,7 +7,17 @@ export type UserProfile = {
   email: string;
   displayName?: string;
   isPremium: boolean;
+  emailConfirmed: boolean;
   roles: string[];
+  avatar?: UserAvatar | null;
+};
+
+export type UserAvatar = {
+  url: string;
+  fileName: string;
+  contentType: string;
+  fileSizeBytes?: number | null;
+  updatedAtUtc?: string | null;
 };
 
 export type AuthSession = {
@@ -23,8 +33,105 @@ export type UserListItem = {
   displayName?: string;
   isPremium: boolean;
   isActive: boolean;
+  emailConfirmed: boolean;
   roles: string[];
   createdAtUtc: string;
+  avatar?: UserAvatar | null;
+};
+
+export type AdminUserDetail = {
+  userId: string;
+  email: string;
+  displayName?: string;
+  isPremium: boolean;
+  isActive: boolean;
+  emailConfirmed: boolean;
+  roles: string[];
+  createdAtUtc: string;
+  avatar?: UserAvatar | null;
+};
+
+export type AdminUserAnalyticsSummary = {
+  walletBalance: number;
+  totalPurchases: number;
+  successfulPurchases: number;
+  totalPurchasedSpark: number;
+  lastPurchaseAtUtc?: string | null;
+  totalGenerations: number;
+  completedGenerations: number;
+  failedGenerations: number;
+  lastGenerationAtUtc?: string | null;
+  templateAnalyticsEvents: number;
+  auditEvents: number;
+  lastActivityAtUtc?: string | null;
+};
+
+export type AdminUserActivityItem = {
+  kind: string;
+  title: string;
+  details?: string | null;
+  occurredAtUtc: string;
+};
+
+export type AdminUserAuditEvent = {
+  auditEventId: string;
+  action: string;
+  details: string;
+  occurredAtUtc: string;
+};
+
+export type AdminUserPurchase = {
+  orderId: string;
+  status: string;
+  priceAmount: number;
+  currencyCode: string;
+  sparkToGrant: number;
+  paymentProvider: string;
+  createdAtUtc: string;
+  confirmedAtUtc?: string | null;
+};
+
+export type AdminUserGeneration = {
+  generationId: string;
+  templateId: string;
+  templateTitle: string;
+  templateType: TemplateType;
+  status: string;
+  tokenCost: number;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  outputUrl?: string | null;
+  createdAtUtc: string;
+  completedAtUtc?: string | null;
+};
+
+export type AdminUserTemplateEvent = {
+  eventId: string;
+  templateId: string;
+  templateTitle: string;
+  eventType: string;
+  source: string;
+  deviceClass: string;
+  countryCode: string;
+  generationId?: string | null;
+  feedbackMessage?: string | null;
+  createdAtUtc: string;
+};
+
+export type AdminUserFailureBreakdownItem = {
+  failureCode: string;
+  count: number;
+  lastOccurredAtUtc?: string | null;
+};
+
+export type AdminUserAnalytics = {
+  summary: AdminUserAnalyticsSummary;
+  recentActivity: AdminUserActivityItem[];
+  recentAuditEvents: AdminUserAuditEvent[];
+  recentPurchases: AdminUserPurchase[];
+  recentGenerations: AdminUserGeneration[];
+  recentTemplateEvents: AdminUserTemplateEvent[];
+  failureBreakdown: AdminUserFailureBreakdownItem[];
 };
 
 export type TemplateType = "Image" | "Video";
@@ -392,6 +499,8 @@ type AuthSessionSnapshot = AuthSession | null | undefined;
 let cachedAuthRaw: string | null | undefined;
 let cachedAuthSession: AuthSession | null = null;
 const cachedUsersLists = new Map<string, { value: UserListItem[]; expiresAt: number }>();
+const cachedAdminUserDetails = new Map<string, { value: AdminUserDetail; expiresAt: number }>();
+const cachedAdminUserAnalytics = new Map<string, { value: AdminUserAnalytics; expiresAt: number }>();
 const cachedTemplateLists = new Map<string, { value: AdminTemplateListItem[]; expiresAt: number }>();
 const cachedTemplateCategories = new Map<string, { value: AdminTemplateCategory[]; expiresAt: number }>();
 const cachedTemplatesAnalyticsOverview = new Map<string, { value: AdminTemplatesAnalyticsOverview; expiresAt: number }>();
@@ -399,6 +508,8 @@ const inflightGetRequests = new Map<string, Promise<unknown>>();
 
 function clearAdminListCaches(): void {
   cachedUsersLists.clear();
+  cachedAdminUserDetails.clear();
+  cachedAdminUserAnalytics.clear();
   cachedTemplateLists.clear();
   cachedTemplateCategories.clear();
   cachedTemplatesAnalyticsOverview.clear();
@@ -662,12 +773,30 @@ export async function fetchUsers(): Promise<UserListItem[]> {
   );
 }
 
+export async function fetchAdminUser(userId: string): Promise<AdminUserDetail> {
+  return cachedGet(
+    `admin-user:${userId}`,
+    cachedAdminUserDetails,
+    () => apiRequest<AdminUserDetail>(`/api/admin/users/${userId}`, { method: "GET" }),
+  );
+}
+
+export async function fetchAdminUserAnalytics(userId: string): Promise<AdminUserAnalytics> {
+  return cachedGet(
+    `admin-user-analytics:${userId}`,
+    cachedAdminUserAnalytics,
+    () => apiRequest<AdminUserAnalytics>(`/api/admin/users/${userId}/analytics`, { method: "GET" }),
+  );
+}
+
 export async function assignRole(userId: string, role: string): Promise<void> {
   await apiRequest<void>(`/api/admin/users/${userId}/role`, {
     method: "PUT",
     body: JSON.stringify({ role })
   });
   cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
 }
 
 export async function revokeRole(userId: string, role: string): Promise<void> {
@@ -676,6 +805,8 @@ export async function revokeRole(userId: string, role: string): Promise<void> {
     body: JSON.stringify({ role })
   });
   cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
 }
 
 export async function setPremium(userId: string, isPremium: boolean): Promise<void> {
@@ -684,6 +815,8 @@ export async function setPremium(userId: string, isPremium: boolean): Promise<vo
     body: JSON.stringify({ isPremium })
   });
   cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
 }
 
 export async function setActive(userId: string, isActive: boolean): Promise<void> {
@@ -692,6 +825,8 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
     body: JSON.stringify({ isActive })
   });
   cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
 }
 
 export async function fetchAdminTemplates(type?: TemplateType): Promise<AdminTemplateListItem[]> {

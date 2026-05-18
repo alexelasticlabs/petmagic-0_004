@@ -9,6 +9,7 @@ import {
 import { AdminBadge, AdminCard, AdminPage, AdminPageHero, AdminStateCard, AdminStatusBadge, adminTableStyles, type AdminTone } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
+import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users-table.module.css";
 import { useUsersAdmin } from "@/components/users/use-users-admin";
 import {
@@ -18,6 +19,7 @@ import {
     setPremium,
 } from "@/lib/api-client";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
+import Link from "next/link";
 
 type UsersTableProps = {
   locale: Locale;
@@ -97,6 +99,7 @@ export function UsersTable({ locale }: UsersTableProps) {
             <table className={adminTableStyles.table}>
             <thead>
               <tr>
+                <th>{text.avatarLabel}</th>
                 <th>{text.emailLabel}</th>
                 <th>{text.roleLabel}</th>
                 <th>{text.premiumLabel}</th>
@@ -112,6 +115,13 @@ export function UsersTable({ locale }: UsersTableProps) {
 
                 return (
                   <tr key={user.userId}>
+                    <td data-label={text.avatarLabel}>
+                      <UserAvatarView
+                        avatar={user.avatar}
+                        label={`${text.avatarLabel}: ${user.displayName ?? user.email}`}
+                        fallbackLabel={user.displayName ?? user.email}
+                      />
+                    </td>
                     <td data-label={text.emailLabel}>{user.email}</td>
                     <td data-label={text.roleLabel}>
                       <div className={styles.roleList}>
@@ -184,6 +194,9 @@ export function UsersTable({ locale }: UsersTableProps) {
                             </Button>
                           </>
                         )}
+                        <Link href={`/${locale}/users/${user.userId}`} className={styles.inlineLink}>
+                          <span>{text.openLabel}</span>
+                        </Link>
                       </div>
                     </td>
                   </tr>

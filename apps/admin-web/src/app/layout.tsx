@@ -3,14 +3,14 @@ import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 
 const bodyFont = Inter({
-  variable: "--font-manrope",
+  variable: "--font-admin-body",
   subsets: ["latin", "cyrillic"],
   display: "swap",
   weight: ["400", "500", "600", "700"],
 });
 
 const headingFont = Manrope({
-  variable: "--font-space-grotesk",
+  variable: "--font-admin-heading",
   subsets: ["latin", "cyrillic"],
   display: "swap",
   weight: ["500", "600", "700", "800"],
