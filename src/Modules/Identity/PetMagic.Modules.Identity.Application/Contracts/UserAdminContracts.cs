@@ -1,0 +1,95 @@
+namespace PetMagic.Modules.Identity.Application.Contracts;
+
+public sealed record UpdateUserAvatarCommand(
+    Guid UserId,
+    string FileName,
+    string ContentType,
+    byte[] Content);
+
+public sealed record RemoveUserAvatarCommand(Guid UserId);
+
+public sealed record AdminUserDetailResponse(
+    Guid UserId,
+    string Email,
+    string? DisplayName,
+    bool IsPremium,
+    bool IsActive,
+    bool EmailConfirmed,
+    IReadOnlyList<string> Roles,
+    DateTime CreatedAtUtc,
+    UserAvatarResponse? Avatar);
+
+public sealed record AdminUserAnalyticsSummaryResponse(
+    int WalletBalance,
+    int TotalPurchases,
+    int SuccessfulPurchases,
+    int TotalPurchasedSpark,
+    DateTime? LastPurchaseAtUtc,
+    int TotalGenerations,
+    int CompletedGenerations,
+    int FailedGenerations,
+    DateTime? LastGenerationAtUtc,
+    int TemplateAnalyticsEvents,
+    int AuditEvents,
+    DateTime? LastActivityAtUtc);
+
+public sealed record AdminUserAuditEventResponse(
+    Guid AuditEventId,
+    string Action,
+    string Details,
+    DateTime OccurredAtUtc);
+
+public sealed record AdminUserPurchaseResponse(
+    Guid OrderId,
+    string Status,
+    decimal PriceAmount,
+    string CurrencyCode,
+    int SparkToGrant,
+    string PaymentProvider,
+    DateTime CreatedAtUtc,
+    DateTime? ConfirmedAtUtc);
+
+public sealed record AdminUserGenerationResponse(
+    Guid GenerationId,
+    Guid TemplateId,
+    string TemplateTitle,
+    string TemplateType,
+    string Status,
+    int TokenCost,
+    string? FailureCode,
+    string? FailureMessage,
+    string? OutputUrl,
+    DateTime CreatedAtUtc,
+    DateTime? CompletedAtUtc);
+
+public sealed record AdminUserTemplateEventResponse(
+    Guid EventId,
+    Guid TemplateId,
+    string TemplateTitle,
+    string EventType,
+    string Source,
+    string DeviceClass,
+    string CountryCode,
+    Guid? GenerationId,
+    string? FeedbackMessage,
+    DateTime CreatedAtUtc);
+
+public sealed record AdminUserFailureBreakdownItemResponse(
+    string FailureCode,
+    int Count,
+    DateTime? LastOccurredAtUtc);
+
+public sealed record AdminUserActivityItemResponse(
+    string Kind,
+    string Title,
+    string? Details,
+    DateTime OccurredAtUtc);
+
+public sealed record AdminUserAnalyticsResponse(
+    AdminUserAnalyticsSummaryResponse Summary,
+    IReadOnlyList<AdminUserActivityItemResponse> RecentActivity,
+    IReadOnlyList<AdminUserAuditEventResponse> RecentAuditEvents,
+    IReadOnlyList<AdminUserPurchaseResponse> RecentPurchases,
+    IReadOnlyList<AdminUserGenerationResponse> RecentGenerations,
+    IReadOnlyList<AdminUserTemplateEventResponse> RecentTemplateEvents,
+    IReadOnlyList<AdminUserFailureBreakdownItemResponse> FailureBreakdown);
