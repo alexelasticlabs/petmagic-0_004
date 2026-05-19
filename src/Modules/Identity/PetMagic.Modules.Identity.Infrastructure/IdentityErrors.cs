@@ -14,6 +14,10 @@ public static class IdentityErrors
 
     public static readonly Error ExternalPrincipalInvalid = new("auth.external_invalid", "External login payload is invalid.");
 
+    public static readonly Error ExternalProviderNotConfigured = new("auth.external_not_configured", "External provider is not configured.");
+
+    public static readonly Error ExternalTokenInvalid = new("auth.external_token_invalid", "External identity token is invalid.");
+
     public static readonly Error ExternalEmailMissing = new("auth.external_email_missing", "External provider did not supply an email.");
 
     public static readonly Error EmailNotConfirmed = new("auth.email_not_confirmed", "Email address is not confirmed.");

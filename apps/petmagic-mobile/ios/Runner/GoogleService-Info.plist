@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>288623941469-3pq3f1kq4ec3d2n8fj091317ke7ufks7.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCJQ-tS18twJyi7h4ADar3Pq3KI8m7n-Jw</string>
+	<key>GCM_SENDER_ID</key>
+	<string>288623941469</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.petmagic.app</string>
+	<key>PROJECT_ID</key>
+	<string>petmagic-f036b</string>
+	<key>STORAGE_BUCKET</key>
+	<string>petmagic-f036b.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:288623941469:ios:028da7172892fdf964bab4</string>
+</dict>
+</plist>

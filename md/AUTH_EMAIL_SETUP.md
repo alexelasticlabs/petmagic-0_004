@@ -1,18 +1,25 @@
 # Полная настройка Google входа и email для PetMagic
 
-Ниже инструкция без пропусков: что создать, куда вставить значения и как запускать проект так, чтобы Google login и письма на сброс пароля реально работали.
+Ниже актуальная инструкция именно под текущую реализацию.
+
+Google вход теперь работает так:
+
+1. Мобильное приложение сначала запускает нативный Google Sign-In.
+2. Google возвращает приложению identity token.
+3. Приложение отправляет этот token в backend.
+4. Backend проверяет token и выдает обычную PetMagic-сессию.
+5. Если нативный сценарий недоступен, приложение может откатиться на browser fallback flow.
+
+Это ближе к production mobile UX, чем старый сценарий с обязательным переводом пользователя в браузер.
 
 ## Что уже сделано в проекте
 
-- Мобильное приложение уже умеет открывать backend OAuth flow и принимать возврат в deep link petmagic://auth/external.
-- Android и iOS уже настроены на этот deep link.
-- Backend уже умеет:
-  - запускать Google external auth
-  - завершать вход через mobile callback
-  - отправлять письма подтверждения и сброса пароля через SMTP worker
-- Docker-конфиг уже умеет передавать нужные переменные окружения в backend контейнер.
-
-Тебе осталось только заполнить реальные значения и запустить сервис.
+- Flutter mobile уже поддерживает native Google sign-in.
+- Backend уже умеет принимать Google id token и обменивать его на PetMagic session.
+- Старый browser-based Google OAuth flow оставлен как fallback.
+- Deep link petmagic://auth/external уже настроен для fallback flow.
+- SMTP worker уже умеет отправлять confirmation и password reset письма.
+- Docker уже передает Google и email env-переменные в backend.
 
 ## Файлы, которые нужно использовать
 
@@ -37,7 +44,7 @@ Copy-Item .env.example .env
 
 Ниже блоки, которые важны именно для auth, Google и email.
 
-### 2.1 Google OAuth
+### 2.1 Google OAuth для backend
 
 Вставь в .env:
 
@@ -45,6 +52,11 @@ Copy-Item .env.example .env
 GOOGLE_CLIENT_ID=вставь_сюда_google_client_id
 GOOGLE_CLIENT_SECRET=вставь_сюда_google_client_secret
 ```
+
+Важно:
+
+- сюда нужно вставлять Web application OAuth client из Google Cloud Console
+- эти значения использует backend для проверки Google identity token и для browser fallback
 
 ### 2.2 SMTP для писем
 
@@ -104,53 +116,90 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
 2. Укажи support email
 3. Добавь test users, если приложение пока в тестовом режиме
 
-### 3.3 Создай OAuth client
+### 3.3 Создай три OAuth client-а
 
-Тип клиента:
+Для нормального mobile production-style Google sign-in нужны три клиента:
 
-- Web application
+1. Web application client
+2. Android client
+3. iOS client
 
-### 3.4 Самое важное: Authorized redirect URI
+### 3.4 Web application client
 
-В Google нужно добавить redirect URI backend middleware, а не mobile deep link.
+Создай OAuth client типа Web application.
 
-Для локального запуска используй:
+Именно его значения нужно положить в backend env:
+
+```env
+GOOGLE_CLIENT_ID=web_client_id
+GOOGLE_CLIENT_SECRET=web_client_secret
+```
+
+Для browser fallback добавь redirect URI backend middleware:
+
+Локально:
 
 ```text
 http://localhost:5000/signin-google
 ```
 
-Для production потом будет так:
+В production:
 
 ```text
 https://api.petmagic.app/signin-google
 ```
 
-Не вставляй в Google вот это:
+### 3.5 Android client
+
+Создай OAuth client типа Android.
+
+Используй application id из проекта:
 
 ```text
-petmagic://auth/external
+com.petmagic.app
 ```
 
-Это mobile callback, он используется уже после обработки ответа backend-ом.
+Его можно увидеть в [apps/petmagic-mobile/android/app/build.gradle.kts](apps/petmagic-mobile/android/app/build.gradle.kts).
 
-### 3.5 Куда вставить выданные Google значения
+В Google Cloud Console для Android клиента нужно указать:
 
-После создания OAuth client Google покажет:
+1. Package name: app.petmagic.petmagic_mobile
+1. Package name: com.petmagic.app
+2. SHA-1 fingerprint debug keystore
+3. Позже отдельно SHA-1 release keystore
 
-- Client ID
-- Client Secret
+Чтобы получить debug SHA-1 на Windows:
 
-Скопируй их в .env:
+```powershell
+keytool -list -v -alias androiddebugkey -keystore "$env:USERPROFILE\.android\debug.keystore" -storepass android -keypass android
+```
+
+### 3.6 iOS client
+
+Создай OAuth client типа iOS.
+
+Используй bundle identifier из проекта:
+
+```text
+com.petmagic.app
+```
+
+Его можно увидеть в [apps/petmagic-mobile/ios/Runner.xcodeproj/project.pbxproj](apps/petmagic-mobile/ios/Runner.xcodeproj/project.pbxproj).
+
+### 3.7 Что в итоге куда вставлять
+
+В .env идут только значения Web application client:
 
 ```env
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
+GOOGLE_CLIENT_ID=web_client_id
+GOOGLE_CLIENT_SECRET=web_client_secret
 ```
+
+Android client и iOS client в .env не вставляются. Они нужны в Google Cloud Console, чтобы нативный вход на устройстве считался валидным для ваших platform ids.
 
 ## Шаг 4. Где уже настроен mobile callback
 
-Ничего переносить не нужно, это уже в проекте есть:
+Ничего переносить не нужно, fallback callback уже в проекте есть:
 
 - Android deep link: [apps/petmagic-mobile/android/app/src/main/AndroidManifest.xml](apps/petmagic-mobile/android/app/src/main/AndroidManifest.xml)
 - iOS URL scheme: [apps/petmagic-mobile/ios/Runner/Info.plist](apps/petmagic-mobile/ios/Runner/Info.plist)
@@ -218,15 +267,27 @@ flutter run --dart-define=API_BASE_URL=http://localhost:5000
 1. Запусти backend на http://localhost:5000
 2. Запусти mobile с правильным API_BASE_URL
 3. На экране входа нажми Continue with Google
-4. Должен открыться browser flow Google
-5. После успешного входа должен сработать возврат в приложение через petmagic://auth/external
-6. В приложении должен открыться уже авторизованный state
+4. Должен открыться нативный Google chooser / account picker, а не полный внешний браузер
+5. После выбора аккаунта приложение должно вернуться в авторизованный state
 
-Если браузер открылся, но возврата в приложение нет, почти всегда проблема в одном из трех мест:
+Fallback-сценарий:
 
-1. Неверный API_BASE_URL
-2. Неверный Google redirect URI
-3. Backend доступен не по тому host, который указан в Google Console
+- если нативный сценарий недоступен, приложение может открыть browser-based Google flow
+- в этом случае возврат пойдет через petmagic://auth/external
+
+Если нативный вход не работает, почти всегда проблема в одном из этих мест:
+
+1. Для Android не создан OAuth client с package name com.petmagic.app
+2. Для Android не указан SHA-1 debug или release keystore
+3. Для iOS не создан OAuth client с bundle id com.petmagic.app
+4. В .env backend лежит не Web application client, а какой-то другой client id
+5. API_BASE_URL смотрит не на тот backend
+
+Если fallback flow открылся в браузере, но возврата нет, проверь:
+
+1. Redirect URI http://localhost:5000/signin-google или production URI
+2. Deep link petmagic://auth/external
+3. Доступность backend по тому host, который использует приложение
 
 ## Шаг 8. Как проверить, что email работает
 
@@ -304,7 +365,9 @@ EMAIL_FROM_NAME=PetMagic
 
 ## Что нельзя забыть
 
-1. В Google Console указывать http://localhost:5000/signin-google, а не petmagic://auth/external
-2. Если mobile ходит на 127.0.0.1:5000, backend реально должен быть доступен именно там для твоего устройства
-3. Для USB Android нужен adb reverse tcp:5000 tcp:5000
-4. Для Docker нужно заполнить .env в корне проекта, не внутри apps/petmagic-mobile
+1. GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET в .env должны быть от Web application client
+2. Для Android нужен отдельный Google OAuth client с package name com.petmagic.app и SHA-1
+3. Для iOS нужен отдельный Google OAuth client с bundle id com.petmagic.app
+4. Redirect URI http://localhost:5000/signin-google нужен для browser fallback, а не для native mobile sign-in
+5. Для USB Android нужен adb reverse tcp:5000 tcp:5000
+6. Для Docker нужно заполнять .env в корне проекта, не внутри apps/petmagic-mobile

@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: petmagic_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PetMagic_DevPassword123}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-PetMagic_DevPassword123}"
       POSTGRES_DB: petmagic_db
     ports:
       - "5432:5432"
@@ -23,37 +23,38 @@ services:
       dockerfile: Dockerfile.api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://+:5000
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:-PetMagic_DevPassword123};
-      Jwt__SigningKey: ${JWT_SIGNING_KEY:-PetMagicDemoSigningKey12345DemoSigningKey}
+      ASPNETCORE_HTTP_PORTS: 5000
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:-PetMagic_DevPassword123};"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-PetMagicDemoSigningKey12345DemoSigningKey}"
       Jwt__Issuer: petmagic.app
       Jwt__Audience: petmagic-admin
+      DataProtection__CertificatePassword: "${DATA_PROTECTION_CERTIFICATE_PASSWORD:-PetMagic.DataProtection.Dev.2026}"
       BootstrapAdmin__Email: admin@petmagic.app
       BootstrapAdmin__Password: PetMagic!Admin2026
       BootstrapAdmin__DisplayName: PetMagic Admin
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
-      APPLE_CLIENT_SECRET: ${APPLE_CLIENT_SECRET:-}
-      APPLE_AUTHORIZATION_ENDPOINT: ${APPLE_AUTHORIZATION_ENDPOINT:-}
-      APPLE_TOKEN_ENDPOINT: ${APPLE_TOKEN_ENDPOINT:-}
-      EMAIL_HOST: ${EMAIL_HOST:-}
-      EMAIL_PORT: ${EMAIL_PORT:-2525}
-      EMAIL_USERNAME: ${EMAIL_USERNAME:-}
-      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
-      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-true}
-      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-no-reply@petmagic.app}
-      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-PetMagic}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      FAL_AI_API_KEY: ${FAL_AI_API_KEY:-}
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
-      R2_ACCESS_KEY: ${R2_ACCESS_KEY:-}
-      R2_SECRET_KEY: ${R2_SECRET_KEY:-}
-      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
-      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
-      Identity__AvatarStorage__PublicBaseUrl: ${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}
-      Templates__PublicBaseUrl: ${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      APPLE_CLIENT_ID: "${APPLE_CLIENT_ID:-}"
+      APPLE_CLIENT_SECRET: "${APPLE_CLIENT_SECRET:-}"
+      APPLE_AUTHORIZATION_ENDPOINT: "${APPLE_AUTHORIZATION_ENDPOINT:-}"
+      APPLE_TOKEN_ENDPOINT: "${APPLE_TOKEN_ENDPOINT:-}"
+      EMAIL_HOST: "${EMAIL_HOST:-}"
+      EMAIL_PORT: "${EMAIL_PORT:-2525}"
+      EMAIL_USERNAME: "${EMAIL_USERNAME:-}"
+      EMAIL_PASSWORD: "${EMAIL_PASSWORD:-}"
+      EMAIL_USE_SSL: "${EMAIL_USE_SSL:-true}"
+      EMAIL_FROM_ADDRESS: "${EMAIL_FROM_ADDRESS:-no-reply@petmagic.app}"
+      EMAIL_FROM_NAME: "${EMAIL_FROM_NAME:-PetMagic}"
+      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
+      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-}"
+      FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
+      R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
+      R2_ACCESS_KEY: "${R2_ACCESS_KEY:-}"
+      R2_SECRET_KEY: "${R2_SECRET_KEY:-}"
+      R2_BUCKET_NAME: "${R2_BUCKET_NAME:-}"
+      R2_PUBLIC_URL: "${R2_PUBLIC_URL:-}"
+      Identity__AvatarStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
+      Templates__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
     ports:
       - "5000:5000"
@@ -72,8 +73,8 @@ services:
       context: ./apps/admin-web
       dockerfile: Dockerfile
     environment:
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}
-      INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL:-http://backend:5000}
+      NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}"
+      INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:-http://backend:5000}"
     ports:
       - "3000:3000"
     depends_on:

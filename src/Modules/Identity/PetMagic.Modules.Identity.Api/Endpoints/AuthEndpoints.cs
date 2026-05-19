@@ -72,10 +72,16 @@ public static class AuthEndpoints
         group.MapGet("/external/{provider}", ExternalChallengeAsync)
             .AllowAnonymous();
 
+        group.MapGet("/external/google/mobile-config", GetGoogleMobileConfigAsync)
+            .AllowAnonymous();
+
         group.MapGet("/external/callback", ExternalCallbackAsync)
             .AllowAnonymous();
 
         group.MapPost("/external/exchange", ExchangeExternalLoginAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/external/google/native", GoogleNativeLoginAsync)
             .AllowAnonymous();
 
         return endpoints;
@@ -381,6 +387,58 @@ public static class AuthEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static Results<Ok<GoogleMobileConfigResponse>, ProblemHttpResult> GetGoogleMobileConfigAsync(
+        IGoogleIdentityTokenVerifier verifier)
+    {
+        if (!verifier.IsConfigured || string.IsNullOrWhiteSpace(verifier.ClientId))
+        {
+            return TypedResults.Problem(
+                title: "auth.external_not_configured",
+                detail: "Google sign-in is not configured.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(new GoogleMobileConfigResponse(verifier.ClientId));
+    }
+
+    private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> GoogleNativeLoginAsync(
+        GoogleNativeLoginCommand command,
+        IValidator<GoogleNativeLoginCommand> validator,
+        IGoogleIdentityTokenVerifier verifier,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var verification = await verifier.VerifyIdTokenAsync(command.IdToken, cancellationToken);
+        if (verification.IsFailure)
+        {
+            var statusCode = string.Equals(verification.Error.Code, "auth.external_not_configured", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status401Unauthorized;
+
+            return TypedResults.Problem(
+                title: verification.Error.Code,
+                detail: verification.Error.Message,
+                statusCode: statusCode);
+        }
+
+        var result = await service.ExternalLoginAsync(verification.Value, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult> ExchangeExternalLoginAsync(
         ExternalLoginExchangeRequest request,
         ExternalLoginCompletionStore completionStore)
@@ -547,4 +605,6 @@ public static class AuthEndpoints
     }
 
     private sealed record ExternalLoginExchangeRequest(string Ticket);
+
+    private sealed record GoogleMobileConfigResponse(string ServerClientId);
 }

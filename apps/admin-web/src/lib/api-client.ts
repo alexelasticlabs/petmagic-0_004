@@ -519,7 +519,8 @@ export type TemplateCategoryPayload = {
 
 const AUTH_KEY = "petmagic_admin_auth";
 const AUTH_SESSION_EVENT = "petmagic_admin_auth_changed";
-const ADMIN_LIST_CACHE_TTL_MS = 30_000;
+const ADMIN_LIST_CACHE_TTL_MS = 120_000;
+const API_REQUEST_TIMEOUT_MS = 15_000;
 
 function getApiBaseUrl(): string {
   if (typeof window === "undefined") {
@@ -542,6 +543,12 @@ const cachedAdminUserAnalytics = new Map<string, { value: AdminUserAnalytics; ex
 const cachedTemplateLists = new Map<string, { value: AdminTemplateListItem[]; expiresAt: number }>();
 const cachedTemplateCategories = new Map<string, { value: AdminTemplateCategory[]; expiresAt: number }>();
 const cachedTemplatesAnalyticsOverview = new Map<string, { value: AdminTemplatesAnalyticsOverview; expiresAt: number }>();
+const cachedAdminTemplateDetails = new Map<string, { value: AdminTemplate; expiresAt: number }>();
+const cachedAdminTemplateStatistics = new Map<string, { value: AdminTemplateStatistics; expiresAt: number }>();
+const cachedAdminTemplateTrends = new Map<string, { value: AdminTemplateTrendPoint[]; expiresAt: number }>();
+const cachedAdminTemplateRecentGenerations = new Map<string, { value: AdminTemplateRecentGeneration[]; expiresAt: number }>();
+const cachedAdminTemplateFailureBreakdowns = new Map<string, { value: AdminTemplateFailureBreakdownItem[]; expiresAt: number }>();
+const cachedAdminTemplateEventAnalytics = new Map<string, { value: AdminTemplateEventAnalytics; expiresAt: number }>();
 const inflightGetRequests = new Map<string, Promise<unknown>>();
 
 function clearAdminListCaches(): void {
@@ -551,6 +558,12 @@ function clearAdminListCaches(): void {
   cachedTemplateLists.clear();
   cachedTemplateCategories.clear();
   cachedTemplatesAnalyticsOverview.clear();
+  cachedAdminTemplateDetails.clear();
+  cachedAdminTemplateStatistics.clear();
+  cachedAdminTemplateTrends.clear();
+  cachedAdminTemplateRecentGenerations.clear();
+  cachedAdminTemplateFailureBreakdowns.clear();
+  cachedAdminTemplateEventAnalytics.clear();
   inflightGetRequests.clear();
 }
 
@@ -568,6 +581,10 @@ function getAnalyticsOverviewCacheKey(query: AdminTemplatesAnalyticsQuery): stri
     sort: query.sort ?? null,
     take: query.take ?? null,
   });
+}
+
+function getTemplateRecentGenerationsCacheKey(templateId: string, take?: number): string {
+  return `${templateId}:${take ?? "default"}`;
 }
 
 async function cachedGet<TResponse>(
@@ -700,10 +717,49 @@ async function apiRequest<TResponse>(
     headers.set("Authorization", `Bearer ${session.accessToken}`);
   }
 
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers
-  });
+  const abortController = new AbortController();
+  let isTimedOut = false;
+  const abortHandler = () => {
+    abortController.abort();
+  };
+
+  if (init.signal) {
+    if (init.signal.aborted) {
+      abortController.abort();
+    } else {
+      init.signal.addEventListener("abort", abortHandler, { once: true });
+    }
+  }
+
+  const timeoutId = globalThis.setTimeout(() => {
+    isTimedOut = true;
+    abortController.abort();
+  }, API_REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      headers,
+      signal: abortController.signal,
+    });
+  } catch (error) {
+    if (isTimedOut) {
+      const timeoutError = new Error("API request timed out") as ApiError;
+      timeoutError.code = "request.timeout";
+      timeoutError.detail = `Request exceeded ${API_REQUEST_TIMEOUT_MS / 1000} seconds.`;
+      throw timeoutError;
+    }
+
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+
+    if (init.signal) {
+      init.signal.removeEventListener("abort", abortHandler);
+    }
+  }
 
   if (response.status === 401 && allowRefresh && session?.refreshToken) {
     await refreshSession(session.refreshToken);
@@ -941,28 +997,52 @@ export async function deleteTemplateCategory(categoryId: string): Promise<void> 
 }
 
 export async function fetchAdminTemplate(templateId: string): Promise<AdminTemplate> {
-  return apiRequest<AdminTemplate>(`/api/admin/templates/${templateId}`, { method: "GET" });
+  return cachedGet(
+    `admin-template:${templateId}`,
+    cachedAdminTemplateDetails,
+    () => apiRequest<AdminTemplate>(`/api/admin/templates/${templateId}`, { method: "GET" }),
+  );
 }
 
 export async function fetchAdminTemplateStatistics(templateId: string): Promise<AdminTemplateStatistics> {
-  return apiRequest<AdminTemplateStatistics>(`/api/admin/templates/${templateId}/statistics`, { method: "GET" });
+  return cachedGet(
+    `admin-template-statistics:${templateId}`,
+    cachedAdminTemplateStatistics,
+    () => apiRequest<AdminTemplateStatistics>(`/api/admin/templates/${templateId}/statistics`, { method: "GET" }),
+  );
 }
 
 export async function fetchAdminTemplateTrends(templateId: string): Promise<AdminTemplateTrendPoint[]> {
-  return apiRequest<AdminTemplateTrendPoint[]>(`/api/admin/templates/${templateId}/statistics/trends`, { method: "GET" });
+  return cachedGet(
+    `admin-template-trends:${templateId}`,
+    cachedAdminTemplateTrends,
+    () => apiRequest<AdminTemplateTrendPoint[]>(`/api/admin/templates/${templateId}/statistics/trends`, { method: "GET" }),
+  );
 }
 
 export async function fetchAdminTemplateRecentGenerations(templateId: string, take?: number): Promise<AdminTemplateRecentGeneration[]> {
   const query = typeof take === "number" ? `?take=${encodeURIComponent(String(take))}` : "";
-  return apiRequest<AdminTemplateRecentGeneration[]>(`/api/admin/templates/${templateId}/statistics/recent${query}`, { method: "GET" });
+  return cachedGet(
+    `admin-template-recent:${getTemplateRecentGenerationsCacheKey(templateId, take)}`,
+    cachedAdminTemplateRecentGenerations,
+    () => apiRequest<AdminTemplateRecentGeneration[]>(`/api/admin/templates/${templateId}/statistics/recent${query}`, { method: "GET" }),
+  );
 }
 
 export async function fetchAdminTemplateFailureBreakdown(templateId: string): Promise<AdminTemplateFailureBreakdownItem[]> {
-  return apiRequest<AdminTemplateFailureBreakdownItem[]>(`/api/admin/templates/${templateId}/statistics/failures`, { method: "GET" });
+  return cachedGet(
+    `admin-template-failures:${templateId}`,
+    cachedAdminTemplateFailureBreakdowns,
+    () => apiRequest<AdminTemplateFailureBreakdownItem[]>(`/api/admin/templates/${templateId}/statistics/failures`, { method: "GET" }),
+  );
 }
 
 export async function fetchAdminTemplateEventAnalytics(templateId: string): Promise<AdminTemplateEventAnalytics> {
-  return apiRequest<AdminTemplateEventAnalytics>(`/api/admin/templates/${templateId}/statistics/events`, { method: "GET" });
+  return cachedGet(
+    `admin-template-events:${templateId}`,
+    cachedAdminTemplateEventAnalytics,
+    () => apiRequest<AdminTemplateEventAnalytics>(`/api/admin/templates/${templateId}/statistics/events`, { method: "GET" }),
+  );
 }
 
 export async function fetchAdminTemplateFeedback(templateId: string, query: AdminTemplateFeedbackQuery = {}): Promise<AdminTemplateFeedbackItem[]> {

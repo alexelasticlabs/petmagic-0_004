@@ -33,6 +33,8 @@ class MobileUserProfile {
     required this.displayName,
     required this.isPremium,
     required this.emailConfirmed,
+    required this.termsOfUseAccepted,
+    required this.marketingEmailsEnabled,
     required this.roles,
     required this.avatar,
   });
@@ -42,6 +44,8 @@ class MobileUserProfile {
   final String? displayName;
   final bool isPremium;
   final bool emailConfirmed;
+  final bool termsOfUseAccepted;
+  final bool marketingEmailsEnabled;
   final List<String> roles;
   final MobileUserAvatar? avatar;
 
@@ -52,6 +56,8 @@ class MobileUserProfile {
       displayName: json['displayName'] as String?,
       isPremium: json['isPremium'] as bool? ?? false,
       emailConfirmed: json['emailConfirmed'] as bool? ?? false,
+      termsOfUseAccepted: json['termsOfUseAccepted'] as bool? ?? false,
+      marketingEmailsEnabled: json['marketingEmailsEnabled'] as bool? ?? false,
       roles: (json['roles'] as List<dynamic>? ?? const [])
           .whereType<String>()
           .toList(growable: false),
@@ -86,6 +92,8 @@ class AuthSession {
         'displayName': user.displayName,
         'isPremium': user.isPremium,
         'emailConfirmed': user.emailConfirmed,
+        'termsOfUseAccepted': user.termsOfUseAccepted,
+        'marketingEmailsEnabled': user.marketingEmailsEnabled,
         'roles': user.roles,
         'avatar': user.avatar == null
             ? null

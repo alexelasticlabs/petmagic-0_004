@@ -55,6 +55,9 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _acceptedTerms = false;
+  bool _receiveUpdates = false;
+  String? _consentErrorMessage;
 
   bool get _isSignUp => widget.mode == _AuthMode.signUp;
 
@@ -155,6 +158,16 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                                 ),
                               ),
                             ),
+                          if (_consentErrorMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: ErrorCard(
+                                message: _mapErrorMessage(
+                                  _consentErrorMessage!,
+                                  text,
+                                ),
+                              ),
+                            ),
                           AuthFormCard(
                             isDark: isDark,
                             child: Column(
@@ -239,6 +252,29 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                               ],
                             ),
                           ),
+                          if (_isSignUp) ...[
+                            const SizedBox(height: 12),
+                            _ConsentOption(
+                              value: _acceptedTerms,
+                              title: text.authAcceptTermsLabel,
+                              onChanged: (value) {
+                                setState(() {
+                                  _acceptedTerms = value ?? false;
+                                  _consentErrorMessage = null;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 6),
+                            _ConsentOption(
+                              value: _receiveUpdates,
+                              title: text.authReceiveUpdatesLabel,
+                              onChanged: (value) {
+                                setState(() {
+                                  _receiveUpdates = value ?? false;
+                                });
+                              },
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           _AuthInlineActions(
                             isSignUp: _isSignUp,
@@ -287,24 +323,32 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                           const SizedBox(height: 12),
                           AuthDivider(label: text.authOrContinueWith),
                           const SizedBox(height: 12),
-                          SocialButton(
-                            icon: SocialGlyph.google(),
-                            label: text.authContinueWithGoogle,
-                            onPressed: state.isSaving
-                                ? null
-                                : () => _submitExternal(
-                                    ExternalAuthProvider.google,
-                                  ),
-                          ),
-                          const SizedBox(height: 8),
-                          SocialButton(
-                            icon: SocialGlyph.apple(),
-                            label: text.authContinueWithApple,
-                            onPressed: state.isSaving
-                                ? null
-                                : () => _submitExternal(
-                                    ExternalAuthProvider.apple,
-                                  ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SocialButton(
+                                  icon: SocialGlyph.google(),
+                                  label: text.authGoogleShortLabel,
+                                  onPressed: state.isSaving
+                                      ? null
+                                      : () => _submitExternal(
+                                          ExternalAuthProvider.google,
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SocialButton(
+                                  icon: SocialGlyph.apple(),
+                                  label: text.authAppleShortLabel,
+                                  onPressed: state.isSaving
+                                      ? null
+                                      : () => _submitExternal(
+                                          ExternalAuthProvider.apple,
+                                        ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 14),
                           if (isDark)
@@ -338,7 +382,16 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final controller = ref.read(profileControllerProvider.notifier);
     final router = GoRouter.of(context);
     if (_isSignUp) {
-      await controller.register();
+      if (!_acceptedTerms) {
+        setState(() {
+          _consentErrorMessage = 'auth.accept_terms_required';
+        });
+        return;
+      }
+      await controller.register(
+        termsOfUseAccepted: _acceptedTerms,
+        marketingEmailsEnabled: _receiveUpdates,
+      );
     } else {
       await controller.login();
     }
@@ -398,6 +451,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         return text.authPasswordMismatch;
       case 'auth.password_too_short':
         return text.authPasswordTooShort;
+      case 'auth.accept_terms_required':
+        return text.authAcceptTermsRequired;
       case 'auth.external_cancelled':
         return text.authExternalCancelled;
       case 'auth.external_callback_failed':
@@ -408,11 +463,70 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         return text.authExternalTimedOut;
       case 'auth.external_ticket_invalid':
         return text.authExternalSessionExpired;
+      case 'auth.external_not_configured':
+      case 'auth.external_token_invalid':
       case 'auth.external_invalid':
         return text.authExternalFailed;
       default:
         return raw;
     }
+  }
+}
+
+class _ConsentOption extends StatelessWidget {
+  const _ConsentOption({
+    required this.value,
+    required this.title,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final String title;
+  final ValueChanged<bool?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Material(
+      color: colors.surfaceGlass,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => onChanged(!value),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.border),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              Checkbox(
+                value: value,
+                onChanged: onChanged,
+                activeColor: colors.accent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.textStrong,
+                    fontSize: 12.8,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

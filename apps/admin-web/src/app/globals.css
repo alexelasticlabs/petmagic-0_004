@@ -43,7 +43,7 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18);
   --shadow-strong: 0 10px 24px rgba(0, 0, 0, 0.34);
   --focus-ring: 0 0 0 2px rgba(138, 180, 248, 0.24);
-  --interactive-glow: 0 0 0 1px rgba(138, 180, 248, 0.14);
+  --interactive-glow: 0 0 0 1px rgba(138, 180, 248, 0.08);
   --scrollbar-track: rgba(0, 0, 0, 0.96);
   --scrollbar-thumb: rgba(68, 76, 86, 0.92);
   --scrollbar-thumb-hover: rgba(96, 105, 118, 0.96);
@@ -100,9 +100,9 @@ body {
   line-height: 1.55;
   letter-spacing: 0;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
-    radial-gradient(circle at top left, rgba(138, 180, 248, 0.06), transparent 24rem),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+    radial-gradient(circle at top left, rgba(138, 180, 248, 0.035), transparent 24rem),
     linear-gradient(180deg, #000000 0%, #020304 100%);
   background-size: 32px 32px, 32px 32px, auto, auto;
 }
@@ -173,7 +173,7 @@ select {
   border-color: rgba(138, 180, 248, 0.6);
   color: var(--accent-contrast);
   background: #1a73e8;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .ui-button--secondary {
@@ -203,7 +203,7 @@ select {
 .ui-button--primary:hover:not(:disabled) {
   border-color: rgba(166, 196, 255, 0.92);
   background: #226fdb;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
 .ui-button:active:not(:disabled) {

@@ -4,8 +4,10 @@ import {
     CalendarIcon,
     ChartIcon,
     DownloadIcon,
+    GlobeIcon,
     RefreshIcon,
     TableIcon,
+    TrendUpIcon
 } from "@/components/admin/admin-icons";
 import { AdminMetricStrip, AdminPage, AdminStateCard, AdminToolbar } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
@@ -15,10 +17,10 @@ import {
     TemplateAnalyticsRecentRunsSection,
 } from "@/components/templates/template-analytics-detail-sections";
 import {
-  TemplateAnalyticsInsightGridSection,
-  TemplateAnalyticsOverviewSection,
-  TemplateAnalyticsSnapshotSection,
-  TemplateAnalyticsVisualSection,
+    TemplateAnalyticsInsightGridSection,
+    TemplateAnalyticsOverviewSection,
+    TemplateAnalyticsSnapshotSection,
+    TemplateAnalyticsVisualSection,
 } from "@/components/templates/template-analytics-overview-sections";
 import styles from "@/components/templates/template-analytics-page.module.css";
 import {
@@ -44,7 +46,7 @@ import {
 import { type Locale } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 
 type TemplateAnalyticsPageProps = {
   locale: Locale;
@@ -79,7 +81,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     eventAnalytics,
     failureBreakdown,
     hasError,
+    hasSecondaryError,
     isLoading,
+    isSecondaryLoading,
     recentRunsPreview,
     statistics,
     template,
@@ -111,6 +115,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   });
   const error = hasError ? text.loadError : null;
   const feedbackError = hasFeedbackError ? text.feedbackLoadError : null;
+  const secondaryStateMessage = isSecondaryLoading ? text.loading : text.loadError;
 
   const periodAnalytics = useMemo(() => buildPeriodAnalytics(trendPoints, period), [trendPoints, period]);
   const feedbackOptions: Array<{ key: FeedbackFilterKey; label: string }> = [
@@ -173,10 +178,13 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const canShowAllRecentRuns = statistics.totalRuns > RECENT_RUNS_PREVIEW_LIMIT;
   const canShowFailedRecentRuns = statistics.failedRuns > 0;
   const shouldShowRecentRunModes = canShowAllRecentRuns || canShowFailedRecentRuns;
+  const isSecondaryReady = !isSecondaryLoading && !hasSecondaryError;
   const events = eventAnalytics ?? EMPTY_EVENT_ANALYTICS;
-  const selectedTotals = period === "all" ? totalsFromStatistics(statistics) : periodAnalytics.current;
-  const previousTotals = isComparisonEnabled && period !== "all" ? periodAnalytics.previous : null;
-  const chartPoints = period === "all" ? trendPoints : periodAnalytics.currentPoints;
+  const selectedTotals = isSecondaryReady
+    ? (period === "all" ? totalsFromStatistics(statistics) : periodAnalytics.current)
+    : (period === "all" ? totalsFromStatistics(statistics) : null);
+  const previousTotals = isSecondaryReady && isComparisonEnabled && period !== "all" ? periodAnalytics.previous : null;
+  const chartPoints = isSecondaryReady ? (period === "all" ? trendPoints : periodAnalytics.currentPoints) : [];
 
   async function handleRecentRunsModeChange(mode: RecentRunsMode) {
     setRecentRunsError(null);
@@ -205,43 +213,43 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const kpiCards = [
     {
       label: text.views,
-      value: formatNumber(events.totalViews, locale),
-      hint: text.viewsHint,
+      value: isSecondaryReady ? formatNumber(events.totalViews, locale) : "...",
+      hint: isSecondaryReady ? text.viewsHint : secondaryStateMessage,
       accent: "blue" as MetricAccent,
     },
     {
       label: text.generationStarts,
-      value: formatNumber(selectedTotals.totalRuns, locale),
-      hint: text.generationStartsHint,
+      value: selectedTotals ? formatNumber(selectedTotals.totalRuns, locale) : "...",
+      hint: selectedTotals ? text.generationStartsHint : secondaryStateMessage,
       accent: "blue" as MetricAccent,
-      delta: calculateChange(selectedTotals.totalRuns, previousTotals?.totalRuns),
+      delta: selectedTotals ? calculateChange(selectedTotals.totalRuns, previousTotals?.totalRuns) : null,
     },
     {
       label: text.successfulGenerations,
-      value: formatNumber(selectedTotals.completedRuns, locale),
-      hint: text.successfulGenerationsHint,
+      value: selectedTotals ? formatNumber(selectedTotals.completedRuns, locale) : "...",
+      hint: selectedTotals ? text.successfulGenerationsHint : secondaryStateMessage,
       accent: "green" as MetricAccent,
-      delta: calculateChange(selectedTotals.completedRuns, previousTotals?.completedRuns),
+      delta: selectedTotals ? calculateChange(selectedTotals.completedRuns, previousTotals?.completedRuns) : null,
     },
     {
       label: text.generationConversion,
-      value: formatPercent(selectedTotals.successRatePercent, isRu),
-      hint: text.generationConversionHint,
+      value: selectedTotals ? formatPercent(selectedTotals.successRatePercent, isRu) : "...",
+      hint: selectedTotals ? text.generationConversionHint : secondaryStateMessage,
       accent: "green" as MetricAccent,
-      delta: calculateChange(selectedTotals.successRatePercent, previousTotals?.successRatePercent),
+      delta: selectedTotals ? calculateChange(selectedTotals.successRatePercent, previousTotals?.successRatePercent) : null,
     },
     {
       label: text.tokenSpend,
-      value: formatTokens(selectedTotals.totalTokenCost, isRu),
-      hint: text.tokenSpendHint,
+      value: selectedTotals ? formatTokens(selectedTotals.totalTokenCost, isRu) : "...",
+      hint: selectedTotals ? text.tokenSpendHint : secondaryStateMessage,
       accent: "cyan" as MetricAccent,
-      delta: calculateChange(selectedTotals.totalTokenCost, previousTotals?.totalTokenCost),
+      delta: selectedTotals ? calculateChange(selectedTotals.totalTokenCost, previousTotals?.totalTokenCost) : null,
     },
     {
       label: text.complaints,
-      value: formatNumber(events.totalComplaints, locale),
-      hint: text.complaintsHint,
-      accent: events.totalComplaints > 0 ? "red" as MetricAccent : "neutral" as MetricAccent,
+      value: isSecondaryReady ? formatNumber(events.totalComplaints, locale) : "...",
+      hint: isSecondaryReady ? text.complaintsHint : secondaryStateMessage,
+      accent: isSecondaryReady && events.totalComplaints > 0 ? "red" as MetricAccent : "neutral" as MetricAccent,
     },
   ];
   const periodOptions: Array<{ key: PeriodKey; label: string }> = [
@@ -335,7 +343,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             <RefreshIcon className={styles.controlIcon} />
             <span>{text.comparePeriod}</span>
           </button>
-          <button type="button" className={styles.exportButton} onClick={handleExportAnalytics}>
+          <button type="button" className={styles.exportButton} onClick={handleExportAnalytics} disabled={isSecondaryLoading}>
             <DownloadIcon className={styles.controlIcon} />
             <span>{text.exportAnalytics}</span>
           </button>
@@ -361,32 +369,60 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         text={text}
       />
 
-      <TemplateAnalyticsInsightGridSection
-        events={events}
-        isRu={isRu}
-        locale={locale}
-        statistics={statistics}
-        text={text}
-      />
+      {isSecondaryReady ? (
+        <TemplateAnalyticsInsightGridSection
+          events={events}
+          isRu={isRu}
+          locale={locale}
+          statistics={statistics}
+          text={text}
+        />
+      ) : (
+        <div className={styles.insightGrid}>
+          <TemplateAnalyticsSectionPlaceholder icon={GlobeIcon} message={secondaryStateMessage} title={text.sourcesTitle} hint={text.sourcesHint} />
+          <TemplateAnalyticsSectionPlaceholder icon={TrendUpIcon} message={secondaryStateMessage} title={text.retentionTitle} hint={text.retentionHint} />
+          <TemplateAnalyticsSectionPlaceholder icon={GlobeIcon} message={secondaryStateMessage} title={text.geographyTitle} hint={text.geographyHint} />
+          <TemplateAnalyticsSectionPlaceholder icon={GlobeIcon} message={secondaryStateMessage} title={text.devicesTitle} hint={text.devicesHint} />
+        </div>
+      )}
 
       <div className={styles.detailsGrid}>
-        <TemplateAnalyticsRecentRunsSection
-          canShowFailedRecentRuns={canShowFailedRecentRuns}
-          canShowRecentRunModes={shouldShowRecentRunModes}
-          error={recentRunsError}
-          isLoading={isRecentRunsLoading}
-          items={visibleRecentRuns}
-          locale={locale}
-          mode={recentRunsMode}
-          onModeChange={(mode) => void handleRecentRunsModeChange(mode)}
-          text={text}
-        />
+        {isSecondaryReady ? (
+          <TemplateAnalyticsRecentRunsSection
+            canShowFailedRecentRuns={canShowFailedRecentRuns}
+            canShowRecentRunModes={shouldShowRecentRunModes}
+            error={recentRunsError}
+            isLoading={isRecentRunsLoading}
+            items={visibleRecentRuns}
+            locale={locale}
+            mode={recentRunsMode}
+            onModeChange={(mode) => void handleRecentRunsModeChange(mode)}
+            text={text}
+          />
+        ) : (
+          <TemplateAnalyticsSectionPlaceholder
+            wide
+            icon={TableIcon}
+            message={secondaryStateMessage}
+            title={text.recentRunsTitle}
+            hint={text.recentRunsHint}
+          />
+        )}
 
-        <TemplateAnalyticsFailureBreakdownSection
-          items={failureBreakdown}
-          locale={locale}
-          text={text}
-        />
+        {isSecondaryReady ? (
+          <TemplateAnalyticsFailureBreakdownSection
+            items={failureBreakdown}
+            locale={locale}
+            text={text}
+          />
+        ) : (
+          <TemplateAnalyticsSectionPlaceholder
+            icon={ChartIcon}
+            message={secondaryStateMessage}
+            title={text.failureBreakdownTitle}
+            hint={text.failureBreakdownHint}
+          />
+        )}
       </div>
 
       <TemplateAnalyticsFeedbackSection
@@ -411,6 +447,30 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         text={text}
       />
     </AdminPage>
+  );
+}
+
+function TemplateAnalyticsSectionPlaceholder({
+  hint,
+  icon: Icon,
+  message,
+  title,
+  wide = false,
+}: {
+  hint: string;
+  icon: ComponentType<{ className?: string }>;
+  message: string;
+  title: string;
+  wide?: boolean;
+}) {
+  return (
+    <section className={wide ? `${styles.sectionCard} ${styles.sectionCardWide}` : styles.sectionCard}>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitleWithIcon}><Icon className={styles.sectionTitleIcon} /><span>{title}</span></h2>
+        <p>{hint}</p>
+      </div>
+      <p className={styles.emptyState}>{message}</p>
+    </section>
   );
 }
 

@@ -1,4 +1,4 @@
-package app.petmagic.petmagic_mobile
+package com.petmagic.app
 
 import io.flutter.embedding.android.FlutterActivity
 

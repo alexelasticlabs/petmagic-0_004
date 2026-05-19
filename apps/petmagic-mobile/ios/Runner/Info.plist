@@ -14,7 +14,17 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>app.petmagic.petmagic-mobile.auth</string>
+			<string>com.petmagic.app.google</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.petmagic.app.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>petmagic</string>
@@ -29,6 +39,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>PetMagic</string>
+	<key>GIDClientID</key>
+	<string>288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b.apps.googleusercontent.com</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

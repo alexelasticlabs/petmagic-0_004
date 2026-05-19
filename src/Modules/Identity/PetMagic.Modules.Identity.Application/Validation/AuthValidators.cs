@@ -13,6 +13,9 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
             .NotEmpty()
             .MinimumLength(6)
             .WithMessage("Password must be at least 6 characters long.");
+        RuleFor(x => x.TermsOfUseAccepted)
+            .Equal(true)
+            .WithMessage("Terms of Use and Privacy Policy must be accepted.");
     }
 }
 
@@ -92,6 +95,14 @@ public sealed class ExternalLoginCallbackCommandValidator : AbstractValidator<Ex
     {
         RuleFor(x => x.Provider).NotEmpty();
         RuleFor(x => x.ProviderSubject).NotEmpty();
+    }
+}
+
+public sealed class GoogleNativeLoginCommandValidator : AbstractValidator<GoogleNativeLoginCommand>
+{
+    public GoogleNativeLoginCommandValidator()
+    {
+        RuleFor(x => x.IdToken).NotEmpty();
     }
 }
 

@@ -24,14 +24,6 @@ internal sealed class TemplatesService(
 
     private sealed record PublicFeedCursor(DateTime UpdatedAtUtc, Guid TemplateId);
 
-    private sealed record GenerationStatisticsProjection(
-        TemplateGenerationStatus Status,
-        int TokenCost,
-        decimal? MotionProviderCostUsd,
-        DateTime CreatedAtUtc,
-        DateTime? StartedAtUtc,
-        DateTime? CompletedAtUtc);
-
     private sealed record GenerationAnalyticsProjection(
         Guid GenerationId,
         Guid TemplateId,
@@ -219,66 +211,131 @@ internal sealed class TemplatesService(
             return Result.Failure<AdminTemplateStatisticsResponse>(TemplatesErrors.NotFound);
         }
 
-        var jobs = await dbContext.TemplateGenerationJobs
+        var summary = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.TemplateId == templateId)
-            .Select(x => new GenerationStatisticsProjection(
-                x.Status,
-                x.TokenCost,
-                x.MotionProviderCostUsd,
-                x.CreatedAtUtc,
-                x.StartedAtUtc,
-                x.CompletedAtUtc))
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalRuns = group.Count(),
+                QueuedRuns = group.Count(x => x.Status == TemplateGenerationStatus.Queued),
+                ProcessingRuns = group.Count(x => x.Status == TemplateGenerationStatus.Processing),
+                CompletedRuns = group.Count(x => x.Status == TemplateGenerationStatus.Completed),
+                FailedRuns = group.Count(x => x.Status == TemplateGenerationStatus.Failed),
+                TotalTokenCost = group.Sum(x => x.TokenCost),
+                ProviderCostSamples = group.Count(x => x.MotionProviderCostUsd.HasValue),
+                TotalProviderCostUsd = group.Sum(x => x.MotionProviderCostUsd ?? 0m),
+                LastRunAtUtc = group.Max(x => (DateTime?)x.CreatedAtUtc),
+                LastCompletedAtUtc = group.Where(x => x.Status == TemplateGenerationStatus.Completed)
+                    .Max(x => x.CompletedAtUtc)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var durationSamples = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId
+                && x.Status == TemplateGenerationStatus.Completed
+                && x.StartedAtUtc.HasValue
+                && x.CompletedAtUtc.HasValue)
+            .Select(x => (x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds)
             .ToArrayAsync(cancellationToken);
 
-        return Result.Success(MapAdminStatisticsResponse(templateId, jobs));
+        var validDurationSamples = durationSamples.Where(x => x >= 0).ToArray();
+        var totalRuns = summary?.TotalRuns ?? 0;
+        var completedRuns = summary?.CompletedRuns ?? 0;
+        var successRatePercent = totalRuns == 0
+            ? 0
+            : Math.Round((double)completedRuns * 100 / totalRuns, 1, MidpointRounding.AwayFromZero);
+        var averageTokenCost = totalRuns == 0
+            ? 0
+            : Math.Round((double)(summary?.TotalTokenCost ?? 0) / totalRuns, 1, MidpointRounding.AwayFromZero);
+        var averageProviderCostUsd = summary is null || summary.ProviderCostSamples == 0
+            ? 0m
+            : Math.Round(summary.TotalProviderCostUsd / summary.ProviderCostSamples, 4, MidpointRounding.AwayFromZero);
+        double? averageGenerationSeconds = validDurationSamples.Length == 0
+            ? null
+            : Math.Round(validDurationSamples.Average(), 1, MidpointRounding.AwayFromZero);
+
+        return Result.Success(new AdminTemplateStatisticsResponse(
+            templateId,
+            totalRuns,
+            summary?.QueuedRuns ?? 0,
+            summary?.ProcessingRuns ?? 0,
+            completedRuns,
+            summary?.FailedRuns ?? 0,
+            successRatePercent,
+            summary?.TotalTokenCost ?? 0,
+            averageTokenCost,
+            Math.Round(summary?.TotalProviderCostUsd ?? 0m, 4, MidpointRounding.AwayFromZero),
+            averageProviderCostUsd,
+            summary?.LastRunAtUtc,
+            summary?.LastCompletedAtUtc,
+            averageGenerationSeconds));
     }
 
     public async Task<Result<IReadOnlyList<AdminTemplateTrendPointResponse>>> GetAdminTrendAsync(Guid templateId, CancellationToken cancellationToken)
     {
-        var jobs = await GetAnalyticsProjectionsAsync(templateId, cancellationToken);
-        if (jobs is null)
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
         {
             return Result.Failure<IReadOnlyList<AdminTemplateTrendPointResponse>>(TemplatesErrors.NotFound);
         }
 
-        var trend = jobs
+        var trendRows = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId)
             .GroupBy(x => x.CreatedAtUtc.Date)
-            .OrderBy(x => x.Key)
-            .Select(group =>
+            .Select(group => new
             {
-                var entries = group.ToArray();
-                var totalRuns = entries.Length;
-                var queuedRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Queued);
-                var processingRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Processing);
-                var completedRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Completed);
-                var failedRuns = entries.Count(x => x.Status == TemplateGenerationStatus.Failed);
-                var totalTokenCost = entries.Sum(x => x.TokenCost);
-                var totalProviderCostUsd = entries.Sum(x => x.MotionProviderCostUsd ?? 0m);
-                var successRatePercent = totalRuns == 0
-                    ? 0
-                    : Math.Round((double)completedRuns * 100 / totalRuns, 1, MidpointRounding.AwayFromZero);
-                var durations = entries
-                    .Where(x => x.Status == TemplateGenerationStatus.Completed && x.StartedAtUtc.HasValue && x.CompletedAtUtc.HasValue)
-                    .Select(x => (x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds)
-                    .Where(x => x >= 0)
-                    .ToArray();
-                double? averageGenerationSeconds = durations.Length == 0
-                    ? null
-                    : Math.Round(durations.Average(), 1, MidpointRounding.AwayFromZero);
-
-                return new AdminTemplateTrendPointResponse(
-                    group.Key,
-                    totalRuns,
-                    queuedRuns,
-                    processingRuns,
-                    completedRuns,
-                    failedRuns,
-                    successRatePercent,
-                    totalTokenCost,
-                    Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
-                    averageGenerationSeconds);
+                Day = group.Key,
+                TotalRuns = group.Count(),
+                QueuedRuns = group.Count(x => x.Status == TemplateGenerationStatus.Queued),
+                ProcessingRuns = group.Count(x => x.Status == TemplateGenerationStatus.Processing),
+                CompletedRuns = group.Count(x => x.Status == TemplateGenerationStatus.Completed),
+                FailedRuns = group.Count(x => x.Status == TemplateGenerationStatus.Failed),
+                TotalTokenCost = group.Sum(x => x.TokenCost),
+                TotalProviderCostUsd = group.Sum(x => x.MotionProviderCostUsd ?? 0m)
             })
+            .ToArrayAsync(cancellationToken);
+
+        var durationSamples = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId
+                && x.Status == TemplateGenerationStatus.Completed
+                && x.StartedAtUtc.HasValue
+                && x.CompletedAtUtc.HasValue)
+            .Select(x => new
+            {
+                Day = x.CreatedAtUtc.Date,
+                DurationSeconds = (x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds
+            })
+            .ToArrayAsync(cancellationToken);
+
+        var averageDurationByDay = durationSamples
+            .Where(x => x.DurationSeconds >= 0)
+            .GroupBy(x => x.Day)
+            .ToDictionary(
+                group => group.Key,
+                group => (double?)Math.Round(group.Average(x => x.DurationSeconds), 1, MidpointRounding.AwayFromZero));
+
+        var trend = trendRows
+            .OrderBy(x => x.Day)
+            .Select(row => new AdminTemplateTrendPointResponse(
+                row.Day,
+                row.TotalRuns,
+                row.QueuedRuns,
+                row.ProcessingRuns,
+                row.CompletedRuns,
+                row.FailedRuns,
+                row.TotalRuns == 0
+                    ? 0
+                    : Math.Round((double)row.CompletedRuns * 100 / row.TotalRuns, 1, MidpointRounding.AwayFromZero),
+                row.TotalTokenCost,
+                Math.Round(row.TotalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
+                averageDurationByDay.GetValueOrDefault(row.Day)))
             .ToArray();
 
         return Result.Success<IReadOnlyList<AdminTemplateTrendPointResponse>>(trend);
@@ -286,17 +343,22 @@ internal sealed class TemplatesService(
 
     public async Task<Result<IReadOnlyList<AdminTemplateRecentGenerationResponse>>> GetAdminRecentGenerationsAsync(Guid templateId, int take, CancellationToken cancellationToken)
     {
-        var jobs = await GetAnalyticsProjectionsAsync(templateId, cancellationToken);
-        if (jobs is null)
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
         {
             return Result.Failure<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(TemplatesErrors.NotFound);
         }
 
-        var recent = jobs
+        var recent = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Take(take)
             .Select(x => new AdminTemplateRecentGenerationResponse(
-                x.GenerationId,
+                    x.Id,
                 x.UserId,
                 x.Status.ToString(),
                 x.TokenCost,
@@ -310,7 +372,7 @@ internal sealed class TemplatesService(
                 x.CreatedAtUtc,
                 x.StartedAtUtc,
                 x.CompletedAtUtc))
-            .ToArray();
+            .ToArrayAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(recent);
     }
@@ -338,21 +400,33 @@ internal sealed class TemplatesService(
 
     public async Task<Result<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>> GetAdminFailureBreakdownAsync(Guid templateId, CancellationToken cancellationToken)
     {
-        var jobs = await GetAnalyticsProjectionsAsync(templateId, cancellationToken);
-        if (jobs is null)
+        var templateExists = await dbContext.TemplateItems
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == templateId, cancellationToken);
+
+        if (!templateExists)
         {
             return Result.Failure<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>(TemplatesErrors.NotFound);
         }
 
-        var failures = jobs
-            .Where(x => x.Status == TemplateGenerationStatus.Failed)
-            .GroupBy(x => string.IsNullOrWhiteSpace(x.FailureCode) ? "templates.unknown_failure" : x.FailureCode!)
-            .OrderByDescending(x => x.Count())
-            .ThenBy(x => x.Key)
+        var failureRows = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.TemplateId == templateId && x.Status == TemplateGenerationStatus.Failed)
+            .Select(x => new
+            {
+                x.FailureCode,
+                LastOccurredAtUtc = x.CompletedAtUtc ?? x.StartedAtUtc ?? x.CreatedAtUtc
+            })
+            .ToArrayAsync(cancellationToken);
+
+        var failures = failureRows
+            .GroupBy(x => string.IsNullOrWhiteSpace(x.FailureCode) ? "templates.unknown_failure" : x.FailureCode)
             .Select(group => new AdminTemplateFailureBreakdownItemResponse(
                 group.Key,
                 group.Count(),
-                group.Max(x => x.CompletedAtUtc ?? x.StartedAtUtc ?? x.CreatedAtUtc)))
+                group.Max(x => x.LastOccurredAtUtc)))
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.FailureCode)
             .ToArray();
 
         return Result.Success<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>(failures);
@@ -369,22 +443,75 @@ internal sealed class TemplatesService(
             return Result.Failure<AdminTemplateEventAnalyticsResponse>(TemplatesErrors.NotFound);
         }
 
-        var events = await dbContext.TemplateAnalyticsEvents
+        var eventsQuery = dbContext.TemplateAnalyticsEvents
             .AsNoTracking()
-            .Where(x => x.TemplateId == templateId)
-            .ToArrayAsync(cancellationToken);
+            .Where(x => x.TemplateId == templateId);
 
-        var viewEvents = events.Where(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.View)).ToArray();
-        var videoViewEvents = events.Where(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.VideoView)).ToArray();
-        var complaintEvents = events.Where(x => IsAnalyticsEventType(x, TemplateAnalyticsEventTypes.Complaint)).ToArray();
+        var totals = await eventsQuery
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalViews = group.Count(x => x.EventType == TemplateAnalyticsEventTypes.View),
+                TotalVideoViews = group.Count(x => x.EventType == TemplateAnalyticsEventTypes.VideoView),
+                TotalComplaints = group.Count(x => x.EventType == TemplateAnalyticsEventTypes.Complaint)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var totalViews = totals?.TotalViews ?? 0;
+        var viewEventsQuery = eventsQuery.Where(x => x.EventType == TemplateAnalyticsEventTypes.View);
+
+        var sourceCounts = totalViews == 0
+            ? []
+            : await viewEventsQuery
+                .GroupBy(x => x.Source == null || x.Source == string.Empty ? "direct" : x.Source.Trim().ToLower())
+                .Select(group => new { group.Key, Count = group.Count() })
+                .ToArrayAsync(cancellationToken);
+
+        var deviceCounts = totalViews == 0
+            ? []
+            : await viewEventsQuery
+                .GroupBy(x => x.DeviceClass == null || x.DeviceClass == string.Empty ? "unknown" : x.DeviceClass.Trim().ToLower())
+                .Select(group => new { group.Key, Count = group.Count() })
+                .ToArrayAsync(cancellationToken);
+
+        var geographyCounts = totalViews == 0
+            ? []
+            : await viewEventsQuery
+                .GroupBy(x => x.CountryCode == null || x.CountryCode == string.Empty ? "unknown" : x.CountryCode.Trim().ToLower())
+                .Select(group => new { group.Key, Count = group.Count() })
+                .ToArrayAsync(cancellationToken);
 
         var response = new AdminTemplateEventAnalyticsResponse(
-            viewEvents.Length,
-            videoViewEvents.Length,
-            complaintEvents.Length,
-            BuildDimension(viewEvents, x => x.Source, "direct"),
-            BuildDimension(viewEvents, x => x.DeviceClass, "unknown"),
-            BuildDimension(viewEvents, x => x.CountryCode, "unknown"));
+            totalViews,
+            totals?.TotalVideoViews ?? 0,
+            totals?.TotalComplaints ?? 0,
+            sourceCounts
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Key)
+                .Select(x => new AdminTemplateAnalyticsDimensionResponse(
+                    x.Key,
+                    FormatDimensionLabel(x.Key),
+                    x.Count,
+                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))
+                .ToArray(),
+            deviceCounts
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Key)
+                .Select(x => new AdminTemplateAnalyticsDimensionResponse(
+                    x.Key,
+                    FormatDimensionLabel(x.Key),
+                    x.Count,
+                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))
+                .ToArray(),
+            geographyCounts
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Key)
+                .Select(x => new AdminTemplateAnalyticsDimensionResponse(
+                    x.Key,
+                    FormatDimensionLabel(x.Key),
+                    x.Count,
+                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))
+                .ToArray());
 
         return Result.Success(response);
     }
@@ -1345,60 +1472,6 @@ internal sealed class TemplatesService(
         }
 
         await mediaLifecycleService.SaveChangesAsync(cancellationToken);
-    }
-
-    private static AdminTemplateStatisticsResponse MapAdminStatisticsResponse(Guid templateId, IReadOnlyCollection<GenerationStatisticsProjection> jobs)
-    {
-        var totalRuns = jobs.Count;
-        var queuedRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Queued);
-        var processingRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Processing);
-        var completedRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Completed);
-        var failedRuns = jobs.Count(x => x.Status == TemplateGenerationStatus.Failed);
-        var totalTokenCost = jobs.Sum(x => x.TokenCost);
-        var averageTokenCost = totalRuns == 0
-            ? 0
-            : Math.Round(jobs.Average(x => x.TokenCost), 1, MidpointRounding.AwayFromZero);
-        var totalProviderCostUsd = jobs.Sum(x => x.MotionProviderCostUsd ?? 0m);
-        var providerCostSamples = jobs
-            .Where(x => x.MotionProviderCostUsd.HasValue)
-            .Select(x => x.MotionProviderCostUsd!.Value)
-            .ToArray();
-        var averageProviderCostUsd = providerCostSamples.Length == 0
-            ? 0m
-            : Math.Round(providerCostSamples.Average(), 4, MidpointRounding.AwayFromZero);
-        var successRatePercent = totalRuns == 0
-            ? 0
-            : Math.Round((double)completedRuns * 100 / totalRuns, 1, MidpointRounding.AwayFromZero);
-        DateTime? lastRunAtUtc = totalRuns == 0 ? null : jobs.Max(x => x.CreatedAtUtc);
-        var completedAtValues = jobs
-            .Where(x => x.CompletedAtUtc.HasValue && x.Status == TemplateGenerationStatus.Completed)
-            .Select(x => x.CompletedAtUtc!.Value)
-            .ToArray();
-        DateTime? lastCompletedAtUtc = completedAtValues.Length == 0 ? null : completedAtValues.Max();
-        var completedDurations = jobs
-            .Where(x => x.Status == TemplateGenerationStatus.Completed && x.StartedAtUtc.HasValue && x.CompletedAtUtc.HasValue)
-            .Select(x => (x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds)
-            .Where(x => x >= 0)
-            .ToArray();
-        double? averageGenerationSeconds = completedDurations.Length == 0
-            ? null
-            : Math.Round(completedDurations.Average(), 1, MidpointRounding.AwayFromZero);
-
-        return new AdminTemplateStatisticsResponse(
-            templateId,
-            totalRuns,
-            queuedRuns,
-            processingRuns,
-            completedRuns,
-            failedRuns,
-            successRatePercent,
-            totalTokenCost,
-            averageTokenCost,
-            Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
-            averageProviderCostUsd,
-            lastRunAtUtc,
-            lastCompletedAtUtc,
-            averageGenerationSeconds);
     }
 
     private static AdminTemplatesAnalyticsTemplateRowResponse BuildTemplatesAnalyticsRow(

@@ -703,6 +703,36 @@ abstract class AppLocalizations {
   /// **'or continue with'**
   String get authOrContinueWith;
 
+  /// No description provided for @authAcceptTermsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree to the Terms of Use and Privacy Policy'**
+  String get authAcceptTermsLabel;
+
+  /// No description provided for @authReceiveUpdatesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to receive updates and offers from PetMagic'**
+  String get authReceiveUpdatesLabel;
+
+  /// No description provided for @authAcceptTermsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'You need to accept the Terms of Use and Privacy Policy to create an account.'**
+  String get authAcceptTermsRequired;
+
+  /// No description provided for @authGoogleShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Google'**
+  String get authGoogleShortLabel;
+
+  /// No description provided for @authAppleShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple'**
+  String get authAppleShortLabel;
+
   /// No description provided for @authContinueWithGoogle.
   ///
   /// In en, this message translates to:

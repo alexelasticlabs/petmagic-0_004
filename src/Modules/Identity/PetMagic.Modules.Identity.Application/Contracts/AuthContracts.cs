@@ -1,6 +1,11 @@
 namespace PetMagic.Modules.Identity.Application.Contracts;
 
-public sealed record RegisterUserCommand(string Email, string Password, string? DisplayName);
+public sealed record RegisterUserCommand(
+    string Email,
+    string Password,
+    string? DisplayName,
+    bool TermsOfUseAccepted,
+    bool MarketingEmailsEnabled);
 
 public sealed record LoginCommand(string Email, string Password);
 
@@ -22,6 +27,8 @@ public sealed record ExternalLoginCallbackCommand(
     string? Email,
     string? DisplayName);
 
+public sealed record GoogleNativeLoginCommand(string IdToken);
+
 public sealed record TokenPairResponse(
     string AccessToken,
     string RefreshToken,
@@ -41,6 +48,8 @@ public sealed record UserProfileResponse(
     string? DisplayName,
     bool IsPremium,
     bool EmailConfirmed,
+    bool TermsOfUseAccepted,
+    bool MarketingEmailsEnabled,
     IReadOnlyList<string> Roles,
     UserAvatarResponse? Avatar);
 
@@ -51,6 +60,8 @@ public sealed record UserListItemResponse(
     bool IsPremium,
     bool IsActive,
     bool EmailConfirmed,
+    bool TermsOfUseAccepted,
+    bool MarketingEmailsEnabled,
     IReadOnlyList<string> Roles,
     DateTime CreatedAtUtc,
     UserAvatarResponse? Avatar);

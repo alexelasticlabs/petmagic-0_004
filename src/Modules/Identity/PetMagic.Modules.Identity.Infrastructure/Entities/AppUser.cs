@@ -6,6 +6,14 @@ public sealed class AppUser : IdentityUser<Guid>
 {
     public string? DisplayName { get; set; }
 
+    public bool TermsOfUseAccepted { get; set; }
+
+    public DateTime? TermsOfUseAcceptedAtUtc { get; set; }
+
+    public bool MarketingEmailsEnabled { get; set; }
+
+    public DateTime? MarketingEmailsUpdatedAtUtc { get; set; }
+
     public string? AvatarUrl { get; set; }
 
     public string? AvatarFileName { get; set; }

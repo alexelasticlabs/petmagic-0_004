@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -41,6 +42,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   static const _timedOutCode = 'auth.external_timed_out';
   static const _invalidSessionCode = 'auth.external_ticket_invalid';
   static const _genericFailedCode = 'auth.external_invalid';
+  static const _cancelledCode = 'auth.external_cancelled';
 
   MobileExternalAuthRepository({
     required Dio dio,
@@ -62,6 +64,92 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
+    if (provider == ExternalAuthProvider.google) {
+      try {
+        return await _authenticateWithNativeGoogle();
+      } on AppException catch (error) {
+        if (error.message == _cancelledCode) {
+          rethrow;
+        }
+
+        return _authenticateWithBrowserFlow(provider);
+      } catch (_) {
+        return _authenticateWithBrowserFlow(provider);
+      }
+    }
+
+    return _authenticateWithBrowserFlow(provider);
+  }
+
+  Future<AuthSession> _authenticateWithNativeGoogle() async {
+    GoogleSignIn? googleSignIn;
+
+    try {
+      final configResponse = await _dio.get<Map<String, dynamic>>(
+        '/api/auth/external/google/mobile-config',
+      );
+      final serverClientId =
+          configResponse.data?['serverClientId'] as String? ??
+          configResponse.data?['ServerClientId'] as String?;
+      if (serverClientId == null || serverClientId.isEmpty) {
+        throw const AppException(_genericFailedCode);
+      }
+
+      googleSignIn = GoogleSignIn(
+        scopes: const ['email'],
+        serverClientId: serverClientId,
+      );
+
+      final account = await googleSignIn.signIn();
+      if (account == null) {
+        throw const AppException(_cancelledCode);
+      }
+
+      final authentication = await account.authentication;
+      final idToken = authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw const AppException(_genericFailedCode);
+      }
+
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/auth/external/google/native',
+        data: {'idToken': idToken},
+      );
+
+      final session = AuthSession.fromJson(response.data ?? const {});
+      await _sessionStorage.save(session);
+      return session;
+    } on AppException {
+      await _resetGoogleSession(googleSignIn);
+      rethrow;
+    } on DioException catch (error) {
+      await _resetGoogleSession(googleSignIn);
+      throw _mapDioException(error, fallbackMessage: _genericFailedCode);
+    } catch (_) {
+      await _resetGoogleSession(googleSignIn);
+      throw const AppException(_genericFailedCode);
+    }
+  }
+
+  Future<void> _resetGoogleSession(GoogleSignIn? googleSignIn) async {
+    if (googleSignIn == null) {
+      return;
+    }
+
+    try {
+      await googleSignIn.disconnect();
+    } catch (_) {
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {
+        // Best-effort cleanup only.
+      }
+    }
+  }
+
+  Future<AuthSession> _authenticateWithBrowserFlow(
+    ExternalAuthProvider provider,
+  ) async {
     final completer = Completer<Uri>();
     late final StreamSubscription<Uri> subscription;
 
@@ -84,10 +172,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         queryParameters: {'redirectUri': _callbackUri.toString()},
       );
 
-      final launched = await launchUrl(
-        authUri,
-        mode: LaunchMode.externalApplication,
-      );
+      final launched = await _launchAuthUri(authUri);
       if (!launched) {
         throw const AppException(_launchFailedCode);
       }
@@ -116,10 +201,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       await _sessionStorage.save(session);
       return session;
     } on DioException catch (error) {
-      throw _mapDioException(
-        error,
-        fallbackMessage: _genericFailedCode,
-      );
+      throw _mapDioException(error, fallbackMessage: _genericFailedCode);
     } finally {
       await subscription.cancel();
     }
@@ -129,6 +211,18 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     return uri.scheme == _callbackUri.scheme &&
         uri.host == _callbackUri.host &&
         uri.path == _callbackUri.path;
+  }
+
+  Future<bool> _launchAuthUri(Uri authUri) async {
+    final launchedInApp = await launchUrl(
+      authUri,
+      mode: LaunchMode.inAppBrowserView,
+    );
+    if (launchedInApp) {
+      return true;
+    }
+
+    return launchUrl(authUri, mode: LaunchMode.externalApplication);
   }
 
   AppException _mapDioException(

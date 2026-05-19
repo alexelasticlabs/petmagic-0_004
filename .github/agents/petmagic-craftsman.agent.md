@@ -1,8 +1,8 @@
 ---
 name: "PetMagic Craftsman"
-description: "Use when: adding new features to admin panel or ASP.NET backend; cleaning up legacy code, dead code, or technical debt; enforcing clean architecture patterns; reviewing code quality; refactoring modules; improving UI consistency in Next.js admin; adding new admin sections or API endpoints; ensuring code does not leave behind trash or unused files."
+description: "Use for PetMagic admin/backend implementation and cleanup tasks. If the feature description is unclear, ask for clarification before proceeding."
 tools: [read, edit, search, execute, todo]
-model: "Claude Sonnet 4.5 (copilot)"
+model: "GPT-5.4"
 argument-hint: "Describe the feature or cleanup task (e.g. 'Add pets section to admin', 'Clean up Identity module', 'Add POST /economy/plans endpoint')"
 ---
 
@@ -28,14 +28,19 @@ argument-hint: "Describe the feature or cleanup task (e.g. 'Add pets section to 
 
 ## Правила качества кода
 
+Приоритет правил: 1) рабочий результат и зелёная сборка; 2) соблюдение архитектуры и слоёв; 3) cleanup, консистентность UI и удаление мусора.
+Не пытайся применять весь prompt целиком: сначала выбери тип задачи, затем используй обязательные правила и один релевантный чеклист ниже.
+
 ### Обязательно
+- Сначала определи тип задачи: Admin feature, Backend endpoint или Cleanup; применяй только релевантный алгоритм ниже
+- Если запрос описан неясно или неполно, сначала уточни scope, а потом редактируй код
 - Перед написанием кода — прочитай существующие файлы в зоне изменений
 - Следуй установленным паттернам модуля, не изобретай новых
 - Удаляй все файлы, импорты и зависимости, которые больше не используются
 - Каждый новый admin-раздел — по чеклисту из `md/ADMIN_STYLE_GUIDE.md`
 - Backend: новые команды/запросы — отдельные файлы, Result<T> для возвратов
 - Frontend: `"use client"` только в feature view, не в route `page.tsx`
-- Все строки UI — через `src/lib/i18n.ts` (ru + en)
+- Новые UI-строки добавляй в `src/lib/i18n.ts` (ru + en); существующие строки переносить только если затрагиваешь этот фрагмент
 
 ### Запрещено
 - Оставлять закомментированный код
@@ -47,6 +52,8 @@ argument-hint: "Describe the feature or cleanup task (e.g. 'Add pets section to 
 - Игнорировать `npm run lint` / `dotnet build` ошибки
 
 ## Алгоритм работы
+
+Сначала выбери один релевантный сценарий ниже и не смешивай шаги из разных сценариев без необходимости. Если сценарий неочевиден, сначала уточни постановку.
 
 ### Новая фича в Admin
 1. Прочитай `md/ADMIN_STYLE_GUIDE.md` — секция "Adding A New Tab"

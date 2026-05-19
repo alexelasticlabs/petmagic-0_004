@@ -324,6 +324,24 @@ class AppLocalizationsIt extends AppLocalizations {
   String get authOrContinueWith => 'or continue with';
 
   @override
+  String get authAcceptTermsLabel =>
+      'I agree to the Terms of Use and Privacy Policy';
+
+  @override
+  String get authReceiveUpdatesLabel =>
+      'I want to receive updates and offers from PetMagic';
+
+  @override
+  String get authAcceptTermsRequired =>
+      'You need to accept the Terms of Use and Privacy Policy to create an account.';
+
+  @override
+  String get authGoogleShortLabel => 'Google';
+
+  @override
+  String get authAppleShortLabel => 'Apple';
+
+  @override
   String get authContinueWithGoogle => 'Continue with Google';
 
   @override

@@ -50,6 +50,8 @@ public sealed class ExternalLoginCompletionStoreTests
                 "Pet Parent",
                 false,
                 true,
+                true,
+                false,
                 ["user"],
                 null));
     }

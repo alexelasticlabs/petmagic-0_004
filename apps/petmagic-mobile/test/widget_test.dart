@@ -7,10 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -34,6 +36,7 @@ void main() {
 
     expect(find.text('Welcome back to PetMagic'), findsOneWidget);
     expect(find.text('Continue as guest'), findsOneWidget);
+    expect(find.text('View onboarding'), findsNothing);
   });
 
   testWidgets('guest can open auth and registration pages', (tester) async {
@@ -44,7 +47,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome back!'), findsOneWidget);
-    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Google'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Apple'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.widgetWithText(TextButton, 'Sign Up'),
@@ -59,6 +63,54 @@ void main() {
 
     expect(find.text('Create your account'), findsOneWidget);
     expect(find.text('Display name (optional)'), findsOneWidget);
+    expect(
+      find.text('I agree to the Terms of Use and Privacy Policy'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('I want to receive updates and offers from PetMagic'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(OutlinedButton, 'Google'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Apple'), findsOneWidget);
+  });
+
+  testWidgets('registration requires accepting terms', (tester) async {
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      profileRepository: _FakeProfileRepository(),
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextButton, 'Sign Up'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
+    await tester.enterText(find.byType(TextField).at(2), 'Password123');
+    await tester.enterText(find.byType(TextField).at(3), 'Password123');
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, 'Sign Up'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'You need to accept the Terms of Use and Privacy Policy to create an account.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('guest can open password reset and request a code', (
@@ -144,6 +196,10 @@ void main() {
     await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
     await tester.enterText(find.byType(TextField).at(2), 'Password123');
     await tester.enterText(find.byType(TextField).at(3), 'Password123');
+    await tester.tap(
+      find.text('I agree to the Terms of Use and Privacy Policy'),
+    );
+    await tester.pump();
 
     await tester.scrollUntilVisible(
       find.widgetWithText(FilledButton, 'Sign Up'),
@@ -156,6 +212,58 @@ void main() {
 
     expect(find.text('Create Magic'), findsOneWidget);
     expect(find.text('Magic Studio'), findsOneWidget);
+  });
+
+  testWidgets('registration forwards consent and marketing flags', (
+    tester,
+  ) async {
+    final profileRepository = _FakeProfileRepository();
+
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
+      profileRepository: profileRepository,
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextButton, 'Sign Up'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
+    await tester.enterText(find.byType(TextField).at(2), 'pet123');
+    await tester.enterText(find.byType(TextField).at(3), 'pet123');
+    await tester.tap(
+      find.text('I agree to the Terms of Use and Privacy Policy'),
+    );
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.text('I want to receive updates and offers from PetMagic'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(
+      find.text('I want to receive updates and offers from PetMagic'),
+    );
+    await tester.pump();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, 'Sign Up'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+
+    expect(profileRepository.lastTermsOfUseAccepted, isTrue);
+    expect(profileRepository.lastMarketingEmailsEnabled, isTrue);
   });
 
   testWidgets('shows validation error when passwords do not match', (
@@ -181,6 +289,10 @@ void main() {
     await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
     await tester.enterText(find.byType(TextField).at(2), 'Password123');
     await tester.enterText(find.byType(TextField).at(3), 'Password321');
+    await tester.tap(
+      find.text('I agree to the Terms of Use and Privacy Policy'),
+    );
+    await tester.pump();
 
     await tester.scrollUntilVisible(
       find.widgetWithText(FilledButton, 'Sign Up'),
@@ -205,16 +317,7 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.widgetWithText(OutlinedButton, 'Continue with Google'),
-      120,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pump();
-
-    await tester.tap(
-      find.widgetWithText(OutlinedButton, 'Continue with Google'),
-    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Google'));
     await tester.pump();
     await tester.pumpAndSettle();
 
@@ -236,18 +339,53 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.widgetWithText(OutlinedButton, 'Continue with Google'),
-      120,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(
-      find.widgetWithText(OutlinedButton, 'Continue with Google'),
-    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Google'));
     await tester.pumpAndSettle();
 
     expect(find.text('Sign-in was cancelled.'), findsOneWidget);
   });
+
+  test(
+    'failed external sign-in does not block retrying regular auth',
+    () async {
+      SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
+
+      final container = ProviderContainer(
+        overrides: [
+          profileRepositoryProvider.overrideWith(
+            (ref) => _FakeProfileRepository(),
+          ),
+          externalAuthRepositoryProvider.overrideWith(
+            (ref) => _ThrowingExternalAuthRepository(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(appLaunchControllerProvider);
+      final controller = container.read(profileControllerProvider.notifier);
+
+      await controller.initialize();
+      await controller.authenticateWithProvider(ExternalAuthProvider.google);
+
+      final failedState = container.read(profileControllerProvider);
+      expect(failedState.isSaving, isFalse);
+      expect(failedState.isAuthenticated, isFalse);
+      expect(failedState.errorMessage, 'auth.external_invalid');
+
+      controller.updateEmail('pet@example.com');
+      controller.updatePassword('Password123');
+      await controller.login();
+
+      final signedInState = container.read(profileControllerProvider);
+      expect(signedInState.isSaving, isFalse);
+      expect(signedInState.isAuthenticated, isTrue);
+      expect(
+        container.read(appLaunchControllerProvider).isAuthenticated,
+        isTrue,
+      );
+    },
+  );
 
   testWidgets('opens templates directly for authenticated user', (
     tester,
@@ -286,6 +424,24 @@ void main() {
     await tester.pump();
 
     expect(find.text('Try template'), findsOneWidget);
+  });
+
+  testWidgets('profile tab sends guest to auth flow', (tester) async {
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
+    );
+
+    await tester.tap(find.text('Continue as guest'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Profile'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome back!'), findsOneWidget);
+    expect(find.text('Sign in to continue'), findsNothing);
   });
 }
 
@@ -338,6 +494,8 @@ String _buildSessionJson() {
         displayName: 'Pet Parent',
         isPremium: false,
         emailConfirmed: true,
+        termsOfUseAccepted: true,
+        marketingEmailsEnabled: false,
         roles: ['user'],
         avatar: null,
       ),
@@ -383,6 +541,8 @@ class _FakeProfileRepository extends ProfileRepository {
   AuthSession? storedSession;
   String? passwordResetRequestedFor;
   String? passwordResetConfirmedFor;
+  bool? lastTermsOfUseAccepted;
+  bool? lastMarketingEmailsEnabled;
 
   MobileUserProfile get _profile => const MobileUserProfile(
     userId: 'user-1',
@@ -390,6 +550,8 @@ class _FakeProfileRepository extends ProfileRepository {
     displayName: 'Pet Parent',
     isPremium: false,
     emailConfirmed: true,
+    termsOfUseAccepted: true,
+    marketingEmailsEnabled: false,
     roles: ['user'],
     avatar: null,
   );
@@ -412,6 +574,8 @@ class _FakeProfileRepository extends ProfileRepository {
         displayName: _profile.displayName,
         isPremium: _profile.isPremium,
         emailConfirmed: _profile.emailConfirmed,
+        termsOfUseAccepted: _profile.termsOfUseAccepted,
+        marketingEmailsEnabled: _profile.marketingEmailsEnabled,
         roles: _profile.roles,
         avatar: _profile.avatar,
       ),
@@ -424,8 +588,13 @@ class _FakeProfileRepository extends ProfileRepository {
   Future<AuthSession> register({
     required String email,
     required String password,
+    required bool termsOfUseAccepted,
+    required bool marketingEmailsEnabled,
     String? displayName,
   }) async {
+    lastTermsOfUseAccepted = termsOfUseAccepted;
+    lastMarketingEmailsEnabled = marketingEmailsEnabled;
+
     final session = AuthSession(
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
@@ -438,6 +607,8 @@ class _FakeProfileRepository extends ProfileRepository {
             : displayName,
         isPremium: _profile.isPremium,
         emailConfirmed: _profile.emailConfirmed,
+        termsOfUseAccepted: termsOfUseAccepted,
+        marketingEmailsEnabled: marketingEmailsEnabled,
         roles: _profile.roles,
         avatar: _profile.avatar,
       ),
@@ -459,6 +630,8 @@ class _FakeProfileRepository extends ProfileRepository {
       displayName: session.user.displayName,
       isPremium: _profile.isPremium,
       emailConfirmed: _profile.emailConfirmed,
+      termsOfUseAccepted: session.user.termsOfUseAccepted,
+      marketingEmailsEnabled: session.user.marketingEmailsEnabled,
       roles: _profile.roles,
       avatar: _profile.avatar,
     );
@@ -501,6 +674,8 @@ class _FakeExternalAuthRepository implements ExternalAuthRepository {
             : 'Apple Pet Parent',
         isPremium: false,
         emailConfirmed: true,
+        termsOfUseAccepted: true,
+        marketingEmailsEnabled: false,
         roles: const ['user'],
         avatar: null,
       ),
@@ -516,5 +691,12 @@ class _FailingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     throw error;
+  }
+}
+
+class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
+  @override
+  Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
+    throw Exception('google sign-in failed unexpectedly');
   }
 }

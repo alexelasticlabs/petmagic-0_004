@@ -7,7 +7,6 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
@@ -41,10 +40,7 @@ class GuestWelcomePage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    BrandHeader(
-                      actionLabel: text.startupWelcomeViewOnboarding,
-                      onAction: () => context.go(OnboardingPage.routePath),
-                    ),
+                    const BrandHeader(),
                     const Spacer(),
                     Text(
                       text.startupWelcomeTitle,

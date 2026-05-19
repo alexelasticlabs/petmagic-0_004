@@ -33,12 +33,26 @@ type UseAdminTemplateAnalyticsOverviewOptions = {
 };
 
 export function useAdminTemplateAnalyticsOverview({ enabled = true, previewTake, templateId }: UseAdminTemplateAnalyticsOverviewOptions) {
-  const overviewQuery = useQuery<AdminTemplateAnalyticsOverview>({
-    queryKey: adminQueryKeys.templateAnalyticsOverview(templateId),
+  const primaryQuery = useQuery<Pick<AdminTemplateAnalyticsOverview, "statistics" | "template">>({
+    queryKey: adminQueryKeys.templateAnalyticsPrimary(templateId),
     queryFn: async () => {
-      const [template, statistics, trendPoints, recentRunsPreview, failureBreakdown, eventAnalytics] = await Promise.all([
+      const [template, statistics] = await Promise.all([
         fetchAdminTemplate(templateId),
         fetchAdminTemplateStatistics(templateId),
+      ]);
+
+      return {
+        statistics,
+        template,
+      };
+    },
+    enabled,
+  });
+
+  const secondaryQuery = useQuery<Pick<AdminTemplateAnalyticsOverview, "eventAnalytics" | "failureBreakdown" | "recentRunsPreview" | "trendPoints">>({
+    queryKey: adminQueryKeys.templateAnalyticsSecondary(templateId, previewTake),
+    queryFn: async () => {
+      const [trendPoints, recentRunsPreview, failureBreakdown, eventAnalytics] = await Promise.all([
         fetchAdminTemplateTrends(templateId),
         fetchAdminTemplateRecentGenerations(templateId, previewTake),
         fetchAdminTemplateFailureBreakdown(templateId),
@@ -49,23 +63,25 @@ export function useAdminTemplateAnalyticsOverview({ enabled = true, previewTake,
         eventAnalytics,
         failureBreakdown,
         recentRunsPreview,
-        statistics,
-        template,
         trendPoints,
       };
     },
-    enabled,
+    enabled: enabled && primaryQuery.isSuccess,
   });
 
   return {
-    eventAnalytics: overviewQuery.data?.eventAnalytics ?? null,
-    failureBreakdown: overviewQuery.data?.failureBreakdown ?? [],
-    hasError: overviewQuery.isError,
-    isLoading: overviewQuery.isLoading,
-    recentRunsPreview: overviewQuery.data?.recentRunsPreview ?? [],
-    refresh: overviewQuery.refetch,
-    statistics: overviewQuery.data?.statistics ?? null,
-    template: overviewQuery.data?.template ?? null,
-    trendPoints: overviewQuery.data?.trendPoints ?? [],
+    eventAnalytics: secondaryQuery.data?.eventAnalytics ?? null,
+    failureBreakdown: secondaryQuery.data?.failureBreakdown ?? [],
+    hasError: primaryQuery.isError,
+    hasSecondaryError: secondaryQuery.isError,
+    isLoading: primaryQuery.isLoading,
+    isSecondaryLoading: primaryQuery.isSuccess && secondaryQuery.isLoading,
+    recentRunsPreview: secondaryQuery.data?.recentRunsPreview ?? [],
+    refresh: async () => {
+      await Promise.all([primaryQuery.refetch(), secondaryQuery.refetch()]);
+    },
+    statistics: primaryQuery.data?.statistics ?? null,
+    template: primaryQuery.data?.template ?? null,
+    trendPoints: secondaryQuery.data?.trendPoints ?? [],
   };
 }

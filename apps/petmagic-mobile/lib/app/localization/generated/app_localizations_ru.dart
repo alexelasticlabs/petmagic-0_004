@@ -325,6 +325,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authOrContinueWith => 'или продолжить через';
 
   @override
+  String get authAcceptTermsLabel =>
+      'Я принимаю Условия использования и Политику конфиденциальности';
+
+  @override
+  String get authReceiveUpdatesLabel =>
+      'Я хочу получать новости и предложения от PetMagic';
+
+  @override
+  String get authAcceptTermsRequired =>
+      'Чтобы создать аккаунт, нужно принять Условия использования и Политику конфиденциальности.';
+
+  @override
+  String get authGoogleShortLabel => 'Google';
+
+  @override
+  String get authAppleShortLabel => 'Apple';
+
+  @override
   String get authContinueWithGoogle => 'Продолжить с Google';
 
   @override

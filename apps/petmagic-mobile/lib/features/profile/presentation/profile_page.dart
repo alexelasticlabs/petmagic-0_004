@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -14,9 +16,6 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
@@ -26,30 +25,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final state = ref.watch(profileControllerProvider);
     final controller = ref.read(profileControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
-    if (_emailController.text != state.email) {
-      _emailController.value = _emailController.value.copyWith(
-        text: state.email,
-        selection: TextSelection.collapsed(offset: state.email.length),
-      );
-    }
+    if (!state.isLoading && !state.isAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go(AuthEntryPage.routePath);
+        }
+      });
 
-    if (_passwordController.text != state.password) {
-      _passwordController.value = _passwordController.value.copyWith(
-        text: state.password,
-        selection: TextSelection.collapsed(offset: state.password.length),
+      return const SizedBox.expand(
+        child: Center(child: CircularProgressIndicator.adaptive()),
       );
     }
 
@@ -102,60 +92,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       ),
                     ],
                     const SizedBox(height: 24),
-                    if (!state.isAuthenticated) ...[
-                      _GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              text.profileSignInTitle,
-                              style: TextStyle(
-                                color: colors.textStrong,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              text.profileSignInHint,
-                              style: TextStyle(
-                                color: colors.textMuted,
-                                height: 1.35,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              onChanged: controller.updateEmail,
-                              decoration: InputDecoration(
-                                labelText: text.profileEmailLabel,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _passwordController,
-                              obscureText: true,
-                              onChanged: controller.updatePassword,
-                              decoration: InputDecoration(
-                                labelText: text.profilePasswordLabel,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            FilledButton(
-                              onPressed: state.isSaving
-                                  ? null
-                                  : controller.login,
-                              child: Text(
-                                state.isSaving
-                                    ? text.profileLoadingAction
-                                    : text.profileSignInAction,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ] else if (state.profile != null) ...[
+                    if (state.profile != null) ...[
                       _GlassCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

@@ -57,14 +57,10 @@ class StartupBackdrop extends StatelessWidget {
 }
 
 class BrandHeader extends StatelessWidget {
-  const BrandHeader({
-    required this.actionLabel,
-    required this.onAction,
-    super.key,
-  });
+  const BrandHeader({this.actionLabel, this.onAction, super.key});
 
-  final String actionLabel;
-  final VoidCallback onAction;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +99,8 @@ class BrandHeader extends StatelessWidget {
             ),
           ),
         ),
-        TextButton(onPressed: onAction, child: Text(actionLabel)),
+        if (actionLabel != null && onAction != null)
+          TextButton(onPressed: onAction, child: Text(actionLabel!)),
       ],
     );
   }

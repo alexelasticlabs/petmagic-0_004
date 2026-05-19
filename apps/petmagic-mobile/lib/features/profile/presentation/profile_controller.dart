@@ -181,7 +181,10 @@ class ProfileController extends Notifier<ProfileState> {
     }
   }
 
-  Future<void> register() async {
+  Future<void> register({
+    required bool termsOfUseAccepted,
+    required bool marketingEmailsEnabled,
+  }) async {
     if (state.password.length < 6) {
       state = state.copyWith(
         errorMessage: 'auth.password_too_short',
@@ -209,6 +212,8 @@ class ProfileController extends Notifier<ProfileState> {
         email: state.email,
         password: state.password,
         displayName: state.displayName,
+        termsOfUseAccepted: termsOfUseAccepted,
+        marketingEmailsEnabled: marketingEmailsEnabled,
       );
       final profile = await _repository.fetchProfile();
       state = state.copyWith(
@@ -245,6 +250,11 @@ class ProfileController extends Notifier<ProfileState> {
       ref.read(appLaunchControllerProvider.notifier).markSignedIn();
     } on AppException catch (error) {
       state = state.copyWith(isSaving: false, errorMessage: error.message);
+    } catch (_) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'auth.external_invalid',
+      );
     }
   }
 

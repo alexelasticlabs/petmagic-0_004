@@ -34,6 +34,8 @@ class ProfileRepository {
   Future<AuthSession> register({
     required String email,
     required String password,
+    required bool termsOfUseAccepted,
+    required bool marketingEmailsEnabled,
     String? displayName,
   }) async {
     try {
@@ -42,6 +44,8 @@ class ProfileRepository {
         data: {
           'email': email.trim(),
           'password': password,
+          'termsOfUseAccepted': termsOfUseAccepted,
+          'marketingEmailsEnabled': marketingEmailsEnabled,
           'displayName': displayName?.trim().isEmpty ?? true
               ? null
               : displayName!.trim(),

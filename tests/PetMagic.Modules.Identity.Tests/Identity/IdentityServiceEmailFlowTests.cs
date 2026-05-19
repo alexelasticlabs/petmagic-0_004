@@ -26,60 +26,58 @@ namespace PetMagic.Modules.Identity.Tests.Identity;
 public sealed class IdentityServiceEmailFlowTests
 {
     [Fact]
-    public async Task RegisterAsync_ShouldQueueEmailConfirmation_And_BlockLoginUntilConfirmed()
+    public async Task RegisterAsync_ShouldPersistPreferences_And_AllowImmediateLogin()
     {
         await using var dbContext = CreateDbContext();
         var service = await CreateServiceAsync(dbContext);
 
         var registerResult = await service.RegisterAsync(
-            new RegisterUserCommand("demo.user@petmagic.app", "StrongPassword123", "Demo User"),
+            new RegisterUserCommand("demo.user@petmagic.app", "StrongPassword123", "Demo User", true, true),
             CancellationToken.None);
 
         Assert.True(registerResult.IsSuccess);
-        Assert.False(registerResult.Value.EmailConfirmed);
+        Assert.True(registerResult.Value.EmailConfirmed);
+        Assert.True(registerResult.Value.TermsOfUseAccepted);
+        Assert.True(registerResult.Value.MarketingEmailsEnabled);
 
         var persistedUser = await dbContext.Users.SingleAsync();
-        Assert.False(persistedUser.EmailConfirmed);
-
-        var queuedCode = await dbContext.UserEmailCodes.SingleAsync();
-        Assert.Equal(EmailCodePurpose.EmailConfirmation, queuedCode.Purpose);
-
-        var emailJob = await dbContext.EmailDispatchJobs.SingleAsync();
-        Assert.Equal(EmailDispatchKind.EmailConfirmation, emailJob.Kind);
-        Assert.Equal("demo.user@petmagic.app", emailJob.RecipientEmail);
+        Assert.True(persistedUser.EmailConfirmed);
+        Assert.True(persistedUser.TermsOfUseAccepted);
+        Assert.NotNull(persistedUser.TermsOfUseAcceptedAtUtc);
+        Assert.True(persistedUser.MarketingEmailsEnabled);
+        Assert.NotNull(persistedUser.MarketingEmailsUpdatedAtUtc);
+        Assert.Empty(await dbContext.UserEmailCodes.ToListAsync());
+        Assert.Empty(await dbContext.EmailDispatchJobs.ToListAsync());
 
         var loginResult = await service.LoginAsync(
             new LoginCommand("demo.user@petmagic.app", "StrongPassword123"),
             CancellationToken.None);
 
-        Assert.True(loginResult.IsFailure);
-        Assert.Equal(IdentityErrors.EmailNotConfirmed.Code, loginResult.Error.Code);
+        Assert.True(loginResult.IsSuccess);
     }
 
     [Fact]
-    public async Task ConfirmEmailAsync_ShouldMarkUserConfirmed_And_AllowLogin()
+    public async Task RequestEmailConfirmationAsync_ShouldBeNoOp_ForAlreadyConfirmedSelfRegistration()
     {
         await using var dbContext = CreateDbContext();
         var service = await CreateServiceAsync(dbContext);
 
         var registerResult = await service.RegisterAsync(
-            new RegisterUserCommand("confirm.me@petmagic.app", "StrongPassword123", "Confirm Me"),
+            new RegisterUserCommand("confirm.me@petmagic.app", "StrongPassword123", "Confirm Me", true, false),
             CancellationToken.None);
 
         Assert.True(registerResult.IsSuccess);
 
-        var queuedCode = await dbContext.UserEmailCodes.SingleAsync();
-        queuedCode.CodeHash = HashValue("123456");
-        await dbContext.SaveChangesAsync();
-
-        var confirmResult = await service.ConfirmEmailAsync(
-            new ConfirmEmailCommand("confirm.me@petmagic.app", "123456"),
+        var requestResult = await service.RequestEmailConfirmationAsync(
+            new RequestEmailConfirmationCommand("confirm.me@petmagic.app"),
             CancellationToken.None);
 
-        Assert.True(confirmResult.IsSuccess);
+        Assert.True(requestResult.IsSuccess);
 
         var persistedUser = await dbContext.Users.SingleAsync();
         Assert.True(persistedUser.EmailConfirmed);
+        Assert.Empty(await dbContext.UserEmailCodes.ToListAsync());
+        Assert.Empty(await dbContext.EmailDispatchJobs.ToListAsync());
 
         var loginResult = await service.LoginAsync(
             new LoginCommand("confirm.me@petmagic.app", "StrongPassword123"),
@@ -95,7 +93,7 @@ public sealed class IdentityServiceEmailFlowTests
         var service = await CreateServiceAsync(dbContext);
 
         var registerResult = await service.RegisterAsync(
-            new RegisterUserCommand("reset.me@petmagic.app", "StrongPassword123", "Reset Me"),
+            new RegisterUserCommand("reset.me@petmagic.app", "StrongPassword123", "Reset Me", true, false),
             CancellationToken.None);
 
         Assert.True(registerResult.IsSuccess);

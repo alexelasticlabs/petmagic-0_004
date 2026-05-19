@@ -9,7 +9,18 @@ public sealed class RegisterUserCommandValidatorTests
     public void Should_Fail_When_Password_Is_Weak()
     {
         var validator = new RegisterUserCommandValidator();
-        var command = new RegisterUserCommand("demo@petmagic.app", "weak", "Demo");
+        var command = new RegisterUserCommand("demo@petmagic.app", "weak", "Demo", true, false);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Should_Fail_When_Terms_Are_Not_Accepted()
+    {
+        var validator = new RegisterUserCommandValidator();
+        var command = new RegisterUserCommand("demo@petmagic.app", "pet123", "Demo", false, false);
 
         var result = validator.Validate(command);
 
@@ -20,7 +31,7 @@ public sealed class RegisterUserCommandValidatorTests
     public void Should_Pass_When_Payload_Is_Valid()
     {
         var validator = new RegisterUserCommandValidator();
-        var command = new RegisterUserCommand("demo@petmagic.app", "pet123", "Demo");
+        var command = new RegisterUserCommand("demo@petmagic.app", "pet123", "Demo", true, true);
 
         var result = validator.Validate(command);
 
