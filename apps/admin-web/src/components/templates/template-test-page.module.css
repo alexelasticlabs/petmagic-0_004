@@ -3,20 +3,20 @@
   max-width: 108rem;
   margin: 0 auto;
   display: grid;
-  gap: clamp(1rem, 0.76rem + 0.55vw, 1.35rem);
-  padding-bottom: 1rem;
+  gap: clamp(0.84rem, 0.68rem + 0.4vw, 1.06rem);
+  padding-bottom: 0.82rem;
 }
 
 .pageHeader {
   display: grid;
-  gap: 1rem;
-  padding: clamp(0.95rem, 0.8rem + 0.35vw, 1.15rem) clamp(0.95rem, 0.72rem + 0.55vw, 1.2rem) clamp(1rem, 0.82rem + 0.45vw, 1.15rem);
+  gap: 0.82rem;
+  padding: clamp(0.82rem, 0.72rem + 0.28vw, 0.96rem) clamp(0.82rem, 0.68rem + 0.36vw, 0.98rem) clamp(0.86rem, 0.74rem + 0.32vw, 1rem);
   border: 1px solid var(--border-soft);
   border-radius: 0.86rem;
   background:
-    radial-gradient(circle at top right, rgba(45, 212, 191, 0.1), transparent 24%),
-    linear-gradient(180deg, rgba(10, 17, 30, 0.96) 0%, rgba(7, 12, 22, 0.98) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 22px 48px rgba(0, 0, 0, 0.2);
+    radial-gradient(circle at top right, rgba(88, 166, 255, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(17, 24, 37, 0.96) 0%, rgba(13, 17, 23, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 32px rgba(0, 0, 0, 0.16);
 }
 
 .breadcrumbs,
@@ -42,7 +42,7 @@
   gap: 0.5rem;
   color: var(--text-muted);
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.01em;
 }
 
@@ -84,30 +84,30 @@
 .dangerButton,
 .fileButton,
 .iconButton {
-  min-height: 2.65rem;
+  min-height: 2.28rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.42rem;
   border-radius: 0.68rem;
-  font-family: var(--font-space-grotesk), sans-serif;
-  font-size: 0.84rem;
-  font-weight: 800;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
   letter-spacing: 0.01em;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease, color 160ms ease;
 }
 
 .secondaryLink,
 .detailRowMultiline {
-  padding: 0.72rem 1rem;
+  padding: 0.56rem 0.78rem;
 }
 
 .primaryLink {
-  padding: 0.75rem 1.08rem;
-  border: 1px solid rgba(74, 222, 128, 0.42);
-  background: linear-gradient(180deg, #6ee7b7 0%, #4ade80 42%, var(--success) 100%);
-  color: #04210f;
-  box-shadow: 0 16px 32px rgba(45, 212, 191, 0.18);
+  padding: 0.58rem 0.86rem;
+  border: 1px solid rgba(83, 155, 245, 0.46);
+  background: linear-gradient(180deg, #58a6ff 0%, #388bfd 100%);
+  color: var(--accent-contrast);
+  box-shadow: 0 10px 22px rgba(31, 111, 235, 0.18);
 }
 
 .secondaryLink,
@@ -115,7 +115,7 @@
 .fileButton,
 .iconButton {
   border: 1px solid var(--border-soft);
-  background: linear-gradient(180deg, rgba(16, 24, 21, 0.96) 0%, rgba(9, 15, 13, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(21, 27, 35, 0.96) 0%, rgba(13, 17, 23, 0.96) 100%);
   color: var(--text-soft);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
@@ -150,7 +150,7 @@
 }
 
 .primaryLink:hover {
-  box-shadow: 0 18px 34px rgba(45, 212, 191, 0.22);
+  box-shadow: 0 12px 26px rgba(31, 111, 235, 0.2);
 }
 
 .secondaryLink:hover,
@@ -182,14 +182,14 @@
   min-width: 0;
   overflow: hidden;
   display: grid;
-  gap: clamp(0.85rem, 0.72rem + 0.35vw, 1rem);
+  gap: clamp(0.74rem, 0.64rem + 0.28vw, 0.88rem);
   border: 1px solid var(--border-soft);
   border-radius: 0.92rem;
-  padding: clamp(1.02rem, 0.8rem + 0.48vw, 1.26rem);
+  padding: clamp(0.84rem, 0.72rem + 0.3vw, 0.98rem);
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.05), transparent 24%),
-    linear-gradient(180deg, rgba(16, 24, 21, 0.98) 0%, rgba(5, 8, 7, 0.98) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 20px 46px rgba(0, 0, 0, 0.18);
+    linear-gradient(180deg, rgba(21, 27, 35, 0.98) 0%, rgba(13, 17, 23, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 14px 28px rgba(0, 0, 0, 0.14);
 }
 
 .stepHeader,
@@ -228,9 +228,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-heading), sans-serif;
   font-size: 1.18rem;
   line-height: 1.15;
+  font-weight: 700;
 }
 
 .stepHeader h2 span {
@@ -251,9 +252,9 @@
 }
 
 .statusPill_success {
-  border-color: rgba(45, 212, 191, 0.28);
+  border-color: rgba(46, 160, 67, 0.28);
   background: rgba(22, 163, 74, 0.13);
-  color: #4ade80;
+  color: #8ddb9c;
 }
 
 .statusPill_warning {
@@ -304,7 +305,7 @@
     linear-gradient(180deg, rgba(10, 38, 46, 0.94) 0%, rgba(10, 27, 45, 0.98) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -24px 40px rgba(4, 9, 19, 0.38);
   color: var(--text-muted);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .uploadPreview img {
@@ -321,9 +322,10 @@
 }
 
 .uploadMeta strong {
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-heading), sans-serif;
   font-size: 1.16rem;
   line-height: 1.1;
+  font-weight: 700;
 }
 
 .uploadMeta strong,
@@ -358,12 +360,12 @@
 }
 
 .resultHeaderActions :global(.ui-button) {
-  min-height: 2.7rem;
-  padding-inline: 1rem;
+  min-height: 2.3rem;
+  padding-inline: 0.82rem;
   border-radius: 0.68rem;
-  font-family: var(--font-space-grotesk), sans-serif;
-  font-size: 0.88rem;
-  font-weight: 800;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .mediaGrid {
@@ -388,15 +390,15 @@
   padding: 0.55rem 0.45rem;
   border: 1px solid rgba(43, 62, 86, 0.52);
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(16, 24, 21, 0.92) 0%, rgba(5, 8, 7, 0.84) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 28px rgba(0, 0, 0, 0.14);
+  background: linear-gradient(180deg, rgba(21, 27, 35, 0.92) 0%, rgba(13, 17, 23, 0.84) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 24px rgba(0, 0, 0, 0.12);
 }
 
 .mediaConnectorLine {
   width: 2px;
   height: 1.55rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(45, 212, 191, 0) 0%, rgba(125, 211, 252, 0.78) 38%, rgba(125, 211, 252, 0.98) 58%, rgba(45, 212, 191, 0.18) 100%);
+  background: linear-gradient(180deg, rgba(88, 166, 255, 0) 0%, rgba(125, 211, 252, 0.72) 38%, rgba(88, 166, 255, 0.92) 58%, rgba(88, 166, 255, 0.16) 100%);
   box-shadow: 0 0 16px rgba(125, 211, 252, 0.16);
 }
 
@@ -471,8 +473,8 @@
 .uploadDropzone:focus-visible .mediaAsset,
 .uploadDropzone:hover .mediaAsset,
 .uploadDropzoneActive .mediaAsset {
-  border-color: rgba(74, 222, 128, 0.62);
-  box-shadow: 0 0 0 0.18rem rgba(74, 222, 128, 0.12);
+  border-color: rgba(83, 155, 245, 0.62);
+  box-shadow: 0 0 0 0.18rem rgba(83, 155, 245, 0.12);
 }
 
 .uploadDropzoneBadge {
@@ -532,11 +534,11 @@
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.52rem;
-  background: rgba(16, 24, 21, 0.78);
+  background: rgba(21, 27, 35, 0.78);
   color: #fca5a5;
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-heading), sans-serif;
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -545,7 +547,7 @@
 }
 
 .mediaPreviewCard_preprocess {
-  border-color: rgba(45, 212, 191, 0.18);
+  border-color: rgba(83, 155, 245, 0.18);
 }
 
 .mediaPreviewCard_result {
@@ -568,7 +570,7 @@
 .mediaCardHeader strong {
   color: var(--text-strong);
   font-size: 0.84rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .mediaCardTitle,
@@ -631,7 +633,7 @@
   inset: 14% 18% auto;
   height: 32%;
   border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.18), rgba(45, 212, 191, 0.18));
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(88, 166, 255, 0.16));
   filter: blur(28px);
   pointer-events: none;
 }
@@ -648,7 +650,7 @@
 .mediaPlaceholderBody span {
   color: var(--info);
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -703,8 +705,8 @@
 }
 
 .mediaActionLinkPrimary {
-  border-color: rgba(45, 212, 191, 0.34);
-  color: #4ade80;
+  border-color: rgba(83, 155, 245, 0.34);
+  color: #58a6ff;
 }
 
 .resultMetrics {
@@ -723,9 +725,10 @@
 }
 
 .metricTile strong {
-  color: #4ade80;
-  font-family: var(--font-space-grotesk), sans-serif;
+  color: #58a6ff;
+  font-family: var(--font-heading), sans-serif;
   font-size: 1.18rem;
+  font-weight: 700;
 }
 
 .timeline {
@@ -824,7 +827,7 @@
   background: var(--surface-2);
   color: var(--info);
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .timelineDotDone {
@@ -910,7 +913,7 @@
     min-width: 1.9rem;
     max-width: 2.8rem;
     height: 2px;
-    background: linear-gradient(90deg, rgba(45, 212, 191, 0) 0%, rgba(125, 211, 252, 0.78) 36%, rgba(125, 211, 252, 0.98) 58%, rgba(45, 212, 191, 0.18) 100%);
+    background: linear-gradient(90deg, rgba(88, 166, 255, 0) 0%, rgba(125, 211, 252, 0.72) 36%, rgba(88, 166, 255, 0.92) 58%, rgba(88, 166, 255, 0.16) 100%);
   }
 
   .mediaConnectorArrow {

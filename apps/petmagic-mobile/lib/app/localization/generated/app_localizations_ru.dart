@@ -64,10 +64,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addTokensTooltip => 'Добавить PawSpark';
 
   @override
-  String get premiumLabel => 'Premium';
+  String get premiumLabel => 'Премиум';
 
   @override
-  String get freeLabel => 'Free';
+  String get freeLabel => 'Бесплатно';
 
   @override
   String get profileTitle => 'Ваш профиль';
@@ -235,13 +235,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupWelcomeTemplatesSubtitle => 'Смотрите весь каталог';
 
   @override
-  String get startupWelcomeAiTitle => 'AI Magic';
+  String get startupWelcomeAiTitle => 'AI магия';
 
   @override
   String get startupWelcomeAiSubtitle => 'Откроется после входа';
 
   @override
-  String get startupWelcomeShareTitle => 'Share & Enjoy';
+  String get startupWelcomeShareTitle => 'Делитесь и радуйтесь';
 
   @override
   String get startupWelcomeShareSubtitle => 'Сохраняйте избранное позже';

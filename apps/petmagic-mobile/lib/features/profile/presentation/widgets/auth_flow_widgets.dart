@@ -68,46 +68,52 @@ class AuthHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final titleStyle = Theme.of(context).textTheme.headlineMedium;
+    final subtitleStyle = Theme.of(context).textTheme.bodyMedium;
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
+          flex: 11,
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AuthWordmark(isDark: isDark),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 Text(
                   title,
-                  style: GoogleFonts.nunito(
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: titleStyle?.copyWith(
+                    fontSize: isDark ? 23 : 21,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.25,
                     color: colors.textStrong,
-                    fontSize: isDark ? 30 : 27,
-                    height: 1.02,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.9,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: GoogleFonts.nunito(
+                  style: subtitleStyle?.copyWith(
+                    fontSize: 12.4,
+                    height: 1.28,
+                    fontWeight: FontWeight.w500,
                     color: colors.textSoft,
-                    fontSize: 14,
-                    height: 1.38,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         Expanded(
+          flex: 9,
           child: SizedBox(
-            height: isDark ? 230 : 210,
+            height: isDark ? 222 : 198,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -130,8 +136,8 @@ class AuthHero extends StatelessWidget {
                 Positioned(
                   left: 20,
                   right: 18,
-                  top: 28,
-                  bottom: 20,
+                  top: 54,
+                  bottom: 4,
                   child: Transform.rotate(
                     angle: -0.14,
                     child: DecoratedBox(
@@ -159,12 +165,12 @@ class AuthHero extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  left: -22,
-                  right: -22,
-                  top: -6,
-                  bottom: -18,
+                  left: -14,
+                  right: -14,
+                  top: 46,
+                  bottom: -80,
                   child: Transform.scale(
-                    scale: 1.4,
+                    scale: 1.14,
                     alignment: Alignment.bottomCenter,
                     child: Image.asset(
                       'assets/auth/petmagic-auth-hero.png',
@@ -193,10 +199,10 @@ class AuthWordmark extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 66,
-          height: 66,
+          width: 58,
+          height: 58,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(18),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -205,20 +211,20 @@ class AuthWordmark extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: colors.accent.withValues(alpha: isDark ? 0.2 : 0.12),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: Icon(Icons.pets_rounded, color: colors.accent, size: 34),
+          child: Icon(Icons.pets_rounded, color: colors.accent, size: 30),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(
           'PetMagic',
           style: GoogleFonts.comfortaa(
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
+            letterSpacing: -0.45,
             color: isDark ? colors.textStrong : const Color(0xFF10234A),
           ),
         ),
@@ -238,35 +244,66 @@ class AuthFormCard extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(
-          sigmaX: isDark ? 14 : 10,
-          sigmaY: isDark ? 14 : 10,
+          sigmaX: isDark ? 12 : 8,
+          sigmaY: isDark ? 12 : 8,
         ),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                colors.surfaceGlass.withValues(alpha: isDark ? 0.95 : 0.98),
-                colors.surface.withValues(alpha: isDark ? 0.84 : 0.92),
+                colors.surfaceGlass.withValues(alpha: isDark ? 0.95 : 1),
+                colors.surface.withValues(alpha: isDark ? 0.86 : 0.96),
+                colors.accentSoft.withValues(alpha: isDark ? 0.06 : 0.32),
               ],
+              stops: const [0.0, 0.68, 1.0],
             ),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: colors.border),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colors.border.withValues(alpha: isDark ? 0.95 : 0.85),
+            ),
             boxShadow: [
               BoxShadow(
                 color: colors.shadow,
-                blurRadius: 24,
-                offset: const Offset(0, 14),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: colors.gold.withValues(alpha: isDark ? 0.04 : 0.08),
+                blurRadius: 26,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: child,
+          child: Stack(
+            children: [
+              Positioned(
+                right: -6,
+                top: -8,
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 24,
+                  color: colors.gold.withValues(alpha: isDark ? 0.14 : 0.24),
+                ),
+              ),
+              Positioned(
+                left: -4,
+                bottom: -2,
+                child: Icon(
+                  Icons.pets_rounded,
+                  size: 22,
+                  color: colors.accent.withValues(alpha: isDark ? 0.12 : 0.18),
+                ),
+              ),
+              child,
+            ],
+          ),
         ),
       ),
     );
@@ -298,6 +335,8 @@ class AuthField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final labelStyle = Theme.of(context).textTheme.bodyMedium;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return TextField(
       controller: controller,
@@ -305,40 +344,62 @@ class AuthField extends StatelessWidget {
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       obscureText: obscureText,
-      style: TextStyle(
+      style: labelStyle?.copyWith(
         color: colors.textStrong,
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
+        fontSize: 13.4,
+        fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: TextStyle(
+        hintStyle: labelStyle?.copyWith(
           color: colors.textMuted,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
+          fontSize: 12.6,
+          fontWeight: FontWeight.w600,
         ),
-        prefixIcon: Icon(prefixIcon, color: colors.textSoft),
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 10, right: 6),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colors.accentSoft,
+                  colors.gold.withValues(alpha: 0.14),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(prefixIcon, color: colors.accent, size: 17),
+          ),
+        ),
+        prefixIconConstraints: const BoxConstraints(
+          minWidth: 46,
+          minHeight: 40,
+        ),
         suffixIcon: trailing,
         filled: true,
-        fillColor: colors.surface.withValues(alpha: 0.98),
+        fillColor: colors.surface.withValues(alpha: isDark ? 0.92 : 0.98),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: colors.border.withValues(alpha: 0.75)),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: colors.border.withValues(alpha: isDark ? 0.82 : 0.7),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: colors.accent.withValues(alpha: 0.75),
+            color: colors.accent.withValues(alpha: 0.82),
             width: 1.4,
           ),
         ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 16,
+          horizontal: 12,
+          vertical: 14,
         ),
       ),
     );
@@ -539,6 +600,8 @@ class LightPrivacyPanel extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.textStrong,
                     fontSize: 15,

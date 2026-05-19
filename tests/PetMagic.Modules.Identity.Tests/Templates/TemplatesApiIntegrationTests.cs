@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.RateLimiting;
@@ -166,6 +167,36 @@ public sealed class TemplatesApiIntegrationTests
             "/api/templates/?type=Video");
 
         Assert.Empty(publicAfterDelete);
+    }
+
+    [Fact]
+    public async Task EventsStream_ShouldEmitInvalidation_WhenTemplateCatalogChanges()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/templates/events");
+        using var response = await application.Client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+
+        var eventTask = ReadNextServerSentEventAsync(reader);
+
+        var createdCategory = await PostAsJsonAsync<AdminTemplateCategoryListItemResponse>(
+            application.Client,
+            "/api/admin/templates/categories/",
+            new CreateTemplateCategoryCommand("Seasonal"));
+
+        Assert.Equal("Seasonal", createdCategory.Name);
+
+        var receivedEvent = await eventTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated, receivedEvent.Topic);
+        Assert.Equal("{}", receivedEvent.Data);
     }
 
     [Fact]
@@ -919,6 +950,7 @@ public sealed class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<IVideoMotionGenerator, TestVideoMotionGenerator>();
             builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
+            builder.Services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
             builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
@@ -1092,6 +1124,48 @@ public sealed class TemplatesApiIntegrationTests
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(ticket));
+        }
+    }
+
+    private static async Task<TemplateFeedRealtimeEvent> ReadNextServerSentEventAsync(StreamReader reader)
+    {
+        string? topic = null;
+        var dataLines = new List<string>();
+
+        while (true)
+        {
+            var line = await reader.ReadLineAsync();
+            if (line is null)
+            {
+                throw new InvalidOperationException("SSE stream closed before an event was received.");
+            }
+
+            if (line.Length == 0)
+            {
+                if (!string.IsNullOrWhiteSpace(topic))
+                {
+                    return new TemplateFeedRealtimeEvent(topic, string.Join("\n", dataLines));
+                }
+
+                dataLines.Clear();
+                continue;
+            }
+
+            if (line.StartsWith(':'))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("event:", StringComparison.Ordinal))
+            {
+                topic = line[6..].Trim();
+                continue;
+            }
+
+            if (line.StartsWith("data:", StringComparison.Ordinal))
+            {
+                dataLines.Add(line[5..].TrimStart());
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ import { formatDuration, formatPromoBadge } from "@/components/templates/templat
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import styles from "@/components/templates/template-phone-preview-card.module.css";
 import { type TemplatePromoBadgeMode } from "@/lib/api-client";
+import { joinClassNames } from "@/lib/join-class-names";
 import Image from "next/image";
 
 type TemplatePreviewCardProps = {
@@ -160,10 +161,6 @@ function getPromoBadgeClassName(value: Exclude<TemplatePromoBadgeMode, "Auto">):
     default:
       return styles.phoneHeroBadgeNew;
   }
-}
-
-function joinClassNames(...classes: Array<string | null | undefined | false>) {
-  return classes.filter(Boolean).join(" ");
 }
 
 export { TemplatePreviewCard as TemplatePhonePreviewCard };

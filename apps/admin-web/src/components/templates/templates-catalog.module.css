@@ -22,48 +22,48 @@
   align-items: center;
   justify-content: center;
   gap: 0.42rem;
-  min-height: 2.35rem;
+  min-height: 2.18rem;
   border-radius: var(--radius-sm);
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, filter 140ms ease,
     transform 140ms ease;
 }
 
 .primaryLink {
-  padding: 0.72rem 0.95rem;
-  border: 1px solid rgba(45, 212, 191, 0.64);
-  background: linear-gradient(180deg, #5eead4 0%, var(--accent) 100%);
+  padding: 0.56rem 0.82rem;
+  border: 1px solid rgba(83, 155, 245, 0.48);
+  background: linear-gradient(180deg, #58a6ff 0%, #388bfd 100%);
   color: var(--accent-contrast);
-  box-shadow: 0 12px 28px rgba(45, 212, 191, 0.2);
+  box-shadow: 0 10px 22px rgba(31, 111, 235, 0.18);
 }
 
 .secondaryLink,
 .compactLink {
-  padding: 0.68rem 0.82rem;
+  padding: 0.54rem 0.72rem;
   border: 1px solid var(--border-soft);
-  background: rgba(10, 15, 13, 0.84);
+  background: rgba(17, 22, 29, 0.88);
   color: var(--text-soft);
 }
 
 .primaryLink:hover,
 .secondaryLink:hover,
 .compactLink:hover {
-  filter: saturate(1.1);
-  transform: translateY(-2px);
+  filter: none;
+  transform: translateY(-1px);
 }
 
 .primaryLink:hover {
-  box-shadow: 0 16px 34px rgba(45, 212, 191, 0.26), var(--interactive-glow);
+  box-shadow: 0 12px 26px rgba(31, 111, 235, 0.22);
 }
 
 .secondaryLink:hover,
 .compactLink:hover {
   border-color: var(--border-accent);
-  background: rgba(8, 18, 14, 0.98);
+  background: rgba(21, 27, 35, 0.96);
   color: var(--text-strong);
-  box-shadow: var(--interactive-glow);
+  box-shadow: var(--shadow-soft);
 }
 
 .linkIcon {
@@ -96,7 +96,7 @@
   color: var(--text-muted);
   font: inherit;
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 600;
   overflow-wrap: anywhere;
   word-break: break-word;
   cursor: pointer;
@@ -111,8 +111,8 @@
 
 .tabActive {
   border-bottom-color: var(--accent);
-  color: #99fff0;
-  background: rgba(16, 185, 129, 0.1);
+  color: var(--text-strong);
+  background: rgba(88, 166, 255, 0.08);
 }
 
 .catalogShell {
@@ -149,7 +149,7 @@
 .selectField span {
   color: var(--text-muted);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .viewToggleShell {
@@ -161,7 +161,7 @@
 .viewToggleCaption {
   color: var(--text-muted);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .searchField input,
@@ -170,10 +170,11 @@
   min-height: 2.55rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  background: rgba(1, 3, 2, 0.86);
+  background: rgba(17, 22, 29, 0.9);
   color: var(--text-strong);
   font: inherit;
   font-size: 0.82rem;
+  font-weight: 500;
   outline: none;
   padding: 0.68rem 0.78rem;
   transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
@@ -188,7 +189,7 @@
 .searchField input:hover,
 .selectField select:hover {
   border-color: var(--border-strong);
-  background: rgba(8, 18, 14, 0.92);
+  background: rgba(21, 27, 35, 0.96);
 }
 
 .viewToggle {
@@ -216,7 +217,7 @@
   color: var(--text-muted);
   font: inherit;
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
   cursor: pointer;
   transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
@@ -230,9 +231,9 @@
 }
 
 .viewButtonActive {
-  background: linear-gradient(180deg, rgba(16, 185, 129, 0.24) 0%, rgba(45, 212, 191, 0.14) 100%);
-  color: #e8fffb;
-  box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.32), 0 10px 24px rgba(8, 18, 24, 0.28);
+  background: rgba(88, 166, 255, 0.1);
+  color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.24), 0 8px 18px rgba(8, 18, 24, 0.18);
 }
 
 .viewButton:hover,
@@ -274,7 +275,7 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .cardGrid {
@@ -293,19 +294,19 @@
   flex-direction: column;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(9, 14, 12, 0.99) 0%, rgba(3, 6, 5, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(21, 27, 35, 0.98) 0%, rgba(13, 17, 23, 0.98) 100%);
   box-shadow: var(--shadow-card);
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .templateCard:hover {
-  transform: translateY(-3px);
+  transform: translateY(-1px);
   border-color: var(--border-accent);
-  box-shadow: var(--shadow-strong), var(--interactive-glow);
+  box-shadow: var(--shadow-soft);
 }
 
 .previewCard {
-  --phone-preview-card-aspect-ratio: 9 / 16;
+  --phone-preview-card-aspect-ratio: 2 / 3;
 }
 
 .cardBody {
@@ -338,10 +339,10 @@
   padding: 0.14rem 0.38rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  background: rgba(5, 8, 7, 0.84);
+  background: rgba(17, 22, 29, 0.84);
   color: var(--text-muted);
   font-size: 0.64rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -370,8 +371,9 @@
 .cardTitleRow h2 {
   margin: 0;
   color: var(--text-strong);
+  font-family: var(--font-heading), sans-serif;
   font-size: 0.92rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.2;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -381,7 +383,7 @@
 
 .cardTitleRow p {
   margin: 0.24rem 0 0;
-  color: var(--text-muted);
+  color: var(--text-soft);
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -389,7 +391,7 @@
 .cardDescription {
   margin: 0;
   min-height: 3.3rem;
-  color: var(--text-muted);
+  color: var(--text-soft);
   font-size: 0.78rem;
   line-height: 1.45;
   display: -webkit-box;
@@ -461,7 +463,7 @@
   min-width: 0;
   color: var(--text-strong);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.01em;
   overflow: hidden;
@@ -540,8 +542,8 @@
 .cardActionIconButton:hover {
   transform: translateY(-2px);
   border-color: var(--border-accent);
-  background: linear-gradient(180deg, rgba(12, 25, 20, 0.98) 0%, rgba(3, 6, 5, 0.96) 100%);
-  box-shadow: var(--interactive-glow);
+  background: linear-gradient(180deg, rgba(21, 27, 35, 0.98) 0%, rgba(13, 17, 23, 0.96) 100%);
+  box-shadow: var(--shadow-soft);
   color: var(--text-strong);
 }
 
@@ -584,14 +586,14 @@
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table tbody tr) {
-  background: linear-gradient(180deg, rgba(10, 15, 13, 0.9) 0%, rgba(5, 8, 7, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(21, 27, 35, 0.92) 0%, rgba(13, 17, 23, 0.98) 100%);
   transition: background 100ms ease, box-shadow 100ms ease;
   cursor: default;
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:hover) {
-  background: linear-gradient(180deg, rgba(20, 36, 30, 0.96) 0%, rgba(12, 20, 16, 1) 100%);
-  box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px rgba(52, 211, 153, 0.06);
+  background: linear-gradient(180deg, rgba(26, 33, 43, 0.96) 0%, rgba(18, 24, 32, 1) 100%);
+  box-shadow: inset 3px 0 0 #58a6ff, inset 0 0 0 1px rgba(83, 155, 245, 0.08);
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:last-child td) {
@@ -604,13 +606,13 @@
   position: sticky;
   right: 0;
   z-index: 2;
-  background: #070d0b;
+  background: #111827;
   border-left: 1px solid rgba(33, 51, 45, 0.55);
   box-shadow: -4px 0 10px rgba(0, 0, 0, 0.35);
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:hover td:last-child) {
-  background: #0d1c17;
+  background: #16202b;
 }
 
 .listCard :global(.admin-primitives-module__gNhzuG__statusBadge) {
@@ -673,6 +675,7 @@
 .titleCell strong {
   color: var(--text-strong);
   font-size: 0.84rem;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -709,10 +712,10 @@
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   padding: 0.18rem 0.46rem;
-  background: rgba(5, 8, 7, 0.86);
+  background: rgba(17, 22, 29, 0.88);
   color: var(--text-strong);
   font-size: 0.7rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .typeIcon {
@@ -736,14 +739,14 @@
   border-radius: var(--radius-sm);
   padding: 0.16rem 0.5rem;
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .freePill {
-  border: 1px solid rgba(45, 212, 191, 0.28);
-  background: rgba(45, 212, 191, 0.12);
-  color: #99fff0;
+  border: 1px solid rgba(88, 166, 255, 0.24);
+  background: rgba(88, 166, 255, 0.08);
+  color: var(--text-strong);
 }
 
 .premiumPill {
@@ -754,7 +757,7 @@
 
 .numericCell {
   color: var(--text-strong);
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -816,7 +819,7 @@
 .categoryField span {
   color: var(--text-muted);
   font-size: 0.75rem;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .categoryInput {
@@ -825,8 +828,9 @@
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   padding: 0.72rem 0.82rem;
-  background: rgba(5, 8, 7, 0.88);
+  background: rgba(17, 22, 29, 0.9);
   color: var(--text-strong);
+  font-weight: 500;
 }
 
 .categoryInput::placeholder {
@@ -869,9 +873,9 @@
 .bigMetric {
   margin: 0;
   color: var(--text-strong);
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-heading), sans-serif;
   font-size: clamp(2rem, 1.6rem + 1vw, 2.75rem);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
 }
 

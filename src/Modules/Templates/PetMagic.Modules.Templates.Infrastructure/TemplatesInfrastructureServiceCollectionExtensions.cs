@@ -106,6 +106,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         AddAiProviders(services, options);
         AddGeneratedMediaImporter(services, options);
         AddGenerationBilling(services);
+        services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplatesService, TemplatesService>();
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();

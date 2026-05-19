@@ -20,7 +20,7 @@
 .emptyTitle {
   margin: 0;
   color: var(--text-strong);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .emptyDescription {
@@ -82,9 +82,9 @@
   border-radius: 999px;
   border: 1px solid rgba(96, 165, 250, 0.3);
   background: rgba(37, 99, 235, 0.12);
-  color: #bfdbfe;
+  color: var(--text-strong);
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
 }
@@ -107,7 +107,7 @@
 
 .adminButton {
   border-color: var(--border-soft) !important;
-  background: rgba(3, 6, 5, 0.9) !important;
+  background: rgba(17, 22, 29, 0.9) !important;
   color: var(--text-soft) !important;
   box-shadow: none;
   gap: 0.38rem;
@@ -116,22 +116,22 @@
 
 .adminButton:hover:not(:disabled) {
   border-color: var(--border-accent) !important;
-  background: rgba(8, 18, 14, 0.98) !important;
-  box-shadow: var(--interactive-glow);
+  background: rgba(21, 27, 35, 0.96) !important;
+  box-shadow: var(--shadow-soft);
   color: var(--text-strong) !important;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .adminButtonPrimary {
-  border-color: rgba(45, 212, 191, 0.42) !important;
-  background: rgba(16, 185, 129, 0.16) !important;
-  color: #a7f3d0 !important;
+  border-color: rgba(83, 155, 245, 0.38) !important;
+  background: rgba(88, 166, 255, 0.1) !important;
+  color: var(--text-strong) !important;
   gap: 0.38rem;
 }
 
 .adminButtonPrimary:hover:not(:disabled) {
-  border-color: rgba(45, 212, 191, 0.62) !important;
-  background: rgba(16, 185, 129, 0.22) !important;
+  border-color: rgba(83, 155, 245, 0.56) !important;
+  background: rgba(88, 166, 255, 0.16) !important;
 }
 
 .buttonIcon {

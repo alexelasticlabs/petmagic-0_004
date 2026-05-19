@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
 class StartupBackdrop extends StatelessWidget {
@@ -68,6 +69,7 @@ class BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final brandStyle = Theme.of(context).textTheme.titleLarge;
 
     return Row(
       children: [
@@ -91,11 +93,13 @@ class BrandHeader extends StatelessWidget {
         Expanded(
           child: Text(
             'PetMagic',
-            style: TextStyle(
-              color: colors.textStrong,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.9,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.comfortaa(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
+              color: brandStyle?.color ?? colors.textStrong,
             ),
           ),
         ),

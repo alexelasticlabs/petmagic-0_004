@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 @immutable
 class PetMagicColors extends ThemeExtension<PetMagicColors> {
@@ -161,9 +162,7 @@ class AppTheme {
   }
 
   static ThemeData _base(Brightness brightness, PetMagicColors colors) {
-    final textTheme = Typography.material2021(platform: TargetPlatform.iOS)
-        .black
-        .apply(bodyColor: colors.textStrong, displayColor: colors.textStrong);
+    final textTheme = _buildTextTheme(colors);
 
     return ThemeData(
       useMaterial3: true,
@@ -177,6 +176,59 @@ class AppTheme {
       scaffoldBackgroundColor: colors.backgroundBottom,
       extensions: [colors],
       textTheme: textTheme,
+      primaryTextTheme: textTheme,
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(54),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          backgroundColor: colors.accent,
+          foregroundColor: brightness == Brightness.dark
+              ? const Color(0xFF04110B)
+              : const Color(0xFF082313),
+          disabledBackgroundColor: colors.border,
+          disabledForegroundColor: colors.textMuted,
+          elevation: 0.8,
+          shadowColor: colors.accent.withValues(alpha: 0.22),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          foregroundColor: colors.textStrong,
+          backgroundColor: colors.surfaceGlass,
+          side: BorderSide(color: colors.border),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontSize: 12.8,
+            fontWeight: FontWeight.w700,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: colors.accent,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colors.surfaceGlass,
@@ -194,5 +246,105 @@ class AppTheme {
         ),
       ),
     );
+  }
+
+  static TextTheme _buildTextTheme(PetMagicColors colors) {
+    final base = Typography.material2021(platform: TargetPlatform.iOS).black
+        .apply(bodyColor: colors.textStrong, displayColor: colors.textStrong);
+
+    return GoogleFonts.comfortaaTextTheme(base)
+        .copyWith(
+          displayLarge: GoogleFonts.comfortaa(
+            fontSize: 54,
+            fontWeight: FontWeight.w700,
+            height: 1.06,
+            color: colors.textStrong,
+          ),
+          displayMedium: GoogleFonts.comfortaa(
+            fontSize: 44,
+            fontWeight: FontWeight.w700,
+            height: 1.06,
+            color: colors.textStrong,
+          ),
+          displaySmall: GoogleFonts.comfortaa(
+            fontSize: 36,
+            fontWeight: FontWeight.w700,
+            height: 1.08,
+            color: colors.textStrong,
+          ),
+          headlineLarge: GoogleFonts.comfortaa(
+            fontSize: 30,
+            fontWeight: FontWeight.w700,
+            height: 1.1,
+            color: colors.textStrong,
+          ),
+          headlineMedium: GoogleFonts.comfortaa(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            height: 1.12,
+            color: colors.textStrong,
+          ),
+          headlineSmall: GoogleFonts.comfortaa(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            height: 1.12,
+            color: colors.textStrong,
+          ),
+          titleLarge: GoogleFonts.comfortaa(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            height: 1.14,
+            color: colors.textStrong,
+          ),
+          titleMedium: GoogleFonts.comfortaa(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            height: 1.16,
+            color: colors.textStrong,
+          ),
+          titleSmall: GoogleFonts.comfortaa(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            height: 1.16,
+            color: colors.textStrong,
+          ),
+          bodyLarge: GoogleFonts.comfortaa(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            height: 1.22,
+            color: colors.textStrong,
+          ),
+          bodyMedium: GoogleFonts.comfortaa(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+            height: 1.24,
+            color: colors.textStrong,
+          ),
+          bodySmall: GoogleFonts.comfortaa(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            height: 1.24,
+            color: colors.textSoft,
+          ),
+          labelLarge: GoogleFonts.comfortaa(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            height: 1.14,
+            color: colors.textStrong,
+          ),
+          labelMedium: GoogleFonts.comfortaa(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            height: 1.14,
+            color: colors.textStrong,
+          ),
+          labelSmall: GoogleFonts.comfortaa(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            height: 1.12,
+            color: colors.textSoft,
+          ),
+        )
+        .apply(fontSizeFactor: 0.93);
   }
 }

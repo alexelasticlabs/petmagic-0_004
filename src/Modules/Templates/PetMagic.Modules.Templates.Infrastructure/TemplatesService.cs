@@ -16,7 +16,8 @@ internal sealed class TemplatesService(
     TemplatesOptions options,
     IMediaMetadataReader metadataReader,
     IMediaStorage mediaStorage,
-    ITemplateMediaLifecycleService mediaLifecycleService) : ITemplatesService
+    ITemplateMediaLifecycleService mediaLifecycleService,
+    ITemplateFeedRealtimeService templateFeedRealtimeService) : ITemplatesService
 {
     private const int PublicFeedDefaultTake = 20;
     private const int PublicFeedMaxTake = 50;
@@ -95,6 +96,7 @@ internal sealed class TemplatesService(
 
         dbContext.TemplateCategories.Add(category);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success(MapAdminCategory(category, []));
     }
@@ -139,6 +141,7 @@ internal sealed class TemplatesService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishFeedInvalidatedAsync(cancellationToken);
         return Result.Success(await BuildAdminCategoryResponseAsync(category, cancellationToken));
     }
 
@@ -155,6 +158,7 @@ internal sealed class TemplatesService(
             category.IsArchived = command.IsArchived;
             category.UpdatedAtUtc = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
+            await PublishFeedInvalidatedAsync(cancellationToken);
         }
 
         return Result.Success(await BuildAdminCategoryResponseAsync(category, cancellationToken));
@@ -179,6 +183,7 @@ internal sealed class TemplatesService(
 
         dbContext.TemplateCategories.Remove(category);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishFeedInvalidatedAsync(cancellationToken);
         return Result.Success();
     }
 
@@ -656,6 +661,7 @@ internal sealed class TemplatesService(
         dbContext.TemplateItems.Add(template);
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
     }
@@ -742,6 +748,7 @@ internal sealed class TemplatesService(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        await PublishFeedInvalidatedAsync(cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(MapAdminResponse(template));
     }
@@ -808,6 +815,7 @@ internal sealed class TemplatesService(
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
     }
@@ -910,6 +918,7 @@ internal sealed class TemplatesService(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        await PublishFeedInvalidatedAsync(cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
         return Result.Success(MapAdminResponse(template));
     }
@@ -939,6 +948,7 @@ internal sealed class TemplatesService(
         template.Status = status;
         template.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
     }
@@ -960,6 +970,7 @@ internal sealed class TemplatesService(
 
         dbContext.TemplateItems.Remove(template);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success();
     }
@@ -1653,6 +1664,11 @@ internal sealed class TemplatesService(
             .Cast<string>()
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private ValueTask PublishFeedInvalidatedAsync(CancellationToken cancellationToken)
+    {
+        return templateFeedRealtimeService.PublishTemplatesFeedInvalidatedAsync(cancellationToken);
     }
 
     private static string? SetAsset(TemplateItem template, TemplateAssetKind assetKind, TemplateAssetCommand? asset)

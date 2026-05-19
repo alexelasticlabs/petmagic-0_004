@@ -1,7 +1,6 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -135,8 +134,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
                         if (!isLastPage) {
                           await _pageController.nextPage(
-                            duration: 280.ms,
-                            curve: Curves.easeOutCubic,
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOut,
                           );
                           return;
                         }
@@ -222,6 +221,8 @@ class _OnboardingHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final titleStyle = Theme.of(context).textTheme.displaySmall;
+    final subtitleStyle = Theme.of(context).textTheme.bodyLarge;
     final accent = switch (content.accentRank % 3) {
       0 => colors.accent,
       1 => colors.blue,
@@ -240,68 +241,65 @@ class _OnboardingHero extends StatelessWidget {
                 const SizedBox(height: 10),
                 Center(
                   child: Container(
-                        width: 280,
-                        height: 280,
+                    width: 280,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          accent.withValues(alpha: 0.24),
+                          accent.withValues(alpha: 0.08),
+                          Colors.transparent,
+                        ],
+                        stops: const [0, 0.52, 1],
+                      ),
+                      border: Border.all(
+                        color: accent.withValues(alpha: 0.22),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 156,
+                        height: 156,
                         decoration: BoxDecoration(
+                          color: colors.surfaceGlass,
                           shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              accent.withValues(alpha: 0.24),
-                              accent.withValues(alpha: 0.08),
-                              Colors.transparent,
-                            ],
-                            stops: const [0, 0.52, 1],
-                          ),
-                          border: Border.all(
-                            color: accent.withValues(alpha: 0.22),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Center(
-                          child: Container(
-                            width: 156,
-                            height: 156,
-                            decoration: BoxDecoration(
-                              color: colors.surfaceGlass,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: colors.border),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: accent.withValues(alpha: 0.16),
-                                  blurRadius: 32,
-                                  offset: const Offset(0, 16),
-                                ),
-                              ],
+                          border: Border.all(color: colors.border),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.16),
+                              blurRadius: 32,
+                              offset: const Offset(0, 16),
                             ),
-                            child: Icon(content.icon, color: accent, size: 74),
-                          ),
+                          ],
                         ),
-                      )
-                      .animate()
-                      .fadeIn(duration: 420.ms)
-                      .scale(begin: const Offset(0.92, 0.92)),
+                        child: Icon(content.icon, color: accent, size: 74),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   content.title,
-                  style: TextStyle(
+                  style: titleStyle?.copyWith(
                     color: colors.textStrong,
-                    fontSize: 38,
-                    height: 0.98,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1.2,
+                    fontSize: 31,
+                    height: 1.02,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
                   ),
-                ).animate().fadeIn(duration: 320.ms).slideY(begin: 0.16),
+                ),
                 const SizedBox(height: 14),
                 Text(
                   content.subtitle,
-                  style: TextStyle(
+                  style: subtitleStyle?.copyWith(
                     color: colors.textSoft,
-                    fontSize: 16,
-                    height: 1.4,
+                    fontSize: 14.5,
+                    height: 1.34,
                     fontWeight: FontWeight.w500,
                   ),
-                ).animate().fadeIn(delay: 80.ms, duration: 320.ms).slideY(begin: 0.16),
+                ),
                 const SizedBox(height: 18),
                 Wrap(
                   spacing: 10,
@@ -346,7 +344,7 @@ class _OnboardingHero extends StatelessWidget {
                       ),
                     ),
                   ),
-                ).animate().fadeIn(delay: 140.ms, duration: 340.ms).slideY(begin: 0.2),
+                ),
               ],
             ),
           ),
@@ -398,7 +396,7 @@ class _OnboardingFooter extends StatelessWidget {
                   for (var index = 0; index < pageCount; index++) ...[
                     if (index > 0) const SizedBox(width: 8),
                     AnimatedContainer(
-                      duration: 220.ms,
+                      duration: const Duration(milliseconds: 220),
                       width: index == pageIndex ? 28 : 8,
                       height: 8,
                       decoration: BoxDecoration(

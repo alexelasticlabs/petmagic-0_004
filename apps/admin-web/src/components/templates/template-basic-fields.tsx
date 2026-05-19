@@ -2,6 +2,7 @@ import styles from "@/components/templates/template-editor.module.css";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
+import { joinClassNames } from "@/lib/join-class-names";
 
 type TemplateBasicFieldsProps = {
   text: Dictionary;
@@ -161,8 +162,4 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
       </div>
     </div>
   );
-}
-
-function joinClassNames(...classes: Array<string | null | undefined | false>) {
-  return classes.filter(Boolean).join(" ");
 }

@@ -59,23 +59,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: StartupLoadingPage.routePath,
-        builder: (context, state) => const StartupLoadingPage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: StartupLoadingPage()),
       ),
       GoRoute(
         path: OnboardingPage.routePath,
-        builder: (context, state) => const OnboardingPage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: OnboardingPage()),
       ),
       GoRoute(
         path: GuestWelcomePage.routePath,
-        builder: (context, state) => const GuestWelcomePage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: GuestWelcomePage()),
       ),
       GoRoute(
         path: AuthEntryPage.routePath,
-        builder: (context, state) => const AuthEntryPage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: AuthEntryPage()),
       ),
       GoRoute(
         path: RegisterEntryPage.routePath,
-        builder: (context, state) => const RegisterEntryPage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: RegisterEntryPage()),
       ),
       ShellRoute(
         builder: (context, state, child) =>

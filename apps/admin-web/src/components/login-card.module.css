@@ -121,15 +121,15 @@
 }
 
 .eyeButton:hover {
-  background: rgba(16, 185, 129, 0.12);
-  box-shadow: var(--interactive-glow);
+  background: rgba(88, 166, 255, 0.1);
+  box-shadow: var(--shadow-soft);
   color: var(--text-soft);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .eyeButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 0 0 2px rgba(83, 155, 245, 0.38);
 }
 
 .submit {

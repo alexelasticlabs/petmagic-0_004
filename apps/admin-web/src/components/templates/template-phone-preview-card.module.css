@@ -91,7 +91,7 @@
   background: rgba(8, 11, 18, 0.48);
   color: #ffffff;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.015em;
   text-transform: none;
   backdrop-filter: blur(24px);
@@ -260,7 +260,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 1.1rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.03;
   letter-spacing: -0.03em;
   text-shadow: 0 8px 20px rgba(3, 7, 15, 0.62);
@@ -374,7 +374,7 @@
   backdrop-filter: blur(12px) saturate(1.3);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
@@ -397,12 +397,11 @@
 
 .phoneAccessTagFree {
   border-color: rgba(74, 222, 128, 0.45);
-  background: linear-gradient(135deg, rgba(22, 101, 52, 0.58) 0%, rgba(8, 43, 29, 0.38) 100%);
-  color: #a8ffc8;
+  background: linear-gradient(135deg, rgba(21, 60, 32, 0.62) 0%, rgba(15, 37, 24, 0.42) 100%);
+  color: #dff3e4;
   box-shadow:
-    inset 0 1px 0 rgba(134, 239, 172, 0.24),
-    0 0 14px rgba(74, 222, 128, 0.35),
-    0 3px 10px rgba(0, 0, 0, 0.36);
+    inset 0 1px 0 rgba(134, 239, 172, 0.14),
+    0 3px 10px rgba(0, 0, 0, 0.3);
 }
 
 .phoneAccessIconPremium {

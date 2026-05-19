@@ -4,6 +4,12 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/router/app_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
+const _supportedAppLocales = <Locale>[
+  Locale('ru'),
+  Locale('en'),
+  Locale('en', 'US'),
+];
+
 class PetMagicApp extends ConsumerWidget {
   const PetMagicApp({super.key});
 
@@ -19,7 +25,25 @@ class PetMagicApp extends ConsumerWidget {
       themeMode: ThemeMode.system,
       routerConfig: router,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      supportedLocales: _supportedAppLocales,
+      localeListResolutionCallback: (locales, supportedLocales) {
+        if (locales == null || locales.isEmpty) {
+          return const Locale('ru');
+        }
+
+        for (final locale in locales) {
+          if (locale.languageCode == 'ru') {
+            return const Locale('ru');
+          }
+          if (locale.languageCode == 'en') {
+            return locale.countryCode == 'US'
+                ? const Locale('en', 'US')
+                : const Locale('en');
+          }
+        }
+
+        return const Locale('ru');
+      },
     );
   }
 }

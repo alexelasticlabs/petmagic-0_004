@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
@@ -71,6 +73,7 @@ class TemplatesState {
 class TemplatesController extends Notifier<TemplatesState> {
   late final TemplatesRepository _repository;
   late final RealtimeClient _realtimeClient;
+  StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   int _requestVersion = 0;
 
   static String? _normalizeCategory(String? value) {
@@ -105,9 +108,26 @@ class TemplatesController extends Notifier<TemplatesState> {
   TemplatesState build() {
     _repository = ref.watch(templatesRepositoryProvider);
     _realtimeClient = ref.watch(realtimeClientProvider);
-    _realtimeClient.connect();
-    ref.onDispose(() => _realtimeClient.disconnect());
+    unawaited(_realtimeClient.connect());
+    _realtimeSubscription?.cancel();
+    _realtimeSubscription = _realtimeClient.events.listen(_handleRealtimeEvent);
+    ref.onDispose(() {
+      unawaited(_realtimeSubscription?.cancel());
+      unawaited(_realtimeClient.disconnect());
+    });
     return const TemplatesState();
+  }
+
+  void _handleRealtimeEvent(RealtimeEvent event) {
+    if (event.topic != RealtimeTopics.templatesFeedInvalidated) {
+      return;
+    }
+
+    if (state.isLoading || state.isRefreshing || state.isLoadingMore) {
+      return;
+    }
+
+    unawaited(loadInitial(forceRefresh: true));
   }
 
   Future<void> loadInitial({bool forceRefresh = false}) async {

@@ -39,55 +39,60 @@ class TemplateTypeFilters extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _FilterPill(
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Row(
+            children: [
+              _FilterPill(
                 label: text.allFilter,
                 selected: selectedType == null,
                 onTap: () => onTypeSelected(null),
                 compact: true,
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _FilterPill(
+              const SizedBox(width: 8),
+              _FilterPill(
                 label: text.videosFilter,
                 icon: Icons.play_circle_outline_rounded,
                 selected: selectedType == TemplateType.video,
                 onTap: () => onTypeSelected(TemplateType.video),
                 compact: true,
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _FilterPill(
+              const SizedBox(width: 8),
+              _FilterPill(
                 label: text.imagesFilter,
                 icon: Icons.image_outlined,
                 selected: selectedType == TemplateType.image,
                 onTap: () => onTypeSelected(TemplateType.image),
                 compact: true,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _FilterPill(
-              label: text.allFilter,
-              selected: selectedCategory == null,
-              onTap: () => onCategorySelected(null),
-            ),
-            for (final category in normalizedCategories)
-              _FilterPill(
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: normalizedCategories.length + 1,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _FilterPill(
+                  label: text.allFilter,
+                  selected: selectedCategory == null,
+                  onTap: () => onCategorySelected(null),
+                );
+              }
+
+              final category = normalizedCategories[index - 1];
+              return _FilterPill(
                 label: category,
                 selected: selectedCategory == category,
                 onTap: () => onCategorySelected(category),
-              ),
-          ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -112,23 +117,38 @@ class _FilterPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final textStyle = Theme.of(context).textTheme.labelMedium;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 10 : 12,
-            vertical: compact ? 9 : 7,
+            horizontal: compact ? 10 : 11,
+            vertical: compact ? 8 : 7,
           ),
           decoration: BoxDecoration(
-            color: selected
-                ? colors.accent.withValues(alpha: 0.96)
-                : colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(24),
+            gradient: selected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colors.accent,
+                      colors.gold.withValues(alpha: 0.82),
+                    ],
+                  )
+                : LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colors.surfaceGlass,
+                      colors.surface.withValues(alpha: 0.9),
+                    ],
+                  ),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(color: selected ? colors.accent : colors.border),
             boxShadow: selected
                 ? [
@@ -146,20 +166,20 @@ class _FilterPill extends StatelessWidget {
               if (icon != null) ...[
                 Icon(
                   icon,
-                  size: compact ? 15 : 16,
+                  size: compact ? 14 : 15,
                   color: selected ? Colors.white : colors.textStrong,
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
               ],
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: textStyle?.copyWith(
                   color: selected ? Colors.white : colors.textStrong,
-                  fontSize: compact ? 11 : 11.5,
-                  fontWeight: FontWeight.w800,
+                  fontSize: compact ? 10.1 : 10.5,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],

@@ -5,11 +5,11 @@
   display: grid;
   grid-template-columns: minmax(300px, 420px) 1fr;
   min-height: 100vh;
-  background: #040806;
+  background: #0d1117;
   background-image:
-    radial-gradient(circle at 84% -8%, rgba(16, 185, 129, 0.22), transparent 34rem),
-    radial-gradient(circle at 8% 100%, rgba(56, 189, 248, 0.12), transparent 30rem),
-    linear-gradient(125deg, #040806 0%, #03110b 44%, #020907 100%);
+    radial-gradient(circle at 84% -8%, rgba(56, 139, 253, 0.2), transparent 34rem),
+    radial-gradient(circle at 8% 100%, rgba(56, 189, 248, 0.1), transparent 30rem),
+    linear-gradient(125deg, #0d1117 0%, #111827 44%, #0b1220 100%);
   background-size: cover;
   color: var(--text-strong);
 }
@@ -25,8 +25,8 @@
 .screen::before {
   z-index: 0;
   background:
-    radial-gradient(58rem 30rem at 18% 18%, rgba(110, 231, 183, 0.2), transparent 68%),
-    radial-gradient(42rem 26rem at 86% 24%, rgba(45, 212, 191, 0.18), transparent 72%),
+    radial-gradient(58rem 30rem at 18% 18%, rgba(88, 166, 255, 0.14), transparent 68%),
+    radial-gradient(42rem 26rem at 86% 24%, rgba(56, 139, 253, 0.14), transparent 72%),
     radial-gradient(52rem 34rem at 52% 80%, rgba(56, 189, 248, 0.12), transparent 76%);
   filter: blur(18px) saturate(112%);
   transform-origin: 50% 50%;
@@ -36,8 +36,8 @@
 .screen::after {
   z-index: 0;
   background-image:
-    radial-gradient(circle, rgba(110, 231, 183, 0.17) 1px, transparent 1.2px),
-    linear-gradient(115deg, rgba(52, 211, 153, 0.05), rgba(34, 197, 94, 0.02) 44%, rgba(2, 6, 23, 0) 70%);
+    radial-gradient(circle, rgba(88, 166, 255, 0.14) 1px, transparent 1.2px),
+    linear-gradient(115deg, rgba(88, 166, 255, 0.05), rgba(56, 139, 253, 0.02) 44%, rgba(2, 6, 23, 0) 70%);
   background-size: 24px 24px, 100% 100%;
   mix-blend-mode: screen;
   opacity: 0.38;
@@ -63,15 +63,15 @@
 .brandMark {
   width: 5.125rem;
   height: 5.75rem;
-  color: #22c55e;
-  filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.36));
+  color: #58a6ff;
+  filter: drop-shadow(0 0 20px rgba(56, 139, 253, 0.24));
   flex-shrink: 0;
 }
 
 .welcome {
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-heading), sans-serif;
   font-size: clamp(1.45rem, 2.4vw, 1.9rem);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-strong);
   letter-spacing: -0.025em;
   line-height: 1.2;
@@ -219,7 +219,7 @@
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background:
-    radial-gradient(circle, rgba(52, 211, 153, 0.2) 0%, rgba(45, 212, 191, 0.12) 32%, rgba(2, 6, 23, 0) 72%);
+    radial-gradient(circle, rgba(88, 166, 255, 0.16) 0%, rgba(56, 139, 253, 0.1) 32%, rgba(2, 6, 23, 0) 72%);
   filter: blur(8px);
   opacity: 0.72;
   z-index: -1;
@@ -325,7 +325,7 @@
   }
 
   .topbar {
-    padding: 1rem;
+    padding: 0.85rem;
   }
 }
 

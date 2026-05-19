@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
@@ -19,26 +20,32 @@ class TemplatesPage extends ConsumerStatefulWidget {
 }
 
 class _TemplatesPageState extends ConsumerState<TemplatesPage> {
+  static const _refreshCooldown = Duration(seconds: 15);
+
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   Timer? _searchDebounce;
+  DateTime? _lastRefreshAt;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
-    Future.microtask(
-      () => ref.read(templatesControllerProvider.notifier).loadInitial(),
-    );
+    Future.microtask(() => _refreshFeed(forceRefresh: true));
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _searchDebounce?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
+
+  late final WidgetsBindingObserver _lifecycleObserver =
+      _TemplatesLifecycleObserver(onResumed: () => _refreshFeed());
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +53,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final controller = ref.read(templatesControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final titleStyle = Theme.of(context).textTheme.titleLarge;
+    final subtitleStyle = Theme.of(context).textTheme.bodySmall;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -77,20 +86,20 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                       const SizedBox(height: 6),
                       Text(
                         text.createMagicTitle,
-                        style: TextStyle(
+                        style: titleStyle?.copyWith(
                           color: colors.textStrong,
-                          fontSize: 18,
-                          height: 1.02,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          height: 1.08,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         text.pickTemplateSubtitle,
-                        style: TextStyle(
+                        style: subtitleStyle?.copyWith(
                           color: colors.textSoft,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 10.2,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 5),
@@ -195,6 +204,33 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       ref.read(templatesControllerProvider.notifier).setSearch(value);
     });
   }
+
+  Future<void> _refreshFeed({bool forceRefresh = false}) async {
+    final now = DateTime.now();
+    if (!forceRefresh &&
+        _lastRefreshAt != null &&
+        now.difference(_lastRefreshAt!) < _refreshCooldown) {
+      return;
+    }
+
+    _lastRefreshAt = now;
+    await ref
+        .read(templatesControllerProvider.notifier)
+        .loadInitial(forceRefresh: true);
+  }
+}
+
+class _TemplatesLifecycleObserver with WidgetsBindingObserver {
+  _TemplatesLifecycleObserver({required this.onResumed});
+
+  final VoidCallback onResumed;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      onResumed();
+    }
+  }
 }
 
 class _TopBar extends StatelessWidget {
@@ -216,10 +252,11 @@ class _TopBar extends StatelessWidget {
             'PetMagic',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: GoogleFonts.comfortaa(
               color: colors.textStrong,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
             ),
           ),
         ),
@@ -301,10 +338,10 @@ class _TokenBalance extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   '$balance',
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: colors.textStrong,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 12.8,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -372,15 +409,15 @@ class _SearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       style: TextStyle(
         color: colors.textStrong,
-        fontSize: 10.5,
-        fontWeight: FontWeight.w600,
+        fontSize: 10.2,
+        fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(
         hintText: text.searchTemplates,
         hintStyle: TextStyle(
           color: colors.textMuted,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
+          fontSize: 9.8,
+          fontWeight: FontWeight.w700,
         ),
         prefixIcon: Icon(
           Icons.search_rounded,
@@ -423,19 +460,19 @@ class _StateMessage extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: colors.textStrong,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colors.textMuted,
-              fontSize: 14.5,
+              fontSize: 13,
               height: 1.35,
             ),
           ),

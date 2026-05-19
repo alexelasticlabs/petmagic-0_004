@@ -20,6 +20,8 @@ class GuestWelcomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
+    final titleStyle = Theme.of(context).textTheme.displaySmall;
+    final subtitleStyle = Theme.of(context).textTheme.bodyLarge;
 
     return Scaffold(
       body: DecoratedBox(
@@ -46,21 +48,22 @@ class GuestWelcomePage extends ConsumerWidget {
                     const Spacer(),
                     Text(
                       text.startupWelcomeTitle,
-                      style: TextStyle(
+                      style: titleStyle?.copyWith(
                         color: colors.textStrong,
-                        fontSize: 42,
-                        height: 0.96,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -1.4,
+                        fontSize: 34,
+                        height: 1.02,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 14),
                     Text(
                       text.startupWelcomeSubtitle,
-                      style: TextStyle(
+                      style: subtitleStyle?.copyWith(
                         color: colors.textSoft,
-                        fontSize: 16,
-                        height: 1.4,
+                        fontSize: 14.5,
+                        height: 1.34,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -164,19 +167,19 @@ class _FeatureTile extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: colors.textStrong,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
+              fontSize: 13.8,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colors.textMuted,
-              fontSize: 12,
+              fontSize: 11.2,
               height: 1.3,
             ),
           ),

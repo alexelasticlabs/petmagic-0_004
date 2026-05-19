@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -111,7 +112,8 @@ public sealed class TemplatesServiceTests
     public async Task ChangeCategoryArchiveStateAsync_ShouldToggleArchiveFlag()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext);
+        var realtimeService = new RecordingTemplateFeedRealtimeService();
+        var service = CreateService(dbContext, realtimeService: realtimeService);
 
         var createdCategory = await service.CreateCategoryAsync(
             new CreateTemplateCategoryCommand("Seasonal"),
@@ -133,6 +135,32 @@ public sealed class TemplatesServiceTests
 
         Assert.True(restored.IsSuccess);
         Assert.False(restored.Value.IsArchived);
+        Assert.Equal(3, realtimeService.InvalidatedCount);
+    }
+
+    [Fact]
+    public async Task CreateImageAsync_ShouldPublishFeedInvalidation()
+    {
+        await using var dbContext = CreateDbContext();
+        var realtimeService = new RecordingTemplateFeedRealtimeService();
+        var service = CreateService(dbContext, realtimeService: realtimeService);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        Assert.Equal(1, realtimeService.InvalidatedCount);
     }
 
     [Fact]
@@ -1288,7 +1316,10 @@ public sealed class TemplatesServiceTests
         Assert.Null(referenceRecord.ExpiresAtUtc);
     }
 
-    private static TemplatesService CreateService(TemplatesDbContext dbContext, IMediaStorage? mediaStorage = null)
+    private static TemplatesService CreateService(
+        TemplatesDbContext dbContext,
+        IMediaStorage? mediaStorage = null,
+        ITemplateFeedRealtimeService? realtimeService = null)
     {
         var options = new TemplatesOptions
         {
@@ -1314,7 +1345,13 @@ public sealed class TemplatesServiceTests
 
         IMediaMetadataReader metadataReader = new TestMediaMetadataReader();
         ITemplateMediaLifecycleService lifecycleService = new TemplateMediaLifecycleService(dbContext, options);
-        return new TemplatesService(dbContext, options, metadataReader, mediaStorage ?? new RecordingMediaStorage(), lifecycleService);
+        return new TemplatesService(
+            dbContext,
+            options,
+            metadataReader,
+            mediaStorage ?? new RecordingMediaStorage(),
+            lifecycleService,
+            realtimeService ?? new RecordingTemplateFeedRealtimeService());
     }
 
     private static async Task<Guid> CreateActiveImageTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
@@ -1358,6 +1395,23 @@ public sealed class TemplatesServiceTests
             .Options;
 
         return new TemplatesDbContext(options);
+    }
+
+    private sealed class RecordingTemplateFeedRealtimeService : ITemplateFeedRealtimeService
+    {
+        public int InvalidatedCount { get; private set; }
+
+        public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
+        {
+            var channel = Channel.CreateUnbounded<TemplateFeedRealtimeEvent>();
+            return channel.Reader;
+        }
+
+        public ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default)
+        {
+            InvalidatedCount++;
+            return ValueTask.CompletedTask;
+        }
     }
 
     private static TemplateAssetCommand CreatePreviewAsset(

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Inter, Manrope } from "next/font/google";
+import { IBM_Plex_Sans, Manrope } from "next/font/google";
 import "./globals.css";
 
-const bodyFont = Inter({
+const bodyFont = IBM_Plex_Sans({
   variable: "--font-admin-body",
   subsets: ["latin", "cyrillic"],
   display: "swap",
@@ -13,7 +13,7 @@ const headingFont = Manrope({
   variable: "--font-admin-heading",
   subsets: ["latin", "cyrillic"],
   display: "swap",
-  weight: ["500", "600", "700", "800"],
+  weight: ["500", "600", "700"],
 });
 
 export const metadata: Metadata = {
