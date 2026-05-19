@@ -76,6 +76,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileSubtitle => 'Manage sign-in and your public avatar.';
 
   @override
+  String get profileDashboardSubtitle =>
+      'Manage your account and personalize your PetMagic experience.';
+
+  @override
   String get profileSignInTitle => 'Sign in to continue';
 
   @override
@@ -111,6 +115,352 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileSignedOut => 'Signed out on this device.';
+
+  @override
+  String get profileAccountCenterTitle => 'Account center';
+
+  @override
+  String get profileAccountCenterSubtitle =>
+      'Review your preferences, privacy and app setup.';
+
+  @override
+  String get profileTermsStat => 'Terms accepted';
+
+  @override
+  String get profileMarketingStat => 'Offers & updates';
+
+  @override
+  String get profileEmailStat => 'Email status';
+
+  @override
+  String get profileStatOn => 'On';
+
+  @override
+  String get profileStatOff => 'Off';
+
+  @override
+  String get profileStatReady => 'Ready';
+
+  @override
+  String get profileStatPending => 'Pending';
+
+  @override
+  String get profilePetsTitle => 'My pets';
+
+  @override
+  String get profilePetsSubtitle =>
+      'Your favorite companions and pet profiles.';
+
+  @override
+  String get profilePremiumTitle => 'Go Premium';
+
+  @override
+  String get profilePremiumSubtitle =>
+      'Unlock all templates and premium editing flows.';
+
+  @override
+  String get profileCommunicationsTitle => 'PetMagic updates';
+
+  @override
+  String get profileCommunicationsEnabled =>
+      'You are subscribed to product updates and offers.';
+
+  @override
+  String get profileCommunicationsDisabled =>
+      'Marketing updates are currently turned off.';
+
+  @override
+  String get profilePrivacyTitle => 'Privacy and consent';
+
+  @override
+  String get profileTermsAccepted =>
+      'Your account has accepted the Terms of Use and Privacy Policy.';
+
+  @override
+  String get profileTermsPending =>
+      'Complete consent review in account settings.';
+
+  @override
+  String get profileSupportTitle => 'Contact support';
+
+  @override
+  String get profileSupportSubtitle =>
+      'We are here when you need help with your account.';
+
+  @override
+  String get profileSettingsShortcutTitle => 'Settings';
+
+  @override
+  String get profileSettingsShortcutSubtitle =>
+      'Manage language, theme and account sections.';
+
+  @override
+  String get profilePreferenceEnabled => 'Enabled';
+
+  @override
+  String get profilePreferenceOff => 'Off';
+
+  @override
+  String get profileSettingsTitle => 'Settings';
+
+  @override
+  String get profileSettingsSubtitle => 'Manage the app and your account.';
+
+  @override
+  String get profileSettingsAccountSection => 'Account';
+
+  @override
+  String get profileSettingsNotificationsSection => 'Notifications';
+
+  @override
+  String get profileSettingsPreferencesSection => 'Preferences';
+
+  @override
+  String get profileSettingsSupportSection => 'Support';
+
+  @override
+  String get profileSettingsAboutSection => 'About app';
+
+  @override
+  String get profileSettingsDangerSection => 'Danger zone';
+
+  @override
+  String get profileSettingsAccountInfoTitle => 'Account information';
+
+  @override
+  String get profileSettingsUnavailableSubtitle =>
+      'This information becomes available after sign in.';
+
+  @override
+  String get profileSettingsLinkedAccountsTitle => 'Linked accounts';
+
+  @override
+  String get profileSettingsLinkedAccountsSubtitle =>
+      'Google, Apple and other providers will appear here.';
+
+  @override
+  String get profileSettingsPasswordTitle => 'Change password';
+
+  @override
+  String get profileSettingsPasswordSubtitle =>
+      'Update your password to keep the account secure.';
+
+  @override
+  String get profileSettingsNotificationsTitle => 'Notification settings';
+
+  @override
+  String get profileSettingsNotificationsSubtitle =>
+      'Manage push and email preferences across the app.';
+
+  @override
+  String get profileSettingsLanguageTitle => 'App language';
+
+  @override
+  String get profileSettingsLanguageSubtitle =>
+      'Choose the language used throughout the interface.';
+
+  @override
+  String get profileSettingsThemeTitle => 'App theme';
+
+  @override
+  String get profileSettingsThemeSubtitle =>
+      'Switch between system, light and dark appearance.';
+
+  @override
+  String get profileSettingsHelpCenterTitle => 'Help center';
+
+  @override
+  String get profileSettingsHelpCenterSubtitle =>
+      'Quick answers and guides for common questions.';
+
+  @override
+  String get profileSettingsSupportTitle => 'Contact support';
+
+  @override
+  String get profileSettingsSupportSubtitle =>
+      'Reach out if you need help with billing or account access.';
+
+  @override
+  String get profileSettingsTermsTitle => 'Terms of Use';
+
+  @override
+  String get profileSettingsTermsSubtitle =>
+      'Review the rules for using PetMagic.';
+
+  @override
+  String get profileSettingsPrivacyTitle => 'Privacy Policy';
+
+  @override
+  String get profileSettingsPrivacySubtitle =>
+      'Learn how your data is handled and protected.';
+
+  @override
+  String get profileSettingsDeleteAccountTitle => 'Delete account';
+
+  @override
+  String get profileSettingsDeleteAccountSubtitle =>
+      'This action cannot be undone.';
+
+  @override
+  String get profileAccountDetailsSubtitle =>
+      'Review the account data currently available on this device.';
+
+  @override
+  String get profileAccountDetailsSection => 'Account details';
+
+  @override
+  String get profileAccountUserIdLabel => 'User ID';
+
+  @override
+  String get profileAccountDisplayNameLabel => 'Display name';
+
+  @override
+  String get profileAccountDisplayNameMissing => 'Not set yet';
+
+  @override
+  String get profileAccountRolesLabel => 'Roles';
+
+  @override
+  String get profileAccountRolesMissing => 'No roles assigned';
+
+  @override
+  String get profileAccountMembershipLabel => 'Membership';
+
+  @override
+  String get profileAccountConsentLabel => 'Terms acceptance';
+
+  @override
+  String get profileAccountMarketingLabel => 'Offers and updates';
+
+  @override
+  String get profileAccountAvatarLabel => 'Avatar';
+
+  @override
+  String get profileAccountAvatarMissing => 'No avatar uploaded';
+
+  @override
+  String get profileAccountAvatarUploaded => 'Avatar uploaded';
+
+  @override
+  String get profileDetailsCurrentStatusSection => 'Current status';
+
+  @override
+  String get profileDetailsNextStepSection => 'What happens next';
+
+  @override
+  String get profileDetailsLinkedAccountsBody =>
+      'Connected providers will appear here as soon as linking is enabled for your account.';
+
+  @override
+  String get profileDetailsLinkedAccountsStatus =>
+      'No external providers are linked yet. Email and password remain the active sign-in method for this profile.';
+
+  @override
+  String get profileDetailsLinkedAccountsNext =>
+      'Google, Apple and additional providers will be shown here after the backend linking flow is opened in the app.';
+
+  @override
+  String get profileDetailsNotificationsBody =>
+      'This section reflects your current communication preferences in the app.';
+
+  @override
+  String get profileDetailsNotificationsStatusEnabled =>
+      'Product updates and offers are enabled for this profile. Additional push controls will appear here later.';
+
+  @override
+  String get profileDetailsNotificationsStatusDisabled =>
+      'Marketing emails are currently disabled for this profile. Additional push controls will appear here later.';
+
+  @override
+  String get profileDetailsNotificationsNext =>
+      'You can already review the current email preference here. Dedicated push toggles will be added in a later product slice.';
+
+  @override
+  String get profileDetailsHelpBody =>
+      'The help center will collect quick answers, setup tips and account guidance in one place.';
+
+  @override
+  String get profileDetailsHelpStatus =>
+      'The in-app knowledge base is still being assembled, so this screen shows the current rollout status.';
+
+  @override
+  String get profileDetailsHelpNext =>
+      'The first help articles and troubleshooting guides will appear here as the mobile support content is published.';
+
+  @override
+  String get profileDetailsSupportBody =>
+      'Support requests will be handled here without forcing you out of the profile area.';
+
+  @override
+  String get profileDetailsSupportStatus =>
+      'Direct in-app contact is not wired yet. For now, keep this screen as the support entry point for the next slice.';
+
+  @override
+  String get profileDetailsSupportNext =>
+      'The next step is a real support form or email handoff connected to the backend support flow.';
+
+  @override
+  String get profileDetailsTermsBody =>
+      'Review how PetMagic expects the app and account to be used.';
+
+  @override
+  String get profileDetailsTermsStatusAccepted =>
+      'This account has already accepted the Terms of Use during registration.';
+
+  @override
+  String get profileDetailsTermsStatusPending =>
+      'This account has not recorded a completed terms acceptance yet.';
+
+  @override
+  String get profileDetailsTermsNext =>
+      'A fuller legal document view can be attached here later. For now, this screen confirms the current acceptance state.';
+
+  @override
+  String get profileDetailsPrivacyBody =>
+      'Review how PetMagic stores, protects and uses account data.';
+
+  @override
+  String get profileDetailsPrivacyStatus =>
+      'Privacy details are currently represented as an in-app summary screen while the full legal document flow is prepared.';
+
+  @override
+  String get profileDetailsPrivacyNext =>
+      'The next slice can attach a complete policy document or hosted legal page to this route.';
+
+  @override
+  String get profileDetailsDeleteBody =>
+      'Account deletion is intentionally protected and not executed from this screen yet.';
+
+  @override
+  String get profileDetailsDeleteStatus =>
+      'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.';
+
+  @override
+  String get profileDetailsDeleteNext =>
+      'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.';
+
+  @override
+  String get profileSettingsThemeSystem => 'System';
+
+  @override
+  String get profileSettingsThemeLight => 'Light';
+
+  @override
+  String get profileSettingsThemeDark => 'Dark';
+
+  @override
+  String get profileSettingsLanguageRussian => 'Russian';
+
+  @override
+  String get profileSettingsLanguageEnglish => 'English';
+
+  @override
+  String get profileSettingsLanguageEnglishUs => 'English (US)';
+
+  @override
+  String profileSettingsVersionLabel(Object version) {
+    return 'App version $version';
+  }
 
   @override
   String get magicLoadingPreparing => 'Magie wird vorbereitet...';

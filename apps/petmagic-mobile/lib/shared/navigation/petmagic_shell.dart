@@ -126,7 +126,9 @@ class _FloatingBottomNav extends StatelessWidget {
                                 ),
                                 child: _BottomNavButton(
                                   item: item,
-                                  selected: location == item.path,
+                                  selected: item.path == '/profile'
+                                      ? location.startsWith('/profile')
+                                      : location == item.path,
                                   onTap: () => context.go(item.path),
                                 ),
                               ),

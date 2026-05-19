@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/app.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -13,6 +16,8 @@ import 'package:petmagic_mobile/features/profile/data/external_auth_repository.d
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -442,6 +447,135 @@ void main() {
 
     expect(find.text('Welcome back!'), findsOneWidget);
     expect(find.text('Sign in to continue'), findsNothing);
+  });
+
+  testWidgets('settings screen renders account and preferences sections', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({_sessionKey: _buildSessionJson()});
+
+    final container = ProviderContainer(
+      overrides: [
+        profileRepositoryProvider.overrideWith(
+          (ref) => _FakeProfileRepository(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(profileControllerProvider.notifier).initialize();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: const ProfileSettingsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Account information'), findsOneWidget);
+    expect(find.text('App language'), findsOneWidget);
+    expect(find.text('App theme'), findsOneWidget);
+  });
+
+  testWidgets('account details screen renders stored profile fields', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({_sessionKey: _buildSessionJson()});
+    final profileRepository = _FakeProfileRepository()
+      ..storedSession = AuthSession.fromJson(
+        jsonDecode(_buildSessionJson()) as Map<String, dynamic>,
+      );
+
+    final container = ProviderContainer(
+      overrides: [
+        profileRepositoryProvider.overrideWith((ref) => profileRepository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(profileControllerProvider.notifier).initialize();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: const ProfileAccountInfoPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Account information'), findsOneWidget);
+    expect(find.text('Pet Parent'), findsWidgets);
+    expect(find.text('pet@example.com'), findsWidgets);
+    expect(find.text('User ID'), findsOneWidget);
+    expect(find.text('user-1'), findsOneWidget);
+  });
+
+  testWidgets('delete account detail screen stays informational', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: [Locale('en')],
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: ProfileSettingsDetailPage(
+            kind: ProfileSettingsDetailKind.deleteAccount,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete account'), findsOneWidget);
+    expect(find.text('CURRENT STATUS'), findsOneWidget);
+    expect(
+      find.textContaining('Deletion is not available as a one-tap action'),
+      findsOneWidget,
+    );
+  });
+
+  test('app preferences controller persists theme and locale', () async {
+    SharedPreferences.setMockInitialValues(const {});
+
+    final firstContainer = ProviderContainer();
+    addTearDown(firstContainer.dispose);
+
+    firstContainer.read(appPreferencesControllerProvider);
+    await Future<void>.delayed(Duration.zero);
+
+    final firstController = firstContainer.read(
+      appPreferencesControllerProvider.notifier,
+    );
+
+    await firstController.updateThemeMode(ThemeMode.dark);
+    await firstController.updateLocale(const Locale('en', 'US'));
+
+    final secondContainer = ProviderContainer();
+    addTearDown(secondContainer.dispose);
+
+    secondContainer.read(appPreferencesControllerProvider);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final loadedState = secondContainer.read(appPreferencesControllerProvider);
+    expect(loadedState.themeMode, ThemeMode.dark);
+    expect(loadedState.locale, const Locale('en', 'US'));
   });
 }
 

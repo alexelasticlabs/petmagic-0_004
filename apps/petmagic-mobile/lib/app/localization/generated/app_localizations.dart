@@ -241,6 +241,12 @@ abstract class AppLocalizations {
   /// **'Manage sign-in and your public avatar.'**
   String get profileSubtitle;
 
+  /// No description provided for @profileDashboardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage your account and personalize your PetMagic experience.'**
+  String get profileDashboardSubtitle;
+
   /// No description provided for @profileSignInTitle.
   ///
   /// In en, this message translates to:
@@ -312,6 +318,606 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Signed out on this device.'**
   String get profileSignedOut;
+
+  /// No description provided for @profileAccountCenterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account center'**
+  String get profileAccountCenterTitle;
+
+  /// No description provided for @profileAccountCenterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review your preferences, privacy and app setup.'**
+  String get profileAccountCenterSubtitle;
+
+  /// No description provided for @profileTermsStat.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms accepted'**
+  String get profileTermsStat;
+
+  /// No description provided for @profileMarketingStat.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers & updates'**
+  String get profileMarketingStat;
+
+  /// No description provided for @profileEmailStat.
+  ///
+  /// In en, this message translates to:
+  /// **'Email status'**
+  String get profileEmailStat;
+
+  /// No description provided for @profileStatOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get profileStatOn;
+
+  /// No description provided for @profileStatOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get profileStatOff;
+
+  /// No description provided for @profileStatReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get profileStatReady;
+
+  /// No description provided for @profileStatPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get profileStatPending;
+
+  /// No description provided for @profilePetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My pets'**
+  String get profilePetsTitle;
+
+  /// No description provided for @profilePetsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your favorite companions and pet profiles.'**
+  String get profilePetsSubtitle;
+
+  /// No description provided for @profilePremiumTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Go Premium'**
+  String get profilePremiumTitle;
+
+  /// No description provided for @profilePremiumSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock all templates and premium editing flows.'**
+  String get profilePremiumSubtitle;
+
+  /// No description provided for @profileCommunicationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic updates'**
+  String get profileCommunicationsTitle;
+
+  /// No description provided for @profileCommunicationsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'You are subscribed to product updates and offers.'**
+  String get profileCommunicationsEnabled;
+
+  /// No description provided for @profileCommunicationsDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing updates are currently turned off.'**
+  String get profileCommunicationsDisabled;
+
+  /// No description provided for @profilePrivacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy and consent'**
+  String get profilePrivacyTitle;
+
+  /// No description provided for @profileTermsAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account has accepted the Terms of Use and Privacy Policy.'**
+  String get profileTermsAccepted;
+
+  /// No description provided for @profileTermsPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete consent review in account settings.'**
+  String get profileTermsPending;
+
+  /// No description provided for @profileSupportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get profileSupportTitle;
+
+  /// No description provided for @profileSupportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We are here when you need help with your account.'**
+  String get profileSupportSubtitle;
+
+  /// No description provided for @profileSettingsShortcutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get profileSettingsShortcutTitle;
+
+  /// No description provided for @profileSettingsShortcutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage language, theme and account sections.'**
+  String get profileSettingsShortcutSubtitle;
+
+  /// No description provided for @profilePreferenceEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get profilePreferenceEnabled;
+
+  /// No description provided for @profilePreferenceOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get profilePreferenceOff;
+
+  /// No description provided for @profileSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get profileSettingsTitle;
+
+  /// No description provided for @profileSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage the app and your account.'**
+  String get profileSettingsSubtitle;
+
+  /// No description provided for @profileSettingsAccountSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get profileSettingsAccountSection;
+
+  /// No description provided for @profileSettingsNotificationsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get profileSettingsNotificationsSection;
+
+  /// No description provided for @profileSettingsPreferencesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get profileSettingsPreferencesSection;
+
+  /// No description provided for @profileSettingsSupportSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get profileSettingsSupportSection;
+
+  /// No description provided for @profileSettingsAboutSection.
+  ///
+  /// In en, this message translates to:
+  /// **'About app'**
+  String get profileSettingsAboutSection;
+
+  /// No description provided for @profileSettingsDangerSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get profileSettingsDangerSection;
+
+  /// No description provided for @profileSettingsAccountInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account information'**
+  String get profileSettingsAccountInfoTitle;
+
+  /// No description provided for @profileSettingsUnavailableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This information becomes available after sign in.'**
+  String get profileSettingsUnavailableSubtitle;
+
+  /// No description provided for @profileSettingsLinkedAccountsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked accounts'**
+  String get profileSettingsLinkedAccountsTitle;
+
+  /// No description provided for @profileSettingsLinkedAccountsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google, Apple and other providers will appear here.'**
+  String get profileSettingsLinkedAccountsSubtitle;
+
+  /// No description provided for @profileSettingsPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get profileSettingsPasswordTitle;
+
+  /// No description provided for @profileSettingsPasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update your password to keep the account secure.'**
+  String get profileSettingsPasswordSubtitle;
+
+  /// No description provided for @profileSettingsNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification settings'**
+  String get profileSettingsNotificationsTitle;
+
+  /// No description provided for @profileSettingsNotificationsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage push and email preferences across the app.'**
+  String get profileSettingsNotificationsSubtitle;
+
+  /// No description provided for @profileSettingsLanguageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App language'**
+  String get profileSettingsLanguageTitle;
+
+  /// No description provided for @profileSettingsLanguageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the language used throughout the interface.'**
+  String get profileSettingsLanguageSubtitle;
+
+  /// No description provided for @profileSettingsThemeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App theme'**
+  String get profileSettingsThemeTitle;
+
+  /// No description provided for @profileSettingsThemeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch between system, light and dark appearance.'**
+  String get profileSettingsThemeSubtitle;
+
+  /// No description provided for @profileSettingsHelpCenterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help center'**
+  String get profileSettingsHelpCenterTitle;
+
+  /// No description provided for @profileSettingsHelpCenterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick answers and guides for common questions.'**
+  String get profileSettingsHelpCenterSubtitle;
+
+  /// No description provided for @profileSettingsSupportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get profileSettingsSupportTitle;
+
+  /// No description provided for @profileSettingsSupportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach out if you need help with billing or account access.'**
+  String get profileSettingsSupportSubtitle;
+
+  /// No description provided for @profileSettingsTermsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Use'**
+  String get profileSettingsTermsTitle;
+
+  /// No description provided for @profileSettingsTermsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the rules for using PetMagic.'**
+  String get profileSettingsTermsSubtitle;
+
+  /// No description provided for @profileSettingsPrivacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get profileSettingsPrivacyTitle;
+
+  /// No description provided for @profileSettingsPrivacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn how your data is handled and protected.'**
+  String get profileSettingsPrivacySubtitle;
+
+  /// No description provided for @profileSettingsDeleteAccountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get profileSettingsDeleteAccountTitle;
+
+  /// No description provided for @profileSettingsDeleteAccountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This action cannot be undone.'**
+  String get profileSettingsDeleteAccountSubtitle;
+
+  /// No description provided for @profileAccountDetailsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the account data currently available on this device.'**
+  String get profileAccountDetailsSubtitle;
+
+  /// No description provided for @profileAccountDetailsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Account details'**
+  String get profileAccountDetailsSection;
+
+  /// No description provided for @profileAccountUserIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'User ID'**
+  String get profileAccountUserIdLabel;
+
+  /// No description provided for @profileAccountDisplayNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get profileAccountDisplayNameLabel;
+
+  /// No description provided for @profileAccountDisplayNameMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set yet'**
+  String get profileAccountDisplayNameMissing;
+
+  /// No description provided for @profileAccountRolesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Roles'**
+  String get profileAccountRolesLabel;
+
+  /// No description provided for @profileAccountRolesMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No roles assigned'**
+  String get profileAccountRolesMissing;
+
+  /// No description provided for @profileAccountMembershipLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership'**
+  String get profileAccountMembershipLabel;
+
+  /// No description provided for @profileAccountConsentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms acceptance'**
+  String get profileAccountConsentLabel;
+
+  /// No description provided for @profileAccountMarketingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers and updates'**
+  String get profileAccountMarketingLabel;
+
+  /// No description provided for @profileAccountAvatarLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar'**
+  String get profileAccountAvatarLabel;
+
+  /// No description provided for @profileAccountAvatarMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No avatar uploaded'**
+  String get profileAccountAvatarMissing;
+
+  /// No description provided for @profileAccountAvatarUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar uploaded'**
+  String get profileAccountAvatarUploaded;
+
+  /// No description provided for @profileDetailsCurrentStatusSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Current status'**
+  String get profileDetailsCurrentStatusSection;
+
+  /// No description provided for @profileDetailsNextStepSection.
+  ///
+  /// In en, this message translates to:
+  /// **'What happens next'**
+  String get profileDetailsNextStepSection;
+
+  /// No description provided for @profileDetailsLinkedAccountsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected providers will appear here as soon as linking is enabled for your account.'**
+  String get profileDetailsLinkedAccountsBody;
+
+  /// No description provided for @profileDetailsLinkedAccountsStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'No external providers are linked yet. Email and password remain the active sign-in method for this profile.'**
+  String get profileDetailsLinkedAccountsStatus;
+
+  /// No description provided for @profileDetailsLinkedAccountsNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Google, Apple and additional providers will be shown here after the backend linking flow is opened in the app.'**
+  String get profileDetailsLinkedAccountsNext;
+
+  /// No description provided for @profileDetailsNotificationsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This section reflects your current communication preferences in the app.'**
+  String get profileDetailsNotificationsBody;
+
+  /// No description provided for @profileDetailsNotificationsStatusEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Product updates and offers are enabled for this profile. Additional push controls will appear here later.'**
+  String get profileDetailsNotificationsStatusEnabled;
+
+  /// No description provided for @profileDetailsNotificationsStatusDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing emails are currently disabled for this profile. Additional push controls will appear here later.'**
+  String get profileDetailsNotificationsStatusDisabled;
+
+  /// No description provided for @profileDetailsNotificationsNext.
+  ///
+  /// In en, this message translates to:
+  /// **'You can already review the current email preference here. Dedicated push toggles will be added in a later product slice.'**
+  String get profileDetailsNotificationsNext;
+
+  /// No description provided for @profileDetailsHelpBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The help center will collect quick answers, setup tips and account guidance in one place.'**
+  String get profileDetailsHelpBody;
+
+  /// No description provided for @profileDetailsHelpStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'The in-app knowledge base is still being assembled, so this screen shows the current rollout status.'**
+  String get profileDetailsHelpStatus;
+
+  /// No description provided for @profileDetailsHelpNext.
+  ///
+  /// In en, this message translates to:
+  /// **'The first help articles and troubleshooting guides will appear here as the mobile support content is published.'**
+  String get profileDetailsHelpNext;
+
+  /// No description provided for @profileDetailsSupportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Support requests will be handled here without forcing you out of the profile area.'**
+  String get profileDetailsSupportBody;
+
+  /// No description provided for @profileDetailsSupportStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct in-app contact is not wired yet. For now, keep this screen as the support entry point for the next slice.'**
+  String get profileDetailsSupportStatus;
+
+  /// No description provided for @profileDetailsSupportNext.
+  ///
+  /// In en, this message translates to:
+  /// **'The next step is a real support form or email handoff connected to the backend support flow.'**
+  String get profileDetailsSupportNext;
+
+  /// No description provided for @profileDetailsTermsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Review how PetMagic expects the app and account to be used.'**
+  String get profileDetailsTermsBody;
+
+  /// No description provided for @profileDetailsTermsStatusAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has already accepted the Terms of Use during registration.'**
+  String get profileDetailsTermsStatusAccepted;
+
+  /// No description provided for @profileDetailsTermsStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has not recorded a completed terms acceptance yet.'**
+  String get profileDetailsTermsStatusPending;
+
+  /// No description provided for @profileDetailsTermsNext.
+  ///
+  /// In en, this message translates to:
+  /// **'A fuller legal document view can be attached here later. For now, this screen confirms the current acceptance state.'**
+  String get profileDetailsTermsNext;
+
+  /// No description provided for @profileDetailsPrivacyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Review how PetMagic stores, protects and uses account data.'**
+  String get profileDetailsPrivacyBody;
+
+  /// No description provided for @profileDetailsPrivacyStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy details are currently represented as an in-app summary screen while the full legal document flow is prepared.'**
+  String get profileDetailsPrivacyStatus;
+
+  /// No description provided for @profileDetailsPrivacyNext.
+  ///
+  /// In en, this message translates to:
+  /// **'The next slice can attach a complete policy document or hosted legal page to this route.'**
+  String get profileDetailsPrivacyNext;
+
+  /// No description provided for @profileDetailsDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Account deletion is intentionally protected and not executed from this screen yet.'**
+  String get profileDetailsDeleteBody;
+
+  /// No description provided for @profileDetailsDeleteStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.'**
+  String get profileDetailsDeleteStatus;
+
+  /// No description provided for @profileDetailsDeleteNext.
+  ///
+  /// In en, this message translates to:
+  /// **'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.'**
+  String get profileDetailsDeleteNext;
+
+  /// No description provided for @profileSettingsThemeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get profileSettingsThemeSystem;
+
+  /// No description provided for @profileSettingsThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get profileSettingsThemeLight;
+
+  /// No description provided for @profileSettingsThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get profileSettingsThemeDark;
+
+  /// No description provided for @profileSettingsLanguageRussian.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian'**
+  String get profileSettingsLanguageRussian;
+
+  /// No description provided for @profileSettingsLanguageEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get profileSettingsLanguageEnglish;
+
+  /// No description provided for @profileSettingsLanguageEnglishUs.
+  ///
+  /// In en, this message translates to:
+  /// **'English (US)'**
+  String get profileSettingsLanguageEnglishUs;
+
+  /// No description provided for @profileSettingsVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'App version {version}'**
+  String profileSettingsVersionLabel(Object version);
 
   /// No description provided for @magicLoadingPreparing.
   ///

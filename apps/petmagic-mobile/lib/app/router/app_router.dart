@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
@@ -115,6 +117,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: ProfilePage.routePath,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: ProfilePage()),
+          ),
+          GoRoute(
+            path: ProfileSettingsPage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfileSettingsPage()),
+          ),
+          GoRoute(
+            path: ProfileAccountInfoPage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfileAccountInfoPage()),
+          ),
+          GoRoute(
+            path: ProfileSettingsDetailPage.routePath,
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: ProfileSettingsDetailPage(
+                kind: ProfileSettingsDetailKind.fromSlug(
+                  state.pathParameters['kind'] ?? 'help-center',
+                ),
+              ),
+            ),
           ),
         ],
       ),

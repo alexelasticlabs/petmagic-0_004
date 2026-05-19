@@ -77,6 +77,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Управляйте входом и публичным аватаром пользователя.';
 
   @override
+  String get profileDashboardSubtitle =>
+      'Управляйте аккаунтом и персонализируйте свой опыт в PetMagic.';
+
+  @override
   String get profileSignInTitle => 'Войдите в аккаунт';
 
   @override
@@ -112,6 +116,351 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileSignedOut => 'Вы вышли на этом устройстве.';
+
+  @override
+  String get profileAccountCenterTitle => 'Центр аккаунта';
+
+  @override
+  String get profileAccountCenterSubtitle =>
+      'Проверьте предпочтения, приватность и настройки приложения.';
+
+  @override
+  String get profileTermsStat => 'Условия приняты';
+
+  @override
+  String get profileMarketingStat => 'Новости и офферы';
+
+  @override
+  String get profileEmailStat => 'Статус email';
+
+  @override
+  String get profileStatOn => 'Вкл';
+
+  @override
+  String get profileStatOff => 'Выкл';
+
+  @override
+  String get profileStatReady => 'Готово';
+
+  @override
+  String get profileStatPending => 'Ожидает';
+
+  @override
+  String get profilePetsTitle => 'Мои питомцы';
+
+  @override
+  String get profilePetsSubtitle => 'Ваши любимцы и их профили в приложении.';
+
+  @override
+  String get profilePremiumTitle => 'Перейти на Premium';
+
+  @override
+  String get profilePremiumSubtitle =>
+      'Откройте все шаблоны и premium-сценарии редактирования.';
+
+  @override
+  String get profileCommunicationsTitle => 'Обновления PetMagic';
+
+  @override
+  String get profileCommunicationsEnabled =>
+      'Вы подписаны на продуктовые обновления и предложения.';
+
+  @override
+  String get profileCommunicationsDisabled =>
+      'Маркетинговые обновления сейчас отключены.';
+
+  @override
+  String get profilePrivacyTitle => 'Приватность и согласия';
+
+  @override
+  String get profileTermsAccepted =>
+      'Ваш аккаунт принял Условия использования и Политику конфиденциальности.';
+
+  @override
+  String get profileTermsPending => 'Проверьте согласия в настройках аккаунта.';
+
+  @override
+  String get profileSupportTitle => 'Связаться с поддержкой';
+
+  @override
+  String get profileSupportSubtitle =>
+      'Мы рядом, если нужна помощь с аккаунтом.';
+
+  @override
+  String get profileSettingsShortcutTitle => 'Настройки';
+
+  @override
+  String get profileSettingsShortcutSubtitle =>
+      'Управляйте языком, темой и разделами аккаунта.';
+
+  @override
+  String get profilePreferenceEnabled => 'Включено';
+
+  @override
+  String get profilePreferenceOff => 'Выкл';
+
+  @override
+  String get profileSettingsTitle => 'Настройки';
+
+  @override
+  String get profileSettingsSubtitle =>
+      'Управляйте приложением и своим аккаунтом.';
+
+  @override
+  String get profileSettingsAccountSection => 'Аккаунт';
+
+  @override
+  String get profileSettingsNotificationsSection => 'Уведомления';
+
+  @override
+  String get profileSettingsPreferencesSection => 'Предпочтения';
+
+  @override
+  String get profileSettingsSupportSection => 'Поддержка';
+
+  @override
+  String get profileSettingsAboutSection => 'О приложении';
+
+  @override
+  String get profileSettingsDangerSection => 'Опасная зона';
+
+  @override
+  String get profileSettingsAccountInfoTitle => 'Информация об аккаунте';
+
+  @override
+  String get profileSettingsUnavailableSubtitle =>
+      'Эта информация станет доступна после входа.';
+
+  @override
+  String get profileSettingsLinkedAccountsTitle => 'Связанные аккаунты';
+
+  @override
+  String get profileSettingsLinkedAccountsSubtitle =>
+      'Здесь появятся Google, Apple и другие провайдеры.';
+
+  @override
+  String get profileSettingsPasswordTitle => 'Сменить пароль';
+
+  @override
+  String get profileSettingsPasswordSubtitle =>
+      'Обновите пароль для защиты аккаунта.';
+
+  @override
+  String get profileSettingsNotificationsTitle => 'Настройки уведомлений';
+
+  @override
+  String get profileSettingsNotificationsSubtitle =>
+      'Управляйте push и email-предпочтениями в приложении.';
+
+  @override
+  String get profileSettingsLanguageTitle => 'Язык приложения';
+
+  @override
+  String get profileSettingsLanguageSubtitle =>
+      'Выберите язык интерфейса во всем приложении.';
+
+  @override
+  String get profileSettingsThemeTitle => 'Тема приложения';
+
+  @override
+  String get profileSettingsThemeSubtitle =>
+      'Переключайтесь между системной, светлой и темной темой.';
+
+  @override
+  String get profileSettingsHelpCenterTitle => 'Центр помощи';
+
+  @override
+  String get profileSettingsHelpCenterSubtitle =>
+      'Быстрые ответы и инструкции по частым вопросам.';
+
+  @override
+  String get profileSettingsSupportTitle => 'Связаться с поддержкой';
+
+  @override
+  String get profileSettingsSupportSubtitle =>
+      'Напишите нам, если нужна помощь с оплатой или доступом.';
+
+  @override
+  String get profileSettingsTermsTitle => 'Пользовательское соглашение';
+
+  @override
+  String get profileSettingsTermsSubtitle =>
+      'Изучите правила использования PetMagic.';
+
+  @override
+  String get profileSettingsPrivacyTitle => 'Политика конфиденциальности';
+
+  @override
+  String get profileSettingsPrivacySubtitle =>
+      'Узнайте, как обрабатываются и защищаются ваши данные.';
+
+  @override
+  String get profileSettingsDeleteAccountTitle => 'Удалить аккаунт';
+
+  @override
+  String get profileSettingsDeleteAccountSubtitle =>
+      'Это действие нельзя отменить.';
+
+  @override
+  String get profileAccountDetailsSubtitle =>
+      'Проверьте данные аккаунта, которые сейчас доступны на этом устройстве.';
+
+  @override
+  String get profileAccountDetailsSection => 'Детали аккаунта';
+
+  @override
+  String get profileAccountUserIdLabel => 'ID пользователя';
+
+  @override
+  String get profileAccountDisplayNameLabel => 'Отображаемое имя';
+
+  @override
+  String get profileAccountDisplayNameMissing => 'Пока не задано';
+
+  @override
+  String get profileAccountRolesLabel => 'Роли';
+
+  @override
+  String get profileAccountRolesMissing => 'Роли не назначены';
+
+  @override
+  String get profileAccountMembershipLabel => 'Тариф';
+
+  @override
+  String get profileAccountConsentLabel => 'Принятие условий';
+
+  @override
+  String get profileAccountMarketingLabel => 'Новости и предложения';
+
+  @override
+  String get profileAccountAvatarLabel => 'Аватар';
+
+  @override
+  String get profileAccountAvatarMissing => 'Аватар не загружен';
+
+  @override
+  String get profileAccountAvatarUploaded => 'Аватар загружен';
+
+  @override
+  String get profileDetailsCurrentStatusSection => 'Текущий статус';
+
+  @override
+  String get profileDetailsNextStepSection => 'Что дальше';
+
+  @override
+  String get profileDetailsLinkedAccountsBody =>
+      'Подключенные провайдеры появятся здесь, как только для аккаунта будет включено связывание.';
+
+  @override
+  String get profileDetailsLinkedAccountsStatus =>
+      'Внешние провайдеры пока не привязаны. Для этого профиля активным способом входа остаются email и пароль.';
+
+  @override
+  String get profileDetailsLinkedAccountsNext =>
+      'Google, Apple и другие провайдеры появятся здесь после открытия backend-flow привязки в приложении.';
+
+  @override
+  String get profileDetailsNotificationsBody =>
+      'В этом разделе отражаются текущие коммуникационные предпочтения аккаунта.';
+
+  @override
+  String get profileDetailsNotificationsStatusEnabled =>
+      'Обновления продукта и предложения для этого профиля включены. Дополнительные push-настройки появятся позже.';
+
+  @override
+  String get profileDetailsNotificationsStatusDisabled =>
+      'Маркетинговые письма для этого профиля сейчас отключены. Дополнительные push-настройки появятся позже.';
+
+  @override
+  String get profileDetailsNotificationsNext =>
+      'Уже сейчас здесь видно текущее email-предпочтение. Отдельные push-переключатели добавим в следующем продуктовом срезе.';
+
+  @override
+  String get profileDetailsHelpBody =>
+      'Центр помощи соберет быстрые ответы, инструкции по настройке и подсказки по аккаунту в одном месте.';
+
+  @override
+  String get profileDetailsHelpStatus =>
+      'Встроенная база знаний еще собирается, поэтому этот экран пока показывает текущий статус запуска.';
+
+  @override
+  String get profileDetailsHelpNext =>
+      'Первые статьи помощи и troubleshooting-гайды появятся здесь, когда будет опубликован мобильный support-контент.';
+
+  @override
+  String get profileDetailsSupportBody =>
+      'Здесь будут обрабатываться обращения в поддержку без выхода из раздела профиля.';
+
+  @override
+  String get profileDetailsSupportStatus =>
+      'Прямой in-app контакт еще не подключен. Пока этот экран служит точкой входа в поддержку для следующего среза.';
+
+  @override
+  String get profileDetailsSupportNext =>
+      'Следующим шагом станет реальная форма поддержки или email-handoff, связанный с backend-flow поддержки.';
+
+  @override
+  String get profileDetailsTermsBody =>
+      'Проверьте, на каких правилах строится использование приложения и аккаунта PetMagic.';
+
+  @override
+  String get profileDetailsTermsStatusAccepted =>
+      'Этот аккаунт уже принял Пользовательское соглашение во время регистрации.';
+
+  @override
+  String get profileDetailsTermsStatusPending =>
+      'Для этого аккаунта еще не зафиксировано завершенное принятие условий.';
+
+  @override
+  String get profileDetailsTermsNext =>
+      'Позже к этому экрану можно подключить полный юридический документ. Сейчас он подтверждает текущее состояние согласия.';
+
+  @override
+  String get profileDetailsPrivacyBody =>
+      'Проверьте, как PetMagic хранит, защищает и использует данные аккаунта.';
+
+  @override
+  String get profileDetailsPrivacyStatus =>
+      'Детали приватности сейчас представлены как краткий in-app экран, пока готовится полный legal-flow документа.';
+
+  @override
+  String get profileDetailsPrivacyNext =>
+      'На следующем этапе к этому маршруту можно привязать полный текст политики или hosted legal page.';
+
+  @override
+  String get profileDetailsDeleteBody =>
+      'Удаление аккаунта намеренно защищено и пока не выполняется с этого экрана.';
+
+  @override
+  String get profileDetailsDeleteStatus =>
+      'Удаление сейчас недоступно как действие в один тап в мобильном приложении. Это защищает от разрушительного поведения, пока не готов backend-flow подтверждения.';
+
+  @override
+  String get profileDetailsDeleteNext =>
+      'Когда backend-flow удаления будет реализован, этот экран сможет стать шагом подтверждения и верификации вместо заглушки.';
+
+  @override
+  String get profileSettingsThemeSystem => 'Системная';
+
+  @override
+  String get profileSettingsThemeLight => 'Светлая';
+
+  @override
+  String get profileSettingsThemeDark => 'Темная';
+
+  @override
+  String get profileSettingsLanguageRussian => 'Русский';
+
+  @override
+  String get profileSettingsLanguageEnglish => 'Английский';
+
+  @override
+  String get profileSettingsLanguageEnglishUs => 'Английский (США)';
+
+  @override
+  String profileSettingsVersionLabel(Object version) {
+    return 'Версия приложения $version';
+  }
 
   @override
   String get magicLoadingPreparing => 'Готовим магию...';
