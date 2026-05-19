@@ -269,8 +269,11 @@ class AppLocalizationsIt extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Confirm password';
 
   @override
-  String get authPasswordRulesHint =>
-      'Use 10+ characters with uppercase, lowercase and a number.';
+  String get authPasswordRulesHint => 'Use at least 6 characters.';
+
+  @override
+  String get authPasswordTooShort =>
+      'Password must be at least 6 characters long.';
 
   @override
   String get authForgotPasswordAction => 'Forgot password?';
@@ -278,6 +281,44 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get authForgotPasswordComingSoon =>
       'Password recovery is coming soon.';
+
+  @override
+  String get authPasswordResetTitle => 'Reset your password';
+
+  @override
+  String get authPasswordResetSubtitle =>
+      'Enter your email and we will send you a reset code.';
+
+  @override
+  String get authPasswordResetCodeTitle => 'Enter the code from your email';
+
+  @override
+  String get authPasswordResetCodeSubtitle =>
+      'Use the code to set a new password for your account.';
+
+  @override
+  String get authPasswordResetCodeLabel => 'Reset code';
+
+  @override
+  String get authPasswordResetRequestAction => 'Send code';
+
+  @override
+  String get authPasswordResetConfirmAction => 'Save new password';
+
+  @override
+  String get authPasswordResetResendAction => 'Send code again';
+
+  @override
+  String get authPasswordResetCodeSent =>
+      'We sent a password reset code to your email.';
+
+  @override
+  String get authPasswordResetSuccess =>
+      'Password updated. You can now sign in with the new password.';
+
+  @override
+  String get authPasswordResetCodeInvalid =>
+      'This reset code is invalid or has expired.';
 
   @override
   String get authOrContinueWith => 'or continue with';

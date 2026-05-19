@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U petmagic_user"]
+      test: [ "CMD-SHELL", "pg_isready -U petmagic_user" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,6 +31,19 @@ services:
       BootstrapAdmin__Email: admin@petmagic.app
       BootstrapAdmin__Password: PetMagic!Admin2026
       BootstrapAdmin__DisplayName: PetMagic Admin
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_CLIENT_SECRET: ${APPLE_CLIENT_SECRET:-}
+      APPLE_AUTHORIZATION_ENDPOINT: ${APPLE_AUTHORIZATION_ENDPOINT:-}
+      APPLE_TOKEN_ENDPOINT: ${APPLE_TOKEN_ENDPOINT:-}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-2525}
+      EMAIL_USERNAME: ${EMAIL_USERNAME:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-true}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-no-reply@petmagic.app}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-PetMagic}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       FAL_AI_API_KEY: ${FAL_AI_API_KEY:-}
@@ -39,9 +52,15 @@ services:
       R2_SECRET_KEY: ${R2_SECRET_KEY:-}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      Identity__AvatarStorage__PublicBaseUrl: ${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}
+      Templates__PublicBaseUrl: ${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
     ports:
       - "5000:5000"
+    volumes:
+      - backend_data_protection:/root/.aspnet/DataProtection-Keys
+      - backend_user_avatars:/app/wwwroot/user-avatars
+      - backend_template_media:/app/wwwroot/templates-media
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,6 +73,7 @@ services:
       dockerfile: Dockerfile
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}
+      INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL:-http://backend:5000}
     ports:
       - "3000:3000"
     depends_on:
@@ -63,6 +83,12 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  backend_data_protection:
+    driver: local
+  backend_user_avatars:
+    driver: local
+  backend_template_media:
     driver: local
 
 networks:

@@ -24,10 +24,12 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<BootstrapAdminOptions>(configuration.GetSection(BootstrapAdminOptions.SectionName));
 
-        var externalAuth = configuration.GetSection(ExternalAuthOptions.SectionName).Get<ExternalAuthOptions>() ?? new ExternalAuthOptions();
+        var externalAuth = BuildExternalAuthOptions(configuration.GetSection(ExternalAuthOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         var emailOptions = BuildEmailOptions(configuration.GetSection(EmailOptions.SectionName));
         var avatarStorageOptions = BuildAvatarStorageOptions(configuration.GetSection(AvatarStorageOptions.SectionName));
+
+        ValidateExternalAuthConfiguration(externalAuth);
 
         services.AddDbContext<IdentityDbContext>(options =>
         {
@@ -169,7 +171,9 @@ public static class IdentityInfrastructureServiceCollectionExtensions
                 {
                     google.ClientId = options.Google.ClientId;
                     google.ClientSecret = options.Google.ClientSecret;
+                    google.CallbackPath = "/signin-google";
                     google.SignInScheme = IdentityConstants.ExternalScheme;
+                    google.SaveTokens = true;
                 });
         }
 
@@ -197,6 +201,25 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         options.ClaimActions.MapJsonKey("email", "email");
         options.ClaimActions.MapJsonKey("name", "name");
         options.SaveTokens = true;
+    }
+
+    private static ExternalAuthOptions BuildExternalAuthOptions(IConfigurationSection section)
+    {
+        return new ExternalAuthOptions
+        {
+            Google = new ExternalAuthOptions.GoogleOAuthOptions
+            {
+                ClientId = ReadValue(section.GetSection("Google"), "ClientId", "GOOGLE_CLIENT_ID") ?? string.Empty,
+                ClientSecret = ReadValue(section.GetSection("Google"), "ClientSecret", "GOOGLE_CLIENT_SECRET") ?? string.Empty
+            },
+            Apple = new ExternalAuthOptions.OAuthProviderOptions
+            {
+                ClientId = ReadValue(section.GetSection("Apple"), "ClientId", "APPLE_CLIENT_ID") ?? string.Empty,
+                ClientSecret = ReadValue(section.GetSection("Apple"), "ClientSecret", "APPLE_CLIENT_SECRET") ?? string.Empty,
+                AuthorizationEndpoint = ReadValue(section.GetSection("Apple"), "AuthorizationEndpoint", "APPLE_AUTHORIZATION_ENDPOINT") ?? string.Empty,
+                TokenEndpoint = ReadValue(section.GetSection("Apple"), "TokenEndpoint", "APPLE_TOKEN_ENDPOINT") ?? string.Empty
+            }
+        };
     }
 
     private static EmailOptions BuildEmailOptions(IConfigurationSection section)
@@ -266,6 +289,33 @@ public static class IdentityInfrastructureServiceCollectionExtensions
     private static bool ParseBool(string? rawValue, bool fallback)
     {
         return bool.TryParse(rawValue, out var parsed) ? parsed : fallback;
+    }
+
+    private static void ValidateExternalAuthConfiguration(ExternalAuthOptions options)
+    {
+        var googleClientIdConfigured = !string.IsNullOrWhiteSpace(options.Google.ClientId);
+        var googleClientSecretConfigured = !string.IsNullOrWhiteSpace(options.Google.ClientSecret);
+        if (googleClientIdConfigured != googleClientSecretConfigured)
+        {
+            throw new InvalidOperationException("Google external auth configuration is incomplete. Configure both ClientId and ClientSecret.");
+        }
+
+        var appleClientIdConfigured = !string.IsNullOrWhiteSpace(options.Apple.ClientId);
+        var appleClientSecretConfigured = !string.IsNullOrWhiteSpace(options.Apple.ClientSecret);
+        var appleAuthorizationConfigured = !string.IsNullOrWhiteSpace(options.Apple.AuthorizationEndpoint);
+        var appleTokenConfigured = !string.IsNullOrWhiteSpace(options.Apple.TokenEndpoint);
+
+        if (appleClientIdConfigured != appleClientSecretConfigured)
+        {
+            throw new InvalidOperationException("Apple external auth configuration is incomplete. Configure both ClientId and ClientSecret.");
+        }
+
+        var appleCredentialsConfigured = appleClientIdConfigured && appleClientSecretConfigured;
+        var appleAllConfigured = appleCredentialsConfigured && appleAuthorizationConfigured && appleTokenConfigured;
+        if (appleCredentialsConfigured && !appleAllConfigured)
+        {
+            throw new InvalidOperationException("Apple external auth configuration is incomplete. Configure ClientId, ClientSecret, AuthorizationEndpoint, and TokenEndpoint together.");
+        }
     }
 
     private static void ValidateProductionEmailConfiguration(EmailOptions options, IHostEnvironment? environment)

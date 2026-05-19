@@ -5,6 +5,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
+import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
@@ -12,13 +13,15 @@ import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.da
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
 class AuthEntryPage extends StatelessWidget {
-  const AuthEntryPage({super.key});
+  const AuthEntryPage({super.key, this.initialEmail});
 
   static const routePath = '/auth';
 
+  final String? initialEmail;
+
   @override
   Widget build(BuildContext context) {
-    return const _AuthFlowPage(mode: _AuthMode.signIn);
+    return _AuthFlowPage(mode: _AuthMode.signIn, initialEmail: initialEmail);
   }
 }
 
@@ -36,9 +39,10 @@ class RegisterEntryPage extends StatelessWidget {
 enum _AuthMode { signIn, signUp }
 
 class _AuthFlowPage extends ConsumerStatefulWidget {
-  const _AuthFlowPage({required this.mode});
+  const _AuthFlowPage({required this.mode, this.initialEmail});
 
   final _AuthMode mode;
+  final String? initialEmail;
 
   @override
   ConsumerState<_AuthFlowPage> createState() => _AuthFlowPageState();
@@ -57,9 +61,11 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(profileControllerProvider.notifier).initialize(),
-    );
+    Future.microtask(() {
+      ref
+          .read(profileControllerProvider.notifier)
+          .initialize(initialEmail: widget.initialEmail?.trim() ?? '');
+    });
   }
 
   @override
@@ -239,8 +245,15 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                             switchPrompt: switchPrompt,
                             switchAction: switchAction,
                             forgotPasswordAction: text.authForgotPasswordAction,
-                            onForgotPassword: () =>
-                                _showInfo(text.authForgotPasswordComingSoon),
+                            onForgotPassword: () {
+                              final email = _emailController.text.trim();
+                              final query = email.isEmpty
+                                  ? ''
+                                  : '?email=${Uri.encodeQueryComponent(email)}';
+                              context.go(
+                                '${PasswordResetPage.routePath}$query',
+                              );
+                            },
                             onSwitchMode: () {
                               context.go(
                                 _isSignUp
@@ -368,13 +381,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     );
   }
 
-  void _showInfo(String message) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
   void _syncController(TextEditingController controller, String value) {
     if (controller.text == value) {
       return;
@@ -390,6 +396,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     switch (raw) {
       case 'auth.password_mismatch':
         return text.authPasswordMismatch;
+      case 'auth.password_too_short':
+        return text.authPasswordTooShort;
       case 'auth.external_cancelled':
         return text.authExternalCancelled;
       case 'auth.external_callback_failed':

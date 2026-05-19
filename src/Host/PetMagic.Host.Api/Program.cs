@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.DataProtection;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -23,6 +24,15 @@ builder.Host.UseSerilog((context, loggerConfiguration) =>
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddMemoryCache();
+
+var dataProtectionKeysPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".aspnet",
+    "DataProtection-Keys");
+
+builder.Services.AddDataProtection()
+    .SetApplicationName("PetMagic.Host.Api")
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 
@@ -102,6 +112,11 @@ builder.Services
         .AddOtlpExporter());
 
 var app = builder.Build();
+
+Directory.CreateDirectory(dataProtectionKeysPath);
+Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot"));
+Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
+Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
 
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();

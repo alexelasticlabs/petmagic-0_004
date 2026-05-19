@@ -3,20 +3,18 @@
   max-width: 108rem;
   margin: 0 auto;
   display: grid;
-  gap: clamp(0.84rem, 0.68rem + 0.4vw, 1.06rem);
+  gap: clamp(0.74rem, 0.66rem + 0.2vw, 0.9rem);
   padding-bottom: 0.82rem;
 }
 
 .pageHeader {
   display: grid;
-  gap: 0.82rem;
-  padding: clamp(0.82rem, 0.72rem + 0.28vw, 0.96rem) clamp(0.82rem, 0.68rem + 0.36vw, 0.98rem) clamp(0.86rem, 0.74rem + 0.32vw, 1rem);
+  gap: 0.72rem;
+  padding: clamp(0.72rem, 0.66rem + 0.18vw, 0.84rem) clamp(0.72rem, 0.64rem + 0.22vw, 0.88rem) clamp(0.76rem, 0.68rem + 0.22vw, 0.9rem);
   border: 1px solid var(--border-soft);
   border-radius: 0.86rem;
-  background:
-    radial-gradient(circle at top right, rgba(88, 166, 255, 0.1), transparent 24%),
-    linear-gradient(180deg, rgba(17, 24, 37, 0.96) 0%, rgba(13, 17, 23, 0.98) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 32px rgba(0, 0, 0, 0.16);
+  background: rgba(5, 8, 14, 0.96);
+  box-shadow: none;
 }
 
 .breadcrumbs,
@@ -53,7 +51,7 @@
 .headerGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1.15rem;
+  gap: 0.9rem;
   align-items: center;
 }
 
@@ -68,7 +66,7 @@
 .headerActions,
 .uploadActions,
 .resultHeaderActions {
-  gap: 0.65rem;
+  gap: 0.5rem;
 }
 
 .inlineIcon,
@@ -84,14 +82,14 @@
 .dangerButton,
 .fileButton,
 .iconButton {
-  min-height: 2.28rem;
+  min-height: 2.08rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.42rem;
   border-radius: 0.68rem;
   font-family: var(--font-heading), sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease, color 160ms ease;
@@ -99,15 +97,15 @@
 
 .secondaryLink,
 .detailRowMultiline {
-  padding: 0.56rem 0.78rem;
+  padding: 0.46rem 0.66rem;
 }
 
 .primaryLink {
-  padding: 0.58rem 0.86rem;
+  padding: 0.46rem 0.72rem;
   border: 1px solid rgba(83, 155, 245, 0.46);
-  background: linear-gradient(180deg, #58a6ff 0%, #388bfd 100%);
+  background: #1a73e8;
   color: var(--accent-contrast);
-  box-shadow: 0 10px 22px rgba(31, 111, 235, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .secondaryLink,
@@ -115,9 +113,9 @@
 .fileButton,
 .iconButton {
   border: 1px solid var(--border-soft);
-  background: linear-gradient(180deg, rgba(21, 27, 35, 0.96) 0%, rgba(13, 17, 23, 0.96) 100%);
+  background: rgba(5, 8, 14, 0.94);
   color: var(--text-soft);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: none;
 }
 
 .dangerButton,
@@ -160,7 +158,7 @@
 }
 
 .iconButton {
-  width: 2.65rem;
+  width: 2.3rem;
   padding: 0;
   color: #fca5a5;
 }
@@ -168,14 +166,14 @@
 .workflowGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 1.15rem;
+  gap: 0.88rem;
   align-items: start;
 }
 
 .resultsColumn {
   min-width: 0;
   display: grid;
-  gap: clamp(0.9rem, 0.72rem + 0.45vw, 1rem);
+  gap: clamp(0.74rem, 0.66rem + 0.18vw, 0.86rem);
 }
 
 .card {
@@ -186,10 +184,8 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.92rem;
   padding: clamp(0.84rem, 0.72rem + 0.3vw, 0.98rem);
-  background:
-    radial-gradient(circle at top right, rgba(56, 189, 248, 0.05), transparent 24%),
-    linear-gradient(180deg, rgba(21, 27, 35, 0.98) 0%, rgba(13, 17, 23, 0.98) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 14px 28px rgba(0, 0, 0, 0.14);
+  background: rgba(5, 8, 14, 0.96);
+  box-shadow: none;
 }
 
 .stepHeader,
@@ -203,7 +199,7 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0.8rem;
+  gap: 0.68rem;
   min-width: 0;
 }
 
@@ -219,7 +215,7 @@
 
 .sectionHeaderRow {
   align-items: center;
-  gap: 1rem;
+  gap: 0.8rem;
 }
 
 .stepHeader h2 {
@@ -241,10 +237,10 @@
 .statusPill {
   display: inline-flex;
   align-items: center;
-  min-height: 1.62rem;
+  min-height: 1.5rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  padding: 0.28rem 0.68rem;
+  padding: 0.22rem 0.58rem;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
@@ -300,10 +296,8 @@
   overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: 0.78rem;
-  background:
-    radial-gradient(circle at 50% 18%, rgba(125, 211, 252, 0.16), transparent 48%),
-    linear-gradient(180deg, rgba(10, 38, 46, 0.94) 0%, rgba(10, 27, 45, 0.98) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -24px 40px rgba(4, 9, 19, 0.38);
+  background: rgba(7, 12, 20, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   color: var(--text-muted);
   font-weight: 700;
 }
@@ -356,7 +350,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.68rem;
   padding: 0.82rem 0.9rem;
-  background: rgba(8, 15, 27, 0.48);
+  background: rgba(4, 7, 12, 0.9);
 }
 
 .resultHeaderActions :global(.ui-button) {
@@ -388,18 +382,18 @@
   justify-content: center;
   gap: 0.4rem;
   padding: 0.55rem 0.45rem;
-  border: 1px solid rgba(43, 62, 86, 0.52);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(21, 27, 35, 0.92) 0%, rgba(13, 17, 23, 0.84) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 24px rgba(0, 0, 0, 0.12);
+  background: rgba(5, 8, 14, 0.92);
+  box-shadow: none;
 }
 
 .mediaConnectorLine {
   width: 2px;
   height: 1.55rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(88, 166, 255, 0) 0%, rgba(125, 211, 252, 0.72) 38%, rgba(88, 166, 255, 0.92) 58%, rgba(88, 166, 255, 0.16) 100%);
-  box-shadow: 0 0 16px rgba(125, 211, 252, 0.16);
+  background: linear-gradient(180deg, rgba(88, 166, 255, 0) 0%, rgba(88, 166, 255, 0.72) 44%, rgba(88, 166, 255, 0.92) 58%, rgba(88, 166, 255, 0.16) 100%);
+  box-shadow: none;
 }
 
 .mediaConnectorArrow {
@@ -446,8 +440,8 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.69rem;
   padding: 0.72rem;
-  background: linear-gradient(180deg, rgba(11, 18, 31, 0.96) 0%, rgba(8, 14, 25, 0.92) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: rgba(5, 8, 14, 0.96);
+  box-shadow: none;
 }
 
 .uploadDropzone {
@@ -534,7 +528,7 @@
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.52rem;
-  background: rgba(21, 27, 35, 0.78);
+  background: rgba(38, 14, 20, 0.74);
   color: #fca5a5;
   font-family: var(--font-heading), sans-serif;
   font-size: 0.75rem;
@@ -623,9 +617,7 @@
   display: grid;
   place-items: center;
   min-height: 15rem;
-  background:
-    radial-gradient(circle at top, rgba(125, 211, 252, 0.12), transparent 42%),
-    linear-gradient(180deg, rgba(12, 24, 39, 0.98) 0%, rgba(6, 11, 20, 0.98) 100%);
+  background: rgba(5, 8, 14, 0.96);
 }
 
 .mediaPlaceholderGlow {
@@ -633,8 +625,8 @@
   inset: 14% 18% auto;
   height: 32%;
   border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(88, 166, 255, 0.16));
-  filter: blur(28px);
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.08), rgba(88, 166, 255, 0.08));
+  filter: blur(20px);
   pointer-events: none;
 }
 
@@ -696,7 +688,7 @@
   padding: 0.48rem 0.72rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.52rem;
-  background: rgba(16, 24, 21, 0.78);
+  background: rgba(5, 8, 14, 0.94);
   color: var(--text-soft);
   font-size: 0.76rem;
   font-weight: 800;
@@ -706,7 +698,8 @@
 
 .mediaActionLinkPrimary {
   border-color: rgba(83, 155, 245, 0.34);
-  color: #58a6ff;
+  background: rgba(18, 36, 67, 0.82);
+  color: #e8f0fe;
 }
 
 .resultMetrics {
@@ -721,7 +714,7 @@
   padding: 0.95rem 1rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.72rem;
-  background: rgba(8, 15, 27, 0.42);
+  background: rgba(4, 7, 12, 0.9);
 }
 
 .metricTile strong {
@@ -748,7 +741,7 @@
   padding: 0.88rem 0.95rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.69rem;
-  background: rgba(8, 15, 27, 0.34);
+  background: rgba(4, 7, 12, 0.88);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -757,12 +750,12 @@
 .historyItemCurrent {
   border-color: rgba(74, 222, 128, 0.28);
   box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.12);
-  background: rgba(12, 24, 35, 0.56);
+  background: rgba(9, 18, 28, 0.9);
 }
 
 .historyItem:hover {
   border-color: var(--border-accent);
-  background: rgba(10, 19, 33, 0.52);
+  background: rgba(9, 14, 22, 0.98);
 }
 
 .historyItemHeader {
@@ -807,7 +800,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.69rem;
   padding: 0.8rem 0.9rem;
-  background: rgba(8, 15, 27, 0.34);
+  background: rgba(4, 7, 12, 0.88);
 }
 
 .timelineItem>* {

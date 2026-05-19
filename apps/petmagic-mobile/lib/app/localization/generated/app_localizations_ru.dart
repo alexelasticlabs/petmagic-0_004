@@ -270,8 +270,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Подтвердите пароль';
 
   @override
-  String get authPasswordRulesHint =>
-      'Используйте 10+ символов, верхний и нижний регистр и цифру.';
+  String get authPasswordRulesHint => 'Используйте минимум 6 символов.';
+
+  @override
+  String get authPasswordTooShort =>
+      'Пароль должен содержать минимум 6 символов.';
 
   @override
   String get authForgotPasswordAction => 'Забыли пароль?';
@@ -279,6 +282,44 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get authForgotPasswordComingSoon =>
       'Восстановление пароля скоро появится.';
+
+  @override
+  String get authPasswordResetTitle => 'Восстановление пароля';
+
+  @override
+  String get authPasswordResetSubtitle =>
+      'Введите email, и мы отправим код для сброса пароля.';
+
+  @override
+  String get authPasswordResetCodeTitle => 'Введите код из письма';
+
+  @override
+  String get authPasswordResetCodeSubtitle =>
+      'Укажите код и задайте новый пароль для входа.';
+
+  @override
+  String get authPasswordResetCodeLabel => 'Код из письма';
+
+  @override
+  String get authPasswordResetRequestAction => 'Отправить код';
+
+  @override
+  String get authPasswordResetConfirmAction => 'Сохранить новый пароль';
+
+  @override
+  String get authPasswordResetResendAction => 'Отправить код повторно';
+
+  @override
+  String get authPasswordResetCodeSent =>
+      'Код для восстановления отправлен на вашу почту.';
+
+  @override
+  String get authPasswordResetSuccess =>
+      'Пароль обновлен. Теперь можно войти с новым паролем.';
+
+  @override
+  String get authPasswordResetCodeInvalid =>
+      'Код восстановления недействителен или уже истек.';
 
   @override
   String get authOrContinueWith => 'или продолжить через';

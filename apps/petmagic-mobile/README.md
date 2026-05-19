@@ -37,6 +37,18 @@ flutter run --dart-define=API_BASE_URL=http://localhost:5000
 flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
 ```
 
+## External auth and password reset
+
+Google sign-in uses the backend OAuth flow and returns to the app through the deep link `petmagic://auth/external`, which is already configured on Android and iOS.
+
+For Google sign-in to work end-to-end:
+
+- configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the backend
+- register the backend redirect URI `https://<your-api-host>/signin-google` in Google Cloud Console
+- run the app against the same backend host via `API_BASE_URL`
+
+Password reset emails are sent by the backend SMTP worker, so reset flow depends on valid backend email settings rather than any direct SMTP integration in Flutter.
+
 ## Checks
 
 ```bash

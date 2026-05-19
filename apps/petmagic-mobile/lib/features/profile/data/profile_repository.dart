@@ -72,6 +72,39 @@ class ProfileRepository {
     }
   }
 
+  Future<void> requestPasswordReset({required String email}) async {
+    try {
+      await _dio.post<void>(
+        '/api/auth/password-reset/request',
+        data: {'email': email.trim()},
+      );
+    } on DioException catch (error) {
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'Password reset request failed.',
+      );
+    }
+  }
+
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/api/auth/password-reset/confirm',
+        data: {
+          'email': email.trim(),
+          'code': code.trim(),
+          'newPassword': newPassword,
+        },
+      );
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: 'Password reset failed.');
+    }
+  }
+
   Future<void> logout() async {
     final session = await _sessionStorage.read();
     await _sessionStorage.clear();

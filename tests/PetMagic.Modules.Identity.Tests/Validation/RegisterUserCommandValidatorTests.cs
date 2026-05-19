@@ -20,7 +20,7 @@ public sealed class RegisterUserCommandValidatorTests
     public void Should_Pass_When_Payload_Is_Valid()
     {
         var validator = new RegisterUserCommandValidator();
-        var command = new RegisterUserCommand("demo@petmagic.app", "StrongPassword123", "Demo");
+        var command = new RegisterUserCommand("demo@petmagic.app", "pet123", "Demo");
 
         var result = validator.Validate(command);
 

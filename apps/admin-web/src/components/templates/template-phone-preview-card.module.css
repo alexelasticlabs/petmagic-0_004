@@ -1,5 +1,5 @@
 .phonePreview {
-  --phone-preview-min-height: clamp(23.2rem, 21.6rem + 8vw, 27rem);
+  --phone-preview-min-height: clamp(20.2rem, 19.2rem + 5.8vw, 23.8rem);
   width: 100%;
   min-width: 0;
 }
@@ -37,9 +37,9 @@
 
 .phoneTopRow {
   position: absolute;
-  top: 0.82rem;
-  left: 0.82rem;
-  right: 0.82rem;
+  top: 0.68rem;
+  left: 0.68rem;
+  right: 0.68rem;
   z-index: 1;
   display: flex;
   align-items: center;
@@ -59,15 +59,15 @@
   align-items: center;
   border-radius: var(--radius-sm);
   backdrop-filter: blur(14px);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .phoneHeroBadge {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  min-height: 1.5rem;
-  padding: 0.15rem 0.58rem;
+  min-height: 1.34rem;
+  padding: 0.1rem 0.48rem;
   border: 1px solid rgba(242, 249, 255, 0.34);
   background: linear-gradient(180deg, rgba(22, 34, 48, 0.62) 0%, rgba(8, 13, 22, 0.48) 100%);
   color: #fdfefe;
@@ -85,8 +85,8 @@
 
 .phoneMediaKindBadge {
   gap: 0.32rem;
-  min-height: 1.72rem;
-  padding: 0.2rem 0.68rem 0.2rem 0.46rem;
+  min-height: 1.54rem;
+  padding: 0.14rem 0.58rem 0.14rem 0.4rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(8, 11, 18, 0.48);
   color: #ffffff;
@@ -192,8 +192,8 @@
   right: 0;
   bottom: 0;
   display: grid;
-  gap: 0.4rem;
-  padding: 0.4rem 0.95rem 0.85rem;
+  gap: 0.32rem;
+  padding: 0.32rem 0.78rem 0.72rem;
   border-radius: 0 0 1.28rem 1.28rem;
   isolation: isolate;
   z-index: 1;
@@ -221,18 +221,18 @@
 .phoneMetaRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.38rem;
   align-items: center;
 }
 
 .phoneMetricBadge {
   gap: 0.35rem;
-  min-height: 1.68rem;
-  padding: 0.22rem 0.56rem;
+  min-height: 1.5rem;
+  padding: 0.16rem 0.46rem;
   border: 1px solid rgba(255, 255, 255, 0.09);
   background: rgba(15, 24, 37, 0.28);
   color: #eef6ff;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   box-shadow: 0 8px 16px rgba(2, 6, 14, 0.15);
 }
 

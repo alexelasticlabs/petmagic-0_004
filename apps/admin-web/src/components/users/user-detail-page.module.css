@@ -3,15 +3,15 @@
   max-width: 106rem;
   margin: 0 auto;
   display: grid;
-  gap: 1rem;
+  gap: 0.82rem;
 }
 
 .backLink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.4rem;
-  padding: 0 0.95rem;
+  min-height: 2.08rem;
+  padding: 0 0.78rem;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.26);
   background: rgba(15, 23, 42, 0.62);
@@ -23,13 +23,14 @@
 .profileHeader {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) minmax(14rem, 20rem);
-  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr) minmax(12rem, 17rem);
+  gap: 0.78rem;
   align-items: center;
 }
 
 .profileCopy {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.4rem;
 }
 
 .profileTitle,
@@ -39,7 +40,7 @@
 
 .profileTitle {
   color: var(--text-strong);
-  font-size: 1.35rem;
+  font-size: 1.22rem;
   font-weight: 700;
 }
 
@@ -50,7 +51,7 @@
 .profileBadges {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 
 .profileMeta,
@@ -62,7 +63,7 @@
 
 .profileMeta,
 .dataList {
-  gap: 0.75rem;
+  gap: 0.58rem;
 }
 
 .metric {
@@ -73,7 +74,7 @@
 .timelineItem span,
 .dataCard span {
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .metric strong {
@@ -81,14 +82,14 @@
 }
 
 .timeline {
-  gap: 0.75rem;
+  gap: 0.58rem;
 }
 
 .timelineItem,
 .dataCard {
   display: grid;
   gap: 0.45rem;
-  padding: 0.95rem 1rem;
+  padding: 0.76rem 0.82rem;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: var(--radius-md);
   background: linear-gradient(180deg, rgba(12, 18, 30, 0.9), rgba(7, 11, 20, 0.96));
@@ -105,7 +106,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.8rem;
+  gap: 0.62rem;
 }
 
 .timelineHeader strong,

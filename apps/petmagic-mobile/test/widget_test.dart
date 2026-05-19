@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -29,20 +30,14 @@ void main() {
   });
 
   testWidgets('shows short welcome for returning guest', (tester) async {
-    await _pumpApp(
-      tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-    );
+    await _pumpApp(tester, sharedPrefs: const {_onboardingSeenKey: true});
 
     expect(find.text('Welcome back to PetMagic'), findsOneWidget);
     expect(find.text('Continue as guest'), findsOneWidget);
   });
 
   testWidgets('guest can open auth and registration pages', (tester) async {
-    await _pumpApp(
-      tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-    );
+    await _pumpApp(tester, sharedPrefs: const {_onboardingSeenKey: true});
 
     await tester.tap(find.text('Sign in'));
     await tester.pump();
@@ -64,6 +59,66 @@ void main() {
 
     expect(find.text('Create your account'), findsOneWidget);
     expect(find.text('Display name (optional)'), findsOneWidget);
+  });
+
+  testWidgets('guest can open password reset and request a code', (
+    tester,
+  ) async {
+    final profileRepository = _FakeProfileRepository();
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      profileRepository: profileRepository,
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Forgot password?'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reset your password'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'pet@example.com');
+    await tester.tap(find.widgetWithText(FilledButton, 'Send code'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(profileRepository.passwordResetRequestedFor, 'pet@example.com');
+    expect(find.text('Enter the code from your email'), findsOneWidget);
+  });
+
+  testWidgets('password reset returns to sign in with prefilled email', (
+    tester,
+  ) async {
+    final profileRepository = _FakeProfileRepository();
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      profileRepository: profileRepository,
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'pet@example.com');
+    await tester.tap(find.text('Forgot password?'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Send code'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(1), '123456');
+    await tester.enterText(find.byType(TextField).at(2), 'pet123');
+    await tester.enterText(find.byType(TextField).at(3), 'pet123');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save new password'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(profileRepository.passwordResetConfirmedFor, 'pet@example.com');
+    expect(find.text('Welcome back!'), findsOneWidget);
+    final emailField = tester.widget<TextField>(find.byType(TextField).first);
+    expect(emailField.controller?.text, 'pet@example.com');
   });
 
   testWidgets('registers a new user and opens templates', (tester) async {
@@ -157,7 +212,9 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Continue with Google'));
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Continue with Google'),
+    );
     await tester.pump();
     await tester.pumpAndSettle();
 
@@ -184,7 +241,9 @@ void main() {
       120,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Continue with Google'));
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Continue with Google'),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Sign-in was cancelled.'), findsOneWidget);
@@ -195,10 +254,7 @@ void main() {
   ) async {
     await _pumpApp(
       tester,
-      sharedPrefs: {
-        _onboardingSeenKey: true,
-        _sessionKey: _buildSessionJson(),
-      },
+      sharedPrefs: {_onboardingSeenKey: true, _sessionKey: _buildSessionJson()},
       repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
     );
 
@@ -253,6 +309,9 @@ Future<void> _pumpApp(
         ),
         externalAuthRepositoryProvider.overrideWith(
           (ref) => externalAuthRepository ?? _FakeExternalAuthRepository(),
+        ),
+        realtimeClientProvider.overrideWith(
+          (ref) => const NoopRealtimeClient(),
         ),
       ],
       child: const PetMagicApp(),
@@ -322,17 +381,18 @@ class _FakeProfileRepository extends ProfileRepository {
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   AuthSession? storedSession;
+  String? passwordResetRequestedFor;
+  String? passwordResetConfirmedFor;
 
-  MobileUserProfile get _profile =>
-      const MobileUserProfile(
-        userId: 'user-1',
-        email: 'pet@example.com',
-        displayName: 'Pet Parent',
-        isPremium: false,
-        emailConfirmed: true,
-        roles: ['user'],
-        avatar: null,
-      );
+  MobileUserProfile get _profile => const MobileUserProfile(
+    userId: 'user-1',
+    email: 'pet@example.com',
+    displayName: 'Pet Parent',
+    isPremium: false,
+    emailConfirmed: true,
+    roles: ['user'],
+    avatar: null,
+  );
 
   @override
   Future<AuthSession?> readSession() async => storedSession;
@@ -407,6 +467,20 @@ class _FakeProfileRepository extends ProfileRepository {
   @override
   Future<void> logout() async {
     storedSession = null;
+  }
+
+  @override
+  Future<void> requestPasswordReset({required String email}) async {
+    passwordResetRequestedFor = email;
+  }
+
+  @override
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    passwordResetConfirmedFor = email;
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart'
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
@@ -22,7 +23,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isWelcomeRoute = location == GuestWelcomePage.routePath;
       final isAuthRoute = location == AuthEntryPage.routePath;
       final isRegisterRoute = location == RegisterEntryPage.routePath;
-      final isPublicAuthRoute = isAuthRoute || isRegisterRoute;
+      final isPasswordResetRoute = location == PasswordResetPage.routePath;
+      final isPublicAuthRoute =
+          isAuthRoute || isRegisterRoute || isPasswordResetRoute;
 
       if (launchState.isLoading) {
         return isStartupRoute ? null : StartupLoadingPage.routePath;
@@ -74,13 +77,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AuthEntryPage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: AuthEntryPage()),
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: AuthEntryPage(
+            initialEmail: state.uri.queryParameters['email'],
+          ),
+        ),
       ),
       GoRoute(
         path: RegisterEntryPage.routePath,
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: RegisterEntryPage()),
+      ),
+      GoRoute(
+        path: PasswordResetPage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: PasswordResetPage(
+            initialEmail: state.uri.queryParameters['email'],
+          ),
+        ),
       ),
       ShellRoute(
         builder: (context, state, child) =>

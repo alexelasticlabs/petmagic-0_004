@@ -3,7 +3,7 @@
   max-width: 106rem;
   margin: 0 auto;
   display: grid;
-  gap: clamp(0.9rem, 0.6rem + 0.5vw, 1.1rem);
+  gap: clamp(0.78rem, 0.68rem + 0.24vw, 0.92rem);
 }
 
 .message {
@@ -13,7 +13,7 @@
 .emptyState {
   grid-template-columns: 1fr;
   place-items: center;
-  min-height: 12rem;
+  min-height: 8.75rem;
   text-align: center;
 }
 
@@ -26,7 +26,7 @@
 .emptyDescription {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.86rem;
+  font-size: 0.8rem;
 }
 
 .roleList {
@@ -44,14 +44,14 @@
 }
 
 .actionsCell {
-  min-width: clamp(16rem, 20vw, 22rem);
+  min-width: clamp(13rem, 16vw, 18rem);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.45rem;
+  gap: 0.35rem;
   min-width: 0;
 }
 
@@ -77,13 +77,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.25rem;
-  padding: 0 0.85rem;
-  border-radius: 999px;
+  min-height: 2rem;
+  padding: 0 0.72rem;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(96, 165, 250, 0.3);
-  background: rgba(37, 99, 235, 0.12);
+  background: rgba(18, 36, 67, 0.74);
   color: var(--text-strong);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
   text-decoration: none;
   transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
@@ -91,7 +91,7 @@
 
 .inlineLink:hover {
   border-color: rgba(96, 165, 250, 0.5);
-  background: rgba(37, 99, 235, 0.18);
+  background: rgba(24, 48, 87, 0.88);
   color: #dbeafe;
   transform: translateY(-1px);
 }
@@ -107,7 +107,7 @@
 
 .adminButton {
   border-color: var(--border-soft) !important;
-  background: rgba(17, 22, 29, 0.9) !important;
+  background: rgba(5, 8, 14, 0.94) !important;
   color: var(--text-soft) !important;
   box-shadow: none;
   gap: 0.38rem;
@@ -116,22 +116,22 @@
 
 .adminButton:hover:not(:disabled) {
   border-color: var(--border-accent) !important;
-  background: rgba(21, 27, 35, 0.96) !important;
-  box-shadow: var(--shadow-soft);
+  background: rgba(9, 14, 22, 0.98) !important;
+  box-shadow: none;
   color: var(--text-strong) !important;
   transform: none;
 }
 
 .adminButtonPrimary {
   border-color: rgba(83, 155, 245, 0.38) !important;
-  background: rgba(88, 166, 255, 0.1) !important;
+  background: rgba(18, 36, 67, 0.82) !important;
   color: var(--text-strong) !important;
   gap: 0.38rem;
 }
 
 .adminButtonPrimary:hover:not(:disabled) {
   border-color: rgba(83, 155, 245, 0.56) !important;
-  background: rgba(88, 166, 255, 0.16) !important;
+  background: rgba(24, 48, 87, 0.9) !important;
 }
 
 .buttonIcon {
@@ -142,11 +142,11 @@
 
 .skeletonStack {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.58rem;
 }
 
 .skeletonLine {
-  height: 2.5rem;
+  height: 2.2rem;
   border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--surface-1) 0%, var(--surface-3) 50%, var(--surface-1) 100%);
   background-size: 220% 100%;
@@ -161,7 +161,7 @@
 
 @media (max-width: 760px) {
   .actionsCell {
-    min-width: 18rem;
+    min-width: 15rem;
   }
 
   .actions {

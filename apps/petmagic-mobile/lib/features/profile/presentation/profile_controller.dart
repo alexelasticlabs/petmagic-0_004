@@ -89,7 +89,7 @@ class ProfileController extends Notifier<ProfileState> {
     return const ProfileState.initial();
   }
 
-  Future<void> initialize() async {
+  Future<void> initialize({String initialEmail = ''}) async {
     state = state.copyWith(
       isLoading: true,
       clearError: true,
@@ -101,6 +101,7 @@ class ProfileController extends Notifier<ProfileState> {
       if (session == null) {
         state = state.copyWith(
           isLoading: false,
+          email: initialEmail,
           clearSession: true,
           clearProfile: true,
         );
@@ -118,6 +119,7 @@ class ProfileController extends Notifier<ProfileState> {
     } on AppException catch (error) {
       state = state.copyWith(
         isLoading: false,
+        email: initialEmail,
         errorMessage: error.message,
         clearSession: true,
         clearProfile: true,
@@ -180,6 +182,14 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> register() async {
+    if (state.password.length < 6) {
+      state = state.copyWith(
+        errorMessage: 'auth.password_too_short',
+        clearSuccess: true,
+      );
+      return;
+    }
+
     if (state.password != state.confirmPassword) {
       state = state.copyWith(
         errorMessage: 'auth.password_mismatch',

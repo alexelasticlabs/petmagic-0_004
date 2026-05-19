@@ -71,9 +71,13 @@ class TemplatesState {
 }
 
 class TemplatesController extends Notifier<TemplatesState> {
+  static const _realtimeRefreshDebounce = Duration(milliseconds: 350);
+
   late final TemplatesRepository _repository;
   late final RealtimeClient _realtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+  Timer? _realtimeRefreshTimer;
+  bool _hasPendingRealtimeRefresh = false;
   int _requestVersion = 0;
 
   static String? _normalizeCategory(String? value) {
@@ -112,6 +116,7 @@ class TemplatesController extends Notifier<TemplatesState> {
     _realtimeSubscription?.cancel();
     _realtimeSubscription = _realtimeClient.events.listen(_handleRealtimeEvent);
     ref.onDispose(() {
+      _realtimeRefreshTimer?.cancel();
       unawaited(_realtimeSubscription?.cancel());
       unawaited(_realtimeClient.disconnect());
     });
@@ -123,11 +128,39 @@ class TemplatesController extends Notifier<TemplatesState> {
       return;
     }
 
-    if (state.isLoading || state.isRefreshing || state.isLoadingMore) {
+    _hasPendingRealtimeRefresh = true;
+    _scheduleRealtimeRefresh();
+  }
+
+  bool get _isFeedBusy =>
+      state.isLoading || state.isRefreshing || state.isLoadingMore;
+
+  void _scheduleRealtimeRefresh() {
+    if (_isFeedBusy) {
       return;
     }
 
+    _realtimeRefreshTimer?.cancel();
+    _realtimeRefreshTimer = Timer(
+      _realtimeRefreshDebounce,
+      _flushPendingRealtimeRefresh,
+    );
+  }
+
+  void _flushPendingRealtimeRefresh() {
+    _realtimeRefreshTimer = null;
+    if (!_hasPendingRealtimeRefresh || _isFeedBusy) {
+      return;
+    }
+
+    _hasPendingRealtimeRefresh = false;
     unawaited(loadInitial(forceRefresh: true));
+  }
+
+  void _resumePendingRealtimeRefreshIfNeeded() {
+    if (_hasPendingRealtimeRefresh) {
+      _scheduleRealtimeRefresh();
+    }
   }
 
   Future<void> loadInitial({bool forceRefresh = false}) async {
@@ -187,6 +220,8 @@ class TemplatesController extends Notifier<TemplatesState> {
         isRefreshing: false,
         errorMessage: error.toString(),
       );
+    } finally {
+      _resumePendingRealtimeRefreshIfNeeded();
     }
   }
 
@@ -235,6 +270,8 @@ class TemplatesController extends Notifier<TemplatesState> {
         isLoadingMore: false,
         errorMessage: error.toString(),
       );
+    } finally {
+      _resumePendingRealtimeRefreshIfNeeded();
     }
   }
 

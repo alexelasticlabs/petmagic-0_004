@@ -239,6 +239,7 @@ docker-compose up --build
 - **Frontend**: Next.js App Router with dynamic localization ([locale] segments)
 - **Database**: PostgreSQL 16 with EF Core 10 migrations
 - **Observability**: Serilog (structured logging) + OpenTelemetry (distributed tracing)
+- **Google + Email setup**: [md/AUTH_EMAIL_SETUP.md](md/AUTH_EMAIL_SETUP.md)
 
 ---
 

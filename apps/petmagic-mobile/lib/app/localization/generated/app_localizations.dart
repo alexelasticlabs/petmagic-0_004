@@ -610,8 +610,14 @@ abstract class AppLocalizations {
   /// No description provided for @authPasswordRulesHint.
   ///
   /// In en, this message translates to:
-  /// **'Use 10+ characters with uppercase, lowercase and a number.'**
+  /// **'Use at least 6 characters.'**
   String get authPasswordRulesHint;
+
+  /// No description provided for @authPasswordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters long.'**
+  String get authPasswordTooShort;
 
   /// No description provided for @authForgotPasswordAction.
   ///
@@ -624,6 +630,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Password recovery is coming soon.'**
   String get authForgotPasswordComingSoon;
+
+  /// No description provided for @authPasswordResetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset your password'**
+  String get authPasswordResetTitle;
+
+  /// No description provided for @authPasswordResetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email and we will send you a reset code.'**
+  String get authPasswordResetSubtitle;
+
+  /// No description provided for @authPasswordResetCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code from your email'**
+  String get authPasswordResetCodeTitle;
+
+  /// No description provided for @authPasswordResetCodeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the code to set a new password for your account.'**
+  String get authPasswordResetCodeSubtitle;
+
+  /// No description provided for @authPasswordResetCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset code'**
+  String get authPasswordResetCodeLabel;
+
+  /// No description provided for @authPasswordResetRequestAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get authPasswordResetRequestAction;
+
+  /// No description provided for @authPasswordResetConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save new password'**
+  String get authPasswordResetConfirmAction;
+
+  /// No description provided for @authPasswordResetResendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code again'**
+  String get authPasswordResetResendAction;
+
+  /// No description provided for @authPasswordResetCodeSent.
+  ///
+  /// In en, this message translates to:
+  /// **'We sent a password reset code to your email.'**
+  String get authPasswordResetCodeSent;
+
+  /// No description provided for @authPasswordResetSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Password updated. You can now sign in with the new password.'**
+  String get authPasswordResetSuccess;
+
+  /// No description provided for @authPasswordResetCodeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This reset code is invalid or has expired.'**
+  String get authPasswordResetCodeInvalid;
 
   /// No description provided for @authOrContinueWith.
   ///

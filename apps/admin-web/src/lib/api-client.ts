@@ -520,7 +520,16 @@ export type TemplateCategoryPayload = {
 const AUTH_KEY = "petmagic_admin_auth";
 const AUTH_SESSION_EVENT = "petmagic_admin_auth_changed";
 const ADMIN_LIST_CACHE_TTL_MS = 30_000;
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
+
+function getApiBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return process.env.INTERNAL_API_BASE_URL
+      ?? process.env.NEXT_PUBLIC_API_BASE_URL
+      ?? "http://localhost:5000";
+  }
+
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
+}
 
 type ApiError = Error & { status?: number; detail?: string; code?: string; validationErrors?: string[] };
 type AuthSessionSnapshot = AuthSession | null | undefined;
@@ -691,7 +700,7 @@ async function apiRequest<TResponse>(
     headers.set("Authorization", `Bearer ${session.accessToken}`);
   }
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers
   });
@@ -783,7 +792,7 @@ export async function logout(): Promise<void> {
       headers.set("Authorization", `Bearer ${session.accessToken}`);
     }
 
-    void fetch(`${apiBaseUrl}/api/auth/logout`, {
+    void fetch(`${getApiBaseUrl()}/api/auth/logout`, {
         method: "POST",
         headers,
         body: JSON.stringify({ refreshToken: session.refreshToken })
