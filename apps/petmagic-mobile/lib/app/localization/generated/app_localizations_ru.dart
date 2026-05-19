@@ -247,11 +247,109 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupWelcomeShareSubtitle => 'Сохраняйте избранное позже';
 
   @override
-  String get authEntryTitle => 'Войти';
+  String get authEntryTitle => 'С возвращением!';
 
   @override
   String get authEntrySubtitle =>
-      'Откройте шаблоны, токены и премиальную магию для питомцев.';
+      'Войдите, чтобы продолжить магию для вашего питомца.';
+
+  @override
+  String get authRegisterTitle => 'Создайте аккаунт';
+
+  @override
+  String get authRegisterSubtitle =>
+      'Присоединяйтесь к PetMagic и откройте шаблоны, токены и premium-возможности.';
+
+  @override
+  String get authRegisterAction => 'Зарегистрироваться';
+
+  @override
+  String get authDisplayNameLabel => 'Имя профиля (необязательно)';
+
+  @override
+  String get authConfirmPasswordLabel => 'Подтвердите пароль';
+
+  @override
+  String get authPasswordRulesHint =>
+      'Используйте 10+ символов, верхний и нижний регистр и цифру.';
+
+  @override
+  String get authForgotPasswordAction => 'Забыли пароль?';
+
+  @override
+  String get authForgotPasswordComingSoon =>
+      'Восстановление пароля скоро появится.';
+
+  @override
+  String get authOrContinueWith => 'или продолжить через';
+
+  @override
+  String get authContinueWithGoogle => 'Продолжить с Google';
+
+  @override
+  String get authContinueWithApple => 'Продолжить с Apple';
+
+  @override
+  String get authNoAccountPrompt => 'Еще нет аккаунта?';
+
+  @override
+  String get authHaveAccountPrompt => 'Уже есть аккаунт?';
+
+  @override
+  String get authSignUpAction => 'Регистрация';
+
+  @override
+  String get authSocialComingSoon => 'Социальный вход скоро появится.';
+
+  @override
+  String get authPasswordMismatch => 'Пароли не совпадают.';
+
+  @override
+  String get authExternalCancelled => 'Вход был отменен.';
+
+  @override
+  String get authExternalFailed =>
+      'Не удалось выполнить вход через внешний сервис. Попробуйте еще раз.';
+
+  @override
+  String get authExternalTimedOut =>
+      'Вход занял слишком много времени. Попробуйте еще раз.';
+
+  @override
+  String get authExternalLaunchFailed => 'Не удалось открыть страницу входа.';
+
+  @override
+  String get authExternalCallbackFailed =>
+      'Не удалось завершить вход обратно в приложении.';
+
+  @override
+  String get authExternalSessionExpired =>
+      'Сессия внешнего входа истекла. Попробуйте еще раз.';
+
+  @override
+  String get authSecurePrivateTitle => 'Безопасно';
+
+  @override
+  String get authSecurePrivateSubtitle => 'Ваши данные надежно защищены.';
+
+  @override
+  String get authFastEasyTitle => 'Быстро';
+
+  @override
+  String get authFastEasySubtitle => 'Начните создавать магию в пару тапов.';
+
+  @override
+  String get authLovedByPetsTitle => 'Для любимцев';
+
+  @override
+  String get authLovedByPetsSubtitle => 'Сделано для заботливых pet-родителей.';
+
+  @override
+  String get authPrivacyTitle => 'Ваша приватность важна';
+
+  @override
+  String get authPrivacySubtitle =>
+      'Мы не продаем и не передаем ваши данные третьим лицам.';
 
   @override
   String get authRequiredTitle => 'Войдите, чтобы открыть это действие';

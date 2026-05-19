@@ -19,6 +19,215 @@ class OnboardingPage extends ConsumerStatefulWidget {
   @override
   ConsumerState<OnboardingPage> createState() => _OnboardingPageState();
 }
+
+class _OnboardingPageState extends ConsumerState<OnboardingPage> {
+  late final PageController _pageController;
+  int _pageIndex = 0;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    final pages = [
+      _OnboardingContent(
+        icon: Icons.auto_awesome_rounded,
+        accentRank: 0,
+        title: text.startupOnboardingPageOneTitle,
+        subtitle: text.startupOnboardingPageOneSubtitle,
+        highlights: [
+          text.startupOnboardingPageOneHighlightOne,
+          text.startupOnboardingPageOneHighlightTwo,
+          text.startupOnboardingPageOneHighlightThree,
+        ],
+      ),
+      _OnboardingContent(
+        icon: Icons.movie_creation_outlined,
+        accentRank: 1,
+        title: text.startupOnboardingPageTwoTitle,
+        subtitle: text.startupOnboardingPageTwoSubtitle,
+        highlights: [
+          text.startupOnboardingPageTwoHighlightOne,
+          text.startupOnboardingPageTwoHighlightTwo,
+          text.startupOnboardingPageTwoHighlightThree,
+        ],
+      ),
+      _OnboardingContent(
+        icon: Icons.stars_rounded,
+        accentRank: 2,
+        title: text.startupOnboardingPageThreeTitle,
+        subtitle: text.startupOnboardingPageThreeSubtitle,
+        highlights: [
+          text.startupOnboardingPageThreeHighlightOne,
+          text.startupOnboardingPageThreeHighlightTwo,
+          text.startupOnboardingPageThreeHighlightThree,
+        ],
+      ),
+    ];
+    final isLastPage = _pageIndex == pages.length - 1;
+
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [colors.backgroundTop, colors.backgroundBottom],
+          ),
+        ),
+        child: Stack(
+          children: [
+            StartupBackdrop(accentRank: _pageIndex),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    BrandHeader(
+                      actionLabel: text.profileSignInAction,
+                      onAction: _openSignIn,
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: pages.length,
+                        onPageChanged: (value) {
+                          setState(() => _pageIndex = value);
+                        },
+                        itemBuilder: (context, index) {
+                          return _OnboardingHero(
+                            content: pages[index],
+                            fastStartLabel: text.startupMiniFeatureFastStart,
+                            petFirstLabel: text.startupMiniFeaturePetFirst,
+                            upgradeLaterLabel:
+                                text.startupMiniFeatureUpgradeLater,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _OnboardingFooter(
+                      pageIndex: _pageIndex,
+                      pageCount: pages.length,
+                      primaryLabel: isLastPage
+                          ? text.startupOnboardingActionStart
+                          : text.startupOnboardingActionNext,
+                      secondaryLabel: text.startupOnboardingActionContinueGuest,
+                      isBusy: _isSubmitting,
+                      onPrimaryPressed: () async {
+                        if (_isSubmitting) {
+                          return;
+                        }
+
+                        if (!isLastPage) {
+                          await _pageController.nextPage(
+                            duration: 280.ms,
+                            curve: Curves.easeOutCubic,
+                          );
+                          return;
+                        }
+
+                        setState(() => _isSubmitting = true);
+                        await ref
+                            .read(appLaunchControllerProvider.notifier)
+                            .continueAsGuest();
+                        if (!context.mounted) {
+                          return;
+                        }
+                        context.go(TemplatesPage.routePath);
+                      },
+                      onSecondaryPressed: () async {
+                        if (_isSubmitting) {
+                          return;
+                        }
+                        setState(() => _isSubmitting = true);
+                        await ref
+                            .read(appLaunchControllerProvider.notifier)
+                            .continueAsGuest();
+                        if (!context.mounted) {
+                          return;
+                        }
+                        context.go(TemplatesPage.routePath);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSignIn() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    final router = GoRouter.of(context);
+    setState(() => _isSubmitting = true);
+    await ref.read(appLaunchControllerProvider.notifier).markOnboardingSeen();
+    if (!context.mounted) {
+      return;
+    }
+    setState(() => _isSubmitting = false);
+    router.go(AuthEntryPage.routePath);
+  }
+}
+
+class _OnboardingContent {
+  const _OnboardingContent({
+    required this.icon,
+    required this.accentRank,
+    required this.title,
+    required this.subtitle,
+    required this.highlights,
+  });
+
+  final IconData icon;
+  final int accentRank;
+  final String title;
+  final String subtitle;
+  final List<String> highlights;
+}
+
+class _OnboardingHero extends StatelessWidget {
+  const _OnboardingHero({
+    required this.content,
+    required this.fastStartLabel,
+    required this.petFirstLabel,
+    required this.upgradeLaterLabel,
+  });
+
+  final _OnboardingContent content;
+  final String fastStartLabel;
+  final String petFirstLabel;
+  final String upgradeLaterLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final accent = switch (content.accentRank % 3) {
+      0 => colors.accent,
+      1 => colors.blue,
+      _ => colors.gold,
+    };
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -143,215 +352,6 @@ class OnboardingPage extends ConsumerStatefulWidget {
           ),
         );
       },
-                          await _pageController.nextPage(
-                            duration: 280.ms,
-                            curve: Curves.easeOutCubic,
-                          );
-                          return;
-                        }
-
-                        setState(() => _isSubmitting = true);
-                        await ref
-                            .read(appLaunchControllerProvider.notifier)
-                            .continueAsGuest();
-                        if (!context.mounted) {
-                          return;
-                        }
-                        context.go(TemplatesPage.routePath);
-                      },
-                      onSecondaryPressed: () async {
-                        if (_isSubmitting) {
-                          return;
-                        }
-                        setState(() => _isSubmitting = true);
-                        await ref
-                            .read(appLaunchControllerProvider.notifier)
-                            .continueAsGuest();
-                        if (!context.mounted) {
-                          return;
-                        }
-                        context.go(TemplatesPage.routePath);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openSignIn() async {
-    if (_isSubmitting) {
-      return;
-    }
-
-    final router = GoRouter.of(context);
-    setState(() => _isSubmitting = true);
-    await ref.read(appLaunchControllerProvider.notifier).markOnboardingSeen();
-    if (!context.mounted) {
-      return;
-    }
-    setState(() => _isSubmitting = false);
-    router.go(AuthEntryPage.routePath);
-  }
-}
-
-class _OnboardingContent {
-  const _OnboardingContent({
-    required this.icon,
-    required this.accentRank,
-    required this.title,
-    required this.subtitle,
-    required this.highlights,
-  });
-
-  final IconData icon;
-  final int accentRank;
-  final String title;
-  final String subtitle;
-  final List<String> highlights;
-}
-
-class _OnboardingHero extends StatelessWidget {
-  const _OnboardingHero({
-    required this.content,
-    required this.fastStartLabel,
-    required this.petFirstLabel,
-    required this.upgradeLaterLabel,
-  });
-
-  final _OnboardingContent content;
-  final String fastStartLabel;
-  final String petFirstLabel;
-  final String upgradeLaterLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    final accent = switch (content.accentRank % 3) {
-      0 => colors.accent,
-      1 => colors.blue,
-      _ => colors.gold,
-    };
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 10),
-        Center(
-          child:
-              Container(
-                    width: 280,
-                    height: 280,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          accent.withValues(alpha: 0.24),
-                          accent.withValues(alpha: 0.08),
-                          Colors.transparent,
-                        ],
-                        stops: const [0, 0.52, 1],
-                      ),
-                      border: Border.all(
-                        color: accent.withValues(alpha: 0.22),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Center(
-                      child: Container(
-                        width: 156,
-                        height: 156,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceGlass,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: colors.border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accent.withValues(alpha: 0.16),
-                              blurRadius: 32,
-                              offset: const Offset(0, 16),
-                            ),
-                          ],
-                        ),
-                        child: Icon(content.icon, color: accent, size: 74),
-                      ),
-                    ),
-                  )
-                  .animate()
-                  .fadeIn(duration: 420.ms)
-                  .scale(begin: const Offset(0.92, 0.92)),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          content.title,
-          style: TextStyle(
-            color: colors.textStrong,
-            fontSize: 38,
-            height: 0.98,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -1.2,
-          ),
-        ).animate().fadeIn(duration: 320.ms).slideY(begin: 0.16),
-        const SizedBox(height: 14),
-        Text(
-          content.subtitle,
-          style: TextStyle(
-            color: colors.textSoft,
-            fontSize: 16,
-            height: 1.4,
-            fontWeight: FontWeight.w500,
-          ),
-        ).animate().fadeIn(delay: 80.ms, duration: 320.ms).slideY(begin: 0.16),
-        const SizedBox(height: 18),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final highlight in content.highlights)
-              _HighlightChip(label: highlight, accent: accent),
-          ],
-        ),
-        const Spacer(),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: colors.surfaceGlass,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: colors.border),
-              ),
-              child: Row(
-                children: [
-                  _MiniFeature(
-                    icon: Icons.rocket_launch_outlined,
-                    label: fastStartLabel,
-                    accent: accent,
-                  ),
-                  const SizedBox(width: 12),
-                  _MiniFeature(
-                    icon: Icons.favorite_outline_rounded,
-                    label: petFirstLabel,
-                    accent: colors.purple,
-                  ),
-                  const SizedBox(width: 12),
-                  _MiniFeature(
-                    icon: Icons.workspace_premium_outlined,
-                    label: upgradeLaterLabel,
-                    accent: colors.gold,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ).animate().fadeIn(delay: 140.ms, duration: 340.ms).slideY(begin: 0.2),
-      ],
     );
   }
 }

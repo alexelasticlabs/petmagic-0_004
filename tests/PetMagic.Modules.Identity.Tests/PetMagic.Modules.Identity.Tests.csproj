@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Domain\PetMagic.Modules.Economy.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Infrastructure\PetMagic.Modules.Economy.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Api\PetMagic.Modules.Identity.Api.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Domain\PetMagic.Modules.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\PetMagic.Modules.Identity.Infrastructure\PetMagic.Modules.Identity.Infrastructure.csproj" />

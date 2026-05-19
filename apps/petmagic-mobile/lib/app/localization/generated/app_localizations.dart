@@ -568,14 +568,194 @@ abstract class AppLocalizations {
   /// No description provided for @authEntryTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sign in'**
+  /// **'Welcome back!'**
   String get authEntryTitle;
 
   /// No description provided for @authEntrySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Unlock templates, tokens and premium pet magic.'**
+  /// **'Sign in to continue your pet magic.'**
   String get authEntrySubtitle;
+
+  /// No description provided for @authRegisterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your account'**
+  String get authRegisterTitle;
+
+  /// No description provided for @authRegisterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join PetMagic and unlock templates, tokens and premium features.'**
+  String get authRegisterSubtitle;
+
+  /// No description provided for @authRegisterAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign Up'**
+  String get authRegisterAction;
+
+  /// No description provided for @authDisplayNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name (optional)'**
+  String get authDisplayNameLabel;
+
+  /// No description provided for @authConfirmPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get authConfirmPasswordLabel;
+
+  /// No description provided for @authPasswordRulesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use 10+ characters with uppercase, lowercase and a number.'**
+  String get authPasswordRulesHint;
+
+  /// No description provided for @authForgotPasswordAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get authForgotPasswordAction;
+
+  /// No description provided for @authForgotPasswordComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Password recovery is coming soon.'**
+  String get authForgotPasswordComingSoon;
+
+  /// No description provided for @authOrContinueWith.
+  ///
+  /// In en, this message translates to:
+  /// **'or continue with'**
+  String get authOrContinueWith;
+
+  /// No description provided for @authContinueWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get authContinueWithGoogle;
+
+  /// No description provided for @authContinueWithApple.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Apple'**
+  String get authContinueWithApple;
+
+  /// No description provided for @authNoAccountPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account?'**
+  String get authNoAccountPrompt;
+
+  /// No description provided for @authHaveAccountPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account?'**
+  String get authHaveAccountPrompt;
+
+  /// No description provided for @authSignUpAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign Up'**
+  String get authSignUpAction;
+
+  /// No description provided for @authSocialComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Social sign-in is coming soon.'**
+  String get authSocialComingSoon;
+
+  /// No description provided for @authPasswordMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match.'**
+  String get authPasswordMismatch;
+
+  /// No description provided for @authExternalCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in was cancelled.'**
+  String get authExternalCancelled;
+
+  /// No description provided for @authExternalFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'External sign-in failed. Please try again.'**
+  String get authExternalFailed;
+
+  /// No description provided for @authExternalTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in took too long. Please try again.'**
+  String get authExternalTimedOut;
+
+  /// No description provided for @authExternalLaunchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the sign-in page.'**
+  String get authExternalLaunchFailed;
+
+  /// No description provided for @authExternalCallbackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not finish sign-in in the app.'**
+  String get authExternalCallbackFailed;
+
+  /// No description provided for @authExternalSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This sign-in session expired. Please try again.'**
+  String get authExternalSessionExpired;
+
+  /// No description provided for @authSecurePrivateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure & Private'**
+  String get authSecurePrivateTitle;
+
+  /// No description provided for @authSecurePrivateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data stays protected.'**
+  String get authSecurePrivateSubtitle;
+
+  /// No description provided for @authFastEasyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast & Easy'**
+  String get authFastEasyTitle;
+
+  /// No description provided for @authFastEasySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start creating in just a few taps.'**
+  String get authFastEasySubtitle;
+
+  /// No description provided for @authLovedByPetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Loved by Pets'**
+  String get authLovedByPetsTitle;
+
+  /// No description provided for @authLovedByPetsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Built for happy pet parents.'**
+  String get authLovedByPetsSubtitle;
+
+  /// No description provided for @authPrivacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your privacy matters'**
+  String get authPrivacyTitle;
+
+  /// No description provided for @authPrivacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We never sell or share your data with third parties.'**
+  String get authPrivacySubtitle;
 
   /// No description provided for @authRequiredTitle.
   ///

@@ -22,6 +22,7 @@ builder.Host.UseSerilog((context, loggerConfiguration) =>
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+builder.Services.AddMemoryCache();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 

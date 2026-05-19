@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 
@@ -12,8 +13,10 @@ class ProfileState {
   const ProfileState({
     required this.isLoading,
     required this.isSaving,
+    required this.displayName,
     required this.email,
     required this.password,
+    required this.confirmPassword,
     this.session,
     this.profile,
     this.errorMessage,
@@ -21,12 +24,21 @@ class ProfileState {
   });
 
   const ProfileState.initial()
-    : this(isLoading: true, isSaving: false, email: '', password: '');
+    : this(
+        isLoading: true,
+        isSaving: false,
+        displayName: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+      );
 
   final bool isLoading;
   final bool isSaving;
+  final String displayName;
   final String email;
   final String password;
+  final String confirmPassword;
   final AuthSession? session;
   final MobileUserProfile? profile;
   final String? errorMessage;
@@ -37,8 +49,10 @@ class ProfileState {
   ProfileState copyWith({
     bool? isLoading,
     bool? isSaving,
+    String? displayName,
     String? email,
     String? password,
+    String? confirmPassword,
     AuthSession? session,
     MobileUserProfile? profile,
     String? errorMessage,
@@ -51,8 +65,10 @@ class ProfileState {
     return ProfileState(
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
+      displayName: displayName ?? this.displayName,
       email: email ?? this.email,
       password: password ?? this.password,
+      confirmPassword: confirmPassword ?? this.confirmPassword,
       session: clearSession ? null : (session ?? this.session),
       profile: clearProfile ? null : (profile ?? this.profile),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -113,9 +129,25 @@ class ProfileController extends Notifier<ProfileState> {
     state = state.copyWith(email: value, clearError: true, clearSuccess: true);
   }
 
+  void updateDisplayName(String value) {
+    state = state.copyWith(
+      displayName: value,
+      clearError: true,
+      clearSuccess: true,
+    );
+  }
+
   void updatePassword(String value) {
     state = state.copyWith(
       password: value,
+      clearError: true,
+      clearSuccess: true,
+    );
+  }
+
+  void updateConfirmPassword(String value) {
+    state = state.copyWith(
+      confirmPassword: value,
       clearError: true,
       clearSuccess: true,
     );
@@ -139,6 +171,66 @@ class ProfileController extends Notifier<ProfileState> {
         session: session,
         profile: profile,
         password: '',
+        confirmPassword: '',
+      );
+      ref.read(appLaunchControllerProvider.notifier).markSignedIn();
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    }
+  }
+
+  Future<void> register() async {
+    if (state.password != state.confirmPassword) {
+      state = state.copyWith(
+        errorMessage: 'auth.password_mismatch',
+        clearSuccess: true,
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      final session = await _repository.register(
+        email: state.email,
+        password: state.password,
+        displayName: state.displayName,
+      );
+      final profile = await _repository.fetchProfile();
+      state = state.copyWith(
+        isSaving: false,
+        session: session,
+        profile: profile,
+        password: '',
+        confirmPassword: '',
+      );
+      ref.read(appLaunchControllerProvider.notifier).markSignedIn();
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    }
+  }
+
+  Future<void> authenticateWithProvider(ExternalAuthProvider provider) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      final session = await ref
+          .read(externalAuthRepositoryProvider)
+          .authenticate(provider);
+      state = state.copyWith(
+        isSaving: false,
+        session: session,
+        profile: session.user,
+        password: '',
+        confirmPassword: '',
       );
       ref.read(appLaunchControllerProvider.notifier).markSignedIn();
     } on AppException catch (error) {
@@ -159,6 +251,7 @@ class ProfileController extends Notifier<ProfileState> {
       clearSession: true,
       clearProfile: true,
       password: '',
+      confirmPassword: '',
       successMessage: 'logout',
     );
     ref.read(appLaunchControllerProvider.notifier).markSignedOut();

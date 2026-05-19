@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.WebUtilities;
+using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 
@@ -17,6 +19,15 @@ public static class AuthEndpoints
     private const string InvalidSubjectCode = "auth.invalid_subject";
     private const string RefreshTokenOwnershipViolationCode = "auth.refresh_token_not_owned";
     private const string EmailNotConfirmedCode = "auth.email_not_confirmed";
+    private const string ExternalRedirectUriProperty = "mobile_redirect_uri";
+    private const string ExternalTicketInvalidCode = "auth.external_ticket_invalid";
+    private const string ExternalCancelledCode = "auth.external_cancelled";
+    private const string ExternalTicketInvalidMessage = "External sign-in session is invalid or expired.";
+    private const string ExternalCancelledMessage = "External sign-in was cancelled.";
+    private const string UnsupportedRedirectUriMessage = "Unsupported redirect URI.";
+    private const string MobileRedirectScheme = "petmagic";
+    private const string MobileRedirectHost = "auth";
+    private const string MobileRedirectPath = "/external";
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -62,6 +73,9 @@ public static class AuthEndpoints
             .AllowAnonymous();
 
         group.MapGet("/external/callback", ExternalCallbackAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/external/exchange", ExchangeExternalLoginAsync)
             .AllowAnonymous();
 
         return endpoints;
@@ -257,34 +271,65 @@ public static class AuthEndpoints
         return TypedResults.NoContent();
     }
 
-    private static IResult ExternalChallengeAsync(string provider)
+    private static IResult ExternalChallengeAsync(string provider, string? redirectUri)
     {
-        if (!string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(provider, "Apple", StringComparison.OrdinalIgnoreCase))
+        var normalizedProvider = NormalizeExternalProvider(provider);
+        string? normalizedRedirectUri = null;
+        if (normalizedProvider is null)
         {
             return Results.BadRequest(new { message = "Unsupported provider." });
         }
 
-        var redirectUri = $"/api/auth/external/callback?provider={provider}";
+        if (redirectUri is not null && !TryNormalizeMobileRedirectUri(redirectUri, out normalizedRedirectUri))
+        {
+            return Results.BadRequest(new { message = UnsupportedRedirectUriMessage });
+        }
+
+        var callbackRedirectUri = $"/api/auth/external/callback?provider={normalizedProvider}";
+        var properties = new AuthenticationProperties { RedirectUri = callbackRedirectUri };
+        if (normalizedRedirectUri is not null)
+        {
+            properties.Items[ExternalRedirectUriProperty] = normalizedRedirectUri;
+        }
+
         return Results.Challenge(
-            new AuthenticationProperties { RedirectUri = redirectUri },
-            authenticationSchemes: [provider]);
+            properties,
+            authenticationSchemes: [normalizedProvider]);
     }
 
-    private static async Task<Results<Ok<TokenPairResponse>, ProblemHttpResult>> ExternalCallbackAsync(
+    private static async Task<IResult> ExternalCallbackAsync(
         string provider,
         HttpContext httpContext,
         IValidator<ExternalLoginCallbackCommand> validator,
         IIdentityService service,
+        ExternalLoginCompletionStore completionStore,
         CancellationToken cancellationToken)
     {
+        var normalizedProvider = NormalizeExternalProvider(provider);
+        if (normalizedProvider is null)
+        {
+            return Results.BadRequest(new { message = "Unsupported provider." });
+        }
+
         var externalAuthResult = await httpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
+        var clientRedirectUri = ReadMobileRedirectUri(externalAuthResult.Properties);
         if (!externalAuthResult.Succeeded || externalAuthResult.Principal is null)
         {
-            return TypedResults.Problem(
-                title: "auth.external_invalid",
-                detail: "External authentication failed.",
-                statusCode: StatusCodes.Status401Unauthorized);
+            var providerError = httpContext.Request.Query["error"].ToString();
+            if (string.Equals(providerError, "access_denied", StringComparison.OrdinalIgnoreCase))
+            {
+                return BuildExternalCallbackErrorResult(
+                    clientRedirectUri,
+                    ExternalCancelledCode,
+                    ExternalCancelledMessage,
+                    StatusCodes.Status401Unauthorized);
+            }
+
+            return BuildExternalCallbackErrorResult(
+                clientRedirectUri,
+                "auth.external_invalid",
+                "External authentication failed.",
+                StatusCodes.Status401Unauthorized);
         }
 
         var principal = externalAuthResult.Principal;
@@ -293,7 +338,7 @@ public static class AuthEndpoints
             ?? string.Empty;
 
         var command = new ExternalLoginCallbackCommand(
-            provider,
+            normalizedProvider,
             providerSubject,
             principal.FindFirstValue(ClaimTypes.Email) ?? principal.FindFirstValue("email"),
             principal.FindFirstValue(ClaimTypes.Name) ?? principal.FindFirstValue("name"));
@@ -301,10 +346,12 @@ public static class AuthEndpoints
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return TypedResults.Problem(
-                title: "auth.external_invalid",
-                detail: "External principal payload is invalid.",
-                statusCode: StatusCodes.Status400BadRequest);
+            await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+            return BuildExternalCallbackErrorResult(
+                clientRedirectUri,
+                "auth.external_invalid",
+                "External principal payload is invalid.",
+                StatusCodes.Status400BadRequest);
         }
 
         var result = await service.ExternalLoginAsync(command, cancellationToken);
@@ -312,10 +359,49 @@ public static class AuthEndpoints
 
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return BuildExternalCallbackErrorResult(
+                clientRedirectUri,
+                result.Error.Code,
+                result.Error.Message,
+                StatusCodes.Status401Unauthorized);
+        }
+
+        if (clientRedirectUri is not null)
+        {
+            var ticket = completionStore.Create(result.Value);
+            var redirectUrl = QueryHelpers.AddQueryString(clientRedirectUri, new Dictionary<string, string?>
+            {
+                ["ticket"] = ticket,
+                ["provider"] = normalizedProvider
+            });
+
+            return Results.Redirect(redirectUrl);
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult> ExchangeExternalLoginAsync(
+        ExternalLoginExchangeRequest request,
+        ExternalLoginCompletionStore completionStore)
+    {
+        if (string.IsNullOrWhiteSpace(request.Ticket))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.Ticket)] = ["Ticket is required."]
+            });
+        }
+
+        if (!completionStore.TryTake(request.Ticket, out var session) || session is null)
+        {
+            return TypedResults.Problem(
+                title: ExternalTicketInvalidCode,
+                detail: ExternalTicketInvalidMessage,
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        return TypedResults.Ok(session);
     }
 
     private static async Task<Results<Ok<UserProfileResponse>, ProblemHttpResult>> MeAsync(
@@ -392,4 +478,73 @@ public static class AuthEndpoints
 
         return TypedResults.Ok(result.Value);
     }
+
+    private static string? NormalizeExternalProvider(string provider)
+    {
+        if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Google";
+        }
+
+        if (string.Equals(provider, "Apple", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Apple";
+        }
+
+        return null;
+    }
+
+    private static string? ReadMobileRedirectUri(AuthenticationProperties? properties)
+    {
+        if (properties?.Items.TryGetValue(ExternalRedirectUriProperty, out var redirectUri) == true &&
+            redirectUri is not null &&
+            TryNormalizeMobileRedirectUri(redirectUri, out var normalizedRedirectUri))
+        {
+            return normalizedRedirectUri;
+        }
+
+        return null;
+    }
+
+    private static bool TryNormalizeMobileRedirectUri(string redirectUri, out string? normalizedRedirectUri)
+    {
+        normalizedRedirectUri = null;
+
+        if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var parsedUri))
+        {
+            return false;
+        }
+
+        if (!string.Equals(parsedUri.Scheme, MobileRedirectScheme, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(parsedUri.Host, MobileRedirectHost, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(parsedUri.AbsolutePath, MobileRedirectPath, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        normalizedRedirectUri = parsedUri.GetLeftPart(UriPartial.Path);
+        return true;
+    }
+
+    private static IResult BuildExternalCallbackErrorResult(
+        string? clientRedirectUri,
+        string errorCode,
+        string errorMessage,
+        int statusCode)
+    {
+        if (clientRedirectUri is not null)
+        {
+            var redirectUrl = QueryHelpers.AddQueryString(clientRedirectUri, new Dictionary<string, string?>
+            {
+                ["error"] = errorCode,
+                ["message"] = errorMessage
+            });
+
+            return Results.Redirect(redirectUrl);
+        }
+
+        return TypedResults.Problem(title: errorCode, detail: errorMessage, statusCode: statusCode);
+    }
+
+    private sealed record ExternalLoginExchangeRequest(string Ticket);
 }

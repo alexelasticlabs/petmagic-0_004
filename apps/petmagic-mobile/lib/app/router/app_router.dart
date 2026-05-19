@@ -21,26 +21,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isOnboardingRoute = location == OnboardingPage.routePath;
       final isWelcomeRoute = location == GuestWelcomePage.routePath;
       final isAuthRoute = location == AuthEntryPage.routePath;
+      final isRegisterRoute = location == RegisterEntryPage.routePath;
+      final isPublicAuthRoute = isAuthRoute || isRegisterRoute;
 
       if (launchState.isLoading) {
         return isStartupRoute ? null : StartupLoadingPage.routePath;
       }
 
       if (launchState.isAuthenticated) {
-        if (isStartupRoute || isOnboardingRoute || isWelcomeRoute || isAuthRoute) {
+        if (isStartupRoute ||
+            isOnboardingRoute ||
+            isWelcomeRoute ||
+            isPublicAuthRoute) {
           return TemplatesPage.routePath;
         }
         return null;
       }
 
       if (!launchState.hasSeenOnboarding) {
-        return isOnboardingRoute || isAuthRoute
+        return isOnboardingRoute || isPublicAuthRoute
             ? null
             : OnboardingPage.routePath;
       }
 
       if (!launchState.guestSessionReady) {
-        return isWelcomeRoute || isAuthRoute ? null : GuestWelcomePage.routePath;
+        return isWelcomeRoute || isPublicAuthRoute
+            ? null
+            : GuestWelcomePage.routePath;
       }
 
       if (isStartupRoute || isOnboardingRoute || isWelcomeRoute) {
@@ -65,6 +72,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AuthEntryPage.routePath,
         builder: (context, state) => const AuthEntryPage(),
+      ),
+      GoRoute(
+        path: RegisterEntryPage.routePath,
+        builder: (context, state) => const RegisterEntryPage(),
       ),
       ShellRoute(
         builder: (context, state, child) =>

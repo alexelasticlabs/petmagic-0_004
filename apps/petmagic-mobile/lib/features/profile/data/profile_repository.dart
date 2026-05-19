@@ -31,6 +31,29 @@ class ProfileRepository {
 
   Future<AuthSession?> readSession() => _sessionStorage.read();
 
+  Future<AuthSession> register({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '/api/auth/register',
+        data: {
+          'email': email.trim(),
+          'password': password,
+          'displayName': displayName?.trim().isEmpty ?? true
+              ? null
+              : displayName!.trim(),
+        },
+      );
+
+      return login(email: email, password: password);
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: 'Registration failed.');
+    }
+  }
+
   Future<AuthSession> login({
     required String email,
     required String password,

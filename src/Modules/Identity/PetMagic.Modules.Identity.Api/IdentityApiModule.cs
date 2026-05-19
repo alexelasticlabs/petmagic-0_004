@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Api.Endpoints;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Application.Validation;
@@ -11,6 +12,7 @@ public static class IdentityApiModule
 {
     public static IServiceCollection AddIdentityApiModule(this IServiceCollection services)
     {
+        services.AddSingleton<ExternalLoginCompletionStore>();
         services.AddScoped<IValidator<RegisterUserCommand>, RegisterUserCommandValidator>();
         services.AddScoped<IValidator<LoginCommand>, LoginCommandValidator>();
         services.AddScoped<IValidator<RequestEmailConfirmationCommand>, RequestEmailConfirmationCommandValidator>();

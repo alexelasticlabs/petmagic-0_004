@@ -247,11 +247,106 @@ class AppLocalizationsEs extends AppLocalizations {
   String get startupWelcomeShareSubtitle => 'Save your favorites later';
 
   @override
-  String get authEntryTitle => 'Sign in';
+  String get authEntryTitle => 'Welcome back!';
 
   @override
-  String get authEntrySubtitle =>
-      'Unlock templates, tokens and premium pet magic.';
+  String get authEntrySubtitle => 'Sign in to continue your pet magic.';
+
+  @override
+  String get authRegisterTitle => 'Create your account';
+
+  @override
+  String get authRegisterSubtitle =>
+      'Join PetMagic and unlock templates, tokens and premium features.';
+
+  @override
+  String get authRegisterAction => 'Sign Up';
+
+  @override
+  String get authDisplayNameLabel => 'Display name (optional)';
+
+  @override
+  String get authConfirmPasswordLabel => 'Confirm password';
+
+  @override
+  String get authPasswordRulesHint =>
+      'Use 10+ characters with uppercase, lowercase and a number.';
+
+  @override
+  String get authForgotPasswordAction => 'Forgot password?';
+
+  @override
+  String get authForgotPasswordComingSoon =>
+      'Password recovery is coming soon.';
+
+  @override
+  String get authOrContinueWith => 'or continue with';
+
+  @override
+  String get authContinueWithGoogle => 'Continue with Google';
+
+  @override
+  String get authContinueWithApple => 'Continue with Apple';
+
+  @override
+  String get authNoAccountPrompt => 'Don\'t have an account?';
+
+  @override
+  String get authHaveAccountPrompt => 'Already have an account?';
+
+  @override
+  String get authSignUpAction => 'Sign Up';
+
+  @override
+  String get authSocialComingSoon => 'Social sign-in is coming soon.';
+
+  @override
+  String get authPasswordMismatch => 'Passwords do not match.';
+
+  @override
+  String get authExternalCancelled => 'Sign-in was cancelled.';
+
+  @override
+  String get authExternalFailed => 'External sign-in failed. Please try again.';
+
+  @override
+  String get authExternalTimedOut => 'Sign-in took too long. Please try again.';
+
+  @override
+  String get authExternalLaunchFailed => 'Could not open the sign-in page.';
+
+  @override
+  String get authExternalCallbackFailed =>
+      'We could not finish sign-in in the app.';
+
+  @override
+  String get authExternalSessionExpired =>
+      'This sign-in session expired. Please try again.';
+
+  @override
+  String get authSecurePrivateTitle => 'Secure & Private';
+
+  @override
+  String get authSecurePrivateSubtitle => 'Your data stays protected.';
+
+  @override
+  String get authFastEasyTitle => 'Fast & Easy';
+
+  @override
+  String get authFastEasySubtitle => 'Start creating in just a few taps.';
+
+  @override
+  String get authLovedByPetsTitle => 'Loved by Pets';
+
+  @override
+  String get authLovedByPetsSubtitle => 'Built for happy pet parents.';
+
+  @override
+  String get authPrivacyTitle => 'Your privacy matters';
+
+  @override
+  String get authPrivacySubtitle =>
+      'We never sell or share your data with third parties.';
 
   @override
   String get authRequiredTitle => 'Sign in to unlock this action';
