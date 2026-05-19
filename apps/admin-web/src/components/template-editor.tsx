@@ -19,18 +19,19 @@ import {
 import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
 import { TemplatePreviewAssetSection } from "@/components/templates/template-preview-asset-section";
 import { type TemplateFormState } from "@/components/templates/types";
+import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import {
     fetchAdminTemplate,
-    fetchAdminTemplateCategories,
     fetchAdminTemplates,
     uploadTemplateMedia,
+    useAuthSession,
     type AdminTemplate,
     type AdminTemplateListItem,
     type TemplateAssetKind,
     type TemplateStatus,
-    type TemplateType
+    type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -52,8 +53,9 @@ type EditorVisibilityStatus = Extract<TemplateStatus, "Draft" | "Active">;
 export function TemplateEditor({ locale, templateType, initialTemplateId }: TemplateEditorProps) {
   const text = getDictionary(locale);
   const router = useRouter();
+  const session = useAuthSession();
+  const { categories } = useAdminTemplateCategories({ enabled: Boolean(session), includeArchived: false });
   const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
-  const [categorySuggestions, setCategorySuggestions] = useState<string[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<AdminTemplate | null>(null);
   const [form, setForm] = useState<TemplateFormState>(() => createInitialTemplateForm(templateType));
   const [isLoading, setIsLoading] = useState(true);
@@ -83,13 +85,8 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
         return;
       }
 
-      const [templatesResponse, categoriesResponse] = await Promise.all([
-        fetchAdminTemplates(templateType),
-        fetchAdminTemplateCategories(false),
-      ]);
-
+      const templatesResponse = await fetchAdminTemplates(templateType);
       setTemplates(templatesResponse);
-      setCategorySuggestions(categoriesResponse.map((category) => category.name));
     } catch {
       setToast({ type: "error", message: text.errorLoadingTemplates });
     } finally {
@@ -100,27 +97,20 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
   }
 
   const loadEditorLookups = useCallback(async (isCancelled: () => boolean, notifyOnFailure = true) => {
-    const [templatesResult, categoriesResult] = await Promise.allSettled([
-      fetchAdminTemplates(templateType),
-      fetchAdminTemplateCategories(false),
-    ]);
+    const templatesResult = await Promise.allSettled([fetchAdminTemplates(templateType)]);
 
     if (isCancelled()) {
       return;
     }
 
-    const hasTemplateData = templatesResult.status === "fulfilled";
-    const hasCategoryData = categoriesResult.status === "fulfilled";
+    const templatesLookup = templatesResult[0];
+    const hasTemplateData = templatesLookup.status === "fulfilled";
 
     if (hasTemplateData) {
-      setTemplates(templatesResult.value);
+      setTemplates(templatesLookup.value);
     }
 
-    if (hasCategoryData) {
-      setCategorySuggestions(categoriesResult.value.map((category) => category.name));
-    }
-
-    if (!hasTemplateData && !hasCategoryData && notifyOnFailure) {
+    if (!hasTemplateData && notifyOnFailure) {
       setToast({ type: "error", message: text.errorLoadingTemplates });
     }
   }, [templateType, text.errorLoadingTemplates]);
@@ -265,7 +255,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
     }
   }
 
-  const mergedCategorySuggestions = getUniqueValues([...categorySuggestions, ...templates.map((template) => template.category)]);
+  const mergedCategorySuggestions = getUniqueValues([...categories.map((category) => category.name), ...templates.map((template) => template.category)]);
   const isEditMode = selectedTemplate !== null;
   const catalogPath = getTemplateCatalogPath(locale, templateType);
   const editorModel = buildTemplateEditorModel(text, form, selectedTemplate, templateType);

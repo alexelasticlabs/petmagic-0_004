@@ -4,20 +4,21 @@ import { ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
 import { AdminCard, AdminKpiCard, AdminPage, AdminPageGrid, AdminPageHero, AdminStateCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/templates/templates-catalog.module.css";
+import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import {
     changeTemplateCategoryArchiveState,
     createTemplateCategory,
     deleteTemplateCategory,
-    fetchAdminTemplateCategories,
     updateTemplateCategory,
+    useAuthSession,
     type AdminTemplateCategory,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type TemplatesCategoriesViewProps = {
   locale: Locale;
@@ -39,9 +40,9 @@ const typeColors = {
 export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps) {
   const text = getDictionary(locale);
   const router = useRouter();
-  const [categories, setCategories] = useState<AdminTemplateCategory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const session = useAuthSession();
+  const { categories, hasError, isLoading, refresh } = useAdminTemplateCategories({ enabled: Boolean(session), includeArchived: true });
+  const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -50,6 +51,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isRu = locale === "ru";
+  const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
 
   useEffect(() => {
     if (!toast) {
@@ -60,50 +62,11 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const loadCategories = useCallback(async (showLoading = true) => {
-    if (showLoading) {
-      setIsLoading(true);
-    }
-
-    setError(null);
-
-    try {
-      if (!ensureAdminSession(locale, router)) {
-        return;
-      }
-
-      const response = await fetchAdminTemplateCategories(true);
-      setCategories(response);
-    } catch {
-      const message = text.errorLoadingTemplates;
-      setError(message);
-      setToast({ type: "error", message });
-    } finally {
-      if (showLoading) {
-        setIsLoading(false);
-      }
-    }
-  }, [locale, router, text.errorLoadingTemplates]);
-
   useEffect(() => {
-    let isCancelled = false;
-
-    async function initialize() {
-      try {
-        await loadCategories(true);
-      } catch {
-        if (!isCancelled) {
-          setError(text.errorLoadingTemplates);
-        }
-      }
+    if (!session) {
+      ensureAdminSession(locale, router);
     }
-
-    void initialize();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [loadCategories, text.errorLoadingTemplates]);
+  }, [locale, router, session]);
 
   const visibleCategories = useMemo(
     () => categories.filter((category) => archiveFilter === "archived" ? category.isArchived : !category.isArchived),
@@ -126,16 +89,19 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setActionError(null);
 
     try {
       await createTemplateCategory({ name });
       setNewCategoryName("");
-      await loadCategories(false);
+      const result = await refresh();
+      if (result.isError) {
+        throw result.error;
+      }
       setToast({ type: "success", message: isRu ? "Категория создана." : "Category created." });
     } catch (actionError) {
       const message = getActionErrorMessage(actionError, isRu ? "Не удалось создать категорию." : "Could not create category.");
-      setError(message);
+      setActionError(message);
       setToast({ type: "error", message });
     } finally {
       setIsSubmitting(false);
@@ -149,17 +115,20 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     }
 
     setBusyCategoryId(categoryId);
-    setError(null);
+    setActionError(null);
 
     try {
       await updateTemplateCategory(categoryId, { name });
       setEditingCategoryId(null);
       setEditingName("");
-      await loadCategories(false);
+      const result = await refresh();
+      if (result.isError) {
+        throw result.error;
+      }
       setToast({ type: "success", message: isRu ? "Категория обновлена." : "Category updated." });
     } catch (actionError) {
       const message = getActionErrorMessage(actionError, isRu ? "Не удалось обновить категорию." : "Could not update category.");
-      setError(message);
+      setActionError(message);
       setToast({ type: "error", message });
     } finally {
       setBusyCategoryId(null);
@@ -168,7 +137,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
   async function handleArchiveToggle(category: AdminTemplateCategory) {
     setBusyCategoryId(category.categoryId);
-    setError(null);
+    setActionError(null);
 
     try {
       await changeTemplateCategoryArchiveState(category.categoryId, !category.isArchived);
@@ -176,7 +145,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
         setEditingCategoryId(null);
         setEditingName("");
       }
-      await loadCategories(false);
+      const result = await refresh();
+      if (result.isError) {
+        throw result.error;
+      }
       setToast({
         type: "success",
         message: category.isArchived
@@ -185,7 +157,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       });
     } catch (actionError) {
       const message = getActionErrorMessage(actionError, isRu ? "Не удалось изменить состояние категории." : "Could not change category state.");
-      setError(message);
+      setActionError(message);
       setToast({ type: "error", message });
     } finally {
       setBusyCategoryId(null);
@@ -204,7 +176,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     }
 
     setBusyCategoryId(category.categoryId);
-    setError(null);
+    setActionError(null);
 
     try {
       await deleteTemplateCategory(category.categoryId);
@@ -212,11 +184,14 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
         setEditingCategoryId(null);
         setEditingName("");
       }
-      await loadCategories(false);
+      const result = await refresh();
+      if (result.isError) {
+        throw result.error;
+      }
       setToast({ type: "success", message: isRu ? "Категория удалена." : "Category deleted." });
     } catch (actionError) {
       const message = getActionErrorMessage(actionError, isRu ? "Не удалось удалить категорию." : "Could not delete category.");
-      setError(message);
+      setActionError(message);
       setToast({ type: "error", message });
     } finally {
       setBusyCategoryId(null);

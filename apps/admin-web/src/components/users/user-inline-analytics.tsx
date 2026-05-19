@@ -1,13 +1,12 @@
 "use client";
 
 import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
+import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import styles from "@/components/users/user-inline-analytics.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
-import { fetchAdminUser, fetchAdminUserAnalytics, type AdminUserAnalytics, type AdminUserDetail } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import styles from "@/components/users/user-inline-analytics.module.css";
 
 type UserInlineAnalyticsProps = {
   locale: Locale;
@@ -16,59 +15,7 @@ type UserInlineAnalyticsProps = {
 
 export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps) {
   const text = getDictionary(locale);
-  const [user, setUser] = useState<AdminUserDetail | null>(null);
-  const [analytics, setAnalytics] = useState<AdminUserAnalytics | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function loadUserAnalytics(nextUserId: string) {
-    const [nextUser, nextAnalytics] = await Promise.all([
-      fetchAdminUser(nextUserId),
-      fetchAdminUserAnalytics(nextUserId),
-    ]);
-
-    setUser(nextUser);
-    setAnalytics(nextAnalytics);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      if (!userId) {
-        setUser(null);
-        setAnalytics(null);
-        setError(null);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const [nextUser, nextAnalytics] = await Promise.all([fetchAdminUser(userId), fetchAdminUserAnalytics(userId)]);
-        if (!cancelled) {
-          setUser(nextUser);
-          setAnalytics(nextAnalytics);
-        }
-      } catch {
-        if (!cancelled) {
-          setError(text.userAnalyticsLoadError);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [text.userAnalyticsLoadError, userId]);
+  const { analytics, hasError, isLoading, refresh, user } = useAdminUserProfile({ userId });
 
   if (!userId) {
     return (
@@ -80,8 +27,8 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
     return <AdminStateCard tone="info" title={text.userInlineAnalyticsTitle} description={text.loading} />;
   }
 
-  if (error || !user || !analytics) {
-    return <AdminStateCard tone="danger" title={error ?? text.userAnalyticsLoadError} />;
+  if (hasError || !user || !analytics) {
+    return <AdminStateCard tone="danger" title={text.userAnalyticsLoadError} />;
   }
 
   return (
@@ -186,11 +133,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
         userId={user.userId}
         analytics={analytics}
         onUpdated={async () => {
-          if (!userId) {
-            return;
-          }
-
-          await loadUserAnalytics(userId);
+          await refresh();
         }}
       />
     </AdminCard>

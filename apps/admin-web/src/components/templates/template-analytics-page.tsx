@@ -10,30 +10,48 @@ import {
     TableIcon,
     TrendUpIcon,
     UsersIcon,
-    VideoIcon,
 } from "@/components/admin/admin-icons";
 import { AdminMetricStrip, AdminPage, AdminStateCard, AdminToolbar } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateAccessLabel, getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
-import styles from "@/components/templates/template-analytics-page.module.css";
-import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import {
-    fetchAdminTemplate,
-    fetchAdminTemplateEventAnalytics,
-    fetchAdminTemplateFailureBreakdown,
-    fetchAdminTemplateFeedback,
+    TemplateAnalyticsFailureBreakdownSection,
+    TemplateAnalyticsFeedbackSection,
+    TemplateAnalyticsRecentRunsSection,
+} from "@/components/templates/template-analytics-detail-sections";
+import styles from "@/components/templates/template-analytics-page.module.css";
+import {
+    buildChartTicks,
+    buildPeriodAnalytics,
+    calculateChange,
+    formatDateTime,
+    formatDelta,
+    formatDuration,
+    formatModelValue,
+    formatNumber,
+    formatPercent,
+    formatShortDate,
+    formatTokens,
+    formatTrendValue,
+    formatUsd,
+    getStatusBadgeClassName,
+    getTrendMetricValue,
+    shortenId,
+    totalsFromStatistics,
+    type PeriodKey,
+    type TrendMetricKey,
+} from "@/components/templates/template-analytics-utils";
+import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
+import { useAdminTemplateAnalyticsOverview } from "@/components/templates/use-admin-template-analytics-overview";
+import { useAdminTemplateFeedback } from "@/components/templates/use-admin-template-feedback";
+import {
     fetchAdminTemplateRecentGenerations,
-    fetchAdminTemplateStatistics,
-    fetchAdminTemplateTrends,
+    useAuthSession,
     type AdminTemplate,
     type AdminTemplateEventAnalytics,
-    type AdminTemplateFailureBreakdownItem,
-    type AdminTemplateFeedbackItem,
     type AdminTemplateRecentGeneration,
     type AdminTemplateStatistics,
     type AdminTemplateTrendPoint,
-    type TemplateGenerationJobStatus,
-    type TemplateStatus,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Image from "next/image";
@@ -48,38 +66,11 @@ type TemplateAnalyticsPageProps = {
 
 type AnalyticsCopy = ReturnType<typeof getAnalyticsCopy>;
 
-type PeriodKey = "7d" | "30d" | "90d" | "all";
-type TrendMetricKey = "totalRuns" | "completedRuns" | "failedRuns" | "totalTokenCost" | "averageGenerationSeconds";
 type MetricAccent = "blue" | "green" | "red" | "cyan" | "neutral";
 type RecentRunsMode = "latest" | "all" | "failed";
 type FeedbackFilterKey = "all" | "complaint" | "feedback";
 
 const RECENT_RUNS_PREVIEW_LIMIT = 8;
-
-type TrendTotals = {
-  totalRuns: number;
-  queuedRuns: number;
-  processingRuns: number;
-  completedRuns: number;
-  failedRuns: number;
-  totalTokenCost: number;
-  totalProviderCostUsd: number;
-  averageGenerationSeconds: number | null;
-  successRatePercent: number;
-};
-
-type PeriodAnalytics = {
-  currentPoints: AdminTemplateTrendPoint[];
-  previousPoints: AdminTemplateTrendPoint[];
-  current: TrendTotals;
-  previous: TrendTotals | null;
-};
-
-const PERIOD_DAY_COUNTS: Record<Exclude<PeriodKey, "all">, number> = {
-  "7d": 7,
-  "30d": 30,
-  "90d": 90,
-};
 
 const EMPTY_EVENT_ANALYTICS: AdminTemplateEventAnalytics = {
   totalViews: 0,
@@ -91,30 +82,50 @@ const EMPTY_EVENT_ANALYTICS: AdminTemplateEventAnalytics = {
 };
 
 export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsPageProps) {
+  return <TemplateAnalyticsPageContent key={templateId} locale={locale} templateId={templateId} />;
+}
+
+function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsPageProps) {
   const isRu = locale === "ru";
   const text = useMemo(() => getAnalyticsCopy(locale), [locale]);
   const router = useRouter();
-  const [template, setTemplate] = useState<AdminTemplate | null>(null);
-  const [statistics, setStatistics] = useState<AdminTemplateStatistics | null>(null);
-  const [trendPoints, setTrendPoints] = useState<AdminTemplateTrendPoint[]>([]);
-  const [recentRunsPreview, setRecentRunsPreview] = useState<AdminTemplateRecentGeneration[]>([]);
+  const session = useAuthSession();
+  const {
+    eventAnalytics,
+    failureBreakdown,
+    hasError,
+    isLoading,
+    recentRunsPreview,
+    statistics,
+    template,
+    trendPoints,
+  } = useAdminTemplateAnalyticsOverview({
+    enabled: Boolean(session),
+    previewTake: RECENT_RUNS_PREVIEW_LIMIT,
+    templateId,
+  });
   const [allRecentRuns, setAllRecentRuns] = useState<AdminTemplateRecentGeneration[] | null>(null);
   const [recentRunsMode, setRecentRunsMode] = useState<RecentRunsMode>("latest");
   const [isRecentRunsLoading, setIsRecentRunsLoading] = useState(false);
   const [recentRunsError, setRecentRunsError] = useState<string | null>(null);
-  const [failureBreakdown, setFailureBreakdown] = useState<AdminTemplateFailureBreakdownItem[]>([]);
-  const [feedbackItems, setFeedbackItems] = useState<AdminTemplateFeedbackItem[]>([]);
   const [feedbackFilter, setFeedbackFilter] = useState<FeedbackFilterKey>("all");
   const [feedbackSearchInput, setFeedbackSearchInput] = useState("");
   const [feedbackSearch, setFeedbackSearch] = useState("");
-  const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
-  const [feedbackError, setFeedbackError] = useState<string | null>(null);
-  const [eventAnalytics, setEventAnalytics] = useState<AdminTemplateEventAnalytics | null>(null);
   const [period, setPeriod] = useState<PeriodKey>("30d");
   const [chartMetric, setChartMetric] = useState<TrendMetricKey>("totalRuns");
   const [isComparisonEnabled, setIsComparisonEnabled] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    hasError: hasFeedbackError,
+    isLoading: isFeedbackLoading,
+    items: feedbackItems,
+  } = useAdminTemplateFeedback({
+    enabled: Boolean(session),
+    filter: feedbackFilter,
+    search: feedbackSearch,
+    templateId,
+  });
+  const error = hasError ? text.loadError : null;
+  const feedbackError = hasFeedbackError ? text.feedbackLoadError : null;
 
   const periodAnalytics = useMemo(() => buildPeriodAnalytics(trendPoints, period), [trendPoints, period]);
   const feedbackOptions: Array<{ key: FeedbackFilterKey; label: string }> = [
@@ -146,99 +157,10 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
   }, [feedbackSearchInput]);
 
   useEffect(() => {
-    let isCancelled = false;
-
-    async function loadAnalytics() {
-      setIsLoading(true);
-      setError(null);
-      setRecentRunsError(null);
-      setRecentRunsMode("latest");
-      setAllRecentRuns(null);
-
-      try {
-        if (!ensureAdminSession(locale, router)) {
-          return;
-        }
-
-        const [
-          templateResponse,
-          statisticsResponse,
-          trendResponse,
-          recentResponse,
-          failureResponse,
-          eventResponse,
-        ] = await Promise.all([
-          fetchAdminTemplate(templateId),
-          fetchAdminTemplateStatistics(templateId),
-          fetchAdminTemplateTrends(templateId),
-          fetchAdminTemplateRecentGenerations(templateId, RECENT_RUNS_PREVIEW_LIMIT),
-          fetchAdminTemplateFailureBreakdown(templateId),
-          fetchAdminTemplateEventAnalytics(templateId),
-        ]);
-
-        if (isCancelled) {
-          return;
-        }
-
-        setTemplate(templateResponse);
-        setStatistics(statisticsResponse);
-        setTrendPoints(trendResponse);
-        setRecentRunsPreview(recentResponse);
-        setFailureBreakdown(failureResponse);
-        setFeedbackItems([]);
-        setEventAnalytics(eventResponse);
-      } catch {
-        if (!isCancelled) {
-          setError(text.loadError);
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
+    if (!session) {
+      ensureAdminSession(locale, router);
     }
-
-    void loadAnalytics();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [locale, router, templateId, text.loadError]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadFeedback() {
-      setIsFeedbackLoading(true);
-      setFeedbackError(null);
-
-      try {
-        const items = await fetchAdminTemplateFeedback(templateId, {
-          take: 50,
-          type: feedbackFilter === "all" ? undefined : feedbackFilter,
-          search: feedbackSearch || undefined,
-        });
-
-        if (!isCancelled) {
-          setFeedbackItems(items);
-        }
-      } catch {
-        if (!isCancelled) {
-          setFeedbackError(text.feedbackLoadError);
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsFeedbackLoading(false);
-        }
-      }
-    }
-
-    void loadFeedback();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [feedbackFilter, feedbackSearch, templateId, text.feedbackLoadError]);
+  }, [locale, router, session]);
 
   if (isLoading) {
     return (
@@ -513,88 +435,37 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
       </div>
 
       <div className={styles.detailsGrid}>
-        <section className={`${styles.sectionCard} ${styles.sectionCardWide}`}>
-          <div className={styles.sectionHeaderRow}>
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitleWithIcon}><TableIcon className={styles.sectionTitleIcon} /><span>{text.recentRunsTitle}</span></h2>
-              <p>{recentRunsMode === "all" ? text.recentRunsAllHint : recentRunsMode === "failed" ? text.failedRunsHint : text.recentRunsHint}</p>
-            </div>
+        <TemplateAnalyticsRecentRunsSection
+          canShowFailedRecentRuns={canShowFailedRecentRuns}
+          canShowRecentRunModes={shouldShowRecentRunModes}
+          error={recentRunsError}
+          isLoading={isRecentRunsLoading}
+          items={visibleRecentRuns}
+          locale={locale}
+          mode={recentRunsMode}
+          onModeChange={(mode) => void handleRecentRunsModeChange(mode)}
+          text={text}
+        />
 
-            {shouldShowRecentRunModes ? (
-              <div className={styles.chartTabs} aria-label={text.recentRunsTitle}>
-                <button
-                  type="button"
-                  className={recentRunsMode === "latest" ? styles.chartTabActive : styles.chartTab}
-                  onClick={() => void handleRecentRunsModeChange("latest")}
-                >
-                  <span>{text.recentRunsLatest}</span>
-                </button>
-                <button
-                  type="button"
-                  className={recentRunsMode === "all" ? styles.chartTabActive : styles.chartTab}
-                  onClick={() => void handleRecentRunsModeChange("all")}
-                  disabled={isRecentRunsLoading}
-                >
-                  <span>{isRecentRunsLoading ? text.recentRunsLoading : text.recentRunsAll}</span>
-                </button>
-                {canShowFailedRecentRuns ? (
-                  <button
-                    type="button"
-                    className={recentRunsMode === "failed" ? styles.chartTabActive : styles.chartTab}
-                    onClick={() => void handleRecentRunsModeChange("failed")}
-                    disabled={isRecentRunsLoading}
-                  >
-                    <span>{text.recentRunsFailed}</span>
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-          {recentRunsError ? <p className={styles.emptyState}>{recentRunsError}</p> : null}
-          <RecentRunsTable locale={locale} items={visibleRecentRuns} text={text} mode={recentRunsMode} />
-        </section>
-
-        <section className={styles.sectionCard}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitleWithIcon}><ChartIcon className={styles.sectionTitleIcon} /><span>{text.failureBreakdownTitle}</span></h2>
-            <p>{text.failureBreakdownHint}</p>
-          </div>
-          <FailureBreakdownList locale={locale} items={failureBreakdown} text={text} />
-        </section>
+        <TemplateAnalyticsFailureBreakdownSection
+          items={failureBreakdown}
+          locale={locale}
+          text={text}
+        />
       </div>
 
-      <section className={styles.sectionCard}>
-        <div className={styles.sectionHeaderRow}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitleWithIcon}><ChartIcon className={styles.sectionTitleIcon} /><span>{text.feedbackTitle}</span></h2>
-            <p>{text.feedbackHint}</p>
-          </div>
-          <div className={styles.feedbackToolbar}>
-            <div className={styles.chartTabs} aria-label={text.feedbackFilterLabel}>
-              {feedbackOptions.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={feedbackFilter === option.key ? styles.chartTabActive : styles.chartTab}
-                  onClick={() => setFeedbackFilter(option.key)}
-                >
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
-            <input
-              type="search"
-              value={feedbackSearchInput}
-              onChange={(event) => setFeedbackSearchInput(event.target.value)}
-              className={styles.feedbackSearchInput}
-              placeholder={text.feedbackSearchPlaceholder}
-              aria-label={text.feedbackSearchLabel}
-            />
-          </div>
-        </div>
-        {feedbackError ? <p className={styles.emptyState}>{feedbackError}</p> : null}
-        <FeedbackList locale={locale} items={feedbackItems} text={text} isLoading={isFeedbackLoading} hasActiveFilter={feedbackFilter !== "all" || feedbackSearch.length > 0} />
-      </section>
+      <TemplateAnalyticsFeedbackSection
+        error={feedbackError}
+        feedbackFilter={feedbackFilter}
+        feedbackOptions={feedbackOptions}
+        feedbackSearch={feedbackSearchInput}
+        isLoading={isFeedbackLoading}
+        items={feedbackItems}
+        locale={locale}
+        onFeedbackFilterChange={setFeedbackFilter}
+        onFeedbackSearchChange={setFeedbackSearchInput}
+        text={text}
+      />
 
       <section className={styles.sectionCard}>
         <div className={styles.sectionHeader}>
@@ -852,7 +723,7 @@ function TrendChart({
           return (
             <g key={`${tick}-${index}`}>
               <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} className={styles.chartGridLine} />
-              <text x={paddingX} y={y - 6} className={styles.chartTick}>{formatTrendValue(tick, metric, locale, text)}</text>
+              <text x={paddingX} y={y - 6} className={styles.chartTick}>{formatTrendValue(tick, metric, locale, text.failedRuns)}</text>
             </g>
           );
         })}
@@ -861,7 +732,7 @@ function TrendChart({
         <path d={linePath} className={styles.chartLine} />
 
         {coordinates.map(({ point, value, x, y }) => {
-          const label = formatTrendValue(value, metric, locale, text);
+          const label = formatTrendValue(value, metric, locale, text.failedRuns);
           const labelWidth = Math.max(48, Math.min(132, label.length * 7.2 + 20));
           const labelX = Math.min(width - paddingX - labelWidth, Math.max(paddingX, x - labelWidth / 2));
           const labelY = Math.max(8, y - 34);
@@ -883,7 +754,7 @@ function TrendChart({
         {points.slice(-4).map((point) => (
           <div key={point.dateUtc} className={styles.chartSummaryItem}>
             <span>{formatShortDate(point.dateUtc, locale)}</span>
-            <strong>{formatTrendValue(getTrendMetricValue(point, metric), metric, locale, text)}</strong>
+            <strong>{formatTrendValue(getTrendMetricValue(point, metric), metric, locale, text.failedRuns)}</strong>
           </div>
         ))}
       </div>
@@ -932,140 +803,6 @@ function StatusRing({ statistics, text, isRu }: { statistics: AdminTemplateStati
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function RecentRunsTable({ locale, items, text, mode }: { locale: Locale; items: readonly AdminTemplateRecentGeneration[]; text: AnalyticsCopy; mode: RecentRunsMode }) {
-  const isRu = locale === "ru";
-  const hasFailureDetails = items.some((item) => item.status === "Failed" || Boolean(item.failureCode) || Boolean(item.failureMessage));
-
-  if (!items.length) {
-    return <p className={styles.emptyState}>{mode === "failed" ? text.failedRunsEmpty : text.recentRunsEmpty}</p>;
-  }
-
-  return (
-    <div className={styles.tableWrap}>
-      <table className={styles.recentTable}>
-        <thead>
-          <tr>
-            <th>{text.generationIdHeader}</th>
-            <th>{text.userHeader}</th>
-            <th>{text.recentCreated}</th>
-            <th>{text.recentStatus}</th>
-            <th>{text.recentTokens}</th>
-            <th>{text.recentDuration}</th>
-            <th>{text.recentModels}</th>
-            {hasFailureDetails ? <th>{text.failureCodeHeader}</th> : null}
-            {hasFailureDetails ? <th>{text.failureReasonHeader}</th> : null}
-            <th>{text.recentOutput}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.generationId}>
-              <td><span className={styles.monoCell}>{shortenId(item.generationId)}</span></td>
-              <td><span className={styles.monoCell}>{shortenId(item.userId)}</span></td>
-              <td>{formatDateTime(item.createdAtUtc, locale)}</td>
-              <td>
-                <span className={`${styles.statusChip} ${styles[getJobStatusClassName(item.status)]}`}>
-                  {formatJobStatus(item.status, isRu)}
-                </span>
-              </td>
-              <td>{formatTokens(item.tokenCost, isRu)}</td>
-              <td>{formatRangeDuration(item.startedAtUtc, item.completedAtUtc, isRu)}</td>
-              <td>{formatModelSummary(item.usedPreprocessingModel, item.usedKlingModel)}</td>
-              {hasFailureDetails ? (
-                <td>
-                  {item.failureCode ? <span className={styles.failureCodeCell}>{formatFailureCode(item.failureCode, text)}</span> : <span className={styles.mutedCell}>-</span>}
-                </td>
-              ) : null}
-              {hasFailureDetails ? (
-                <td>
-                  {item.failureMessage ? <span className={styles.failureReasonCell}>{item.failureMessage}</span> : <span className={styles.mutedCell}>-</span>}
-                </td>
-              ) : null}
-              <td>
-                {item.outputUrl ? (
-                  <a href={item.outputUrl} target="_blank" rel="noreferrer" className={styles.inlineLink}>
-                    <VideoIcon className={styles.inlineIcon} />
-                    <span>{text.openOutput}</span>
-                  </a>
-                ) : (
-                  <span className={styles.mutedCell}>{text.noOutput}</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function FailureBreakdownList({ locale, items, text }: { locale: Locale; items: readonly AdminTemplateFailureBreakdownItem[]; text: AnalyticsCopy }) {
-  if (!items.length) {
-    return <p className={styles.emptyState}>{text.failuresEmpty}</p>;
-  }
-
-  return (
-    <div className={styles.failureList}>
-      {items.map((item) => (
-        <div key={item.failureCode} className={styles.failureItem}>
-          <strong>{formatFailureCode(item.failureCode, text)}</strong>
-          <span>{item.count}</span>
-          <p>
-            {text.lastFailure}: {formatDateTime(item.lastOccurredAtUtc, locale)}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FeedbackList({
-  locale,
-  items,
-  text,
-  isLoading,
-  hasActiveFilter,
-}: {
-  locale: Locale;
-  items: readonly AdminTemplateFeedbackItem[];
-  text: AnalyticsCopy;
-  isLoading: boolean;
-  hasActiveFilter: boolean;
-}) {
-  if (isLoading) {
-    return <p className={styles.emptyState}>{text.feedbackLoading}</p>;
-  }
-
-  if (!items.length) {
-    return <p className={styles.emptyState}>{hasActiveFilter ? text.feedbackFilteredEmpty : text.feedbackEmpty}</p>;
-  }
-
-  const isRu = locale === "ru";
-
-  return (
-    <div className={styles.feedbackList}>
-      {items.map((item) => (
-        <article key={item.eventId} className={styles.feedbackItem}>
-          <div className={styles.feedbackHeader}>
-            <span className={`${styles.statusChip} ${styles[item.eventType === "complaint" ? "statusChip_danger" : "statusChip_info"]}`}>
-              {item.eventType === "complaint" ? text.feedbackTypeComplaint : text.feedbackTypeFeedback}
-            </span>
-            <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
-          </div>
-          <p className={styles.feedbackMessage}>{item.feedbackMessage?.trim() || text.feedbackMessageMissing}</p>
-          <div className={styles.feedbackMeta}>
-            <span>{text.feedbackSourceLabel}: {formatAnalyticsValue(item.source)}</span>
-            <span>{text.feedbackDeviceLabel}: {formatAnalyticsValue(item.deviceClass)}</span>
-            <span>{text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}</span>
-            <span>{text.userHeader}: {item.userId ? shortenId(item.userId) : (isRu ? "анон" : "guest")}</span>
-            {item.generationId ? <span>{text.generationIdHeader}: {shortenId(item.generationId)}</span> : null}
-          </div>
-        </article>
-      ))}
     </div>
   );
 }
@@ -1216,344 +953,3 @@ function getAnalyticsCopy(locale: Locale) {
   };
 }
 
-function buildPeriodAnalytics(points: readonly AdminTemplateTrendPoint[], period: PeriodKey): PeriodAnalytics {
-  const sortedPoints = [...points].sort((left, right) => getUtcDay(left.dateUtc) - getUtcDay(right.dateUtc));
-
-  if (!sortedPoints.length) {
-    return {
-      currentPoints: [],
-      previousPoints: [],
-      current: summarizeTrendPoints([]),
-      previous: null,
-    };
-  }
-
-  if (period === "all") {
-    return {
-      currentPoints: sortedPoints,
-      previousPoints: [],
-      current: summarizeTrendPoints(sortedPoints),
-      previous: null,
-    };
-  }
-
-  const dayMs = 24 * 60 * 60 * 1000;
-  const days = PERIOD_DAY_COUNTS[period];
-  const latestDay = Math.max(...sortedPoints.map((point) => getUtcDay(point.dateUtc)));
-  const currentStart = latestDay - (days - 1) * dayMs;
-  const previousStart = currentStart - days * dayMs;
-  const previousEnd = currentStart - dayMs;
-  const currentPoints = sortedPoints.filter((point) => {
-    const day = getUtcDay(point.dateUtc);
-    return day >= currentStart && day <= latestDay;
-  });
-  const previousPoints = sortedPoints.filter((point) => {
-    const day = getUtcDay(point.dateUtc);
-    return day >= previousStart && day <= previousEnd;
-  });
-
-  return {
-    currentPoints,
-    previousPoints,
-    current: summarizeTrendPoints(currentPoints),
-    previous: previousPoints.length ? summarizeTrendPoints(previousPoints) : null,
-  };
-}
-
-function summarizeTrendPoints(points: readonly AdminTemplateTrendPoint[]): TrendTotals {
-  const totals = points.reduce(
-    (accumulator, point) => {
-      accumulator.totalRuns += point.totalRuns;
-      accumulator.queuedRuns += point.queuedRuns;
-      accumulator.processingRuns += point.processingRuns;
-      accumulator.completedRuns += point.completedRuns;
-      accumulator.failedRuns += point.failedRuns;
-      accumulator.totalTokenCost += point.totalTokenCost;
-      accumulator.totalProviderCostUsd += point.totalProviderCostUsd;
-
-      if (typeof point.averageGenerationSeconds === "number" && point.completedRuns > 0) {
-        accumulator.durationSeconds += point.averageGenerationSeconds * point.completedRuns;
-        accumulator.durationSamples += point.completedRuns;
-      }
-
-      return accumulator;
-    },
-    {
-      totalRuns: 0,
-      queuedRuns: 0,
-      processingRuns: 0,
-      completedRuns: 0,
-      failedRuns: 0,
-      totalTokenCost: 0,
-      totalProviderCostUsd: 0,
-      durationSeconds: 0,
-      durationSamples: 0,
-    },
-  );
-
-  return {
-    totalRuns: totals.totalRuns,
-    queuedRuns: totals.queuedRuns,
-    processingRuns: totals.processingRuns,
-    completedRuns: totals.completedRuns,
-    failedRuns: totals.failedRuns,
-    totalTokenCost: totals.totalTokenCost,
-    totalProviderCostUsd: totals.totalProviderCostUsd,
-    averageGenerationSeconds: totals.durationSamples > 0 ? totals.durationSeconds / totals.durationSamples : null,
-    successRatePercent: totals.totalRuns > 0 ? (totals.completedRuns / totals.totalRuns) * 100 : 0,
-  };
-}
-
-function totalsFromStatistics(statistics: AdminTemplateStatistics): TrendTotals {
-  return {
-    totalRuns: statistics.totalRuns,
-    queuedRuns: statistics.queuedRuns,
-    processingRuns: statistics.processingRuns,
-    completedRuns: statistics.completedRuns,
-    failedRuns: statistics.failedRuns,
-    totalTokenCost: statistics.totalTokenCost,
-    totalProviderCostUsd: statistics.totalProviderCostUsd,
-    averageGenerationSeconds: statistics.averageGenerationSeconds ?? null,
-    successRatePercent: statistics.successRatePercent,
-  };
-}
-
-function getUtcDay(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 0;
-  }
-
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
-
-function calculateChange(current: number, previous: number | null | undefined) {
-  if (typeof previous !== "number" || Number.isNaN(previous) || previous === 0) {
-    return null;
-  }
-
-  return ((current - previous) / Math.abs(previous)) * 100;
-}
-
-function getTrendMetricValue(point: AdminTemplateTrendPoint, metric: TrendMetricKey) {
-  if (metric === "averageGenerationSeconds") {
-    return point.averageGenerationSeconds ?? 0;
-  }
-
-  return point[metric];
-}
-
-function buildChartTicks(maxValue: number) {
-  const ceiling = Math.max(1, Math.ceil(maxValue));
-
-  if (ceiling <= 4) {
-    return Array.from({ length: ceiling + 1 }, (_, index) => ceiling - index);
-  }
-
-  const step = Math.ceil(ceiling / 4);
-  const top = step * 4;
-  return [top, top - step, top - step * 2, step, 0];
-}
-
-function formatTrendValue(value: number, metric: TrendMetricKey, locale: Locale, text: AnalyticsCopy) {
-  if (metric === "totalTokenCost") {
-    return formatTokens(value, locale === "ru");
-  }
-
-  if (metric === "averageGenerationSeconds") {
-    return formatDuration(value, locale === "ru");
-  }
-
-  return `${formatNumber(value, locale)} ${metric === "failedRuns" ? text.failedRuns.toLowerCase() : ""}`.trim();
-}
-
-function getStatusBadgeClassName(status: TemplateStatus) {
-  if (status === "Active") {
-    return "statusBadge_active";
-  }
-
-  if (status === "Archived") {
-    return "statusBadge_archived";
-  }
-
-  return "statusBadge_draft";
-}
-
-function getJobStatusClassName(status: TemplateGenerationJobStatus) {
-  if (status === "Completed") {
-    return "statusChip_success";
-  }
-
-  if (status === "Failed") {
-    return "statusChip_danger";
-  }
-
-  if (status === "Processing") {
-    return "statusChip_warning";
-  }
-
-  return "statusChip_info";
-}
-
-function formatJobStatus(status: TemplateGenerationJobStatus, isRu: boolean) {
-  if (!isRu) {
-    return status;
-  }
-
-  if (status === "Completed") {
-    return "Успешно";
-  }
-
-  if (status === "Failed") {
-    return "Ошибка";
-  }
-
-  if (status === "Processing") {
-    return "В работе";
-  }
-
-  return "В очереди";
-}
-
-function formatFailureCode(value: string, text: AnalyticsCopy) {
-  if (!value || value === "templates.unknown_failure") {
-    return text.unknownFailure;
-  }
-
-  return value;
-}
-
-function formatAnalyticsValue(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  return value.toUpperCase() === value && value.length <= 3
-    ? value
-    : value.replace(/[_-]+/g, " ");
-}
-
-function formatPercent(value: number, isRu: boolean) {
-  const formatter = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", {
-    minimumFractionDigits: value % 1 === 0 ? 0 : 1,
-    maximumFractionDigits: 1,
-  });
-
-  return `${formatter.format(value)}%`;
-}
-
-function formatDelta(value: number, isRu: boolean) {
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${formatPercent(value, isRu)}`;
-}
-
-function formatNumber(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    maximumFractionDigits: value % 1 === 0 ? 0 : 1,
-  }).format(value);
-}
-
-function formatTokens(value: number, isRu: boolean) {
-  const formatter = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", {
-    maximumFractionDigits: value % 1 === 0 ? 0 : 1,
-  });
-
-  return `${formatter.format(value)} ${isRu ? "токенов" : "tokens"}`;
-}
-
-function formatUsd(value: number | null | undefined, locale: Locale) {
-  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
-    return "-";
-  }
-
-  return new Intl.NumberFormat(locale === "ru" ? "en-US" : "en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  }).format(value);
-}
-
-function formatDuration(value: number | null | undefined, isRu: boolean) {
-  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
-    return "-";
-  }
-
-  const rounded = Math.round(value);
-  const minutes = Math.floor(rounded / 60);
-  const seconds = rounded % 60;
-
-  if (minutes > 0) {
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  }
-
-  return `${rounded} ${isRu ? "сек" : "sec"}`;
-}
-
-function formatRangeDuration(startedAtUtc: string | null | undefined, completedAtUtc: string | null | undefined, isRu: boolean) {
-  if (!startedAtUtc || !completedAtUtc) {
-    return "-";
-  }
-
-  const started = new Date(startedAtUtc).getTime();
-  const completed = new Date(completedAtUtc).getTime();
-  if (Number.isNaN(started) || Number.isNaN(completed) || completed < started) {
-    return "-";
-  }
-
-  return formatDuration(Math.round((completed - started) / 1000), isRu);
-}
-
-function formatDateTime(value: string | null | undefined, locale: Locale) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function formatShortDate(value: string, locale: Locale) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    day: "2-digit",
-    month: "short",
-  }).format(date);
-}
-
-function formatModelSummary(preprocessingModel: string | null | undefined, klingModel: string | null | undefined) {
-  const values = [preprocessingModel, klingModel]
-    .filter(Boolean)
-    .map((value) => {
-      const parts = value!.split("/");
-      return parts.length >= 2 ? parts.slice(-2).join("/") : value!;
-    });
-
-  return values.length ? values.join(" + ") : "-";
-}
-
-function formatModelValue(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  const parts = value.split("/");
-  return parts.length >= 2 ? parts.slice(-2).join("/") : value;
-}
-
-function shortenId(value: string) {
-  return value.length > 13 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
-}

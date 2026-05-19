@@ -20,13 +20,13 @@ import {
 } from "@/components/templates/template-admin-shared";
 import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
 import styles from "@/components/templates/templates-catalog.module.css";
+import { useAdminTemplateCatalog } from "@/components/templates/use-admin-template-catalog";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import {
     changeTemplateStatus,
     deleteTemplate,
-    fetchAdminTemplates,
-    fetchAdminTemplatesAnalyticsOverview,
+    useAuthSession,
     type AdminTemplateListItem,
     type AdminTemplatesAnalyticsTemplateRow,
     type TemplateStatus,
@@ -36,7 +36,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactElement } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from "react";
 
 type TemplatesCatalogViewProps = {
   locale: Locale;
@@ -82,32 +82,14 @@ const METRIC_ICONS: Record<string, ReactElement> = {
   ),
 };
 
-async function fetchTemplatesList(locale: Locale, router: { replace: (href: string) => void }, templateType: TemplateType) {
-  if (!ensureAdminSession(locale, router)) {
-    return null;
-  }
-
-  return fetchAdminTemplates(templateType);
-}
-
-async function fetchTemplatesAnalyticsRows(locale: Locale, router: { replace: (href: string) => void }, templateType: TemplateType) {
-  if (!ensureAdminSession(locale, router)) {
-    return null;
-  }
-
-  const response = await fetchAdminTemplatesAnalyticsOverview({ templateType, sort: "updated", take: 500 });
-  return Object.fromEntries(response.templates.map((row) => [row.templateId, row]));
-}
-
 export function TemplatesCatalogView({ locale, templateType, initialCategory }: TemplatesCatalogViewProps) {
   const isRu = locale === "ru";
   const text = getDictionary(locale);
   const copy = useMemo(() => getCatalogCopy(locale, templateType), [locale, templateType]);
   const router = useRouter();
-  const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
-  const [analyticsRows, setAnalyticsRows] = useState<Record<string, AdminTemplatesAnalyticsTemplateRow>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const session = useAuthSession();
+  const { analyticsRows, hasError, isLoading, refresh, templates } = useAdminTemplateCatalog({ enabled: Boolean(session), templateType });
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
@@ -116,92 +98,23 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const [statusFilter, setStatusFilter] = useState<TemplateStatus | "all">("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
-
-  async function loadTemplates(showLoading = true, canUpdateState: () => boolean = () => true) {
-    if (showLoading && canUpdateState()) {
-      setIsLoading(true);
-    }
-    if (canUpdateState()) {
-      setError(null);
-    }
-
-    try {
-      const templatesResponse = await fetchTemplatesList(locale, router, templateType);
-      if (!templatesResponse) {
-        return;
-      }
-
-      if (canUpdateState()) {
-        setTemplates(templatesResponse);
-      }
-
-      void loadAnalyticsRows(canUpdateState);
-    } catch {
-      if (canUpdateState()) {
-        setError(text.errorLoadingTemplates);
-      }
-    } finally {
-      if (showLoading && canUpdateState()) {
-        setIsLoading(false);
-      }
-    }
-  }
-
-  const loadAnalyticsRows = useCallback(async (canUpdateState: () => boolean = () => true) => {
-    try {
-      const analyticsResponse = await fetchTemplatesAnalyticsRows(locale, router, templateType);
-      if (analyticsResponse && canUpdateState()) {
-        setAnalyticsRows(analyticsResponse);
-      }
-    } catch {
-      if (canUpdateState()) {
-        setAnalyticsRows({});
-      }
-    }
-  }, [locale, router, templateType]);
+  const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
 
   useEffect(() => {
-    let isCancelled = false;
-
-    async function initialize() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const templatesResponse = await fetchTemplatesList(locale, router, templateType);
-
-        if (templatesResponse && !isCancelled) {
-          setTemplates(templatesResponse);
-        }
-
-        void loadAnalyticsRows(() => !isCancelled);
-      } catch {
-        if (!isCancelled) {
-          setError(text.errorLoadingTemplates);
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
+    if (!session) {
+      ensureAdminSession(locale, router);
     }
-
-    void initialize();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [loadAnalyticsRows, locale, router, templateType, text.errorLoadingTemplates]);
+  }, [locale, router, session]);
 
   async function handleStatusChange(templateId: string, status: TemplateStatus) {
     setBusyTemplateId(templateId);
-    setError(null);
+    setActionError(null);
 
     try {
       await changeTemplateStatus(templateId, status);
-      await loadTemplates(false);
+      await refresh();
     } catch {
-      setError(text.errorSavingTemplate);
+      setActionError(text.errorSavingTemplate);
     } finally {
       setBusyTemplateId(null);
     }
@@ -214,13 +127,13 @@ export function TemplatesCatalogView({ locale, templateType, initialCategory }: 
     }
 
     setBusyTemplateId(templateId);
-    setError(null);
+    setActionError(null);
 
     try {
       await deleteTemplate(templateId);
-      await loadTemplates(false);
+      await refresh();
     } catch {
-      setError(text.errorDeletingTemplate);
+      setActionError(text.errorDeletingTemplate);
     } finally {
       setBusyTemplateId(null);
     }

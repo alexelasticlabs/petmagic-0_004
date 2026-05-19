@@ -1,12 +1,14 @@
 "use client";
 
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
     fetchUsers,
     useAuthSession,
     type UserListItem,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -19,12 +21,16 @@ export function useUsersAdmin(locale: Locale) {
   const text = getDictionary(locale);
   const router = useRouter();
   const session = useAuthSession();
-  const [users, setUsers] = useState<UserListItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<UsersToastState | null>(null);
   const canManageRoles = session?.user.roles.includes("Admin") ?? false;
+
+  const usersQuery = useQuery<UserListItem[]>({
+    queryKey: adminQueryKeys.users,
+    queryFn: fetchUsers,
+    enabled: Boolean(session),
+  });
 
   useEffect(() => {
     if (!toast) {
@@ -36,58 +42,31 @@ export function useUsersAdmin(locale: Locale) {
   }, [toast]);
 
   useEffect(() => {
-    let isCancelled = false;
-
-    async function initialize() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        if (!ensureAdminSession(locale, router)) {
-          return;
-        }
-
-        const response = await fetchUsers();
-        if (!isCancelled) {
-          setUsers(response);
-        }
-      } catch {
-        if (!isCancelled) {
-          setError(text.errorLoadingUsers);
-          setToast({ type: "error", message: text.errorLoadingUsers });
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void initialize();
-
-    return () => {
-      isCancelled = true;
+    if (!session) {
+      ensureAdminSession(locale, router);
     };
-  }, [locale, router, text.errorLoadingUsers]);
+  }, [locale, router, session]);
 
-  async function refreshUsers() {
-    const response = await fetchUsers();
-    setUsers(response);
-  }
+  const isLoading = usersQuery.isLoading || usersQuery.isFetching;
+  const error = actionError ?? (usersQuery.isError ? text.errorLoadingUsers : null);
 
   async function runAction(userId: string, action: () => Promise<void>) {
     setBusyUserId(userId);
-    setError(null);
+    setActionError(null);
 
     try {
       await action();
-      await refreshUsers();
+      const refreshedUsers = await usersQuery.refetch();
+      if (refreshedUsers.isError) {
+        throw refreshedUsers.error;
+      }
+
       setToast({
         type: "success",
         message: text.usersChangesSaved,
       });
     } catch {
-      setError(text.errorLoadingUsers);
+      setActionError(text.errorLoadingUsers);
       setToast({ type: "error", message: text.errorLoadingUsers });
     } finally {
       setBusyUserId(null);
@@ -101,6 +80,6 @@ export function useUsersAdmin(locale: Locale) {
     isLoading,
     runAction,
     toast,
-    users,
+    users: usersQuery.data ?? [],
   };
 }

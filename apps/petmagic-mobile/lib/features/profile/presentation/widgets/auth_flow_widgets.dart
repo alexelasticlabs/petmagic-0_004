@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
 class AuthBackdrop extends StatelessWidget {
@@ -69,7 +70,7 @@ class AuthHero extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Padding(
@@ -77,41 +78,26 @@ class AuthHero extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isDark)
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: colors.accentSoft,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.pets_rounded,
-                      color: colors.accent,
-                      size: 32,
-                    ),
-                  )
-                else
-                  const AuthWordmark(),
-                const SizedBox(height: 10),
+                AuthWordmark(isDark: isDark),
+                const SizedBox(height: 14),
                 Text(
                   title,
-                  style: TextStyle(
+                  style: GoogleFonts.nunito(
                     color: colors.textStrong,
-                    fontSize: isDark ? 28 : 24,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.8,
+                    fontSize: isDark ? 30 : 27,
+                    height: 1.02,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.9,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   subtitle,
-                  style: TextStyle(
+                  style: GoogleFonts.nunito(
                     color: colors.textSoft,
-                    fontSize: 13.5,
-                    height: 1.32,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    height: 1.38,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -121,7 +107,7 @@ class AuthHero extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: SizedBox(
-            height: isDark ? 190 : 165,
+            height: isDark ? 230 : 210,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -131,19 +117,59 @@ class AuthHero extends StatelessWidget {
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          colors.accent.withValues(alpha: 0.24),
+                          colors.gold.withValues(alpha: 0.16),
+                          colors.accent.withValues(alpha: 0.28),
                           colors.accent.withValues(alpha: 0.08),
                           Colors.transparent,
                         ],
-                        stops: const [0.1, 0.65, 1],
+                        stops: const [0.08, 0.4, 0.75, 1],
                       ),
                     ),
                   ),
                 ),
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/auth/petmagic-auth-hero.png',
-                    fit: BoxFit.contain,
+                Positioned(
+                  left: 20,
+                  right: 18,
+                  top: 28,
+                  bottom: 20,
+                  child: Transform.rotate(
+                    angle: -0.14,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(32),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            colors.surfaceGlass.withValues(
+                              alpha: isDark ? 0.3 : 0.88,
+                            ),
+                            colors.surface.withValues(
+                              alpha: isDark ? 0.14 : 0.55,
+                            ),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: colors.border.withValues(
+                            alpha: isDark ? 0.7 : 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: -22,
+                  right: -22,
+                  top: -6,
+                  bottom: -18,
+                  child: Transform.scale(
+                    scale: 1.4,
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/auth/petmagic-auth-hero.png',
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ],
@@ -156,7 +182,9 @@ class AuthHero extends StatelessWidget {
 }
 
 class AuthWordmark extends StatelessWidget {
-  const AuthWordmark({super.key});
+  const AuthWordmark({super.key, required this.isDark});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -164,25 +192,34 @@ class AuthWordmark extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.pets_rounded, color: colors.accent, size: 54),
-        const SizedBox(height: 2),
-        RichText(
-          text: TextSpan(
-            style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.8,
+        Container(
+          width: 66,
+          height: 66,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colors.accentSoft, colors.gold.withValues(alpha: 0.28)],
             ),
-            children: [
-              const TextSpan(
-                text: 'Pet',
-                style: TextStyle(color: Color(0xFF10234A)),
-              ),
-              TextSpan(
-                text: 'Magic',
-                style: TextStyle(color: colors.accent),
+            boxShadow: [
+              BoxShadow(
+                color: colors.accent.withValues(alpha: isDark ? 0.2 : 0.12),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
             ],
+          ),
+          child: Icon(Icons.pets_rounded, color: colors.accent, size: 34),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'PetMagic',
+          style: GoogleFonts.comfortaa(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.6,
+            color: isDark ? colors.textStrong : const Color(0xFF10234A),
           ),
         ),
       ],
@@ -201,24 +238,31 @@ class AuthFormCard extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
         filter: ImageFilter.blur(
-          sigmaX: isDark ? 12 : 8,
-          sigmaY: isDark ? 12 : 8,
+          sigmaX: isDark ? 14 : 10,
+          sigmaY: isDark ? 14 : 10,
         ),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colors.surfaceGlass.withValues(alpha: isDark ? 0.95 : 0.98),
+                colors.surface.withValues(alpha: isDark ? 0.84 : 0.92),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(28),
             border: Border.all(color: colors.border),
             boxShadow: [
               BoxShadow(
                 color: colors.shadow,
-                blurRadius: 18,
-                offset: const Offset(0, 12),
+                blurRadius: 24,
+                offset: const Offset(0, 14),
               ),
             ],
           ),
@@ -276,7 +320,22 @@ class AuthField extends StatelessWidget {
         prefixIcon: Icon(prefixIcon, color: colors.textSoft),
         suffixIcon: trailing,
         filled: true,
-        fillColor: colors.surface,
+        fillColor: colors.surface.withValues(alpha: 0.98),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: colors.border.withValues(alpha: 0.75)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(
+            color: colors.accent.withValues(alpha: 0.75),
+            width: 1.4,
+          ),
+        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 16,
@@ -580,7 +639,11 @@ class ErrorCard extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         child: Text(
           message,
-          style: TextStyle(color: colors.textStrong, fontWeight: FontWeight.w600, fontSize: 13),
+          style: TextStyle(
+            color: colors.textStrong,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
         ),
       ),
     );

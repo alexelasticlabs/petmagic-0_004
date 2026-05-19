@@ -1,16 +1,16 @@
 "use client";
 
 import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminPage, AdminPageGrid, AdminPageHero, AdminStateCard, AdminStatusBadge } from "@/components/admin/admin-primitives";
-import { UserAvatarView } from "@/components/users/user-avatar";
-import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { ensureAdminSession } from "@/components/admin/admin-session";
-import type { AdminUserAnalytics, AdminUserDetail } from "@/lib/api-client";
-import { fetchAdminUser, fetchAdminUserAnalytics } from "@/lib/api-client";
+import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
+import { UserAvatarView } from "@/components/users/user-avatar";
+import styles from "@/components/users/user-detail-page.module.css";
+import { UserWalletPanel } from "@/components/users/user-wallet-panel";
+import { useAuthSession } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactElement, useEffect, useMemo, useState } from "react";
-import styles from "@/components/users/user-detail-page.module.css";
+import { type ReactElement, useEffect, useMemo } from "react";
 
 type UserDetailPageProps = {
   locale: Locale;
@@ -20,55 +20,14 @@ type UserDetailPageProps = {
 export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
   const router = useRouter();
-  const [user, setUser] = useState<AdminUserDetail | null>(null);
-  const [analytics, setAnalytics] = useState<AdminUserAnalytics | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  async function loadUserDetails(nextUserId: string) {
-    const [nextUser, nextAnalytics] = await Promise.all([
-      fetchAdminUser(nextUserId),
-      fetchAdminUserAnalytics(nextUserId),
-    ]);
-
-    setUser(nextUser);
-    setAnalytics(nextAnalytics);
-  }
+  const session = useAuthSession();
+  const { analytics, hasError, isLoading, refresh, user } = useAdminUserProfile({ userId });
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        if (!ensureAdminSession(locale, router)) {
-          return;
-        }
-
-        const [nextUser, nextAnalytics] = await Promise.all([fetchAdminUser(userId), fetchAdminUserAnalytics(userId)]);
-
-        if (!cancelled) {
-          setUser(nextUser);
-          setAnalytics(nextAnalytics);
-        }
-      } catch {
-        if (!cancelled) {
-          setError(text.userAnalyticsLoadError);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
+    if (!session) {
+      ensureAdminSession(locale, router);
     };
-  }, [locale, router, text.userAnalyticsLoadError, userId]);
+  }, [locale, router, session]);
 
   const metaItems = useMemo(() => {
     if (!user || !analytics) {
@@ -93,11 +52,11 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
     );
   }
 
-  if (error || !user || !analytics) {
+  if (hasError || !user || !analytics) {
     return (
       <AdminPage className={styles.page}>
         <AdminPageHero eyebrow={text.userDetailsEyebrow} title={text.userDetailsTitle} description={text.userDetailsDescription} />
-        <AdminStateCard tone="danger" title={error ?? text.userAnalyticsLoadError} action={<Link href={`/${locale}/users`} className={styles.backLink}>{text.navUsers}</Link>} />
+        <AdminStateCard tone="danger" title={text.userAnalyticsLoadError} action={<Link href={`/${locale}/users`} className={styles.backLink}>{text.navUsers}</Link>} />
       </AdminPage>
     );
   }
@@ -147,7 +106,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         userId={user.userId}
         analytics={analytics}
         onUpdated={async () => {
-          await loadUserDetails(userId);
+          await refresh();
         }}
       />
 

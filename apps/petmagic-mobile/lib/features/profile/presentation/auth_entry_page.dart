@@ -117,7 +117,9 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                   return SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -141,7 +143,10 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                             Padding(
                               padding: const EdgeInsets.only(bottom: 10),
                               child: ErrorCard(
-                                message: _mapErrorMessage(state.errorMessage!, text),
+                                message: _mapErrorMessage(
+                                  state.errorMessage!,
+                                  text,
+                                ),
                               ),
                             ),
                           AuthFormCard(
@@ -228,23 +233,82 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          if (!_isSignUp)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () => _showInfo(text.authForgotPasswordComingSoon),
-                                child: Text(text.authForgotPasswordAction),
-                              ),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
                             ),
-                          const SizedBox(height: 4),
+                            decoration: BoxDecoration(
+                              color: colors.surfaceGlass,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: colors.border),
+                            ),
+                            child: _isSignUp
+                                ? Center(
+                                    child: Wrap(
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      spacing: 6,
+                                      children: [
+                                        Text(
+                                          switchPrompt,
+                                          style: TextStyle(
+                                            color: colors.textMuted,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            context.go(AuthEntryPage.routePath);
+                                          },
+                                          child: Text(switchAction),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : Row(
+                                    children: [
+                                      Expanded(
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: TextButton(
+                                            onPressed: () => _showInfo(
+                                              text.authForgotPasswordComingSoon,
+                                            ),
+                                            child: Text(
+                                              text.authForgotPasswordAction,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          context.go(
+                                            RegisterEntryPage.routePath,
+                                          );
+                                        },
+                                        child: Text(switchAction),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                          const SizedBox(height: 10),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
                               onPressed: state.isSaving ? null : _submit,
                               style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(52),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                minimumSize: const Size.fromHeight(56),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 15,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                elevation: 1,
                               ),
                               child: Text(
                                 state.isSaving
@@ -262,8 +326,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                             onPressed: state.isSaving
                                 ? null
                                 : () => _submitExternal(
-                                      ExternalAuthProvider.google,
-                                    ),
+                                    ExternalAuthProvider.google,
+                                  ),
                           ),
                           const SizedBox(height: 8),
                           SocialButton(
@@ -272,35 +336,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                             onPressed: state.isSaving
                                 ? null
                                 : () => _submitExternal(
-                                      ExternalAuthProvider.apple,
-                                    ),
-                          ),
-                          const SizedBox(height: 12),
-                          Center(
-                            child: Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              children: [
-                                Text(
-                                  switchPrompt,
-                                  style: TextStyle(
-                                    color: colors.textMuted,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
+                                    ExternalAuthProvider.apple,
                                   ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    context.go(
-                                      _isSignUp
-                                          ? AuthEntryPage.routePath
-                                          : RegisterEntryPage.routePath,
-                                    );
-                                  },
-                                  child: Text(switchAction),
-                                ),
-                              ],
-                            ),
                           ),
                           const SizedBox(height: 14),
                           if (isDark)
