@@ -307,6 +307,109 @@ public sealed class IdentityService(
         return Result.Success(tokenPair);
     }
 
+    public async Task<Result<IReadOnlyList<LinkedAccountResponse>>> GetLinkedAccountsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.UserNotFound);
+        }
+
+        return Result.Success(await ListLinkedAccountsAsync(user));
+    }
+
+    public async Task<Result<IReadOnlyList<LinkedAccountResponse>>> LinkExternalLoginAsync(Guid userId, ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.Provider) || string.IsNullOrWhiteSpace(command.ProviderSubject))
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalPrincipalInvalid);
+        }
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.UserNotFound);
+        }
+
+        if (!user.IsActive)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.InvalidCredentials);
+        }
+
+        var existingOwner = await userManager.FindByLoginAsync(command.Provider, command.ProviderSubject);
+        if (existingOwner is not null && existingOwner.Id != user.Id)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalAlreadyLinked);
+        }
+
+        var userLogins = await userManager.GetLoginsAsync(user);
+        var providerLogins = userLogins
+            .Where(x => string.Equals(x.LoginProvider, command.Provider, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (providerLogins.Count > 0)
+        {
+            if (providerLogins.Any(x => string.Equals(x.ProviderKey, command.ProviderSubject, StringComparison.Ordinal)))
+            {
+                return Result.Success<IReadOnlyList<LinkedAccountResponse>>(await ListLinkedAccountsAsync(user));
+            }
+
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalProviderAlreadyLinked);
+        }
+
+        var addLoginResult = await userManager.AddLoginAsync(
+            user,
+            new UserLoginInfo(command.Provider, command.ProviderSubject, command.Provider));
+        if (!addLoginResult.Succeeded)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.OperationFailed);
+        }
+
+        await WriteAuditAsync(user.Id, "auth.external_link.succeeded", $"External provider linked: {command.Provider}", cancellationToken);
+        return Result.Success<IReadOnlyList<LinkedAccountResponse>>(await ListLinkedAccountsAsync(user));
+    }
+
+    public async Task<Result<IReadOnlyList<LinkedAccountResponse>>> UnlinkExternalLoginAsync(Guid userId, string provider, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalPrincipalInvalid);
+        }
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.UserNotFound);
+        }
+
+        var userLogins = await userManager.GetLoginsAsync(user);
+        var providerLogins = userLogins
+            .Where(x => string.Equals(x.LoginProvider, provider, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (providerLogins.Count == 0)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalProviderNotLinked);
+        }
+
+        var hasPassword = !string.IsNullOrWhiteSpace(user.PasswordHash);
+        if (!hasPassword && userLogins.Count <= providerLogins.Count)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalLastSignInMethod);
+        }
+
+        foreach (var login in providerLogins)
+        {
+            var removeLoginResult = await userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
+            if (!removeLoginResult.Succeeded)
+            {
+                return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.OperationFailed);
+            }
+        }
+
+        await WriteAuditAsync(user.Id, "auth.external_link.removed", $"External provider unlinked: {provider}", cancellationToken);
+        return Result.Success<IReadOnlyList<LinkedAccountResponse>>(await ListLinkedAccountsAsync(user));
+    }
+
     public async Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken)
     {
         var hash = HashToken(command.RefreshToken);
@@ -1407,6 +1510,45 @@ public sealed class IdentityService(
             roles.ToList(),
             user.CreatedAtUtc,
             ToAvatarResponse(user));
+
+    private async Task<IReadOnlyList<LinkedAccountResponse>> ListLinkedAccountsAsync(AppUser user)
+    {
+        var userLogins = await userManager.GetLoginsAsync(user);
+
+        return userLogins
+            .GroupBy(x => x.LoginProvider, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new LinkedAccountResponse(
+                group.First().LoginProvider,
+                ToLinkedAccountDisplayName(group.First().ProviderDisplayName ?? group.First().LoginProvider),
+                CanDisconnectLinkedProvider(user, userLogins, group.Count())))
+            .ToList();
+    }
+
+    private static bool CanDisconnectLinkedProvider(AppUser user, IEnumerable<UserLoginInfo> allLogins, int providerLoginCount)
+    {
+        if (!string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return true;
+        }
+
+        return allLogins.Count() > providerLoginCount;
+    }
+
+    private static string ToLinkedAccountDisplayName(string provider)
+    {
+        if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Google";
+        }
+
+        if (string.Equals(provider, "Apple", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Apple";
+        }
+
+        return provider;
+    }
 
     private UserProfileResponse ToUserProfileResponse(AppUser user, IEnumerable<string> roles) =>
         new(
