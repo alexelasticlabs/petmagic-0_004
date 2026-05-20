@@ -129,8 +129,14 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
                                     {conversation.lastMessagePreview || text.supportNoMessages}
                                 </div>
                                 <div className={styles.rowFooter}>
-                                    <span>{text.supportAssignedTo}: {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}</span>
-                                    <span>{formatDateTime(conversation.lastMessageAtUtc ?? conversation.updatedAtUtc, locale)}</span>
+                                    <div className={styles.rowMetaGroup}>
+                                        <AdminBadge tone={priorityTone(conversation.priority)}>{priorityLabel(conversation.priority, text)}</AdminBadge>
+                                        <span>{text.supportAssignedTo}: {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}</span>
+                                    </div>
+                                    <div className={styles.rowMetaGroup}>
+                                        {conversation.adminUnreadCount > 0 ? <span className={styles.unreadDot}>{conversation.adminUnreadCount}</span> : null}
+                                        <span className={styles.waitingLabel}>{`${text.supportWaitingLabel}: ${formatWaitTime(conversation.lastMessageAtUtc ?? conversation.createdAtUtc, locale)}`}</span>
+                                    </div>
                                 </div>
                             </Link>
                         ))}
@@ -171,13 +177,43 @@ function toneForStatus(status: string) {
     }
 }
 
-function formatDateTime(value: string | null | undefined, locale: Locale) {
+function priorityLabel(priority: string, text: ReturnType<typeof getDictionary>) {
+    switch (priority.toLowerCase()) {
+        case "high":
+            return text.supportPriorityHigh;
+        case "low":
+            return text.supportPriorityLow;
+        default:
+            return text.supportPriorityNormal;
+    }
+}
+
+function priorityTone(priority: string) {
+    switch (priority.toLowerCase()) {
+        case "high":
+            return "danger" as const;
+        case "low":
+            return "neutral" as const;
+        default:
+            return "success" as const;
+    }
+}
+
+function formatWaitTime(value: string | null | undefined, locale: Locale) {
     if (!value) {
         return "—";
     }
 
-    return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-    }).format(new Date(value));
+    const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+    if (diffMinutes < 60) {
+        return locale === "ru" ? `${diffMinutes} мин` : `${diffMinutes} min`;
+    }
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    const restMinutes = diffMinutes % 60;
+    if (restMinutes === 0) {
+        return locale === "ru" ? `${diffHours} ч` : `${diffHours} h`;
+    }
+
+    return locale === "ru" ? `${diffHours} ч ${restMinutes} мин` : `${diffHours} h ${restMinutes} min`;
 }

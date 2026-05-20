@@ -10,6 +10,9 @@ export type SupportConversationUpdatedEvent = {
 };
 
 const supportHubUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000"}/hubs/support-chat`;
+const supportRealtimeCooldownMs = 30_000;
+
+let supportRealtimeBlockedUntil = 0;
 
 export function useSupportRealtime(
   accessToken: string | undefined,
@@ -18,7 +21,7 @@ export function useSupportRealtime(
   const handleConversationUpdated = useEffectEvent(onConversationUpdated);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!accessToken || Date.now() < supportRealtimeBlockedUntil) {
       return;
     }
 
@@ -26,9 +29,10 @@ export function useSupportRealtime(
       .withUrl(supportHubUrl, {
         accessTokenFactory: async () => accessToken,
       })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
+      .configureLogging(LogLevel.None)
       .build();
+
+    let isDisposed = false;
 
     connection.on("conversation-updated", (payload: unknown) => {
       const event = normalizeConversationUpdated(payload);
@@ -37,13 +41,26 @@ export function useSupportRealtime(
       }
     });
 
-    void connection.start().catch(() => undefined);
+    void connection.start().catch((error: unknown) => {
+      if (isDisposed || isExpectedConnectionFailure(error)) {
+        supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
+      }
+    });
 
     return () => {
+      isDisposed = true;
       connection.off("conversation-updated");
       void connection.stop();
     };
   }, [accessToken]);
+}
+
+function isExpectedConnectionFailure(error: unknown) {
+  if (!(error instanceof Error)) {
+    return true;
+  }
+
+  return /failed to (start the connection|complete negotiation)|failed to fetch|networkerror/i.test(error.message);
 }
 
 function normalizeConversationUpdated(payload: unknown): SupportConversationUpdatedEvent | null {

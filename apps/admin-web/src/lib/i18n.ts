@@ -94,6 +94,7 @@ export type Dictionary = {
   activeLabel: string;
   statusLabel: string;
   navDashboard: string;
+  navEconomy: string;
   navSupport: string;
   navUsers: string;
   navTemplates: string;
@@ -269,16 +270,51 @@ export type Dictionary = {
   supportTemplateEnabledLabel: string;
   supportTemplateDisabledBadge: string;
   supportTemplateSortOrderLabel: string;
+  supportTemplateSearchPlaceholder: string;
+  supportTemplateFilterAll: string;
+  supportTemplateUseAction: string;
   supportTemplateEditAction: string;
   supportTemplateDeleteAction: string;
   supportTemplateCreateAction: string;
   supportTemplateUpdateAction: string;
   supportTemplateResetAction: string;
+  supportTemplateCancelEditAction: string;
   supportTemplateSaved: string;
   supportTemplateDeleted: string;
   supportUserLabel: string;
   supportUnreadAdmin: string;
   supportUnreadUser: string;
+  supportSearchPlaceholder: string;
+  supportUserInformationTitle: string;
+  supportConversationDetailsTitle: string;
+  supportActionsTitle: string;
+  supportMessagesCount: string;
+  supportUpdatedLabel: string;
+  supportPriorityLabel: string;
+  supportPriorityLow: string;
+  supportPriorityNormal: string;
+  supportPriorityHigh: string;
+  supportWaitingLabel: string;
+  supportMarkInProgressAction: string;
+  supportCloseConversationAction: string;
+  supportTodayLabel: string;
+  supportViewUserTab: string;
+  supportViewTemplatesTab: string;
+  supportViewHistoryTab: string;
+  supportOpenPanelAction: string;
+  supportClosePanelAction: string;
+  supportTimelineTitle: string;
+  supportTimelineConversationCreated: string;
+  supportTimelineUserMessage: string;
+  supportTimelineAdminReply: string;
+  supportTimelineInternalNote: string;
+  supportHistoryEmpty: string;
+  supportPlanLabel: string;
+  supportLastGenerationLabel: string;
+  supportLastPaymentLabel: string;
+  supportCountryLabel: string;
+  supportLastSeenLabel: string;
+  supportAiContextTitle: string;
 };
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -372,6 +408,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     activeLabel: "Активен",
     statusLabel: "Статус",
     navDashboard: "Дашборд",
+    navEconomy: "Экономика",
     navSupport: "Поддержка",
     navUsers: "Пользователи",
     navTemplates: "Шаблоны",
@@ -547,16 +584,51 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportTemplateEnabledLabel: "Шаблон активен",
     supportTemplateDisabledBadge: "Выключен",
     supportTemplateSortOrderLabel: "Порядок",
+    supportTemplateSearchPlaceholder: "Поиск шаблонов...",
+    supportTemplateFilterAll: "Все шаблоны",
+    supportTemplateUseAction: "Вставить",
     supportTemplateEditAction: "Изменить",
     supportTemplateDeleteAction: "Удалить",
     supportTemplateCreateAction: "Создать шаблон",
     supportTemplateUpdateAction: "Сохранить шаблон",
     supportTemplateResetAction: "Сбросить форму",
+    supportTemplateCancelEditAction: "Скрыть редактор",
     supportTemplateSaved: "Шаблон сохранен",
     supportTemplateDeleted: "Шаблон удален",
     supportUserLabel: "Пользователь",
     supportUnreadAdmin: "Непрочитано для поддержки",
-    supportUnreadUser: "Непрочитано для пользователя"
+    supportUnreadUser: "Непрочитано для пользователя",
+    supportSearchPlaceholder: "Поиск диалогов...",
+    supportUserInformationTitle: "Информация о пользователе",
+    supportConversationDetailsTitle: "Детали диалога",
+    supportActionsTitle: "Действия",
+    supportMessagesCount: "Сообщений",
+    supportUpdatedLabel: "Обновлен",
+    supportPriorityLabel: "Приоритет",
+    supportPriorityLow: "Низкий",
+    supportPriorityNormal: "Нормальный",
+    supportPriorityHigh: "Высокий",
+    supportWaitingLabel: "Ожидает",
+    supportMarkInProgressAction: "Взять в работу",
+    supportCloseConversationAction: "Закрыть диалог",
+    supportTodayLabel: "Сегодня",
+    supportViewUserTab: "Пользователь",
+    supportViewTemplatesTab: "Шаблоны",
+    supportViewHistoryTab: "История",
+    supportOpenPanelAction: "Открыть панель",
+    supportClosePanelAction: "Скрыть панель",
+    supportTimelineTitle: "Хронология диалога",
+    supportTimelineConversationCreated: "Обращение создано",
+    supportTimelineUserMessage: "Сообщение пользователя",
+    supportTimelineAdminReply: "Ответ поддержки",
+    supportTimelineInternalNote: "Внутренняя заметка",
+    supportHistoryEmpty: "История пока пуста.",
+    supportPlanLabel: "План",
+    supportLastGenerationLabel: "Последняя генерация",
+    supportLastPaymentLabel: "Последний платеж",
+    supportCountryLabel: "Страна",
+    supportLastSeenLabel: "Последняя активность",
+    supportAiContextTitle: "PetMagic AI context"
   },
   en: {
     loginTitle: "Sign in",
@@ -648,6 +720,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     activeLabel: "Active",
     statusLabel: "Status",
     navDashboard: "Dashboard",
+    navEconomy: "Economy",
     navSupport: "Support",
     navUsers: "Users",
     navTemplates: "Templates",
@@ -823,16 +896,51 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportTemplateEnabledLabel: "Template enabled",
     supportTemplateDisabledBadge: "Disabled",
     supportTemplateSortOrderLabel: "Sort order",
+    supportTemplateSearchPlaceholder: "Search templates...",
+    supportTemplateFilterAll: "All templates",
+    supportTemplateUseAction: "Insert",
     supportTemplateEditAction: "Edit",
     supportTemplateDeleteAction: "Delete",
     supportTemplateCreateAction: "Create template",
     supportTemplateUpdateAction: "Save template",
     supportTemplateResetAction: "Reset form",
+    supportTemplateCancelEditAction: "Hide editor",
     supportTemplateSaved: "Template saved",
     supportTemplateDeleted: "Template deleted",
     supportUserLabel: "User",
     supportUnreadAdmin: "Unread for support",
-    supportUnreadUser: "Unread for user"
+    supportUnreadUser: "Unread for user",
+    supportSearchPlaceholder: "Search conversations...",
+    supportUserInformationTitle: "User information",
+    supportConversationDetailsTitle: "Conversation details",
+    supportActionsTitle: "Actions",
+    supportMessagesCount: "Messages",
+    supportUpdatedLabel: "Updated",
+    supportPriorityLabel: "Priority",
+    supportPriorityLow: "Low",
+    supportPriorityNormal: "Normal",
+    supportPriorityHigh: "High",
+    supportWaitingLabel: "Waiting",
+    supportMarkInProgressAction: "Mark as in progress",
+    supportCloseConversationAction: "Close conversation",
+    supportTodayLabel: "Today",
+    supportViewUserTab: "User",
+    supportViewTemplatesTab: "Templates",
+    supportViewHistoryTab: "History",
+    supportOpenPanelAction: "Open panel",
+    supportClosePanelAction: "Hide panel",
+    supportTimelineTitle: "Conversation timeline",
+    supportTimelineConversationCreated: "Conversation created",
+    supportTimelineUserMessage: "User message",
+    supportTimelineAdminReply: "Support reply",
+    supportTimelineInternalNote: "Internal note",
+    supportHistoryEmpty: "No history yet.",
+    supportPlanLabel: "Plan",
+    supportLastGenerationLabel: "Last generation",
+    supportLastPaymentLabel: "Last payment",
+    supportCountryLabel: "Country",
+    supportLastSeenLabel: "Last activity",
+    supportAiContextTitle: "PetMagic AI context"
   }
 };
 
