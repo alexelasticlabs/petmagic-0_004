@@ -17,7 +17,11 @@ public sealed record SendSupportMessageCommand(
     Guid SenderUserId,
     string Body,
     bool IsAdmin,
-    bool IsInternalNote = false);
+    bool IsInternalNote = false,
+    string? AttachmentUrl = null,
+    string? AttachmentFileName = null,
+    string? AttachmentContentType = null,
+    long? AttachmentFileSizeBytes = null);
 
 public sealed record MarkSupportConversationReadCommand(
     Guid ConversationId,
@@ -72,6 +76,10 @@ public sealed record SupportMessageResponse(
     bool IsFromAdmin,
     bool IsInternalNote,
     string Body,
+    string? AttachmentUrl,
+    string? AttachmentFileName,
+    string? AttachmentContentType,
+    long? AttachmentFileSizeBytes,
     bool IsRead,
     DateTime? ReadAtUtc,
     DateTime CreatedAtUtc);

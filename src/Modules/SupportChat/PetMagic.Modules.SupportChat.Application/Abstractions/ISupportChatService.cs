@@ -8,9 +8,29 @@ public sealed record SupportConversationRealtimeEvent(
     Guid InitiatorUserId,
     DateTime UpdatedAtUtc);
 
+public sealed record SupportAttachmentUploadCommand(
+    string FileName,
+    string ContentType,
+    byte[] Content);
+
+public sealed record StoredSupportAttachmentResponse(
+    string Url,
+    string StorageKey,
+    string FileName,
+    string ContentType,
+    long FileSizeBytes,
+    string? LocalPath);
+
 public interface ISupportChatRealtimeNotifier
 {
     Task NotifyConversationUpdatedAsync(SupportConversationRealtimeEvent notification, CancellationToken cancellationToken);
+}
+
+public interface ISupportAttachmentStorage
+{
+    Task<Result<StoredSupportAttachmentResponse>> StoreAsync(SupportAttachmentUploadCommand attachment, CancellationToken cancellationToken);
+
+    Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken);
 }
 
 public interface ISupportChatService

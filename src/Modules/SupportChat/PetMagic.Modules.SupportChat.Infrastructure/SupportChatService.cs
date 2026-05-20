@@ -44,7 +44,17 @@ public sealed class SupportChatService(
 
         if (!string.IsNullOrWhiteSpace(command.InitialMessage))
         {
-            await AppendMessageAsync(conversation, command.UserId, command.InitialMessage, isAdmin: false, isInternalNote: false, cancellationToken);
+            await AppendMessageAsync(
+                conversation,
+                command.UserId,
+                command.InitialMessage,
+                isAdmin: false,
+                isInternalNote: false,
+                attachmentUrl: null,
+                attachmentFileName: null,
+                attachmentContentType: null,
+                attachmentFileSizeBytes: null,
+                cancellationToken);
             appendedInitialMessage = true;
         }
 
@@ -183,6 +193,10 @@ public sealed class SupportChatService(
             command.Body,
             command.IsAdmin,
             command.IsInternalNote,
+            command.AttachmentUrl,
+            command.AttachmentFileName,
+            command.AttachmentContentType,
+            command.AttachmentFileSizeBytes,
             cancellationToken);
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
@@ -289,6 +303,10 @@ public sealed class SupportChatService(
         string body,
         bool isAdmin,
         bool isInternalNote,
+        string? attachmentUrl,
+        string? attachmentFileName,
+        string? attachmentContentType,
+        long? attachmentFileSizeBytes,
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
@@ -301,6 +319,10 @@ public sealed class SupportChatService(
             Body = trimmedBody,
             IsFromAdmin = isAdmin,
             IsInternalNote = isInternalNote,
+            AttachmentUrl = attachmentUrl,
+            AttachmentFileName = attachmentFileName,
+            AttachmentContentType = attachmentContentType,
+            AttachmentFileSizeBytes = attachmentFileSizeBytes,
             CreatedAtUtc = now
         };
 
@@ -370,8 +392,12 @@ public sealed class SupportChatService(
                 message.SenderUserId,
                 ResolveDisplayName(sender?.Email, sender?.DisplayName, message.IsFromAdmin),
                 message.IsFromAdmin,
-            message.IsInternalNote,
+                message.IsInternalNote,
                 message.Body,
+                message.AttachmentUrl,
+                message.AttachmentFileName,
+                message.AttachmentContentType,
+                message.AttachmentFileSizeBytes,
                 message.ReadAtUtc.HasValue,
                 message.ReadAtUtc,
                 message.CreatedAtUtc));
@@ -413,6 +439,10 @@ public sealed class SupportChatService(
             message.IsFromAdmin,
             message.IsInternalNote,
             message.Body,
+            message.AttachmentUrl,
+            message.AttachmentFileName,
+            message.AttachmentContentType,
+            message.AttachmentFileSizeBytes,
             message.ReadAtUtc.HasValue,
             message.ReadAtUtc,
             message.CreatedAtUtc);

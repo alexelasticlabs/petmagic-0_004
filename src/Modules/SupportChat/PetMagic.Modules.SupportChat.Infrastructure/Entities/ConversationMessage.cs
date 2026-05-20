@@ -14,6 +14,14 @@ public sealed class ConversationMessage
 
     public string Body { get; set; } = string.Empty;
 
+    public string? AttachmentUrl { get; set; }
+
+    public string? AttachmentFileName { get; set; }
+
+    public string? AttachmentContentType { get; set; }
+
+    public long? AttachmentFileSizeBytes { get; set; }
+
     public DateTime? ReadAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

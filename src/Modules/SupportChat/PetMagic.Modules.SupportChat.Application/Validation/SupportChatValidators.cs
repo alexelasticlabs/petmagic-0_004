@@ -26,8 +26,25 @@ public sealed class SendSupportMessageCommandValidator : AbstractValidator<SendS
             .When(x => !x.IsAdmin)
             .WithMessage("Internal notes are only supported for admin senders.");
         RuleFor(x => x.Body)
-            .NotEmpty()
             .MaximumLength(4000);
+        RuleFor(x => x.Body)
+            .NotEmpty()
+            .When(x => string.IsNullOrWhiteSpace(x.AttachmentUrl));
+        RuleFor(x => x.AttachmentUrl)
+            .NotEmpty()
+            .When(x => !string.IsNullOrWhiteSpace(x.AttachmentFileName));
+        RuleFor(x => x.AttachmentFileName)
+            .NotEmpty()
+            .MaximumLength(256)
+            .When(x => !string.IsNullOrWhiteSpace(x.AttachmentUrl));
+        RuleFor(x => x.AttachmentContentType)
+            .NotEmpty()
+            .MaximumLength(128)
+            .When(x => !string.IsNullOrWhiteSpace(x.AttachmentUrl));
+        RuleFor(x => x.AttachmentFileSizeBytes)
+            .NotNull()
+            .GreaterThan(0)
+            .When(x => !string.IsNullOrWhiteSpace(x.AttachmentUrl));
     }
 }
 

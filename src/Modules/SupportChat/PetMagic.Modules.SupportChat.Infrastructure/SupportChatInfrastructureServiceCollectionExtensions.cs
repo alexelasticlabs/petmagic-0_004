@@ -12,11 +12,16 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
 {
     public static IServiceCollection AddSupportChatInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        var attachmentStorageOptions = BuildSupportAttachmentStorageOptions(
+            configuration.GetSection("SupportChat:AttachmentStorage"));
+
         services.AddDbContext<SupportChatDbContext>(options =>
         {
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });
 
+        services.AddSingleton(attachmentStorageOptions);
+        services.AddSingleton<ISupportAttachmentStorage, LocalSupportAttachmentStorage>();
         services.AddScoped<ISupportChatService, SupportChatService>();
         services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
 
@@ -97,5 +102,20 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
             });
 
         await dbContext.SaveChangesAsync();
+    }
+
+    private static SupportAttachmentStorageOptions BuildSupportAttachmentStorageOptions(IConfigurationSection section)
+    {
+        return new SupportAttachmentStorageOptions
+        {
+            PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
+            LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "support-attachments"),
+            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], 8 * 1024 * 1024)
+        };
+    }
+
+    private static long ParsePositiveLong(string? rawValue, long fallback)
+    {
+        return long.TryParse(rawValue, out var parsed) && parsed > 0 ? parsed : fallback;
     }
 }

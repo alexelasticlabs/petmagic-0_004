@@ -24,6 +24,9 @@ public static class SupportChatEndpoints
         userGroup.MapGet("/conversation", GetUserConversationAsync);
         userGroup.MapPost("/conversation/{conversationId:guid}/messages", SendUserMessageAsync)
             .RequireRateLimiting("support-chat");
+        userGroup.MapPost("/conversation/{conversationId:guid}/attachments", SendUserAttachmentAsync)
+            .DisableAntiforgery()
+            .RequireRateLimiting("support-chat");
         userGroup.MapPost("/conversation/{conversationId:guid}/read", MarkUserReadAsync);
 
         var adminGroup = endpoints.MapGroup("/api/admin/support")
@@ -120,6 +123,85 @@ public static class SupportChatEndpoints
         var result = await service.SendMessageAsync(command, cancellationToken);
         if (result.IsFailure)
         {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendUserAttachmentAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromForm] IFormFile? file,
+        [FromForm] string? body,
+        [FromServices] IValidator<SendSupportMessageCommand> validator,
+        [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(file)] = ["Support attachment file is required."]
+            });
+        }
+
+        if (!(file.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(file)] = ["Only image attachments are supported."]
+            });
+        }
+
+        await using var stream = file.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, cancellationToken);
+
+        var storeResult = await attachmentStorage.StoreAsync(
+            new SupportAttachmentUploadCommand(
+                Path.GetFileName(file.FileName),
+                file.ContentType ?? "application/octet-stream",
+                memoryStream.ToArray()),
+            cancellationToken);
+
+        if (storeResult.IsFailure)
+        {
+            return ToProblem(storeResult.Error);
+        }
+
+        var normalizedBody = string.IsNullOrWhiteSpace(body)
+            ? Path.GetFileName(file.FileName)
+            : body.Trim();
+
+        var command = new SendSupportMessageCommand(
+            conversationId,
+            userId,
+            normalizedBody,
+            IsAdmin: false,
+            IsInternalNote: false,
+            AttachmentUrl: storeResult.Value.Url,
+            AttachmentFileName: storeResult.Value.FileName,
+            AttachmentContentType: storeResult.Value.ContentType,
+            AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.SendMessageAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
             return ToProblem(result.Error);
         }
 
@@ -473,6 +555,10 @@ public static class SupportChatEndpoints
             "support.template_not_found" => StatusCodes.Status404NotFound,
             "support.forbidden" => StatusCodes.Status403Forbidden,
             "support.invalid_subject" => StatusCodes.Status401Unauthorized,
+            "support.attachment_invalid_upload" => StatusCodes.Status400BadRequest,
+            "support.attachment_content_type_not_allowed" => StatusCodes.Status400BadRequest,
+            "support.attachment_file_too_large" => StatusCodes.Status400BadRequest,
+            "support.attachment_storage_failed" => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status400BadRequest,
         };
 
