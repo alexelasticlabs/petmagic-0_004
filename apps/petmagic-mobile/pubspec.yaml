@@ -49,6 +49,7 @@ dependencies:
   app_links: ^6.4.1
   google_sign_in: ^6.3.0
   url_launcher: ^6.3.2
+  in_app_purchase: ^3.2.3
   flutter_localizations:
     sdk: flutter
   signalr_netcore: ^1.4.4
