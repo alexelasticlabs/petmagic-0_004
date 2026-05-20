@@ -5,6 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
+double petMagicBottomNavInset(BuildContext context) {
+  final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+  return bottomPadding == 0 ? 78 : bottomPadding + 66;
+}
+
 class PetMagicShell extends StatelessWidget {
   const PetMagicShell({required this.location, required this.child, super.key});
 
@@ -38,18 +43,18 @@ class _BottomNavBackdrop extends StatelessWidget {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          height: 110 + bottomPadding,
+          height: 84 + bottomPadding,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
                 colors.backgroundBottom.withValues(alpha: 0),
-                colors.backgroundBottom.withValues(alpha: 0.24),
-                colors.backgroundBottom.withValues(alpha: 0.56),
-                colors.backgroundBottom.withValues(alpha: 0.88),
+                colors.backgroundBottom.withValues(alpha: 0.18),
+                colors.backgroundBottom.withValues(alpha: 0.42),
+                colors.backgroundBottom.withValues(alpha: 0.74),
               ],
-              stops: const [0, 0.28, 0.62, 1],
+              stops: const [0, 0.34, 0.68, 1],
             ),
           ),
         ),
@@ -77,43 +82,43 @@ class _FloatingBottomNav extends StatelessWidget {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(22, 0, 22, bottomPadding == 0 ? 18 : 12),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding == 0 ? 10 : 6),
         child: Stack(
           alignment: Alignment.center,
           children: [
             Positioned.fill(
-              top: 2,
-              bottom: 2,
+              top: 1,
+              bottom: 1,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(15),
                   boxShadow: [
                     BoxShadow(
-                      color: colors.shadow.withValues(alpha: 0.48),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
+                      color: colors.shadow.withValues(alpha: 0.24),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
               ),
             ),
             ClipRRect(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(15),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colors.surfaceGlass.withValues(alpha: 0.66),
-                    borderRadius: BorderRadius.circular(18),
+                    color: colors.surfaceGlass.withValues(alpha: 0.58),
+                    borderRadius: BorderRadius.circular(15),
                     border: Border.all(
-                      color: colors.border.withValues(alpha: 0.2),
+                      color: colors.border.withValues(alpha: 0.12),
                     ),
                   ),
                   child: SafeArea(
                     top: false,
-                    minimum: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+                    minimum: const EdgeInsets.fromLTRB(3, 1, 3, 1),
                     child: SizedBox(
-                      height: 50,
+                      height: 42,
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -121,8 +126,8 @@ class _FloatingBottomNav extends StatelessWidget {
                             Expanded(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 3,
-                                  vertical: 3,
+                                  horizontal: 2,
+                                  vertical: 2,
                                 ),
                                 child: _BottomNavButton(
                                   item: item,
@@ -167,19 +172,19 @@ class _BottomNavButton extends StatelessWidget {
       button: true,
       label: item.label,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             color: selected
-                ? colors.accent.withValues(alpha: 0.15)
+                ? colors.accent.withValues(alpha: 0.1)
                 : Colors.transparent,
             border: selected
-                ? Border.all(color: colors.accent.withValues(alpha: 0.14))
+                ? Border.all(color: colors.accent.withValues(alpha: 0.08))
                 : null,
           ),
           child: Column(
@@ -188,9 +193,9 @@ class _BottomNavButton extends StatelessWidget {
               Icon(
                 item.icon,
                 color: selected ? colors.accent : colors.textMuted,
-                size: 19,
+                size: 17,
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Text(
                 item.label,
                 maxLines: 1,
@@ -198,7 +203,7 @@ class _BottomNavButton extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: selected ? colors.accent : colors.textMuted,
-                  fontSize: 8.8,
+                  fontSize: 8.1,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                   letterSpacing: 0.05,
                 ),
