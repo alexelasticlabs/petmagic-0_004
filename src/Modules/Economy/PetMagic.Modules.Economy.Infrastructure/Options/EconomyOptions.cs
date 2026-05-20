@@ -19,4 +19,16 @@ public sealed class EconomyOptions
     public string StripeCheckoutSuccessUrl { get; init; } = "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}";
 
     public string StripeCheckoutCancelUrl { get; init; } = "https://petmagic.app/payments/cancel";
+
+    public string StripeBillingPortalReturnUrl { get; init; } = "https://petmagic.app/profile/premium";
+
+    public string GooglePlayPackageName { get; init; } = "com.petmagic.app";
+
+    public string GooglePlayServiceAccountEmail { get; init; } = string.Empty;
+
+    public string GooglePlayPrivateKeyPem { get; init; } = string.Empty;
+
+    public string AppStoreBundleId { get; init; } = "com.petmagic.app";
+
+    public string AppStoreSharedSecret { get; init; } = string.Empty;
 }

@@ -8,6 +8,8 @@ public sealed class PurchaseOrder
 
     public Guid PackId { get; set; }
 
+    public Guid? SavedPaymentMethodId { get; set; }
+
     public string PaymentProvider { get; set; } = "stripe";
 
     public string Status { get; set; } = "pending";

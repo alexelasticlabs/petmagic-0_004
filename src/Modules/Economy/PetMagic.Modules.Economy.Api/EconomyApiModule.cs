@@ -16,8 +16,16 @@ public static class EconomyApiModule
         services.AddScoped<IValidator<SpendBalanceCommand>, SpendBalanceCommandValidator>();
         services.AddScoped<IValidator<CreditBalanceCommand>, CreditBalanceCommandValidator>();
         services.AddScoped<IValidator<CreatePackPurchaseCommand>, CreatePackPurchaseCommandValidator>();
+        services.AddScoped<IValidator<CreatePremiumCheckoutCommand>, CreatePremiumCheckoutCommandValidator>();
+        services.AddScoped<IValidator<CreatePremiumBillingPortalCommand>, CreatePremiumBillingPortalCommandValidator>();
+        services.AddScoped<IValidator<CreatePaymentMethodSetupCommand>, CreatePaymentMethodSetupCommandValidator>();
+        services.AddScoped<IValidator<RemovePaymentMethodCommand>, RemovePaymentMethodCommandValidator>();
         services.AddScoped<IValidator<ConfirmPackPurchaseCommand>, ConfirmPackPurchaseCommandValidator>();
         services.AddScoped<IValidator<StripeWebhookCommand>, StripeWebhookCommandValidator>();
+        services.AddScoped<IValidator<UpdateCurrencyPackCommand>, UpdateCurrencyPackCommandValidator>();
+        services.AddScoped<IValidator<ApplyRedeemCodeCommand>, ApplyRedeemCodeCommandValidator>();
+        services.AddScoped<IValidator<CreateRedeemCodeCommand>, CreateRedeemCodeCommandValidator>();
+        services.AddScoped<IValidator<UpdateRedeemCodeCommand>, UpdateRedeemCodeCommandValidator>();
 
         return services;
     }
@@ -25,6 +33,7 @@ public static class EconomyApiModule
     public static IApplicationBuilder MapEconomyApiModule(this WebApplication app)
     {
         app.MapEconomyEndpoints();
+        app.MapAdminEconomyEndpoints();
         return app;
     }
 }

@@ -5,6 +5,24 @@ namespace PetMagic.Modules.Economy.Application.Abstractions;
 public interface IPaymentGateway
 {
     Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken);
+
+    Task<Result<SubscriptionCheckoutCreateResponse>> CreateSubscriptionCheckoutAsync(
+        SubscriptionCheckoutCreateRequest request,
+        CancellationToken cancellationToken);
+
+    Task<Result<PaymentCustomerCreateResponse>> CreateCustomerAsync(PaymentCustomerCreateRequest request, CancellationToken cancellationToken);
+
+    Task<Result<BillingPortalCreateResponse>> CreateBillingPortalSessionAsync(
+        BillingPortalCreateRequest request,
+        CancellationToken cancellationToken);
+
+    Task<Result<PaymentMethodSetupCreateResponse>> CreatePaymentMethodSetupAsync(PaymentMethodSetupCreateRequest request, CancellationToken cancellationToken);
+
+    Task<Result<PaymentMethodDetailsResponse>> ResolveSetupIntentPaymentMethodAsync(PaymentMethodResolveRequest request, CancellationToken cancellationToken);
+
+    Task<Result> DetachPaymentMethodAsync(PaymentMethodDetachRequest request, CancellationToken cancellationToken);
+
+    Task<Result<PaymentCreateResponse>> CreatePaymentWithSavedMethodAsync(PaymentSavedMethodCreateRequest request, CancellationToken cancellationToken);
 }
 
 public sealed record PaymentCreateRequest(
@@ -17,3 +35,44 @@ public sealed record PaymentCreateRequest(
     string ProductName);
 
 public sealed record PaymentCreateResponse(string ExternalPaymentId, string CheckoutUrl);
+
+public sealed record SubscriptionCheckoutCreateRequest(
+    string Provider,
+    Guid UserId,
+    string ExternalCustomerId,
+    string PlanCode,
+    string ProductName,
+    decimal PriceAmount,
+    string CurrencyCode,
+    string BillingInterval);
+
+public sealed record SubscriptionCheckoutCreateResponse(string ExternalCheckoutId, string CheckoutUrl);
+
+public sealed record PaymentCustomerCreateRequest(string Provider, Guid UserId);
+
+public sealed record PaymentCustomerCreateResponse(string ExternalCustomerId);
+
+public sealed record BillingPortalCreateRequest(string Provider, Guid UserId, string ExternalCustomerId);
+
+public sealed record BillingPortalCreateResponse(string PortalUrl);
+
+public sealed record PaymentMethodSetupCreateRequest(string Provider, Guid UserId, string ExternalCustomerId);
+
+public sealed record PaymentMethodSetupCreateResponse(string ExternalSetupId, string CheckoutUrl);
+
+public sealed record PaymentMethodResolveRequest(string Provider, string ExternalSetupId);
+
+public sealed record PaymentMethodDetailsResponse(string ExternalPaymentMethodId, string Brand, string Last4, long? ExpMonth, long? ExpYear);
+
+public sealed record PaymentMethodDetachRequest(string Provider, string ExternalPaymentMethodId);
+
+public sealed record PaymentSavedMethodCreateRequest(
+    string Provider,
+    Guid OrderId,
+    Guid UserId,
+    decimal PriceAmount,
+    string CurrencyCode,
+    int SparkToGrant,
+    string ProductName,
+    string ExternalCustomerId,
+    string ExternalPaymentMethodId);

@@ -24,7 +24,13 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             StripeSecretKey = ReadValue(section, "StripeSecretKey", "STRIPE_SECRET_KEY") ?? string.Empty,
             StripeWebhookSecret = ReadValue(section, "StripeWebhookSecret", "STRIPE_WEBHOOK_SECRET") ?? string.Empty,
             StripeCheckoutSuccessUrl = section["StripeCheckoutSuccessUrl"] ?? "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}",
-            StripeCheckoutCancelUrl = section["StripeCheckoutCancelUrl"] ?? "https://petmagic.app/payments/cancel"
+            StripeCheckoutCancelUrl = section["StripeCheckoutCancelUrl"] ?? "https://petmagic.app/payments/cancel",
+            StripeBillingPortalReturnUrl = section["StripeBillingPortalReturnUrl"] ?? "https://petmagic.app/profile/premium",
+            GooglePlayPackageName = section["GooglePlayPackageName"] ?? "com.petmagic.app",
+            GooglePlayServiceAccountEmail = ReadValue(section, "GooglePlayServiceAccountEmail", "GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL") ?? string.Empty,
+            GooglePlayPrivateKeyPem = NormalizePem(ReadValue(section, "GooglePlayPrivateKeyPem", "GOOGLE_PLAY_PRIVATE_KEY_PEM")),
+            AppStoreBundleId = section["AppStoreBundleId"] ?? "com.petmagic.app",
+            AppStoreSharedSecret = ReadValue(section, "AppStoreSharedSecret", "APP_STORE_SHARED_SECRET") ?? string.Empty
         };
 
         services.AddSingleton<IOptions<EconomyOptions>>(Microsoft.Extensions.Options.Options.Create(economyOptions));
@@ -36,6 +42,10 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
         services.AddScoped<IEconomyService, EconomyService>();
         services.AddSingleton<IPaymentGateway>(_ => new StripePaymentGateway(economyOptions));
+        services.AddSingleton<IStoreSubscriptionVerifier>(serviceProvider =>
+            new StoreSubscriptionVerifier(
+                new HttpClient(),
+                serviceProvider.GetRequiredService<IOptions<EconomyOptions>>()));
 
         return services;
     }
@@ -55,6 +65,16 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
         value = Environment.GetEnvironmentVariable(environmentVariable);
         return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static string NormalizePem(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        return raw.Replace("\\n", "\n", StringComparison.Ordinal);
     }
 
     public static async Task EnsureEconomySeedDataAsync(this IServiceProvider serviceProvider)

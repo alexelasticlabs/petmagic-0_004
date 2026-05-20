@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PetMagic.Modules.Economy.Application\PetMagic.Modules.Economy.Application.csproj" />
     <ProjectReference Include="..\PetMagic.Modules.Economy.Domain\PetMagic.Modules.Economy.Domain.csproj" />
+    <ProjectReference Include="..\..\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
   </ItemGroup>
 
