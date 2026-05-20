@@ -160,6 +160,186 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schalten Sie alle Vorlagen und Premium-Bearbeitungsabläufe frei.';
 
   @override
+  String get premiumPageTitle => 'PetMagic Premium';
+
+  @override
+  String get premiumPageSubtitle =>
+      'Unlimited pet magic, faster generation and premium templates in one plan.';
+
+  @override
+  String get premiumHeroEyebrow => 'Premium magic';
+
+  @override
+  String get premiumAlreadyActive => 'Premium active';
+
+  @override
+  String get premiumBenefitUnlimitedTemplates => 'Unlimited templates';
+
+  @override
+  String get premiumBenefitFastGeneration => 'Faster generation';
+
+  @override
+  String get premiumBenefitHighQuality => 'High quality output';
+
+  @override
+  String get premiumBenefitExclusive => 'Exclusive templates';
+
+  @override
+  String get premiumChoosePlanTitle => 'Choose plan';
+
+  @override
+  String get premiumWeeklyPlan => 'Weekly';
+
+  @override
+  String get premiumMonthlyPlan => 'Monthly';
+
+  @override
+  String get premiumYearlyPlan => 'Yearly';
+
+  @override
+  String get premiumWeeklyPeriod => '/ week';
+
+  @override
+  String get premiumMonthlyPeriod => '/ month';
+
+  @override
+  String get premiumYearlyPeriod => '/ year';
+
+  @override
+  String get premiumPopularBadge => 'Most popular';
+
+  @override
+  String premiumTokensPerWeek(Object count) {
+    return '$count tokens / week';
+  }
+
+  @override
+  String premiumTokensPerMonth(Object count) {
+    return '$count tokens / month';
+  }
+
+  @override
+  String premiumDiscountLabel(Object percent) {
+    return 'Save $percent%';
+  }
+
+  @override
+  String get premiumCancelAnytime => 'Cancel anytime';
+
+  @override
+  String get premiumPaymentTitle => 'Payment method';
+
+  @override
+  String get premiumPaymentStripe => 'Card via Stripe';
+
+  @override
+  String get premiumPaymentGooglePlay => 'Google Play';
+
+  @override
+  String get premiumPaymentApple => 'Apple Pay / App Store';
+
+  @override
+  String get premiumComparisonTitle => 'Feature comparison';
+
+  @override
+  String get premiumFreeColumn => 'Free';
+
+  @override
+  String get premiumPremiumColumn => 'Premium';
+
+  @override
+  String get premiumComparisonFreeTemplates => 'Free templates';
+
+  @override
+  String get premiumComparisonPremiumTemplates => 'Premium templates';
+
+  @override
+  String get premiumComparisonTokens => 'Tokens per month';
+
+  @override
+  String premiumComparisonPremiumTokens(Object count) {
+    return 'Up to $count';
+  }
+
+  @override
+  String get premiumComparisonPremiumTokensFallback => 'Up to 1000';
+
+  @override
+  String get premiumComparisonFast => 'Fast generation';
+
+  @override
+  String get premiumComparisonHighQuality => 'High quality export';
+
+  @override
+  String get premiumComparisonNoWatermark => 'No watermark';
+
+  @override
+  String get premiumComparisonPrioritySupport => 'Priority support';
+
+  @override
+  String get premiumSecurePaymentTitle => 'Secure payment';
+
+  @override
+  String get premiumSecurePaymentSubtitle =>
+      'Manage or cancel your subscription from billing settings at any time.';
+
+  @override
+  String get premiumContinueAction => 'Continue';
+
+  @override
+  String premiumContinueWithPlan(Object plan, Object price, Object period) {
+    return 'Continue with $plan — $price $period';
+  }
+
+  @override
+  String get premiumManageAction => 'Manage subscription';
+
+  @override
+  String get premiumRestoreAction => 'Restore purchases';
+
+  @override
+  String get premiumTermsNotice =>
+      'By continuing, you agree to the Terms of Use and Privacy Policy.';
+
+  @override
+  String get premiumStoreUnavailable =>
+      'Store subscriptions are waiting for App Store / Google Play product setup. Use Stripe checkout for now.';
+
+  @override
+  String get premiumStoreProductUnavailable =>
+      'This subscription product is not available in the store on this device.';
+
+  @override
+  String get premiumStoreVerificationUnavailable =>
+      'Server-side store verification is not configured yet.';
+
+  @override
+  String get premiumStorePurchaseInvalid =>
+      'The purchase could not be verified.';
+
+  @override
+  String get premiumStorePurchaseInactive =>
+      'This subscription is no longer active.';
+
+  @override
+  String get premiumPurchaseActivated => 'Premium is active now.';
+
+  @override
+  String get premiumPurchaseCancelled => 'Purchase was cancelled.';
+
+  @override
+  String get premiumCheckoutFailed =>
+      'Premium checkout is temporarily unavailable.';
+
+  @override
+  String get premiumManageFailed =>
+      'Billing management is not available yet for this account.';
+
+  @override
+  String get premiumRestoreStarted =>
+      'Premium status refreshed on this device.';
+
+  @override
   String get profileCommunicationsTitle => 'PetMagic-Updates';
 
   @override
@@ -362,6 +542,27 @@ class AppLocalizationsDe extends AppLocalizations {
       'Google, Apple und weitere Anbieter werden hier angezeigt, nachdem der Backend-Verknüpfungsfluss in der App geöffnet wurde.';
 
   @override
+  String get profileLinkedAccountsLoading =>
+      'Verknüpfte Anmeldeanbieter werden geladen...';
+
+  @override
+  String get profileLinkedAccountsConnectedStatus =>
+      'Verbunden und für die Anmeldung bereit.';
+
+  @override
+  String get profileLinkedAccountsNotConnectedStatus => 'Noch nicht verbunden.';
+
+  @override
+  String get profileLinkedAccountsConnectAction => 'Verbinden';
+
+  @override
+  String get profileLinkedAccountsDisconnectAction => 'Trennen';
+
+  @override
+  String get profileLinkedAccountsProtectedHint =>
+      'Dieser Anbieter kann erst entfernt werden, wenn eine andere Anmeldemethode verfügbar bleibt.';
+
+  @override
   String get profileDetailsNotificationsBody =>
       'Dieser Abschnitt spiegelt Ihre aktuellen Kommunikationspräferenzen in der App wider.';
 
@@ -498,6 +699,22 @@ class AppLocalizationsDe extends AppLocalizations {
       'Senden Sie dem PetMagic-Team direkt von Ihrem Profil aus eine Nachricht.';
 
   @override
+  String get supportChatSecureTitle => 'Your conversation is secure';
+
+  @override
+  String get supportChatSecureSubtitle =>
+      'We protect your data and keep your information private.';
+
+  @override
+  String get supportChatTeamTitle => 'PetMagic Support';
+
+  @override
+  String get supportChatTeamStatus => 'Online • typical reply under 5 min';
+
+  @override
+  String get supportChatTodayLabel => 'Today';
+
+  @override
   String get supportChatInputHint =>
       'Beschreiben Sie das Problem, die Frage oder den Wunsch ...';
 
@@ -510,6 +727,49 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get supportChatEmptyMessage =>
       'Ihr Support-Chat ist fertig. Senden Sie die erste Nachricht und das Team wird hier antworten.';
+
+  @override
+  String get supportChatWelcomeTitle => 'Welcome to PetMagic support';
+
+  @override
+  String get supportChatWelcomeBody =>
+      'Choose a common topic below or write your message right away. We will route it to the right team without making the chat feel empty.';
+
+  @override
+  String get supportChatQuickActionGeneration => 'Issue with image generation';
+
+  @override
+  String get supportChatQuickActionPayment => 'Payment problem';
+
+  @override
+  String get supportChatQuickActionRefund => 'Refund request';
+
+  @override
+  String get supportChatQuickActionHuman => 'Talk to an operator';
+
+  @override
+  String get supportChatFaqTitle => 'FAQ';
+
+  @override
+  String get supportChatFaqGenerationTitle => 'Why did my generation fail?';
+
+  @override
+  String get supportChatFaqGenerationBody =>
+      'Send the template name, your pet type and a screenshot if possible. This usually gives support enough context on the first reply.';
+
+  @override
+  String get supportChatFaqResponseTitle => 'When will support reply?';
+
+  @override
+  String get supportChatFaqResponseBody =>
+      'Active chats are normally answered within a few minutes during support hours. We keep the thread here so you do not lose context.';
+
+  @override
+  String get supportChatFaqRefundTitle => 'How do refunds work?';
+
+  @override
+  String get supportChatFaqRefundBody =>
+      'Share the order date and the reason for the request. Billing cases are reviewed in the same chat without switching channels.';
 
   @override
   String get supportChatStatusOpen => 'Offen';

@@ -397,6 +397,324 @@ abstract class AppLocalizations {
   /// **'Unlock all templates and premium editing flows.'**
   String get profilePremiumSubtitle;
 
+  /// No description provided for @premiumPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic Premium'**
+  String get premiumPageTitle;
+
+  /// No description provided for @premiumPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited pet magic, faster generation and premium templates in one plan.'**
+  String get premiumPageSubtitle;
+
+  /// No description provided for @premiumHeroEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium magic'**
+  String get premiumHeroEyebrow;
+
+  /// No description provided for @premiumAlreadyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium active'**
+  String get premiumAlreadyActive;
+
+  /// No description provided for @premiumBenefitUnlimitedTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited templates'**
+  String get premiumBenefitUnlimitedTemplates;
+
+  /// No description provided for @premiumBenefitFastGeneration.
+  ///
+  /// In en, this message translates to:
+  /// **'Faster generation'**
+  String get premiumBenefitFastGeneration;
+
+  /// No description provided for @premiumBenefitHighQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'High quality output'**
+  String get premiumBenefitHighQuality;
+
+  /// No description provided for @premiumBenefitExclusive.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive templates'**
+  String get premiumBenefitExclusive;
+
+  /// No description provided for @premiumChoosePlanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose plan'**
+  String get premiumChoosePlanTitle;
+
+  /// No description provided for @premiumWeeklyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get premiumWeeklyPlan;
+
+  /// No description provided for @premiumMonthlyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get premiumMonthlyPlan;
+
+  /// No description provided for @premiumYearlyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get premiumYearlyPlan;
+
+  /// No description provided for @premiumWeeklyPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'/ week'**
+  String get premiumWeeklyPeriod;
+
+  /// No description provided for @premiumMonthlyPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'/ month'**
+  String get premiumMonthlyPeriod;
+
+  /// No description provided for @premiumYearlyPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'/ year'**
+  String get premiumYearlyPeriod;
+
+  /// No description provided for @premiumPopularBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Most popular'**
+  String get premiumPopularBadge;
+
+  /// No description provided for @premiumTokensPerWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tokens / week'**
+  String premiumTokensPerWeek(Object count);
+
+  /// No description provided for @premiumTokensPerMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tokens / month'**
+  String premiumTokensPerMonth(Object count);
+
+  /// No description provided for @premiumDiscountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Save {percent}%'**
+  String premiumDiscountLabel(Object percent);
+
+  /// No description provided for @premiumCancelAnytime.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel anytime'**
+  String get premiumCancelAnytime;
+
+  /// No description provided for @premiumPaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get premiumPaymentTitle;
+
+  /// No description provided for @premiumPaymentStripe.
+  ///
+  /// In en, this message translates to:
+  /// **'Card via Stripe'**
+  String get premiumPaymentStripe;
+
+  /// No description provided for @premiumPaymentGooglePlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play'**
+  String get premiumPaymentGooglePlay;
+
+  /// No description provided for @premiumPaymentApple.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Pay / App Store'**
+  String get premiumPaymentApple;
+
+  /// No description provided for @premiumComparisonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Feature comparison'**
+  String get premiumComparisonTitle;
+
+  /// No description provided for @premiumFreeColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get premiumFreeColumn;
+
+  /// No description provided for @premiumPremiumColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get premiumPremiumColumn;
+
+  /// No description provided for @premiumComparisonFreeTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Free templates'**
+  String get premiumComparisonFreeTemplates;
+
+  /// No description provided for @premiumComparisonPremiumTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium templates'**
+  String get premiumComparisonPremiumTemplates;
+
+  /// No description provided for @premiumComparisonTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens per month'**
+  String get premiumComparisonTokens;
+
+  /// No description provided for @premiumComparisonPremiumTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {count}'**
+  String premiumComparisonPremiumTokens(Object count);
+
+  /// No description provided for @premiumComparisonPremiumTokensFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 1000'**
+  String get premiumComparisonPremiumTokensFallback;
+
+  /// No description provided for @premiumComparisonFast.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast generation'**
+  String get premiumComparisonFast;
+
+  /// No description provided for @premiumComparisonHighQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'High quality export'**
+  String get premiumComparisonHighQuality;
+
+  /// No description provided for @premiumComparisonNoWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'No watermark'**
+  String get premiumComparisonNoWatermark;
+
+  /// No description provided for @premiumComparisonPrioritySupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority support'**
+  String get premiumComparisonPrioritySupport;
+
+  /// No description provided for @premiumSecurePaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure payment'**
+  String get premiumSecurePaymentTitle;
+
+  /// No description provided for @premiumSecurePaymentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage or cancel your subscription from billing settings at any time.'**
+  String get premiumSecurePaymentSubtitle;
+
+  /// No description provided for @premiumContinueAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get premiumContinueAction;
+
+  /// No description provided for @premiumContinueWithPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with {plan} — {price} {period}'**
+  String premiumContinueWithPlan(Object plan, Object price, Object period);
+
+  /// No description provided for @premiumManageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage subscription'**
+  String get premiumManageAction;
+
+  /// No description provided for @premiumRestoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore purchases'**
+  String get premiumRestoreAction;
+
+  /// No description provided for @premiumTermsNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'By continuing, you agree to the Terms of Use and Privacy Policy.'**
+  String get premiumTermsNotice;
+
+  /// No description provided for @premiumStoreUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Store subscriptions are waiting for App Store / Google Play product setup. Use Stripe checkout for now.'**
+  String get premiumStoreUnavailable;
+
+  /// No description provided for @premiumStoreProductUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This subscription product is not available in the store on this device.'**
+  String get premiumStoreProductUnavailable;
+
+  /// No description provided for @premiumStoreVerificationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Server-side store verification is not configured yet.'**
+  String get premiumStoreVerificationUnavailable;
+
+  /// No description provided for @premiumStorePurchaseInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The purchase could not be verified.'**
+  String get premiumStorePurchaseInvalid;
+
+  /// No description provided for @premiumStorePurchaseInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This subscription is no longer active.'**
+  String get premiumStorePurchaseInactive;
+
+  /// No description provided for @premiumPurchaseActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium is active now.'**
+  String get premiumPurchaseActivated;
+
+  /// No description provided for @premiumPurchaseCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase was cancelled.'**
+  String get premiumPurchaseCancelled;
+
+  /// No description provided for @premiumCheckoutFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium checkout is temporarily unavailable.'**
+  String get premiumCheckoutFailed;
+
+  /// No description provided for @premiumManageFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Billing management is not available yet for this account.'**
+  String get premiumManageFailed;
+
+  /// No description provided for @premiumRestoreStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium status refreshed on this device.'**
+  String get premiumRestoreStarted;
+
   /// No description provided for @profileCommunicationsTitle.
   ///
   /// In en, this message translates to:
@@ -757,6 +1075,42 @@ abstract class AppLocalizations {
   /// **'Google, Apple and additional providers will be shown here after the backend linking flow is opened in the app.'**
   String get profileDetailsLinkedAccountsNext;
 
+  /// No description provided for @profileLinkedAccountsLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading linked sign-in providers...'**
+  String get profileLinkedAccountsLoading;
+
+  /// No description provided for @profileLinkedAccountsConnectedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected and ready for sign in.'**
+  String get profileLinkedAccountsConnectedStatus;
+
+  /// No description provided for @profileLinkedAccountsNotConnectedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected yet.'**
+  String get profileLinkedAccountsNotConnectedStatus;
+
+  /// No description provided for @profileLinkedAccountsConnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get profileLinkedAccountsConnectAction;
+
+  /// No description provided for @profileLinkedAccountsDisconnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get profileLinkedAccountsDisconnectAction;
+
+  /// No description provided for @profileLinkedAccountsProtectedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This provider cannot be removed until another sign-in method remains available.'**
+  String get profileLinkedAccountsProtectedHint;
+
   /// No description provided for @profileDetailsNotificationsBody.
   ///
   /// In en, this message translates to:
@@ -973,6 +1327,36 @@ abstract class AppLocalizations {
   /// **'Message the PetMagic team directly from your profile.'**
   String get supportChatSubtitle;
 
+  /// No description provided for @supportChatSecureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your conversation is secure'**
+  String get supportChatSecureTitle;
+
+  /// No description provided for @supportChatSecureSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We protect your data and keep your information private.'**
+  String get supportChatSecureSubtitle;
+
+  /// No description provided for @supportChatTeamTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic Support'**
+  String get supportChatTeamTitle;
+
+  /// No description provided for @supportChatTeamStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Online • typical reply under 5 min'**
+  String get supportChatTeamStatus;
+
+  /// No description provided for @supportChatTodayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get supportChatTodayLabel;
+
   /// No description provided for @supportChatInputHint.
   ///
   /// In en, this message translates to:
@@ -996,6 +1380,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your support chat is ready. Send the first message and the team will respond here.'**
   String get supportChatEmptyMessage;
+
+  /// No description provided for @supportChatWelcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to PetMagic support'**
+  String get supportChatWelcomeTitle;
+
+  /// No description provided for @supportChatWelcomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a common topic below or write your message right away. We will route it to the right team without making the chat feel empty.'**
+  String get supportChatWelcomeBody;
+
+  /// No description provided for @supportChatQuickActionGeneration.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue with image generation'**
+  String get supportChatQuickActionGeneration;
+
+  /// No description provided for @supportChatQuickActionPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment problem'**
+  String get supportChatQuickActionPayment;
+
+  /// No description provided for @supportChatQuickActionRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund request'**
+  String get supportChatQuickActionRefund;
+
+  /// No description provided for @supportChatQuickActionHuman.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk to an operator'**
+  String get supportChatQuickActionHuman;
+
+  /// No description provided for @supportChatFaqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FAQ'**
+  String get supportChatFaqTitle;
+
+  /// No description provided for @supportChatFaqGenerationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why did my generation fail?'**
+  String get supportChatFaqGenerationTitle;
+
+  /// No description provided for @supportChatFaqGenerationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the template name, your pet type and a screenshot if possible. This usually gives support enough context on the first reply.'**
+  String get supportChatFaqGenerationBody;
+
+  /// No description provided for @supportChatFaqResponseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When will support reply?'**
+  String get supportChatFaqResponseTitle;
+
+  /// No description provided for @supportChatFaqResponseBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Active chats are normally answered within a few minutes during support hours. We keep the thread here so you do not lose context.'**
+  String get supportChatFaqResponseBody;
+
+  /// No description provided for @supportChatFaqRefundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How do refunds work?'**
+  String get supportChatFaqRefundTitle;
+
+  /// No description provided for @supportChatFaqRefundBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Share the order date and the reason for the request. Billing cases are reviewed in the same chat without switching channels.'**
+  String get supportChatFaqRefundBody;
 
   /// No description provided for @supportChatStatusOpen.
   ///
