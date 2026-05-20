@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -70,6 +71,30 @@ public static class IdentityInfrastructureServiceCollectionExtensions
                     ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey))
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(context.Token))
+                        {
+                            return Task.CompletedTask;
+                        }
+
+                        var accessToken = context.Request.Query["access_token"].ToString();
+                        if (string.IsNullOrWhiteSpace(accessToken))
+                        {
+                            return Task.CompletedTask;
+                        }
+
+                        var path = context.HttpContext.Request.Path;
+                        if (path.StartsWithSegments("/hubs/support-chat", StringComparison.OrdinalIgnoreCase))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         AddExternalProviders(services, externalAuth);
@@ -83,6 +108,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddSingleton(externalAuth);
         services.AddSingleton(emailOptions);
         services.AddSingleton(avatarStorageOptions);
+        services.AddSingleton<ILegalDocumentsCatalog, LegalDocumentsCatalog>();
         services.AddSingleton<IIdentityEmailTemplateRenderer, IdentityEmailTemplateRenderer>();
         services.AddSingleton<IAvatarStorage, LocalAvatarStorage>();
         services.AddScoped<IGoogleIdentityTokenVerifier, GoogleIdentityTokenVerifier>();

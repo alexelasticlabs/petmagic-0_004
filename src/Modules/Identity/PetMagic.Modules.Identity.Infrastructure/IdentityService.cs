@@ -33,12 +33,18 @@ public sealed class IdentityService(
     EconomyDbContext economyDbContext,
     IEconomyService economyService,
     TemplatesDbContext templatesDbContext,
+    ILegalDocumentsCatalog legalDocumentsCatalog,
     IIdentityEmailTemplateRenderer emailTemplateRenderer,
     IAvatarStorage avatarStorage,
     EmailOptions emailOptions,
     AvatarStorageOptions avatarStorageOptions,
     IOptions<JwtOptions> jwtOptions) : IIdentityService
 {
+    public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Result.Success(legalDocumentsCatalog.GetCurrentDocuments(locale)));
+    }
+
     public async Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken)
     {
         var email = command.Email.Trim();
@@ -51,6 +57,7 @@ public sealed class IdentityService(
             return Result.Failure<UserProfileResponse>(IdentityErrors.UserAlreadyExists);
         }
 
+        var now = DateTime.UtcNow;
         var user = new AppUser
         {
             Id = Guid.NewGuid(),
@@ -59,12 +66,16 @@ public sealed class IdentityService(
             EmailConfirmed = true,
             DisplayName = command.DisplayName,
             TermsOfUseAccepted = command.TermsOfUseAccepted,
-            TermsOfUseAcceptedAtUtc = command.TermsOfUseAccepted ? DateTime.UtcNow : null,
+            TermsOfUseAcceptedAtUtc = command.TermsOfUseAccepted ? now : null,
+            TermsOfUseAcceptedVersion = command.TermsOfUseAccepted ? command.TermsOfUseVersion : null,
+            PrivacyPolicyAccepted = command.PrivacyPolicyAccepted,
+            PrivacyPolicyAcceptedAtUtc = command.PrivacyPolicyAccepted ? now : null,
+            PrivacyPolicyAcceptedVersion = command.PrivacyPolicyAccepted ? command.PrivacyPolicyVersion : null,
             MarketingEmailsEnabled = command.MarketingEmailsEnabled,
-            MarketingEmailsUpdatedAtUtc = DateTime.UtcNow,
+            MarketingEmailsUpdatedAtUtc = now,
             IsPremium = false,
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = now
         };
 
         var createResult = await userManager.CreateAsync(user, command.Password);
@@ -379,6 +390,39 @@ public sealed class IdentityService(
         return Result.Success(ToUserProfileResponse(user, roles));
     }
 
+    public async Task<Result<UserProfileResponse>> AcceptLegalDocumentsAsync(Guid userId, AcceptLegalDocumentsCommand command, CancellationToken cancellationToken)
+    {
+        if (!legalDocumentsCatalog.MatchesCurrentVersions(command.TermsOfUseVersion, command.PrivacyPolicyVersion))
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.LegalDocumentVersionMismatch);
+        }
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.UserNotFound);
+        }
+
+        var now = DateTime.UtcNow;
+        user.TermsOfUseAccepted = true;
+        user.TermsOfUseAcceptedAtUtc = now;
+        user.TermsOfUseAcceptedVersion = command.TermsOfUseVersion;
+        user.PrivacyPolicyAccepted = true;
+        user.PrivacyPolicyAcceptedAtUtc = now;
+        user.PrivacyPolicyAcceptedVersion = command.PrivacyPolicyVersion;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
+        }
+
+        await WriteAuditAsync(user.Id, "user.legal_documents.accepted", $"Accepted terms {command.TermsOfUseVersion} and privacy {command.PrivacyPolicyVersion}.", cancellationToken);
+
+        var roles = await userManager.GetRolesAsync(user);
+        return Result.Success(ToUserProfileResponse(user, roles));
+    }
+
     public async Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken)
     {
         if (command.Content.Length == 0)
@@ -505,7 +549,9 @@ public sealed class IdentityService(
                 user.IsActive,
                 user.EmailConfirmed,
                 user.TermsOfUseAccepted,
+                user.PrivacyPolicyAccepted,
                 user.MarketingEmailsEnabled,
+                ToLegalAcceptanceResponse(user),
                 rolesByUserId.GetValueOrDefault(user.Id) ?? [],
                 user.CreatedAtUtc,
                 ToAvatarResponse(user)))
@@ -1325,7 +1371,28 @@ public sealed class IdentityService(
             user.AvatarUpdatedAtUtc);
     }
 
-    private static AdminUserDetailResponse ToAdminUserDetailResponse(AppUser user, IEnumerable<string> roles) =>
+    private LegalAcceptanceStatusResponse ToLegalAcceptanceResponse(AppUser user)
+    {
+        var currentTermsVersion = legalDocumentsCatalog.CurrentTermsOfUseVersion;
+        var currentPrivacyVersion = legalDocumentsCatalog.CurrentPrivacyPolicyVersion;
+        var requiresAcceptance = !user.TermsOfUseAccepted
+            || !user.PrivacyPolicyAccepted
+            || !string.Equals(user.TermsOfUseAcceptedVersion, currentTermsVersion, StringComparison.Ordinal)
+            || !string.Equals(user.PrivacyPolicyAcceptedVersion, currentPrivacyVersion, StringComparison.Ordinal);
+
+        return new LegalAcceptanceStatusResponse(
+            user.TermsOfUseAccepted,
+            user.TermsOfUseAcceptedVersion,
+            user.TermsOfUseAcceptedAtUtc,
+            user.PrivacyPolicyAccepted,
+            user.PrivacyPolicyAcceptedVersion,
+            user.PrivacyPolicyAcceptedAtUtc,
+            currentTermsVersion,
+            currentPrivacyVersion,
+            requiresAcceptance);
+    }
+
+    private AdminUserDetailResponse ToAdminUserDetailResponse(AppUser user, IEnumerable<string> roles) =>
         new(
             user.Id,
             user.Email ?? string.Empty,
@@ -1334,12 +1401,14 @@ public sealed class IdentityService(
             user.IsActive,
             user.EmailConfirmed,
             user.TermsOfUseAccepted,
+            user.PrivacyPolicyAccepted,
             user.MarketingEmailsEnabled,
+            ToLegalAcceptanceResponse(user),
             roles.ToList(),
             user.CreatedAtUtc,
             ToAvatarResponse(user));
 
-    private static UserProfileResponse ToUserProfileResponse(AppUser user, IEnumerable<string> roles) =>
+    private UserProfileResponse ToUserProfileResponse(AppUser user, IEnumerable<string> roles) =>
         new(
             user.Id,
             user.Email ?? string.Empty,
@@ -1347,7 +1416,9 @@ public sealed class IdentityService(
             user.IsPremium,
             user.EmailConfirmed,
             user.TermsOfUseAccepted,
+            user.PrivacyPolicyAccepted,
             user.MarketingEmailsEnabled,
+            ToLegalAcceptanceResponse(user),
             roles.ToList(),
             ToAvatarResponse(user));
 }

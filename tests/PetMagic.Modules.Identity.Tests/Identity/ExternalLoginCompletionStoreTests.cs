@@ -6,6 +6,17 @@ namespace PetMagic.Modules.Identity.Tests.Identity;
 
 public sealed class ExternalLoginCompletionStoreTests
 {
+    private static readonly LegalAcceptanceStatusResponse DefaultLegalAcceptance = new(
+        true,
+        "2026-05-20",
+        DateTime.UtcNow,
+        true,
+        "2026-05-20",
+        DateTime.UtcNow,
+        "2026-05-20",
+        "2026-05-20",
+        false);
+
     [Fact]
     public void Create_and_try_take_returns_payload_once()
     {
@@ -52,6 +63,8 @@ public sealed class ExternalLoginCompletionStoreTests
                 true,
                 true,
                 false,
+                false,
+                DefaultLegalAcceptance,
                 ["user"],
                 null));
     }

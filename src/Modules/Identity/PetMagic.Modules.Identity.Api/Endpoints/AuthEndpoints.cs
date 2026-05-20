@@ -62,6 +62,9 @@ public static class AuthEndpoints
         group.MapGet("/me", MeAsync)
             .RequireAuthorization();
 
+        group.MapPost("/me/legal-acceptance", AcceptCurrentLegalDocumentsAsync)
+            .RequireAuthorization();
+
         group.MapPut("/me/avatar", UpdateAvatarAsync)
             .RequireAuthorization()
             .DisableAntiforgery();
@@ -477,6 +480,41 @@ public static class AuthEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<UserProfileResponse>, ValidationProblem, ProblemHttpResult>> AcceptCurrentLegalDocumentsAsync(
+        HttpContext context,
+        AcceptLegalDocumentsCommand command,
+        IValidator<AcceptLegalDocumentsCommand> validator,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(subject, out var userId))
+        {
+            return TypedResults.Problem(
+                title: InvalidSubjectCode,
+                detail: "Invalid access token subject.",
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.AcceptLegalDocumentsAsync(userId, command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
         return TypedResults.Ok(result.Value);

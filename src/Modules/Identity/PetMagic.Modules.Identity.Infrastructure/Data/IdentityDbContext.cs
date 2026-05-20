@@ -30,6 +30,9 @@ public sealed class IdentityDbContext : IdentityDbContext<AppUser, IdentityRole<
             entity.ToTable("users");
             entity.Property(x => x.DisplayName).HasMaxLength(120);
             entity.Property(x => x.TermsOfUseAccepted).HasDefaultValue(false);
+            entity.Property(x => x.TermsOfUseAcceptedVersion).HasMaxLength(32);
+            entity.Property(x => x.PrivacyPolicyAccepted).HasDefaultValue(false);
+            entity.Property(x => x.PrivacyPolicyAcceptedVersion).HasMaxLength(32);
             entity.Property(x => x.MarketingEmailsEnabled).HasDefaultValue(false);
             entity.Property(x => x.AvatarUrl).HasMaxLength(2048);
             entity.Property(x => x.AvatarFileName).HasMaxLength(256);

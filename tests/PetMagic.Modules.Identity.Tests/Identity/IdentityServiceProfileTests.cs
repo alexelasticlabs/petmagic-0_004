@@ -10,6 +10,7 @@ using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
@@ -26,6 +27,8 @@ namespace PetMagic.Modules.Identity.Tests.Identity;
 
 public sealed class IdentityServiceProfileTests
 {
+    private const string CurrentLegalVersion = "2026-05-20";
+
     [Fact]
     public async Task UpdateUserAvatarAsync_ShouldReplaceExistingAvatar_AndDeleteOldFile()
     {
@@ -475,6 +478,7 @@ public sealed class IdentityServiceProfileTests
             economyDbContext,
             CreateEconomyService(economyDbContext),
             templatesDbContext,
+            new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),
             avatarStorage,
             new EmailOptions
@@ -491,6 +495,26 @@ public sealed class IdentityServiceProfileTests
                 MaxFileSizeBytes = maxAvatarSizeBytes
             },
             Options.Create(new JwtOptions()));
+    }
+
+    private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog
+    {
+        public string CurrentTermsOfUseVersion => CurrentLegalVersion;
+
+        public string CurrentPrivacyPolicyVersion => CurrentLegalVersion;
+
+        public LegalDocumentsResponse GetCurrentDocuments(string? locale)
+        {
+            return new LegalDocumentsResponse(
+                new LegalDocumentResponse(LegalDocumentKinds.TermsOfUse, "Terms", CurrentLegalVersion, DateTime.UtcNow, "Summary", []),
+                new LegalDocumentResponse(LegalDocumentKinds.PrivacyPolicy, "Privacy", CurrentLegalVersion, DateTime.UtcNow, "Summary", []));
+        }
+
+        public bool MatchesCurrentVersions(string? termsOfUseVersion, string? privacyPolicyVersion)
+        {
+            return string.Equals(termsOfUseVersion, CurrentLegalVersion, StringComparison.Ordinal)
+                && string.Equals(privacyPolicyVersion, CurrentLegalVersion, StringComparison.Ordinal);
+        }
     }
 
     private static IEconomyService CreateEconomyService(EconomyDbContext dbContext)

@@ -14,6 +14,7 @@ public static class IdentityApiModule
     {
         services.AddSingleton<ExternalLoginCompletionStore>();
         services.AddScoped<IValidator<RegisterUserCommand>, RegisterUserCommandValidator>();
+        services.AddScoped<IValidator<AcceptLegalDocumentsCommand>, AcceptLegalDocumentsCommandValidator>();
         services.AddScoped<IValidator<LoginCommand>, LoginCommandValidator>();
         services.AddScoped<IValidator<RequestEmailConfirmationCommand>, RequestEmailConfirmationCommandValidator>();
         services.AddScoped<IValidator<ConfirmEmailCommand>, ConfirmEmailCommandValidator>();
@@ -36,6 +37,7 @@ public static class IdentityApiModule
     public static IApplicationBuilder MapIdentityApiModule(this WebApplication app)
     {
         app.MapAuthEndpoints();
+        app.MapLegalEndpoints();
         app.MapAdminUserEndpoints();
         return app;
     }

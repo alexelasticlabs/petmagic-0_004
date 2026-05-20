@@ -11,6 +11,7 @@ using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Options;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
@@ -25,6 +26,8 @@ namespace PetMagic.Modules.Identity.Tests.Identity;
 
 public sealed class IdentityServiceEmailFlowTests
 {
+    private const string CurrentLegalVersion = "2026-05-20";
+
     [Fact]
     public async Task RegisterAsync_ShouldPersistPreferences_And_AllowImmediateLogin()
     {
@@ -32,18 +35,24 @@ public sealed class IdentityServiceEmailFlowTests
         var service = await CreateServiceAsync(dbContext);
 
         var registerResult = await service.RegisterAsync(
-            new RegisterUserCommand("demo.user@petmagic.app", "StrongPassword123", "Demo User", true, true),
+            new RegisterUserCommand("demo.user@petmagic.app", "StrongPassword123", "Demo User", true, true, CurrentLegalVersion, CurrentLegalVersion, true),
             CancellationToken.None);
 
         Assert.True(registerResult.IsSuccess);
         Assert.True(registerResult.Value.EmailConfirmed);
         Assert.True(registerResult.Value.TermsOfUseAccepted);
+        Assert.True(registerResult.Value.PrivacyPolicyAccepted);
         Assert.True(registerResult.Value.MarketingEmailsEnabled);
+        Assert.False(registerResult.Value.LegalAcceptance.RequiresAcceptance);
 
         var persistedUser = await dbContext.Users.SingleAsync();
         Assert.True(persistedUser.EmailConfirmed);
         Assert.True(persistedUser.TermsOfUseAccepted);
         Assert.NotNull(persistedUser.TermsOfUseAcceptedAtUtc);
+        Assert.Equal(CurrentLegalVersion, persistedUser.TermsOfUseAcceptedVersion);
+        Assert.True(persistedUser.PrivacyPolicyAccepted);
+        Assert.NotNull(persistedUser.PrivacyPolicyAcceptedAtUtc);
+        Assert.Equal(CurrentLegalVersion, persistedUser.PrivacyPolicyAcceptedVersion);
         Assert.True(persistedUser.MarketingEmailsEnabled);
         Assert.NotNull(persistedUser.MarketingEmailsUpdatedAtUtc);
         Assert.Empty(await dbContext.UserEmailCodes.ToListAsync());
@@ -63,7 +72,7 @@ public sealed class IdentityServiceEmailFlowTests
         var service = await CreateServiceAsync(dbContext);
 
         var registerResult = await service.RegisterAsync(
-            new RegisterUserCommand("confirm.me@petmagic.app", "StrongPassword123", "Confirm Me", true, false),
+            new RegisterUserCommand("confirm.me@petmagic.app", "StrongPassword123", "Confirm Me", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
             CancellationToken.None);
 
         Assert.True(registerResult.IsSuccess);
@@ -93,7 +102,7 @@ public sealed class IdentityServiceEmailFlowTests
         var service = await CreateServiceAsync(dbContext);
 
         var registerResult = await service.RegisterAsync(
-            new RegisterUserCommand("reset.me@petmagic.app", "StrongPassword123", "Reset Me", true, false),
+            new RegisterUserCommand("reset.me@petmagic.app", "StrongPassword123", "Reset Me", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
             CancellationToken.None);
 
         Assert.True(registerResult.IsSuccess);
@@ -259,6 +268,7 @@ public sealed class IdentityServiceEmailFlowTests
             economyDbContext,
             CreateEconomyService(economyDbContext),
             templatesDbContext,
+            new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),
             new InMemoryAvatarStorage(),
             new EmailOptions
@@ -272,6 +282,38 @@ public sealed class IdentityServiceEmailFlowTests
             },
             new AvatarStorageOptions(),
             Options.Create(new JwtOptions()));
+    }
+
+    private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog
+    {
+        public string CurrentTermsOfUseVersion => CurrentLegalVersion;
+
+        public string CurrentPrivacyPolicyVersion => CurrentLegalVersion;
+
+        public LegalDocumentsResponse GetCurrentDocuments(string? locale)
+        {
+            return new LegalDocumentsResponse(
+                new LegalDocumentResponse(
+                    LegalDocumentKinds.TermsOfUse,
+                    "Terms",
+                    CurrentLegalVersion,
+                    DateTime.UtcNow,
+                    "Summary",
+                    []),
+                new LegalDocumentResponse(
+                    LegalDocumentKinds.PrivacyPolicy,
+                    "Privacy",
+                    CurrentLegalVersion,
+                    DateTime.UtcNow,
+                    "Summary",
+                    []));
+        }
+
+        public bool MatchesCurrentVersions(string? termsOfUseVersion, string? privacyPolicyVersion)
+        {
+            return string.Equals(termsOfUseVersion, CurrentLegalVersion, StringComparison.Ordinal)
+                && string.Equals(privacyPolicyVersion, CurrentLegalVersion, StringComparison.Ordinal);
+        }
     }
 
     private static IEconomyService CreateEconomyService(EconomyDbContext dbContext)

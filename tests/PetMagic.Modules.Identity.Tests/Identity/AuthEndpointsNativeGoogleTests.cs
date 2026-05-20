@@ -96,6 +96,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             builder.Services.AddAuthorization();
             builder.Services.AddIdentityApiModule();
             builder.Services.AddSingleton(verifier);
+            builder.Services.AddSingleton<ILegalDocumentsCatalog>(new FakeLegalDocumentsCatalog());
             builder.Services.AddSingleton<IIdentityService>(service);
 
             var app = builder.Build();
@@ -137,8 +138,20 @@ public sealed class AuthEndpointsNativeGoogleTests
 
     private sealed class FakeIdentityService : IIdentityService
     {
+        private static readonly LegalAcceptanceStatusResponse DefaultLegalAcceptance = new(
+            true,
+            "2026-05-20",
+            DateTime.UtcNow,
+            true,
+            "2026-05-20",
+            DateTime.UtcNow,
+            "2026-05-20",
+            "2026-05-20",
+            false);
+
         public ExternalLoginCallbackCommand? LastExternalLoginCommand { get; private set; }
 
+        public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
         public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
         public Task<Result> RequestEmailConfirmationAsync(RequestEmailConfirmationCommand command, CancellationToken cancellationToken) => NotSupported();
@@ -162,6 +175,8 @@ public sealed class AuthEndpointsNativeGoogleTests
                     true,
                     true,
                     false,
+                    false,
+                    DefaultLegalAcceptance,
                     ["user"],
                     null))));
         }
@@ -169,6 +184,7 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
         public Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
+        public Task<Result<UserProfileResponse>> AcceptLegalDocumentsAsync(Guid userId, AcceptLegalDocumentsCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<IReadOnlyList<UserListItemResponse>>> ListUsersAsync(CancellationToken cancellationToken) => NotSupported<IReadOnlyList<UserListItemResponse>>();
@@ -183,5 +199,37 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         private static Task<Result> NotSupported() => Task.FromException<Result>(new NotSupportedException());
         private static Task<Result<T>> NotSupported<T>() => Task.FromException<Result<T>>(new NotSupportedException());
+    }
+
+    private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog
+    {
+        public string CurrentTermsOfUseVersion => "2026-05-20";
+
+        public string CurrentPrivacyPolicyVersion => "2026-05-20";
+
+        public LegalDocumentsResponse GetCurrentDocuments(string? locale)
+        {
+            return new LegalDocumentsResponse(
+                new LegalDocumentResponse(
+                    LegalDocumentKinds.TermsOfUse,
+                    "Terms",
+                    CurrentTermsOfUseVersion,
+                    DateTime.UtcNow,
+                    "Summary",
+                    []),
+                new LegalDocumentResponse(
+                    LegalDocumentKinds.PrivacyPolicy,
+                    "Privacy",
+                    CurrentPrivacyPolicyVersion,
+                    DateTime.UtcNow,
+                    "Summary",
+                    []));
+        }
+
+        public bool MatchesCurrentVersions(string? termsOfUseVersion, string? privacyPolicyVersion)
+        {
+            return string.Equals(termsOfUseVersion, CurrentTermsOfUseVersion, StringComparison.Ordinal)
+                && string.Equals(privacyPolicyVersion, CurrentPrivacyPolicyVersion, StringComparison.Ordinal);
+        }
     }
 }

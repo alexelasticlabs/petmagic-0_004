@@ -20,6 +20,14 @@ public static class IdentityErrors
 
     public static readonly Error ExternalEmailMissing = new("auth.external_email_missing", "External provider did not supply an email.");
 
+    public static readonly Error ExternalAlreadyLinked = new("auth.external_already_linked", "This external account is already linked to another user.");
+
+    public static readonly Error ExternalProviderAlreadyLinked = new("auth.external_provider_already_linked", "This provider is already linked to the current user.");
+
+    public static readonly Error ExternalProviderNotLinked = new("auth.external_not_linked", "This provider is not linked to the current user.");
+
+    public static readonly Error ExternalLastSignInMethod = new("auth.external_last_sign_in_method", "At least one sign-in method must remain linked to this account.");
+
     public static readonly Error EmailNotConfirmed = new("auth.email_not_confirmed", "Email address is not confirmed.");
 
     public static readonly Error EmailCodeInvalid = new("auth.email_code_invalid", "Email confirmation code is invalid.");
@@ -45,6 +53,8 @@ public static class IdentityErrors
     public static readonly Error AvatarStorageFailed = new("users.avatar_storage_failed", "Avatar upload could not be stored.");
 
     public static readonly Error RefreshTokenOwnershipViolation = new("auth.refresh_token_not_owned", "Refresh token does not belong to current user.");
+
+    public static readonly Error LegalDocumentVersionMismatch = new("legal.version_mismatch", "Current legal document versions must be accepted.");
 
     public static readonly Error OperationFailed = new("common.operation_failed", "Operation failed.");
 }

@@ -16,7 +16,9 @@ public sealed record AdminUserDetailResponse(
     bool IsActive,
     bool EmailConfirmed,
     bool TermsOfUseAccepted,
+    bool PrivacyPolicyAccepted,
     bool MarketingEmailsEnabled,
+    LegalAcceptanceStatusResponse LegalAcceptance,
     IReadOnlyList<string> Roles,
     DateTime CreatedAtUtc,
     UserAvatarResponse? Avatar);

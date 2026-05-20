@@ -5,6 +5,9 @@ public sealed record RegisterUserCommand(
     string Password,
     string? DisplayName,
     bool TermsOfUseAccepted,
+    bool PrivacyPolicyAccepted,
+    string TermsOfUseVersion,
+    string PrivacyPolicyVersion,
     bool MarketingEmailsEnabled);
 
 public sealed record LoginCommand(string Email, string Password);
@@ -26,6 +29,13 @@ public sealed record ExternalLoginCallbackCommand(
     string ProviderSubject,
     string? Email,
     string? DisplayName);
+
+public sealed record LinkedAccountResponse(
+    string Provider,
+    string DisplayName,
+    bool CanDisconnect);
+
+public sealed record ExternalLinkPreparationResponse(string Ticket);
 
 public sealed record GoogleNativeLoginCommand(string IdToken);
 
@@ -49,7 +59,9 @@ public sealed record UserProfileResponse(
     bool IsPremium,
     bool EmailConfirmed,
     bool TermsOfUseAccepted,
+    bool PrivacyPolicyAccepted,
     bool MarketingEmailsEnabled,
+    LegalAcceptanceStatusResponse LegalAcceptance,
     IReadOnlyList<string> Roles,
     UserAvatarResponse? Avatar);
 
@@ -61,7 +73,9 @@ public sealed record UserListItemResponse(
     bool IsActive,
     bool EmailConfirmed,
     bool TermsOfUseAccepted,
+    bool PrivacyPolicyAccepted,
     bool MarketingEmailsEnabled,
+    LegalAcceptanceStatusResponse LegalAcceptance,
     IReadOnlyList<string> Roles,
     DateTime CreatedAtUtc,
     UserAvatarResponse? Avatar);

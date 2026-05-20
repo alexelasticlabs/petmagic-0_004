@@ -10,6 +10,14 @@ public sealed class AppUser : IdentityUser<Guid>
 
     public DateTime? TermsOfUseAcceptedAtUtc { get; set; }
 
+    public string? TermsOfUseAcceptedVersion { get; set; }
+
+    public bool PrivacyPolicyAccepted { get; set; }
+
+    public DateTime? PrivacyPolicyAcceptedAtUtc { get; set; }
+
+    public string? PrivacyPolicyAcceptedVersion { get; set; }
+
     public bool MarketingEmailsEnabled { get; set; }
 
     public DateTime? MarketingEmailsUpdatedAtUtc { get; set; }

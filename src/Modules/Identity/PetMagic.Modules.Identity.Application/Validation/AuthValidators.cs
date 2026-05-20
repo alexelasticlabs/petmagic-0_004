@@ -1,4 +1,5 @@
 using FluentValidation;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 
@@ -6,7 +7,7 @@ namespace PetMagic.Modules.Identity.Application.Validation;
 
 public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUserCommand>
 {
-    public RegisterUserCommandValidator()
+    public RegisterUserCommandValidator(ILegalDocumentsCatalog legalDocumentsCatalog)
     {
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Password)
@@ -15,7 +16,25 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
             .WithMessage("Password must be at least 6 characters long.");
         RuleFor(x => x.TermsOfUseAccepted)
             .Equal(true)
-            .WithMessage("Terms of Use and Privacy Policy must be accepted.");
+            .WithMessage("Terms of Use must be accepted.");
+        RuleFor(x => x.PrivacyPolicyAccepted)
+            .Equal(true)
+            .WithMessage("Privacy Policy must be accepted.");
+        RuleFor(x => x)
+            .Must(command => legalDocumentsCatalog.MatchesCurrentVersions(command.TermsOfUseVersion, command.PrivacyPolicyVersion))
+            .WithMessage("Current Terms of Use and Privacy Policy versions must be accepted.");
+    }
+}
+
+public sealed class AcceptLegalDocumentsCommandValidator : AbstractValidator<AcceptLegalDocumentsCommand>
+{
+    public AcceptLegalDocumentsCommandValidator(ILegalDocumentsCatalog legalDocumentsCatalog)
+    {
+        RuleFor(x => x.TermsOfUseVersion).NotEmpty();
+        RuleFor(x => x.PrivacyPolicyVersion).NotEmpty();
+        RuleFor(x => x)
+            .Must(command => legalDocumentsCatalog.MatchesCurrentVersions(command.TermsOfUseVersion, command.PrivacyPolicyVersion))
+            .WithMessage("Current Terms of Use and Privacy Policy versions must be accepted.");
     }
 }
 

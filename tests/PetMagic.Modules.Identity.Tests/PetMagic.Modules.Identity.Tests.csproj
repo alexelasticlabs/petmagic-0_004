@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.8" />
@@ -39,6 +40,10 @@
     <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Application\PetMagic.Modules.Templates.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Domain\PetMagic.Modules.Templates.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\PetMagic.Modules.Templates.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Api\PetMagic.Modules.SupportChat.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Application\PetMagic.Modules.SupportChat.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Domain\PetMagic.Modules.SupportChat.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Infrastructure\PetMagic.Modules.SupportChat.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
