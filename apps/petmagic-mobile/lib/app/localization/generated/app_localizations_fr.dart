@@ -12,7 +12,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get navTemplates => 'Modeles';
 
   @override
-  String get navCreations => 'Creations';
+  String get navCreations => 'Créations';
 
   @override
   String get navProfile => 'Profil';
@@ -34,7 +34,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get allFilter => 'Tous';
 
   @override
-  String get videosFilter => 'Videos';
+  String get videosFilter => 'Vidéos';
 
   @override
   String get imagesFilter => 'Images';
@@ -64,402 +64,485 @@ class AppLocalizationsFr extends AppLocalizations {
   String get addTokensTooltip => 'Ajouter PawSpark';
 
   @override
-  String get premiumLabel => 'Premium';
+  String get premiumLabel => 'Prime';
 
   @override
-  String get freeLabel => 'Free';
+  String get freeLabel => 'Gratuit';
 
   @override
-  String get profileTitle => 'Your Profile';
+  String get profileTitle => 'Votre profil';
 
   @override
-  String get profileSubtitle => 'Manage sign-in and your public avatar.';
+  String get profileSubtitle => 'Gérez la connexion et votre avatar public.';
 
   @override
   String get profileDashboardSubtitle =>
-      'Manage your account and personalize your PetMagic experience.';
+      'Gérez votre compte et personnalisez votre expérience PetMagic.';
 
   @override
-  String get profileSignInTitle => 'Sign in to continue';
+  String get profileSignInTitle => 'Connectez-vous pour continuer';
 
   @override
   String get profileSignInHint =>
-      'Use your PetMagic account to load your profile and manage the avatar visible in admin.';
+      'Utilisez votre compte PetMagic pour charger votre profil et gérer l\'avatar visible dans l\'administrateur.';
 
   @override
-  String get profileEmailLabel => 'Email';
+  String get profileEmailLabel => 'E-mail';
 
   @override
-  String get profilePasswordLabel => 'Password';
+  String get profilePasswordLabel => 'Mot de passe';
 
   @override
-  String get profileSignInAction => 'Sign in';
+  String get profileSignInAction => 'Se connecter';
 
   @override
-  String get profileSignOutAction => 'Sign out';
+  String get profileSignOutAction => 'se déconnecter';
 
   @override
-  String get profileLoadingAction => 'Working...';
+  String get profileLoadingAction => 'Fonctionnement...';
 
   @override
-  String get profileAvatarUpload => 'Upload avatar';
+  String get profileAvatarUpload => 'Télécharger un avatar';
 
   @override
-  String get profileAvatarRemove => 'Remove avatar';
+  String get profileAvatarRemove => 'Supprimer l\'avatar';
 
   @override
-  String get profileEmailConfirmed => 'Email confirmed';
+  String get profileEmailConfirmed => 'E-mail confirmé';
 
   @override
-  String get profileEmailPending => 'Email not confirmed';
+  String get profileEmailPending => 'E-mail non confirmé';
 
   @override
-  String get profileSignedOut => 'Signed out on this device.';
+  String get profileSignedOut => 'Déconnecté sur cet appareil.';
 
   @override
-  String get profileAccountCenterTitle => 'Account center';
+  String get profileAccountCenterTitle => 'Centre de comptes';
 
   @override
   String get profileAccountCenterSubtitle =>
-      'Review your preferences, privacy and app setup.';
+      'Vérifiez vos préférences, votre confidentialité et la configuration de l\'application.';
 
   @override
-  String get profileTermsStat => 'Terms accepted';
+  String get profileTermsStat => 'Conditions acceptées';
 
   @override
-  String get profileMarketingStat => 'Offers & updates';
+  String get profileMarketingStat => 'Offres et mises à jour';
 
   @override
-  String get profileEmailStat => 'Email status';
+  String get profileEmailStat => 'Statut de l\'e-mail';
 
   @override
-  String get profileStatOn => 'On';
+  String get profileStatOn => 'Sur';
 
   @override
-  String get profileStatOff => 'Off';
+  String get profileStatOff => 'Désactivé';
 
   @override
-  String get profileStatReady => 'Ready';
+  String get profileStatReady => 'Prêt';
 
   @override
-  String get profileStatPending => 'Pending';
+  String get profileStatPending => 'En attente';
 
   @override
-  String get profilePetsTitle => 'My pets';
+  String get profilePetsTitle => 'Mes animaux de compagnie';
 
   @override
   String get profilePetsSubtitle =>
-      'Your favorite companions and pet profiles.';
+      'Vos compagnons et profils d\'animaux préférés.';
 
   @override
-  String get profilePremiumTitle => 'Go Premium';
+  String get profilePremiumTitle => 'Passez à la version premium';
 
   @override
   String get profilePremiumSubtitle =>
-      'Unlock all templates and premium editing flows.';
+      'Débloquez tous les modèles et flux d’édition premium.';
 
   @override
-  String get profileCommunicationsTitle => 'PetMagic updates';
+  String get profileCommunicationsTitle => 'Mises à jour de PetMagic';
 
   @override
   String get profileCommunicationsEnabled =>
-      'You are subscribed to product updates and offers.';
+      'Vous êtes abonné aux mises à jour et offres de produits.';
 
   @override
   String get profileCommunicationsDisabled =>
-      'Marketing updates are currently turned off.';
+      'Les mises à jour marketing sont actuellement désactivées.';
 
   @override
-  String get profilePrivacyTitle => 'Privacy and consent';
+  String get profilePrivacyTitle => 'Confidentialité et consentement';
 
   @override
   String get profileTermsAccepted =>
-      'Your account has accepted the Terms of Use and Privacy Policy.';
+      'Votre compte a accepté les conditions d\'utilisation et la politique de confidentialité.';
 
   @override
   String get profileTermsPending =>
-      'Complete consent review in account settings.';
+      'Terminez l’examen du consentement dans les paramètres du compte.';
 
   @override
-  String get profileSupportTitle => 'Contact support';
+  String get profileSupportTitle => 'Contacter l\'assistance';
 
   @override
   String get profileSupportSubtitle =>
-      'We are here when you need help with your account.';
+      'Nous sommes là lorsque vous avez besoin d\'aide avec votre compte.';
 
   @override
-  String get profileSettingsShortcutTitle => 'Settings';
+  String get profileSettingsShortcutTitle => 'Paramètres';
 
   @override
   String get profileSettingsShortcutSubtitle =>
-      'Manage language, theme and account sections.';
+      'Gérez les sections de langue, de thème et de compte.';
 
   @override
-  String get profilePreferenceEnabled => 'Enabled';
+  String get profilePreferenceEnabled => 'Activé';
 
   @override
-  String get profilePreferenceOff => 'Off';
+  String get profilePreferenceOff => 'Désactivé';
 
   @override
-  String get profileSettingsTitle => 'Settings';
+  String get profileSettingsTitle => 'Paramètres';
 
   @override
-  String get profileSettingsSubtitle => 'Manage the app and your account.';
+  String get profileSettingsSubtitle => 'Gérez l\'application et votre compte.';
 
   @override
-  String get profileSettingsAccountSection => 'Account';
+  String get profileSettingsAccountSection => 'Compte';
 
   @override
   String get profileSettingsNotificationsSection => 'Notifications';
 
   @override
-  String get profileSettingsPreferencesSection => 'Preferences';
+  String get profileSettingsPreferencesSection => 'Préférences';
 
   @override
-  String get profileSettingsSupportSection => 'Support';
+  String get profileSettingsSupportSection => 'Soutien';
 
   @override
-  String get profileSettingsAboutSection => 'About app';
+  String get profileSettingsAboutSection => 'À propos de l\'application';
 
   @override
-  String get profileSettingsDangerSection => 'Danger zone';
+  String get profileSettingsDangerSection => 'Zone dangereuse';
 
   @override
-  String get profileSettingsAccountInfoTitle => 'Account information';
+  String get profileSettingsAccountInfoTitle => 'Informations sur le compte';
 
   @override
   String get profileSettingsUnavailableSubtitle =>
-      'This information becomes available after sign in.';
+      'Ces informations deviennent disponibles après la connexion.';
 
   @override
-  String get profileSettingsLinkedAccountsTitle => 'Linked accounts';
+  String get profileSettingsLinkedAccountsTitle => 'Comptes liés';
 
   @override
   String get profileSettingsLinkedAccountsSubtitle =>
-      'Google, Apple and other providers will appear here.';
+      'Google, Apple et d\'autres fournisseurs apparaîtront ici.';
 
   @override
-  String get profileSettingsPasswordTitle => 'Change password';
+  String get profileSettingsPasswordTitle => 'Changer le mot de passe';
 
   @override
   String get profileSettingsPasswordSubtitle =>
-      'Update your password to keep the account secure.';
+      'Mettez à jour votre mot de passe pour sécuriser le compte.';
 
   @override
-  String get profileSettingsNotificationsTitle => 'Notification settings';
+  String get profileSettingsNotificationsTitle => 'Paramètres de notification';
 
   @override
   String get profileSettingsNotificationsSubtitle =>
-      'Manage push and email preferences across the app.';
+      'Gérez les préférences push et email dans l\'application.';
 
   @override
-  String get profileSettingsLanguageTitle => 'App language';
+  String get profileSettingsLanguageTitle => 'Langue de l\'application';
 
   @override
   String get profileSettingsLanguageSubtitle =>
-      'Choose the language used throughout the interface.';
+      'Choisissez la langue utilisée dans toute l\'interface.';
 
   @override
-  String get profileSettingsThemeTitle => 'App theme';
+  String get profileSettingsThemeTitle => 'Thème de l\'application';
 
   @override
   String get profileSettingsThemeSubtitle =>
-      'Switch between system, light and dark appearance.';
+      'Basculez entre le système, l’apparence claire et sombre.';
 
   @override
-  String get profileSettingsHelpCenterTitle => 'Help center';
+  String get profileSettingsHelpCenterTitle => 'Centre d\'aide';
 
   @override
   String get profileSettingsHelpCenterSubtitle =>
-      'Quick answers and guides for common questions.';
+      'Réponses rapides et guides pour les questions courantes.';
 
   @override
-  String get profileSettingsSupportTitle => 'Contact support';
+  String get profileSettingsSupportTitle => 'Contacter l\'assistance';
 
   @override
   String get profileSettingsSupportSubtitle =>
-      'Reach out if you need help with billing or account access.';
+      'Contactez-nous si vous avez besoin d\'aide pour la facturation ou l\'accès au compte.';
 
   @override
-  String get profileSettingsTermsTitle => 'Terms of Use';
+  String get profileSettingsTermsTitle => 'Conditions d\'utilisation';
 
   @override
   String get profileSettingsTermsSubtitle =>
-      'Review the rules for using PetMagic.';
+      'Consultez les règles d\'utilisation de PetMagic.';
 
   @override
-  String get profileSettingsPrivacyTitle => 'Privacy Policy';
+  String get profileSettingsPrivacyTitle => 'politique de confidentialité';
 
   @override
   String get profileSettingsPrivacySubtitle =>
-      'Learn how your data is handled and protected.';
+      'Découvrez comment vos données sont traitées et protégées.';
 
   @override
-  String get profileSettingsDeleteAccountTitle => 'Delete account';
+  String get profileSettingsDeleteAccountTitle => 'Supprimer le compte';
 
   @override
   String get profileSettingsDeleteAccountSubtitle =>
-      'This action cannot be undone.';
+      'Cette action ne peut pas être annulée.';
 
   @override
   String get profileAccountDetailsSubtitle =>
-      'Review the account data currently available on this device.';
+      'Vérifiez les données de compte actuellement disponibles sur cet appareil.';
 
   @override
-  String get profileAccountDetailsSection => 'Account details';
+  String get profileAccountDetailsSection => 'Détails du compte';
 
   @override
-  String get profileAccountUserIdLabel => 'User ID';
+  String get profileAccountUserIdLabel => 'ID de l\'utilisateur';
 
   @override
-  String get profileAccountDisplayNameLabel => 'Display name';
+  String get profileAccountDisplayNameLabel => 'Nom d\'affichage';
 
   @override
-  String get profileAccountDisplayNameMissing => 'Not set yet';
+  String get profileAccountDisplayNameMissing => 'Pas encore défini';
 
   @override
-  String get profileAccountRolesLabel => 'Roles';
+  String get profileAccountRolesLabel => 'Rôles';
 
   @override
-  String get profileAccountRolesMissing => 'No roles assigned';
+  String get profileAccountRolesMissing => 'Aucun rôle attribué';
 
   @override
-  String get profileAccountMembershipLabel => 'Membership';
+  String get profileAccountMembershipLabel => 'Adhésion';
 
   @override
-  String get profileAccountConsentLabel => 'Terms acceptance';
+  String get profileAccountConsentLabel => 'Acceptation des conditions';
 
   @override
-  String get profileAccountMarketingLabel => 'Offers and updates';
+  String get profileAccountMarketingLabel => 'Offres et mises à jour';
 
   @override
   String get profileAccountAvatarLabel => 'Avatar';
 
   @override
-  String get profileAccountAvatarMissing => 'No avatar uploaded';
+  String get profileAccountAvatarMissing => 'Aucun avatar téléchargé';
 
   @override
-  String get profileAccountAvatarUploaded => 'Avatar uploaded';
+  String get profileAccountAvatarUploaded => 'Avatar téléchargé';
 
   @override
-  String get profileDetailsCurrentStatusSection => 'Current status';
+  String get profileDetailsCurrentStatusSection => 'Statut actuel';
 
   @override
-  String get profileDetailsNextStepSection => 'What happens next';
+  String get profileDetailsNextStepSection => 'Que se passe-t-il ensuite';
 
   @override
   String get profileDetailsLinkedAccountsBody =>
-      'Connected providers will appear here as soon as linking is enabled for your account.';
+      'Les fournisseurs connectés apparaîtront ici dès que la liaison sera activée pour votre compte.';
 
   @override
   String get profileDetailsLinkedAccountsStatus =>
-      'No external providers are linked yet. Email and password remain the active sign-in method for this profile.';
+      'Aucun fournisseur externe n\'est encore lié. L\'e-mail et le mot de passe restent la méthode de connexion active pour ce profil.';
 
   @override
   String get profileDetailsLinkedAccountsNext =>
-      'Google, Apple and additional providers will be shown here after the backend linking flow is opened in the app.';
+      'Google, Apple et d\'autres fournisseurs seront affichés ici après l\'ouverture du flux de liaison backend dans l\'application.';
 
   @override
   String get profileDetailsNotificationsBody =>
-      'This section reflects your current communication preferences in the app.';
+      'Cette section reflète vos préférences de communication actuelles dans l\'application.';
 
   @override
   String get profileDetailsNotificationsStatusEnabled =>
-      'Product updates and offers are enabled for this profile. Additional push controls will appear here later.';
+      'Les mises à jour de produits et les offres sont activées pour ce profil. Des commandes push supplémentaires apparaîtront ici plus tard.';
 
   @override
   String get profileDetailsNotificationsStatusDisabled =>
-      'Marketing emails are currently disabled for this profile. Additional push controls will appear here later.';
+      'Les e-mails marketing sont actuellement désactivés pour ce profil. Des commandes push supplémentaires apparaîtront ici plus tard.';
 
   @override
   String get profileDetailsNotificationsNext =>
-      'You can already review the current email preference here. Dedicated push toggles will be added in a later product slice.';
+      'Vous pouvez déjà consulter les préférences de courrier électronique actuelles ici. Des boutons poussoirs dédiés seront ajoutés dans une tranche de produit ultérieure.';
 
   @override
   String get profileDetailsHelpBody =>
-      'The help center will collect quick answers, setup tips and account guidance in one place.';
+      'Le centre d\'aide rassemblera des réponses rapides, des conseils de configuration et des conseils sur le compte en un seul endroit.';
 
   @override
   String get profileDetailsHelpStatus =>
-      'The in-app knowledge base is still being assembled, so this screen shows the current rollout status.';
+      'La base de connaissances intégrée à l\'application est toujours en cours d\'assemblage. Cet écran affiche donc l\'état actuel du déploiement.';
 
   @override
   String get profileDetailsHelpNext =>
-      'The first help articles and troubleshooting guides will appear here as the mobile support content is published.';
+      'Les premiers articles d\'aide et guides de dépannage apparaîtront ici au fur et à mesure de la publication du contenu de l\'assistance mobile.';
 
   @override
   String get profileDetailsSupportBody =>
-      'Support requests will be handled here without forcing you out of the profile area.';
+      'Les demandes d\'assistance seront traitées ici sans vous forcer à quitter la zone de profil.';
 
   @override
   String get profileDetailsSupportStatus =>
-      'Direct in-app contact is not wired yet. For now, keep this screen as the support entry point for the next slice.';
+      'Le contact direct dans l\'application n\'est pas encore câblé. Pour l’instant, conservez cet écran comme point d’entrée du support pour la tranche suivante.';
 
   @override
   String get profileDetailsSupportNext =>
-      'The next step is a real support form or email handoff connected to the backend support flow.';
+      'L\'étape suivante est un véritable formulaire d\'assistance ou un transfert d\'e-mail connecté au flux d\'assistance backend.';
 
   @override
   String get profileDetailsTermsBody =>
-      'Review how PetMagic expects the app and account to be used.';
+      'Vérifiez comment PetMagic s\'attend à ce que l\'application et le compte soient utilisés.';
 
   @override
   String get profileDetailsTermsStatusAccepted =>
-      'This account has already accepted the Terms of Use during registration.';
+      'Ce compte a déjà accepté les conditions d\'utilisation lors de l\'inscription.';
 
   @override
   String get profileDetailsTermsStatusPending =>
-      'This account has not recorded a completed terms acceptance yet.';
+      'Ce compte n\'a pas encore enregistré d\'acceptation des conditions complétées.';
 
   @override
   String get profileDetailsTermsNext =>
-      'A fuller legal document view can be attached here later. For now, this screen confirms the current acceptance state.';
+      'Une vue plus complète du document juridique peut être jointe ici ultérieurement. Pour l\'instant, cet écran confirme l\'état d\'acceptation actuel.';
 
   @override
   String get profileDetailsPrivacyBody =>
-      'Review how PetMagic stores, protects and uses account data.';
+      'Découvrez comment PetMagic stocke, protège et utilise les données de compte.';
 
   @override
   String get profileDetailsPrivacyStatus =>
-      'Privacy details are currently represented as an in-app summary screen while the full legal document flow is prepared.';
+      'Les détails de confidentialité sont actuellement représentés sous la forme d\'un écran de résumé dans l\'application pendant que le flux complet des documents juridiques est préparé.';
 
   @override
   String get profileDetailsPrivacyNext =>
-      'The next slice can attach a complete policy document or hosted legal page to this route.';
+      'La tranche suivante peut joindre un document de politique complet ou une page juridique hébergée à cette route.';
+
+  @override
+  String get profileLegalAcceptanceCurrent =>
+      'Les documents juridiques actuels sont acceptés pour ce compte.';
+
+  @override
+  String get profileLegalAcceptanceRequired =>
+      'Ce compte doit accepter les versions actuelles des documents juridiques.';
+
+  @override
+  String get profileLegalVersionLabel => 'Version actuelle';
+
+  @override
+  String get profileLegalPublishedLabel => 'Publié';
+
+  @override
+  String get profileLegalAcceptedVersionLabel => 'Version acceptée';
+
+  @override
+  String get profileLegalAcceptedAtLabel => 'Accepté le';
+
+  @override
+  String get profileLegalLoading =>
+      'Chargement du document juridique actuel depuis le backend...';
+
+  @override
+  String get profileLegalUnavailable =>
+      'Le document juridique actuel ne peut pas être chargé pour le moment.';
+
+  @override
+  String get profileLegalAcceptAction =>
+      'Accepter les documents juridiques actuels';
+
+  @override
+  String get profileLegalAcceptanceGuestHint =>
+      'Lors de l\'inscription, vous accepterez la version actuelle des Conditions d\'utilisation et de la Politique de confidentialité.';
+
+  @override
+  String get profileLegalDocumentSection => 'Document';
+
+  @override
+  String get profileLegalCompactHint =>
+      'Le résumé reste visible et les détails ne s\'ouvrent qu\'en cas de besoin.';
+
+  @override
+  String get profileLegalCurrentAcceptedHint =>
+      'Aucune confirmation supplémentaire n\'est nécessaire pour ce compte.';
+
+  @override
+  String get profileLegalCompactSectionLabel => 'Appuyer pour développer';
 
   @override
   String get profileDetailsDeleteBody =>
-      'Account deletion is intentionally protected and not executed from this screen yet.';
+      'La suppression du compte est intentionnellement protégée et n\'est pas encore exécutée à partir de cet écran.';
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.';
+      'La suppression n\'est pas disponible en un seul clic dans l\'application mobile pour le moment. Cela évite un comportement destructeur avant que le flux de confirmation du backend ne soit prêt.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.';
+      'Lorsque le workflow de suppression backend est mis en œuvre, cet écran peut devenir l\'étape de confirmation et de vérification au lieu d\'un espace réservé.';
 
   @override
-  String get profileSettingsThemeSystem => 'System';
+  String get supportChatTitle => 'Chat d\'assistance';
 
   @override
-  String get profileSettingsThemeLight => 'Light';
+  String get supportChatSubtitle =>
+      'Envoyez un message à l\'équipe PetMagic directement depuis votre profil.';
 
   @override
-  String get profileSettingsThemeDark => 'Dark';
+  String get supportChatInputHint =>
+      'Décrivez le problème, la question ou la demande...';
 
   @override
-  String get profileSettingsLanguageRussian => 'Russian';
+  String get supportChatSendAction => 'Envoyer';
 
   @override
-  String get profileSettingsLanguageEnglish => 'English';
+  String get supportChatEmptyTitle => 'Démarrer la conversation';
 
   @override
-  String get profileSettingsLanguageEnglishUs => 'English (US)';
+  String get supportChatEmptyMessage =>
+      'Votre chat d\'assistance est prêt. Envoyez le premier message et l’équipe répondra ici.';
+
+  @override
+  String get supportChatStatusOpen => 'Ouvrir';
+
+  @override
+  String get supportChatStatusInProgress => 'En cours';
+
+  @override
+  String get supportChatStatusResolved => 'Résolu';
+
+  @override
+  String get supportChatStatusClosed => 'Fermé';
+
+  @override
+  String get profileSettingsThemeSystem => 'Système';
+
+  @override
+  String get profileSettingsThemeLight => 'Lumière';
+
+  @override
+  String get profileSettingsThemeDark => 'Sombre';
+
+  @override
+  String get profileSettingsLanguageRussian => 'russe';
+
+  @override
+  String get profileSettingsLanguageEnglish => 'Anglais';
+
+  @override
+  String get profileSettingsLanguageEnglishUs => 'Anglais (États-Unis)';
 
   @override
   String profileSettingsVersionLabel(Object version) {
-    return 'App version $version';
+    return 'Version de l\'application $version';
   }
 
   @override
@@ -480,7 +563,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get magicLoadingAlmostReady => 'Presque pret...';
 
   @override
-  String get videoLabel => 'Video';
+  String get videoLabel => 'Vidéo';
 
   @override
   String get imageLabel => 'Image';
@@ -499,288 +582,319 @@ class AppLocalizationsFr extends AppLocalizations {
       'Essayez un autre filtre ou actualisez le catalogue.';
 
   @override
-  String get startupOnboardingActionContinueGuest => 'Continue as guest';
+  String get startupOnboardingActionContinueGuest =>
+      'Continuer en tant qu\'invité';
 
   @override
-  String get startupOnboardingActionNext => 'Next';
+  String get startupOnboardingActionNext => 'Suivant';
 
   @override
-  String get startupOnboardingActionStart => 'Get started';
+  String get startupOnboardingActionStart => 'Commencer';
 
   @override
   String get startupOnboardingPageOneTitle =>
-      'Create magic moments with your pet';
+      'Créez des moments magiques avec votre animal de compagnie';
 
   @override
   String get startupOnboardingPageOneSubtitle =>
-      'Turn everyday clips into playful viral-ready stories with bright, pet-first templates.';
+      'Transformez des clips de tous les jours en histoires ludiques prêtes pour le virus avec des modèles lumineux axés sur les animaux de compagnie.';
 
   @override
-  String get startupOnboardingPageOneHighlightOne => 'Trendy templates';
+  String get startupOnboardingPageOneHighlightOne => 'Modèles tendance';
 
   @override
-  String get startupOnboardingPageOneHighlightTwo => 'Fast edits';
+  String get startupOnboardingPageOneHighlightTwo => 'Modifications rapides';
 
   @override
-  String get startupOnboardingPageOneHighlightThree => 'Pet-safe vibe';
+  String get startupOnboardingPageOneHighlightThree =>
+      'Ambiance sans danger pour les animaux';
 
   @override
   String get startupOnboardingPageTwoTitle =>
-      'Browse first, unlock when you are ready';
+      'Parcourez d\'abord, déverrouillez lorsque vous êtes prêt';
 
   @override
   String get startupOnboardingPageTwoSubtitle =>
-      'Explore the feed as a guest, then sign in when you want to render, save or go premium.';
+      'Explorez le flux en tant qu\'invité, puis connectez-vous lorsque vous souhaitez effectuer un rendu, un enregistrement ou une version premium.';
 
   @override
-  String get startupOnboardingPageTwoHighlightOne => 'Guest browsing';
+  String get startupOnboardingPageTwoHighlightOne => 'Navigation invité';
 
   @override
-  String get startupOnboardingPageTwoHighlightTwo => 'One-tap sign in';
+  String get startupOnboardingPageTwoHighlightTwo =>
+      'Connectez-vous en un seul clic';
 
   @override
-  String get startupOnboardingPageTwoHighlightThree => 'Smooth handoff';
+  String get startupOnboardingPageTwoHighlightThree => 'Transfert en douceur';
 
   @override
   String get startupOnboardingPageThreeTitle =>
-      'Collect tokens and premium perks later';
+      'Collectez des jetons et des avantages premium plus tard';
 
   @override
   String get startupOnboardingPageThreeSubtitle =>
-      'Keep the first impression fun. Tokens, rewards and premium actions wait behind a clean auth step.';
+      'Gardez la première impression amusante. Les jetons, les récompenses et les actions premium attendent derrière une étape d\'authentification propre.';
 
   @override
-  String get startupOnboardingPageThreeHighlightOne => 'Premium unlocks';
+  String get startupOnboardingPageThreeHighlightOne => 'Déblocages Premium';
 
   @override
-  String get startupOnboardingPageThreeHighlightTwo => 'Token balance';
+  String get startupOnboardingPageThreeHighlightTwo => 'Solde des jetons';
 
   @override
-  String get startupOnboardingPageThreeHighlightThree => 'Creator perks';
+  String get startupOnboardingPageThreeHighlightThree =>
+      'Avantages du créateur';
 
   @override
-  String get startupMiniFeatureFastStart => 'Fast start';
+  String get startupMiniFeatureFastStart => 'Démarrage rapide';
 
   @override
-  String get startupMiniFeaturePetFirst => 'Pet-first';
+  String get startupMiniFeaturePetFirst => 'Les animaux de compagnie d\'abord';
 
   @override
-  String get startupMiniFeatureUpgradeLater => 'Upgrade later';
+  String get startupMiniFeatureUpgradeLater => 'Mettre à niveau plus tard';
 
   @override
-  String get startupWelcomeViewOnboarding => 'View onboarding';
+  String get startupWelcomeViewOnboarding => 'Voir l\'intégration';
 
   @override
-  String get startupWelcomeTitle => 'Welcome back to PetMagic';
+  String get startupWelcomeTitle => 'Bienvenue à PetMagic';
 
   @override
   String get startupWelcomeSubtitle =>
-      'Keep exploring as a guest or sign in before you render templates, unlock rewards and save your creations.';
+      'Continuez à explorer en tant qu\'invité ou connectez-vous avant de créer des modèles, de débloquer des récompenses et d\'enregistrer vos créations.';
 
   @override
-  String get startupWelcomeContinueGuest => 'Continue as guest';
+  String get startupWelcomeContinueGuest => 'Continuer en tant qu\'invité';
 
   @override
-  String get startupWelcomeTemplatesTitle => 'Viral Templates';
+  String get startupWelcomeTemplatesTitle => 'Modèles viraux';
 
   @override
-  String get startupWelcomeTemplatesSubtitle => 'Preview the full feed';
+  String get startupWelcomeTemplatesSubtitle => 'Aperçu du flux complet';
 
   @override
-  String get startupWelcomeAiTitle => 'AI Magic';
+  String get startupWelcomeAiTitle => 'Magie de l\'IA';
 
   @override
-  String get startupWelcomeAiSubtitle => 'Unlock on sign in';
+  String get startupWelcomeAiSubtitle => 'Déverrouiller lors de la connexion';
 
   @override
-  String get startupWelcomeShareTitle => 'Share & Enjoy';
+  String get startupWelcomeShareTitle => 'Partagez et profitez';
 
   @override
-  String get startupWelcomeShareSubtitle => 'Save your favorites later';
+  String get startupWelcomeShareSubtitle => 'Enregistrez vos favoris plus tard';
 
   @override
-  String get authEntryTitle => 'Welcome back!';
+  String get authEntryTitle => 'Content de te revoir!';
 
   @override
-  String get authEntrySubtitle => 'Sign in to continue your pet magic.';
+  String get authEntrySubtitle =>
+      'Connectez-vous pour continuer la magie de votre animal de compagnie.';
 
   @override
-  String get authRegisterTitle => 'Create your account';
+  String get authRegisterTitle => 'Créez votre compte';
 
   @override
   String get authRegisterSubtitle =>
-      'Join PetMagic and unlock templates, tokens and premium features.';
+      'Rejoignez PetMagic et débloquez des modèles, des jetons et des fonctionnalités premium.';
 
   @override
-  String get authRegisterAction => 'Sign Up';
+  String get authRegisterAction => 'S\'inscrire';
 
   @override
-  String get authDisplayNameLabel => 'Display name (optional)';
+  String get authDisplayNameLabel => 'Nom d\'affichage (facultatif)';
 
   @override
-  String get authConfirmPasswordLabel => 'Confirm password';
+  String get authConfirmPasswordLabel => 'Confirmez le mot de passe';
 
   @override
-  String get authPasswordRulesHint => 'Use at least 6 characters.';
+  String get authPasswordRulesHint => 'Utilisez au moins 6 caractères.';
 
   @override
   String get authPasswordTooShort =>
-      'Password must be at least 6 characters long.';
+      'Le mot de passe doit comporter au moins 6 caractères.';
 
   @override
-  String get authForgotPasswordAction => 'Forgot password?';
+  String get authForgotPasswordAction => 'Mot de passe oublié ?';
 
   @override
   String get authForgotPasswordComingSoon =>
-      'Password recovery is coming soon.';
+      'La récupération du mot de passe sera bientôt disponible.';
 
   @override
-  String get authPasswordResetTitle => 'Reset your password';
+  String get authPasswordResetTitle => 'Réinitialisez votre mot de passe';
 
   @override
   String get authPasswordResetSubtitle =>
-      'Enter your email and we will send you a reset code.';
+      'Entrez votre email et nous vous enverrons un code de réinitialisation.';
 
   @override
-  String get authPasswordResetCodeTitle => 'Enter the code from your email';
+  String get authPasswordResetCodeTitle => 'Entrez le code de votre email';
 
   @override
   String get authPasswordResetCodeSubtitle =>
-      'Use the code to set a new password for your account.';
+      'Utilisez le code pour définir un nouveau mot de passe pour votre compte.';
 
   @override
-  String get authPasswordResetCodeLabel => 'Reset code';
+  String get authPasswordResetCodeLabel => 'Réinitialiser le code';
 
   @override
-  String get authPasswordResetRequestAction => 'Send code';
+  String get authPasswordResetRequestAction => 'Envoyer le code';
 
   @override
-  String get authPasswordResetConfirmAction => 'Save new password';
+  String get authPasswordResetConfirmAction =>
+      'Enregistrer le nouveau mot de passe';
 
   @override
-  String get authPasswordResetResendAction => 'Send code again';
+  String get authPasswordResetResendAction => 'Envoyer à nouveau le code';
 
   @override
   String get authPasswordResetCodeSent =>
-      'We sent a password reset code to your email.';
+      'Nous avons envoyé un code de réinitialisation de mot de passe à votre adresse e-mail.';
 
   @override
   String get authPasswordResetSuccess =>
-      'Password updated. You can now sign in with the new password.';
+      'Mot de passe mis à jour. Vous pouvez maintenant vous connecter avec le nouveau mot de passe.';
 
   @override
   String get authPasswordResetCodeInvalid =>
-      'This reset code is invalid or has expired.';
+      'Ce code de réinitialisation n\'est pas valide ou a expiré.';
 
   @override
-  String get authOrContinueWith => 'or continue with';
+  String get authOrContinueWith => 'ou continuez avec';
 
   @override
   String get authAcceptTermsLabel =>
-      'I agree to the Terms of Use and Privacy Policy';
+      'J\'accepte les conditions d\'utilisation et la politique de confidentialité';
 
   @override
   String get authReceiveUpdatesLabel =>
-      'I want to receive updates and offers from PetMagic';
+      'Je souhaite recevoir des mises à jour et des offres de PetMagic';
 
   @override
   String get authAcceptTermsRequired =>
-      'You need to accept the Terms of Use and Privacy Policy to create an account.';
+      'Vous devez accepter les conditions d\'utilisation et la politique de confidentialité pour créer un compte.';
+
+  @override
+  String get authReviewTermsAction => 'Voir les conditions';
+
+  @override
+  String get authReviewPrivacyAction => 'Voir la confidentialité';
+
+  @override
+  String get authLegalLoading =>
+      'Chargement des documents actuels de conditions et de confidentialité...';
+
+  @override
+  String get authLegalReady =>
+      'Les documents juridiques actuels sont prêts à être consultés et acceptés.';
+
+  @override
+  String get authLegalUnavailable =>
+      'Les documents juridiques actuels sont temporairement indisponibles. Réessayez dans un instant.';
 
   @override
   String get authGoogleShortLabel => 'Google';
 
   @override
-  String get authAppleShortLabel => 'Apple';
+  String get authAppleShortLabel => 'Pomme';
 
   @override
-  String get authContinueWithGoogle => 'Continue with Google';
+  String get authContinueWithGoogle => 'Continuer avec Google';
 
   @override
-  String get authContinueWithApple => 'Continue with Apple';
+  String get authContinueWithApple => 'Continuer avec Apple';
 
   @override
-  String get authNoAccountPrompt => 'Don\'t have an account?';
+  String get authNoAccountPrompt => 'Vous n\'avez pas de compte ?';
 
   @override
-  String get authHaveAccountPrompt => 'Already have an account?';
+  String get authHaveAccountPrompt => 'Vous avez déjà un compte ?';
 
   @override
-  String get authSignUpAction => 'Sign Up';
+  String get authSignUpAction => 'S\'inscrire';
 
   @override
-  String get authSocialComingSoon => 'Social sign-in is coming soon.';
+  String get authSocialComingSoon =>
+      'La connexion sociale sera bientôt disponible.';
 
   @override
-  String get authPasswordMismatch => 'Passwords do not match.';
+  String get authPasswordMismatch => 'Les mots de passe ne correspondent pas.';
 
   @override
-  String get authExternalCancelled => 'Sign-in was cancelled.';
+  String get authExternalCancelled => 'La connexion a été annulée.';
 
   @override
-  String get authExternalFailed => 'External sign-in failed. Please try again.';
+  String get authExternalFailed =>
+      'La connexion externe a échoué. Veuillez réessayer.';
 
   @override
-  String get authExternalTimedOut => 'Sign-in took too long. Please try again.';
+  String get authExternalTimedOut =>
+      'La connexion a pris trop de temps. Veuillez réessayer.';
 
   @override
-  String get authExternalLaunchFailed => 'Could not open the sign-in page.';
+  String get authExternalLaunchFailed =>
+      'Impossible d\'ouvrir la page de connexion.';
 
   @override
   String get authExternalCallbackFailed =>
-      'We could not finish sign-in in the app.';
+      'Nous n\'avons pas pu terminer la connexion dans l\'application.';
 
   @override
   String get authExternalSessionExpired =>
-      'This sign-in session expired. Please try again.';
+      'Cette session de connexion a expiré. Veuillez réessayer.';
 
   @override
-  String get authSecurePrivateTitle => 'Secure & Private';
+  String get authSecurePrivateTitle => 'Sécurisé et privé';
 
   @override
-  String get authSecurePrivateSubtitle => 'Your data stays protected.';
+  String get authSecurePrivateSubtitle => 'Vos données restent protégées.';
 
   @override
-  String get authFastEasyTitle => 'Fast & Easy';
+  String get authFastEasyTitle => 'Rapide et facile';
 
   @override
-  String get authFastEasySubtitle => 'Start creating in just a few taps.';
+  String get authFastEasySubtitle => 'Commencez à créer en quelques clics.';
 
   @override
-  String get authLovedByPetsTitle => 'Loved by Pets';
+  String get authLovedByPetsTitle => 'Aimé par les animaux de compagnie';
 
   @override
-  String get authLovedByPetsSubtitle => 'Built for happy pet parents.';
+  String get authLovedByPetsSubtitle =>
+      'Conçu pour les heureux parents d\'animaux de compagnie.';
 
   @override
-  String get authPrivacyTitle => 'Your privacy matters';
+  String get authPrivacyTitle => 'Votre vie privée est importante';
 
   @override
   String get authPrivacySubtitle =>
-      'We never sell or share your data with third parties.';
+      'Nous ne vendons ni ne partageons jamais vos données avec des tiers.';
 
   @override
-  String get authRequiredTitle => 'Sign in to unlock this action';
+  String get authRequiredTitle => 'Connectez-vous pour débloquer cette action';
 
   @override
   String get authRequiredMessage =>
-      'Guests can explore the app, but template actions, rewards and token features require a PetMagic account.';
+      'Les invités peuvent explorer l\'application, mais les actions de modèles, les récompenses et les fonctionnalités de jetons nécessitent un compte PetMagic.';
 
   @override
-  String get authRequiredContinueBrowsing => 'Continue browsing';
+  String get authRequiredContinueBrowsing => 'Continuer la navigation';
 
   @override
-  String get templateTryAction => 'Try template';
+  String get templateTryAction => 'Essayez le modèle';
 
   @override
-  String get templateGuestPreview => 'Guest preview';
+  String get templateGuestPreview => 'Aperçu invité';
 
   @override
-  String get templateActionComingSoon => 'Template studio is coming soon.';
+  String get templateActionComingSoon => 'Le studio de modèles arrive bientôt.';
 
   @override
-  String get tokensActionComingSoon => 'Token wallet is coming soon.';
+  String get tokensActionComingSoon =>
+      'Le portefeuille de jetons arrive bientôt.';
 
   @override
-  String get rewardsActionComingSoon => 'Rewards center is coming soon.';
+  String get rewardsActionComingSoon =>
+      'Le centre de récompenses arrive bientôt.';
 }

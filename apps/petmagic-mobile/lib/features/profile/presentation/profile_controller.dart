@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -109,14 +109,37 @@ class ProfileController extends Notifier<ProfileState> {
       }
 
       final profile = await _repository.fetchProfile();
+      final hydratedSession = AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAtUtc: session.expiresAtUtc,
+        user: profile,
+      );
       state = state.copyWith(
         isLoading: false,
-        session: session,
+        session: hydratedSession,
         profile: profile,
-        email: session.user.email,
+        email: hydratedSession.user.email,
         clearError: true,
       );
     } on AppException catch (error) {
+      final storedSession = await _repository.readSession();
+      if (storedSession != null && error.statusCode != 401) {
+        state = state.copyWith(
+          isLoading: false,
+          session: storedSession,
+          profile: storedSession.user,
+          email: storedSession.user.email,
+          errorMessage: error.message,
+          clearSuccess: true,
+        );
+        return;
+      }
+
+      if (error.statusCode == 401) {
+        ref.read(appLaunchControllerProvider.notifier).markSignedOut();
+      }
+
       state = state.copyWith(
         isLoading: false,
         email: initialEmail,
@@ -168,9 +191,15 @@ class ProfileController extends Notifier<ProfileState> {
         password: state.password,
       );
       final profile = await _repository.fetchProfile();
+      final hydratedSession = AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAtUtc: session.expiresAtUtc,
+        user: profile,
+      );
       state = state.copyWith(
         isSaving: false,
-        session: session,
+        session: hydratedSession,
         profile: profile,
         password: '',
         confirmPassword: '',
@@ -183,6 +212,8 @@ class ProfileController extends Notifier<ProfileState> {
 
   Future<void> register({
     required bool termsOfUseAccepted,
+    required bool privacyPolicyAccepted,
+    required MobileLegalDocuments legalDocuments,
     required bool marketingEmailsEnabled,
   }) async {
     if (state.password.length < 6) {
@@ -213,12 +244,21 @@ class ProfileController extends Notifier<ProfileState> {
         password: state.password,
         displayName: state.displayName,
         termsOfUseAccepted: termsOfUseAccepted,
+        privacyPolicyAccepted: privacyPolicyAccepted,
+        termsOfUseVersion: legalDocuments.termsOfUse.version,
+        privacyPolicyVersion: legalDocuments.privacyPolicy.version,
         marketingEmailsEnabled: marketingEmailsEnabled,
       );
       final profile = await _repository.fetchProfile();
+      final hydratedSession = AuthSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAtUtc: session.expiresAtUtc,
+        user: profile,
+      );
       state = state.copyWith(
         isSaving: false,
-        session: session,
+        session: hydratedSession,
         profile: profile,
         password: '',
         confirmPassword: '',
@@ -294,7 +334,11 @@ class ProfileController extends Notifier<ProfileState> {
     );
     try {
       final profile = await _repository.uploadAvatar(file.path);
-      state = state.copyWith(isSaving: false, profile: profile);
+      state = state.copyWith(
+        isSaving: false,
+        profile: profile,
+        session: _replaceSessionUser(profile),
+      );
     } on AppException catch (error) {
       state = state.copyWith(isSaving: false, errorMessage: error.message);
     }
@@ -308,9 +352,50 @@ class ProfileController extends Notifier<ProfileState> {
     );
     try {
       final profile = await _repository.removeAvatar();
-      state = state.copyWith(isSaving: false, profile: profile);
+      state = state.copyWith(
+        isSaving: false,
+        profile: profile,
+        session: _replaceSessionUser(profile),
+      );
     } on AppException catch (error) {
       state = state.copyWith(isSaving: false, errorMessage: error.message);
     }
+  }
+
+  Future<void> acceptCurrentLegalDocuments(
+    MobileLegalDocuments legalDocuments,
+  ) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      final profile = await _repository.acceptCurrentLegalDocuments(
+        documents: legalDocuments,
+      );
+      state = state.copyWith(
+        isSaving: false,
+        profile: profile,
+        session: _replaceSessionUser(profile),
+      );
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    }
+  }
+
+  AuthSession? _replaceSessionUser(MobileUserProfile profile) {
+    final session = state.session;
+    if (session == null) {
+      return null;
+    }
+
+    return AuthSession(
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      expiresAtUtc: session.expiresAtUtc,
+      user: profile,
+    );
   }
 }

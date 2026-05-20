@@ -13,11 +13,14 @@ import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -550,6 +553,72 @@ void main() {
     );
   });
 
+  test('support chat controller loads existing messages', () async {
+    final supportRepository = _FakeSupportChatRepository();
+    final container = ProviderContainer(
+      overrides: [
+        supportChatRepositoryProvider.overrideWith((ref) => supportRepository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(supportChatControllerProvider.notifier).initialize();
+
+    final state = container.read(supportChatControllerProvider);
+    expect(state.conversation, isNotNull);
+    expect(state.conversation?.assignedAdminDisplayName, 'PetMagic Support');
+    expect(state.conversation?.messages.first.body, 'How can we help today?');
+    expect(state.conversation?.userUnreadCount, 0);
+  });
+
+  test('support chat controller sends a new message', () async {
+    final supportRepository = _FakeSupportChatRepository();
+    final container = ProviderContainer(
+      overrides: [
+        supportChatRepositoryProvider.overrideWith((ref) => supportRepository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(supportChatControllerProvider.notifier);
+    await controller.initialize();
+    await controller.sendMessage('I need billing help');
+
+    final state = container.read(supportChatControllerProvider);
+    expect(supportRepository.lastSentBody, 'I need billing help');
+    expect(
+      state.conversation?.messages.any(
+        (message) => message.body == 'I need billing help',
+      ),
+      isTrue,
+    );
+  });
+
+  test(
+    'support chat controller clears loading state on unexpected error',
+    () async {
+      final supportRepository = _ThrowingSupportChatRepository();
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWith(
+            (ref) => supportRepository,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(supportChatControllerProvider.notifier).initialize();
+
+      final state = container.read(supportChatControllerProvider);
+      expect(state.isLoading, isFalse);
+      expect(state.conversation, isNull);
+      expect(
+        state.errorMessage,
+        'Unable to reach support right now. Please try again in a moment.',
+      );
+    },
+  );
+
   test('app preferences controller persists theme and locale', () async {
     SharedPreferences.setMockInitialValues(const {});
 
@@ -629,13 +698,56 @@ String _buildSessionJson() {
         isPremium: false,
         emailConfirmed: true,
         termsOfUseAccepted: true,
+        privacyPolicyAccepted: true,
         marketingEmailsEnabled: false,
+        legalAcceptance: _sampleLegalAcceptance,
         roles: ['user'],
         avatar: null,
       ),
     ).toJson(),
   );
 }
+
+const _sampleLegalAcceptance = MobileLegalAcceptanceStatus(
+  termsOfUseAccepted: true,
+  termsOfUseAcceptedVersion: '2026-05-20',
+  termsOfUseAcceptedAtUtc: null,
+  privacyPolicyAccepted: true,
+  privacyPolicyAcceptedVersion: '2026-05-20',
+  privacyPolicyAcceptedAtUtc: null,
+  currentTermsOfUseVersion: '2026-05-20',
+  currentPrivacyPolicyVersion: '2026-05-20',
+  requiresAcceptance: false,
+);
+
+const _sampleLegalDocuments = MobileLegalDocuments(
+  termsOfUse: MobileLegalDocument(
+    kind: 'terms-of-use',
+    title: 'Terms',
+    version: '2026-05-20',
+    publishedAtUtc: null,
+    summary: 'Terms summary',
+    sections: [
+      MobileLegalDocumentSection(
+        heading: 'General',
+        paragraphs: ['Terms paragraph'],
+      ),
+    ],
+  ),
+  privacyPolicy: MobileLegalDocument(
+    kind: 'privacy-policy',
+    title: 'Privacy',
+    version: '2026-05-20',
+    publishedAtUtc: null,
+    summary: 'Privacy summary',
+    sections: [
+      MobileLegalDocumentSection(
+        heading: 'Privacy',
+        paragraphs: ['Privacy paragraph'],
+      ),
+    ],
+  ),
+);
 
 const _sessionKey = 'petmagic_mobile_auth_session';
 const _onboardingSeenKey = 'petmagic_mobile_guest_onboarding_seen';
@@ -685,7 +797,9 @@ class _FakeProfileRepository extends ProfileRepository {
     isPremium: false,
     emailConfirmed: true,
     termsOfUseAccepted: true,
+    privacyPolicyAccepted: true,
     marketingEmailsEnabled: false,
+    legalAcceptance: _sampleLegalAcceptance,
     roles: ['user'],
     avatar: null,
   );
@@ -709,7 +823,9 @@ class _FakeProfileRepository extends ProfileRepository {
         isPremium: _profile.isPremium,
         emailConfirmed: _profile.emailConfirmed,
         termsOfUseAccepted: _profile.termsOfUseAccepted,
+        privacyPolicyAccepted: _profile.privacyPolicyAccepted,
         marketingEmailsEnabled: _profile.marketingEmailsEnabled,
+        legalAcceptance: _profile.legalAcceptance,
         roles: _profile.roles,
         avatar: _profile.avatar,
       ),
@@ -723,6 +839,9 @@ class _FakeProfileRepository extends ProfileRepository {
     required String email,
     required String password,
     required bool termsOfUseAccepted,
+    required bool privacyPolicyAccepted,
+    required String termsOfUseVersion,
+    required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
   }) async {
@@ -742,7 +861,19 @@ class _FakeProfileRepository extends ProfileRepository {
         isPremium: _profile.isPremium,
         emailConfirmed: _profile.emailConfirmed,
         termsOfUseAccepted: termsOfUseAccepted,
+        privacyPolicyAccepted: privacyPolicyAccepted,
         marketingEmailsEnabled: marketingEmailsEnabled,
+        legalAcceptance: const MobileLegalAcceptanceStatus(
+          termsOfUseAccepted: true,
+          termsOfUseAcceptedVersion: '2026-05-20',
+          termsOfUseAcceptedAtUtc: null,
+          privacyPolicyAccepted: true,
+          privacyPolicyAcceptedVersion: '2026-05-20',
+          privacyPolicyAcceptedAtUtc: null,
+          currentTermsOfUseVersion: '2026-05-20',
+          currentPrivacyPolicyVersion: '2026-05-20',
+          requiresAcceptance: false,
+        ),
         roles: _profile.roles,
         avatar: _profile.avatar,
       ),
@@ -765,10 +896,62 @@ class _FakeProfileRepository extends ProfileRepository {
       isPremium: _profile.isPremium,
       emailConfirmed: _profile.emailConfirmed,
       termsOfUseAccepted: session.user.termsOfUseAccepted,
+      privacyPolicyAccepted: session.user.privacyPolicyAccepted,
       marketingEmailsEnabled: session.user.marketingEmailsEnabled,
+      legalAcceptance: session.user.legalAcceptance,
       roles: _profile.roles,
       avatar: _profile.avatar,
     );
+  }
+
+  @override
+  Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
+    required String locale,
+  }) async {
+    return _sampleLegalDocuments;
+  }
+
+  @override
+  Future<MobileUserProfile> acceptCurrentLegalDocuments({
+    required MobileLegalDocuments documents,
+  }) async {
+    final session = storedSession;
+    if (session == null) {
+      throw const AppException('Unauthorized', statusCode: 401);
+    }
+
+    final profile = MobileUserProfile(
+      userId: session.user.userId,
+      email: session.user.email,
+      displayName: session.user.displayName,
+      isPremium: session.user.isPremium,
+      emailConfirmed: session.user.emailConfirmed,
+      termsOfUseAccepted: true,
+      privacyPolicyAccepted: true,
+      marketingEmailsEnabled: session.user.marketingEmailsEnabled,
+      legalAcceptance: MobileLegalAcceptanceStatus(
+        termsOfUseAccepted: true,
+        termsOfUseAcceptedVersion: documents.termsOfUse.version,
+        termsOfUseAcceptedAtUtc: null,
+        privacyPolicyAccepted: true,
+        privacyPolicyAcceptedVersion: documents.privacyPolicy.version,
+        privacyPolicyAcceptedAtUtc: null,
+        currentTermsOfUseVersion: documents.termsOfUse.version,
+        currentPrivacyPolicyVersion: documents.privacyPolicy.version,
+        requiresAcceptance: false,
+      ),
+      roles: session.user.roles,
+      avatar: session.user.avatar,
+    );
+
+    storedSession = AuthSession(
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      expiresAtUtc: session.expiresAtUtc,
+      user: profile,
+    );
+
+    return profile;
   }
 
   @override
@@ -809,7 +992,9 @@ class _FakeExternalAuthRepository implements ExternalAuthRepository {
         isPremium: false,
         emailConfirmed: true,
         termsOfUseAccepted: true,
+        privacyPolicyAccepted: true,
         marketingEmailsEnabled: false,
+        legalAcceptance: _sampleLegalAcceptance,
         roles: const ['user'],
         avatar: null,
       ),
@@ -832,5 +1017,107 @@ class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     throw Exception('google sign-in failed unexpectedly');
+  }
+}
+
+class _FakeSupportChatRepository extends SupportChatRepository {
+  _FakeSupportChatRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  String? lastSentBody;
+  late SupportChatConversation _conversation = SupportChatConversation(
+    conversationId: 'conversation-1',
+    initiatorUserId: 'user-1',
+    userEmail: 'pet@example.com',
+    userDisplayName: 'Pet Parent',
+    assignedAdminId: 'admin-1',
+    assignedAdminDisplayName: 'PetMagic Support',
+    status: 'Open',
+    priority: 'Normal',
+    userUnreadCount: 1,
+    adminUnreadCount: 0,
+    createdAtUtc: DateTime.utc(2026, 1, 1, 10),
+    updatedAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
+    lastMessageAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
+    messages: [
+      SupportChatMessage(
+        messageId: 'message-1',
+        conversationId: 'conversation-1',
+        senderUserId: 'admin-1',
+        senderDisplayName: 'PetMagic Support',
+        isFromAdmin: true,
+        body: 'How can we help today?',
+        isRead: false,
+        createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
+      ),
+    ],
+  );
+
+  @override
+  Future<SupportChatConversation> openConversation({
+    String? initialMessage,
+  }) async {
+    return _conversation;
+  }
+
+  @override
+  Future<SupportChatConversation> getConversation() async {
+    return _conversation;
+  }
+
+  @override
+  Future<SupportChatMessage> sendMessage({
+    required String conversationId,
+    required String body,
+  }) async {
+    lastSentBody = body;
+    final message = SupportChatMessage(
+      messageId: 'message-2',
+      conversationId: conversationId,
+      senderUserId: 'user-1',
+      senderDisplayName: 'Pet Parent',
+      isFromAdmin: false,
+      body: body,
+      isRead: false,
+      createdAtUtc: DateTime.utc(2026, 1, 1, 10, 10),
+    );
+
+    _conversation = _conversation.copyWith(
+      adminUnreadCount: _conversation.adminUnreadCount + 1,
+      updatedAtUtc: message.createdAtUtc,
+      lastMessageAtUtc: message.createdAtUtc,
+      messages: [..._conversation.messages, message],
+    );
+
+    return message;
+  }
+
+  @override
+  Future<void> markConversationRead(String conversationId) async {
+    _conversation = _conversation.copyWith(
+      userUnreadCount: 0,
+      messages: _conversation.messages
+          .map(
+            (message) => message.isFromAdmin
+                ? message.copyWith(
+                    isRead: true,
+                    readAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
+                  )
+                : message,
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
+class _ThrowingSupportChatRepository extends SupportChatRepository {
+  _ThrowingSupportChatRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  @override
+  Future<SupportChatConversation> openConversation({
+    String? initialMessage,
+  }) async {
+    throw Exception('unexpected support failure');
   }
 }

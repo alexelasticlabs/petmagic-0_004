@@ -19,6 +19,13 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   );
 });
 
+final currentLegalDocumentsProvider =
+    FutureProvider.family<MobileLegalDocuments, String>((ref, locale) {
+      return ref
+          .watch(profileRepositoryProvider)
+          .fetchCurrentLegalDocuments(locale: locale);
+    });
+
 class ProfileRepository {
   ProfileRepository({
     required Dio dio,
@@ -35,6 +42,9 @@ class ProfileRepository {
     required String email,
     required String password,
     required bool termsOfUseAccepted,
+    required bool privacyPolicyAccepted,
+    required String termsOfUseVersion,
+    required String privacyPolicyVersion,
     required bool marketingEmailsEnabled,
     String? displayName,
   }) async {
@@ -45,6 +55,9 @@ class ProfileRepository {
           'email': email.trim(),
           'password': password,
           'termsOfUseAccepted': termsOfUseAccepted,
+          'privacyPolicyAccepted': privacyPolicyAccepted,
+          'termsOfUseVersion': termsOfUseVersion,
+          'privacyPolicyVersion': privacyPolicyVersion,
           'marketingEmailsEnabled': marketingEmailsEnabled,
           'displayName': displayName?.trim().isEmpty ?? true
               ? null
@@ -144,7 +157,50 @@ class ProfileRepository {
       ),
     );
 
-    return MobileUserProfile.fromJson(response.data ?? const {});
+    final profile = MobileUserProfile.fromJson(response.data ?? const {});
+    await _replaceStoredUser(profile);
+    return profile;
+  }
+
+  Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
+    required String locale,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/legal/current',
+        queryParameters: {'locale': locale},
+      );
+
+      return MobileLegalDocuments.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.legal_documents_unavailable',
+      );
+    }
+  }
+
+  Future<MobileUserProfile> acceptCurrentLegalDocuments({
+    required MobileLegalDocuments documents,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/legal/accept',
+        data: {
+          'termsOfUseVersion': documents.termsOfUse.version,
+          'privacyPolicyVersion': documents.privacyPolicy.version,
+        },
+        options: Options(
+          headers: {
+            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+          },
+        ),
+      ),
+    );
+
+    final profile = MobileUserProfile.fromJson(response.data ?? const {});
+    await _replaceStoredUser(profile);
+    return profile;
   }
 
   Future<MobileUserProfile> uploadAvatar(String filePath) async {

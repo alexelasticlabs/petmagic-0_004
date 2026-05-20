@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.da
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -22,9 +23,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(profileControllerProvider.notifier).initialize(),
-    );
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+
+      ref.read(profileControllerProvider.notifier).initialize();
+    });
   }
 
   @override
@@ -55,7 +60,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             : RefreshIndicator.adaptive(
                 onRefresh: controller.initialize,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 104),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     Row(
@@ -69,16 +74,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 text.profileTitle,
                                 style: TextStyle(
                                   color: colors.textStrong,
-                                  fontSize: 31,
+                                  fontSize: 27,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 text.profileDashboardSubtitle,
                                 style: TextStyle(
                                   color: colors.textSoft,
-                                  fontSize: 16,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -112,7 +117,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         tone: colors.accent,
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
                     if (profile != null) ...[
                       _ProfileHeroCard(
                         profile: profile,
@@ -123,9 +128,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         onOpenSettings: () =>
                             context.push(ProfileSettingsPage.routePath),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       _ProfilePetsRow(onTap: () {}),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       ProfileGlassCard(
                         padding: EdgeInsets.zero,
                         child: Column(
@@ -161,6 +166,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               title: text.profileSupportTitle,
                               subtitle: text.profileSupportSubtitle,
                               iconColor: colors.blue,
+                              onTap: () => context.push(SupportChatPage.routePath),
                             ),
                             ProfileSettingsRow(
                               icon: Icons.settings_outlined,
@@ -173,11 +179,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: state.isSaving ? null : controller.logout,
                         style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(62),
+                          minimumSize: const Size.fromHeight(52),
                           foregroundColor: colors.danger,
                           side: BorderSide(
                             color: colors.danger.withValues(alpha: 0.3),
@@ -228,15 +234,15 @@ class _ProfileHeroCard extends StatelessWidget {
               ProfileAvatarBadge(
                 imageUrl: profile.avatar?.url,
                 fallbackLabel: displayName,
-                size: 96,
+                size: 80,
                 bottomBadge: Material(
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(999),
                     onTap: onUploadAvatar,
                     child: Container(
-                      width: 42,
-                      height: 42,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: colors.accent,
                         shape: BoxShape.circle,
@@ -250,13 +256,13 @@ class _ProfileHeroCard extends StatelessWidget {
                             ? Icons.hourglass_top_rounded
                             : Icons.camera_alt_rounded,
                         color: colors.backgroundBottom,
-                        size: 20,
+                        size: 18,
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,7 +274,7 @@ class _ProfileHeroCard extends StatelessWidget {
                             displayName,
                             style: TextStyle(
                               color: colors.textStrong,
-                              fontSize: 22,
+                              fontSize: 19,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -278,7 +284,7 @@ class _ProfileHeroCard extends StatelessWidget {
                           icon: Icon(
                             Icons.edit_rounded,
                             color: colors.accent,
-                            size: 20,
+                            size: 18,
                           ),
                         ),
                       ],
@@ -288,11 +294,11 @@ class _ProfileHeroCard extends StatelessWidget {
                       profile.email,
                       style: TextStyle(
                         color: colors.textSoft,
-                        fontSize: 15,
+                        fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -326,9 +332,9 @@ class _ProfileHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: colors.surfaceStrong.withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(24),
@@ -337,8 +343,8 @@ class _ProfileHeroCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: colors.accent.withValues(alpha: 0.14),
@@ -346,10 +352,10 @@ class _ProfileHeroCard extends StatelessWidget {
                   child: Icon(
                     Icons.tips_and_updates_outlined,
                     color: colors.accent,
-                    size: 24,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,7 +364,7 @@ class _ProfileHeroCard extends StatelessWidget {
                         text.profileAccountCenterTitle,
                         style: TextStyle(
                           color: colors.textStrong,
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -367,7 +373,7 @@ class _ProfileHeroCard extends StatelessWidget {
                         text.profileAccountCenterSubtitle,
                         style: TextStyle(
                           color: colors.textSoft,
-                          fontSize: 13.5,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -377,48 +383,10 @@ class _ProfileHeroCard extends StatelessWidget {
                 Icon(
                   Icons.chevron_right_rounded,
                   color: colors.textMuted,
-                  size: 28,
+                  size: 24,
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              ProfileStatTile(
-                icon: Icons.verified_user_outlined,
-                value: profile.termsOfUseAccepted
-                    ? text.profileStatOn
-                    : text.profileStatOff,
-                label: text.profileTermsStat,
-              ),
-              Container(
-                width: 1,
-                height: 86,
-                color: colors.border.withValues(alpha: 0.8),
-              ),
-              ProfileStatTile(
-                icon: Icons.mail_outline_rounded,
-                value: profile.marketingEmailsEnabled
-                    ? text.profileStatOn
-                    : text.profileStatOff,
-                label: text.profileMarketingStat,
-                highlight: colors.blue,
-              ),
-              Container(
-                width: 1,
-                height: 86,
-                color: colors.border.withValues(alpha: 0.8),
-              ),
-              ProfileStatTile(
-                icon: Icons.verified_rounded,
-                value: profile.emailConfirmed
-                    ? text.profileStatReady
-                    : text.profileStatPending,
-                label: text.profileEmailStat,
-                highlight: colors.gold,
-              ),
-            ],
           ),
         ],
       ),
@@ -442,19 +410,19 @@ class _ProfilePetsRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: colors.accent.withValues(alpha: 0.14),
                 ),
-                child: Icon(Icons.pets_rounded, color: colors.accent, size: 24),
+                child: Icon(Icons.pets_rounded, color: colors.accent, size: 20),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -463,7 +431,7 @@ class _ProfilePetsRow extends StatelessWidget {
                       text.profilePetsTitle,
                       style: TextStyle(
                         color: colors.textStrong,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -472,7 +440,7 @@ class _ProfilePetsRow extends StatelessWidget {
                       text.profilePetsSubtitle,
                       style: TextStyle(
                         color: colors.textSoft,
-                        fontSize: 13.5,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -485,8 +453,8 @@ class _ProfilePetsRow extends StatelessWidget {
                 (index) => Transform.translate(
                   offset: Offset(index == 0 ? 0 : -10.0 * index, 0),
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: colors.surfaceStrong,
@@ -499,7 +467,7 @@ class _ProfilePetsRow extends StatelessWidget {
                         Icons.favorite_rounded,
                       ][index],
                       color: [colors.accent, colors.gold, colors.blue][index],
-                      size: 22,
+                      size: 18,
                     ),
                   ),
                 ),
@@ -508,7 +476,7 @@ class _ProfilePetsRow extends StatelessWidget {
               Icon(
                 Icons.chevron_right_rounded,
                 color: colors.textMuted,
-                size: 28,
+                size: 24,
               ),
             ],
           ),

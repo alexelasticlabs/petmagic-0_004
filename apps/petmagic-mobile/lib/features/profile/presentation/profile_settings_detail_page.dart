@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 
@@ -158,7 +161,13 @@ class ProfileAccountInfoPage extends ConsumerWidget {
                     ),
                     _InfoRow(
                       label: text.profileAccountConsentLabel,
-                      value: profile.termsOfUseAccepted
+                      value: profile.legalAcceptance.isCurrentAccepted
+                          ? text.profileLegalAcceptanceCurrent
+                          : text.profileLegalAcceptanceRequired,
+                    ),
+                    _InfoRow(
+                      label: text.profileSettingsPrivacyTitle,
+                      value: profile.privacyPolicyAccepted
                           ? text.profilePreferenceEnabled
                           : text.profilePreferenceOff,
                     ),
@@ -201,7 +210,13 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final profile = ref.watch(profileControllerProvider).profile;
+    final state = ref.watch(profileControllerProvider);
+    final profile = state.profile;
+    final locale = Localizations.localeOf(context);
+    final localeTag = locale.toLanguageTag();
+    final legalDocumentsAsync = ref.watch(
+      currentLegalDocumentsProvider(localeTag),
+    );
 
     final title = switch (kind) {
       ProfileSettingsDetailKind.linkedAccounts =>
@@ -229,6 +244,213 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       ProfileSettingsDetailKind.deleteAccount => text.profileDetailsDeleteBody,
     };
 
+    if (kind == ProfileSettingsDetailKind.terms ||
+        kind == ProfileSettingsDetailKind.privacy) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+            children: [
+              _DetailHeader(title: title, subtitle: subtitle),
+              const SizedBox(height: 22),
+              if (state.errorMessage != null) ...[
+                ProfileGlassCard(
+                  child: Text(
+                    state.errorMessage!,
+                    style: TextStyle(
+                      color: colors.danger,
+                      fontSize: 15,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+              ProfileSectionLabel(
+                label: text.profileDetailsCurrentStatusSection,
+              ),
+              ProfileGlassCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _InfoRow(
+                      label: text.profileAccountConsentLabel,
+                      value: profile?.legalAcceptance.isCurrentAccepted == true
+                          ? text.profileLegalAcceptanceCurrent
+                          : text.profileLegalAcceptanceRequired,
+                    ),
+                    _InfoRow(
+                      label: text.profileLegalVersionLabel,
+                      value:
+                          _documentFromAsync(
+                            kind,
+                            legalDocumentsAsync,
+                          )?.version ??
+                          '...',
+                    ),
+                    _InfoRow(
+                      label: text.profileLegalPublishedLabel,
+                      value: _formatDate(
+                        _documentFromAsync(
+                          kind,
+                          legalDocumentsAsync,
+                        )?.publishedAtUtc,
+                        locale,
+                      ),
+                    ),
+                    _InfoRow(
+                      label: text.profileLegalAcceptedVersionLabel,
+                      value: kind == ProfileSettingsDetailKind.terms
+                          ? (profile
+                                    ?.legalAcceptance
+                                    .termsOfUseAcceptedVersion ??
+                                '—')
+                          : (profile
+                                    ?.legalAcceptance
+                                    .privacyPolicyAcceptedVersion ??
+                                '—'),
+                    ),
+                    _InfoRow(
+                      label: text.profileLegalAcceptedAtLabel,
+                      value: _formatDate(
+                        kind == ProfileSettingsDetailKind.terms
+                            ? profile?.legalAcceptance.termsOfUseAcceptedAtUtc
+                            : profile
+                                  ?.legalAcceptance
+                                  .privacyPolicyAcceptedAtUtc,
+                        locale,
+                      ),
+                      showDivider: false,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (_documentFromAsync(kind, legalDocumentsAsync)
+                  case final document?)
+                ProfileGlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        document.summary,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 15,
+                          height: 1.45,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        text.profileLegalCompactHint,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 13,
+                          height: 1.45,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 18),
+              ...switch (legalDocumentsAsync) {
+                AsyncLoading() => [
+                  ProfileGlassCard(
+                    child: Text(
+                      text.profileLegalLoading,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 15,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                AsyncError() => [
+                  ProfileGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          text.profileLegalUnavailable,
+                          style: TextStyle(
+                            color: colors.danger,
+                            fontSize: 15,
+                            height: 1.45,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                            currentLegalDocumentsProvider(localeTag),
+                          ),
+                          child: Text(text.retryAction),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                AsyncData(:final value) => [
+                  ProfileGlassCard(
+                    child:
+                        profile != null &&
+                            profile.legalAcceptance.requiresAcceptance
+                        ? SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: state.isSaving
+                                  ? null
+                                  : () => ref
+                                        .read(
+                                          profileControllerProvider.notifier,
+                                        )
+                                        .acceptCurrentLegalDocuments(value),
+                              child: Text(
+                                state.isSaving
+                                    ? text.profileLoadingAction
+                                    : text.profileLegalAcceptAction,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            profile == null
+                                ? text.profileLegalAcceptanceGuestHint
+                                : text.profileLegalCurrentAcceptedHint,
+                            style: TextStyle(
+                              color: colors.textSoft,
+                              fontSize: 14,
+                              height: 1.45,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 14),
+                  ProfileSectionLabel(label: text.profileLegalDocumentSection),
+                  ..._documentFromValue(kind, value).sections.map(
+                    (section) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: ProfileGlassCard(
+                        child: _LegalSectionTile(
+                          section: section,
+                          compactLabel: text.profileLegalCompactSectionLabel,
+                          colors: colors,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              },
+            ],
+          ),
+        ),
+      );
+    }
+
     final status = switch (kind) {
       ProfileSettingsDetailKind.linkedAccounts =>
         text.profileDetailsLinkedAccountsStatus,
@@ -238,10 +460,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
             : text.profileDetailsNotificationsStatusDisabled,
       ProfileSettingsDetailKind.helpCenter => text.profileDetailsHelpStatus,
       ProfileSettingsDetailKind.support => text.profileDetailsSupportStatus,
-      ProfileSettingsDetailKind.terms =>
-        profile?.termsOfUseAccepted == true
-            ? text.profileDetailsTermsStatusAccepted
-            : text.profileDetailsTermsStatusPending,
+      ProfileSettingsDetailKind.terms => text.profileDetailsTermsStatusAccepted,
       ProfileSettingsDetailKind.privacy => text.profileDetailsPrivacyStatus,
       ProfileSettingsDetailKind.deleteAccount =>
         text.profileDetailsDeleteStatus,
@@ -293,6 +512,96 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  MobileLegalDocument? _documentFromAsync(
+    ProfileSettingsDetailKind kind,
+    AsyncValue<MobileLegalDocuments> value,
+  ) {
+    return switch (value) {
+      AsyncData(:final value) => _documentFromValue(kind, value),
+      _ => null,
+    };
+  }
+
+  MobileLegalDocument _documentFromValue(
+    ProfileSettingsDetailKind kind,
+    MobileLegalDocuments value,
+  ) {
+    return kind == ProfileSettingsDetailKind.terms
+        ? value.termsOfUse
+        : value.privacyPolicy;
+  }
+
+  String _formatDate(DateTime? value, Locale locale) {
+    if (value == null) {
+      return '—';
+    }
+
+    return DateFormat.yMMMd(
+      locale.toLanguageTag(),
+    ).add_Hm().format(value.toLocal());
+  }
+}
+
+class _LegalSectionTile extends StatelessWidget {
+  const _LegalSectionTile({
+    required this.section,
+    required this.compactLabel,
+    required this.colors,
+  });
+
+  final MobileLegalDocumentSection section;
+  final String compactLabel;
+  final PetMagicColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        iconColor: colors.textStrong,
+        collapsedIconColor: colors.textMuted,
+        title: Text(
+          section.heading,
+          style: TextStyle(
+            color: colors.textStrong,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            compactLabel,
+            style: TextStyle(
+              color: colors.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        children: [
+          const SizedBox(height: 8),
+          ...section.paragraphs.map(
+            (paragraph) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                paragraph,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 14,
+                  height: 1.55,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

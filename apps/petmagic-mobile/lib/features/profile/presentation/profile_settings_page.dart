@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/presentation/password_reset_pag
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
 class ProfileSettingsPage extends ConsumerWidget {
   const ProfileSettingsPage({super.key});
@@ -27,7 +28,7 @@ class ProfileSettingsPage extends ConsumerWidget {
     return ProfileScreenBackground(
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 104),
           children: [
             Row(
               children: [
@@ -47,7 +48,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                         text.profileSettingsTitle,
                         style: TextStyle(
                           color: colors.textStrong,
-                          fontSize: 31,
+                          fontSize: 27,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -56,7 +57,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                         text.profileSettingsSubtitle,
                         style: TextStyle(
                           color: colors.textSoft,
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -65,7 +66,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
             ProfileSectionLabel(label: text.profileSettingsAccountSection),
             ProfileGlassCard(
               padding: EdgeInsets.zero,
@@ -103,7 +104,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             ProfileSectionLabel(
               label: text.profileSettingsNotificationsSection,
             ),
@@ -131,42 +132,97 @@ class ProfileSettingsPage extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             ProfileSectionLabel(label: text.profileSettingsPreferencesSection),
             ProfileGlassCard(
-              padding: EdgeInsets.zero,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ProfileSettingsRow(
+                  _SettingsChoiceGroup(
                     icon: Icons.language_rounded,
                     title: text.profileSettingsLanguageTitle,
                     subtitle: text.profileSettingsLanguageSubtitle,
-                    trailingText: _languageLabel(context, preferences.locale),
-                    onTap: () => _showLocalePicker(
-                      context,
-                      preferences.locale,
-                      preferencesController,
+                    children: [
+                      _SettingsChoiceButton(
+                        icon: Icons.translate_rounded,
+                        label: 'RU',
+                        caption: text.profileSettingsLanguageRussian,
+                        isSelected: _matchesLocale(
+                          preferences.locale,
+                          const Locale('ru'),
+                        ),
+                        onTap: () => preferencesController.updateLocale(
+                          const Locale('ru'),
+                        ),
+                      ),
+                      _SettingsChoiceButton(
+                        icon: Icons.language_rounded,
+                        label: 'EN',
+                        caption: text.profileSettingsLanguageEnglish,
+                        isSelected: _matchesLocale(
+                          preferences.locale,
+                          const Locale('en'),
+                        ),
+                        onTap: () => preferencesController.updateLocale(
+                          const Locale('en'),
+                        ),
+                      ),
+                      _SettingsChoiceButton(
+                        icon: Icons.public_rounded,
+                        label: 'US',
+                        caption: text.profileSettingsLanguageEnglishUs,
+                        isSelected: _matchesLocale(
+                          preferences.locale,
+                          const Locale('en', 'US'),
+                        ),
+                        onTap: () => preferencesController.updateLocale(
+                          const Locale('en', 'US'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(
+                      height: 1,
+                      color: colors.border.withValues(alpha: 0.7),
                     ),
                   ),
-                  ProfileSettingsRow(
+                  _SettingsChoiceGroup(
                     icon: Icons.dark_mode_outlined,
                     title: text.profileSettingsThemeTitle,
                     subtitle: text.profileSettingsThemeSubtitle,
-                    trailingText: _themeModeLabel(
-                      context,
-                      preferences.themeMode,
-                    ),
-                    showDivider: false,
-                    onTap: () => _showThemeModePicker(
-                      context,
-                      preferences.themeMode,
-                      preferencesController,
-                    ),
+                    children: [
+                      _SettingsChoiceButton(
+                        icon: Icons.brightness_auto_rounded,
+                        label: text.profileSettingsThemeSystem,
+                        isSelected: preferences.themeMode == ThemeMode.system,
+                        onTap: () => preferencesController.updateThemeMode(
+                          ThemeMode.system,
+                        ),
+                      ),
+                      _SettingsChoiceButton(
+                        icon: Icons.light_mode_rounded,
+                        label: text.profileSettingsThemeLight,
+                        isSelected: preferences.themeMode == ThemeMode.light,
+                        onTap: () => preferencesController.updateThemeMode(
+                          ThemeMode.light,
+                        ),
+                      ),
+                      _SettingsChoiceButton(
+                        icon: Icons.dark_mode_rounded,
+                        label: text.profileSettingsThemeDark,
+                        isSelected: preferences.themeMode == ThemeMode.dark,
+                        onTap: () => preferencesController.updateThemeMode(
+                          ThemeMode.dark,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             ProfileSectionLabel(label: text.profileSettingsSupportSection),
             ProfileGlassCard(
               padding: EdgeInsets.zero,
@@ -187,16 +243,12 @@ class ProfileSettingsPage extends ConsumerWidget {
                     title: text.profileSettingsSupportTitle,
                     subtitle: text.profileSettingsSupportSubtitle,
                     showDivider: false,
-                    onTap: () => context.push(
-                      ProfileSettingsDetailPage.location(
-                        ProfileSettingsDetailKind.support,
-                      ),
-                    ),
+                    onTap: () => context.push(SupportChatPage.routePath),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             ProfileSectionLabel(label: text.profileSettingsAboutSection),
             ProfileGlassCard(
               padding: EdgeInsets.zero,
@@ -240,7 +292,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             ProfileSectionLabel(label: text.profileSettingsDangerSection),
             ProfileGlassCard(
               padding: EdgeInsets.zero,
@@ -264,124 +316,156 @@ class ProfileSettingsPage extends ConsumerWidget {
     );
   }
 
-  String _themeModeLabel(BuildContext context, ThemeMode mode) {
-    final text = AppLocalizations.of(context);
+  static bool _matchesLocale(Locale? currentLocale, Locale candidate) {
+    final effectiveLocale = currentLocale ?? candidate;
 
-    return switch (mode) {
-      ThemeMode.system => text.profileSettingsThemeSystem,
-      ThemeMode.light => text.profileSettingsThemeLight,
-      ThemeMode.dark => text.profileSettingsThemeDark,
-    };
+    return effectiveLocale.languageCode == candidate.languageCode &&
+        (effectiveLocale.countryCode ?? '') == (candidate.countryCode ?? '');
   }
+}
 
-  String _languageLabel(BuildContext context, Locale? locale) {
-    final text = AppLocalizations.of(context);
-    final effectiveLocale = locale ?? Localizations.localeOf(context);
+class _SettingsChoiceGroup extends StatelessWidget {
+  const _SettingsChoiceGroup({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
 
-    if (effectiveLocale.languageCode == 'ru') {
-      return text.profileSettingsLanguageRussian;
-    }
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
 
-    if (effectiveLocale.languageCode == 'en' &&
-        effectiveLocale.countryCode == 'US') {
-      return text.profileSettingsLanguageEnglishUs;
-    }
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
 
-    return text.profileSettingsLanguageEnglish;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colors.accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: colors.accent, size: 19),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 12.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(spacing: 10, runSpacing: 10, children: children),
+      ],
+    );
   }
+}
 
-  Future<void> _showThemeModePicker(
-    BuildContext context,
-    ThemeMode currentMode,
-    AppPreferencesController controller,
-  ) async {
-    final text = AppLocalizations.of(context);
-    final selectedMode = await showModalBottomSheet<ThemeMode>(
-      context: context,
-      builder: (context) {
-        return SafeArea(
+class _SettingsChoiceButton extends StatelessWidget {
+  const _SettingsChoiceButton({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.caption,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? caption;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          width: 104,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colors.accent.withValues(alpha: 0.16)
+                : colors.surfaceStrong.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected
+                  ? colors.accent.withValues(alpha: 0.55)
+                  : colors.border.withValues(alpha: 0.75),
+            ),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                title: Text(text.profileSettingsThemeSystem),
-                trailing: currentMode == ThemeMode.system
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () => Navigator.of(context).pop(ThemeMode.system),
+              Icon(
+                icon,
+                color: isSelected ? colors.accent : colors.textMuted,
+                size: 20,
               ),
-              ListTile(
-                title: Text(text.profileSettingsThemeLight),
-                trailing: currentMode == ThemeMode.light
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () => Navigator.of(context).pop(ThemeMode.light),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 12.8,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              ListTile(
-                title: Text(text.profileSettingsThemeDark),
-                trailing: currentMode == ThemeMode.dark
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () => Navigator.of(context).pop(ThemeMode.dark),
-              ),
+              if (caption != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  caption!,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 11.4,
+                    height: 1.25,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
-
-    if (selectedMode != null) {
-      await controller.updateThemeMode(selectedMode);
-    }
-  }
-
-  Future<void> _showLocalePicker(
-    BuildContext context,
-    Locale? currentLocale,
-    AppPreferencesController controller,
-  ) async {
-    final text = AppLocalizations.of(context);
-    final selectedLocale = await showModalBottomSheet<Locale>(
-      context: context,
-      builder: (context) {
-        final current = currentLocale ?? Localizations.localeOf(context);
-
-        Widget buildLocaleTile(Locale locale, String label) {
-          final isSelected =
-              locale.languageCode == current.languageCode &&
-              (locale.countryCode ?? '') == (current.countryCode ?? '');
-
-          return ListTile(
-            title: Text(label),
-            trailing: isSelected ? const Icon(Icons.check_rounded) : null,
-            onTap: () => Navigator.of(context).pop(locale),
-          );
-        }
-
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              buildLocaleTile(
-                const Locale('ru'),
-                text.profileSettingsLanguageRussian,
-              ),
-              buildLocaleTile(
-                const Locale('en'),
-                text.profileSettingsLanguageEnglish,
-              ),
-              buildLocaleTile(
-                const Locale('en', 'US'),
-                text.profileSettingsLanguageEnglishUs,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (selectedLocale != null) {
-      await controller.updateLocale(selectedLocale);
-    }
   }
 }

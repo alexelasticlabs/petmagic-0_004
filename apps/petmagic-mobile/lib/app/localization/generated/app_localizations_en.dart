@@ -428,6 +428,55 @@ class AppLocalizationsEn extends AppLocalizations {
       'The next slice can attach a complete policy document or hosted legal page to this route.';
 
   @override
+  String get profileLegalAcceptanceCurrent =>
+      'Current legal documents are accepted for this account.';
+
+  @override
+  String get profileLegalAcceptanceRequired =>
+      'This account needs to accept the current legal document versions.';
+
+  @override
+  String get profileLegalVersionLabel => 'Current version';
+
+  @override
+  String get profileLegalPublishedLabel => 'Published';
+
+  @override
+  String get profileLegalAcceptedVersionLabel => 'Accepted version';
+
+  @override
+  String get profileLegalAcceptedAtLabel => 'Accepted at';
+
+  @override
+  String get profileLegalLoading =>
+      'Loading the current legal document from the backend...';
+
+  @override
+  String get profileLegalUnavailable =>
+      'The current legal document could not be loaded right now.';
+
+  @override
+  String get profileLegalAcceptAction => 'Accept current legal documents';
+
+  @override
+  String get profileLegalAcceptanceGuestHint =>
+      'You will accept the current Terms of Use and Privacy Policy during sign up.';
+
+  @override
+  String get profileLegalDocumentSection => 'Document';
+
+  @override
+  String get profileLegalCompactHint =>
+      'The summary stays visible, and each section expands only when you need more detail.';
+
+  @override
+  String get profileLegalCurrentAcceptedHint =>
+      'No additional confirmation is required for this account right now.';
+
+  @override
+  String get profileLegalCompactSectionLabel => 'Tap to expand';
+
+  @override
   String get profileDetailsDeleteBody =>
       'Account deletion is intentionally protected and not executed from this screen yet.';
 
@@ -438,6 +487,39 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get profileDetailsDeleteNext =>
       'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.';
+
+  @override
+  String get supportChatTitle => 'Support chat';
+
+  @override
+  String get supportChatSubtitle =>
+      'Message the PetMagic team directly from your profile.';
+
+  @override
+  String get supportChatInputHint =>
+      'Describe the issue, question or request...';
+
+  @override
+  String get supportChatSendAction => 'Send';
+
+  @override
+  String get supportChatEmptyTitle => 'Start the conversation';
+
+  @override
+  String get supportChatEmptyMessage =>
+      'Your support chat is ready. Send the first message and the team will respond here.';
+
+  @override
+  String get supportChatStatusOpen => 'Open';
+
+  @override
+  String get supportChatStatusInProgress => 'In progress';
+
+  @override
+  String get supportChatStatusResolved => 'Resolved';
+
+  @override
+  String get supportChatStatusClosed => 'Closed';
 
   @override
   String get profileSettingsThemeSystem => 'System';
@@ -684,6 +766,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get authAcceptTermsRequired =>
       'You need to accept the Terms of Use and Privacy Policy to create an account.';
+
+  @override
+  String get authReviewTermsAction => 'Review Terms';
+
+  @override
+  String get authReviewPrivacyAction => 'Review Privacy';
+
+  @override
+  String get authLegalLoading =>
+      'Loading the current Terms and Privacy documents...';
+
+  @override
+  String get authLegalReady =>
+      'Current legal documents are ready to review and accept.';
+
+  @override
+  String get authLegalUnavailable =>
+      'Current legal documents are temporarily unavailable. Try again in a moment.';
 
   @override
   String get authGoogleShortLabel => 'Google';
@@ -1207,6 +1307,55 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
       'The next slice can attach a complete policy document or hosted legal page to this route.';
 
   @override
+  String get profileLegalAcceptanceCurrent =>
+      'Current legal documents are accepted for this account.';
+
+  @override
+  String get profileLegalAcceptanceRequired =>
+      'This account needs to accept the current legal document versions.';
+
+  @override
+  String get profileLegalVersionLabel => 'Current version';
+
+  @override
+  String get profileLegalPublishedLabel => 'Published';
+
+  @override
+  String get profileLegalAcceptedVersionLabel => 'Accepted version';
+
+  @override
+  String get profileLegalAcceptedAtLabel => 'Accepted at';
+
+  @override
+  String get profileLegalLoading =>
+      'Loading the current legal document from the backend...';
+
+  @override
+  String get profileLegalUnavailable =>
+      'The current legal document could not be loaded right now.';
+
+  @override
+  String get profileLegalAcceptAction => 'Accept current legal documents';
+
+  @override
+  String get profileLegalAcceptanceGuestHint =>
+      'You will accept the current Terms of Use and Privacy Policy during sign up.';
+
+  @override
+  String get profileLegalDocumentSection => 'Document';
+
+  @override
+  String get profileLegalCompactHint =>
+      'The summary stays visible, and each section expands only when you need more detail.';
+
+  @override
+  String get profileLegalCurrentAcceptedHint =>
+      'No additional confirmation is required for this account right now.';
+
+  @override
+  String get profileLegalCompactSectionLabel => 'Tap to expand';
+
+  @override
   String get profileDetailsDeleteBody =>
       'Account deletion is intentionally protected and not executed from this screen yet.';
 
@@ -1217,6 +1366,39 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   @override
   String get profileDetailsDeleteNext =>
       'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.';
+
+  @override
+  String get supportChatTitle => 'Support chat';
+
+  @override
+  String get supportChatSubtitle =>
+      'Message the PetMagic team directly from your profile.';
+
+  @override
+  String get supportChatInputHint =>
+      'Describe the issue, question or request...';
+
+  @override
+  String get supportChatSendAction => 'Send';
+
+  @override
+  String get supportChatEmptyTitle => 'Start the conversation';
+
+  @override
+  String get supportChatEmptyMessage =>
+      'Your support chat is ready. Send the first message and the team will respond here.';
+
+  @override
+  String get supportChatStatusOpen => 'Open';
+
+  @override
+  String get supportChatStatusInProgress => 'In progress';
+
+  @override
+  String get supportChatStatusResolved => 'Resolved';
+
+  @override
+  String get supportChatStatusClosed => 'Closed';
 
   @override
   String get profileSettingsThemeSystem => 'System';
@@ -1465,6 +1647,24 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
       'You need to accept the Terms of Use and Privacy Policy to create an account.';
 
   @override
+  String get authReviewTermsAction => 'Review Terms';
+
+  @override
+  String get authReviewPrivacyAction => 'Review Privacy';
+
+  @override
+  String get authLegalLoading =>
+      'Loading the current Terms and Privacy documents...';
+
+  @override
+  String get authLegalReady =>
+      'Current legal documents are ready to review and accept.';
+
+  @override
+  String get authLegalUnavailable =>
+      'Current legal documents are temporarily unavailable. Try again in a moment.';
+
+  @override
   String get authGoogleShortLabel => 'Google';
 
   @override
@@ -1490,6 +1690,26 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get authPasswordMismatch => 'Passwords do not match.';
+
+  @override
+  String get authExternalCancelled => 'Sign-in was cancelled.';
+
+  @override
+  String get authExternalFailed => 'External sign-in failed. Please try again.';
+
+  @override
+  String get authExternalTimedOut => 'Sign-in took too long. Please try again.';
+
+  @override
+  String get authExternalLaunchFailed => 'Could not open the sign-in page.';
+
+  @override
+  String get authExternalCallbackFailed =>
+      'We could not finish sign-in in the app.';
+
+  @override
+  String get authExternalSessionExpired =>
+      'This sign-in session expired. Please try again.';
 
   @override
   String get authSecurePrivateTitle => 'Secure & Private';

@@ -428,6 +428,56 @@ class AppLocalizationsRu extends AppLocalizations {
       'На следующем этапе к этому маршруту можно привязать полный текст политики или hosted legal page.';
 
   @override
+  String get profileLegalAcceptanceCurrent =>
+      'Для этого аккаунта зафиксировано принятие актуальных юридических документов.';
+
+  @override
+  String get profileLegalAcceptanceRequired =>
+      'Этому аккаунту нужно принять актуальные версии юридических документов.';
+
+  @override
+  String get profileLegalVersionLabel => 'Текущая версия';
+
+  @override
+  String get profileLegalPublishedLabel => 'Опубликовано';
+
+  @override
+  String get profileLegalAcceptedVersionLabel => 'Принятая версия';
+
+  @override
+  String get profileLegalAcceptedAtLabel => 'Дата принятия';
+
+  @override
+  String get profileLegalLoading =>
+      'Загружаем актуальный юридический документ с backend...';
+
+  @override
+  String get profileLegalUnavailable =>
+      'Сейчас не удалось загрузить актуальный юридический документ.';
+
+  @override
+  String get profileLegalAcceptAction =>
+      'Принять актуальные юридические документы';
+
+  @override
+  String get profileLegalAcceptanceGuestHint =>
+      'Во время регистрации вы примете актуальные версии Пользовательского соглашения и Политики конфиденциальности.';
+
+  @override
+  String get profileLegalDocumentSection => 'Документ';
+
+  @override
+  String get profileLegalCompactHint =>
+      'Сверху остается краткое резюме, а детали раскрываются только по нажатию.';
+
+  @override
+  String get profileLegalCurrentAcceptedHint =>
+      'Для этого аккаунта сейчас не требуется дополнительное подтверждение.';
+
+  @override
+  String get profileLegalCompactSectionLabel => 'Нажмите, чтобы раскрыть';
+
+  @override
   String get profileDetailsDeleteBody =>
       'Удаление аккаунта намеренно защищено и пока не выполняется с этого экрана.';
 
@@ -438,6 +488,38 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get profileDetailsDeleteNext =>
       'Когда backend-flow удаления будет реализован, этот экран сможет стать шагом подтверждения и верификации вместо заглушки.';
+
+  @override
+  String get supportChatTitle => 'Чат поддержки';
+
+  @override
+  String get supportChatSubtitle =>
+      'Пишите команде PetMagic напрямую из своего профиля.';
+
+  @override
+  String get supportChatInputHint => 'Опишите проблему, вопрос или запрос...';
+
+  @override
+  String get supportChatSendAction => 'Отправить';
+
+  @override
+  String get supportChatEmptyTitle => 'Начните диалог';
+
+  @override
+  String get supportChatEmptyMessage =>
+      'Чат поддержки уже готов. Отправьте первое сообщение, и команда ответит здесь.';
+
+  @override
+  String get supportChatStatusOpen => 'Открыт';
+
+  @override
+  String get supportChatStatusInProgress => 'В работе';
+
+  @override
+  String get supportChatStatusResolved => 'Решен';
+
+  @override
+  String get supportChatStatusClosed => 'Закрыт';
 
   @override
   String get profileSettingsThemeSystem => 'Системная';
@@ -684,6 +766,24 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get authAcceptTermsRequired =>
       'Чтобы создать аккаунт, нужно принять Условия использования и Политику конфиденциальности.';
+
+  @override
+  String get authReviewTermsAction => 'Открыть соглашение';
+
+  @override
+  String get authReviewPrivacyAction => 'Открыть политику';
+
+  @override
+  String get authLegalLoading =>
+      'Загружаем актуальные документы соглашения и приватности...';
+
+  @override
+  String get authLegalReady =>
+      'Актуальные юридические документы готовы к просмотру и принятию.';
+
+  @override
+  String get authLegalUnavailable =>
+      'Актуальные юридические документы временно недоступны. Попробуйте еще раз чуть позже.';
 
   @override
   String get authGoogleShortLabel => 'Google';

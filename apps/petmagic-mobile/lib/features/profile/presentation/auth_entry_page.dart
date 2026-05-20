@@ -5,8 +5,10 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
@@ -65,6 +67,10 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   void initState() {
     super.initState();
     Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+
       ref
           .read(profileControllerProvider.notifier)
           .initialize(initialEmail: widget.initialEmail?.trim() ?? '');
@@ -88,6 +94,10 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final legalDocumentsAsync = ref.watch(
+      currentLegalDocumentsProvider(locale),
+    );
 
     _syncController(_displayNameController, state.displayName);
     _syncController(_emailController, state.email);
@@ -264,6 +274,34 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                                 });
                               },
                             ),
+                            const SizedBox(height: 8),
+                            _LegalDocumentLinks(
+                              reviewTermsLabel: text.authReviewTermsAction,
+                              reviewPrivacyLabel: text.authReviewPrivacyAction,
+                              onOpenTerms: () => context.push(
+                                ProfileSettingsDetailPage.location(
+                                  ProfileSettingsDetailKind.terms,
+                                ),
+                              ),
+                              onOpenPrivacy: () => context.push(
+                                ProfileSettingsDetailPage.location(
+                                  ProfileSettingsDetailKind.privacy,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            switch (legalDocumentsAsync) {
+                              AsyncLoading() => _InlineInfoCard(
+                                message: text.authLegalLoading,
+                              ),
+                              AsyncError() => _InlineInfoCard(
+                                message: text.authLegalUnavailable,
+                                isError: true,
+                              ),
+                              AsyncData() => _InlineInfoCard(
+                                message: text.authLegalReady,
+                              ),
+                            },
                             const SizedBox(height: 6),
                             _ConsentOption(
                               value: _receiveUpdates,
@@ -382,18 +420,40 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final controller = ref.read(profileControllerProvider.notifier);
     final router = GoRouter.of(context);
     if (_isSignUp) {
+      final locale = Localizations.localeOf(context).toLanguageTag();
+      final legalDocuments = switch (ref.read(
+        currentLegalDocumentsProvider(locale),
+      )) {
+        AsyncData(:final value) => value,
+        _ => null,
+      };
+
+      if (legalDocuments == null) {
+        setState(() {
+          _consentErrorMessage = 'auth.legal_documents_unavailable';
+        });
+        return;
+      }
+
       if (!_acceptedTerms) {
         setState(() {
           _consentErrorMessage = 'auth.accept_terms_required';
         });
         return;
       }
+
       await controller.register(
         termsOfUseAccepted: _acceptedTerms,
+        privacyPolicyAccepted: _acceptedTerms,
+        legalDocuments: legalDocuments,
         marketingEmailsEnabled: _receiveUpdates,
       );
     } else {
       await controller.login();
+    }
+
+    if (!mounted) {
+      return;
     }
 
     final nextState = ref.read(profileControllerProvider);
@@ -407,6 +467,10 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final controller = ref.read(profileControllerProvider.notifier);
     final router = GoRouter.of(context);
     await controller.authenticateWithProvider(provider);
+
+    if (!mounted) {
+      return;
+    }
 
     final nextState = ref.read(profileControllerProvider);
     if (!nextState.isAuthenticated || !context.mounted) {
@@ -453,6 +517,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         return text.authPasswordTooShort;
       case 'auth.accept_terms_required':
         return text.authAcceptTermsRequired;
+      case 'auth.legal_documents_unavailable':
+        return text.authLegalUnavailable;
       case 'auth.external_cancelled':
         return text.authExternalCancelled;
       case 'auth.external_callback_failed':
@@ -470,6 +536,91 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       default:
         return raw;
     }
+  }
+}
+
+class _LegalDocumentLinks extends StatelessWidget {
+  const _LegalDocumentLinks({
+    required this.reviewTermsLabel,
+    required this.reviewPrivacyLabel,
+    required this.onOpenTerms,
+    required this.onOpenPrivacy,
+  });
+
+  final String reviewTermsLabel;
+  final String reviewPrivacyLabel;
+  final VoidCallback onOpenTerms;
+  final VoidCallback onOpenPrivacy;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        OutlinedButton(
+          onPressed: onOpenTerms,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: colors.textStrong,
+            side: BorderSide(color: colors.border),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: Text(reviewTermsLabel),
+        ),
+        OutlinedButton(
+          onPressed: onOpenPrivacy,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: colors.textStrong,
+            side: BorderSide(color: colors.border),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: Text(reviewPrivacyLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _InlineInfoCard extends StatelessWidget {
+  const _InlineInfoCard({required this.message, this.isError = false});
+
+  final String message;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isError
+            ? colors.danger.withValues(alpha: 0.12)
+            : colors.surfaceGlass,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isError
+              ? colors.danger.withValues(alpha: 0.35)
+              : colors.border,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: isError ? colors.danger : colors.textSoft,
+          fontSize: 12.6,
+          fontWeight: FontWeight.w600,
+          height: 1.35,
+        ),
+      ),
+    );
   }
 }
 

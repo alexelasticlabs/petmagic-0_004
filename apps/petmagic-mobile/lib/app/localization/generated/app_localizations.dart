@@ -859,6 +859,90 @@ abstract class AppLocalizations {
   /// **'The next slice can attach a complete policy document or hosted legal page to this route.'**
   String get profileDetailsPrivacyNext;
 
+  /// No description provided for @profileLegalAcceptanceCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current legal documents are accepted for this account.'**
+  String get profileLegalAcceptanceCurrent;
+
+  /// No description provided for @profileLegalAcceptanceRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This account needs to accept the current legal document versions.'**
+  String get profileLegalAcceptanceRequired;
+
+  /// No description provided for @profileLegalVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current version'**
+  String get profileLegalVersionLabel;
+
+  /// No description provided for @profileLegalPublishedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get profileLegalPublishedLabel;
+
+  /// No description provided for @profileLegalAcceptedVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted version'**
+  String get profileLegalAcceptedVersionLabel;
+
+  /// No description provided for @profileLegalAcceptedAtLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted at'**
+  String get profileLegalAcceptedAtLabel;
+
+  /// No description provided for @profileLegalLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the current legal document from the backend...'**
+  String get profileLegalLoading;
+
+  /// No description provided for @profileLegalUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The current legal document could not be loaded right now.'**
+  String get profileLegalUnavailable;
+
+  /// No description provided for @profileLegalAcceptAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept current legal documents'**
+  String get profileLegalAcceptAction;
+
+  /// No description provided for @profileLegalAcceptanceGuestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You will accept the current Terms of Use and Privacy Policy during sign up.'**
+  String get profileLegalAcceptanceGuestHint;
+
+  /// No description provided for @profileLegalDocumentSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Document'**
+  String get profileLegalDocumentSection;
+
+  /// No description provided for @profileLegalCompactHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The summary stays visible, and each section expands only when you need more detail.'**
+  String get profileLegalCompactHint;
+
+  /// No description provided for @profileLegalCurrentAcceptedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No additional confirmation is required for this account right now.'**
+  String get profileLegalCurrentAcceptedHint;
+
+  /// No description provided for @profileLegalCompactSectionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to expand'**
+  String get profileLegalCompactSectionLabel;
+
   /// No description provided for @profileDetailsDeleteBody.
   ///
   /// In en, this message translates to:
@@ -876,6 +960,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.'**
   String get profileDetailsDeleteNext;
+
+  /// No description provided for @supportChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Support chat'**
+  String get supportChatTitle;
+
+  /// No description provided for @supportChatSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the PetMagic team directly from your profile.'**
+  String get supportChatSubtitle;
+
+  /// No description provided for @supportChatInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the issue, question or request...'**
+  String get supportChatInputHint;
+
+  /// No description provided for @supportChatSendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get supportChatSendAction;
+
+  /// No description provided for @supportChatEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start the conversation'**
+  String get supportChatEmptyTitle;
+
+  /// No description provided for @supportChatEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your support chat is ready. Send the first message and the team will respond here.'**
+  String get supportChatEmptyMessage;
+
+  /// No description provided for @supportChatStatusOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get supportChatStatusOpen;
+
+  /// No description provided for @supportChatStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get supportChatStatusInProgress;
+
+  /// No description provided for @supportChatStatusResolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get supportChatStatusResolved;
+
+  /// No description provided for @supportChatStatusClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get supportChatStatusClosed;
 
   /// No description provided for @profileSettingsThemeSystem.
   ///
@@ -1326,6 +1470,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You need to accept the Terms of Use and Privacy Policy to create an account.'**
   String get authAcceptTermsRequired;
+
+  /// No description provided for @authReviewTermsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Review Terms'**
+  String get authReviewTermsAction;
+
+  /// No description provided for @authReviewPrivacyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Review Privacy'**
+  String get authReviewPrivacyAction;
+
+  /// No description provided for @authLegalLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the current Terms and Privacy documents...'**
+  String get authLegalLoading;
+
+  /// No description provided for @authLegalReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Current legal documents are ready to review and accept.'**
+  String get authLegalReady;
+
+  /// No description provided for @authLegalUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Current legal documents are temporarily unavailable. Try again in a moment.'**
+  String get authLegalUnavailable;
 
   /// No description provided for @authGoogleShortLabel.
   ///

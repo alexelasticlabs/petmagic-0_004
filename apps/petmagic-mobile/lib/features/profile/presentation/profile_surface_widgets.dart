@@ -79,13 +79,13 @@ class ProfileGlassCard extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: colors.border),
             boxShadow: [
               BoxShadow(
@@ -96,7 +96,7 @@ class ProfileGlassCard extends StatelessWidget {
             ],
           ),
           child: Padding(
-            padding: padding ?? const EdgeInsets.all(18),
+            padding: padding ?? const EdgeInsets.all(16),
             child: child,
           ),
         ),
@@ -222,19 +222,19 @@ class ProfileStatusPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (leading != null) ...[
               Icon(leading, size: 14, color: fg),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
             ],
             Text(
               label,
               style: TextStyle(
                 color: fg,
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -267,23 +267,23 @@ class ProfileStatTile extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: tone, size: 23),
-          const SizedBox(height: 10),
+          Icon(icon, color: tone, size: 20),
+          const SizedBox(height: 8),
           Text(
             value,
             style: TextStyle(
               color: colors.textStrong,
-              fontSize: 22,
+              fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: colors.textSoft,
-              fontSize: 12,
+              fontSize: 11,
               height: 1.3,
               fontWeight: FontWeight.w600,
             ),
@@ -304,12 +304,12 @@ class ProfileSectionLabel extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 2, 6, 10),
+      padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
           color: colors.textMuted,
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
         ),
@@ -350,19 +350,19 @@ class ProfileSettingsRow extends StatelessWidget {
         iconColor ?? (isDestructive ? colors.danger : colors.accent);
 
     final content = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: iconTone.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: iconTone, size: 22),
+            child: Icon(icon, color: iconTone, size: 19),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,18 +371,18 @@ class ProfileSettingsRow extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: tone,
-                    fontSize: 18,
+                    fontSize: 15.5,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
                   style: TextStyle(
                     color: isDestructive
                         ? colors.danger.withValues(alpha: 0.82)
                         : colors.textSoft,
-                    fontSize: 13.5,
+                    fontSize: 12.5,
                     height: 1.35,
                     fontWeight: FontWeight.w500,
                   ),
@@ -390,9 +390,13 @@ class ProfileSettingsRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           if (trailing != null)
-            Material(color: Colors.transparent, child: trailing!)
+            Align(
+              alignment: Alignment.centerRight,
+              widthFactor: 1,
+              child: trailing!,
+            )
           else if (trailingText != null)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -400,7 +404,7 @@ class ProfileSettingsRow extends StatelessWidget {
                 trailingText!,
                 style: TextStyle(
                   color: isDestructive ? colors.danger : colors.accent,
-                  fontSize: 16,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -409,7 +413,7 @@ class ProfileSettingsRow extends StatelessWidget {
             Icon(
               Icons.chevron_right_rounded,
               color: isDestructive ? colors.danger : colors.textMuted,
-              size: 28,
+              size: 24,
             ),
         ],
       ),
