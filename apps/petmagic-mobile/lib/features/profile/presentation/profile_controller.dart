@@ -298,6 +298,43 @@ class ProfileController extends Notifier<ProfileState> {
     }
   }
 
+  Future<void> linkExternalAccount(ExternalAuthProvider provider) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      await ref.read(externalAuthRepositoryProvider).link(provider);
+      ref.invalidate(linkedAccountsProvider);
+      state = state.copyWith(isSaving: false);
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    } catch (_) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'auth.external_invalid',
+      );
+    }
+  }
+
+  Future<void> unlinkExternalAccount(ExternalAuthProvider provider) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      await _repository.unlinkLinkedAccount(provider.apiValue);
+      ref.invalidate(linkedAccountsProvider);
+      state = state.copyWith(isSaving: false);
+    } on AppException catch (error) {
+      state = state.copyWith(isSaving: false, errorMessage: error.message);
+    }
+  }
+
   Future<void> logout() async {
     state = state.copyWith(
       isSaving: true,

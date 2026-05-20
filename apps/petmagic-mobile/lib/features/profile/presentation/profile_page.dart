@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -38,6 +41,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final controller = ref.read(profileControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final bottomNavInset = petMagicBottomNavInset(context);
 
     if (!state.isLoading && !state.isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -52,6 +56,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     final profile = state.profile;
+    final communicationsStatus = profile?.marketingEmailsEnabled == true
+        ? text.profileCommunicationsEnabled
+        : text.profileCommunicationsDisabled;
+    final privacyStatus = profile?.legalAcceptance.isCurrentAccepted == true
+        ? text.profileTermsAccepted
+        : text.profileTermsPending;
 
     return ProfileScreenBackground(
       child: SafeArea(
@@ -60,7 +70,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             : RefreshIndicator.adaptive(
                 onRefresh: controller.initialize,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 104),
+                  padding: EdgeInsets.fromLTRB(18, 16, 18, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     Row(
@@ -136,37 +146,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         child: Column(
                           children: [
                             ProfileSettingsRow(
+                              icon: Icons.account_balance_wallet_outlined,
+                              title: 'Wallet',
+                              subtitle:
+                                  'Balance, PawSpark purchases and transaction history',
+                              iconColor: colors.accent,
+                              onTap: () => context.push(WalletPage.routePath),
+                            ),
+                            ProfileSettingsRow(
                               icon: Icons.workspace_premium_outlined,
                               title: text.profilePremiumTitle,
                               subtitle: text.profilePremiumSubtitle,
                               iconColor: colors.gold,
-                            ),
-                            ProfileSettingsRow(
-                              icon: Icons.mail_outline_rounded,
-                              title: text.profileCommunicationsTitle,
-                              subtitle: profile.marketingEmailsEnabled
-                                  ? text.profileCommunicationsEnabled
-                                  : text.profileCommunicationsDisabled,
-                              trailingText: profile.marketingEmailsEnabled
-                                  ? text.profilePreferenceEnabled
-                                  : text.profilePreferenceOff,
+                              onTap: () => context.push(PremiumPage.routePath),
                             ),
                             ProfileSettingsRow(
                               icon: Icons.privacy_tip_outlined,
-                              title: text.profilePrivacyTitle,
-                              subtitle: profile.termsOfUseAccepted
-                                  ? text.profileTermsAccepted
-                                  : text.profileTermsPending,
-                              trailingText: profile.termsOfUseAccepted
-                                  ? text.profilePreferenceEnabled
-                                  : text.profilePreferenceOff,
+                              title:
+                                  '${text.profileCommunicationsTitle} / ${text.profilePrivacyTitle}',
+                              subtitle: '$communicationsStatus $privacyStatus',
                             ),
                             ProfileSettingsRow(
                               icon: Icons.support_agent_rounded,
                               title: text.profileSupportTitle,
                               subtitle: text.profileSupportSubtitle,
                               iconColor: colors.blue,
-                              onTap: () => context.push(SupportChatPage.routePath),
+                              onTap: () =>
+                                  context.push(SupportChatPage.routePath),
                             ),
                             ProfileSettingsRow(
                               icon: Icons.settings_outlined,
@@ -331,62 +337,6 @@ class _ProfileHeroCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: colors.surfaceStrong.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: colors.border.withValues(alpha: 0.75)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: colors.accent.withValues(alpha: 0.14),
-                  ),
-                  child: Icon(
-                    Icons.tips_and_updates_outlined,
-                    color: colors.accent,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        text.profileAccountCenterTitle,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        text.profileAccountCenterSubtitle,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colors.textMuted,
-                  size: 24,
-                ),
-              ],
-            ),
           ),
         ],
       ),

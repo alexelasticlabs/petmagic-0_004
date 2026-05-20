@@ -26,6 +26,10 @@ final currentLegalDocumentsProvider =
           .fetchCurrentLegalDocuments(locale: locale);
     });
 
+final linkedAccountsProvider = FutureProvider<List<MobileLinkedAccount>>((ref) {
+  return ref.watch(profileRepositoryProvider).fetchLinkedAccounts();
+});
+
 class ProfileRepository {
   ProfileRepository({
     required Dio dio,
@@ -162,6 +166,24 @@ class ProfileRepository {
     return profile;
   }
 
+  Future<List<MobileLinkedAccount>> fetchLinkedAccounts() async {
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.get<List<dynamic>>(
+        '/api/auth/me/linked-accounts',
+        options: Options(
+          headers: {
+            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+          },
+        ),
+      ),
+    );
+
+    return (response.data ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(MobileLinkedAccount.fromJson)
+        .toList(growable: false);
+  }
+
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
   }) async {
@@ -245,6 +267,24 @@ class ProfileRepository {
     final profile = MobileUserProfile.fromJson(response.data ?? const {});
     await _replaceStoredUser(profile);
     return profile;
+  }
+
+  Future<List<MobileLinkedAccount>> unlinkLinkedAccount(String provider) async {
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.delete<List<dynamic>>(
+        '/api/auth/me/linked-accounts/${Uri.encodeComponent(provider)}',
+        options: Options(
+          headers: {
+            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+          },
+        ),
+      ),
+    );
+
+    return (response.data ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(MobileLinkedAccount.fromJson)
+        .toList(growable: false);
   }
 
   Future<Response<T>> _authorizedRequest<T>(

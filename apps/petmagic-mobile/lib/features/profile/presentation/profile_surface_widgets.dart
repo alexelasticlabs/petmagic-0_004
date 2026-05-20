@@ -34,7 +34,7 @@ class ProfileScreenBackground extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      colors.accent.withValues(alpha: 0.22),
+                      colors.accent.withValues(alpha: 0.16),
                       colors.accent.withValues(alpha: 0),
                     ],
                   ),
@@ -47,13 +47,13 @@ class ProfileScreenBackground extends StatelessWidget {
             right: -70,
             child: IgnorePointer(
               child: Container(
-                width: 240,
-                height: 240,
+                width: 220,
+                height: 220,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      colors.blue.withValues(alpha: 0.16),
+                      colors.blue.withValues(alpha: 0.08),
                       colors.blue.withValues(alpha: 0),
                     ],
                   ),

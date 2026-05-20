@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_controller
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 class ProfileSettingsPage extends ConsumerWidget {
   const ProfileSettingsPage({super.key});
@@ -20,6 +21,7 @@ class ProfileSettingsPage extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
+    final bottomNavInset = petMagicBottomNavInset(context);
     final preferences = ref.watch(appPreferencesControllerProvider);
     final preferencesController = ref.read(
       appPreferencesControllerProvider.notifier,
@@ -28,7 +30,7 @@ class ProfileSettingsPage extends ConsumerWidget {
     return ProfileScreenBackground(
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 104),
+          padding: EdgeInsets.fromLTRB(18, 16, 18, bottomNavInset),
           children: [
             Row(
               children: [
@@ -77,7 +79,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                     title: text.profileSettingsAccountInfoTitle,
                     subtitle: state.profile == null
                         ? text.profileSettingsUnavailableSubtitle
-                        : '${state.profile!.displayName?.trim().isNotEmpty == true ? state.profile!.displayName : state.profile!.email} • ${state.profile!.email}',
+                        : state.profile!.email,
                     onTap: () => context.push(ProfileAccountInfoPage.routePath),
                   ),
                   ProfileSettingsRow(
@@ -385,7 +387,17 @@ class _SettingsChoiceGroup extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
-        Wrap(spacing: 10, runSpacing: 10, children: children),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0) const SizedBox(width: 8),
+                children[index],
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -416,8 +428,7 @@ class _SettingsChoiceButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
-          width: 104,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: isSelected
                 ? colors.accent.withValues(alpha: 0.16)
@@ -429,39 +440,23 @@ class _SettingsChoiceButton extends StatelessWidget {
                   : colors.border.withValues(alpha: 0.75),
             ),
           ),
-          child: Column(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
                 color: isSelected ? colors.accent : colors.textMuted,
-                size: 20,
+                size: 18,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(width: 8),
               Text(
                 label,
-                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: colors.textStrong,
-                  fontSize: 12.8,
+                  fontSize: 12.4,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              if (caption != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  caption!,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 11.4,
-                    height: 1.25,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
             ],
           ),
         ),

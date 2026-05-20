@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
@@ -34,6 +35,8 @@ enum ExternalAuthProvider {
 
 abstract class ExternalAuthRepository {
   Future<AuthSession> authenticate(ExternalAuthProvider provider);
+
+  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider);
 }
 
 class MobileExternalAuthRepository implements ExternalAuthRepository {
@@ -79,6 +82,11 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
 
     return _authenticateWithBrowserFlow(provider);
+  }
+
+  @override
+  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) {
+    return _linkWithBrowserFlow(provider);
   }
 
   Future<AuthSession> _authenticateWithNativeGoogle() async {
@@ -207,6 +215,77 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
   }
 
+  Future<List<MobileLinkedAccount>> _linkWithBrowserFlow(
+    ExternalAuthProvider provider,
+  ) async {
+    final session = await _readAuthorizedSession();
+    final prepareResponse = await _dio.post<Map<String, dynamic>>(
+      '/api/auth/me/linked-accounts/${provider.apiValue}/prepare',
+      options: Options(
+        headers: {
+          HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+        },
+      ),
+    );
+    final ticket = prepareResponse.data?['ticket'] as String? ??
+        prepareResponse.data?['Ticket'] as String?;
+    if (ticket == null || ticket.isEmpty) {
+      throw const AppException(_invalidSessionCode);
+    }
+
+    final completer = Completer<Uri>();
+    late final StreamSubscription<Uri> subscription;
+
+    subscription = _appLinks.uriLinkStream.listen(
+      (uri) {
+        if (_isExpectedCallback(uri) && !completer.isCompleted) {
+          completer.complete(uri);
+        }
+      },
+      onError: (Object _) {
+        if (!completer.isCompleted) {
+          completer.completeError(const AppException(_callbackFailedCode));
+        }
+      },
+    );
+
+    try {
+      final authUri = Uri.parse(_dio.options.baseUrl).replace(
+        path: '/api/auth/external/${provider.apiValue}',
+        queryParameters: {
+          'redirectUri': _callbackUri.toString(),
+          'mode': 'link',
+          'linkTicket': ticket,
+        },
+      );
+
+      final launched = await _launchAuthUri(authUri);
+      if (!launched) {
+        throw const AppException(_launchFailedCode);
+      }
+
+      final callbackUri = await completer.future.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () => throw const AppException(_timedOutCode),
+      );
+
+      final errorCode = callbackUri.queryParameters['error'];
+      if (errorCode != null && errorCode.isNotEmpty) {
+        throw AppException(errorCode);
+      }
+
+      if (callbackUri.queryParameters['linked'] != '1') {
+        throw const AppException(_genericFailedCode);
+      }
+
+      return _fetchLinkedAccounts();
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: _genericFailedCode);
+    } finally {
+      await subscription.cancel();
+    }
+  }
+
   bool _isExpectedCallback(Uri uri) {
     return uri.scheme == _callbackUri.scheme &&
         uri.host == _callbackUri.host &&
@@ -223,6 +302,52 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
 
     return launchUrl(authUri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<AuthSession> _readAuthorizedSession() async {
+    var session = await _sessionStorage.read();
+    if (session == null) {
+      throw const AppException('Sign in is required.', statusCode: 401);
+    }
+
+    if (session.expiresAtUtc.isAfter(DateTime.now().toUtc())) {
+      return session;
+    }
+
+    return _refreshSession(session.refreshToken);
+  }
+
+  Future<AuthSession> _refreshSession(String refreshToken) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+
+      final refreshed = AuthSession.fromJson(response.data ?? const {});
+      await _sessionStorage.save(refreshed);
+      return refreshed;
+    } on DioException catch (error) {
+      await _sessionStorage.clear();
+      throw _mapDioException(error, fallbackMessage: 'Session expired.');
+    }
+  }
+
+  Future<List<MobileLinkedAccount>> _fetchLinkedAccounts() async {
+    final session = await _readAuthorizedSession();
+    final response = await _dio.get<List<dynamic>>(
+      '/api/auth/me/linked-accounts',
+      options: Options(
+        headers: {
+          HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+        },
+      ),
+    );
+
+    return (response.data ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(MobileLinkedAccount.fromJson)
+        .toList(growable: false);
   }
 
   AppException _mapDioException(

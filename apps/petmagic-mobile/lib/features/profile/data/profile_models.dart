@@ -147,6 +147,26 @@ class MobileLegalAcceptanceStatus {
   }
 }
 
+class MobileLinkedAccount {
+  const MobileLinkedAccount({
+    required this.provider,
+    required this.displayName,
+    required this.canDisconnect,
+  });
+
+  final String provider;
+  final String displayName;
+  final bool canDisconnect;
+
+  factory MobileLinkedAccount.fromJson(Map<String, dynamic> json) {
+    return MobileLinkedAccount(
+      provider: json['provider'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      canDisconnect: json['canDisconnect'] as bool? ?? false,
+    );
+  }
+}
+
 class MobileUserProfile {
   const MobileUserProfile({
     required this.userId,
@@ -227,20 +247,22 @@ class AuthSession {
         'legalAcceptance': {
           'termsOfUseAccepted': user.legalAcceptance.termsOfUseAccepted,
           'termsOfUseAcceptedVersion':
-            user.legalAcceptance.termsOfUseAcceptedVersion,
-          'termsOfUseAcceptedAtUtc':
-            user.legalAcceptance.termsOfUseAcceptedAtUtc?.toIso8601String(),
+              user.legalAcceptance.termsOfUseAcceptedVersion,
+          'termsOfUseAcceptedAtUtc': user
+              .legalAcceptance
+              .termsOfUseAcceptedAtUtc
+              ?.toIso8601String(),
           'privacyPolicyAccepted': user.legalAcceptance.privacyPolicyAccepted,
           'privacyPolicyAcceptedVersion':
-            user.legalAcceptance.privacyPolicyAcceptedVersion,
+              user.legalAcceptance.privacyPolicyAcceptedVersion,
           'privacyPolicyAcceptedAtUtc': user
-            .legalAcceptance
-            .privacyPolicyAcceptedAtUtc
-            ?.toIso8601String(),
+              .legalAcceptance
+              .privacyPolicyAcceptedAtUtc
+              ?.toIso8601String(),
           'currentTermsOfUseVersion':
-            user.legalAcceptance.currentTermsOfUseVersion,
+              user.legalAcceptance.currentTermsOfUseVersion,
           'currentPrivacyPolicyVersion':
-            user.legalAcceptance.currentPrivacyPolicyVersion,
+              user.legalAcceptance.currentPrivacyPolicyVersion,
           'requiresAcceptance': user.legalAcceptance.requiresAcceptance,
         },
         'roles': user.roles,
