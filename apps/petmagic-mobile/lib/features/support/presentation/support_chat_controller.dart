@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
@@ -158,6 +159,56 @@ class SupportChatController extends Notifier<SupportChatState> {
     }
   }
 
+  Future<bool> sendImageAttachment(XFile file, {String? body}) async {
+    final conversation = state.conversation;
+    if (conversation == null || state.isSending) {
+      return false;
+    }
+
+    state = state.copyWith(isSending: true, clearError: true);
+
+    try {
+      final message = await _repository.sendImageAttachment(
+        conversationId: conversation.conversationId,
+        filePath: file.path,
+        fileName: file.name,
+        contentType: _resolveImageContentType(file),
+        body: body,
+      );
+
+      state = state.copyWith(
+        isSending: false,
+        conversation: conversation.copyWith(
+          assignedAdminId: conversation.assignedAdminId,
+          assignedAdminDisplayName: conversation.assignedAdminDisplayName,
+          status:
+              conversation.status == 'Resolved' ||
+                  conversation.status == 'Closed'
+              ? 'Open'
+              : conversation.status,
+          userUnreadCount: 0,
+          adminUnreadCount: conversation.adminUnreadCount + 1,
+          updatedAtUtc: message.createdAtUtc,
+          lastMessageAtUtc: message.createdAtUtc,
+          messages: [...conversation.messages, message],
+        ),
+        clearError: true,
+      );
+      _resumePendingRealtimeRefreshIfNeeded();
+      return true;
+    } on AppException catch (error) {
+      state = state.copyWith(isSending: false, errorMessage: error.message);
+      return false;
+    } on Object {
+      state = state.copyWith(
+        isSending: false,
+        errorMessage:
+            'Unable to send the attachment right now. Please try again in a moment.',
+      );
+      return false;
+    }
+  }
+
   void _handleRealtimeUpdate(SupportChatRealtimeUpdate event) {
     final activeConversationId = state.conversation?.conversationId;
     if (activeConversationId != null &&
@@ -254,5 +305,26 @@ class SupportChatController extends Notifier<SupportChatState> {
     } on AppException {
       // Keep realtime refresh resilient; the next event or manual refresh will try again.
     }
+  }
+
+  String _resolveImageContentType(XFile file) {
+    final lowerPath = file.path.toLowerCase();
+    if (lowerPath.endsWith('.png')) {
+      return 'image/png';
+    }
+
+    if (lowerPath.endsWith('.webp')) {
+      return 'image/webp';
+    }
+
+    if (lowerPath.endsWith('.heic') || lowerPath.endsWith('.heif')) {
+      return 'image/heic';
+    }
+
+    if (lowerPath.endsWith('.gif')) {
+      return 'image/gif';
+    }
+
+    return 'image/jpeg';
   }
 }

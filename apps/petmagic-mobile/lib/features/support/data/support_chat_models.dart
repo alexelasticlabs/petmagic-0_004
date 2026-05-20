@@ -8,6 +8,10 @@ class SupportChatMessage {
     required this.body,
     required this.isRead,
     required this.createdAtUtc,
+    this.attachmentUrl,
+    this.attachmentFileName,
+    this.attachmentContentType,
+    this.attachmentFileSizeBytes,
     this.readAtUtc,
   });
 
@@ -19,7 +23,15 @@ class SupportChatMessage {
   final String body;
   final bool isRead;
   final DateTime createdAtUtc;
+  final String? attachmentUrl;
+  final String? attachmentFileName;
+  final String? attachmentContentType;
+  final int? attachmentFileSizeBytes;
   final DateTime? readAtUtc;
+
+  bool get hasImageAttachment =>
+      attachmentUrl?.isNotEmpty == true &&
+      (attachmentContentType?.startsWith('image/') ?? false);
 
   SupportChatMessage copyWith({
     bool? isRead,
@@ -35,6 +47,10 @@ class SupportChatMessage {
       body: body,
       isRead: isRead ?? this.isRead,
       createdAtUtc: createdAtUtc,
+      attachmentUrl: attachmentUrl,
+      attachmentFileName: attachmentFileName,
+      attachmentContentType: attachmentContentType,
+      attachmentFileSizeBytes: attachmentFileSizeBytes,
       readAtUtc: clearReadAt ? null : (readAtUtc ?? this.readAtUtc),
     );
   }
@@ -48,6 +64,10 @@ class SupportChatMessage {
       isFromAdmin: json['isFromAdmin'] as bool? ?? false,
       body: json['body'] as String? ?? '',
       isRead: json['isRead'] as bool? ?? false,
+      attachmentUrl: json['attachmentUrl'] as String?,
+      attachmentFileName: json['attachmentFileName'] as String?,
+      attachmentContentType: json['attachmentContentType'] as String?,
+      attachmentFileSizeBytes: json['attachmentFileSizeBytes'] as int?,
       createdAtUtc:
           DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),

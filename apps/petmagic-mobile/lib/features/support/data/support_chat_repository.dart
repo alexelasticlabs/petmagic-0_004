@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
@@ -64,6 +65,34 @@ class SupportChatRepository {
         '/api/support/conversation/$conversationId/messages',
         data: {'body': body.trim()},
         options: _authorizedOptions(session),
+      ),
+    );
+
+    return SupportChatMessage.fromJson(response.data ?? const {});
+  }
+
+  Future<SupportChatMessage> sendImageAttachment({
+    required String conversationId,
+    required String filePath,
+    required String fileName,
+    required String contentType,
+    String? body,
+  }) async {
+    final trimmedBody = body?.trim() ?? '';
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/support/conversation/$conversationId/attachments',
+        data: FormData.fromMap({
+          if (trimmedBody.isNotEmpty) 'body': trimmedBody,
+          'file': MultipartFile.fromFileSync(
+            filePath,
+            filename: fileName,
+            contentType: MediaType.parse(contentType),
+          ),
+        }),
+        options: _authorizedOptions(
+          session,
+        ).copyWith(contentType: 'multipart/form-data'),
       ),
     );
 
