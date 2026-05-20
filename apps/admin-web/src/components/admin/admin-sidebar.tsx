@@ -3,6 +3,7 @@ import {
   CaretDownIcon,
   ChartIcon,
   DashboardIcon,
+  DollarIcon,
   ImageIcon,
   LogoutIcon,
   SupportIcon,
@@ -26,6 +27,7 @@ type AdminSidebarProps = {
 
 const iconMap = {
   dashboard: DashboardIcon,
+  economy: DollarIcon,
   support: SupportIcon,
   users: UsersIcon,
   templates: TemplatesIcon,

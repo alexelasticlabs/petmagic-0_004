@@ -2,6 +2,7 @@ import { type Locale, getDictionary } from "@/lib/i18n";
 
 export type AdminSectionKey =
   | "dashboard"
+  | "economy"
   | "support"
   | "users"
   | "templates"
@@ -55,6 +56,7 @@ export function getAdminNavItems(locale: Locale): AdminNavEntry[] {
 
   return [
     { type: "link", key: "dashboard", href: `/${locale}/dashboard`, label: text.navDashboard },
+    { type: "link", key: "economy", href: `/${locale}/economy`, label: text.navEconomy },
     { type: "link", key: "support", href: `/${locale}/support`, label: text.navSupport },
     { type: "link", key: "users", href: `/${locale}/users`, label: text.navUsers },
     {
@@ -88,6 +90,16 @@ export function getAdminPageMeta(locale: Locale, currentPath: string, userName: 
         locale === "ru"
           ? `Обзор ключевых метрик и активности, ${normalizedName}.`
           : `Overview of key metrics and activity, ${normalizedName}.`,
+    };
+  }
+
+  if (matchesAdminPath(currentPath, "/economy")) {
+    return {
+      title: locale === "ru" ? "Экономика" : "Economy",
+      description:
+        locale === "ru"
+          ? "Баланс, покупки, история движения валюты и управление пакетами пополнения."
+          : "Balance, purchases, currency movement history, and top-up pack management.",
     };
   }
 
