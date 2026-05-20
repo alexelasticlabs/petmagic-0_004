@@ -94,6 +94,7 @@ export type Dictionary = {
   activeLabel: string;
   statusLabel: string;
   navDashboard: string;
+  navSupport: string;
   navUsers: string;
   navTemplates: string;
   navImageTemplates: string;
@@ -219,6 +220,65 @@ export type Dictionary = {
   editorReviewReadyHint: string;
   editorReviewIncompleteHint: string;
   editorMediaRequirements: string;
+  supportTitle: string;
+  supportDescription: string;
+  supportInboxTitle: string;
+  supportInboxDescription: string;
+  supportConversationTitle: string;
+  supportConversationDescription: string;
+  supportEmpty: string;
+  supportLoadError: string;
+  supportRefresh: string;
+  supportStatusAll: string;
+  supportAssignmentAll: string;
+  supportAssignmentMine: string;
+  supportAssignmentUnassigned: string;
+  supportStatusOpen: string;
+  supportStatusInProgress: string;
+  supportStatusResolved: string;
+  supportStatusClosed: string;
+  supportBackToInbox: string;
+  supportOpenConversation: string;
+  supportAssignedTo: string;
+  supportUnassigned: string;
+  supportLastMessage: string;
+  supportNoMessages: string;
+  supportReplyPlaceholder: string;
+  supportReplyAction: string;
+  supportReplySending: string;
+  supportSaveStatusAction: string;
+  supportStatusSaved: string;
+  supportReplySent: string;
+  supportInternalNoteAction: string;
+  supportInternalNotePlaceholder: string;
+  supportInternalNoteSaved: string;
+  supportInternalNoteBadge: string;
+  supportAssignToMe: string;
+  supportUnassign: string;
+  supportAssignmentSaved: string;
+  supportQuickRepliesLabel: string;
+  supportInternalNoteTemplatesLabel: string;
+  supportTemplatesManagerTitle: string;
+  supportTemplatesManagerDescription: string;
+  supportTemplateNoTemplates: string;
+  supportTemplateTitleLabel: string;
+  supportTemplateBodyLabel: string;
+  supportTemplateKindLabel: string;
+  supportTemplateKindReply: string;
+  supportTemplateKindInternalNote: string;
+  supportTemplateEnabledLabel: string;
+  supportTemplateDisabledBadge: string;
+  supportTemplateSortOrderLabel: string;
+  supportTemplateEditAction: string;
+  supportTemplateDeleteAction: string;
+  supportTemplateCreateAction: string;
+  supportTemplateUpdateAction: string;
+  supportTemplateResetAction: string;
+  supportTemplateSaved: string;
+  supportTemplateDeleted: string;
+  supportUserLabel: string;
+  supportUnreadAdmin: string;
+  supportUnreadUser: string;
 };
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -312,6 +372,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     activeLabel: "Активен",
     statusLabel: "Статус",
     navDashboard: "Дашборд",
+    navSupport: "Поддержка",
     navUsers: "Пользователи",
     navTemplates: "Шаблоны",
     navImageTemplates: "Шаблоны изображений",
@@ -436,7 +497,66 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorAccessPremiumHint: "Только для Premium пользователей.",
     editorReviewReadyHint: "Шаблон выглядит цельным и готовым к следующему шагу публикации.",
     editorReviewIncompleteHint: "Перед публикацией лучше закрыть незаполненные медиа или AI-блоки, чтобы карточка выглядела завершённой.",
-    editorMediaRequirements: "Все видео должны быть вертикальными 9:16. Для reference motion поддерживается только MP4, потому что его длительность влияет на auto-detected character orientation."
+    editorMediaRequirements: "Все видео должны быть вертикальными 9:16. Для reference motion поддерживается только MP4, потому что его длительность влияет на auto-detected character orientation.",
+    supportTitle: "Поддержка",
+    supportDescription: "Управляйте диалогами поддержки и отвечайте пользователям из одной очереди.",
+    supportInboxTitle: "Очередь чатов",
+    supportInboxDescription: "Открытые, активные и завершенные диалоги с пользователями.",
+    supportConversationTitle: "Диалог поддержки",
+    supportConversationDescription: "История сообщений, статус обращения и быстрый ответ оператора.",
+    supportEmpty: "Диалогов поддержки пока нет.",
+    supportLoadError: "Не удалось загрузить диалоги поддержки.",
+    supportRefresh: "Обновить",
+    supportStatusAll: "Все статусы",
+    supportAssignmentAll: "Все диалоги",
+    supportAssignmentMine: "Только мои",
+    supportAssignmentUnassigned: "Без ответственного",
+    supportStatusOpen: "Открыт",
+    supportStatusInProgress: "В работе",
+    supportStatusResolved: "Решен",
+    supportStatusClosed: "Закрыт",
+    supportBackToInbox: "К очереди",
+    supportOpenConversation: "Открыть диалог",
+    supportAssignedTo: "Ответственный",
+    supportUnassigned: "Пока не назначен",
+    supportLastMessage: "Последнее сообщение",
+    supportNoMessages: "Сообщений пока нет.",
+    supportReplyPlaceholder: "Напишите ответ пользователю...",
+    supportReplyAction: "Ответить",
+    supportReplySending: "Отправка...",
+    supportSaveStatusAction: "Сохранить статус",
+    supportStatusSaved: "Статус обновлен",
+    supportReplySent: "Ответ отправлен",
+    supportInternalNoteAction: "Внутренняя заметка",
+    supportInternalNotePlaceholder: "Оставьте заметку только для команды поддержки...",
+    supportInternalNoteSaved: "Заметка сохранена",
+    supportInternalNoteBadge: "Internal note",
+    supportAssignToMe: "Взять в работу",
+    supportUnassign: "Снять назначение",
+    supportAssignmentSaved: "Назначение обновлено",
+    supportQuickRepliesLabel: "Быстрые ответы",
+    supportInternalNoteTemplatesLabel: "Шаблоны внутренних заметок",
+    supportTemplatesManagerTitle: "Каталог шаблонов",
+    supportTemplatesManagerDescription: "Редактируйте быстрые ответы и внутренние заметки без нового деплоя.",
+    supportTemplateNoTemplates: "Шаблонов пока нет.",
+    supportTemplateTitleLabel: "Название шаблона",
+    supportTemplateBodyLabel: "Текст шаблона",
+    supportTemplateKindLabel: "Тип шаблона",
+    supportTemplateKindReply: "Ответ пользователю",
+    supportTemplateKindInternalNote: "Внутренняя заметка",
+    supportTemplateEnabledLabel: "Шаблон активен",
+    supportTemplateDisabledBadge: "Выключен",
+    supportTemplateSortOrderLabel: "Порядок",
+    supportTemplateEditAction: "Изменить",
+    supportTemplateDeleteAction: "Удалить",
+    supportTemplateCreateAction: "Создать шаблон",
+    supportTemplateUpdateAction: "Сохранить шаблон",
+    supportTemplateResetAction: "Сбросить форму",
+    supportTemplateSaved: "Шаблон сохранен",
+    supportTemplateDeleted: "Шаблон удален",
+    supportUserLabel: "Пользователь",
+    supportUnreadAdmin: "Непрочитано для поддержки",
+    supportUnreadUser: "Непрочитано для пользователя"
   },
   en: {
     loginTitle: "Sign in",
@@ -528,6 +648,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     activeLabel: "Active",
     statusLabel: "Status",
     navDashboard: "Dashboard",
+    navSupport: "Support",
     navUsers: "Users",
     navTemplates: "Templates",
     navImageTemplates: "Image Templates",
@@ -652,7 +773,66 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorAccessPremiumHint: "Only for Premium users.",
     editorReviewReadyHint: "The template feels cohesive and ready for the next publishing step.",
     editorReviewIncompleteHint: "Before publishing, close the remaining media or AI gaps so the card reads as complete.",
-    editorMediaRequirements: "All videos should stay vertical 9:16. Reference motion supports MP4 only because its duration drives the auto-detected character orientation."
+    editorMediaRequirements: "All videos should stay vertical 9:16. Reference motion supports MP4 only because its duration drives the auto-detected character orientation.",
+    supportTitle: "Support",
+    supportDescription: "Manage support conversations and reply to users from a single inbox.",
+    supportInboxTitle: "Support inbox",
+    supportInboxDescription: "Open, active, and completed user support conversations.",
+    supportConversationTitle: "Support conversation",
+    supportConversationDescription: "Message history, conversation status, and a fast operator reply flow.",
+    supportEmpty: "No support conversations yet.",
+    supportLoadError: "Failed to load support conversations.",
+    supportRefresh: "Refresh",
+    supportStatusAll: "All statuses",
+    supportAssignmentAll: "All conversations",
+    supportAssignmentMine: "Assigned to me",
+    supportAssignmentUnassigned: "Unassigned only",
+    supportStatusOpen: "Open",
+    supportStatusInProgress: "In progress",
+    supportStatusResolved: "Resolved",
+    supportStatusClosed: "Closed",
+    supportBackToInbox: "Back to inbox",
+    supportOpenConversation: "Open conversation",
+    supportAssignedTo: "Assigned to",
+    supportUnassigned: "Unassigned",
+    supportLastMessage: "Last message",
+    supportNoMessages: "No messages yet.",
+    supportReplyPlaceholder: "Write a reply to the user...",
+    supportReplyAction: "Reply",
+    supportReplySending: "Sending...",
+    supportSaveStatusAction: "Save status",
+    supportStatusSaved: "Status updated",
+    supportReplySent: "Reply sent",
+    supportInternalNoteAction: "Internal note",
+    supportInternalNotePlaceholder: "Leave a note visible only to the support team...",
+    supportInternalNoteSaved: "Internal note saved",
+    supportInternalNoteBadge: "Internal note",
+    supportAssignToMe: "Assign to me",
+    supportUnassign: "Unassign",
+    supportAssignmentSaved: "Assignment updated",
+    supportQuickRepliesLabel: "Quick replies",
+    supportInternalNoteTemplatesLabel: "Internal note templates",
+    supportTemplatesManagerTitle: "Template catalog",
+    supportTemplatesManagerDescription: "Edit quick replies and internal notes without another deploy.",
+    supportTemplateNoTemplates: "No templates yet.",
+    supportTemplateTitleLabel: "Template title",
+    supportTemplateBodyLabel: "Template body",
+    supportTemplateKindLabel: "Template kind",
+    supportTemplateKindReply: "User reply",
+    supportTemplateKindInternalNote: "Internal note",
+    supportTemplateEnabledLabel: "Template enabled",
+    supportTemplateDisabledBadge: "Disabled",
+    supportTemplateSortOrderLabel: "Sort order",
+    supportTemplateEditAction: "Edit",
+    supportTemplateDeleteAction: "Delete",
+    supportTemplateCreateAction: "Create template",
+    supportTemplateUpdateAction: "Save template",
+    supportTemplateResetAction: "Reset form",
+    supportTemplateSaved: "Template saved",
+    supportTemplateDeleted: "Template deleted",
+    supportUserLabel: "User",
+    supportUnreadAdmin: "Unread for support",
+    supportUnreadUser: "Unread for user"
   }
 };
 

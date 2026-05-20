@@ -163,6 +163,73 @@ export type AdminUserAnalytics = {
   failureBreakdown: AdminUserFailureBreakdownItem[];
 };
 
+export type SupportConversationStatus = "Open" | "InProgress" | "Resolved" | "Closed";
+
+export type SupportConversationPriority = "Low" | "Normal" | "High";
+
+export type SupportInboxAssignmentScope = "all" | "mine" | "unassigned";
+
+export type SupportReplyTemplateKind = "Reply" | "InternalNote";
+
+export type AdminSupportMessage = {
+  messageId: string;
+  conversationId: string;
+  senderUserId: string;
+  senderDisplayName: string;
+  isFromAdmin: boolean;
+  isInternalNote: boolean;
+  body: string;
+  isRead: boolean;
+  readAtUtc?: string | null;
+  createdAtUtc: string;
+};
+
+export type AdminSupportConversationSummary = {
+  conversationId: string;
+  initiatorUserId: string;
+  userEmail: string;
+  userDisplayName?: string;
+  assignedAdminId?: string | null;
+  assignedAdminDisplayName?: string | null;
+  status: SupportConversationStatus;
+  priority: SupportConversationPriority;
+  lastMessagePreview?: string | null;
+  lastMessageIsInternalNote: boolean;
+  lastMessageAtUtc?: string | null;
+  userUnreadCount: number;
+  adminUnreadCount: number;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
+export type AdminSupportConversation = {
+  conversationId: string;
+  initiatorUserId: string;
+  userEmail: string;
+  userDisplayName?: string;
+  assignedAdminId?: string | null;
+  assignedAdminDisplayName?: string | null;
+  status: SupportConversationStatus;
+  priority: SupportConversationPriority;
+  userUnreadCount: number;
+  adminUnreadCount: number;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  lastMessageAtUtc?: string | null;
+  messages: AdminSupportMessage[];
+};
+
+export type AdminSupportReplyTemplate = {
+  templateId: string;
+  title: string;
+  body: string;
+  kind: SupportReplyTemplateKind;
+  isEnabled: boolean;
+  sortOrder: number;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
 export type TemplateType = "Image" | "Video";
 
 export type TemplateStatus = "Draft" | "Active" | "Archived";
@@ -540,6 +607,9 @@ let cachedAuthSession: AuthSession | null = null;
 const cachedUsersLists = new Map<string, { value: UserListItem[]; expiresAt: number }>();
 const cachedAdminUserDetails = new Map<string, { value: AdminUserDetail; expiresAt: number }>();
 const cachedAdminUserAnalytics = new Map<string, { value: AdminUserAnalytics; expiresAt: number }>();
+const cachedSupportInbox = new Map<string, { value: AdminSupportConversationSummary[]; expiresAt: number }>();
+const cachedSupportConversations = new Map<string, { value: AdminSupportConversation; expiresAt: number }>();
+const cachedSupportTemplates = new Map<string, { value: AdminSupportReplyTemplate[]; expiresAt: number }>();
 const cachedTemplateLists = new Map<string, { value: AdminTemplateListItem[]; expiresAt: number }>();
 const cachedTemplateCategories = new Map<string, { value: AdminTemplateCategory[]; expiresAt: number }>();
 const cachedTemplatesAnalyticsOverview = new Map<string, { value: AdminTemplatesAnalyticsOverview; expiresAt: number }>();
@@ -555,6 +625,9 @@ function clearAdminListCaches(): void {
   cachedUsersLists.clear();
   cachedAdminUserDetails.clear();
   cachedAdminUserAnalytics.clear();
+  cachedSupportInbox.clear();
+  cachedSupportConversations.clear();
+  cachedSupportTemplates.clear();
   cachedTemplateLists.clear();
   cachedTemplateCategories.clear();
   cachedTemplatesAnalyticsOverview.clear();
@@ -940,6 +1013,141 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
   cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
 }
 
+export async function fetchSupportInbox(
+  status?: SupportConversationStatus,
+  assignment: SupportInboxAssignmentScope = "all",
+): Promise<AdminSupportConversationSummary[]> {
+  const cacheKey = `support-inbox:${status ?? "all"}:${assignment}`;
+  const searchParams = new URLSearchParams();
+  if (status) {
+    searchParams.set("status", status);
+  }
+  if (assignment !== "all") {
+    searchParams.set("assignment", assignment);
+  }
+
+  const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
+
+  return cachedGet(
+    cacheKey,
+    cachedSupportInbox,
+    () => apiRequest<AdminSupportConversationSummary[]>(`/api/admin/support/conversations${query}`, { method: "GET" }),
+  );
+}
+
+export async function fetchSupportConversation(conversationId: string): Promise<AdminSupportConversation> {
+  return cachedGet(
+    `support-conversation:${conversationId}`,
+    cachedSupportConversations,
+    () => apiRequest<AdminSupportConversation>(`/api/admin/support/conversations/${conversationId}`, { method: "GET" }),
+  );
+}
+
+export async function sendSupportMessage(conversationId: string, body: string): Promise<AdminSupportMessage> {
+  const message = await apiRequest<AdminSupportMessage>(`/api/admin/support/conversations/${conversationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body })
+  });
+
+  clearSupportCaches(conversationId);
+  return message;
+}
+
+export async function sendSupportInternalNote(conversationId: string, body: string): Promise<AdminSupportMessage> {
+  const message = await apiRequest<AdminSupportMessage>(`/api/admin/support/conversations/${conversationId}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ body })
+  });
+
+  clearSupportCaches(conversationId);
+  return message;
+}
+
+export async function markSupportConversationRead(conversationId: string): Promise<void> {
+  await apiRequest<void>(`/api/admin/support/conversations/${conversationId}/read`, {
+    method: "POST"
+  });
+
+  clearSupportCaches(conversationId);
+}
+
+export async function updateSupportConversationStatus(
+  conversationId: string,
+  status: SupportConversationStatus,
+): Promise<AdminSupportConversation> {
+  const conversation = await apiRequest<AdminSupportConversation>(`/api/admin/support/conversations/${conversationId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status })
+  });
+
+  clearSupportCaches(conversationId);
+  return conversation;
+}
+
+export async function assignSupportConversation(
+  conversationId: string,
+  assignedAdminId?: string | null,
+): Promise<AdminSupportConversation> {
+  const conversation = await apiRequest<AdminSupportConversation>(`/api/admin/support/conversations/${conversationId}/assignment`, {
+    method: "PUT",
+    body: JSON.stringify({ assignedAdminId: assignedAdminId ?? null })
+  });
+
+  clearSupportCaches(conversationId);
+  return conversation;
+}
+
+export async function fetchSupportReplyTemplates(): Promise<AdminSupportReplyTemplate[]> {
+  return cachedGet(
+    "support-templates",
+    cachedSupportTemplates,
+    () => apiRequest<AdminSupportReplyTemplate[]>("/api/admin/support/templates", { method: "GET" }),
+  );
+}
+
+export async function createSupportReplyTemplate(payload: {
+  title: string;
+  body: string;
+  kind: SupportReplyTemplateKind;
+  isEnabled: boolean;
+  sortOrder: number;
+}): Promise<AdminSupportReplyTemplate> {
+  const template = await apiRequest<AdminSupportReplyTemplate>("/api/admin/support/templates", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
+  clearSupportTemplateCaches();
+  return template;
+}
+
+export async function updateSupportReplyTemplate(
+  templateId: string,
+  payload: {
+    title: string;
+    body: string;
+    kind: SupportReplyTemplateKind;
+    isEnabled: boolean;
+    sortOrder: number;
+  },
+): Promise<AdminSupportReplyTemplate> {
+  const template = await apiRequest<AdminSupportReplyTemplate>(`/api/admin/support/templates/${templateId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+
+  clearSupportTemplateCaches();
+  return template;
+}
+
+export async function deleteSupportReplyTemplate(templateId: string): Promise<void> {
+  await apiRequest<void>(`/api/admin/support/templates/${templateId}`, {
+    method: "DELETE"
+  });
+
+  clearSupportTemplateCaches();
+}
+
 export async function fetchAdminTemplates(type?: TemplateType): Promise<AdminTemplateListItem[]> {
   const cacheKey = getTemplateListCacheKey(type);
   const query = type ? `?type=${encodeURIComponent(type)}` : "";
@@ -1153,4 +1361,21 @@ export async function uploadTemplateMedia(file: File, assetKind: TemplateAssetKi
     method: "POST",
     body: formData
   });
+}
+
+function clearSupportCaches(conversationId?: string): void {
+  cachedSupportInbox.clear();
+  inflightGetRequests.clear();
+
+  if (conversationId) {
+    cachedSupportConversations.delete(`support-conversation:${conversationId}`);
+    return;
+  }
+
+  cachedSupportConversations.clear();
+}
+
+function clearSupportTemplateCaches(): void {
+  cachedSupportTemplates.clear();
+  inflightGetRequests.delete("support-templates");
 }

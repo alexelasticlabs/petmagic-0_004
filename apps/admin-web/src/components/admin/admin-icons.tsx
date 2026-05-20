@@ -20,6 +20,10 @@ export function UsersIcon({ className }: IconProps) {
   return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.7" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
 }
 
+export function SupportIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><path d="M6 17.5A6.5 6.5 0 0 1 3.5 12 6.5 6.5 0 0 1 10 5.5h4A6.5 6.5 0 0 1 20.5 12 6.5 6.5 0 0 1 14 18.5H9l-4 3v-4Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M8.5 10.5h7M8.5 13.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
+}
+
 export function PeopleIcon({ className }: IconProps) {
   return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
 }

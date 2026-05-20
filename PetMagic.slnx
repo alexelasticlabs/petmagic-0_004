@@ -19,6 +19,12 @@
     <Project Path="src/Modules/Identity/PetMagic.Modules.Identity.Domain/PetMagic.Modules.Identity.Domain.csproj" />
     <Project Path="src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/PetMagic.Modules.Identity.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/SupportChat/">
+    <Project Path="src/Modules/SupportChat/PetMagic.Modules.SupportChat.Api/PetMagic.Modules.SupportChat.Api.csproj" />
+    <Project Path="src/Modules/SupportChat/PetMagic.Modules.SupportChat.Application/PetMagic.Modules.SupportChat.Application.csproj" />
+    <Project Path="src/Modules/SupportChat/PetMagic.Modules.SupportChat.Domain/PetMagic.Modules.SupportChat.Domain.csproj" />
+    <Project Path="src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/PetMagic.Modules.SupportChat.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Templates/">
     <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Api/PetMagic.Modules.Templates.Api.csproj" />
     <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Application/PetMagic.Modules.Templates.Application.csproj" />

@@ -51,6 +51,7 @@ dependencies:
   url_launcher: ^6.3.2
   flutter_localizations:
     sdk: flutter
+  signalr_netcore: ^1.4.4
 
 dev_dependencies:
   flutter_test:

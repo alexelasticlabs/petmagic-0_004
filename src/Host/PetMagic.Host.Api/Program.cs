@@ -9,6 +9,8 @@ using PetMagic.Modules.Economy.Api;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Identity.Api;
 using PetMagic.Modules.Identity.Infrastructure;
+using PetMagic.Modules.SupportChat.Api;
+using PetMagic.Modules.SupportChat.Infrastructure;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Infrastructure;
 using Serilog;
@@ -107,6 +109,19 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
             }));
+
+    options.AddPolicy("support-chat", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.FindFirst("sub")?.Value
+                ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "global",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
 });
 
 builder.Services
@@ -114,6 +129,8 @@ builder.Services
     .AddEconomyApiModule()
     .AddIdentityInfrastructure(builder.Configuration, builder.Environment)
     .AddIdentityApiModule()
+    .AddSupportChatInfrastructure(builder.Configuration)
+    .AddSupportChatApiModule()
     .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
     .AddTemplatesApiModule();
 
@@ -156,10 +173,12 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
 
 app.MapEconomyApiModule();
 app.MapIdentityApiModule();
+app.MapSupportChatApiModule();
 app.MapTemplatesApiModule();
 
 await app.Services.EnsureEconomySeedDataAsync();
 await app.Services.EnsureIdentitySeedDataAsync();
+await app.Services.EnsureSupportChatSeedDataAsync();
 await app.Services.EnsureTemplatesSeedDataAsync();
 
 app.Run();

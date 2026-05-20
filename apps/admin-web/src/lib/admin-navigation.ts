@@ -2,6 +2,7 @@ import { type Locale, getDictionary } from "@/lib/i18n";
 
 export type AdminSectionKey =
   | "dashboard"
+  | "support"
   | "users"
   | "templates"
   | "image-templates"
@@ -54,6 +55,7 @@ export function getAdminNavItems(locale: Locale): AdminNavEntry[] {
 
   return [
     { type: "link", key: "dashboard", href: `/${locale}/dashboard`, label: text.navDashboard },
+    { type: "link", key: "support", href: `/${locale}/support`, label: text.navSupport },
     { type: "link", key: "users", href: `/${locale}/users`, label: text.navUsers },
     {
       type: "group",
@@ -96,6 +98,16 @@ export function getAdminPageMeta(locale: Locale, currentPath: string, userName: 
         locale === "ru"
           ? "Управление ролями, премиум-статусом и доступом пользователей."
           : "Manage roles, premium status, and user access.",
+    };
+  }
+
+  if (matchesAdminPath(currentPath, "/support")) {
+    return {
+      title: locale === "ru" ? "Поддержка" : "Support",
+      description:
+        locale === "ru"
+          ? "Очередь диалогов поддержки с пользователями и быстрые ответы команды."
+          : "Support conversation inbox with fast team replies.",
     };
   }
 

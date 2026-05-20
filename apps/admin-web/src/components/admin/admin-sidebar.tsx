@@ -1,13 +1,14 @@
 import {
-    BrandMark,
-    CaretDownIcon,
-    ChartIcon,
-    DashboardIcon,
-    ImageIcon,
-    LogoutIcon,
-    TemplatesIcon,
-    UsersIcon,
-    VideoIcon,
+  BrandMark,
+  CaretDownIcon,
+  ChartIcon,
+  DashboardIcon,
+  ImageIcon,
+  LogoutIcon,
+  SupportIcon,
+  TemplatesIcon,
+  UsersIcon,
+  VideoIcon,
 } from "@/components/admin/admin-icons";
 import styles from "@/components/admin/admin-shell.module.css";
 import { getAdminNavItems, matchesAdminPath } from "@/lib/admin-navigation";
@@ -25,6 +26,7 @@ type AdminSidebarProps = {
 
 const iconMap = {
   dashboard: DashboardIcon,
+  support: SupportIcon,
   users: UsersIcon,
   templates: TemplatesIcon,
   "image-templates": ImageIcon,
