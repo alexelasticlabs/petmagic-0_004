@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using PetMagic.BuildingBlocks.Results;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -204,6 +205,44 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task UserAttachmentEndpoint_ShouldUploadImageAndExposeAttachmentMetadata()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need help with screenshot", SupportConversationPriority.Normal));
+
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", "issue.png");
+        form.Add(new StringContent("Screenshot of the payment error"), "body");
+
+        using var response = await userClient.PostAsync(
+            $"/api/support/conversation/{created.ConversationId}/attachments",
+            form);
+
+        await AssertSuccessAsync(response);
+
+        var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+        Assert.False(message.IsFromAdmin);
+        Assert.Equal("Screenshot of the payment error", message.Body);
+        Assert.Equal("issue.png", message.AttachmentFileName);
+        Assert.Equal("image/png", message.AttachmentContentType);
+        Assert.NotNull(message.AttachmentUrl);
+
+        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(AdminId, "Admin"),
+            $"/api/admin/support/conversations/{created.ConversationId}");
+
+        var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
+        Assert.Equal("issue.png", attachmentMessage.AttachmentFileName);
+    }
+
+    [Fact]
     public async Task UpdateStatusEndpoint_ShouldRejectInvalidStatusValues()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -398,6 +437,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             builder.Services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase(identityDatabaseName, identityDatabaseRoot));
 
+            builder.Services.AddSingleton<ISupportAttachmentStorage, FakeSupportAttachmentStorage>();
             builder.Services.AddScoped<ISupportChatService, SupportChatService>();
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
             builder.Services.AddSupportChatApiModule();
@@ -584,6 +624,28 @@ public sealed class SupportChatEndpointsIntegrationTests
     private sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, string Kind, bool IsEnabled, int SortOrder);
 
     private sealed record SupportConversationUpdatedEvent(Guid ConversationId, Guid InitiatorUserId, DateTime UpdatedAtUtc);
+
+    private sealed class FakeSupportAttachmentStorage : ISupportAttachmentStorage
+    {
+        public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
+            SupportAttachmentUploadCommand attachment,
+            CancellationToken cancellationToken)
+        {
+            var url = $"http://localhost:5000/support-attachments/test/{Guid.NewGuid():N}-{attachment.FileName}";
+            return Task.FromResult(Result.Success(new StoredSupportAttachmentResponse(
+                url,
+                url,
+                attachment.FileName,
+                attachment.ContentType,
+                attachment.Content.LongLength,
+                null)));
+        }
+    }
 
     private static string EncodeHubAccessToken(Guid userId, params string[] roles)
     {

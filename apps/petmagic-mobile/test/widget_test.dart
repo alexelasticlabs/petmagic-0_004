@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -19,8 +20,10 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_controller
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -523,8 +526,12 @@ void main() {
     expect(find.text('Account information'), findsOneWidget);
     expect(find.text('Pet Parent'), findsWidgets);
     expect(find.text('pet@example.com'), findsWidgets);
-    expect(find.text('User ID'), findsOneWidget);
-    expect(find.text('user-1'), findsOneWidget);
+    expect(find.text('Account details'), findsOneWidget);
+    expect(find.text('User ID'), findsNothing);
+    expect(
+      find.textContaining('Current legal documents are accepted'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('delete account detail screen stays informational', (
@@ -618,6 +625,136 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'support chat page shows retry fallback when initial load takes too long',
+    (tester) async {
+      final supportRepository = _DelayedSupportChatRepository();
+
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            supportChatRepositoryProvider.overrideWith(
+              (ref) => supportRepository,
+            ),
+            supportChatRealtimeClientProvider.overrideWith(
+              (ref) => const _FakeSupportChatRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            home: const SupportChatPage(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 9));
+
+      expect(find.text('Start the conversation'), findsOneWidget);
+      expect(
+        find.text(
+          'Unable to reach support right now. Please try again in a moment.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(FilledButton, 'Retry'), findsOneWidget);
+    },
+  );
+
+  testWidgets('support chat page renders support header and security card', (
+    tester,
+  ) async {
+    final supportRepository = _FakeSupportChatRepository();
+
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          supportChatRepositoryProvider.overrideWith(
+            (ref) => supportRepository,
+          ),
+          supportChatRealtimeClientProvider.overrideWith(
+            (ref) => const _FakeSupportChatRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('en'),
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: const SupportChatPage(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your conversation is secure'), findsOneWidget);
+    expect(find.byIcon(Icons.shield_rounded), findsOneWidget);
+    expect(find.text('PetMagic Support'), findsWidgets);
+    expect(find.text('Online • typical reply under 5 min'), findsWidgets);
+    expect(find.byIcon(Icons.attach_file_rounded), findsOneWidget);
+  });
+
+  testWidgets('support chat page shows welcome actions for empty chat', (
+    tester,
+  ) async {
+    final supportRepository = _FakeSupportChatRepository(
+      emptyConversation: true,
+    );
+
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          supportChatRepositoryProvider.overrideWith(
+            (ref) => supportRepository,
+          ),
+          supportChatRealtimeClientProvider.overrideWith(
+            (ref) => const _FakeSupportChatRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('en'),
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: const SupportChatPage(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome to PetMagic support'), findsOneWidget);
+    expect(find.text('Issue with image generation'), findsOneWidget);
+    expect(find.text('Payment problem'), findsOneWidget);
+    expect(find.text('FAQ'), findsOneWidget);
+  });
 
   test('app preferences controller persists theme and locale', () async {
     SharedPreferences.setMockInitialValues(const {});
@@ -1000,6 +1137,11 @@ class _FakeExternalAuthRepository implements ExternalAuthRepository {
       ),
     );
   }
+
+  @override
+  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
+    return const [];
+  }
 }
 
 class _FailingExternalAuthRepository implements ExternalAuthRepository {
@@ -1011,6 +1153,11 @@ class _FailingExternalAuthRepository implements ExternalAuthRepository {
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     throw error;
   }
+
+  @override
+  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
+    throw error;
+  }
 }
 
 class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
@@ -1018,12 +1165,18 @@ class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     throw Exception('google sign-in failed unexpectedly');
   }
+
+  @override
+  Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
+    throw Exception('external account link failed unexpectedly');
+  }
 }
 
 class _FakeSupportChatRepository extends SupportChatRepository {
-  _FakeSupportChatRepository()
+  _FakeSupportChatRepository({this.emptyConversation = false})
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
+  final bool emptyConversation;
   String? lastSentBody;
   late SupportChatConversation _conversation = SupportChatConversation(
     conversationId: 'conversation-1',
@@ -1039,18 +1192,20 @@ class _FakeSupportChatRepository extends SupportChatRepository {
     createdAtUtc: DateTime.utc(2026, 1, 1, 10),
     updatedAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
     lastMessageAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
-    messages: [
-      SupportChatMessage(
-        messageId: 'message-1',
-        conversationId: 'conversation-1',
-        senderUserId: 'admin-1',
-        senderDisplayName: 'PetMagic Support',
-        isFromAdmin: true,
-        body: 'How can we help today?',
-        isRead: false,
-        createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
-      ),
-    ],
+    messages: emptyConversation
+        ? []
+        : [
+            SupportChatMessage(
+              messageId: 'message-1',
+              conversationId: 'conversation-1',
+              senderUserId: 'admin-1',
+              senderDisplayName: 'PetMagic Support',
+              isFromAdmin: true,
+              body: 'How can we help today?',
+              isRead: false,
+              createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
+            ),
+          ],
   );
 
   @override
@@ -1120,4 +1275,29 @@ class _ThrowingSupportChatRepository extends SupportChatRepository {
   }) async {
     throw Exception('unexpected support failure');
   }
+}
+
+class _DelayedSupportChatRepository extends SupportChatRepository {
+  _DelayedSupportChatRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  @override
+  Future<SupportChatConversation> openConversation({
+    String? initialMessage,
+  }) async {
+    return Completer<SupportChatConversation>().future;
+  }
+}
+
+class _FakeSupportChatRealtimeClient implements SupportChatRealtimeClient {
+  const _FakeSupportChatRealtimeClient();
+
+  @override
+  Future<void> connect() async {}
+
+  @override
+  Future<void> disconnect() async {}
+
+  @override
+  Stream<SupportChatRealtimeUpdate> get events => const Stream.empty();
 }

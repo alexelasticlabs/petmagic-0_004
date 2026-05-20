@@ -60,6 +60,40 @@ public sealed class EconomyValidatorsTests
     }
 
     [Fact]
+    public void VerifyPremiumStorePurchaseValidator_ShouldFail_WhenVerificationDataMissing()
+    {
+        var validator = new VerifyPremiumStorePurchaseCommandValidator();
+        var result = validator.Validate(new VerifyPremiumStorePurchaseCommand(
+            Guid.NewGuid(),
+            "yearly",
+            "google_play",
+            "com.petmagic.app.premium.yearly",
+            string.Empty,
+            null,
+            "purchase-id",
+            "1234567890"));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void VerifyPremiumStorePurchaseValidator_ShouldPass_WhenPayloadValid()
+    {
+        var validator = new VerifyPremiumStorePurchaseCommandValidator();
+        var result = validator.Validate(new VerifyPremiumStorePurchaseCommand(
+            Guid.NewGuid(),
+            "yearly",
+            "google_play",
+            "com.petmagic.app.premium.yearly",
+            "token-123",
+            "signed-payload",
+            "purchase-id",
+            "1234567890"));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void StripeWebhookValidator_ShouldFail_WhenSignatureEmpty()
     {
         var validator = new StripeWebhookCommandValidator();

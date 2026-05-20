@@ -151,6 +151,46 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task SendMessageAsync_WithAttachment_ShouldPersistAttachmentMetadata()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        const string attachmentUrl = "http://localhost:5000/support-attachments/2026/05/test-image.png";
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageAsync(
+            new SendSupportMessageCommand(
+                conversationId,
+                userId,
+                "Screenshot from the broken screen",
+                false,
+                false,
+                attachmentUrl,
+                "broken-screen.png",
+                "image/png",
+                2048),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsSuccess);
+        Assert.Equal(attachmentUrl, sendResult.Value.AttachmentUrl);
+        Assert.Equal("broken-screen.png", sendResult.Value.AttachmentFileName);
+        Assert.Equal("image/png", sendResult.Value.AttachmentContentType);
+        Assert.Equal(2048, sendResult.Value.AttachmentFileSizeBytes);
+    }
+
+    [Fact]
     public async Task AssignConversationAsync_ShouldUpdateAssignedAdmin()
     {
         var store = CreateStore();
