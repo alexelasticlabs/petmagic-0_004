@@ -20,8 +20,11 @@ public static class AuthEndpoints
     private const string RefreshTokenOwnershipViolationCode = "auth.refresh_token_not_owned";
     private const string EmailNotConfirmedCode = "auth.email_not_confirmed";
     private const string ExternalRedirectUriProperty = "mobile_redirect_uri";
+    private const string ExternalLinkTicketProperty = "external_link_ticket";
+    private const string ExternalFlowModeProperty = "external_flow_mode";
     private const string ExternalTicketInvalidCode = "auth.external_ticket_invalid";
     private const string ExternalCancelledCode = "auth.external_cancelled";
+    private const string ExternalFlowModeLink = "link";
     private const string ExternalTicketInvalidMessage = "External sign-in session is invalid or expired.";
     private const string ExternalCancelledMessage = "External sign-in was cancelled.";
     private const string UnsupportedRedirectUriMessage = "Unsupported redirect URI.";
@@ -63,6 +66,15 @@ public static class AuthEndpoints
             .RequireAuthorization();
 
         group.MapPost("/me/legal-acceptance", AcceptCurrentLegalDocumentsAsync)
+            .RequireAuthorization();
+
+        group.MapGet("/me/linked-accounts", GetLinkedAccountsAsync)
+            .RequireAuthorization();
+
+        group.MapPost("/me/linked-accounts/{provider}/prepare", PrepareLinkedAccountAsync)
+            .RequireAuthorization();
+
+        group.MapDelete("/me/linked-accounts/{provider}", UnlinkLinkedAccountAsync)
             .RequireAuthorization();
 
         group.MapPut("/me/avatar", UpdateAvatarAsync)
@@ -280,7 +292,7 @@ public static class AuthEndpoints
         return TypedResults.NoContent();
     }
 
-    private static IResult ExternalChallengeAsync(string provider, string? redirectUri)
+    private static IResult ExternalChallengeAsync(string provider, string? redirectUri, string? mode, string? linkTicket)
     {
         var normalizedProvider = NormalizeExternalProvider(provider);
         string? normalizedRedirectUri = null;
@@ -301,6 +313,13 @@ public static class AuthEndpoints
             properties.Items[ExternalRedirectUriProperty] = normalizedRedirectUri;
         }
 
+        if (string.Equals(mode, ExternalFlowModeLink, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(linkTicket))
+        {
+            properties.Items[ExternalFlowModeProperty] = ExternalFlowModeLink;
+            properties.Items[ExternalLinkTicketProperty] = linkTicket;
+        }
+
         return Results.Challenge(
             properties,
             authenticationSchemes: [normalizedProvider]);
@@ -312,6 +331,7 @@ public static class AuthEndpoints
         IValidator<ExternalLoginCallbackCommand> validator,
         IIdentityService service,
         ExternalLoginCompletionStore completionStore,
+        ExternalAccountLinkStore linkStore,
         CancellationToken cancellationToken)
     {
         var normalizedProvider = NormalizeExternalProvider(provider);
@@ -322,6 +342,8 @@ public static class AuthEndpoints
 
         var externalAuthResult = await httpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
         var clientRedirectUri = ReadMobileRedirectUri(externalAuthResult.Properties);
+        var flowMode = ReadAuthProperty(externalAuthResult.Properties, ExternalFlowModeProperty);
+        var linkTicket = ReadAuthProperty(externalAuthResult.Properties, ExternalLinkTicketProperty);
         if (!externalAuthResult.Succeeded || externalAuthResult.Principal is null)
         {
             var providerError = httpContext.Request.Query["error"].ToString();
@@ -361,6 +383,45 @@ public static class AuthEndpoints
                 "auth.external_invalid",
                 "External principal payload is invalid.",
                 StatusCodes.Status400BadRequest);
+        }
+
+        if (string.Equals(flowMode, ExternalFlowModeLink, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(linkTicket) || !linkStore.TryTake(linkTicket, out var userId))
+            {
+                await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return BuildExternalCallbackErrorResult(
+                    clientRedirectUri,
+                    ExternalTicketInvalidCode,
+                    ExternalTicketInvalidMessage,
+                    StatusCodes.Status401Unauthorized);
+            }
+
+            var linkedResult = await service.LinkExternalLoginAsync(userId, command, cancellationToken);
+            await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+            if (linkedResult.IsFailure)
+            {
+                return BuildExternalCallbackErrorResult(
+                    clientRedirectUri,
+                    linkedResult.Error.Code,
+                    linkedResult.Error.Message,
+                    StatusCodes.Status400BadRequest);
+            }
+
+            if (clientRedirectUri is not null)
+            {
+                var redirectUrl = QueryHelpers.AddQueryString(clientRedirectUri, new Dictionary<string, string?>
+                {
+                    ["mode"] = ExternalFlowModeLink,
+                    ["provider"] = normalizedProvider,
+                    ["linked"] = "1"
+                });
+
+                return Results.Redirect(redirectUrl);
+            }
+
+            return TypedResults.Ok(linkedResult.Value);
         }
 
         var result = await service.ExternalLoginAsync(command, cancellationToken);
@@ -520,6 +581,85 @@ public static class AuthEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<IReadOnlyList<LinkedAccountResponse>>, ProblemHttpResult>> GetLinkedAccountsAsync(
+        HttpContext context,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var result = await service.GetLinkedAccountsAsync(userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static Results<Ok<ExternalLinkPreparationResponse>, ProblemHttpResult> PrepareLinkedAccountAsync(
+        string provider,
+        HttpContext context,
+        ExternalAccountLinkStore linkStore)
+    {
+        if (NormalizeExternalProvider(provider) is null)
+        {
+            return TypedResults.Problem(
+                title: "auth.external_invalid",
+                detail: "Unsupported provider.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        return TypedResults.Ok(new ExternalLinkPreparationResponse(linkStore.Create(userId)));
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<LinkedAccountResponse>>, ProblemHttpResult>> UnlinkLinkedAccountAsync(
+        string provider,
+        HttpContext context,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var normalizedProvider = NormalizeExternalProvider(provider);
+        if (normalizedProvider is null)
+        {
+            return TypedResults.Problem(
+                title: "auth.external_invalid",
+                detail: "Unsupported provider.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var result = await service.UnlinkExternalLoginAsync(userId, normalizedProvider, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<UserProfileResponse>, ValidationProblem, ProblemHttpResult>> UpdateAvatarAsync(
         HttpContext context,
         IIdentityService service,
@@ -588,6 +728,32 @@ public static class AuthEndpoints
         }
 
         return null;
+    }
+
+    private static string? ReadAuthProperty(AuthenticationProperties? properties, string key)
+    {
+        if (properties?.Items.TryGetValue(key, out var value) == true && !string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        return null;
+    }
+
+    private static bool TryGetUserId(HttpContext context, out Guid userId, out ProblemHttpResult? problem)
+    {
+        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(subject, out userId))
+        {
+            problem = TypedResults.Problem(
+                title: InvalidSubjectCode,
+                detail: "Invalid access token subject.",
+                statusCode: StatusCodes.Status401Unauthorized);
+            return false;
+        }
+
+        problem = null;
+        return true;
     }
 
     private static string? ReadMobileRedirectUri(AuthenticationProperties? properties)

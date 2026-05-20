@@ -13,6 +13,7 @@ public static class IdentityApiModule
     public static IServiceCollection AddIdentityApiModule(this IServiceCollection services)
     {
         services.AddSingleton<ExternalLoginCompletionStore>();
+        services.AddSingleton<ExternalAccountLinkStore>();
         services.AddScoped<IValidator<RegisterUserCommand>, RegisterUserCommandValidator>();
         services.AddScoped<IValidator<AcceptLegalDocumentsCommand>, AcceptLegalDocumentsCommandValidator>();
         services.AddScoped<IValidator<LoginCommand>, LoginCommandValidator>();
