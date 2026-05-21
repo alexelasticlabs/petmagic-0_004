@@ -28,6 +28,10 @@ public sealed class EconomyOptions
 
     public string GooglePlayPrivateKeyPem { get; init; } = string.Empty;
 
+    public string GooglePlayPubSubAudience { get; init; } = string.Empty;
+
+    public string GooglePlayPubSubExpectedEmail { get; init; } = string.Empty;
+
     public string AppStoreBundleId { get; init; } = "com.petmagic.app";
 
     public string AppStoreSharedSecret { get; init; } = string.Empty;

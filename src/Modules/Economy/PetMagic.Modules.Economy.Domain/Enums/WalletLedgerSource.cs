@@ -12,6 +12,8 @@ public static class WalletLedgerSource
 
     public const string PackPurchase = "pack_purchase";
 
+    public const string PremiumSubscriptionGrant = "premium_subscription_grant";
+
     public const string RedeemCode = "redeem_code";
 
     public const string AdminGrant = "admin_grant";

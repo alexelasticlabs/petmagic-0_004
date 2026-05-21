@@ -8,7 +8,13 @@ public sealed class RedeemCodeRedemption
 
     public Guid UserId { get; set; }
 
-    public Guid WalletLedgerEntryId { get; set; }
+    public string RewardKind { get; set; } = Domain.Enums.RedeemCodeRewardKind.Spark;
+
+    public int RewardValue { get; set; }
+
+    public Guid? WalletLedgerEntryId { get; set; }
+
+    public DateTime? PremiumExpiresAtUtc { get; set; }
 
     public DateTime RedeemedAtUtc { get; set; }
 }

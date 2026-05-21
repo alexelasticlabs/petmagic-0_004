@@ -23,7 +23,11 @@ public static class EconomyApiModule
         services.AddScoped<IValidator<RemovePaymentMethodCommand>, RemovePaymentMethodCommandValidator>();
         services.AddScoped<IValidator<ConfirmPackPurchaseCommand>, ConfirmPackPurchaseCommandValidator>();
         services.AddScoped<IValidator<StripeWebhookCommand>, StripeWebhookCommandValidator>();
+        services.AddScoped<IValidator<AppStoreServerNotificationCommand>, AppStoreServerNotificationCommandValidator>();
+        services.AddScoped<IValidator<GooglePlayDeveloperNotificationCommand>, GooglePlayDeveloperNotificationCommandValidator>();
         services.AddScoped<IValidator<UpdateCurrencyPackCommand>, UpdateCurrencyPackCommandValidator>();
+        services.AddScoped<IValidator<UpdateSubscriptionPlanCommand>, UpdateSubscriptionPlanCommandValidator>();
+        services.AddScoped<IValidator<UpdatePaymentProviderConfigurationCommand>, UpdatePaymentProviderConfigurationCommandValidator>();
         services.AddScoped<IValidator<ApplyRedeemCodeCommand>, ApplyRedeemCodeCommandValidator>();
         services.AddScoped<IValidator<CreateRedeemCodeCommand>, CreateRedeemCodeCommandValidator>();
         services.AddScoped<IValidator<UpdateRedeemCodeCommand>, UpdateRedeemCodeCommandValidator>();

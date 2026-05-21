@@ -54,12 +54,14 @@ services:
       R2_BUCKET_NAME: "${R2_BUCKET_NAME:-}"
       R2_PUBLIC_URL: "${R2_PUBLIC_URL:-}"
       Identity__AvatarStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
+      SupportChat__AttachmentStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
       Templates__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
     ports:
       - "5000:5000"
     volumes:
       - backend_data_protection:/root/.aspnet/DataProtection-Keys
+      - backend_support_attachments:/app/wwwroot/support-attachments
       - backend_user_avatars:/app/wwwroot/user-avatars
       - backend_template_media:/app/wwwroot/templates-media
     depends_on:
@@ -86,6 +88,8 @@ volumes:
   postgres_data:
     driver: local
   backend_data_protection:
+    driver: local
+  backend_support_attachments:
     driver: local
   backend_user_avatars:
     driver: local

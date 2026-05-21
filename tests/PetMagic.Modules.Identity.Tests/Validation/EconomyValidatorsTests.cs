@@ -45,7 +45,7 @@ public sealed class EconomyValidatorsTests
     public void CreatePackPurchaseValidator_ShouldFail_WhenCurrencyInvalid()
     {
         var validator = new CreatePackPurchaseCommandValidator();
-        var result = validator.Validate(new CreatePackPurchaseCommand(Guid.NewGuid(), Guid.NewGuid(), "US", "stripe"));
+        var result = validator.Validate(new CreatePackPurchaseCommand(Guid.NewGuid(), Guid.NewGuid(), "US", "stripe", "web", "1.0.0", "*", "en"));
 
         Assert.False(result.IsValid);
     }

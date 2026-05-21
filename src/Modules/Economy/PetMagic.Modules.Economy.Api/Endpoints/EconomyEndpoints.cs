@@ -17,6 +17,7 @@ public static class EconomyEndpoints
     private const string InsufficientBalanceCode = "economy.insufficient_balance";
     private const string PurchaseNotFoundCode = "economy.purchase_not_found";
     private const string InvalidStripeSignatureCode = "economy.invalid_stripe_signature";
+    private const string InvalidStoreWebhookSignatureCode = "economy.invalid_store_webhook_signature";
     private const string InvalidWebhookPayloadCode = "economy.invalid_webhook_payload";
 
     public static IEndpointRouteBuilder MapEconomyEndpoints(this IEndpointRouteBuilder endpoints)
@@ -46,10 +47,19 @@ public static class EconomyEndpoints
         group.MapGet("/packs", ListPacksAsync)
             .AllowAnonymous();
 
+        group.MapGet("/wallet/checkout-config", GetWalletCheckoutConfigAsync)
+            .AllowAnonymous();
+
         group.MapGet("/premium/plans", ListPremiumPlansAsync)
             .AllowAnonymous();
 
+        group.MapGet("/subscriptions/paywall-config", GetPaywallConfigAsync)
+            .AllowAnonymous();
+
         group.MapGet("/premium/status", GetPremiumStatusAsync)
+            .RequireAuthorization();
+
+        group.MapGet("/me/subscription", GetSubscriptionSummaryAsync)
             .RequireAuthorization();
 
         group.MapPost("/premium/checkout", CreatePremiumCheckoutAsync)
@@ -83,6 +93,12 @@ public static class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapPost("/webhooks/stripe", StripeWebhookAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/webhooks/app-store", AppStoreServerNotificationAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/webhooks/google-play", GooglePlayDeveloperNotificationAsync)
             .AllowAnonymous();
 
         return endpoints;
@@ -245,6 +261,7 @@ public static class EconomyEndpoints
             {
                 "economy.redeem_code_not_found" => StatusCodes.Status404NotFound,
                 "economy.redeem_code_already_used" => StatusCodes.Status409Conflict,
+                "economy.redeem_code_user_limit_reached" => StatusCodes.Status409Conflict,
                 "economy.redeem_code_exhausted" => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status400BadRequest,
             };
@@ -263,11 +280,41 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Ok<WalletCheckoutConfigResponse>> GetWalletCheckoutConfigAsync(
+        IEconomyService service,
+        string platform,
+        string appVersion,
+        string country,
+        string locale,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetWalletCheckoutConfigAsync(
+            new GetWalletCheckoutConfigQuery(platform, appVersion, country, locale),
+            cancellationToken);
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Ok<IReadOnlyList<PremiumPlanResponse>>> ListPremiumPlansAsync(
         IEconomyService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListPremiumPlansAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<PaywallConfigResponse>> GetPaywallConfigAsync(
+        IEconomyService service,
+        string platform,
+        string appVersion,
+        string country,
+        string locale,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetPaywallConfigAsync(
+            new GetPaywallConfigQuery(platform, appVersion, country, locale),
+            cancellationToken);
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -283,6 +330,26 @@ public static class EconomyEndpoints
         }
 
         var result = await service.GetPremiumStatusAsync(userId!.Value, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SubscriptionSummaryResponse>, ProblemHttpResult>> GetSubscriptionSummaryAsync(
+        HttpContext context,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.GetSubscriptionSummaryAsync(userId!.Value, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
@@ -415,6 +482,10 @@ public static class EconomyEndpoints
             request.PackId,
             request.CurrencyCode,
             string.IsNullOrWhiteSpace(request.PaymentProvider) ? "stripe" : request.PaymentProvider,
+            request.Platform,
+            request.AppVersion,
+            request.Country,
+            request.Locale,
             request.PaymentMethodId);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
@@ -483,7 +554,11 @@ public static class EconomyEndpoints
         var command = new CreatePremiumCheckoutCommand(
             userId!.Value,
             request.PlanCode,
-            string.IsNullOrWhiteSpace(request.PaymentProvider) ? "stripe" : request.PaymentProvider);
+            string.IsNullOrWhiteSpace(request.PaymentProvider) ? "stripe" : request.PaymentProvider,
+            request.Platform,
+            request.AppVersion,
+            request.Country,
+            request.Locale);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -639,6 +714,91 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<StoreWebhookResultResponse>, ProblemHttpResult, ValidationProblem>> AppStoreServerNotificationAsync(
+        AppStoreServerNotificationRequest request,
+        IValidator<AppStoreServerNotificationCommand> validator,
+        IStoreWebhookSecurityValidator securityValidator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new AppStoreServerNotificationCommand(request.SignedPayload);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var securityValidation = securityValidator.ValidateAppStoreSignedPayload(command.SignedPayload);
+        if (securityValidation.IsFailure)
+        {
+            var statusCode = securityValidation.Error.Code switch
+            {
+                InvalidStoreWebhookSignatureCode => StatusCodes.Status401Unauthorized,
+                _ => StatusCodes.Status400BadRequest
+            };
+
+            return TypedResults.Problem(title: securityValidation.Error.Code, detail: securityValidation.Error.Message, statusCode: statusCode);
+        }
+
+        var result = await service.HandleAppStoreServerNotificationAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                InvalidStoreWebhookSignatureCode => StatusCodes.Status401Unauthorized,
+                InvalidWebhookPayloadCode => StatusCodes.Status400BadRequest,
+                _ => StatusCodes.Status400BadRequest
+            };
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<StoreWebhookResultResponse>, ProblemHttpResult, ValidationProblem>> GooglePlayDeveloperNotificationAsync(
+        HttpRequest httpRequest,
+        GooglePlayDeveloperNotificationRequest request,
+        IValidator<GooglePlayDeveloperNotificationCommand> validator,
+        IStoreWebhookSecurityValidator securityValidator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new GooglePlayDeveloperNotificationCommand(request.Message.Data, request.Message.MessageId);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var securityValidation = await securityValidator.ValidateGooglePlayPushAsync(httpRequest.Headers.Authorization.ToString(), cancellationToken);
+        if (securityValidation.IsFailure)
+        {
+            var statusCode = securityValidation.Error.Code switch
+            {
+                InvalidStoreWebhookSignatureCode => StatusCodes.Status401Unauthorized,
+                "economy.store_verification_unavailable" => StatusCodes.Status503ServiceUnavailable,
+                _ => StatusCodes.Status400BadRequest
+            };
+
+            return TypedResults.Problem(title: securityValidation.Error.Code, detail: securityValidation.Error.Message, statusCode: statusCode);
+        }
+
+        var result = await service.HandleGooglePlayDeveloperNotificationAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                InvalidStoreWebhookSignatureCode => StatusCodes.Status401Unauthorized,
+                "economy.store_verification_unavailable" => StatusCodes.Status503ServiceUnavailable,
+                InvalidWebhookPayloadCode => StatusCodes.Status400BadRequest,
+                _ => StatusCodes.Status400BadRequest
+            };
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static (Guid? UserId, bool IsPremium, PetMagic.BuildingBlocks.Results.Error? Error) TryGetSubject(HttpContext context)
     {
         var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -658,9 +818,23 @@ public static class EconomyEndpoints
 
     public sealed record PaymentMethodSetupRequest(string PaymentProvider = "stripe");
 
-    public sealed record CreatePurchaseRequest(Guid PackId, string CurrencyCode, string PaymentProvider = "stripe", Guid? PaymentMethodId = null);
+    public sealed record CreatePurchaseRequest(
+        Guid PackId,
+        string CurrencyCode,
+        string PaymentProvider = "stripe",
+        string Platform = "web",
+        string AppVersion = "1.0.0",
+        string Country = "*",
+        string Locale = "en",
+        Guid? PaymentMethodId = null);
 
-    public sealed record CreatePremiumCheckoutRequest(string PlanCode, string PaymentProvider = "stripe");
+    public sealed record CreatePremiumCheckoutRequest(
+        string PlanCode,
+        string PaymentProvider = "stripe",
+        string Platform = "web",
+        string AppVersion = "1.0.0",
+        string Country = "*",
+        string Locale = "en");
 
     public sealed record CreatePremiumBillingPortalRequest(string PaymentProvider = "stripe");
 
@@ -672,4 +846,10 @@ public static class EconomyEndpoints
         string? LocalVerificationData,
         string? PurchaseId,
         string? TransactionDate);
+
+    public sealed record AppStoreServerNotificationRequest(string SignedPayload);
+
+    public sealed record GooglePlayDeveloperNotificationRequest(GooglePlayPubSubMessage Message);
+
+    public sealed record GooglePlayPubSubMessage(string Data, string? MessageId);
 }

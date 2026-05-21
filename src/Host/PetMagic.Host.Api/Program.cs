@@ -151,6 +151,7 @@ var app = builder.Build();
 
 Directory.CreateDirectory(dataProtectionKeysPath);
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot"));
+Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "support-attachments"));
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
 

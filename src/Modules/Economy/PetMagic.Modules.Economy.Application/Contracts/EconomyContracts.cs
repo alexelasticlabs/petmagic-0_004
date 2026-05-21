@@ -8,11 +8,31 @@ public sealed record SpendBalanceCommand(Guid UserId, int Amount, string Reason)
 
 public sealed record CreditBalanceCommand(Guid UserId, int Amount, string Source, string Reason);
 
-public sealed record CreatePackPurchaseCommand(Guid UserId, Guid PackId, string CurrencyCode, string PaymentProvider, Guid? PaymentMethodId = null);
+public sealed record CreatePackPurchaseCommand(
+    Guid UserId,
+    Guid PackId,
+    string CurrencyCode,
+    string PaymentProvider,
+    string Platform,
+    string AppVersion,
+    string Country,
+    string Locale,
+    Guid? PaymentMethodId = null);
 
-public sealed record CreatePremiumCheckoutCommand(Guid UserId, string PlanCode, string PaymentProvider);
+public sealed record CreatePremiumCheckoutCommand(
+    Guid UserId,
+    string PlanCode,
+    string PaymentProvider,
+    string Platform,
+    string AppVersion,
+    string Country,
+    string Locale);
 
 public sealed record CreatePremiumBillingPortalCommand(Guid UserId, string PaymentProvider);
+
+public sealed record GetPaywallConfigQuery(string Platform, string AppVersion, string Country, string Locale);
+
+public sealed record GetWalletCheckoutConfigQuery(string Platform, string AppVersion, string Country, string Locale);
 
 public sealed record VerifyPremiumStorePurchaseCommand(
     Guid UserId,
@@ -28,6 +48,10 @@ public sealed record ConfirmPackPurchaseCommand(Guid UserId, Guid OrderId);
 
 public sealed record StripeWebhookCommand(string RawBody, string StripeSignature);
 
+public sealed record AppStoreServerNotificationCommand(string SignedPayload);
+
+public sealed record GooglePlayDeveloperNotificationCommand(string MessageData, string? MessageId);
+
 public sealed record CreatePaymentMethodSetupCommand(Guid UserId, string PaymentProvider);
 
 public sealed record RemovePaymentMethodCommand(Guid UserId, Guid PaymentMethodId);
@@ -37,8 +61,10 @@ public sealed record ApplyRedeemCodeCommand(Guid UserId, string Code);
 public sealed record CreateRedeemCodeCommand(
     string Code,
     string Description,
-    int RewardSpark,
+    string RewardKind,
+    int RewardValue,
     int MaxRedemptions,
+    int MaxRedemptionsPerUser,
     bool IsActive,
     DateTime? StartsAtUtc,
     DateTime? ExpiresAtUtc);
@@ -46,8 +72,10 @@ public sealed record CreateRedeemCodeCommand(
 public sealed record UpdateRedeemCodeCommand(
     Guid RedeemCodeId,
     string Description,
-    int RewardSpark,
+    string RewardKind,
+    int RewardValue,
     int MaxRedemptions,
+    int MaxRedemptionsPerUser,
     bool IsActive,
     DateTime? StartsAtUtc,
     DateTime? ExpiresAtUtc);
@@ -60,6 +88,37 @@ public sealed record UpdateCurrencyPackCommand(
     int BonusSpark,
     bool IsActive,
     int SortOrder);
+
+public sealed record UpdateSubscriptionPlanCommand(
+    string PlanId,
+    string Name,
+    decimal PriceAmount,
+    string CurrencyCode,
+    int MonthlyTokenLimit,
+    bool IsRecommended,
+    bool IsActive,
+    string? AppleProductId,
+    string? GoogleProductId,
+    string? StripePriceId,
+    int DisplayOrder);
+
+public sealed record UpdatePaymentProviderConfigurationCommand(
+    Guid ConfigurationId,
+    string Region,
+    bool IsEnabled,
+    bool IsRecommended,
+    bool IsSelectedByDefault,
+    bool RequiresExternalWarning,
+    bool RequiresStoreDisclosure,
+    string AllowedFromAppVersion,
+    bool ExternalCheckoutAllowed,
+    int BonusTokensPercent,
+    string? DisplayLabel,
+    string? DisplaySubtitle,
+    string? WarningTitle,
+    string? WarningMessage,
+    string Mode,
+    string? Notes);
 
 public sealed record OffsetPagedResponse<T>(
     IReadOnlyList<T> Items,
@@ -95,21 +154,36 @@ public sealed record WalletLedgerItemResponse(
 
 public sealed record RedeemCodeAppliedResponse(
     Guid RedeemCodeId,
-    int RewardSpark,
-    WalletOperationResponse WalletOperation);
+    string RewardKind,
+    int RewardValue,
+    WalletOperationResponse? WalletOperation,
+    DateTime? PremiumExpiresAtUtc);
+
+public sealed record AdminRedeemCodeRedemptionResponse(
+    Guid RedemptionId,
+    Guid UserId,
+    string RewardKind,
+    int RewardValue,
+    Guid? WalletLedgerEntryId,
+    DateTime? PremiumExpiresAtUtc,
+    DateTime RedeemedAtUtc);
 
 public sealed record AdminRedeemCodeResponse(
     Guid RedeemCodeId,
+    string Code,
     string CodePrefix,
     string Description,
-    int RewardSpark,
+    string RewardKind,
+    int RewardValue,
     int MaxRedemptions,
+    int MaxRedemptionsPerUser,
     int RedeemedCount,
     bool IsActive,
     DateTime? StartsAtUtc,
     DateTime? ExpiresAtUtc,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    IReadOnlyList<AdminRedeemCodeRedemptionResponse> Redemptions);
 
 public sealed record CurrencyPackResponse(
     Guid PackId,
@@ -120,6 +194,11 @@ public sealed record CurrencyPackResponse(
     int GrantedSpark,
     int BonusSpark,
     int TotalSpark);
+
+public sealed record WalletCheckoutConfigResponse(
+    IReadOnlyList<CurrencyPackResponse> Packs,
+    IReadOnlyList<PaywallPaymentMethodResponse> AvailablePaymentMethods,
+    bool ExternalPaymentWarningRequired);
 
 public sealed record PremiumPlanResponse(
     string PlanCode,
@@ -140,6 +219,65 @@ public sealed record PremiumStatusResponse(
     bool CanManageBilling,
     string? PaymentProvider);
 
+public sealed record SubscriptionSummaryResponse(
+    bool IsPremium,
+    string? Provider,
+    string? PurchaseChannel,
+    string Status,
+    string? PlanName,
+    string? BillingPeriod,
+    DateTime? CurrentPeriodEndUtc,
+    bool CancelAtPeriodEnd,
+    int MonthlyTokenLimit,
+    int TokensAvailable,
+    bool CanManageSubscription,
+    string ManageSubscriptionAction);
+
+public sealed record PaywallPlanResponse(
+    string PlanId,
+    string Name,
+    string BillingPeriod,
+    decimal PriceAmount,
+    string CurrencyCode,
+    int MonthlyTokenLimit,
+    bool IsRecommended,
+    bool IsActive,
+    string? AppleProductId,
+    string? GoogleProductId,
+    string? StripePriceId,
+    int DisplayOrder,
+    decimal? ApproxMonthlyPriceAmount,
+    int? DiscountPercent);
+
+public sealed record PaywallPaymentMethodResponse(
+    string Provider,
+    string PurchaseChannel,
+    string Platform,
+    string Region,
+    bool IsEnabled,
+    bool IsSelectedByDefault,
+    bool RequiresExternalWarning,
+    bool RequiresStoreDisclosure,
+    bool IsRecommended,
+    int BonusTokensPercent,
+    string? DisplayLabel,
+    string? DisplaySubtitle,
+    string? WarningTitle,
+    string? WarningMessage,
+    string? Notes);
+
+public sealed record PaywallLegalTextsResponse(
+    string StoreNotice,
+    string ExternalCheckoutNotice,
+    string StripeNotice);
+
+public sealed record PaywallConfigResponse(
+    IReadOnlyList<PaywallPlanResponse> Plans,
+    string? RecommendedPlan,
+    IReadOnlyList<PaywallPaymentMethodResponse> AvailablePaymentMethods,
+    PaywallLegalTextsResponse LegalTexts,
+    bool ExternalPaymentWarningRequired);
+
 public sealed record AdminCurrencyPackResponse(
     Guid PackId,
     string Code,
@@ -151,6 +289,72 @@ public sealed record AdminCurrencyPackResponse(
     int TotalSpark,
     bool IsActive,
     int SortOrder);
+
+public sealed record AdminSubscriptionPlanResponse(
+    string PlanId,
+    string Name,
+    string BillingPeriod,
+    decimal PriceAmount,
+    string CurrencyCode,
+    int MonthlyTokenLimit,
+    bool IsRecommended,
+    bool IsActive,
+    string? AppleProductId,
+    string? GoogleProductId,
+    string? StripePriceId,
+    int DisplayOrder,
+    DateTime UpdatedAtUtc);
+
+public sealed record AdminPaymentProviderConfigurationResponse(
+    Guid ConfigurationId,
+    string Provider,
+    string Platform,
+    string Region,
+    bool IsEnabled,
+    bool IsRecommended,
+    bool IsSelectedByDefault,
+    bool RequiresExternalWarning,
+    bool RequiresStoreDisclosure,
+    string AllowedFromAppVersion,
+    bool ExternalCheckoutAllowed,
+    int BonusTokensPercent,
+    string? DisplayLabel,
+    string? DisplaySubtitle,
+    string? WarningTitle,
+    string? WarningMessage,
+    string Mode,
+    string? Notes,
+    DateTime UpdatedAtUtc);
+
+public sealed record AdminUserSubscriptionResponse(
+    Guid SubscriptionId,
+    Guid UserId,
+    string Provider,
+    string PurchaseChannel,
+    string Region,
+    string PlanId,
+    string? PlanName,
+    string Status,
+    DateTime? CurrentPeriodStartUtc,
+    DateTime? CurrentPeriodEndUtc,
+    bool CancelAtPeriodEnd,
+    int MonthlyTokenLimit,
+    int MonthlyTokensGranted,
+    DateTime? LastTokenGrantAtUtc,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record AdminSubscriptionEventResponse(
+    Guid EventId,
+    Guid? UserId,
+    Guid? UserSubscriptionId,
+    string Provider,
+    string EventType,
+    string Status,
+    string? ExternalEventId,
+    string? ExternalSubscriptionId,
+    DateTime CreatedAtUtc,
+    DateTime? ProcessedAtUtc);
 
 public sealed record PurchaseCheckoutResponse(
     Guid OrderId,
@@ -224,3 +428,5 @@ public sealed record PremiumStoreVerificationResponse(
     string Status);
 
 public sealed record StripeWebhookResultResponse(string EventId, bool Processed, string Status);
+
+public sealed record StoreWebhookResultResponse(string Provider, string EventId, bool Processed, string Status);

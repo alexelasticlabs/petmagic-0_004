@@ -19,8 +19,16 @@ public static class AdminEconomyEndpoints
 
         group.MapGet("/ledger", GetWalletLedgerAsync);
         group.MapGet("/purchases", GetPurchasesAsync);
+        group.MapGet("/subscriptions", GetSubscriptionsAsync);
         group.MapGet("/packs", ListPacksAsync);
+        group.MapGet("/subscription-plans", ListSubscriptionPlansAsync);
+        group.MapGet("/payment-provider-configs", ListPaymentProviderConfigurationsAsync);
+        group.MapGet("/subscription-events", GetSubscriptionEventsAsync);
         group.MapPut("/packs/{packId:guid}", UpdatePackAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/subscription-plans/{planId}", UpdateSubscriptionPlanAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/payment-provider-configs/{configurationId:guid}", UpdatePaymentProviderConfigurationAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/redeem-codes", ListRedeemCodesAsync);
         group.MapPost("/redeem-codes", CreateRedeemCodeAsync)
@@ -72,6 +80,56 @@ public static class AdminEconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<OffsetPagedResponse<AdminUserSubscriptionResponse>>, ProblemHttpResult>> GetSubscriptionsAsync(
+        [FromQuery] int skip,
+        [FromQuery] int take,
+        [FromQuery] string? status,
+        [FromQuery] string? provider,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminSubscriptionsAsync(skip, take, status, provider, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<IReadOnlyList<AdminSubscriptionPlanResponse>>> ListSubscriptionPlansAsync(
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListAdminSubscriptionPlansAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>> ListPaymentProviderConfigurationsAsync(
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListAdminPaymentProviderConfigurationsAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<OffsetPagedResponse<AdminSubscriptionEventResponse>>, ProblemHttpResult>> GetSubscriptionEventsAsync(
+        [FromQuery] int skip,
+        [FromQuery] int take,
+        [FromQuery] string? provider,
+        [FromQuery] string? status,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminSubscriptionEventsAsync(skip, take, provider, status, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<AdminCurrencyPackResponse>, ValidationProblem, ProblemHttpResult>> UpdatePackAsync(
         [FromRoute] Guid packId,
         [FromBody] UpdatePackRequest request,
@@ -106,6 +164,87 @@ public static class AdminEconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<AdminSubscriptionPlanResponse>, ValidationProblem, ProblemHttpResult>> UpdateSubscriptionPlanAsync(
+        [FromRoute] string planId,
+        [FromBody] UpdateSubscriptionPlanRequest request,
+        [FromServices] IValidator<UpdateSubscriptionPlanCommand> validator,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new UpdateSubscriptionPlanCommand(
+            planId,
+            request.Name,
+            request.PriceAmount,
+            request.CurrencyCode,
+            request.MonthlyTokenLimit,
+            request.IsRecommended,
+            request.IsActive,
+            request.AppleProductId,
+            request.GoogleProductId,
+            request.StripePriceId,
+            request.DisplayOrder);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.UpdateSubscriptionPlanAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code == "economy.premium_plan_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminPaymentProviderConfigurationResponse>, ValidationProblem, ProblemHttpResult>> UpdatePaymentProviderConfigurationAsync(
+        [FromRoute] Guid configurationId,
+        [FromBody] UpdatePaymentProviderConfigurationRequest request,
+        [FromServices] IValidator<UpdatePaymentProviderConfigurationCommand> validator,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new UpdatePaymentProviderConfigurationCommand(
+            configurationId,
+            request.Region,
+            request.IsEnabled,
+            request.IsRecommended,
+            request.IsSelectedByDefault,
+            request.RequiresExternalWarning,
+            request.RequiresStoreDisclosure,
+            request.AllowedFromAppVersion,
+            request.ExternalCheckoutAllowed,
+            request.BonusTokensPercent,
+            request.DisplayLabel,
+            request.DisplaySubtitle,
+            request.WarningTitle,
+            request.WarningMessage,
+            request.Mode,
+            request.Notes);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.UpdatePaymentProviderConfigurationAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code == "economy.payment_provider_config_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Ok<IReadOnlyList<AdminRedeemCodeResponse>>> ListRedeemCodesAsync(
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
@@ -123,8 +262,10 @@ public static class AdminEconomyEndpoints
         var command = new CreateRedeemCodeCommand(
             request.Code,
             request.Description,
-            request.RewardSpark,
+            request.RewardKind,
+            request.RewardValue,
             request.MaxRedemptions,
+            request.MaxRedemptionsPerUser,
             request.IsActive,
             request.StartsAtUtc,
             request.ExpiresAtUtc);
@@ -157,8 +298,10 @@ public static class AdminEconomyEndpoints
         var command = new UpdateRedeemCodeCommand(
             redeemCodeId,
             request.Description,
-            request.RewardSpark,
+            request.RewardKind,
+            request.RewardValue,
             request.MaxRedemptions,
+            request.MaxRedemptionsPerUser,
             request.IsActive,
             request.StartsAtUtc,
             request.ExpiresAtUtc);
@@ -189,19 +332,52 @@ public static class AdminEconomyEndpoints
         bool IsActive,
         int SortOrder);
 
+    public sealed record UpdateSubscriptionPlanRequest(
+        string Name,
+        decimal PriceAmount,
+        string CurrencyCode,
+        int MonthlyTokenLimit,
+        bool IsRecommended,
+        bool IsActive,
+        string? AppleProductId,
+        string? GoogleProductId,
+        string? StripePriceId,
+        int DisplayOrder);
+
+    public sealed record UpdatePaymentProviderConfigurationRequest(
+        string Region,
+        bool IsEnabled,
+        bool IsRecommended,
+        bool IsSelectedByDefault,
+        bool RequiresExternalWarning,
+        bool RequiresStoreDisclosure,
+        string AllowedFromAppVersion,
+        bool ExternalCheckoutAllowed,
+        int BonusTokensPercent,
+        string? DisplayLabel,
+        string? DisplaySubtitle,
+        string? WarningTitle,
+        string? WarningMessage,
+        string Mode,
+        string? Notes);
+
     public sealed record CreateRedeemCodeRequest(
         string Code,
         string Description,
-        int RewardSpark,
+        string RewardKind,
+        int RewardValue,
         int MaxRedemptions,
+        int MaxRedemptionsPerUser,
         bool IsActive,
         DateTime? StartsAtUtc,
         DateTime? ExpiresAtUtc);
 
     public sealed record UpdateRedeemCodeRequest(
         string Description,
-        int RewardSpark,
+        string RewardKind,
+        int RewardValue,
         int MaxRedemptions,
+        int MaxRedemptionsPerUser,
         bool IsActive,
         DateTime? StartsAtUtc,
         DateTime? ExpiresAtUtc);

@@ -22,13 +22,19 @@ public static class EconomyErrors
 
     public static readonly Error UnsupportedPaymentProvider = new("economy.payment_provider_unsupported", "Payment provider is not supported.");
 
+    public static readonly Error PaymentProviderUnavailable = new("economy.payment_provider_unavailable", "Payment provider is not available for this platform, region, or app version.");
+
     public static readonly Error InvalidStripeSignature = new("economy.invalid_stripe_signature", "Stripe signature is invalid.");
+
+    public static readonly Error InvalidStoreWebhookSignature = new("economy.invalid_store_webhook_signature", "Store webhook signature is invalid.");
 
     public static readonly Error InvalidWebhookPayload = new("economy.invalid_webhook_payload", "Webhook payload is invalid.");
 
     public static readonly Error PaymentGatewayFailed = new("economy.payment_gateway_failed", "Payment gateway call failed.");
 
     public static readonly Error PremiumPlanNotFound = new("economy.premium_plan_not_found", "Premium plan was not found.");
+
+    public static readonly Error PaymentProviderConfigurationNotFound = new("economy.payment_provider_config_not_found", "Payment provider configuration was not found.");
 
     public static readonly Error PremiumBillingUnavailable = new("economy.premium_billing_unavailable", "Premium billing is not available right now.");
 
@@ -48,7 +54,11 @@ public static class EconomyErrors
 
     public static readonly Error RedeemCodeAlreadyUsed = new("economy.redeem_code_already_used", "Redeem code was already used by this user.");
 
+    public static readonly Error RedeemCodeUserLimitReached = new("economy.redeem_code_user_limit_reached", "Redeem code is no longer available for this user.");
+
     public static readonly Error RedeemCodeExhausted = new("economy.redeem_code_exhausted", "Redeem code redemption limit reached.");
 
     public static readonly Error RedeemCodeAlreadyExists = new("economy.redeem_code_exists", "Redeem code already exists.");
+
+    public static readonly Error RedeemCodeRewardUnsupported = new("economy.redeem_code_reward_unsupported", "Redeem code reward is not supported.");
 }

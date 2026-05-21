@@ -5,11 +5,14 @@ using Microsoft.Extensions.Options;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
+using PetMagic.Modules.Identity.Application.Abstractions;
+using PetMagic.Modules.Identity.Application.Contracts;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
@@ -65,7 +68,7 @@ public sealed class EconomyServiceTests
         var service = CreateService(dbContext);
 
         var createResult = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe"),
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
             CancellationToken.None);
 
         Assert.True(createResult.IsSuccess);
@@ -137,7 +140,7 @@ public sealed class EconomyServiceTests
 
         var service = CreateService(dbContext);
         var createResult = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe"),
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
             CancellationToken.None);
 
         Assert.True(createResult.IsSuccess);
@@ -150,6 +153,36 @@ public sealed class EconomyServiceTests
         Assert.Equal("starter", purchase.PackCode);
         Assert.Equal("Starter PawSpark", purchase.PackDisplayName);
         Assert.Equal(120, purchase.SparkToGrant);
+    }
+
+    [Fact]
+    public async Task CreatePackPurchaseAsync_ShouldRejectStripe_WhenProviderConfigUnavailable()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "starter",
+            DisplayName = "Starter PawSpark",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var createResult = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "ios", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentProviderUnavailable.Code, createResult.Error.Code);
     }
 
     [Fact]
@@ -180,7 +213,7 @@ public sealed class EconomyServiceTests
         var service = CreateService(dbContext);
 
         var result = await service.CreatePremiumCheckoutAsync(
-            new CreatePremiumCheckoutCommand(userId, "yearly", "stripe"),
+            new CreatePremiumCheckoutCommand(userId, "yearly", "stripe", "web", "1.0.0", "*", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -192,6 +225,44 @@ public sealed class EconomyServiceTests
     }
 
     [Fact]
+    public async Task CreatePremiumCheckoutAsync_ShouldUseDatabasePlanConfiguration_WhenAvailable()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Annual Pro",
+            BillingPeriod = "yearly",
+            PriceAmount = 129.99m,
+            CurrencyCode = "EUR",
+            MonthlyTokenLimit = 2400,
+            IsRecommended = true,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.yearly.apple",
+            GoogleProductId = "com.petmagic.custom.yearly.google",
+            DisplayOrder = 2,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway();
+        var service = CreateService(dbContext, gateway: gateway);
+
+        var result = await service.CreatePremiumCheckoutAsync(
+            new CreatePremiumCheckoutCommand(Guid.NewGuid(), "yearly", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(gateway.LastSubscriptionCheckoutRequest);
+        Assert.Equal("PetMagic Premium Annual Pro", gateway.LastSubscriptionCheckoutRequest!.ProductName);
+        Assert.Equal(129.99m, gateway.LastSubscriptionCheckoutRequest.PriceAmount);
+        Assert.Equal("EUR", gateway.LastSubscriptionCheckoutRequest.CurrencyCode);
+        Assert.Equal("year", gateway.LastSubscriptionCheckoutRequest.BillingInterval);
+    }
+
+    [Fact]
     public async Task ApplyRedeemCodeAsync_ShouldCreditWalletOncePerUser()
     {
         await using var dbContext = CreateDbContext();
@@ -200,7 +271,7 @@ public sealed class EconomyServiceTests
         var service = CreateService(dbContext);
 
         var codeResult = await service.CreateRedeemCodeAsync(
-            new CreateRedeemCodeCommand("WELCOME-100", "Launch bonus", 100, 10, true, null, DateTime.UtcNow.AddDays(7)),
+            new CreateRedeemCodeCommand("WELCOME-100", "Launch bonus", RedeemCodeRewardKind.Spark, 100, 10, 1, true, null, DateTime.UtcNow.AddDays(7)),
             CancellationToken.None);
 
         Assert.True(codeResult.IsSuccess);
@@ -210,7 +281,8 @@ public sealed class EconomyServiceTests
             CancellationToken.None);
 
         Assert.True(firstApply.IsSuccess);
-        Assert.Equal(100, firstApply.Value.WalletOperation.NewBalance);
+        Assert.NotNull(firstApply.Value.WalletOperation);
+        Assert.Equal(100, firstApply.Value.WalletOperation!.NewBalance);
 
         var duplicateApply = await service.ApplyRedeemCodeAsync(
             new ApplyRedeemCodeCommand(userId, "WELCOME-100"),
@@ -238,7 +310,7 @@ public sealed class EconomyServiceTests
         var service = CreateService(dbContext);
 
         var codeResult = await service.CreateRedeemCodeAsync(
-            new CreateRedeemCodeCommand("SINGLE", "Single use", 25, 1, true, null, DateTime.UtcNow.AddDays(7)),
+            new CreateRedeemCodeCommand("SINGLE", "Single use", RedeemCodeRewardKind.Spark, 25, 1, 1, true, null, DateTime.UtcNow.AddDays(7)),
             CancellationToken.None);
 
         Assert.True(codeResult.IsSuccess);
@@ -253,6 +325,157 @@ public sealed class EconomyServiceTests
         Assert.True(firstApply.IsSuccess);
         Assert.True(secondApply.IsFailure);
         Assert.Equal(EconomyErrors.RedeemCodeExhausted.Code, secondApply.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyRedeemCodeAsync_ShouldRejectInactiveCode()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("ARCHIVED", "Archived promo", RedeemCodeRewardKind.Spark, 40, 10, 1, false, null, DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var apply = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(userId, "ARCHIVED"),
+            CancellationToken.None);
+
+        Assert.True(apply.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodeInactive.Code, apply.Error.Code);
+        Assert.False(await dbContext.Wallets.AnyAsync(x => x.UserId == userId));
+    }
+
+    [Fact]
+    public async Task ApplyRedeemCodeAsync_ShouldRejectScheduledCode()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("FUTURE", "Future promo", RedeemCodeRewardKind.Spark, 40, 10, 1, true, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var apply = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(userId, "FUTURE"),
+            CancellationToken.None);
+
+        Assert.True(apply.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodeInactive.Code, apply.Error.Code);
+        Assert.False(await dbContext.Wallets.AnyAsync(x => x.UserId == userId));
+    }
+
+    [Fact]
+    public async Task ApplyRedeemCodeAsync_ShouldRejectExpiredCode()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("EXPIRED", "Expired promo", RedeemCodeRewardKind.Spark, 40, 10, 1, true, DateTime.UtcNow.AddDays(-10), DateTime.UtcNow.AddDays(-1)),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var apply = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(userId, "EXPIRED"),
+            CancellationToken.None);
+
+        Assert.True(apply.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodeExpired.Code, apply.Error.Code);
+        Assert.False(await dbContext.Wallets.AnyAsync(x => x.UserId == userId));
+    }
+
+    [Fact]
+    public async Task UpdateRedeemCodeAsync_ShouldRejectLimitBelowRedeemedCountAndAllowArchive()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("LIMITED", "Limited promo", RedeemCodeRewardKind.Spark, 30, 2, 1, true, null, DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var apply = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(firstUserId, "LIMITED"),
+            CancellationToken.None);
+
+        Assert.True(apply.IsSuccess);
+
+        var invalidUpdate = await service.UpdateRedeemCodeAsync(
+            new UpdateRedeemCodeCommand(codeResult.Value.RedeemCodeId, "Limited promo", RedeemCodeRewardKind.Spark, 30, 0, 1, true, null, DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(invalidUpdate.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodeExhausted.Code, invalidUpdate.Error.Code);
+
+        var archive = await service.UpdateRedeemCodeAsync(
+            new UpdateRedeemCodeCommand(codeResult.Value.RedeemCodeId, "Archived promo", RedeemCodeRewardKind.Spark, 30, 2, 1, false, null, DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(archive.IsSuccess);
+        Assert.False(archive.Value.IsActive);
+        Assert.Equal("Archived promo", archive.Value.Description);
+
+        var secondApply = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(secondUserId, "LIMITED"),
+            CancellationToken.None);
+
+        Assert.True(secondApply.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodeInactive.Code, secondApply.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyRedeemCodeAsync_ShouldRespectPerUserLimit()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("DOUBLE", "Two per user", RedeemCodeRewardKind.Spark, 15, 20, 2, true, null, DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var firstApply = await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(userId, "DOUBLE"), CancellationToken.None);
+        var secondApply = await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(userId, "DOUBLE"), CancellationToken.None);
+        var thirdApply = await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(userId, "DOUBLE"), CancellationToken.None);
+
+        Assert.True(firstApply.IsSuccess);
+        Assert.True(secondApply.IsSuccess);
+        Assert.True(thirdApply.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodeUserLimitReached.Code, thirdApply.Error.Code);
+    }
+
+    [Fact]
+    public async Task CreateRedeemCodeAsync_ShouldRejectUnsupportedRewardKind()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+
+        var result = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("PREMIUM7", "Premium week", "premium_days", 7, 10, 1, true, null, DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodeRewardUnsupported.Code, result.Error.Code);
     }
 
     [Fact]
@@ -281,7 +504,7 @@ public sealed class EconomyServiceTests
         var service = CreateService(dbContext);
 
         var createResult = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe"),
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
             CancellationToken.None);
 
         Assert.True(createResult.IsSuccess);
@@ -335,6 +558,264 @@ public sealed class EconomyServiceTests
     }
 
     [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldUseDatabasePlanAndGrantTokensOnlyOncePerPeriod()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = "active",
+            IsActive = true,
+        };
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var first = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                userId,
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "server-payload",
+                null,
+                "purchase-1",
+                null),
+            CancellationToken.None);
+
+        var second = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                userId,
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "server-payload",
+                null,
+                "purchase-1",
+                null),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId);
+        var grantEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == "premium_subscription_grant")
+            .ToListAsync();
+
+        Assert.Equal(777, wallet.Balance);
+        Assert.Equal("monthly", subscription.PlanId);
+        Assert.Equal(777, subscription.MonthlyTokenLimit);
+        Assert.Equal(777, subscription.MonthlyTokensGranted);
+        Assert.Single(grantEntries);
+        Assert.Equal(2, identityService.SetPremiumStatusCalls.Count);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldUseDatabasePlanConfiguration_ForSubscriptionGrant()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Ultra Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 149.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 2222,
+            IsRecommended = true,
+            IsActive = true,
+            AppleProductId = "com.petmagic.ultra.yearly.apple",
+            GoogleProductId = "com.petmagic.ultra.yearly.google",
+            DisplayOrder = 2,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var userId = Guid.NewGuid();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var periodStart = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var periodEnd = new DateTimeOffset(new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_sub_test\",\"object\":\"checkout.session\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId);
+
+        Assert.Equal(2222, wallet.Balance);
+        Assert.Equal("yearly", subscription.PlanId);
+        Assert.Equal(2222, subscription.MonthlyTokenLimit);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+    }
+
+    [Fact]
+    public async Task HandleAppStoreServerNotificationAsync_ShouldUpdateExistingSubscription()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddDays(20);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "app_store",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "orig-app-1",
+            ExternalTransactionId = "txn-app-1",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = expiresAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-1\",\"transactionId\":\"txn-app-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
+        var signedRenewalInfo = CreateUnsignedJws("{\"autoRenewStatus\":0}");
+        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-notification-1\",\"notificationType\":\"DID_CHANGE_RENEWAL_STATUS\",\"subtype\":\"AUTO_RENEW_DISABLED\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\",\"signedRenewalInfo\":\"{signedRenewalInfo}\"}}}}");
+
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
+
+        var result = await service.HandleAppStoreServerNotificationAsync(
+            new AppStoreServerNotificationCommand(signedPayload),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
+        Assert.Equal("Canceled", subscription.Status);
+        Assert.True(subscription.CancelAtPeriodEnd);
+        Assert.Equal("txn-app-2", subscription.ExternalTransactionId);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+    }
+
+    [Fact]
+    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldUpdateExistingSubscription()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddDays(14);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "google_play",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "order-1",
+            ExternalTransactionId = "gp-token-1",
+            CurrentPeriodStartUtc = now.AddDays(-5),
+            CurrentPeriodEndUtc = expiresAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":3,\"purchaseToken\":\"gp-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
+        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = expiresAtUtc,
+            Status = "SUBSCRIPTION_STATE_ACTIVE",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
+            new GooglePlayDeveloperNotificationCommand(messageData, "google-message-1"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
+        Assert.Equal("Canceled", subscription.Status);
+        Assert.True(subscription.CancelAtPeriodEnd);
+        Assert.Equal("gp-token-1", subscription.ExternalTransactionId);
+        Assert.Equal("order-1", subscription.ExternalSubscriptionId);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+    }
+
+    [Fact]
     public async Task CreatePackPurchase_WithSavedPaymentMethod_ShouldChargeAndCreditWallet()
     {
         await using var dbContext = CreateDbContext();
@@ -383,7 +864,7 @@ public sealed class EconomyServiceTests
         var service = CreateService(dbContext);
 
         var purchase = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", paymentMethodId),
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en", paymentMethodId),
             CancellationToken.None);
 
         Assert.True(purchase.IsSuccess);
@@ -394,7 +875,11 @@ public sealed class EconomyServiceTests
         Assert.Equal(120, wallet.Balance);
     }
 
-    private static EconomyService CreateService(EconomyDbContext dbContext)
+    private static EconomyService CreateService(
+        EconomyDbContext dbContext,
+        FakePaymentGateway? gateway = null,
+        FakeStoreSubscriptionVerifier? storeVerifier = null,
+        IIdentityService? identityService = null)
     {
         var options = Options.Create(new EconomyOptions
         {
@@ -408,8 +893,12 @@ public sealed class EconomyServiceTests
             StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel"
         });
 
-        var gateway = new FakePaymentGateway();
-        return new EconomyService(dbContext, gateway, new FakeStoreSubscriptionVerifier(), options);
+        return new EconomyService(
+            dbContext,
+            gateway ?? new FakePaymentGateway(),
+            storeVerifier ?? new FakeStoreSubscriptionVerifier(),
+            options,
+            identityService);
     }
 
     private static EconomyDbContext CreateDbContext()
@@ -418,7 +907,28 @@ public sealed class EconomyServiceTests
             .UseInMemoryDatabase($"economy-tests-{Guid.NewGuid():N}")
             .Options;
 
-        return new EconomyDbContext(dbOptions);
+        var dbContext = new EconomyDbContext(dbOptions);
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "web",
+            Region = "*",
+            IsEnabled = true,
+            IsRecommended = true,
+            IsSelectedByDefault = true,
+            RequiresExternalWarning = false,
+            RequiresStoreDisclosure = false,
+            AllowedFromAppVersion = "0.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            Mode = "test",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        dbContext.SaveChanges();
+
+        return dbContext;
     }
 
     private static string BuildStripeSignature(string payload, string secret)
@@ -437,8 +947,23 @@ public sealed class EconomyServiceTests
         return Convert.ToHexString(hmac.ComputeHash(payloadBytes)).ToLowerInvariant();
     }
 
+    private static string CreateUnsignedJws(string json)
+    {
+        return $"{Base64UrlEncode("{\"alg\":\"none\",\"typ\":\"JWT\"}")}.{Base64UrlEncode(json)}.signature";
+    }
+
+    private static string Base64UrlEncode(string value)
+    {
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
     private sealed class FakePaymentGateway : IPaymentGateway
     {
+        public SubscriptionCheckoutCreateRequest? LastSubscriptionCheckoutRequest { get; private set; }
+
         public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
         {
             var sessionId = $"cs_test_{request.OrderId:N}";
@@ -450,6 +975,7 @@ public sealed class EconomyServiceTests
             SubscriptionCheckoutCreateRequest request,
             CancellationToken cancellationToken)
         {
+            LastSubscriptionCheckoutRequest = request;
             var sessionId = $"cs_sub_{request.UserId:N}_{request.PlanCode}";
             var url = $"https://checkout.stripe.com/pay/{sessionId}";
             return Task.FromResult(Result.Success(new SubscriptionCheckoutCreateResponse(sessionId, url)));
@@ -491,11 +1017,85 @@ public sealed class EconomyServiceTests
 
     private sealed class FakeStoreSubscriptionVerifier : IStoreSubscriptionVerifier
     {
+        public bool IsActive { get; init; } = true;
+
+        public DateTime ExpiresAtUtc { get; init; } = DateTime.UtcNow.AddDays(30);
+
+        public string Status { get; init; } = "active";
+
         public Task<Result<StoreSubscriptionVerificationResponse>> VerifyAsync(
             StoreSubscriptionVerificationRequest request,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(Result.Success(new StoreSubscriptionVerificationResponse(true, DateTime.UtcNow.AddDays(30), "active", request.PurchaseId)));
+            return Task.FromResult(Result.Success(new StoreSubscriptionVerificationResponse(IsActive, ExpiresAtUtc, Status, request.PurchaseId)));
         }
+    }
+
+    private sealed class FakeIdentityService : IIdentityService
+    {
+        private static readonly LegalAcceptanceStatusResponse DefaultLegalAcceptance = new(
+            true,
+            "2026-05-20",
+            DateTime.UtcNow,
+            true,
+            "2026-05-20",
+            DateTime.UtcNow,
+            "2026-05-20",
+            "2026-05-20",
+            false);
+
+        public List<SetPremiumStatusCommand> SetPremiumStatusCalls { get; } = [];
+
+        public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
+        public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
+        public Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
+        public Task<Result> RequestEmailConfirmationAsync(RequestEmailConfirmationCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> ConfirmEmailAsync(ConfirmEmailCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> RequestPasswordResetAsync(RequestPasswordResetCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
+        public Task<Result<IReadOnlyList<LinkedAccountResponse>>> GetLinkedAccountsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
+        public Task<Result<IReadOnlyList<LinkedAccountResponse>>> LinkExternalLoginAsync(Guid userId, ExternalLoginCallbackCommand command, CancellationToken cancellationToken) => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
+        public Task<Result<IReadOnlyList<LinkedAccountResponse>>> UnlinkExternalLoginAsync(Guid userId, string provider, CancellationToken cancellationToken) => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
+        public Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
+        public Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken) => NotSupported();
+
+        public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new UserProfileResponse(
+                userId,
+                "premium@petmagic.app",
+                "Premium User",
+                false,
+                true,
+                true,
+                false,
+                false,
+                DefaultLegalAcceptance,
+                ["user"],
+                null)));
+        }
+
+        public Task<Result<UserProfileResponse>> AcceptLegalDocumentsAsync(Guid userId, AcceptLegalDocumentsCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
+        public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
+        public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
+        public Task<Result<IReadOnlyList<UserListItemResponse>>> ListUsersAsync(CancellationToken cancellationToken) => NotSupported<IReadOnlyList<UserListItemResponse>>();
+        public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
+        public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();
+        public Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserWalletOperationResponse>();
+        public Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> RevokeRoleAsync(RevokeRoleCommand command, CancellationToken cancellationToken) => NotSupported();
+
+        public Task<Result> SetPremiumStatusAsync(SetPremiumStatusCommand command, CancellationToken cancellationToken)
+        {
+            SetPremiumStatusCalls.Add(command);
+            return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result> SetUserActiveStatusAsync(SetUserActiveStatusCommand command, CancellationToken cancellationToken) => NotSupported();
+
+        private static Task<Result> NotSupported() => Task.FromException<Result>(new NotSupportedException());
+        private static Task<Result<T>> NotSupported<T>() => Task.FromException<Result<T>>(new NotSupportedException());
     }
 }

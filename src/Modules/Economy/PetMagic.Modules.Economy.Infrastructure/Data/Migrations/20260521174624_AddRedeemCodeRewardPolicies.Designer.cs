@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PetMagic.Modules.Economy.Infrastructure.Data;
 namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(EconomyDbContext))]
-    partial class EconomyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260521174624_AddRedeemCodeRewardPolicies")]
+    partial class AddRedeemCodeRewardPolicies
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -108,30 +111,13 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<int>("BonusTokensPercent")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DisplayLabel")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("DisplaySubtitle")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
 
                     b.Property<bool>("ExternalCheckoutAllowed")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsRecommended")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsSelectedByDefault")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Mode")
@@ -166,14 +152,6 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("WarningMessage")
-                        .HasMaxLength(800)
-                        .HasColumnType("character varying(800)");
-
-                    b.Property<string>("WarningTitle")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
 
                     b.HasKey("Id");
 
@@ -286,11 +264,6 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("CodeHash")
                         .IsRequired()
