@@ -102,7 +102,77 @@ export type Dictionary = {
   navVideoTemplates: string;
   navTemplateAnalytics: string;
   navTemplateCategories: string;
+  navPromoCodes: string;
   navLogout: string;
+  promoCodesHeroEyebrow: string;
+  promoCodesHeroDescription: string;
+  promoCodesTokenOnlyBadge: string;
+  promoCodesLoadingDescription: string;
+  promoCodesErrorDescription: string;
+  promoCodesCreateAction: string;
+  promoCodesExportAction: string;
+  promoCodesRefreshAction: string;
+  promoCodesTableDescription: string;
+  promoCodesSearchPlaceholder: string;
+  promoCodesStatusFilterLabel: string;
+  promoCodesSortLabel: string;
+  promoCodesStatusAll: string;
+  promoCodesStatusArchived: string;
+  promoCodesStatusExhausted: string;
+  promoCodesStatusScheduled: string;
+  promoCodesStatusExpired: string;
+  promoCodesSortUpdated: string;
+  promoCodesSortUsage: string;
+  promoCodesSortReward: string;
+  promoCodesSortCode: string;
+  promoCodesSortExpiry: string;
+  promoCodesTotalLabel: string;
+  promoCodesActiveLabel: string;
+  promoCodesUsesLabel: string;
+  promoCodesGrantedLabel: string;
+  promoCodesEmptyDescription: string;
+  promoCodesNoResults: string;
+  promoCodesCodeLabel: string;
+  promoCodesDescriptionLabel: string;
+  promoCodesRewardLabel: string;
+  promoCodesUsageLabel: string;
+  promoCodesWindowLabel: string;
+  promoCodesUpdatedColumn: string;
+  promoCodesCopyAction: string;
+  promoCodesDuplicateAction: string;
+  promoCodesCreatePanelTitle: string;
+  promoCodesEditPanelTitle: string;
+  promoCodesDuplicatePanelTitle: string;
+  promoCodesRewardFixedLabel: string;
+  promoCodesNewDraftAction: string;
+  promoCodesGenerateCodeAction: string;
+  promoCodesCodeHelp: string;
+  promoCodesLimitLabel: string;
+  promoCodesPerUserLimitLabel: string;
+  promoCodesStartsLabel: string;
+  promoCodesExpiresLabel: string;
+  promoCodesSaveUpdateAction: string;
+  promoCodesSaveCreateAction: string;
+  promoCodesRecentUsageTitle: string;
+  promoCodesSelectForUsage: string;
+  promoCodesRecentUsageEmpty: string;
+  promoCodesWindowAlways: string;
+  promoCodesInvalidCode: string;
+  promoCodesInvalidNumbers: string;
+  promoCodesLimitTooLow: string;
+  promoCodesPerUserLimitTooLow: string;
+  promoCodesInvalidWindow: string;
+  promoCodesCopied: string;
+  promoCodesExported: string;
+  promoCodesArchiveConfirm: string;
+  promoCodesCreateSuccess: string;
+  promoCodesCreateError: string;
+  promoCodesUpdateSuccess: string;
+  promoCodesUpdateError: string;
+  promoCodesArchiveSuccess: string;
+  promoCodesArchiveError: string;
+  promoCodesPreviousAction: string;
+  promoCodesNextAction: string;
   loading: string;
   errorLoadingUsers: string;
   errorLoadingTemplates: string;
@@ -432,7 +502,77 @@ const dictionaries: Record<Locale, Dictionary> = {
     navVideoTemplates: "Видео шаблоны",
     navTemplateAnalytics: "Аналитика шаблонов",
     navTemplateCategories: "Категории",
+    navPromoCodes: "Промокоды",
     navLogout: "Выйти",
+    promoCodesHeroEyebrow: "Токены и активации",
+    promoCodesHeroDescription: "Отдельная рабочая зона для token-only промокодов: создание, лимиты, окно действия и контроль последних активаций.",
+    promoCodesTokenOnlyBadge: "Только PawSpark",
+    promoCodesLoadingDescription: "Подтягиваем активные и архивные промокоды из economy backend.",
+    promoCodesErrorDescription: "Не удалось загрузить список промокодов. Проверьте backend и повторите запрос.",
+    promoCodesCreateAction: "Создать промокод",
+    promoCodesExportAction: "Экспорт CSV",
+    promoCodesRefreshAction: "Обновить",
+    promoCodesTableDescription: "Быстрый поиск по коду, фильтрация по статусу и ручные действия без перехода в другие разделы.",
+    promoCodesSearchPlaceholder: "Поиск по коду или описанию",
+    promoCodesStatusFilterLabel: "Фильтр статуса",
+    promoCodesSortLabel: "Сортировка",
+    promoCodesStatusAll: "Все статусы",
+    promoCodesStatusArchived: "Архив",
+    promoCodesStatusExhausted: "Исчерпан",
+    promoCodesStatusScheduled: "Запланирован",
+    promoCodesStatusExpired: "Истек",
+    promoCodesSortUpdated: "Сначала свежие",
+    promoCodesSortUsage: "По использованиям",
+    promoCodesSortReward: "По награде",
+    promoCodesSortCode: "По коду",
+    promoCodesSortExpiry: "По окончанию",
+    promoCodesTotalLabel: "Всего кодов",
+    promoCodesActiveLabel: "Активно сейчас",
+    promoCodesUsesLabel: "Активаций",
+    promoCodesGrantedLabel: "Выдано токенов",
+    promoCodesEmptyDescription: "Промокодов пока нет. Создайте первый token-only код в панели справа.",
+    promoCodesNoResults: "Фильтры не дали результатов. Ослабьте поиск или сбросьте статус.",
+    promoCodesCodeLabel: "Код",
+    promoCodesDescriptionLabel: "Описание",
+    promoCodesRewardLabel: "Награда",
+    promoCodesUsageLabel: "Использование",
+    promoCodesWindowLabel: "Окно действия",
+    promoCodesUpdatedColumn: "Обновлен",
+    promoCodesCopyAction: "Скопировать",
+    promoCodesDuplicateAction: "Дублировать",
+    promoCodesCreatePanelTitle: "Новый промокод",
+    promoCodesEditPanelTitle: "Редактирование промокода",
+    promoCodesDuplicatePanelTitle: "Дубликат промокода",
+    promoCodesRewardFixedLabel: "Фиксированная награда в PawSpark",
+    promoCodesNewDraftAction: "Новый драфт",
+    promoCodesGenerateCodeAction: "Сгенерировать",
+    promoCodesCodeHelp: "Код можно задавать вручную или сгенерировать. После создания он становится read-only.",
+    promoCodesLimitLabel: "Общий лимит",
+    promoCodesPerUserLimitLabel: "Лимит на пользователя",
+    promoCodesStartsLabel: "Старт",
+    promoCodesExpiresLabel: "Окончание",
+    promoCodesSaveUpdateAction: "Сохранить изменения",
+    promoCodesSaveCreateAction: "Создать и сохранить",
+    promoCodesRecentUsageTitle: "Последние активации",
+    promoCodesSelectForUsage: "Выберите строку в таблице, чтобы увидеть последних пользователей и время активации.",
+    promoCodesRecentUsageEmpty: "У выбранного промокода еще нет активаций.",
+    promoCodesWindowAlways: "Без ограничения по времени",
+    promoCodesInvalidCode: "Код должен содержать от 4 до 48 символов.",
+    promoCodesInvalidNumbers: "Укажите положительные значения для награды и лимитов.",
+    promoCodesLimitTooLow: "Общий лимит не может быть меньше уже использованных активаций.",
+    promoCodesPerUserLimitTooLow: "Лимит на пользователя не может быть меньше уже достигнутого значения.",
+    promoCodesInvalidWindow: "Дата начала не может быть позже даты окончания.",
+    promoCodesCopied: "Код скопирован в буфер обмена.",
+    promoCodesExported: "CSV выгружен локально.",
+    promoCodesArchiveConfirm: "Архивировать этот промокод? Новые активации будут остановлены.",
+    promoCodesCreateSuccess: "Промокод создан.",
+    promoCodesCreateError: "Не удалось создать промокод.",
+    promoCodesUpdateSuccess: "Промокод обновлен.",
+    promoCodesUpdateError: "Не удалось обновить промокод.",
+    promoCodesArchiveSuccess: "Промокод архивирован.",
+    promoCodesArchiveError: "Не удалось архивировать промокод.",
+    promoCodesPreviousAction: "Назад",
+    promoCodesNextAction: "Вперед",
     loading: "Загрузка...",
     errorLoadingUsers: "Не удалось загрузить пользователей.",
     errorLoadingTemplates: "Не удалось загрузить шаблоны.",
@@ -760,7 +900,77 @@ const dictionaries: Record<Locale, Dictionary> = {
     navVideoTemplates: "Video Templates",
     navTemplateAnalytics: "Template Analytics",
     navTemplateCategories: "Categories",
+    navPromoCodes: "Promo Codes",
     navLogout: "Logout",
+    promoCodesHeroEyebrow: "Tokens and redemption flow",
+    promoCodesHeroDescription: "Dedicated token-only workspace for promo code creation, limits, availability windows, and recent redemptions.",
+    promoCodesTokenOnlyBadge: "PawSpark only",
+    promoCodesLoadingDescription: "Loading active and archived promo codes from the economy backend.",
+    promoCodesErrorDescription: "Failed to load promo codes. Check backend availability and try again.",
+    promoCodesCreateAction: "Create promo code",
+    promoCodesExportAction: "Export CSV",
+    promoCodesRefreshAction: "Refresh",
+    promoCodesTableDescription: "Search by code, filter by status, and run manual actions without leaving this page.",
+    promoCodesSearchPlaceholder: "Search by code or description",
+    promoCodesStatusFilterLabel: "Status filter",
+    promoCodesSortLabel: "Sort by",
+    promoCodesStatusAll: "All statuses",
+    promoCodesStatusArchived: "Archived",
+    promoCodesStatusExhausted: "Exhausted",
+    promoCodesStatusScheduled: "Scheduled",
+    promoCodesStatusExpired: "Expired",
+    promoCodesSortUpdated: "Recently updated",
+    promoCodesSortUsage: "Most used",
+    promoCodesSortReward: "Highest reward",
+    promoCodesSortCode: "Code",
+    promoCodesSortExpiry: "Expiry",
+    promoCodesTotalLabel: "Total codes",
+    promoCodesActiveLabel: "Live now",
+    promoCodesUsesLabel: "Redemptions",
+    promoCodesGrantedLabel: "Tokens granted",
+    promoCodesEmptyDescription: "No promo codes yet. Create the first token-only code from the panel on the right.",
+    promoCodesNoResults: "No promo codes match the current filters. Clear the search or change status.",
+    promoCodesCodeLabel: "Code",
+    promoCodesDescriptionLabel: "Description",
+    promoCodesRewardLabel: "Reward",
+    promoCodesUsageLabel: "Usage",
+    promoCodesWindowLabel: "Availability",
+    promoCodesUpdatedColumn: "Updated",
+    promoCodesCopyAction: "Copy",
+    promoCodesDuplicateAction: "Duplicate",
+    promoCodesCreatePanelTitle: "New promo code",
+    promoCodesEditPanelTitle: "Edit promo code",
+    promoCodesDuplicatePanelTitle: "Duplicate promo code",
+    promoCodesRewardFixedLabel: "Fixed PawSpark reward",
+    promoCodesNewDraftAction: "New draft",
+    promoCodesGenerateCodeAction: "Generate",
+    promoCodesCodeHelp: "Set a custom code or generate one automatically. After creation it becomes read-only.",
+    promoCodesLimitLabel: "Total limit",
+    promoCodesPerUserLimitLabel: "Per-user limit",
+    promoCodesStartsLabel: "Starts",
+    promoCodesExpiresLabel: "Expires",
+    promoCodesSaveUpdateAction: "Save changes",
+    promoCodesSaveCreateAction: "Create and save",
+    promoCodesRecentUsageTitle: "Recent redemptions",
+    promoCodesSelectForUsage: "Pick a row in the table to inspect the latest users and redemption timestamps.",
+    promoCodesRecentUsageEmpty: "The selected promo code has no redemptions yet.",
+    promoCodesWindowAlways: "Always available",
+    promoCodesInvalidCode: "Code must be between 4 and 48 characters.",
+    promoCodesInvalidNumbers: "Enter positive values for reward and limits.",
+    promoCodesLimitTooLow: "Total limit cannot be lower than existing redemptions.",
+    promoCodesPerUserLimitTooLow: "Per-user limit cannot be lower than the highest existing user usage.",
+    promoCodesInvalidWindow: "Start date cannot be later than the expiry date.",
+    promoCodesCopied: "Promo code copied to clipboard.",
+    promoCodesExported: "CSV exported locally.",
+    promoCodesArchiveConfirm: "Archive this promo code? New redemptions will stop immediately.",
+    promoCodesCreateSuccess: "Promo code created.",
+    promoCodesCreateError: "Failed to create promo code.",
+    promoCodesUpdateSuccess: "Promo code updated.",
+    promoCodesUpdateError: "Failed to update promo code.",
+    promoCodesArchiveSuccess: "Promo code archived.",
+    promoCodesArchiveError: "Failed to archive promo code.",
+    promoCodesPreviousAction: "Previous",
+    promoCodesNextAction: "Next",
     loading: "Loading...",
     errorLoadingUsers: "Failed to load users.",
     errorLoadingTemplates: "Failed to load templates.",

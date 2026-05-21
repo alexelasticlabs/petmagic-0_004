@@ -3,6 +3,7 @@ import { type Locale, getDictionary } from "@/lib/i18n";
 export type AdminSectionKey =
   | "dashboard"
   | "economy"
+  | "promo-codes"
   | "support"
   | "users"
   | "templates"
@@ -57,6 +58,7 @@ export function getAdminNavItems(locale: Locale): AdminNavEntry[] {
   return [
     { type: "link", key: "dashboard", href: `/${locale}/dashboard`, label: text.navDashboard },
     { type: "link", key: "economy", href: `/${locale}/economy`, label: text.navEconomy },
+    { type: "link", key: "promo-codes", href: `/${locale}/promo-codes`, label: text.navPromoCodes },
     { type: "link", key: "support", href: `/${locale}/support`, label: text.navSupport },
     { type: "link", key: "users", href: `/${locale}/users`, label: text.navUsers },
     {
@@ -100,6 +102,16 @@ export function getAdminPageMeta(locale: Locale, currentPath: string, userName: 
         locale === "ru"
           ? "Баланс, покупки, история движения валюты и управление пакетами пополнения."
           : "Balance, purchases, currency movement history, and top-up pack management.",
+    };
+  }
+
+  if (matchesAdminPath(currentPath, "/promo-codes")) {
+    return {
+      title: locale === "ru" ? "Промокоды" : "Promo codes",
+      description:
+        locale === "ru"
+          ? "Token-only промокоды: создание, лимиты, период действия и история активаций."
+          : "Token-only promo codes: creation, limits, availability window, and redemption history.",
     };
   }
 

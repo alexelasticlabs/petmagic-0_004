@@ -36,6 +36,10 @@ export function DollarIcon({ className }: IconProps) {
   return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>;
 }
 
+export function PromoCodeIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H10l1.4 1.8h6.1A2.5 2.5 0 0 1 20 10.3v5.2A2.5 2.5 0 0 1 17.5 18H11.4L10 19.8H6.5A2.5 2.5 0 0 1 4 17.3V8.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M12 8.8v6.4M9.5 12h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>;
+}
+
 export function TrendUpIcon({ className }: IconProps) {
   return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><polyline points="17,6 23,6 23,12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }

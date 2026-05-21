@@ -196,6 +196,76 @@ export type AdminEconomyPurchase = {
   confirmedAtUtc?: string | null;
 };
 
+export type AdminEconomySubscription = {
+  subscriptionId: string;
+  userId: string;
+  provider: string;
+  purchaseChannel: string;
+  region: string;
+  planId: string;
+  planName?: string | null;
+  status: string;
+  currentPeriodStartUtc?: string | null;
+  currentPeriodEndUtc?: string | null;
+  cancelAtPeriodEnd: boolean;
+  monthlyTokenLimit: number;
+  monthlyTokensGranted: number;
+  lastTokenGrantAtUtc?: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+};
+
+export type AdminSubscriptionPlan = {
+  planId: string;
+  name: string;
+  billingPeriod: string;
+  priceAmount: number;
+  currencyCode: string;
+  monthlyTokenLimit: number;
+  isRecommended: boolean;
+  isActive: boolean;
+  appleProductId?: string | null;
+  googleProductId?: string | null;
+  stripePriceId?: string | null;
+  displayOrder: number;
+  updatedAtUtc: string;
+};
+
+export type AdminPaymentProviderConfiguration = {
+  configurationId: string;
+  provider: string;
+  platform: string;
+  region: string;
+  isEnabled: boolean;
+  isRecommended: boolean;
+  isSelectedByDefault: boolean;
+  requiresExternalWarning: boolean;
+  requiresStoreDisclosure: boolean;
+  allowedFromAppVersion: string;
+  externalCheckoutAllowed: boolean;
+  bonusTokensPercent: number;
+  displayLabel?: string | null;
+  displaySubtitle?: string | null;
+  warningTitle?: string | null;
+  warningMessage?: string | null;
+  mode: string;
+  notes?: string | null;
+  updatedAtUtc: string;
+};
+
+export type AdminSubscriptionEvent = {
+  eventId: string;
+  userId?: string | null;
+  userSubscriptionId?: string | null;
+  provider: string;
+  eventType: string;
+  status: string;
+  externalEventId?: string | null;
+  externalSubscriptionId?: string | null;
+  createdAtUtc: string;
+  processedAtUtc?: string | null;
+};
+
 export type AdminCurrencyPack = {
   packId: string;
   code: string;
@@ -209,18 +279,34 @@ export type AdminCurrencyPack = {
   sortOrder: number;
 };
 
+export type AdminRedeemRewardKind = "spark" | "premium_days";
+
+export type AdminRedeemCodeRedemption = {
+  redemptionId: string;
+  userId: string;
+  rewardKind: AdminRedeemRewardKind;
+  rewardValue: number;
+  walletLedgerEntryId?: string | null;
+  premiumExpiresAtUtc?: string | null;
+  redeemedAtUtc: string;
+};
+
 export type AdminRedeemCode = {
   redeemCodeId: string;
+  code: string;
   codePrefix: string;
   description: string;
-  rewardSpark: number;
+  rewardKind: AdminRedeemRewardKind;
+  rewardValue: number;
   maxRedemptions: number;
+  maxRedemptionsPerUser: number;
   redeemedCount: number;
   isActive: boolean;
   startsAtUtc?: string | null;
   expiresAtUtc?: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
+  redemptions: AdminRedeemCodeRedemption[];
 };
 
 export type SupportConversationStatus = "Open" | "InProgress" | "Resolved" | "Closed";
@@ -1062,6 +1148,66 @@ export async function fetchAdminEconomyPurchases(params?: {
   return apiRequest<OffsetPagedResponse<AdminEconomyPurchase>>(`/api/admin/economy/purchases${query}`, { method: "GET" });
 }
 
+export async function fetchAdminEconomySubscriptions(params?: {
+  skip?: number;
+  take?: number;
+  status?: string;
+  provider?: string;
+}): Promise<OffsetPagedResponse<AdminEconomySubscription>> {
+  const search = new URLSearchParams();
+  if (params?.skip) search.set("skip", String(params.skip));
+  if (params?.take) search.set("take", String(params.take));
+  if (params?.status) search.set("status", params.status);
+  if (params?.provider) search.set("provider", params.provider);
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<OffsetPagedResponse<AdminEconomySubscription>>(`/api/admin/economy/subscriptions${query}`, { method: "GET" });
+}
+
+export async function fetchAdminSubscriptionPlans(): Promise<AdminSubscriptionPlan[]> {
+  return apiRequest<AdminSubscriptionPlan[]>("/api/admin/economy/subscription-plans", { method: "GET" });
+}
+
+export async function fetchAdminPaymentProviderConfigs(): Promise<AdminPaymentProviderConfiguration[]> {
+  return apiRequest<AdminPaymentProviderConfiguration[]>("/api/admin/economy/payment-provider-configs", { method: "GET" });
+}
+
+export async function updateAdminSubscriptionPlan(
+  planId: string,
+  payload: Pick<AdminSubscriptionPlan, "name" | "priceAmount" | "currencyCode" | "monthlyTokenLimit" | "isRecommended" | "isActive" | "appleProductId" | "googleProductId" | "stripePriceId" | "displayOrder">,
+): Promise<AdminSubscriptionPlan> {
+  return apiRequest<AdminSubscriptionPlan>(`/api/admin/economy/subscription-plans/${planId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminPaymentProviderConfig(
+  configurationId: string,
+  payload: Pick<AdminPaymentProviderConfiguration, "region" | "isEnabled" | "isRecommended" | "isSelectedByDefault" | "requiresExternalWarning" | "requiresStoreDisclosure" | "allowedFromAppVersion" | "externalCheckoutAllowed" | "bonusTokensPercent" | "displayLabel" | "displaySubtitle" | "warningTitle" | "warningMessage" | "mode" | "notes">,
+): Promise<AdminPaymentProviderConfiguration> {
+  return apiRequest<AdminPaymentProviderConfiguration>(`/api/admin/economy/payment-provider-configs/${configurationId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchAdminSubscriptionEvents(params?: {
+  skip?: number;
+  take?: number;
+  provider?: string;
+  status?: string;
+}): Promise<OffsetPagedResponse<AdminSubscriptionEvent>> {
+  const search = new URLSearchParams();
+  if (params?.skip) search.set("skip", String(params.skip));
+  if (params?.take) search.set("take", String(params.take));
+  if (params?.provider) search.set("provider", params.provider);
+  if (params?.status) search.set("status", params.status);
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<OffsetPagedResponse<AdminSubscriptionEvent>>(`/api/admin/economy/subscription-events${query}`, { method: "GET" });
+}
+
 export async function fetchAdminCurrencyPacks(): Promise<AdminCurrencyPack[]> {
   return apiRequest<AdminCurrencyPack[]>("/api/admin/economy/packs", { method: "GET" });
 }
@@ -1083,8 +1229,10 @@ export async function fetchAdminRedeemCodes(): Promise<AdminRedeemCode[]> {
 export async function createAdminRedeemCode(payload: {
   code: string;
   description: string;
-  rewardSpark: number;
+  rewardKind: AdminRedeemRewardKind;
+  rewardValue: number;
   maxRedemptions: number;
+  maxRedemptionsPerUser: number;
   isActive: boolean;
   startsAtUtc?: string | null;
   expiresAtUtc?: string | null;
@@ -1097,7 +1245,7 @@ export async function createAdminRedeemCode(payload: {
 
 export async function updateAdminRedeemCode(
   redeemCodeId: string,
-  payload: Pick<AdminRedeemCode, "description" | "rewardSpark" | "maxRedemptions" | "isActive" | "startsAtUtc" | "expiresAtUtc">,
+  payload: Pick<AdminRedeemCode, "description" | "rewardKind" | "rewardValue" | "maxRedemptions" | "maxRedemptionsPerUser" | "isActive" | "startsAtUtc" | "expiresAtUtc">,
 ): Promise<AdminRedeemCode> {
   return apiRequest<AdminRedeemCode>(`/api/admin/economy/redeem-codes/${redeemCodeId}`, {
     method: "PUT",

@@ -6,6 +6,7 @@ import {
   DollarIcon,
   ImageIcon,
   LogoutIcon,
+  PromoCodeIcon,
   SupportIcon,
   TemplatesIcon,
   UsersIcon,
@@ -28,6 +29,7 @@ type AdminSidebarProps = {
 const iconMap = {
   dashboard: DashboardIcon,
   economy: DollarIcon,
+  "promo-codes": PromoCodeIcon,
   support: SupportIcon,
   users: UsersIcon,
   templates: TemplatesIcon,

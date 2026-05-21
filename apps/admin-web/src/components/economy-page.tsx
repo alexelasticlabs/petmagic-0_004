@@ -6,14 +6,20 @@ import { Button } from "@/components/ui/button";
 import styles from "@/components/economy-page.module.css";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    createAdminRedeemCode,
     fetchAdminCurrencyPacks,
     fetchAdminEconomyLedger,
     fetchAdminEconomyPurchases,
-    fetchAdminRedeemCodes,
+    fetchAdminEconomySubscriptions,
+    fetchAdminPaymentProviderConfigs,
+    fetchAdminSubscriptionEvents,
+    fetchAdminSubscriptionPlans,
+    updateAdminPaymentProviderConfig,
+    updateAdminSubscriptionPlan,
     updateAdminCurrencyPack,
     useAuthSession,
     type AdminCurrencyPack,
+    type AdminPaymentProviderConfiguration,
+    type AdminSubscriptionPlan,
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +39,37 @@ type PackDraft = {
     isActive: boolean;
 };
 
+type SubscriptionPlanDraft = {
+    name: string;
+    priceAmount: string;
+    currencyCode: string;
+    monthlyTokenLimit: string;
+    isRecommended: boolean;
+    isActive: boolean;
+    appleProductId: string;
+    googleProductId: string;
+    stripePriceId: string;
+    displayOrder: string;
+};
+
+type ProviderConfigDraft = {
+    region: string;
+    isEnabled: boolean;
+    isRecommended: boolean;
+    isSelectedByDefault: boolean;
+    requiresExternalWarning: boolean;
+    requiresStoreDisclosure: boolean;
+    allowedFromAppVersion: string;
+    externalCheckoutAllowed: boolean;
+    bonusTokensPercent: string;
+    displayLabel: string;
+    displaySubtitle: string;
+    warningTitle: string;
+    warningMessage: string;
+    mode: string;
+    notes: string;
+};
+
 const ledgerSourceOptions = {
     ru: [
         { value: "", label: "Все источники" },
@@ -40,6 +77,8 @@ const ledgerSourceOptions = {
         { value: "generation_spend", label: "Списание за генерацию" },
         { value: "weekly_grant", label: "Недельная награда" },
         { value: "ad_reward", label: "Награда за рекламу" },
+        { value: "redeem_code", label: "Промокод" },
+        { value: "premium_subscription_grant", label: "Выдача Premium токенов" },
         { value: "admin_grant", label: "Ручное начисление" },
         { value: "admin_debit", label: "Ручное списание" },
     ],
@@ -49,6 +88,8 @@ const ledgerSourceOptions = {
         { value: "generation_spend", label: "Generation spend" },
         { value: "weekly_grant", label: "Weekly reward" },
         { value: "ad_reward", label: "Ad reward" },
+        { value: "redeem_code", label: "Redeem code" },
+        { value: "premium_subscription_grant", label: "Premium token grant" },
         { value: "admin_grant", label: "Manual grant" },
         { value: "admin_debit", label: "Manual debit" },
     ],
@@ -69,6 +110,59 @@ const purchaseStatusOptions = {
     ],
 } as const;
 
+const subscriptionProviderOptions = {
+    ru: [
+        { value: "", label: "Все провайдеры" },
+        { value: "app_store", label: "Apple App Store" },
+        { value: "google_play", label: "Google Play" },
+        { value: "stripe", label: "Stripe" },
+    ],
+    en: [
+        { value: "", label: "All providers" },
+        { value: "app_store", label: "Apple App Store" },
+        { value: "google_play", label: "Google Play" },
+        { value: "stripe", label: "Stripe" },
+    ],
+} as const;
+
+const subscriptionStatusOptions = {
+    ru: [
+        { value: "", label: "Все статусы" },
+        { value: "active", label: "Активна" },
+        { value: "trialing", label: "Пробный период" },
+        { value: "past_due", label: "Просрочка" },
+        { value: "canceled", label: "Отменена" },
+        { value: "expired", label: "Истекла" },
+    ],
+    en: [
+        { value: "", label: "All statuses" },
+        { value: "active", label: "Active" },
+        { value: "trialing", label: "Trialing" },
+        { value: "past_due", label: "Past due" },
+        { value: "canceled", label: "Canceled" },
+        { value: "expired", label: "Expired" },
+    ],
+} as const;
+
+const eventStatusOptions = {
+    ru: [
+        { value: "", label: "Все статусы" },
+        { value: "active", label: "Активна" },
+        { value: "canceled", label: "Отменена" },
+        { value: "expired", label: "Истекла" },
+        { value: "processed", label: "Обработано" },
+        { value: "failed", label: "Ошибка" },
+    ],
+    en: [
+        { value: "", label: "All statuses" },
+        { value: "active", label: "Active" },
+        { value: "canceled", label: "Canceled" },
+        { value: "expired", label: "Expired" },
+        { value: "processed", label: "Processed" },
+        { value: "failed", label: "Failed" },
+    ],
+} as const;
+
 export function EconomyPage({ locale }: EconomyPageProps) {
     const text = getText(locale);
     const router = useRouter();
@@ -76,15 +170,13 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     const session = useAuthSession();
     const [ledgerSource, setLedgerSource] = useState("");
     const [purchaseStatus, setPurchaseStatus] = useState("");
+    const [subscriptionStatus, setSubscriptionStatus] = useState("");
+    const [subscriptionProvider, setSubscriptionProvider] = useState("");
+    const [eventStatus, setEventStatus] = useState("");
+    const [eventProvider, setEventProvider] = useState("");
     const [drafts, setDrafts] = useState<Record<string, PackDraft>>({});
-    const [redeemForm, setRedeemForm] = useState({
-        code: "",
-        description: "",
-        rewardSpark: "100",
-        maxRedemptions: "100",
-        isActive: true,
-        expiresAtUtc: "",
-    });
+    const [planDrafts, setPlanDrafts] = useState<Record<string, SubscriptionPlanDraft>>({});
+    const [providerConfigDrafts, setProviderConfigDrafts] = useState<Record<string, ProviderConfigDraft>>({});
     const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
 
     useEffect(() => {
@@ -103,14 +195,29 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         queryFn: () => fetchAdminEconomyPurchases({ take: 20, status: purchaseStatus || undefined }),
     });
 
+    const subscriptionsQuery = useQuery({
+        queryKey: adminQueryKeys.economySubscriptions(subscriptionStatus || "all", subscriptionProvider || "all"),
+        queryFn: () => fetchAdminEconomySubscriptions({ take: 20, status: subscriptionStatus || undefined, provider: subscriptionProvider || undefined }),
+    });
+
+    const subscriptionPlansQuery = useQuery({
+        queryKey: adminQueryKeys.economySubscriptionPlans,
+        queryFn: fetchAdminSubscriptionPlans,
+    });
+
+    const providerConfigsQuery = useQuery({
+        queryKey: adminQueryKeys.economyPaymentProviderConfigs,
+        queryFn: fetchAdminPaymentProviderConfigs,
+    });
+
+    const subscriptionEventsQuery = useQuery({
+        queryKey: adminQueryKeys.economySubscriptionEvents(eventProvider || "all", eventStatus || "all"),
+        queryFn: () => fetchAdminSubscriptionEvents({ take: 20, provider: eventProvider || undefined, status: eventStatus || undefined }),
+    });
+
     const packsQuery = useQuery({
         queryKey: adminQueryKeys.economyPacks,
         queryFn: fetchAdminCurrencyPacks,
-    });
-
-    const redeemCodesQuery = useQuery({
-        queryKey: adminQueryKeys.economyRedeemCodes,
-        queryFn: fetchAdminRedeemCodes,
     });
 
     const savePackMutation = useMutation({
@@ -140,30 +247,53 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         },
     });
 
-    const createRedeemMutation = useMutation({
-        mutationFn: () => createAdminRedeemCode({
-            code: redeemForm.code.trim(),
-            description: redeemForm.description.trim(),
-            rewardSpark: Number(redeemForm.rewardSpark),
-            maxRedemptions: Number(redeemForm.maxRedemptions),
-            isActive: redeemForm.isActive,
-            startsAtUtc: null,
-            expiresAtUtc: redeemForm.expiresAtUtc ? new Date(redeemForm.expiresAtUtc).toISOString() : null,
-        }),
-        onSuccess: async () => {
-            setFeedback({ tone: "success", message: text.redeemCreated });
-            setRedeemForm({ code: "", description: "", rewardSpark: "100", maxRedemptions: "100", isActive: true, expiresAtUtc: "" });
-            await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodes });
+    const savePlanMutation = useMutation({
+        mutationFn: async (planId: string) => {
+            const plan = subscriptionPlans.find((item) => item.planId === planId);
+            const draft = planDrafts[planId] ?? (plan ? toSubscriptionPlanDraft(plan) : null);
+            if (!draft) {
+                throw new Error(text.planMissingDraft);
+            }
+
+            return updateAdminSubscriptionPlan(planId, toSubscriptionPlanPayload(draft, text));
         },
-        onError: () => {
-            setFeedback({ tone: "danger", message: text.redeemCreateError });
+        onSuccess: async (plan) => {
+            setFeedback({ tone: "success", message: text.planSaved });
+            setPlanDrafts((current) => ({ ...current, [plan.planId]: toSubscriptionPlanDraft(plan) }));
+            await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economySubscriptionPlans });
+        },
+        onError: (error) => {
+            setFeedback({ tone: "danger", message: error instanceof Error ? error.message : text.planSaveError });
+        },
+    });
+
+    const saveProviderConfigMutation = useMutation({
+        mutationFn: async (configurationId: string) => {
+            const config = providerConfigs.find((item) => item.configurationId === configurationId);
+            const draft = providerConfigDrafts[configurationId] ?? (config ? toProviderConfigDraft(config) : null);
+            if (!draft) {
+                throw new Error(text.providerConfigMissingDraft);
+            }
+
+            return updateAdminPaymentProviderConfig(configurationId, toProviderConfigPayload(draft, text));
+        },
+        onSuccess: async (config) => {
+            setFeedback({ tone: "success", message: text.providerConfigSaved });
+            setProviderConfigDrafts((current) => ({ ...current, [config.configurationId]: toProviderConfigDraft(config) }));
+            await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPaymentProviderConfigs });
+        },
+        onError: (error) => {
+            setFeedback({ tone: "danger", message: error instanceof Error ? error.message : text.providerConfigSaveError });
         },
     });
 
     const ledgerItems = useMemo(() => ledgerQuery.data?.items ?? [], [ledgerQuery.data?.items]);
     const purchaseItems = useMemo(() => purchasesQuery.data?.items ?? [], [purchasesQuery.data?.items]);
+    const subscriptionItems = useMemo(() => subscriptionsQuery.data?.items ?? [], [subscriptionsQuery.data?.items]);
+    const subscriptionPlans = subscriptionPlansQuery.data ?? [];
+    const providerConfigs = providerConfigsQuery.data ?? [];
+    const subscriptionEvents = useMemo(() => subscriptionEventsQuery.data?.items ?? [], [subscriptionEventsQuery.data?.items]);
     const packs = useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
-    const redeemCodes = useMemo(() => redeemCodesQuery.data ?? [], [redeemCodesQuery.data]);
 
     const metrics = useMemo(() => {
         const credited = ledgerItems.filter((item) => item.delta > 0).reduce((sum, item) => sum + item.delta, 0);
@@ -174,8 +304,28 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         return { credited, debited, grossRevenue, activePacks };
     }, [ledgerItems, packs, purchaseItems]);
 
-    const isLoading = ledgerQuery.isLoading || purchasesQuery.isLoading || packsQuery.isLoading || redeemCodesQuery.isLoading;
-    const hasError = ledgerQuery.isError || purchasesQuery.isError || packsQuery.isError || redeemCodesQuery.isError;
+    const activeSubscriptions = subscriptionItems.filter((item) => item.status === "active").length;
+    const renewalStops = subscriptionItems.filter((item) => item.cancelAtPeriodEnd).length;
+    const activePlans = subscriptionPlans.filter((item) => item.isActive).length;
+    const enabledRoutes = providerConfigs.filter((item) => item.isEnabled).length;
+    const premiumMetrics = { activeSubscriptions, renewalStops, activePlans, enabledRoutes };
+
+    const isLoading =
+        ledgerQuery.isLoading ||
+        purchasesQuery.isLoading ||
+        subscriptionsQuery.isLoading ||
+        subscriptionPlansQuery.isLoading ||
+        providerConfigsQuery.isLoading ||
+        subscriptionEventsQuery.isLoading ||
+        packsQuery.isLoading;
+    const hasError =
+        ledgerQuery.isError ||
+        purchasesQuery.isError ||
+        subscriptionsQuery.isError ||
+        subscriptionPlansQuery.isError ||
+        providerConfigsQuery.isError ||
+        subscriptionEventsQuery.isError ||
+        packsQuery.isError;
 
     if (isLoading) {
         return (
@@ -203,9 +353,10 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 description={text.description}
                 metaItems={[
                     `${text.metaPacks}: ${packs.length}`,
-                    `${text.metaRedeem}: ${redeemCodes.length}`,
                     `${text.metaLedger}: ${ledgerItems.length}`,
                     `${text.metaPurchases}: ${purchaseItems.length}`,
+                    `${text.metaSubscriptions}: ${subscriptionItems.length}`,
+                    `${text.metaRoutes}: ${providerConfigs.length}`,
                 ]}
             />
 
@@ -214,6 +365,13 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 <AdminKpiCard label={text.creditFlowLabel} value={formatTokens(metrics.credited, locale)} tone="success" />
                 <AdminKpiCard label={text.debitFlowLabel} value={formatTokens(metrics.debited, locale)} tone="warning" />
                 <AdminKpiCard label={text.revenueLabel} value={formatCurrency(metrics.grossRevenue, locale, purchaseItems[0]?.currencyCode ?? "USD")} tone="info" />
+            </AdminPageGrid>
+
+            <AdminPageGrid columns="four">
+                <AdminKpiCard label={text.activeSubscriptionsLabel} value={String(premiumMetrics.activeSubscriptions)} tone="primary" />
+                <AdminKpiCard label={text.renewalStopsLabel} value={String(premiumMetrics.renewalStops)} tone="warning" />
+                <AdminKpiCard label={text.activePlansCountLabel} value={String(premiumMetrics.activePlans)} tone="success" />
+                <AdminKpiCard label={text.enabledRoutesLabel} value={String(premiumMetrics.enabledRoutes)} tone="info" />
             </AdminPageGrid>
 
             {feedback ? <AdminStateCard tone={feedback.tone} title={feedback.message} /> : null}
@@ -316,110 +474,6 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 )}
             </AdminCard>
 
-            <AdminCard title={text.redeemTitle} description={text.redeemDescription}>
-                <div className={styles.redeemGrid}>
-                    <section className={styles.redeemForm}>
-                        <label className={styles.field}>
-                            <span>{text.redeemCodeLabel}</span>
-                            <input
-                                value={redeemForm.code}
-                                onChange={(event) => setRedeemForm((current) => ({ ...current, code: event.target.value }))}
-                                className={styles.input}
-                                placeholder="WELCOME-100"
-                            />
-                        </label>
-                        <label className={styles.field}>
-                            <span>{text.redeemDescriptionLabel}</span>
-                            <input
-                                value={redeemForm.description}
-                                onChange={(event) => setRedeemForm((current) => ({ ...current, description: event.target.value }))}
-                                className={styles.input}
-                            />
-                        </label>
-                        <div className={styles.formRow}>
-                            <label className={styles.field}>
-                                <span>{text.redeemRewardLabel}</span>
-                                <input
-                                    value={redeemForm.rewardSpark}
-                                    onChange={(event) => setRedeemForm((current) => ({ ...current, rewardSpark: event.target.value }))}
-                                    inputMode="numeric"
-                                    className={styles.input}
-                                />
-                            </label>
-                            <label className={styles.field}>
-                                <span>{text.redeemLimitLabel}</span>
-                                <input
-                                    value={redeemForm.maxRedemptions}
-                                    onChange={(event) => setRedeemForm((current) => ({ ...current, maxRedemptions: event.target.value }))}
-                                    inputMode="numeric"
-                                    className={styles.input}
-                                />
-                            </label>
-                        </div>
-                        <label className={styles.field}>
-                            <span>{text.redeemExpiresLabel}</span>
-                            <input
-                                type="datetime-local"
-                                value={redeemForm.expiresAtUtc}
-                                onChange={(event) => setRedeemForm((current) => ({ ...current, expiresAtUtc: event.target.value }))}
-                                className={styles.input}
-                            />
-                        </label>
-                        <label className={styles.checkboxField}>
-                            <input
-                                type="checkbox"
-                                checked={redeemForm.isActive}
-                                onChange={(event) => setRedeemForm((current) => ({ ...current, isActive: event.target.checked }))}
-                            />
-                            <span>{text.activeState}</span>
-                        </label>
-                        <Button onClick={() => createRedeemMutation.mutate()} disabled={createRedeemMutation.isPending || !redeemForm.code.trim()}>
-                            {createRedeemMutation.isPending ? text.savingAction : text.redeemCreateAction}
-                        </Button>
-                    </section>
-
-                    <section>
-                        {redeemCodes.length ? (
-                            <div className={adminTableStyles.tableWrap}>
-                                <table className={adminTableStyles.table}>
-                                    <thead>
-                                        <tr>
-                                            <th>{text.redeemCodeColumn}</th>
-                                            <th>{text.redeemRewardLabel}</th>
-                                            <th>{text.redeemUsageColumn}</th>
-                                            <th>{text.activeColumn}</th>
-                                            <th>{text.redeemExpiresLabel}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {redeemCodes.map((code) => (
-                                            <tr key={code.redeemCodeId}>
-                                                <td>
-                                                    <div className={styles.packMeta}>
-                                                        <strong>{code.codePrefix}...</strong>
-                                                        <span>{code.description || text.noDescription}</span>
-                                                    </div>
-                                                </td>
-                                                <td>{code.rewardSpark} {text.tokensShort}</td>
-                                                <td>{code.redeemedCount} / {code.maxRedemptions}</td>
-                                                <td>
-                                                    <AdminStatusBadge color={code.isActive ? "#22c55e" : "#8da1ba"}>
-                                                        {code.isActive ? text.activeState : text.inactiveState}
-                                                    </AdminStatusBadge>
-                                                </td>
-                                                <td>{formatDateTime(code.expiresAtUtc, locale)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <AdminStateCard tone="info" title={text.noRedeemCodes} />
-                        )}
-                    </section>
-                </div>
-            </AdminCard>
-
             <AdminPageGrid columns="two">
                 <AdminCard
                     title={text.ledgerTitle}
@@ -520,6 +574,456 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                     )}
                 </AdminCard>
             </AdminPageGrid>
+
+            <AdminPageGrid columns="two">
+                <AdminCard title={text.subscriptionPlansTitle} description={text.subscriptionPlansDescription}>
+                    <AdminMetricStrip
+                        items={subscriptionPlans.slice(0, 4).map((plan) => ({
+                            label: `${plan.name} • ${humanizeBillingPeriod(plan.billingPeriod, locale)}`,
+                            value: `${plan.monthlyTokenLimit} ${text.tokensShort}`,
+                        }))}
+                        className={styles.metricStrip}
+                    />
+
+                    {subscriptionPlans.length ? (
+                        <div className={adminTableStyles.tableWrap}>
+                            <table className={adminTableStyles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>{text.planColumn}</th>
+                                        <th>{text.priceColumn}</th>
+                                        <th>{text.billingColumn}</th>
+                                        <th>{text.tokensColumn}</th>
+                                        <th>{text.productIdsColumn}</th>
+                                        <th>{text.statusColumn}</th>
+                                        <th>{text.actionsColumn}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {subscriptionPlans.map((plan) => {
+                                        const draft = planDrafts[plan.planId] ?? toSubscriptionPlanDraft(plan);
+                                        const isSavingPlan = savePlanMutation.isPending && savePlanMutation.variables === plan.planId;
+
+                                        return (
+                                            <tr key={plan.planId}>
+                                                <td>
+                                                    <div className={styles.packMeta}>
+                                                        <strong>{plan.planId}</strong>
+                                                        <span>{humanizeBillingPeriod(plan.billingPeriod, locale)}</span>
+                                                    </div>
+                                                    <input
+                                                        value={draft.name}
+                                                        onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { name: event.target.value })}
+                                                        className={styles.input}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <div className={styles.windowFields}>
+                                                        <input
+                                                            value={draft.priceAmount}
+                                                            onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { priceAmount: event.target.value })}
+                                                            inputMode="decimal"
+                                                            className={styles.input}
+                                                        />
+                                                        <input
+                                                            value={draft.currencyCode}
+                                                            onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { currencyCode: event.target.value.toUpperCase() })}
+                                                            className={styles.input}
+                                                            maxLength={3}
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className={styles.windowFields}>
+                                                        <span>{humanizeBillingPeriod(plan.billingPeriod, locale)}</span>
+                                                        <label className={styles.field}>
+                                                            <span>{text.sortColumn}</span>
+                                                            <input
+                                                                value={draft.displayOrder}
+                                                                onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { displayOrder: event.target.value })}
+                                                                inputMode="numeric"
+                                                                className={styles.input}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        value={draft.monthlyTokenLimit}
+                                                        onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { monthlyTokenLimit: event.target.value })}
+                                                        inputMode="numeric"
+                                                        className={styles.input}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <div className={styles.windowFields}>
+                                                        <label className={styles.field}>
+                                                            <span>{text.appleProductLabel}</span>
+                                                            <input
+                                                                value={draft.appleProductId}
+                                                                onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { appleProductId: event.target.value })}
+                                                                className={styles.input}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.googleProductLabel}</span>
+                                                            <input
+                                                                value={draft.googleProductId}
+                                                                onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { googleProductId: event.target.value })}
+                                                                className={styles.input}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.stripePriceLabel}</span>
+                                                            <input
+                                                                value={draft.stripePriceId}
+                                                                onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { stripePriceId: event.target.value })}
+                                                                className={styles.input}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className={styles.statusStack}>
+                                                        <label className={styles.checkboxField}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={draft.isActive}
+                                                                onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { isActive: event.target.checked })}
+                                                            />
+                                                            <span>{draft.isActive ? text.activeState : text.inactiveState}</span>
+                                                        </label>
+                                                        <label className={styles.checkboxField}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={draft.isRecommended}
+                                                                onChange={(event) => updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, { isRecommended: event.target.checked })}
+                                                            />
+                                                            <span>{text.recommendedState}</span>
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <Button onClick={() => savePlanMutation.mutate(plan.planId)} disabled={isSavingPlan}>
+                                                        {isSavingPlan ? text.savingAction : text.saveAction}
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <AdminStateCard tone="info" title={text.noSubscriptionPlans} />
+                    )}
+                </AdminCard>
+
+                <AdminCard title={text.providerConfigsTitle} description={text.providerConfigsDescription}>
+                    {providerConfigs.length ? (
+                        <div className={adminTableStyles.tableWrap}>
+                            <table className={adminTableStyles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>{text.providerColumn}</th>
+                                        <th>{text.platformColumn}</th>
+                                        <th>{text.regionColumn}</th>
+                                        <th>{text.statusColumn}</th>
+                                        <th>{text.flagsColumn}</th>
+                                        <th>{text.modeColumn}</th>
+                                        <th>{text.actionsColumn}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {providerConfigs.map((config) => {
+                                        const draft = providerConfigDrafts[config.configurationId] ?? toProviderConfigDraft(config);
+                                        const isSavingConfig = saveProviderConfigMutation.isPending && saveProviderConfigMutation.variables === config.configurationId;
+
+                                        return (
+                                            <tr key={config.configurationId}>
+                                                <td>{humanizeProvider(config.provider, locale)}</td>
+                                                <td>{config.platform}</td>
+                                                <td>
+                                                    <input
+                                                        value={draft.region}
+                                                        onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { region: event.target.value.toUpperCase() })}
+                                                        className={styles.input}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <label className={styles.checkboxField}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={draft.isEnabled}
+                                                            onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { isEnabled: event.target.checked })}
+                                                        />
+                                                        <span>{draft.isEnabled ? text.activeState : text.inactiveState}</span>
+                                                    </label>
+                                                </td>
+                                                <td>
+                                                    <div className={styles.windowFields}>
+                                                        <label className={styles.checkboxField}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={draft.externalCheckoutAllowed}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { externalCheckoutAllowed: event.target.checked })}
+                                                            />
+                                                            <span>{text.externalCheckoutFlag}</span>
+                                                        </label>
+                                                        <label className={styles.checkboxField}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={draft.isRecommended}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { isRecommended: event.target.checked })}
+                                                            />
+                                                            <span>{text.recommendedFlag}</span>
+                                                        </label>
+                                                        <label className={styles.checkboxField}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={draft.isSelectedByDefault}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { isSelectedByDefault: event.target.checked })}
+                                                            />
+                                                            <span>{text.defaultFlag}</span>
+                                                        </label>
+                                                        <label className={styles.checkboxField}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={draft.requiresExternalWarning}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { requiresExternalWarning: event.target.checked })}
+                                                            />
+                                                            <span>{text.externalWarningFlag}</span>
+                                                        </label>
+                                                        <label className={styles.checkboxField}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={draft.requiresStoreDisclosure}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { requiresStoreDisclosure: event.target.checked })}
+                                                            />
+                                                            <span>{text.storeDisclosureFlag}</span>
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.minVersionLabel}</span>
+                                                            <input
+                                                                value={draft.allowedFromAppVersion}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { allowedFromAppVersion: event.target.value })}
+                                                                className={styles.input}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.bonusPercentLabel}</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="100"
+                                                                value={draft.bonusTokensPercent}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { bonusTokensPercent: event.target.value })}
+                                                                className={styles.input}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className={styles.windowFields}>
+                                                        <label className={styles.field}>
+                                                            <span>{text.modeColumn}</span>
+                                                            <input
+                                                                value={draft.mode}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { mode: event.target.value })}
+                                                                className={styles.input}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.displayLabelLabel}</span>
+                                                            <input
+                                                                value={draft.displayLabel}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { displayLabel: event.target.value })}
+                                                                className={styles.input}
+                                                                placeholder={humanizeProvider(config.provider, locale)}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.displaySubtitleLabel}</span>
+                                                            <input
+                                                                value={draft.displaySubtitle}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { displaySubtitle: event.target.value })}
+                                                                className={styles.input}
+                                                                placeholder={text.noDescription}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.warningTitleLabel}</span>
+                                                            <input
+                                                                value={draft.warningTitle}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { warningTitle: event.target.value })}
+                                                                className={styles.input}
+                                                                placeholder={text.noDescription}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.warningMessageLabel}</span>
+                                                            <input
+                                                                value={draft.warningMessage}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { warningMessage: event.target.value })}
+                                                                className={styles.input}
+                                                                placeholder={text.noDescription}
+                                                            />
+                                                        </label>
+                                                        <label className={styles.field}>
+                                                            <span>{text.notesLabel}</span>
+                                                            <input
+                                                                value={draft.notes}
+                                                                onChange={(event) => updateProviderConfigDraft(setProviderConfigDrafts, config.configurationId, { notes: event.target.value })}
+                                                                className={styles.input}
+                                                                placeholder={text.noDescription}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <Button onClick={() => saveProviderConfigMutation.mutate(config.configurationId)} disabled={isSavingConfig}>
+                                                        {isSavingConfig ? text.savingAction : text.saveAction}
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <AdminStateCard tone="info" title={text.noProviderConfigs} />
+                    )}
+                </AdminCard>
+            </AdminPageGrid>
+
+            <AdminPageGrid columns="two">
+                <AdminCard
+                    title={text.subscriptionsTitle}
+                    description={text.subscriptionsDescription}
+                    action={
+                        <div className={styles.filterRow}>
+                            <AdminSelectField
+                                label={text.providerColumn}
+                                value={subscriptionProvider}
+                                onChange={setSubscriptionProvider}
+                                options={subscriptionProviderOptions[locale]}
+                                className={styles.compactSelect}
+                            />
+                            <AdminSelectField
+                                label={text.statusColumn}
+                                value={subscriptionStatus}
+                                onChange={setSubscriptionStatus}
+                                options={subscriptionStatusOptions[locale]}
+                                className={styles.compactSelect}
+                            />
+                        </div>
+                    }
+                >
+                    {subscriptionItems.length ? (
+                        <div className={adminTableStyles.tableWrap}>
+                            <table className={adminTableStyles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>{text.userColumn}</th>
+                                        <th>{text.planColumn}</th>
+                                        <th>{text.providerColumn}</th>
+                                        <th>{text.statusColumn}</th>
+                                        <th>{text.renewalColumn}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {subscriptionItems.map((item) => (
+                                        <tr key={item.subscriptionId}>
+                                            <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
+                                            <td>
+                                                <div className={styles.packMeta}>
+                                                    <strong>{item.planName || item.planId}</strong>
+                                                    <span>{`${item.monthlyTokensGranted}/${item.monthlyTokenLimit} ${text.tokensShort}`}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div className={styles.packMeta}>
+                                                    <strong>{humanizeProvider(item.provider, locale)}</strong>
+                                                    <span>{`${item.purchaseChannel} • ${item.region}`}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div className={styles.statusStack}>
+                                                    <AdminStatusBadge color={statusColor(item.status)}>{humanizeStatus(item.status, locale)}</AdminStatusBadge>
+                                                    {item.cancelAtPeriodEnd ? <AdminStatusBadge color="#f59e0b">{text.cancelAtPeriodEndLabel}</AdminStatusBadge> : null}
+                                                </div>
+                                            </td>
+                                            <td>{formatDateTime(item.currentPeriodEndUtc ?? item.updatedAtUtc, locale)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <AdminStateCard tone="info" title={text.noSubscriptions} />
+                    )}
+                </AdminCard>
+
+                <AdminCard
+                    title={text.subscriptionEventsTitle}
+                    description={text.subscriptionEventsDescription}
+                    action={
+                        <div className={styles.filterRow}>
+                            <AdminSelectField
+                                label={text.providerColumn}
+                                value={eventProvider}
+                                onChange={setEventProvider}
+                                options={subscriptionProviderOptions[locale]}
+                                className={styles.compactSelect}
+                            />
+                            <AdminSelectField
+                                label={text.statusColumn}
+                                value={eventStatus}
+                                onChange={setEventStatus}
+                                options={eventStatusOptions[locale]}
+                                className={styles.compactSelect}
+                            />
+                        </div>
+                    }
+                >
+                    {subscriptionEvents.length ? (
+                        <div className={adminTableStyles.tableWrap}>
+                            <table className={adminTableStyles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>{text.timeColumn}</th>
+                                        <th>{text.providerColumn}</th>
+                                        <th>{text.eventTypeColumn}</th>
+                                        <th>{text.statusColumn}</th>
+                                        <th>{text.processedColumn}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {subscriptionEvents.map((item) => (
+                                        <tr key={item.eventId}>
+                                            <td>{formatDateTime(item.createdAtUtc, locale)}</td>
+                                            <td>{humanizeProvider(item.provider, locale)}</td>
+                                            <td>
+                                                <div className={styles.packMeta}>
+                                                    <strong>{item.eventType}</strong>
+                                                    <span>{item.externalSubscriptionId || item.externalEventId || text.noDescription}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <AdminStatusBadge color={statusColor(item.status)}>{humanizeStatus(item.status, locale)}</AdminStatusBadge>
+                                            </td>
+                                            <td>{item.processedAtUtc ? formatDateTime(item.processedAtUtc, locale) : text.notProcessedLabel}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <AdminStateCard tone="info" title={text.noSubscriptionEvents} />
+                    )}
+                </AdminCard>
+            </AdminPageGrid>
         </AdminPage>
     );
 }
@@ -538,16 +1042,39 @@ function getText(locale: Locale) {
             metaRedeem: "Промокодов",
             metaLedger: "Операций",
             metaPurchases: "Покупок",
+            metaSubscriptions: "Подписок",
+            metaRoutes: "Маршрутов",
             activePacksLabel: "Активные паки",
             creditFlowLabel: "Начисления",
             debitFlowLabel: "Списания",
             revenueLabel: "Выручка",
+            activeSubscriptionsLabel: "Активные подписки",
+            renewalStopsLabel: "Остановки продления",
+            activePlansCountLabel: "Активные планы",
+            enabledRoutesLabel: "Включенные маршруты",
             packsTitle: "Паки пополнения",
             packsDescription: "Редактирование цен, бонуса и видимости пакетов без затрагивания истории покупок.",
+            subscriptionPlansTitle: "Premium планы",
+            subscriptionPlansDescription: "Текущая конфигурация месячных и годовых планов, которую видят мобильный клиент и checkout flow.",
+            providerConfigsTitle: "Маршрутизация платежей",
+            providerConfigsDescription: "Backend-controlled правила выбора App Store, Google Play и Stripe по платформе и региону.",
+            subscriptionsTitle: "Активные и недавние подписки",
+            subscriptionsDescription: "Снимок последних premium подписок по пользователям с провайдером, токенами и датой продления.",
+            subscriptionEventsTitle: "Лог событий подписок",
+            subscriptionEventsDescription: "Последние lifecycle события из store/Stripe flows для диагностики интеграции.",
             tokensShort: "spark",
             packSaved: "Пакет обновлен.",
             packSaveError: "Не удалось сохранить пакет.",
+            planSaved: "Premium план обновлен.",
+            planSaveError: "Не удалось сохранить Premium план.",
+            providerConfigSaved: "Маршрут оплаты обновлен.",
+            providerConfigSaveError: "Не удалось сохранить маршрут оплаты.",
+            planMissingDraft: "План не найден в текущем списке.",
+            providerConfigMissingDraft: "Маршрут оплаты не найден в текущем списке.",
+            invalidPlanNumbers: "Укажите корректные цену, валюту и лимит токенов для плана.",
+            invalidProviderConfig: "Заполните регион, минимальную версию приложения, режим маршрута и бонус от 0 до 100%.",
             packColumn: "Пакет",
+            planColumn: "План",
             priceColumn: "Цена",
             grantedColumn: "База",
             bonusColumn: "Бонус",
@@ -556,21 +1083,52 @@ function getText(locale: Locale) {
             actionsColumn: "Действие",
             activeState: "Включен",
             inactiveState: "Скрыт",
+            recommendedState: "Рекомендуем",
             savingAction: "Сохраняем...",
             saveAction: "Сохранить",
             noPacks: "Паки пополнения пока не настроены.",
+            noSubscriptionPlans: "Premium планы пока не настроены.",
+            noProviderConfigs: "Правила маршрутизации платежей пока не настроены.",
+            noSubscriptions: "Подписки пока не найдены.",
+            noSubscriptionEvents: "События подписок пока не записаны.",
             redeemTitle: "Промокоды",
-            redeemDescription: "Создание и контроль redeem-кодов для начисления PawSpark через кошелек пользователя.",
+            redeemDescription: "Создание и контроль redeem-кодов для начисления PawSpark или временного Premium через кошелек пользователя.",
             redeemCreated: "Промокод создан.",
             redeemCreateError: "Не удалось создать промокод.",
+            redeemUpdated: "Промокод обновлен.",
+            redeemUpdateError: "Не удалось обновить промокод.",
+            redeemArchived: "Промокод архивирован.",
+            redeemArchiveError: "Не удалось архивировать промокод.",
+            redeemMissingDraft: "Промокод не найден в текущем списке.",
+            redeemInvalidNumbers: "Укажите корректный тип награды и лимиты промокода.",
+            redeemInvalidWindow: "Начало действия не может быть позже окончания.",
+            redeemLimitTooLow: "Лимит не может быть меньше уже использованных активаций.",
+            redeemPerUserLimitTooLow: "Лимит на пользователя не может быть меньше уже использованных активаций одним пользователем.",
             redeemCodeLabel: "Код",
             redeemDescriptionLabel: "Описание",
             redeemRewardLabel: "Награда",
+            redeemRewardTypeLabel: "Тип награды",
+            redeemRewardSparkLabel: "PawSpark",
+            redeemRewardPremiumLabel: "Premium дни",
             redeemLimitLabel: "Лимит",
+            redeemPerUserLimitLabel: "Лимит на пользователя",
+            redeemStartsLabel: "Начинает действовать",
             redeemExpiresLabel: "Истекает",
             redeemCreateAction: "Создать промокод",
+            redeemArchiveAction: "Архивировать",
             redeemCodeColumn: "Код",
             redeemUsageColumn: "Использовано",
+            redeemUsageHistoryLabel: "Последние активации",
+            redeemUsageEmpty: "Активаций пока нет.",
+            redeemUsageMore: (count: number) => `Еще ${count} активаций в истории`,
+            redeemPremiumUntilLabel: "Premium до",
+            redeemStatusColumn: "Статус",
+            redeemWindowColumn: "Период работы",
+            redeemStatusArchived: "Архив",
+            redeemStatusExhausted: "Исчерпан",
+            redeemStatusScheduled: "Запланирован",
+            redeemStatusExpired: "Истек",
+            redeemWindowAlways: "Без ограничения по времени",
             noDescription: "Без описания",
             noRedeemCodes: "Промокодов пока нет.",
             ledgerTitle: "Ledger операций",
@@ -589,6 +1147,34 @@ function getText(locale: Locale) {
             reasonColumn: "Причина",
             amountColumn: "Сумма",
             statusColumn: "Статус",
+            billingColumn: "Период",
+            tokensColumn: "Лимит токенов",
+            providerColumn: "Провайдер",
+            platformColumn: "Платформа",
+            regionColumn: "Регион",
+            productIdsColumn: "Store IDs",
+            appleProductLabel: "Apple product ID",
+            googleProductLabel: "Google product ID",
+            stripePriceLabel: "Stripe price ID",
+            flagsColumn: "Флаги",
+            modeColumn: "Режим",
+            notesLabel: "Заметки",
+            renewalColumn: "Следующее списание",
+            eventTypeColumn: "Событие",
+            processedColumn: "Обработано",
+            cancelAtPeriodEndLabel: "Без автопродления",
+            externalCheckoutFlag: "External checkout",
+            recommendedFlag: "Recommended",
+            defaultFlag: "Default",
+            externalWarningFlag: "External warning",
+            storeDisclosureFlag: "Store disclosure",
+            minVersionLabel: "Минимум",
+            bonusPercentLabel: "Бонус, %",
+            displayLabelLabel: "Название",
+            displaySubtitleLabel: "Подзаголовок",
+            warningTitleLabel: "Заголовок warning",
+            warningMessageLabel: "Текст warning",
+            notProcessedLabel: "Еще не обработано",
         };
     }
 
@@ -604,16 +1190,39 @@ function getText(locale: Locale) {
         metaRedeem: "Redeem codes",
         metaLedger: "Ledger rows",
         metaPurchases: "Purchases",
+        metaSubscriptions: "Subscriptions",
+        metaRoutes: "Routes",
         activePacksLabel: "Active packs",
         creditFlowLabel: "Credits",
         debitFlowLabel: "Debits",
         revenueLabel: "Revenue",
+        activeSubscriptionsLabel: "Active subscriptions",
+        renewalStopsLabel: "Renewal stops",
+        activePlansCountLabel: "Active plans",
+        enabledRoutesLabel: "Enabled routes",
         packsTitle: "Top-up packs",
         packsDescription: "Update pricing, bonus, and visibility without touching historical purchases.",
+        subscriptionPlansTitle: "Premium plans",
+        subscriptionPlansDescription: "Current monthly and yearly plan configuration used by mobile clients and checkout flows.",
+        providerConfigsTitle: "Payment routing",
+        providerConfigsDescription: "Backend-controlled rules that choose App Store, Google Play, and Stripe by platform and region.",
+        subscriptionsTitle: "Active and recent subscriptions",
+        subscriptionsDescription: "Snapshot of recent premium subscriptions with provider, token usage, and renewal date.",
+        subscriptionEventsTitle: "Subscription event log",
+        subscriptionEventsDescription: "Recent lifecycle events from store and Stripe flows for integration diagnostics.",
         tokensShort: "spark",
         packSaved: "Pack updated.",
         packSaveError: "Failed to save pack.",
+        planSaved: "Premium plan updated.",
+        planSaveError: "Failed to save premium plan.",
+        providerConfigSaved: "Payment route updated.",
+        providerConfigSaveError: "Failed to save payment route.",
+        planMissingDraft: "Premium plan was not found in the current list.",
+        providerConfigMissingDraft: "Payment route was not found in the current list.",
+        invalidPlanNumbers: "Enter a valid price, currency, and token limit for the plan.",
+        invalidProviderConfig: "Enter a valid region, minimum app version, routing mode, and 0-100% bonus.",
         packColumn: "Pack",
+        planColumn: "Plan",
         priceColumn: "Price",
         grantedColumn: "Base",
         bonusColumn: "Bonus",
@@ -622,21 +1231,52 @@ function getText(locale: Locale) {
         actionsColumn: "Action",
         activeState: "On",
         inactiveState: "Hidden",
+        recommendedState: "Recommended",
         savingAction: "Saving...",
         saveAction: "Save",
         noPacks: "No top-up packs configured yet.",
+        noSubscriptionPlans: "No premium plans configured yet.",
+        noProviderConfigs: "No payment routing rules configured yet.",
+        noSubscriptions: "No subscriptions found yet.",
+        noSubscriptionEvents: "No subscription events recorded yet.",
         redeemTitle: "Redeem codes",
-        redeemDescription: "Create and monitor wallet redeem codes that grant PawSpark to users.",
+        redeemDescription: "Create and monitor wallet redeem codes that grant PawSpark or temporary Premium to users.",
         redeemCreated: "Redeem code created.",
         redeemCreateError: "Failed to create redeem code.",
+        redeemUpdated: "Redeem code updated.",
+        redeemUpdateError: "Failed to update redeem code.",
+        redeemArchived: "Redeem code archived.",
+        redeemArchiveError: "Failed to archive redeem code.",
+        redeemMissingDraft: "Redeem code was not found in the current list.",
+        redeemInvalidNumbers: "Enter a valid reward type and redemption limits.",
+        redeemInvalidWindow: "The start time cannot be later than the end time.",
+        redeemLimitTooLow: "The limit cannot be lower than the already used activations.",
+        redeemPerUserLimitTooLow: "The per-user limit cannot be lower than the highest existing usage by one user.",
         redeemCodeLabel: "Code",
         redeemDescriptionLabel: "Description",
         redeemRewardLabel: "Reward",
+        redeemRewardTypeLabel: "Reward type",
+        redeemRewardSparkLabel: "PawSpark",
+        redeemRewardPremiumLabel: "Premium days",
         redeemLimitLabel: "Limit",
+        redeemPerUserLimitLabel: "Per-user limit",
+        redeemStartsLabel: "Starts",
         redeemExpiresLabel: "Expires",
         redeemCreateAction: "Create redeem code",
+        redeemArchiveAction: "Archive",
         redeemCodeColumn: "Code",
         redeemUsageColumn: "Used",
+        redeemUsageHistoryLabel: "Recent redemptions",
+        redeemUsageEmpty: "No redemptions yet.",
+        redeemUsageMore: (count: number) => `${count} more redemptions in history`,
+        redeemPremiumUntilLabel: "Premium until",
+        redeemStatusColumn: "Status",
+        redeemWindowColumn: "Active window",
+        redeemStatusArchived: "Archived",
+        redeemStatusExhausted: "Exhausted",
+        redeemStatusScheduled: "Scheduled",
+        redeemStatusExpired: "Expired",
+        redeemWindowAlways: "No time limit",
         noDescription: "No description",
         noRedeemCodes: "No redeem codes yet.",
         ledgerTitle: "Wallet ledger",
@@ -655,6 +1295,34 @@ function getText(locale: Locale) {
         reasonColumn: "Reason",
         amountColumn: "Amount",
         statusColumn: "Status",
+        billingColumn: "Period",
+        tokensColumn: "Token limit",
+        providerColumn: "Provider",
+        platformColumn: "Platform",
+        regionColumn: "Region",
+        productIdsColumn: "Store IDs",
+        appleProductLabel: "Apple product ID",
+        googleProductLabel: "Google product ID",
+        stripePriceLabel: "Stripe price ID",
+        flagsColumn: "Flags",
+        modeColumn: "Mode",
+        notesLabel: "Notes",
+        renewalColumn: "Next renewal",
+        eventTypeColumn: "Event",
+        processedColumn: "Processed",
+        cancelAtPeriodEndLabel: "No auto-renew",
+        externalCheckoutFlag: "External checkout",
+        recommendedFlag: "Recommended",
+        defaultFlag: "Default",
+        externalWarningFlag: "External warning",
+        storeDisclosureFlag: "Store disclosure",
+        minVersionLabel: "Min",
+        bonusPercentLabel: "Bonus, %",
+        displayLabelLabel: "Label",
+        displaySubtitleLabel: "Subtitle",
+        warningTitleLabel: "Warning title",
+        warningMessageLabel: "Warning message",
+        notProcessedLabel: "Not processed yet",
     };
 }
 
@@ -690,6 +1358,154 @@ function updateDraft(
     }));
 }
 
+function toSubscriptionPlanDraft(plan: AdminSubscriptionPlan): SubscriptionPlanDraft {
+    return {
+        name: plan.name,
+        priceAmount: plan.priceAmount.toString(),
+        currencyCode: plan.currencyCode,
+        monthlyTokenLimit: plan.monthlyTokenLimit.toString(),
+        isRecommended: plan.isRecommended,
+        isActive: plan.isActive,
+        appleProductId: plan.appleProductId ?? "",
+        googleProductId: plan.googleProductId ?? "",
+        stripePriceId: plan.stripePriceId ?? "",
+        displayOrder: plan.displayOrder.toString(),
+    };
+}
+
+function updateSubscriptionPlanDraft(
+    setPlanDrafts: React.Dispatch<React.SetStateAction<Record<string, SubscriptionPlanDraft>>>,
+    planId: string,
+    patch: Partial<SubscriptionPlanDraft>,
+) {
+    setPlanDrafts((current) => ({
+        ...current,
+        [planId]: {
+            ...(current[planId] ?? {
+                name: "",
+                priceAmount: "0",
+                currencyCode: "USD",
+                monthlyTokenLimit: "0",
+                isRecommended: false,
+                isActive: false,
+                appleProductId: "",
+                googleProductId: "",
+                stripePriceId: "",
+                displayOrder: "0",
+            }),
+            ...patch,
+        },
+    }));
+}
+
+function toSubscriptionPlanPayload(draft: SubscriptionPlanDraft, text: ReturnType<typeof getText>) {
+    const priceAmount = Number(draft.priceAmount);
+    const monthlyTokenLimit = Number(draft.monthlyTokenLimit);
+    const displayOrder = Number(draft.displayOrder);
+    const currencyCode = draft.currencyCode.trim().toUpperCase();
+
+    if (!draft.name.trim() || !Number.isFinite(priceAmount) || priceAmount <= 0 || !Number.isFinite(monthlyTokenLimit) || monthlyTokenLimit <= 0 || !Number.isFinite(displayOrder) || displayOrder < 0 || currencyCode.length !== 3) {
+        throw new Error(text.invalidPlanNumbers);
+    }
+
+    return {
+        name: draft.name.trim(),
+        priceAmount,
+        currencyCode,
+        monthlyTokenLimit,
+        isRecommended: draft.isRecommended,
+        isActive: draft.isActive,
+        appleProductId: optionalText(draft.appleProductId),
+        googleProductId: optionalText(draft.googleProductId),
+        stripePriceId: optionalText(draft.stripePriceId),
+        displayOrder,
+    };
+}
+
+function toProviderConfigDraft(config: AdminPaymentProviderConfiguration): ProviderConfigDraft {
+    return {
+        region: config.region,
+        isEnabled: config.isEnabled,
+        isRecommended: config.isRecommended,
+        isSelectedByDefault: config.isSelectedByDefault,
+        requiresExternalWarning: config.requiresExternalWarning,
+        requiresStoreDisclosure: config.requiresStoreDisclosure,
+        allowedFromAppVersion: config.allowedFromAppVersion,
+        externalCheckoutAllowed: config.externalCheckoutAllowed,
+        bonusTokensPercent: config.bonusTokensPercent.toString(),
+        displayLabel: config.displayLabel ?? "",
+        displaySubtitle: config.displaySubtitle ?? "",
+        warningTitle: config.warningTitle ?? "",
+        warningMessage: config.warningMessage ?? "",
+        mode: config.mode,
+        notes: config.notes ?? "",
+    };
+}
+
+function updateProviderConfigDraft(
+    setProviderConfigDrafts: React.Dispatch<React.SetStateAction<Record<string, ProviderConfigDraft>>>,
+    configurationId: string,
+    patch: Partial<ProviderConfigDraft>,
+) {
+    setProviderConfigDrafts((current) => ({
+        ...current,
+        [configurationId]: {
+            ...(current[configurationId] ?? {
+                region: "*",
+                isEnabled: false,
+                isRecommended: false,
+                isSelectedByDefault: false,
+                requiresExternalWarning: false,
+                requiresStoreDisclosure: false,
+                allowedFromAppVersion: "0.0.0",
+                externalCheckoutAllowed: false,
+                bonusTokensPercent: "0",
+                displayLabel: "",
+                displaySubtitle: "",
+                warningTitle: "",
+                warningMessage: "",
+                mode: "test",
+                notes: "",
+            }),
+            ...patch,
+        },
+    }));
+}
+
+function toProviderConfigPayload(draft: ProviderConfigDraft, text: ReturnType<typeof getText>) {
+    const region = draft.region.trim().toUpperCase();
+    const allowedFromAppVersion = draft.allowedFromAppVersion.trim();
+    const mode = draft.mode.trim().toLowerCase();
+    const bonusTokensPercent = Number(draft.bonusTokensPercent);
+
+    if (!region || !allowedFromAppVersion || !mode || !Number.isFinite(bonusTokensPercent) || bonusTokensPercent < 0 || bonusTokensPercent > 100) {
+        throw new Error(text.invalidProviderConfig);
+    }
+
+    return {
+        region,
+        isEnabled: draft.isEnabled,
+        isRecommended: draft.isRecommended,
+        isSelectedByDefault: draft.isSelectedByDefault,
+        requiresExternalWarning: draft.requiresExternalWarning,
+        requiresStoreDisclosure: draft.requiresStoreDisclosure,
+        allowedFromAppVersion,
+        externalCheckoutAllowed: draft.externalCheckoutAllowed,
+        bonusTokensPercent,
+        displayLabel: optionalText(draft.displayLabel),
+        displaySubtitle: optionalText(draft.displaySubtitle),
+        warningTitle: optionalText(draft.warningTitle),
+        warningMessage: optionalText(draft.warningMessage),
+        mode,
+        notes: optionalText(draft.notes),
+    };
+}
+
+function optionalText(value: string) {
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+}
+
 function shortGuid(value: string) {
     return value.slice(0, 8);
 }
@@ -721,6 +1537,8 @@ function humanizeSource(value: string, locale: Locale) {
     const labels: Record<string, { ru: string; en: string }> = {
         weekly_grant: { ru: "Недельная награда", en: "Weekly reward" },
         ad_reward: { ru: "Награда за рекламу", en: "Ad reward" },
+        redeem_code: { ru: "Промокод", en: "Redeem code" },
+        premium_subscription_grant: { ru: "Выдача Premium токенов", en: "Premium token grant" },
         generation_spend: { ru: "Списание за генерацию", en: "Generation spend" },
         generation_refund: { ru: "Возврат за генерацию", en: "Generation refund" },
         pack_purchase: { ru: "Покупка пакета", en: "Pack purchase" },
@@ -731,11 +1549,36 @@ function humanizeSource(value: string, locale: Locale) {
     return labels[value]?.[locale] ?? value;
 }
 
+function humanizeProvider(value: string, locale: Locale) {
+    const labels: Record<string, { ru: string; en: string }> = {
+        app_store: { ru: "Apple App Store", en: "Apple App Store" },
+        google_play: { ru: "Google Play", en: "Google Play" },
+        stripe: { ru: "Stripe", en: "Stripe" },
+    };
+
+    return labels[value]?.[locale] ?? value;
+}
+
+function humanizeBillingPeriod(value: string, locale: Locale) {
+    const labels: Record<string, { ru: string; en: string }> = {
+        monthly: { ru: "Месяц", en: "Monthly" },
+        yearly: { ru: "Год", en: "Yearly" },
+    };
+
+    return labels[value]?.[locale] ?? value;
+}
+
 function humanizeStatus(value: string, locale: Locale) {
     const labels: Record<string, { ru: string; en: string }> = {
         pending: { ru: "Ожидает", en: "Pending" },
         succeeded: { ru: "Успешно", en: "Succeeded" },
         failed: { ru: "Ошибка", en: "Failed" },
+        active: { ru: "Активна", en: "Active" },
+        trialing: { ru: "Пробный период", en: "Trialing" },
+        past_due: { ru: "Просрочка", en: "Past due" },
+        canceled: { ru: "Отменена", en: "Canceled" },
+        expired: { ru: "Истекла", en: "Expired" },
+        processed: { ru: "Обработано", en: "Processed" },
     };
 
     return labels[value]?.[locale] ?? value;
@@ -743,10 +1586,18 @@ function humanizeStatus(value: string, locale: Locale) {
 
 function statusColor(value: string) {
     switch (value) {
+        case "active":
         case "succeeded":
+        case "processed":
             return "#22c55e";
+        case "trialing":
+            return "#38bdf8";
+        case "past_due":
         case "failed":
             return "#f87171";
+        case "canceled":
+        case "expired":
+            return "#64748b";
         default:
             return "#f59e0b";
     }
