@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
-    [Migration("20260521203000_AddPaymentProviderCheckoutControls")]
     public partial class AddPaymentProviderCheckoutControls : Migration
     {
         /// <inheritdoc />
