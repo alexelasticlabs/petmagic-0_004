@@ -60,6 +60,17 @@
   "profilePremiumOpenAction": "Открыть Premium",
   "profileWalletTitle": "Кошелек",
   "profileWalletHistoryHint": "Баланс, покупки и история операций.",
+  "profileWalletPreviewEyebrow": "PawSpark",
+  "profileWalletPreviewSubtitle": "Внутренняя валюта для генераций и бонусов.",
+  "profileWalletPreviewAction": "Открыть",
+  "profileWalletPreviewLoadingStatus": "Обновляем статус",
+  "profileWalletPreviewWeeklyReady": "Недельная награда готова",
+  "profileWalletPreviewAdCount": "Реклама сегодня: {count}",
+  "@profileWalletPreviewAdCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "profileWalletLoadingHint": "Загружаем баланс...",
   "profileWalletEmptyHint": "Откройте баланс и историю",
   "walletDataUnavailableFallback": "Данные кошелька сейчас недоступны.",

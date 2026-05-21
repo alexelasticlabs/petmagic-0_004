@@ -60,6 +60,17 @@
   "profilePremiumOpenAction": "Upgrade",
   "profileWalletTitle": "Wallet",
   "profileWalletHistoryHint": "Open balance, purchases and history.",
+  "profileWalletPreviewEyebrow": "PawSpark",
+  "profileWalletPreviewSubtitle": "In-app currency for generations and bonus rewards.",
+  "profileWalletPreviewAction": "Open",
+  "profileWalletPreviewLoadingStatus": "Refreshing status",
+  "profileWalletPreviewWeeklyReady": "Weekly reward ready",
+  "profileWalletPreviewAdCount": "Ads today: {count}",
+  "@profileWalletPreviewAdCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "profileWalletLoadingHint": "Loading balance...",
   "profileWalletEmptyHint": "Open balance and history",
   "walletDataUnavailableFallback": "Wallet data is not available right now.",
