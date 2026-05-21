@@ -322,23 +322,23 @@ class _WalletHighlightCard extends StatelessWidget {
     final colors = context.petMagicColors;
     final wallet = walletState.wallet;
     final weeklyReady =
-      wallet?.nextWeeklyGrantAtUtc == null ||
-      wallet!.nextWeeklyGrantAtUtc!.isBefore(DateTime.now().toUtc());
+        wallet?.nextWeeklyGrantAtUtc == null ||
+        wallet!.nextWeeklyGrantAtUtc!.isBefore(DateTime.now().toUtc());
     final balanceText = wallet == null
         ? (walletState.isLoading
               ? text.profileWalletLoadingHint
               : text.profileWalletEmptyHint)
         : '${_formatProfileNumber(context, wallet.balance)} PawSpark';
     final rewardLabel = wallet == null
-      ? text.profileWalletPreviewLoadingStatus
-      : weeklyReady
-      ? text.profileWalletPreviewWeeklyReady
-      : text.profileWalletPreviewAdCount(wallet.adRewardsRemainingToday);
+        ? text.profileWalletPreviewLoadingStatus
+        : weeklyReady
+        ? text.profileWalletPreviewWeeklyReady
+        : text.profileWalletPreviewAdCount(wallet.adRewardsRemainingToday);
     final rewardColor = wallet == null
-      ? colors.textMuted
-      : weeklyReady
-      ? colors.gold
-      : colors.accent;
+        ? colors.textMuted
+        : weeklyReady
+        ? colors.gold
+        : colors.accent;
 
     return Material(
       color: Colors.transparent,
@@ -357,110 +357,111 @@ class _WalletHighlightCard extends StatelessWidget {
                 colors.blue.withValues(alpha: 0.2),
                 colors.surfaceGlass,
               ],
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            ),
             boxShadow: [
-                      Row(
+              BoxShadow(
+                color: colors.shadow,
+                blurRadius: 24,
+                offset: const Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: colors.backgroundBottom.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: colors.textStrong,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: colors.backgroundBottom.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Icon(
-                              Icons.account_balance_wallet_rounded,
-                              color: colors.textStrong,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  text.profileWalletPreviewEyebrow,
-                                  style: TextStyle(
-                                    color: colors.textSoft,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  text.profileWalletTitle,
-                                  style: TextStyle(
-                                    color: colors.textStrong,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            color: colors.textMuted,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        balanceText,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 24,
-                          height: 1,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        text.profileWalletPreviewSubtitle,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: ProfileStatusPill(
-                              label: rewardLabel,
-                              leading: wallet == null
-                                  ? Icons.sync_rounded
-                                  : weeklyReady
-                                  ? Icons.card_giftcard_rounded
-                                  : Icons.play_circle_outline_rounded,
-                              backgroundColor: rewardColor.withValues(alpha: 0.14),
-                              foregroundColor: rewardColor,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
                           Text(
-                            text.profileWalletPreviewAction,
+                            text.profileWalletPreviewEyebrow,
                             style: TextStyle(
-                              color: colors.accent,
-                              fontSize: 12,
+                              color: colors.textSoft,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: colors.backgroundBottom.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Icon(
-                    Icons.account_balance_wallet_rounded,
+                          const SizedBox(height: 4),
+                          Text(
+                            text.profileWalletTitle,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: colors.textMuted,
+                      size: 18,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  balanceText,
+                  style: TextStyle(
                     color: colors.textStrong,
-                    size: 26,
+                    fontSize: 24,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
                   ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  text.profileWalletPreviewSubtitle,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ProfileStatusPill(
+                        label: rewardLabel,
+                        leading: wallet == null
+                            ? Icons.sync_rounded
+                            : weeklyReady
+                            ? Icons.card_giftcard_rounded
+                            : Icons.play_circle_outline_rounded,
+                        backgroundColor: rewardColor.withValues(alpha: 0.14),
+                        foregroundColor: rewardColor,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      text.profileWalletPreviewAction,
+                      style: TextStyle(
+                        color: colors.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

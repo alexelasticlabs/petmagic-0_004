@@ -792,7 +792,7 @@ class _PacksSection extends StatelessWidget {
                 : 220.0;
 
             return SizedBox(
-              height: compact ? 300 : 228,
+              height: compact ? 364 : 244,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: packs.length,
@@ -800,147 +800,283 @@ class _PacksSection extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final pack = packs[index];
                   final isFeatured = featuredPack?.packId == pack.packId;
+                  final priceLabel = _formatPrice(pack);
 
                   return SizedBox(
                     width: cardWidth,
-                    child: ProfileGlassCard(
-                      padding: const EdgeInsets.all(13),
-                      child: LayoutBuilder(
-                        builder: (context, cardConstraints) {
-                          final stackHeader = cardConstraints.maxWidth <= 270;
+                    child: _PackCardShell(
+                      highlight: isFeatured,
+                      child: ProfileGlassCard(
+                        padding: const EdgeInsets.all(13),
+                        child: LayoutBuilder(
+                          builder: (context, cardConstraints) {
+                            final stackHeader = cardConstraints.maxWidth <= 270;
 
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (stackHeader) ...[
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.pets_rounded,
-                                      color: colors.accent,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        pack.displayName,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: colors.textStrong,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w900,
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (stackHeader) ...[
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 34,
+                                        height: 34,
+                                        decoration: BoxDecoration(
+                                          color: isFeatured
+                                              ? colors.gold.withValues(
+                                                  alpha: 0.12,
+                                                )
+                                              : colors.accent.withValues(
+                                                  alpha: 0.12,
+                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          isFeatured
+                                              ? Icons.workspace_premium_rounded
+                                              : Icons.pets_rounded,
+                                          color: isFeatured
+                                              ? colors.gold
+                                              : colors.accent,
+                                          size: 18,
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          pack.displayName,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: colors.textStrong,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (isFeatured) ...[
+                                    const SizedBox(height: 8),
+                                    _PackFeaturedBadge(
+                                      label: text.walletPopularBadge,
                                     ),
                                   ],
+                                ] else
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 34,
+                                        height: 34,
+                                        decoration: BoxDecoration(
+                                          color: isFeatured
+                                              ? colors.gold.withValues(
+                                                  alpha: 0.12,
+                                                )
+                                              : colors.accent.withValues(
+                                                  alpha: 0.12,
+                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          isFeatured
+                                              ? Icons.workspace_premium_rounded
+                                              : Icons.pets_rounded,
+                                          color: isFeatured
+                                              ? colors.gold
+                                              : colors.accent,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          pack.displayName,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: colors.textStrong,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isFeatured) ...[
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: _PackFeaturedBadge(
+                                            label: text.walletPopularBadge,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    gradient: isFeatured
+                                        ? LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              colors.gold.withValues(
+                                                alpha: 0.16,
+                                              ),
+                                              colors.accent.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              colors.surfaceStrong.withValues(
+                                                alpha: 0.62,
+                                              ),
+                                            ],
+                                          )
+                                        : null,
+                                    color: isFeatured
+                                        ? null
+                                        : colors.surfaceStrong.withValues(
+                                            alpha: 0.52,
+                                          ),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(
+                                      color: isFeatured
+                                          ? colors.gold.withValues(alpha: 0.28)
+                                          : colors.border.withValues(
+                                              alpha: 0.9,
+                                            ),
+                                    ),
+                                  ),
+                                  child: LayoutBuilder(
+                                    builder: (context, heroConstraints) {
+                                      final stackedValue =
+                                          heroConstraints.maxWidth < 185;
+
+                                      final sparkSummary = Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            text.walletPackTotalSpark(
+                                              pack.totalSpark,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: colors.textStrong,
+                                              fontSize: 21,
+                                              fontWeight: FontWeight.w900,
+                                              height: 1.05,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            text.walletPackBaseSpark(
+                                              pack.grantedSpark,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: colors.textSoft,
+                                              fontSize: 11.5,
+                                              height: 1.25,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+
+                                      final priceBadge = _PackPriceBadge(
+                                        price: priceLabel,
+                                        highlight: isFeatured,
+                                      );
+
+                                      if (stackedValue) {
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            sparkSummary,
+                                            const SizedBox(height: 10),
+                                            priceBadge,
+                                          ],
+                                        );
+                                      }
+
+                                      return Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(child: sparkSummary),
+                                          const SizedBox(width: 10),
+                                          priceBadge,
+                                        ],
+                                      );
+                                    },
+                                  ),
                                 ),
-                                if (isFeatured) ...[
-                                  const SizedBox(height: 8),
+                                if (pack.bonusSpark > 0) ...[
+                                  const SizedBox(height: 10),
                                   ProfileStatusPill(
-                                    label: text.walletPopularBadge,
+                                    label: text.walletPackBonus(
+                                      pack.bonusSpark,
+                                    ),
+                                    leading: Icons.add_rounded,
                                     backgroundColor: colors.gold.withValues(
-                                      alpha: 0.18,
+                                      alpha: 0.16,
                                     ),
                                     foregroundColor: colors.gold,
                                   ),
                                 ],
-                              ] else
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.pets_rounded,
-                                      color: colors.accent,
+                                if (isFeatured) ...[
+                                  const SizedBox(height: 8),
+                                  _PackDetailRow(
+                                    icon: Icons.local_fire_department_rounded,
+                                    label: text.walletBestValueLabel,
+                                    accent: colors.gold,
+                                  ),
+                                ],
+                                const Spacer(),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: isBuying
+                                        ? null
+                                        : () => onBuy(pack),
+                                    style: isFeatured
+                                        ? FilledButton.styleFrom(
+                                            backgroundColor: colors.gold,
+                                            foregroundColor:
+                                                colors.backgroundBottom,
+                                            disabledBackgroundColor: colors.gold
+                                                .withValues(alpha: 0.3),
+                                            disabledForegroundColor: colors
+                                                .backgroundBottom
+                                                .withValues(alpha: 0.55),
+                                          )
+                                        : null,
+                                    icon: Icon(
+                                      isFeatured
+                                          ? Icons.auto_awesome_rounded
+                                          : Icons.shopping_bag_outlined,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        pack.displayName,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: colors.textStrong,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                    if (isFeatured) ...[
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: ProfileStatusPill(
-                                          label: text.walletPopularBadge,
-                                          backgroundColor: colors.gold
-                                              .withValues(alpha: 0.18),
-                                          foregroundColor: colors.gold,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              const SizedBox(height: 8),
-                              Text(
-                                text.walletPackTotalSpark(pack.totalSpark),
-                                style: TextStyle(
-                                  color: colors.textStrong,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _formatPrice(pack),
-                                style: TextStyle(
-                                  color: colors.accent,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              if (pack.bonusSpark > 0)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    text.walletPackBonus(pack.bonusSpark),
-                                    style: TextStyle(
-                                      color: colors.gold,
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w900,
+                                    label: Text(
+                                      text.walletBuyForPrice(priceLabel),
                                     ),
                                   ),
-                                ),
-                              const SizedBox(height: 10),
-                              _PackDetailRow(
-                                icon: Icons.auto_awesome_rounded,
-                                label: text.walletPackBreakdown(
-                                  pack.grantedSpark,
-                                  pack.bonusSpark,
-                                ),
-                                accent: colors.accent,
-                              ),
-                              if (isFeatured) ...[
-                                const SizedBox(height: 8),
-                                _PackDetailRow(
-                                  icon: Icons.local_fire_department_rounded,
-                                  label: text.walletBestValueLabel,
-                                  accent: colors.gold,
                                 ),
                               ],
-                              const Spacer(),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton(
-                                  onPressed: isBuying
-                                      ? null
-                                      : () => onBuy(pack),
-                                  child: Text(
-                                    text.walletBuyForPrice(_formatPrice(pack)),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
                   );
@@ -998,6 +1134,117 @@ class _PackDetailRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PackCardShell extends StatelessWidget {
+  const _PackCardShell({required this.highlight, required this.child});
+
+  final bool highlight;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!highlight) {
+      return child;
+    }
+
+    final colors = context.petMagicColors;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.gold.withValues(alpha: 0.26),
+            colors.accent.withValues(alpha: 0.16),
+            colors.blue.withValues(alpha: 0.14),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.gold.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Padding(padding: const EdgeInsets.all(1.5), child: child),
+    );
+  }
+}
+
+class _PackFeaturedBadge extends StatelessWidget {
+  const _PackFeaturedBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return ProfileStatusPill(
+      label: label,
+      leading: Icons.local_fire_department_rounded,
+      backgroundColor: colors.gold.withValues(alpha: 0.22),
+      foregroundColor: colors.gold,
+    );
+  }
+}
+
+class _PackPriceBadge extends StatelessWidget {
+  const _PackPriceBadge({required this.price, required this.highlight});
+
+  final String price;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: highlight
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colors.gold.withValues(alpha: 0.22),
+                  colors.gold.withValues(alpha: 0.12),
+                ],
+              )
+            : null,
+        color: highlight ? null : colors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: highlight
+              ? colors.gold.withValues(alpha: 0.24)
+              : colors.accent.withValues(alpha: 0.18),
+        ),
+        boxShadow: highlight
+            ? [
+                BoxShadow(
+                  color: colors.gold.withValues(alpha: 0.16),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
+      ),
+      child: Text(
+        price,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: highlight ? colors.gold : colors.accent,
+          fontSize: 17,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
       ),
     );
   }

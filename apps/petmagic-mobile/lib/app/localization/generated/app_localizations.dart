@@ -673,6 +673,18 @@ abstract class AppLocalizations {
   /// **'+{count} bonus'**
   String walletPackBonus(Object count);
 
+  /// No description provided for @walletPackBonusPill.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus +{count}'**
+  String walletPackBonusPill(Object count);
+
+  /// No description provided for @walletPackBaseSpark.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} base'**
+  String walletPackBaseSpark(Object count);
+
   /// No description provided for @walletBuyForPrice.
   ///
   /// In en, this message translates to:

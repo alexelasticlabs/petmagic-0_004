@@ -7,7 +7,9 @@ CurrencyPackModel? selectPopularPack(List<CurrencyPackModel> packs) {
 
   return packs.reduce((best, candidate) {
     final bestPrice = best.priceAmount <= 0 ? 1 : best.priceAmount;
-    final candidatePrice = candidate.priceAmount <= 0 ? 1 : candidate.priceAmount;
+    final candidatePrice = candidate.priceAmount <= 0
+        ? 1
+        : candidate.priceAmount;
     final bestValue = best.totalSpark / bestPrice;
     final candidateValue = candidate.totalSpark / candidatePrice;
 

@@ -315,6 +315,16 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String walletPackBonusPill(Object count) {
+    return 'Бонус +$count';
+  }
+
+  @override
+  String walletPackBaseSpark(Object count) {
+    return '$count база';
+  }
+
+  @override
   String walletBuyForPrice(Object price) {
     return 'Купить за $price';
   }

@@ -124,6 +124,18 @@
       "count": {}
     }
   },
+  "walletPackBonusPill": "Bonus +{count}",
+  "@walletPackBonusPill": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPackBaseSpark": "{count} base",
+  "@walletPackBaseSpark": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "walletBuyForPrice": "Buy for {price}",
   "@walletBuyForPrice": {
     "placeholders": {

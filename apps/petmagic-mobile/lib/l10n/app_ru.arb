@@ -124,6 +124,18 @@
       "count": {}
     }
   },
+  "walletPackBonusPill": "Бонус +{count}",
+  "@walletPackBonusPill": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPackBaseSpark": "{count} база",
+  "@walletPackBaseSpark": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "walletBuyForPrice": "Купить за {price}",
   "@walletBuyForPrice": {
     "placeholders": {

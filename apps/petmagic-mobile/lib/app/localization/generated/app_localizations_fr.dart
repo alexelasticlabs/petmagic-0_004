@@ -314,6 +314,16 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String walletPackBonusPill(Object count) {
+    return 'Bonus +$count';
+  }
+
+  @override
+  String walletPackBaseSpark(Object count) {
+    return '$count base';
+  }
+
+  @override
   String walletBuyForPrice(Object price) {
     return 'Buy for $price';
   }
