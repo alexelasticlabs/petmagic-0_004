@@ -1,6 +1,6 @@
 .page {
   width: 100%;
-  max-width: 108rem;
+  max-width: var(--admin-page-max-wide);
   margin: 0 auto;
   display: grid;
   gap: 0.72rem;

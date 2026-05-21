@@ -195,7 +195,7 @@ select {
 }
 
 .ui-button:hover:not(:disabled) {
-  transform: none;
+  transform: translateY(-1px);
   border-color: var(--border-accent);
   filter: none;
 }
@@ -219,6 +219,17 @@ select {
   opacity: 0.56;
   cursor: not-allowed;
   transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-button {
+    transition: none;
+  }
+
+  .ui-button:hover:not(:disabled),
+  .ui-button:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 @media (max-width: 480px) {

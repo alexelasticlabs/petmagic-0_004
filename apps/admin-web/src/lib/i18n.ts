@@ -238,6 +238,11 @@ export type Dictionary = {
   supportStatusInProgress: string;
   supportStatusResolved: string;
   supportStatusClosed: string;
+  supportStatusOpenHint: string;
+  supportStatusInProgressHint: string;
+  supportStatusResolvedHint: string;
+  supportStatusClosedHint: string;
+  supportStatusAutomationHint: string;
   supportBackToInbox: string;
   supportOpenConversation: string;
   supportAssignedTo: string;
@@ -247,26 +252,22 @@ export type Dictionary = {
   supportReplyPlaceholder: string;
   supportReplyAction: string;
   supportReplySending: string;
+  supportAttachmentHint: string;
+  supportAttachmentOpenAction: string;
+  supportAttachmentRemoveAction: string;
   supportSaveStatusAction: string;
   supportStatusSaved: string;
   supportReplySent: string;
-  supportInternalNoteAction: string;
-  supportInternalNotePlaceholder: string;
-  supportInternalNoteSaved: string;
-  supportInternalNoteBadge: string;
   supportAssignToMe: string;
   supportUnassign: string;
   supportAssignmentSaved: string;
   supportQuickRepliesLabel: string;
-  supportInternalNoteTemplatesLabel: string;
   supportTemplatesManagerTitle: string;
   supportTemplatesManagerDescription: string;
   supportTemplateNoTemplates: string;
   supportTemplateTitleLabel: string;
   supportTemplateBodyLabel: string;
-  supportTemplateKindLabel: string;
   supportTemplateKindReply: string;
-  supportTemplateKindInternalNote: string;
   supportTemplateEnabledLabel: string;
   supportTemplateDisabledBadge: string;
   supportTemplateSortOrderLabel: string;
@@ -296,8 +297,14 @@ export type Dictionary = {
   supportPriorityHigh: string;
   supportWaitingLabel: string;
   supportMarkInProgressAction: string;
+  supportResolveConversationAction: string;
+  supportReopenConversationAction: string;
   supportCloseConversationAction: string;
   supportTodayLabel: string;
+  supportViewProfileTab: string;
+  supportViewPurchasesTab: string;
+  supportViewGenerationsTab: string;
+  supportViewErrorsTab: string;
   supportViewUserTab: string;
   supportViewTemplatesTab: string;
   supportViewHistoryTab: string;
@@ -307,9 +314,18 @@ export type Dictionary = {
   supportTimelineConversationCreated: string;
   supportTimelineUserMessage: string;
   supportTimelineAdminReply: string;
-  supportTimelineInternalNote: string;
   supportHistoryEmpty: string;
+  supportStatusWorkflowTitle: string;
+  supportConversationMetaTitle: string;
   supportPlanLabel: string;
+  supportAccountAgeLabel: string;
+  supportPurchasesLabel: string;
+  supportRecentPurchasesTitle: string;
+  supportRecentGenerationsTitle: string;
+  supportGenerationErrorsTitle: string;
+  supportNoPurchases: string;
+  supportNoGenerationErrors: string;
+  supportOccurrencesLabel: string;
   supportLastGenerationLabel: string;
   supportLastPaymentLabel: string;
   supportCountryLabel: string;
@@ -552,6 +568,11 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportStatusInProgress: "В работе",
     supportStatusResolved: "Решен",
     supportStatusClosed: "Закрыт",
+    supportStatusOpenHint: "Диалог ждёт первой реакции поддержки или нового действия со стороны пользователя.",
+    supportStatusInProgressHint: "Диалог взят в работу, оператор ведёт переписку и собирает детали решения.",
+    supportStatusResolvedHint: "Решение уже предложено. Если пользователь ответит снова, диалог автоматически вернётся в статус «Открыт».",
+    supportStatusClosedHint: "Диалог завершён вручную и исключён из активной очереди, пока пользователь не напишет заново.",
+    supportStatusAutomationHint: "Ответ поддержки автоматически переводит диалог в «В работе» и назначает текущего администратора, если диалог ещё не закреплён. Сообщение пользователя после «Решен» или «Закрыт» автоматически снова открывает диалог.",
     supportBackToInbox: "К очереди",
     supportOpenConversation: "Открыть диалог",
     supportAssignedTo: "Ответственный",
@@ -561,26 +582,22 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportReplyPlaceholder: "Напишите ответ пользователю...",
     supportReplyAction: "Ответить",
     supportReplySending: "Отправка...",
+    supportAttachmentHint: "Добавьте скриншот, фото или файл до 8 MB.",
+    supportAttachmentOpenAction: "Открыть файл",
+    supportAttachmentRemoveAction: "Убрать вложение",
     supportSaveStatusAction: "Сохранить статус",
     supportStatusSaved: "Статус обновлен",
     supportReplySent: "Ответ отправлен",
-    supportInternalNoteAction: "Внутренняя заметка",
-    supportInternalNotePlaceholder: "Оставьте заметку только для команды поддержки...",
-    supportInternalNoteSaved: "Заметка сохранена",
-    supportInternalNoteBadge: "Internal note",
     supportAssignToMe: "Взять в работу",
     supportUnassign: "Снять назначение",
     supportAssignmentSaved: "Назначение обновлено",
     supportQuickRepliesLabel: "Быстрые ответы",
-    supportInternalNoteTemplatesLabel: "Шаблоны внутренних заметок",
     supportTemplatesManagerTitle: "Каталог шаблонов",
-    supportTemplatesManagerDescription: "Редактируйте быстрые ответы и внутренние заметки без нового деплоя.",
+    supportTemplatesManagerDescription: "Редактируйте быстрые ответы без нового деплоя.",
     supportTemplateNoTemplates: "Шаблонов пока нет.",
     supportTemplateTitleLabel: "Название шаблона",
     supportTemplateBodyLabel: "Текст шаблона",
-    supportTemplateKindLabel: "Тип шаблона",
     supportTemplateKindReply: "Ответ пользователю",
-    supportTemplateKindInternalNote: "Внутренняя заметка",
     supportTemplateEnabledLabel: "Шаблон активен",
     supportTemplateDisabledBadge: "Выключен",
     supportTemplateSortOrderLabel: "Порядок",
@@ -610,8 +627,14 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportPriorityHigh: "Высокий",
     supportWaitingLabel: "Ожидает",
     supportMarkInProgressAction: "Взять в работу",
+    supportResolveConversationAction: "Отметить решенным",
+    supportReopenConversationAction: "Переоткрыть",
     supportCloseConversationAction: "Закрыть диалог",
     supportTodayLabel: "Сегодня",
+    supportViewProfileTab: "Профиль",
+    supportViewPurchasesTab: "Покупки",
+    supportViewGenerationsTab: "Генерации",
+    supportViewErrorsTab: "Ошибки",
     supportViewUserTab: "Пользователь",
     supportViewTemplatesTab: "Шаблоны",
     supportViewHistoryTab: "История",
@@ -621,9 +644,18 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportTimelineConversationCreated: "Обращение создано",
     supportTimelineUserMessage: "Сообщение пользователя",
     supportTimelineAdminReply: "Ответ поддержки",
-    supportTimelineInternalNote: "Внутренняя заметка",
     supportHistoryEmpty: "История пока пуста.",
+    supportStatusWorkflowTitle: "Статус и workflow",
+    supportConversationMetaTitle: "Состояние диалога",
     supportPlanLabel: "План",
+    supportAccountAgeLabel: "Аккаунт",
+    supportPurchasesLabel: "Покупки",
+    supportRecentPurchasesTitle: "Последние покупки",
+    supportRecentGenerationsTitle: "Последние генерации",
+    supportGenerationErrorsTitle: "Ошибки генераций",
+    supportNoPurchases: "Покупок пока нет.",
+    supportNoGenerationErrors: "Ошибок генераций нет.",
+    supportOccurrencesLabel: "Случаев",
     supportLastGenerationLabel: "Последняя генерация",
     supportLastPaymentLabel: "Последний платеж",
     supportCountryLabel: "Страна",
@@ -864,6 +896,11 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportStatusInProgress: "In progress",
     supportStatusResolved: "Resolved",
     supportStatusClosed: "Closed",
+    supportStatusOpenHint: "The conversation is waiting for the first support action or for a new user update.",
+    supportStatusInProgressHint: "An operator is actively handling the case and working through the resolution.",
+    supportStatusResolvedHint: "A solution has been given. If the user replies again, the conversation automatically returns to Open.",
+    supportStatusClosedHint: "The conversation was manually finished and removed from the active queue until the user writes again.",
+    supportStatusAutomationHint: "A support reply automatically moves the conversation to In progress and assigns the current admin when the chat is still unassigned. A user reply after Resolved or Closed automatically reopens the conversation.",
     supportBackToInbox: "Back to inbox",
     supportOpenConversation: "Open conversation",
     supportAssignedTo: "Assigned to",
@@ -873,26 +910,22 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportReplyPlaceholder: "Write a reply to the user...",
     supportReplyAction: "Reply",
     supportReplySending: "Sending...",
+    supportAttachmentHint: "Add a screenshot, image, or file up to 8 MB.",
+    supportAttachmentOpenAction: "Open file",
+    supportAttachmentRemoveAction: "Remove attachment",
     supportSaveStatusAction: "Save status",
     supportStatusSaved: "Status updated",
     supportReplySent: "Reply sent",
-    supportInternalNoteAction: "Internal note",
-    supportInternalNotePlaceholder: "Leave a note visible only to the support team...",
-    supportInternalNoteSaved: "Internal note saved",
-    supportInternalNoteBadge: "Internal note",
     supportAssignToMe: "Assign to me",
     supportUnassign: "Unassign",
     supportAssignmentSaved: "Assignment updated",
     supportQuickRepliesLabel: "Quick replies",
-    supportInternalNoteTemplatesLabel: "Internal note templates",
     supportTemplatesManagerTitle: "Template catalog",
-    supportTemplatesManagerDescription: "Edit quick replies and internal notes without another deploy.",
+    supportTemplatesManagerDescription: "Edit quick replies without another deploy.",
     supportTemplateNoTemplates: "No templates yet.",
     supportTemplateTitleLabel: "Template title",
     supportTemplateBodyLabel: "Template body",
-    supportTemplateKindLabel: "Template kind",
     supportTemplateKindReply: "User reply",
-    supportTemplateKindInternalNote: "Internal note",
     supportTemplateEnabledLabel: "Template enabled",
     supportTemplateDisabledBadge: "Disabled",
     supportTemplateSortOrderLabel: "Sort order",
@@ -922,8 +955,14 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportPriorityHigh: "High",
     supportWaitingLabel: "Waiting",
     supportMarkInProgressAction: "Mark as in progress",
+    supportResolveConversationAction: "Mark resolved",
+    supportReopenConversationAction: "Reopen",
     supportCloseConversationAction: "Close conversation",
     supportTodayLabel: "Today",
+    supportViewProfileTab: "Profile",
+    supportViewPurchasesTab: "Purchases",
+    supportViewGenerationsTab: "Generations",
+    supportViewErrorsTab: "Errors",
     supportViewUserTab: "User",
     supportViewTemplatesTab: "Templates",
     supportViewHistoryTab: "History",
@@ -933,9 +972,18 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportTimelineConversationCreated: "Conversation created",
     supportTimelineUserMessage: "User message",
     supportTimelineAdminReply: "Support reply",
-    supportTimelineInternalNote: "Internal note",
     supportHistoryEmpty: "No history yet.",
+    supportStatusWorkflowTitle: "Status and workflow",
+    supportConversationMetaTitle: "Conversation state",
     supportPlanLabel: "Plan",
+    supportAccountAgeLabel: "Account",
+    supportPurchasesLabel: "Purchases",
+    supportRecentPurchasesTitle: "Recent purchases",
+    supportRecentGenerationsTitle: "Recent generations",
+    supportGenerationErrorsTitle: "Generation errors",
+    supportNoPurchases: "No purchases yet.",
+    supportNoGenerationErrors: "No generation errors.",
+    supportOccurrencesLabel: "Occurrences",
     supportLastGenerationLabel: "Last generation",
     supportLastPaymentLabel: "Last payment",
     supportCountryLabel: "Country",

@@ -1,6 +1,6 @@
 .dashboard {
   width: 100%;
-  max-width: 106rem;
+  max-width: var(--admin-page-max-wide);
   margin: 0 auto;
   display: grid;
   gap: clamp(0.82rem, 0.72rem + 0.28vw, 0.98rem);
@@ -190,7 +190,7 @@
 
 @media (max-width: 1440px) {
   .dashboard {
-    max-width: 96rem;
+    max-width: var(--admin-page-max-wide);
   }
 }
 

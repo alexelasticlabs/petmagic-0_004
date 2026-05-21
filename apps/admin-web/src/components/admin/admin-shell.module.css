@@ -10,6 +10,9 @@
   --admin-text-dim: var(--text-muted);
   --admin-accent: var(--accent);
   --admin-accent-soft: rgba(138, 180, 248, 0.12);
+  --admin-page-max: 110rem;
+  --admin-page-max-wide: 118rem;
+  --admin-page-max-ultra: 126rem;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 15.5rem minmax(0, 1fr);
@@ -355,7 +358,7 @@
 
 .content {
   min-width: 0;
-  padding: clamp(0.78rem, 0.5rem + 0.56vw, 1.08rem);
+  padding: clamp(0.82rem, 0.48rem + 0.72vw, 1.32rem);
 }
 
 .authGate {
@@ -469,6 +472,34 @@
 .localeCheck {
   width: 0.85rem;
   height: 0.85rem;
+}
+
+@media (min-width: 1600px) {
+  .layout {
+    --admin-page-max: 114rem;
+    --admin-page-max-wide: 124rem;
+    --admin-page-max-ultra: 134rem;
+  }
+
+  .topbar {
+    padding-inline: clamp(1.08rem, 0.7rem + 0.68vw, 1.48rem);
+  }
+
+  .content {
+    padding: clamp(0.96rem, 0.56rem + 0.76vw, 1.52rem);
+  }
+}
+
+@media (min-width: 2200px) {
+  .layout {
+    --admin-page-max: 118rem;
+    --admin-page-max-wide: 130rem;
+    --admin-page-max-ultra: 142rem;
+  }
+
+  .content {
+    padding: clamp(1rem, 0.6rem + 0.78vw, 1.68rem);
+  }
 }
 
 @media (max-width: 1080px) {

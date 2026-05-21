@@ -113,23 +113,10 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         queryFn: fetchAdminRedeemCodes,
     });
 
-    useEffect(() => {
-        if (!packsQuery.data) {
-            return;
-        }
-
-        setDrafts((current) => {
-            const next = { ...current };
-            for (const pack of packsQuery.data) {
-                next[pack.packId] ??= toDraft(pack);
-            }
-            return next;
-        });
-    }, [packsQuery.data]);
-
     const savePackMutation = useMutation({
         mutationFn: async (packId: string) => {
-            const draft = drafts[packId];
+            const pack = packsQuery.data?.find((item) => item.packId === packId);
+            const draft = drafts[packId] ?? (pack ? toDraft(pack) : null);
             if (!draft) {
                 throw new Error("Missing draft");
             }
@@ -173,10 +160,10 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         },
     });
 
-    const ledgerItems = ledgerQuery.data?.items ?? [];
-    const purchaseItems = purchasesQuery.data?.items ?? [];
-    const packs = packsQuery.data ?? [];
-    const redeemCodes = redeemCodesQuery.data ?? [];
+    const ledgerItems = useMemo(() => ledgerQuery.data?.items ?? [], [ledgerQuery.data?.items]);
+    const purchaseItems = useMemo(() => purchasesQuery.data?.items ?? [], [purchasesQuery.data?.items]);
+    const packs = useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
+    const redeemCodes = useMemo(() => redeemCodesQuery.data ?? [], [redeemCodesQuery.data]);
 
     const metrics = useMemo(() => {
         const credited = ledgerItems.filter((item) => item.delta > 0).reduce((sum, item) => sum + item.delta, 0);

@@ -1,6 +1,6 @@
 .page {
   width: 100%;
-  max-width: 106rem;
+  max-width: var(--admin-page-max-wide);
   margin: 0 auto;
   display: grid;
   gap: clamp(0.78rem, 0.68rem + 0.24vw, 0.92rem);
@@ -171,6 +171,6 @@
 
 @media (max-width: 1440px) {
   .page {
-    max-width: 96rem;
+    max-width: var(--admin-page-max-wide);
   }
 }

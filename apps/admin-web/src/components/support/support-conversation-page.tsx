@@ -1,40 +1,41 @@
 "use client";
 
-import { AdminBadge, AdminCard, AdminPage, AdminSelectField, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { SupportOptionGroup } from "@/components/support/support-option-group";
+import styles from "@/components/support/support-page.module.css";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    fetchAdminUser,
-    fetchAdminUserAnalytics,
     assignSupportConversation,
     createSupportReplyTemplate,
-    fetchSupportInbox,
     deleteSupportReplyTemplate,
+    fetchAdminUser,
+    fetchAdminUserAnalytics,
     fetchSupportConversation,
+    fetchSupportInbox,
     fetchSupportReplyTemplates,
     markSupportConversationRead,
-    sendSupportInternalNote,
+    sendSupportAttachment,
     sendSupportMessage,
     updateSupportConversationStatus,
     updateSupportReplyTemplate,
     useAuthSession,
     type AdminSupportConversation,
     type AdminSupportConversationSummary,
+    type AdminSupportReplyTemplate,
     type AdminUserAnalytics,
     type AdminUserDetail,
-    type AdminSupportReplyTemplate,
     type SupportConversationStatus,
-    type SupportReplyTemplateKind,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { useSupportRealtime } from "@/lib/support-realtime";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "@/components/support/support-page.module.css";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type SupportConversationPageProps = {
     locale: Locale;
@@ -46,11 +47,14 @@ type ToastState = {
     message: string;
 };
 
-type SupportFilter = "all" | SupportConversationStatus;
-type TemplateKindFilter = "all" | SupportReplyTemplateKind;
+type StatusActionDescriptor = {
+    status: SupportConversationStatus;
+    label: string;
+    variant: "primary" | "secondary" | "danger";
+};
 
-type ComposerMode = "reply" | "note";
-type SidePanelTab = "user" | "templates" | "history";
+type SupportFilter = "all" | SupportConversationStatus;
+type SidePanelTab = "profile" | "purchases" | "generations" | "errors" | "history" | "templates";
 
 type TimelineItem = {
     id: string;
@@ -64,7 +68,6 @@ type TemplateDraft = {
     templateId: string | null;
     title: string;
     body: string;
-    kind: SupportReplyTemplateKind;
     isEnabled: boolean;
     sortOrder: number;
 };
@@ -74,7 +77,6 @@ const emptyTemplateDraft: TemplateDraft = {
     templateId: null,
     title: "",
     body: "",
-    kind: "Reply",
     isEnabled: true,
     sortOrder: 0,
 };
@@ -87,16 +89,24 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     const [statusFilter, setStatusFilter] = useState<SupportFilter>("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [reply, setReply] = useState("");
-    const [internalNote, setInternalNote] = useState("");
-    const [composerMode, setComposerMode] = useState<ComposerMode>("reply");
     const [templateDraft, setTemplateDraft] = useState<TemplateDraft>(emptyTemplateDraft);
-    const [templateFilter, setTemplateFilter] = useState<TemplateKindFilter>("all");
     const [templateSearchQuery, setTemplateSearchQuery] = useState("");
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
     const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
-    const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("user");
-    const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+    const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("profile");
+    const [isSidePanelOpen, setIsSidePanelOpen] = useState(() => typeof window !== "undefined"
+        && window.matchMedia("(min-width: 1321px)").matches);
     const [toast, setToast] = useState<ToastState | null>(null);
+    const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+    const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+    const markReadRequestRef = useRef<Promise<void> | null>(null);
+
+    const resetSelectedAttachment = useCallback(() => {
+        setSelectedAttachment(null);
+        if (attachmentInputRef.current) {
+            attachmentInputRef.current.value = "";
+        }
+    }, []);
 
     const refreshConversationData = useCallback(async () => {
         await Promise.all([
@@ -123,6 +133,22 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
         const timer = window.setTimeout(() => setToast(null), 2400);
         return () => window.clearTimeout(timer);
     }, [toast]);
+
+    const attachmentPreviewUrl = useMemo(() => {
+        if (!selectedAttachment || !selectedAttachment.type.startsWith("image/")) {
+            return null;
+        }
+
+        return URL.createObjectURL(selectedAttachment);
+    }, [selectedAttachment]);
+
+    useEffect(() => {
+        return () => {
+            if (attachmentPreviewUrl) {
+                URL.revokeObjectURL(attachmentPreviewUrl);
+            }
+        };
+    }, [attachmentPreviewUrl]);
 
     const conversationQuery = useQuery<AdminSupportConversation>({
         queryKey: adminQueryKeys.supportConversation(conversationId),
@@ -154,30 +180,24 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
             return;
         }
 
-        if (conversationQuery.data.adminUnreadCount > 0) {
-            void markSupportConversationRead(conversationId)
+        if (conversationQuery.data.adminUnreadCount > 0 && !markReadRequestRef.current) {
+            markReadRequestRef.current = markSupportConversationRead(conversationId)
                 .then(refreshConversationData)
-                .catch(() => undefined);
+                .catch(() => undefined)
+                .finally(() => {
+                    markReadRequestRef.current = null;
+                });
         }
     }, [conversationId, conversationQuery.data, refreshConversationData]);
 
     const sendMutation = useMutation({
-        mutationFn: async () => sendSupportMessage(conversationId, reply.trim()),
+        mutationFn: async () => selectedAttachment
+            ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim())
+            : sendSupportMessage(conversationId, reply.trim()),
         onSuccess: async () => {
             setReply("");
+            resetSelectedAttachment();
             setToast({ type: "success", message: text.supportReplySent });
-            await refreshConversationData();
-        },
-        onError: () => {
-            setToast({ type: "error", message: text.supportLoadError });
-        },
-    });
-
-    const noteMutation = useMutation({
-        mutationFn: async () => sendSupportInternalNote(conversationId, internalNote.trim()),
-        onSuccess: async () => {
-            setInternalNote("");
-            setToast({ type: "success", message: text.supportInternalNoteSaved });
             await refreshConversationData();
         },
         onError: () => {
@@ -212,7 +232,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
             const payload = {
                 title: templateDraft.title.trim(),
                 body: templateDraft.body.trim(),
-                kind: templateDraft.kind,
                 isEnabled: templateDraft.isEnabled,
                 sortOrder: templateDraft.sortOrder,
             };
@@ -285,10 +304,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     const sortedTemplates = useMemo(
         () =>
             (templatesQuery.data ?? []).slice().sort((left, right) => {
-                if (left.kind !== right.kind) {
-                    return left.kind === "Reply" ? -1 : 1;
-                }
-
                 if (left.sortOrder !== right.sortOrder) {
                     return left.sortOrder - right.sortOrder;
                 }
@@ -301,70 +316,105 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
         const normalizedQuery = templateSearchQuery.trim().toLowerCase();
 
         return sortedTemplates.filter((template) => {
-            if (templateFilter !== "all" && template.kind !== templateFilter) {
-                return false;
-            }
-
             if (!normalizedQuery) {
                 return true;
             }
 
             return `${template.title} ${template.body}`.toLowerCase().includes(normalizedQuery);
         });
-    }, [sortedTemplates, templateFilter, templateSearchQuery]);
+    }, [sortedTemplates, templateSearchQuery]);
     const visibleTemplates = useMemo(
         () =>
             sortedTemplates
-                .filter((template) => template.isEnabled && template.kind === (composerMode === "reply" ? "Reply" : "InternalNote"))
+                .filter((template) => template.isEnabled)
                 .slice(0, 4),
-        [composerMode, sortedTemplates],
+        [sortedTemplates],
     );
-    const composerValue = composerMode === "reply" ? reply : internalNote;
-    const composerPlaceholder = composerMode === "reply" ? text.supportReplyPlaceholder : text.supportInternalNotePlaceholder;
+    const composerValue = reply;
+    const composerPlaceholder = text.supportReplyPlaceholder;
     const userDisplayName = conversation?.userDisplayName?.trim() || conversation?.userEmail || text.supportConversationTitle;
+    const hasComposerAttachment = selectedAttachment !== null;
+    const sidePanelTabs: ReadonlyArray<{ value: SidePanelTab; label: string }> = [
+        { value: "profile", label: text.supportViewProfileTab },
+        { value: "purchases", label: text.supportViewPurchasesTab },
+        { value: "generations", label: text.supportViewGenerationsTab },
+        { value: "errors", label: text.supportViewErrorsTab },
+        { value: "history", label: text.supportViewHistoryTab },
+        { value: "templates", label: text.supportViewTemplatesTab },
+    ];
+    const sidePanelTitle = activeSidePanelTab === "profile"
+        ? text.supportUserInformationTitle
+        : activeSidePanelTab === "purchases"
+            ? text.supportRecentPurchasesTitle
+            : activeSidePanelTab === "generations"
+                ? text.supportRecentGenerationsTitle
+                : activeSidePanelTab === "errors"
+                    ? text.supportGenerationErrorsTitle
+                    : activeSidePanelTab === "templates"
+                        ? text.supportTemplatesManagerTitle
+                        : text.supportTimelineTitle;
+    const sidePanelDescription = activeSidePanelTab === "templates"
+        ? text.supportTemplatesManagerDescription
+        : activeSidePanelTab === "history"
+            ? text.supportConversationDescription
+            : null;
     const selectedTemplate = filteredTemplates.find((template) => template.templateId === selectedTemplateId) ?? filteredTemplates[0] ?? null;
-    const lastCountry = analyticsQuery.data?.recentTemplateEvents[0]?.countryCode || "—";
-    const lastPurchase = analyticsQuery.data?.recentPurchases[0] ?? null;
-    const conversationTimeline = useMemo(() => {
-        if (!conversation) {
-            return [] as TimelineItem[];
-        }
-
-        const items: TimelineItem[] = [
+    const accountCreatedAt = userQuery.data?.createdAtUtc ?? conversation?.createdAtUtc ?? null;
+    const conversationWaitingSince = conversation?.lastMessageAtUtc ?? conversation?.createdAtUtc ?? null;
+    const conversationSla = getConversationSla(conversationWaitingSince, locale, conversation?.adminUnreadCount ?? 0);
+    const totalPurchases = analyticsQuery.data?.summary.totalPurchases ?? 0;
+    const failedGenerations = analyticsQuery.data?.recentGenerations.filter((generation) => generation.status.toLowerCase() === "failed") ?? [];
+    const recentFailures = analyticsQuery.data?.failureBreakdown.slice(0, 4) ?? [];
+    const chatFacts = [
+        userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel,
+        formatAccountAgeFact(accountCreatedAt, locale),
+        formatCountFact(conversation?.messages.length ?? 0, locale, "messages"),
+        formatCountFact(totalPurchases, locale, "purchases"),
+    ];
+    const activityTimeline: TimelineItem[] = [
+        ...(analyticsQuery.data?.recentActivity ?? []).slice(0, 4).map((item) => ({
+            id: `activity:${item.kind}:${item.occurredAtUtc}:${item.title}`,
+            title: item.title,
+            subtitle: item.details || item.kind,
+            occurredAtUtc: item.occurredAtUtc,
+            tone: "info" as const,
+        })),
+        ...(analyticsQuery.data?.recentAuditEvents ?? []).slice(0, 4).map((item) => ({
+            id: `audit:${item.auditEventId}`,
+            title: item.action,
+            subtitle: item.details,
+            occurredAtUtc: item.occurredAtUtc,
+            tone: "warning" as const,
+        })),
+    ].sort((left, right) => new Date(right.occurredAtUtc).getTime() - new Date(left.occurredAtUtc).getTime());
+    const availableStatusActions = conversation ? getAvailableStatusActions(conversation.status, text) : [];
+    const primaryStatusAction = availableStatusActions.find((action) => action.variant === "primary") ?? null;
+    const secondaryStatusActions = availableStatusActions.filter((action) => action.variant === "secondary");
+    const destructiveStatusAction = availableStatusActions.find((action) => action.variant === "danger") ?? null;
+    const conversationTimeline: TimelineItem[] = !conversation
+        ? []
+        : [
             {
                 id: `conversation:${conversation.conversationId}`,
                 title: text.supportTimelineConversationCreated,
                 subtitle: userDisplayName,
                 occurredAtUtc: conversation.createdAtUtc,
-                tone: "info",
+                tone: "info" as const,
             },
             ...conversation.messages.map((message) => ({
                 id: message.messageId,
-                title: message.isInternalNote
-                    ? text.supportTimelineInternalNote
-                    : message.isFromAdmin
-                        ? text.supportTimelineAdminReply
-                        : text.supportTimelineUserMessage,
+                title: message.isFromAdmin
+                    ? text.supportTimelineAdminReply
+                    : text.supportTimelineUserMessage,
                 subtitle: `${message.senderDisplayName} • ${truncateText(message.body, 112)}`,
                 occurredAtUtc: message.createdAtUtc,
-                tone: message.isInternalNote ? "warning" as const : message.isFromAdmin ? "success" as const : "primary" as const,
+                tone: message.isFromAdmin ? "success" as const : "primary" as const,
             })),
-        ];
-
-        return items.sort((left, right) => new Date(right.occurredAtUtc).getTime() - new Date(left.occurredAtUtc).getTime());
-    }, [conversation, text.supportTimelineAdminReply, text.supportTimelineConversationCreated, text.supportTimelineInternalNote, text.supportTimelineUserMessage, userDisplayName]);
+        ].sort((left, right) => new Date(right.occurredAtUtc).getTime() - new Date(left.occurredAtUtc).getTime());
 
     const applyTemplate = useCallback((template: AdminSupportReplyTemplate) => {
         setSelectedTemplateId(template.templateId);
-
-        if (template.kind === "Reply") {
-            setComposerMode("reply");
-            setReply((current) => mergeTemplateDraft(current, template.body));
-            return;
-        }
-
-        setComposerMode("note");
-        setInternalNote((current) => mergeTemplateDraft(current, template.body));
+        setReply((current) => mergeTemplateDraft(current, template.body));
     }, []);
 
     const openTemplateEditor = useCallback((template?: AdminSupportReplyTemplate) => {
@@ -374,7 +424,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 templateId: template.templateId,
                 title: template.title,
                 body: template.body,
-                kind: template.kind,
                 isEnabled: template.isEnabled,
                 sortOrder: template.sortOrder,
             });
@@ -384,11 +433,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
 
         setTemplateDraft({
             ...emptyTemplateDraft,
-            kind: composerMode === "reply" ? "Reply" : "InternalNote",
         });
         setSelectedTemplateId(null);
         setIsTemplateEditorOpen(true);
-    }, [composerMode]);
+    }, []);
 
     return (
         <AdminPage className={styles.page}>
@@ -412,8 +460,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             <span className={styles.subtle}>{userDisplayName}</span>
                         </div>
                         <div className={styles.compactHeaderMeta}>
-                            <AdminBadge tone={priorityTone(conversation.priority)}>{priorityLabel(conversation.priority, text)}</AdminBadge>
-                            <AdminBadge tone={toneForStatus(conversation.status)}>{statusLabel(conversation.status, text)}</AdminBadge>
                             {conversation.adminUnreadCount > 0 ? <span className={styles.unreadDot}>{conversation.adminUnreadCount}</span> : null}
                             <Button variant="secondary" size="sm" onClick={() => setIsSidePanelOpen((current) => !current)}>
                                 {isSidePanelOpen ? text.supportClosePanelAction : text.supportOpenPanelAction}
@@ -422,21 +468,28 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     </div>
 
                     <div className={`${styles.workspace} ${isSidePanelOpen ? styles.workspaceWithSidebar : styles.workspaceCompact}`}>
-                        <AdminCard title={text.supportInboxTitle} description={text.supportInboxDescription} className={styles.inboxPane}>
-                            <div className={styles.inboxToolbar}>
-                                <div className={styles.statusSelect}>
-                                    <AdminSelectField
-                                        label={text.statusLabel}
-                                        value={statusFilter}
-                                        options={[
-                                            { value: "all", label: text.supportStatusAll },
-                                            ...statusOptions.map((status) => ({ value: status, label: statusLabel(status, text) })),
-                                        ]}
-                                        onChange={(value) => setStatusFilter(value as SupportFilter)}
-                                    />
+                        <AdminCard className={styles.inboxPane}>
+                            <div className={styles.paneTopbar}>
+                                <div className={styles.paneTitleGroup}>
+                                    <span className={styles.paneEyebrow}>{text.supportTitle}</span>
+                                    <h2 className={styles.paneTitle}>{text.supportInboxTitle}</h2>
+                                    <p className={styles.paneDescription}>{text.supportInboxDescription}</p>
                                 </div>
+                                <div className={styles.paneCountBadge}>{filteredInboxItems.length}</div>
+                            </div>
+                            <div className={styles.inboxToolbar}>
+                                <SupportOptionGroup
+                                    label={text.statusLabel}
+                                    value={statusFilter}
+                                    options={[
+                                        { value: "all", label: text.supportStatusAll },
+                                        ...statusOptions.map((status) => ({ value: status, label: statusLabel(status, text) })),
+                                    ]}
+                                    onChange={(value) => setStatusFilter(value as SupportFilter)}
+                                    compact
+                                />
                                 <label className={styles.searchField}>
-                                    <span className={styles.searchLabel}>{text.supportSearchPlaceholder}</span>
+                                    <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
                                     <input
                                         className={styles.searchInput}
                                         value={searchQuery}
@@ -463,21 +516,22 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             <div className={styles.rowHeader}>
                                                 <div className={styles.rowIdentity}>
                                                     <span className={styles.avatar}>{initialsFor(item.userDisplayName?.trim() || item.userEmail)}</span>
-                                                    <div>
+                                                    <div className={styles.rowTextStack}>
                                                         <div className={styles.rowTitle}>{item.userDisplayName?.trim() || item.userEmail}</div>
-                                                        <div className={styles.subtle}>{item.userEmail}</div>
+                                                        <div className={styles.rowPreview}><span>{item.lastMessagePreview || text.supportNoMessages}</span></div>
                                                     </div>
                                                 </div>
                                                 <span className={styles.timePill}>{formatRelativeTime(item.lastMessageAtUtc ?? item.updatedAtUtc, locale)}</span>
                                             </div>
-                                            <div className={styles.rowPreview}>{item.lastMessagePreview || text.supportNoMessages}</div>
-                                            <div className={styles.rowFooter}>
+                                            <div className={styles.rowSlaLine}>
+                                                <span className={`${styles.slaPill} ${styles[`slaPill_${getConversationSla(item.lastMessageAtUtc ?? item.createdAtUtc, locale, item.adminUnreadCount).level}`]}`}>
+                                                    {getConversationSla(item.lastMessageAtUtc ?? item.createdAtUtc, locale, item.adminUnreadCount).primaryLabel}
+                                                </span>
                                                 <div className={styles.rowMetaGroup}>
-                                                    <AdminBadge tone={priorityTone(item.priority)}>{priorityLabel(item.priority, text)}</AdminBadge>
-                                                    <AdminBadge tone={toneForStatus(item.status)}>{statusLabel(item.status, text)}</AdminBadge>
                                                     {item.adminUnreadCount > 0 ? <span className={styles.unreadDot}>{item.adminUnreadCount}</span> : null}
+                                                    {item.status !== "Open" ? <span className={styles.rowSecondaryMeta}>{statusLabel(item.status, text)}</span> : null}
+                                                    {item.priority.toLowerCase() === "high" ? <span className={styles.rowSecondaryMeta}>{priorityLabel(item.priority, text)}</span> : null}
                                                 </div>
-                                                <span className={styles.waitingLabel}>{`${text.supportWaitingLabel}: ${formatWaitTime(item.lastMessageAtUtc ?? item.createdAtUtc, locale)}`}</span>
                                             </div>
                                         </Link>
                                     ))}
@@ -493,6 +547,11 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             <strong className={styles.chatUserName}>{userDisplayName}</strong>
                                             <span className={styles.onlineDot} />
                                         </div>
+                                        <div className={styles.chatFacts}>
+                                            {chatFacts.map((fact) => (
+                                                <span key={fact} className={styles.chatFactChip}>{fact}</span>
+                                            ))}
+                                        </div>
                                         <div className={styles.chatMetaLine}>
                                             <span>{conversation.userEmail}</span>
                                             <span>•</span>
@@ -502,27 +561,13 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                         </div>
                                     </div>
 
-                                    <div className={styles.chatActionsBar}>
-                                        <span className={styles.waitingLabel}>{`${text.supportWaitingLabel}: ${formatWaitTime(conversation.lastMessageAtUtc ?? conversation.createdAtUtc, locale)}`}</span>
+                                    <div className={styles.chatHeaderAside}>
+                                        <span className={`${styles.slaPill} ${styles[`slaPill_${conversationSla.level}`]}`}>{conversationSla.waitLabel}</span>
                                         <div className={styles.chatStatusControls}>
-                                            <AdminBadge tone={priorityTone(conversation.priority)}>{priorityLabel(conversation.priority, text)}</AdminBadge>
                                             <AdminBadge tone={toneForStatus(conversation.status)}>{statusLabel(conversation.status, text)}</AdminBadge>
-                                            <div className={styles.statusSelectCompact}>
-                                                <AdminSelectField
-                                                    label={text.statusLabel}
-                                                    value={conversation.status}
-                                                    options={statusOptions.map((status) => ({ value: status, label: statusLabel(status, text) }))}
-                                                    onChange={(value) => {
-                                                        const nextStatus = value as SupportConversationStatus;
-                                                        if (nextStatus === conversation.status) {
-                                                            return;
-                                                        }
-
-                                                        statusMutation.mutate(nextStatus);
-                                                    }}
-                                                />
-                                            </div>
+                                            <AdminBadge tone={priorityTone(conversation.priority)}>{priorityLabel(conversation.priority, text)}</AdminBadge>
                                         </div>
+                                        <p className={styles.chatStatusNote}>{statusHint(conversation.status, text)}</p>
                                     </div>
                                 </div>
 
@@ -533,17 +578,38 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             {conversation.messages.map((message) => (
                                                 <article
                                                     key={message.messageId}
-                                                    className={`${styles.messageItem} ${message.isInternalNote ? styles.messageNote : message.isFromAdmin ? styles.messageAdmin : styles.messageUser}`}
+                                                    className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser}`}
                                                 >
                                                     <div className={styles.messageHeader}>
                                                         <div className={styles.messageSenderWrap}>
-                                                            {!message.isFromAdmin && !message.isInternalNote ? <span className={styles.avatarTiny}>{initialsFor(message.senderDisplayName)}</span> : null}
+                                                            {!message.isFromAdmin ? <span className={styles.avatarTiny}>{initialsFor(message.senderDisplayName)}</span> : null}
                                                             <strong>{message.senderDisplayName}</strong>
                                                         </div>
                                                         <span>{formatClockTime(message.createdAtUtc, locale)}</span>
                                                     </div>
-                                                    <div className={styles.messageBody}>{message.body}</div>
-                                                    {message.isInternalNote ? <AdminBadge tone="warning">{text.supportInternalNoteBadge}</AdminBadge> : null}
+                                                    {hasImageAttachment(message) ? (
+                                                        <a href={message.attachmentUrl!} target="_blank" rel="noreferrer" className={styles.messageImageLink}>
+                                                            <Image
+                                                                src={message.attachmentUrl!}
+                                                                alt={message.attachmentFileName ?? message.body}
+                                                                width={704}
+                                                                height={576}
+                                                                sizes="(max-width: 860px) 100vw, 22rem"
+                                                                className={styles.messageImage}
+                                                                loading="lazy"
+                                                                unoptimized
+                                                            />
+                                                        </a>
+                                                    ) : hasAttachment(message) ? (
+                                                        <a href={message.attachmentUrl!} target="_blank" rel="noreferrer" className={styles.messageAttachmentCard}>
+                                                            <div className={styles.messageAttachmentIcon}>FILE</div>
+                                                            <div className={styles.messageAttachmentMeta}>
+                                                                <strong>{message.attachmentFileName ?? message.body}</strong>
+                                                                <span>{formatFileSize(message.attachmentFileSizeBytes, locale)}</span>
+                                                            </div>
+                                                        </a>
+                                                    ) : null}
+                                                    {shouldRenderMessageBody(message) ? <div className={styles.messageBody}>{message.body}</div> : null}
                                                 </article>
                                             ))}
                                         </div>
@@ -553,27 +619,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                 )}
 
                                 <div className={styles.composerShell}>
-                                    <div className={styles.composerTabs}>
-                                        <button
-                                            type="button"
-                                            className={`${styles.composerTab} ${composerMode === "reply" ? styles.composerTabActive : ""}`}
-                                            onClick={() => setComposerMode("reply")}
-                                        >
-                                            {text.supportReplyAction}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`${styles.composerTab} ${composerMode === "note" ? styles.composerTabActive : ""}`}
-                                            onClick={() => setComposerMode("note")}
-                                        >
-                                            {text.supportInternalNoteAction}
-                                        </button>
-                                    </div>
-
                                     {visibleTemplates.length > 0 ? (
                                         <div className={styles.composerTemplateRail}>
                                             <span className={styles.subtle}>
-                                                {composerMode === "reply" ? text.supportQuickRepliesLabel : text.supportInternalNoteTemplatesLabel}
+                                                {text.supportQuickRepliesLabel}
                                             </span>
                                             <div className={styles.templateList}>
                                                 {visibleTemplates.map((template) => (
@@ -584,9 +633,65 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                         className={styles.quickTemplateButton}
                                                         onClick={() => applyTemplate(template)}
                                                     >
-                                                        {`/${template.title}`}
+                                                        {`✓ ${template.title}`}
                                                     </Button>
                                                 ))}
+                                            </div>
+                                        </div>
+                                    ) : null}
+
+                                    <input
+                                        ref={attachmentInputRef}
+                                        type="file"
+                                        className={styles.hiddenFileInput}
+                                        accept="image/*,.pdf,.txt,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                                        onChange={(event) => {
+                                            const nextFile = event.target.files?.[0] ?? null;
+                                            setSelectedAttachment(nextFile);
+                                        }}
+                                    />
+                                    <div className={styles.composerAttachmentBar}>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => attachmentInputRef.current?.click()}
+                                            disabled={sendMutation.isPending}
+                                        >
+                                            {text.chooseFile}
+                                        </Button>
+                                        <span className={styles.subtle}>{text.supportAttachmentHint}</span>
+                                    </div>
+                                    {selectedAttachment ? (
+                                        <div className={styles.attachmentPreviewCard}>
+                                            {attachmentPreviewUrl ? (
+                                                <a href={attachmentPreviewUrl} target="_blank" rel="noreferrer" className={styles.attachmentPreviewImageLink}>
+                                                    <Image
+                                                        src={attachmentPreviewUrl}
+                                                        alt={selectedAttachment.name}
+                                                        width={72}
+                                                        height={72}
+                                                        sizes="72px"
+                                                        className={styles.attachmentPreviewImage}
+                                                        unoptimized
+                                                    />
+                                                </a>
+                                            ) : (
+                                                <div className={styles.attachmentPreviewFileIcon}>FILE</div>
+                                            )}
+                                            <div className={styles.attachmentPreviewMeta}>
+                                                <span className={styles.subtle}>{text.selectedFileLabel}</span>
+                                                <strong>{selectedAttachment.name}</strong>
+                                                <span className={styles.subtle}>{formatFileSize(selectedAttachment.size, locale)}</span>
+                                            </div>
+                                            <div className={styles.attachmentPreviewActions}>
+                                                {attachmentPreviewUrl ? (
+                                                    <a href={attachmentPreviewUrl} target="_blank" rel="noreferrer" className={styles.attachmentActionLink}>
+                                                        {text.supportAttachmentOpenAction}
+                                                    </a>
+                                                ) : null}
+                                                <Button variant="ghost" size="sm" onClick={resetSelectedAttachment}>
+                                                    {text.supportAttachmentRemoveAction}
+                                                </Button>
                                             </div>
                                         </div>
                                     ) : null}
@@ -594,14 +699,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                     <textarea
                                         className={styles.textarea}
                                         value={composerValue}
-                                        onChange={(event) => {
-                                            if (composerMode === "reply") {
-                                                setReply(event.target.value);
-                                                return;
-                                            }
-
-                                            setInternalNote(event.target.value);
-                                        }}
+                                        onChange={(event) => setReply(event.target.value)}
                                         placeholder={composerPlaceholder}
                                     />
 
@@ -614,16 +712,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                         <div className={styles.rowMetaGroup}>
                                             <Button
                                                 variant="primary"
-                                                onClick={() => composerMode === "reply" ? sendMutation.mutate() : noteMutation.mutate()}
-                                                disabled={
-                                                    composerMode === "reply"
-                                                        ? sendMutation.isPending || !reply.trim()
-                                                        : noteMutation.isPending || !internalNote.trim()
-                                                }
+                                                onClick={() => sendMutation.mutate()}
+                                                disabled={sendMutation.isPending || (!reply.trim() && !hasComposerAttachment)}
                                             >
-                                                {composerMode === "reply"
-                                                    ? (sendMutation.isPending ? text.supportReplySending : text.supportReplyAction)
-                                                    : (noteMutation.isPending ? text.loading : text.supportInternalNoteAction)}
+                                                {sendMutation.isPending ? text.supportReplySending : text.supportReplyAction}
                                             </Button>
                                         </div>
                                     </div>
@@ -632,17 +724,15 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                         </div>
 
                         {isSidePanelOpen ? <div className={styles.sidePane}>
-                            <AdminCard
-                                title={activeSidePanelTab === "user" ? text.supportUserInformationTitle : activeSidePanelTab === "templates" ? text.supportTemplatesManagerTitle : text.supportViewHistoryTab}
-                                description={activeSidePanelTab === "templates" ? text.supportTemplatesManagerDescription : undefined}
-                                className={`${styles.sideCard} ${styles.sidePanelCard}`}
-                                action={
+                            <AdminCard className={`${styles.sideCard} ${styles.sidePanelCard}`}>
+                                <div className={styles.sidePanelTopbar}>
+                                    <div className={styles.paneTitleGroup}>
+                                        <span className={styles.paneEyebrow}>{text.supportConversationDetailsTitle}</span>
+                                        <h2 className={styles.paneTitle}>{sidePanelTitle}</h2>
+                                        {sidePanelDescription ? <p className={styles.paneDescription}>{sidePanelDescription}</p> : null}
+                                    </div>
                                     <div className={styles.sidePanelTabs}>
-                                        {([
-                                            ["user", text.supportViewUserTab],
-                                            ["templates", text.supportViewTemplatesTab],
-                                            ["history", text.supportViewHistoryTab],
-                                        ] as const).map(([value, label]) => (
+                                        {sidePanelTabs.map(({ value, label }) => (
                                             <button
                                                 key={value}
                                                 type="button"
@@ -653,10 +743,69 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             </button>
                                         ))}
                                     </div>
-                                }
-                            >
-                                {activeSidePanelTab === "user" ? (
+                                </div>
+                                {activeSidePanelTab === "profile" ? (
                                     <div className={styles.sidePanelContent}>
+                                        <div className={styles.statusOverviewCard}>
+                                            <div className={styles.statusOverviewHeader}>
+                                                <div className={styles.statusOverviewCopy}>
+                                                    <span className={styles.paneEyebrow}>{text.supportStatusWorkflowTitle}</span>
+                                                    <strong className={styles.statusOverviewTitle}>{statusLabel(conversation.status, text)}</strong>
+                                                    <p className={styles.statusOverviewText}>{statusHint(conversation.status, text)}</p>
+                                                </div>
+                                                <AdminBadge tone={toneForStatus(conversation.status)}>{statusLabel(conversation.status, text)}</AdminBadge>
+                                            </div>
+                                            <div className={styles.workflowPrimaryRow}>
+                                                <Button
+                                                    variant="secondary"
+                                                    className={styles.workflowSecondaryButton}
+                                                    onClick={() => assignmentMutation.mutate(isAssignedToCurrentAdmin ? null : sessionUserId)}
+                                                    disabled={assignmentMutation.isPending || !sessionUserId}
+                                                >
+                                                    {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
+                                                </Button>
+                                                {primaryStatusAction ? (
+                                                    <Button
+                                                        variant="primary"
+                                                        className={styles.workflowPrimaryButton}
+                                                        onClick={() => statusMutation.mutate(primaryStatusAction.status)}
+                                                        disabled={statusMutation.isPending || conversation.status === primaryStatusAction.status}
+                                                    >
+                                                        {primaryStatusAction.label}
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                            {secondaryStatusActions.length ? (
+                                                <div className={styles.workflowSecondaryGrid}>
+                                                    {secondaryStatusActions.map((action) => (
+                                                        <Button
+                                                            key={action.status}
+                                                            variant="secondary"
+                                                            className={styles.workflowSecondaryButton}
+                                                            onClick={() => statusMutation.mutate(action.status)}
+                                                            disabled={statusMutation.isPending || conversation.status === action.status}
+                                                        >
+                                                            {action.label}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                            {destructiveStatusAction ? (
+                                                <div className={styles.workflowDangerZone}>
+                                                    <span className={styles.workflowDangerLabel}>{text.supportCloseConversationAction}</span>
+                                                    <Button
+                                                        variant="danger"
+                                                        className={styles.workflowDangerButton}
+                                                        onClick={() => statusMutation.mutate(destructiveStatusAction.status)}
+                                                        disabled={statusMutation.isPending || conversation.status === destructiveStatusAction.status}
+                                                    >
+                                                        {destructiveStatusAction.label}
+                                                    </Button>
+                                                </div>
+                                            ) : null}
+                                            <p className={styles.statusOverviewHint}>{text.supportStatusAutomationHint}</p>
+                                        </div>
+
                                         <div className={styles.userSummaryHeader}>
                                             <div className={styles.userCard}>
                                                 <span className={styles.avatarHero}>{initialsFor(userDisplayName)}</span>
@@ -679,40 +828,74 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
 
                                         <div className={styles.metricsGrid}>
                                             <div className={styles.metricTile}><span>{text.supportPlanLabel}</span><strong>{userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel}</strong></div>
-                                            <div className={styles.metricTile}><span>{text.tokenBalanceLabel}</span><strong>{analyticsQuery.data ? String(analyticsQuery.data.summary.walletBalance) : "—"}</strong></div>
+                                            <div className={styles.metricTile}><span>{text.supportAccountAgeLabel}</span><strong>{formatAccountAge(accountCreatedAt, locale)}</strong></div>
+                                            <div className={styles.metricTile}><span>{text.supportMessagesCount}</span><strong>{String(conversation.messages.length)}</strong></div>
+                                            <div className={styles.metricTile}><span>{text.supportPurchasesLabel}</span><strong>{String(totalPurchases)}</strong></div>
+                                        </div>
+
+                                        <div className={styles.sectionBlock}>
+                                            <div className={styles.sectionHeaderCompact}>
+                                                <strong>{text.supportConversationMetaTitle}</strong>
+                                            </div>
+                                            <div className={styles.detailGrid}>
+                                                <div className={styles.detailRow}><span>{text.statusLabel}</span><strong>{statusLabel(conversation.status, text)}</strong></div>
+                                                <div className={styles.detailRow}><span>{text.supportAssignedTo}</span><strong>{conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}</strong></div>
+                                                <div className={styles.detailRow}><span>{text.createdAtLabel}</span><strong>{formatDateTime(conversation.createdAtUtc, locale)}</strong></div>
+                                                <div className={styles.detailRow}><span>{text.supportLastMessage}</span><strong>{formatDateTime(conversation.lastMessageAtUtc ?? conversation.createdAtUtc, locale)}</strong></div>
+                                                <div className={styles.detailRow}><span>{text.supportLastSeenLabel}</span><strong>{formatRelativeTime(analyticsQuery.data?.summary.lastActivityAtUtc, locale)}</strong></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                {activeSidePanelTab === "purchases" ? (
+                                    <div className={styles.sidePanelContent}>
+                                        <div className={styles.metricsGrid}>
+                                            <div className={styles.metricTile}><span>{text.supportPurchasesLabel}</span><strong>{String(totalPurchases)}</strong></div>
+                                            <div className={styles.metricTile}><span>{text.supportLastPaymentLabel}</span><strong>{analyticsQuery.data?.summary.lastPurchaseAtUtc ? formatRelativeTime(analyticsQuery.data.summary.lastPurchaseAtUtc, locale) : "—"}</strong></div>
+                                        </div>
+
+                                        <div className={styles.sectionBlock}>
+                                            <div className={styles.sectionHeaderCompact}>
+                                                <strong>{text.supportRecentPurchasesTitle}</strong>
+                                            </div>
+                                            {analyticsQuery.isLoading ? (
+                                                <AdminStateCard tone="info" title={text.loading} />
+                                            ) : analyticsQuery.isError ? (
+                                                <AdminStateCard tone="danger" title={text.supportLoadError} />
+                                            ) : analyticsQuery.data?.recentPurchases.length ? (
+                                                <div className={styles.timelineList}>
+                                                    {analyticsQuery.data.recentPurchases.slice(0, 4).map((purchase) => (
+                                                        <article key={purchase.orderId} className={styles.timelineCard}>
+                                                            <div className={styles.timelineCardHeader}>
+                                                                <strong>{formatMoney(purchase.priceAmount, purchase.currencyCode, locale)}</strong>
+                                                                <span>{formatRelativeTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}</span>
+                                                            </div>
+                                                            <div className={styles.rowMetaGroup}>
+                                                                <AdminBadge tone={purchase.status.toLowerCase() === "paid" || purchase.status.toLowerCase() === "completed" ? "success" : "warning"}>{purchase.status}</AdminBadge>
+                                                                <span className={styles.subtle}>{`${purchase.sparkToGrant} spark`}</span>
+                                                            </div>
+                                                            <p className={styles.timelineCardBody}>{purchase.paymentProvider}</p>
+                                                        </article>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <AdminStateCard tone="info" title={text.supportNoPurchases} />
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                {activeSidePanelTab === "generations" ? (
+                                    <div className={styles.sidePanelContent}>
+                                        <div className={styles.metricsGrid}>
                                             <div className={styles.metricTile}><span>{text.completedGenerationsLabel}</span><strong>{analyticsQuery.data ? String(analyticsQuery.data.summary.completedGenerations) : "—"}</strong></div>
                                             <div className={styles.metricTile}><span>{text.supportLastGenerationLabel}</span><strong>{formatRelativeTime(analyticsQuery.data?.summary.lastGenerationAtUtc, locale)}</strong></div>
-                                            <div className={styles.metricTile}><span>{text.supportLastPaymentLabel}</span><strong>{lastPurchase ? formatMoney(lastPurchase.priceAmount, lastPurchase.currencyCode, locale) : "—"}</strong></div>
-                                            <div className={styles.metricTile}><span>{text.supportCountryLabel}</span><strong>{lastCountry}</strong></div>
-                                            <div className={styles.metricTile}><span>{text.supportLastSeenLabel}</span><strong>{formatRelativeTime(analyticsQuery.data?.summary.lastActivityAtUtc, locale)}</strong></div>
-                                            <div className={styles.metricTile}><span>{text.supportMessagesCount}</span><strong>{String(conversation.messages.length)}</strong></div>
                                         </div>
 
                                         <div className={styles.sectionBlock}>
                                             <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.supportActionsTitle}</strong>
-                                            </div>
-                                            <div className={styles.actionListCompact}>
-                                                <Button
-                                                    variant="secondary"
-                                                    onClick={() => assignmentMutation.mutate(isAssignedToCurrentAdmin ? null : sessionUserId)}
-                                                    disabled={assignmentMutation.isPending || !sessionUserId}
-                                                >
-                                                    {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
-                                                </Button>
-                                                <Button
-                                                    variant="danger"
-                                                    onClick={() => statusMutation.mutate("Closed")}
-                                                    disabled={statusMutation.isPending || conversation.status === "Closed"}
-                                                >
-                                                    {text.supportCloseConversationAction}
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        <div className={styles.sectionBlock}>
-                                            <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.supportAiContextTitle}</strong>
+                                                <strong>{text.supportRecentGenerationsTitle}</strong>
                                             </div>
                                             {analyticsQuery.isLoading ? (
                                                 <AdminStateCard tone="info" title={text.loading} />
@@ -741,6 +924,52 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                     </div>
                                 ) : null}
 
+                                {activeSidePanelTab === "errors" ? (
+                                    <div className={styles.sidePanelContent}>
+                                        <div className={styles.metricsGrid}>
+                                            <div className={styles.metricTile}><span>{text.supportGenerationErrorsTitle}</span><strong>{String(analyticsQuery.data?.summary.failedGenerations ?? failedGenerations.length)}</strong></div>
+                                            <div className={styles.metricTile}><span>{text.supportLastSeenLabel}</span><strong>{recentFailures[0]?.lastOccurredAtUtc ? formatRelativeTime(recentFailures[0].lastOccurredAtUtc, locale) : "—"}</strong></div>
+                                        </div>
+
+                                        <div className={styles.sectionBlock}>
+                                            <div className={styles.sectionHeaderCompact}>
+                                                <strong>{text.supportGenerationErrorsTitle}</strong>
+                                            </div>
+                                            {analyticsQuery.isLoading ? (
+                                                <AdminStateCard tone="info" title={text.loading} />
+                                            ) : analyticsQuery.isError ? (
+                                                <AdminStateCard tone="danger" title={text.supportLoadError} />
+                                            ) : recentFailures.length ? (
+                                                <div className={styles.timelineList}>
+                                                    {recentFailures.map((item) => (
+                                                        <article key={item.failureCode} className={styles.timelineCard}>
+                                                            <div className={styles.timelineCardHeader}>
+                                                                <strong>{item.failureCode}</strong>
+                                                                <span>{formatRelativeTime(item.lastOccurredAtUtc, locale)}</span>
+                                                            </div>
+                                                            <p className={styles.timelineCardBody}>{`${text.supportOccurrencesLabel}: ${item.count}`}</p>
+                                                        </article>
+                                                    ))}
+                                                </div>
+                                            ) : failedGenerations.length ? (
+                                                <div className={styles.timelineList}>
+                                                    {failedGenerations.slice(0, 3).map((generation) => (
+                                                        <article key={generation.generationId} className={styles.timelineCard}>
+                                                            <div className={styles.timelineCardHeader}>
+                                                                <strong>{generation.templateTitle}</strong>
+                                                                <span>{formatRelativeTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
+                                                            </div>
+                                                            <p className={styles.timelineCardBody}>{generation.failureMessage ?? generation.failureCode ?? generation.status}</p>
+                                                        </article>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <AdminStateCard tone="info" title={text.supportNoGenerationErrors} />
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : null}
+
                                 {activeSidePanelTab === "templates" ? (
                                     <div className={styles.sidePanelContent}>
                                         <div className={styles.templateCatalogControls}>
@@ -754,22 +983,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                 />
                                             </label>
                                             <div className={styles.templateToolbarCompact}>
-                                                <div className={styles.templateFilterChips}>
-                                                    {([
-                                                        ["all", text.supportTemplateFilterAll],
-                                                        ["Reply", text.supportTemplateKindReply],
-                                                        ["InternalNote", text.supportTemplateKindInternalNote],
-                                                    ] as const).map(([value, label]) => (
-                                                        <button
-                                                            key={value}
-                                                            type="button"
-                                                            className={`${styles.templateFilterChip} ${templateFilter === value ? styles.templateFilterChipActive : ""}`}
-                                                            onClick={() => setTemplateFilter(value)}
-                                                        >
-                                                            {label}
-                                                        </button>
-                                                    ))}
-                                                </div>
                                                 <Button size="sm" variant="secondary" onClick={() => openTemplateEditor()}>
                                                     {text.supportTemplateCreateAction}
                                                 </Button>
@@ -798,9 +1011,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                                     <span className={styles.subtle}>{`${text.supportUpdatedLabel}: ${formatRelativeTime(template.updatedAtUtc, locale)}`}</span>
                                                                 </div>
                                                                 <div className={styles.rowMetaGroup}>
-                                                                    <AdminBadge tone={template.kind === "Reply" ? "primary" : "warning"}>
-                                                                        {template.kind === "Reply" ? text.supportTemplateKindReply : text.supportTemplateKindInternalNote}
-                                                                    </AdminBadge>
+                                                                    <AdminBadge tone="primary">{text.supportTemplateKindReply}</AdminBadge>
                                                                     {!template.isEnabled ? <AdminBadge tone="neutral">{text.supportTemplateDisabledBadge}</AdminBadge> : null}
                                                                 </div>
                                                             </div>
@@ -866,18 +1077,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                             </label>
 
                                                             <div className={styles.templateFormGrid}>
-                                                                <div className={styles.statusSelect}>
-                                                                    <AdminSelectField
-                                                                        label={text.supportTemplateKindLabel}
-                                                                        value={templateDraft.kind}
-                                                                        options={[
-                                                                            { value: "Reply", label: text.supportTemplateKindReply },
-                                                                            { value: "InternalNote", label: text.supportTemplateKindInternalNote },
-                                                                        ]}
-                                                                        onChange={(value) => setTemplateDraft((current) => ({ ...current, kind: value as SupportReplyTemplateKind }))}
-                                                                    />
-                                                                </div>
-
                                                                 <label className={styles.templateSection}>
                                                                     <span className={styles.subtle}>{text.supportTemplateSortOrderLabel}</span>
                                                                     <input
@@ -960,15 +1159,15 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                 <AdminStateCard tone="info" title={text.loading} />
                                             ) : analyticsQuery.isError ? (
                                                 <AdminStateCard tone="danger" title={text.supportLoadError} />
-                                            ) : analyticsQuery.data?.recentActivity.length ? (
+                                            ) : activityTimeline.length ? (
                                                 <div className={styles.timelineList}>
-                                                    {analyticsQuery.data.recentActivity.slice(0, 6).map((item) => (
-                                                        <article key={`${item.kind}:${item.occurredAtUtc}:${item.title}`} className={styles.timelineCard}>
+                                                    {activityTimeline.map((item) => (
+                                                        <article key={item.id} className={styles.timelineCard}>
                                                             <div className={styles.timelineCardHeader}>
                                                                 <strong>{item.title}</strong>
                                                                 <span>{formatRelativeTime(item.occurredAtUtc, locale)}</span>
                                                             </div>
-                                                            <p className={styles.timelineCardBody}>{item.details || item.kind}</p>
+                                                            <p className={styles.timelineCardBody}>{item.subtitle}</p>
                                                         </article>
                                                     ))}
                                                 </div>
@@ -1014,6 +1213,49 @@ function toneForStatus(status: string) {
             return "neutral" as const;
         default:
             return "neutral" as const;
+    }
+}
+
+function statusHint(status: SupportConversationStatus, text: ReturnType<typeof getDictionary>) {
+    switch (status) {
+        case "Open":
+            return text.supportStatusOpenHint;
+        case "InProgress":
+            return text.supportStatusInProgressHint;
+        case "Resolved":
+            return text.supportStatusResolvedHint;
+        case "Closed":
+            return text.supportStatusClosedHint;
+        default:
+            return text.supportConversationDescription;
+    }
+}
+
+function getAvailableStatusActions(status: SupportConversationStatus, text: ReturnType<typeof getDictionary>): StatusActionDescriptor[] {
+    switch (status) {
+        case "Open":
+            return [
+                { status: "InProgress", label: text.supportMarkInProgressAction, variant: "primary" },
+                { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
+                { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
+            ];
+        case "InProgress":
+            return [
+                { status: "Resolved", label: text.supportResolveConversationAction, variant: "primary" },
+                { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
+                { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
+            ];
+        case "Resolved":
+            return [
+                { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
+                { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
+            ];
+        case "Closed":
+            return [
+                { status: "Open", label: text.supportReopenConversationAction, variant: "primary" },
+            ];
+        default:
+            return [];
     }
 }
 
@@ -1094,6 +1336,31 @@ function formatRelativeTime(value: string | null | undefined, locale: Locale) {
     return locale === "ru" ? `${diffDays} дн назад` : `${diffDays}d ago`;
 }
 
+function getConversationSla(value: string | null | undefined, locale: Locale, unreadCount = 0) {
+    const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(value ?? Date.now()).getTime()) / 60000));
+
+    let level: "good" | "warning" | "risk" | "critical" = "critical";
+    if (diffMinutes < 30) {
+        level = "good";
+    } else if (diffMinutes < 180) {
+        level = "warning";
+    } else if (diffMinutes < 720) {
+        level = "risk";
+    }
+
+    const waitLabel = locale === "ru"
+        ? `${getWaitPrefix(locale)} ${formatWaitTime(value, locale)}`
+        : `${getWaitPrefix(locale)} ${formatWaitTime(value, locale)}`;
+
+    return {
+        level,
+        waitLabel,
+        primaryLabel: unreadCount > 0
+            ? (locale === "ru" ? "Новый ответ пользователя" : "New user reply")
+            : waitLabel,
+    };
+}
+
 function formatWaitTime(value: string | null | undefined, locale: Locale) {
     if (!value) {
         return "—";
@@ -1113,12 +1380,113 @@ function formatWaitTime(value: string | null | undefined, locale: Locale) {
     return locale === "ru" ? `${diffHours} ч ${restMinutes} мин` : `${diffHours} h ${restMinutes} min`;
 }
 
+function getWaitPrefix(locale: Locale) {
+    return locale === "ru" ? "Ожидает" : "Waiting";
+}
+
+function formatAccountAge(value: string | null | undefined, locale: Locale) {
+    if (!value) {
+        return locale === "ru" ? "новый" : "new";
+    }
+
+    const diffDays = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
+    if (diffDays < 30) {
+        return locale === "ru" ? `${diffDays} дн` : `${diffDays}d`;
+    }
+
+    if (diffDays < 365) {
+        const diffMonths = Math.max(1, Math.floor(diffDays / 30));
+        return locale === "ru" ? `${diffMonths} мес` : `${diffMonths} mo`;
+    }
+
+    const diffYears = Math.max(1, Math.floor(diffDays / 365));
+    return locale === "ru" ? `${diffYears} г` : `${diffYears} yr`;
+}
+
+function formatAccountAgeFact(value: string | null | undefined, locale: Locale) {
+    return locale === "ru" ? `Аккаунт ${formatAccountAge(value, locale)}` : `Account ${formatAccountAge(value, locale)}`;
+}
+
+function formatCountFact(value: number, locale: Locale, kind: "messages" | "purchases") {
+    if (locale === "ru") {
+        if (kind === "messages") {
+            return `${value} ${pluralizeRu(value, "сообщение", "сообщения", "сообщений")}`;
+        }
+
+        return `${value} ${pluralizeRu(value, "покупка", "покупки", "покупок")}`;
+    }
+
+    if (kind === "messages") {
+        return `${value} ${value === 1 ? "message" : "messages"}`;
+    }
+
+    return `${value} ${value === 1 ? "purchase" : "purchases"}`;
+}
+
+function pluralizeRu(value: number, one: string, few: string, many: string) {
+    const abs = Math.abs(value) % 100;
+    const last = abs % 10;
+
+    if (abs > 10 && abs < 20) {
+        return many;
+    }
+
+    if (last === 1) {
+        return one;
+    }
+
+    if (last >= 2 && last <= 4) {
+        return few;
+    }
+
+    return many;
+}
+
 function formatMoney(amount: number, currencyCode: string, locale: Locale) {
     return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
         style: "currency",
         currency: currencyCode,
         maximumFractionDigits: 2,
     }).format(amount);
+}
+
+function hasAttachment(message: Pick<AdminSupportConversation["messages"][number], "attachmentUrl">) {
+    return Boolean(message.attachmentUrl?.trim());
+}
+
+function hasImageAttachment(message: Pick<AdminSupportConversation["messages"][number], "attachmentUrl" | "attachmentContentType">) {
+    return hasAttachment(message) && Boolean(message.attachmentContentType?.startsWith("image/"));
+}
+
+function shouldRenderMessageBody(message: Pick<AdminSupportConversation["messages"][number], "body" | "attachmentFileName" | "attachmentUrl">) {
+    const normalizedBody = message.body.trim();
+    if (!normalizedBody) {
+        return false;
+    }
+
+    if (!hasAttachment(message)) {
+        return true;
+    }
+
+    return normalizedBody !== (message.attachmentFileName?.trim() ?? "");
+}
+
+function formatFileSize(value: number | null | undefined, locale: Locale) {
+    if (!value || value <= 0) {
+        return locale === "ru" ? "Размер не указан" : "Size unavailable";
+    }
+
+    if (value < 1024) {
+        return `${value} B`;
+    }
+
+    const kilobytes = value / 1024;
+    if (kilobytes < 1024) {
+        return locale === "ru" ? `${kilobytes.toFixed(1)} КБ` : `${kilobytes.toFixed(1)} KB`;
+    }
+
+    const megabytes = kilobytes / 1024;
+    return locale === "ru" ? `${megabytes.toFixed(1)} МБ` : `${megabytes.toFixed(1)} MB`;
 }
 
 function initialsFor(value: string) {

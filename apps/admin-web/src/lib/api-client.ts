@@ -229,16 +229,17 @@ export type SupportConversationPriority = "Low" | "Normal" | "High";
 
 export type SupportInboxAssignmentScope = "all" | "mine" | "unassigned";
 
-export type SupportReplyTemplateKind = "Reply" | "InternalNote";
-
 export type AdminSupportMessage = {
   messageId: string;
   conversationId: string;
   senderUserId: string;
   senderDisplayName: string;
   isFromAdmin: boolean;
-  isInternalNote: boolean;
   body: string;
+  attachmentUrl?: string | null;
+  attachmentFileName?: string | null;
+  attachmentContentType?: string | null;
+  attachmentFileSizeBytes?: number | null;
   isRead: boolean;
   readAtUtc?: string | null;
   createdAtUtc: string;
@@ -254,7 +255,6 @@ export type AdminSupportConversationSummary = {
   status: SupportConversationStatus;
   priority: SupportConversationPriority;
   lastMessagePreview?: string | null;
-  lastMessageIsInternalNote: boolean;
   lastMessageAtUtc?: string | null;
   userUnreadCount: number;
   adminUnreadCount: number;
@@ -283,7 +283,6 @@ export type AdminSupportReplyTemplate = {
   templateId: string;
   title: string;
   body: string;
-  kind: SupportReplyTemplateKind;
   isEnabled: boolean;
   sortOrder: number;
   createdAtUtc: string;
@@ -1186,10 +1185,22 @@ export async function sendSupportMessage(conversationId: string, body: string): 
   return message;
 }
 
-export async function sendSupportInternalNote(conversationId: string, body: string): Promise<AdminSupportMessage> {
-  const message = await apiRequest<AdminSupportMessage>(`/api/admin/support/conversations/${conversationId}/notes`, {
+export async function sendSupportAttachment(
+  conversationId: string,
+  file: File,
+  body?: string,
+): Promise<AdminSupportMessage> {
+  const formData = new FormData();
+  const trimmedBody = body?.trim();
+  if (trimmedBody) {
+    formData.append("body", trimmedBody);
+  }
+
+  formData.append("file", file);
+
+  const message = await apiRequest<AdminSupportMessage>(`/api/admin/support/conversations/${conversationId}/attachments`, {
     method: "POST",
-    body: JSON.stringify({ body })
+    body: formData,
   });
 
   clearSupportCaches(conversationId);
@@ -1241,7 +1252,6 @@ export async function fetchSupportReplyTemplates(): Promise<AdminSupportReplyTem
 export async function createSupportReplyTemplate(payload: {
   title: string;
   body: string;
-  kind: SupportReplyTemplateKind;
   isEnabled: boolean;
   sortOrder: number;
 }): Promise<AdminSupportReplyTemplate> {
@@ -1259,7 +1269,6 @@ export async function updateSupportReplyTemplate(
   payload: {
     title: string;
     body: string;
-    kind: SupportReplyTemplateKind;
     isEnabled: boolean;
     sortOrder: number;
   },

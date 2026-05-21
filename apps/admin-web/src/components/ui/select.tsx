@@ -31,6 +31,10 @@ export function Select({ value, options, onChange, ariaLabel, showSelectedDescri
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === selectedOption?.value));
 
   useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
     function handlePointerDown(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
         setIsOpen(false);
@@ -49,7 +53,7 @@ export function Select({ value, options, onChange, ariaLabel, showSelectedDescri
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleEscape);
     };
-  }, []);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {

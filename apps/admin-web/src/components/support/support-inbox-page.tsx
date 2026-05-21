@@ -1,17 +1,18 @@
 "use client";
 
-import { AdminBadge, AdminCard, AdminPage, AdminPageHero, AdminSelectField, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { SupportOptionGroup } from "@/components/support/support-option-group";
+import styles from "@/components/support/support-page.module.css";
 import { Button } from "@/components/ui/button";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { fetchSupportInbox, useAuthSession, type AdminSupportConversationSummary, type SupportConversationStatus, type SupportInboxAssignmentScope } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSupportRealtime } from "@/lib/support-realtime";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import styles from "@/components/support/support-page.module.css";
 
 type SupportInboxPageProps = {
     locale: Locale;
@@ -27,6 +28,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     const queryClient = useQueryClient();
     const [status, setStatus] = useState<SupportFilter>("all");
     const [assignment, setAssignment] = useState<AssignmentFilter>("all");
+    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         if (!session) {
@@ -64,77 +66,93 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
         [text.supportAssignmentAll, text.supportAssignmentMine, text.supportAssignmentUnassigned],
     );
 
+    const filteredConversations = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
+        const conversations = inboxQuery.data ?? [];
+        if (!normalizedQuery) {
+            return conversations;
+        }
+
+        return conversations.filter((conversation) => {
+            const searchableText = [
+                conversation.userDisplayName,
+                conversation.userEmail,
+                conversation.lastMessagePreview,
+                conversation.assignedAdminDisplayName,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+            return searchableText.includes(normalizedQuery);
+        });
+    }, [inboxQuery.data, searchQuery]);
     return (
         <AdminPage className={styles.page}>
-            <AdminPageHero
-                eyebrow={text.supportTitle}
-                title={text.supportInboxTitle}
-                description={text.supportInboxDescription}
-                metaItems={[
-                    `${text.statusLabel}: ${statusOptions.find((option) => option.value === status)?.label ?? text.supportStatusAll}`,
-                    `${text.supportAssignedTo}: ${assignmentOptions.find((option) => option.value === assignment)?.label ?? text.supportAssignmentAll}`,
-                    `${text.supportInboxTitle}: ${String(inboxQuery.data?.length ?? 0)}`,
-                ]}
-            />
-
-            <AdminCard
-                title={text.supportInboxTitle}
-                description={text.supportDescription}
-                action={
-                    <div className={styles.toolbar}>
-                        <div className={styles.statusSelect}>
-                            <AdminSelectField
-                                label={text.statusLabel}
-                                value={status}
-                                options={statusOptions}
-                                onChange={(value) => setStatus(value as SupportFilter)}
-                            />
-                        </div>
-                        <div className={styles.statusSelect}>
-                            <AdminSelectField
-                                label={text.supportAssignedTo}
-                                value={assignment}
-                                options={assignmentOptions}
-                                onChange={(value) => setAssignment(value as AssignmentFilter)}
-                            />
-                        </div>
-                        <Button variant="secondary" onClick={() => void inboxQuery.refetch()}>{text.supportRefresh}</Button>
+            <AdminCard title={text.supportInboxTitle} description={text.supportInboxDescription} className={styles.inboxShellCompact}>
+                <div className={styles.inboxControlClusterCompact}>
+                    <label className={styles.searchField}>
+                        <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
+                        <input
+                            className={styles.searchInput}
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder={text.supportSearchPlaceholder}
+                        />
+                    </label>
+                    <div className={styles.supportControlStack}>
+                        <SupportOptionGroup
+                            label={text.statusLabel}
+                            value={status}
+                            options={statusOptions}
+                            onChange={(value) => setStatus(value as SupportFilter)}
+                        />
+                        <SupportOptionGroup
+                            label={text.supportAssignedTo}
+                            value={assignment}
+                            options={assignmentOptions}
+                            onChange={(value) => setAssignment(value as AssignmentFilter)}
+                        />
                     </div>
-                }
-            >
+                    <div className={styles.toolbarCompactEnd}>
+                        <Button variant="secondary" size="sm" onClick={() => void inboxQuery.refetch()}>{text.supportRefresh}</Button>
+                    </div>
+                </div>
                 {inboxQuery.isLoading ? (
                     <AdminStateCard tone="info" title={text.loading} description={text.supportInboxDescription} />
                 ) : inboxQuery.isError ? (
                     <AdminStateCard tone="danger" title={text.supportLoadError} description={text.supportDescription} />
                 ) : (inboxQuery.data?.length ?? 0) === 0 ? (
                     <AdminStateCard tone="info" title={text.supportEmpty} />
+                ) : filteredConversations.length === 0 ? (
+                    <AdminStateCard tone="info" title={text.supportEmpty} description={text.supportSearchPlaceholder} />
                 ) : (
-                    <div className={styles.list}>
-                        {(inboxQuery.data ?? []).map((conversation) => (
+                    <div className={styles.inboxQueueGrid}>
+                        {filteredConversations.map((conversation) => (
                             <Link key={conversation.conversationId} href={`/${locale}/support/${conversation.conversationId}`} className={styles.conversationRow}>
                                 <div className={styles.rowHeader}>
-                                    <div>
-                                        <div className={styles.rowTitle}>{conversation.userDisplayName?.trim() || conversation.userEmail}</div>
-                                        <div className={styles.subtle}>{conversation.userEmail}</div>
+                                    <div className={styles.rowIdentity}>
+                                        <span className={styles.avatar}>{initialsFor(conversation.userDisplayName?.trim() || conversation.userEmail)}</span>
+                                        <div className={styles.rowTextStack}>
+                                            <div className={styles.rowTitle}>{conversation.userDisplayName?.trim() || conversation.userEmail}</div>
+                                            <div className={styles.subtle}>{conversation.userEmail}</div>
+                                        </div>
                                     </div>
                                     <div className={styles.rowMeta}>
                                         <AdminBadge tone={toneForStatus(conversation.status)}>{statusLabel(conversation.status, text)}</AdminBadge>
-                                        {conversation.adminUnreadCount > 0 ? (
-                                            <AdminBadge tone="warning">{`${text.supportUnreadAdmin}: ${conversation.adminUnreadCount}`}</AdminBadge>
-                                        ) : null}
+                                        <span className={styles.timePill}>{formatRelativeTime(conversation.lastMessageAtUtc ?? conversation.updatedAtUtc, locale)}</span>
                                     </div>
                                 </div>
                                 <div className={styles.rowPreview}>
-                                    {conversation.lastMessageIsInternalNote ? <AdminBadge tone="warning">{text.supportInternalNoteBadge}</AdminBadge> : null}
-                                    {conversation.lastMessagePreview || text.supportNoMessages}
+                                    <span>{conversation.lastMessagePreview || text.supportNoMessages}</span>
                                 </div>
                                 <div className={styles.rowFooter}>
                                     <div className={styles.rowMetaGroup}>
                                         <AdminBadge tone={priorityTone(conversation.priority)}>{priorityLabel(conversation.priority, text)}</AdminBadge>
-                                        <span>{text.supportAssignedTo}: {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}</span>
+                                        {conversation.adminUnreadCount > 0 ? <span className={styles.unreadDot}>{conversation.adminUnreadCount}</span> : null}
+                                        <span className={styles.rowDetailValue}>{conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}</span>
                                     </div>
                                     <div className={styles.rowMetaGroup}>
-                                        {conversation.adminUnreadCount > 0 ? <span className={styles.unreadDot}>{conversation.adminUnreadCount}</span> : null}
                                         <span className={styles.waitingLabel}>{`${text.supportWaitingLabel}: ${formatWaitTime(conversation.lastMessageAtUtc ?? conversation.createdAtUtc, locale)}`}</span>
                                     </div>
                                 </div>
@@ -145,6 +163,15 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
             </AdminCard>
         </AdminPage>
     );
+}
+
+function initialsFor(value: string) {
+    return value
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("") || "PM";
 }
 
 function statusLabel(status: string, text: ReturnType<typeof getDictionary>) {
@@ -216,4 +243,23 @@ function formatWaitTime(value: string | null | undefined, locale: Locale) {
     }
 
     return locale === "ru" ? `${diffHours} ч ${restMinutes} мин` : `${diffHours} h ${restMinutes} min`;
+}
+
+function formatRelativeTime(value: string | null | undefined, locale: Locale) {
+    if (!value) {
+        return "—";
+    }
+
+    const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+    if (diffMinutes < 60) {
+        return locale === "ru" ? `${diffMinutes} мин назад` : `${diffMinutes} min ago`;
+    }
+
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) {
+        return locale === "ru" ? `${diffHours} ч назад` : `${diffHours}h ago`;
+    }
+
+    const diffDays = Math.round(diffHours / 24);
+    return locale === "ru" ? `${diffDays} дн назад` : `${diffDays}d ago`;
 }

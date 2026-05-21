@@ -26,13 +26,14 @@
   text-align: left;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 6px 14px rgba(2, 6, 23, 0.14);
-  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease, transform 140ms ease;
 }
 
 .trigger:hover {
   border-color: var(--border-strong);
   background: rgba(21, 27, 35, 1);
   box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
 }
 
 .triggerOpen {
@@ -91,6 +92,11 @@
   border-right: 1.8px solid var(--text-soft);
   border-bottom: 1.8px solid var(--text-soft);
   transform: rotate(45deg) translateY(-1px);
+  transition: transform 160ms ease, border-color 140ms ease;
+}
+
+.rootOpen .chevron {
+  transform: rotate(-135deg) translateY(-1px);
 }
 
 .menu {
@@ -107,6 +113,8 @@
   background: linear-gradient(180deg, rgba(21, 27, 35, 0.995) 0%, rgba(13, 17, 23, 0.99) 100%);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(10px);
+  transform-origin: top center;
+  animation: menuFadeIn 160ms ease;
 }
 
 .option {
@@ -120,13 +128,14 @@
   text-align: left;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .option:hover {
   border-color: var(--border-strong);
   background: rgba(21, 27, 35, 0.98);
   box-shadow: none;
+  transform: translateY(-1px);
 }
 
 .optionSelected {
@@ -242,6 +251,34 @@
   border-radius: 999px;
   background: #4ade80;
   box-shadow: 0 0 0 0.22rem rgba(34, 197, 94, 0.14);
+}
+
+@keyframes menuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .chevron,
+  .menu,
+  .option {
+    transition: none;
+    animation: none;
+  }
+
+  .trigger:hover,
+  .option:hover,
+  .rootOpen .chevron {
+    transform: none;
+  }
 }
 
 @media (max-width: 720px) {

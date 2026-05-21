@@ -1,6 +1,6 @@
 .templateEditorPage {
   width: 100%;
-  max-width: 106rem;
+  max-width: var(--admin-page-max-wide);
   margin: 0 auto;
   display: grid;
   gap: clamp(0.7rem, 0.58rem + 0.24vw, 0.86rem);
@@ -1195,7 +1195,7 @@
 
 @media (max-width: 1440px) {
   .templateEditorPage {
-    max-width: 96rem;
+    max-width: var(--admin-page-max-wide);
   }
 
   .editorGrid {
@@ -1205,7 +1205,7 @@
 
 @media (max-width: 1280px) {
   .templateEditorPage {
-    max-width: 88rem;
+    max-width: var(--admin-page-max);
   }
 
   .mediaGrid {

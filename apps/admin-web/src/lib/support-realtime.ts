@@ -29,10 +29,17 @@ export function useSupportRealtime(
       .withUrl(supportHubUrl, {
         accessTokenFactory: async () => accessToken,
       })
+      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
       .configureLogging(LogLevel.None)
       .build();
 
     let isDisposed = false;
+
+    connection.onclose((error: Error | undefined) => {
+      if (!isDisposed && isExpectedConnectionFailure(error)) {
+        supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
+      }
+    });
 
     connection.on("conversation-updated", (payload: unknown) => {
       const event = normalizeConversationUpdated(payload);
@@ -41,8 +48,12 @@ export function useSupportRealtime(
       }
     });
 
-    void connection.start().catch((error: unknown) => {
-      if (isDisposed || isExpectedConnectionFailure(error)) {
+    void connection.start().then(() => {
+      if (!isDisposed) {
+        supportRealtimeBlockedUntil = 0;
+      }
+    }).catch((error: unknown) => {
+      if (!isDisposed && isExpectedConnectionFailure(error)) {
         supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
       }
     });
