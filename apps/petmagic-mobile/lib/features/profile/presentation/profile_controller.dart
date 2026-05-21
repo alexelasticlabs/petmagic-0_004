@@ -80,6 +80,8 @@ class ProfileState {
 }
 
 class ProfileController extends Notifier<ProfileState> {
+  static const _genericActionError = 'profile.action_failed';
+
   late final ProfileRepository _repository;
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -147,6 +149,26 @@ class ProfileController extends Notifier<ProfileState> {
         clearSession: true,
         clearProfile: true,
       );
+    } catch (_) {
+      final storedSession = await _repository.readSession();
+      if (storedSession != null) {
+        state = state.copyWith(
+          isLoading: false,
+          session: storedSession,
+          profile: storedSession.user,
+          email: storedSession.user.email,
+          errorMessage: _genericActionError,
+          clearSuccess: true,
+        );
+        return;
+      }
+
+      _setFailure(
+        message: _genericActionError,
+        email: initialEmail,
+        clearSession: true,
+        clearProfile: true,
+      );
     }
   }
 
@@ -206,7 +228,9 @@ class ProfileController extends Notifier<ProfileState> {
       );
       ref.read(appLaunchControllerProvider.notifier).markSignedIn();
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
     }
   }
 
@@ -265,7 +289,9 @@ class ProfileController extends Notifier<ProfileState> {
       );
       ref.read(appLaunchControllerProvider.notifier).markSignedIn();
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
     }
   }
 
@@ -289,12 +315,9 @@ class ProfileController extends Notifier<ProfileState> {
       );
       ref.read(appLaunchControllerProvider.notifier).markSignedIn();
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
     } catch (_) {
-      state = state.copyWith(
-        isSaving: false,
-        errorMessage: 'auth.external_invalid',
-      );
+      _setFailure(message: 'auth.external_invalid');
     }
   }
 
@@ -310,12 +333,9 @@ class ProfileController extends Notifier<ProfileState> {
       ref.invalidate(linkedAccountsProvider);
       state = state.copyWith(isSaving: false);
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
     } catch (_) {
-      state = state.copyWith(
-        isSaving: false,
-        errorMessage: 'auth.external_invalid',
-      );
+      _setFailure(message: 'auth.external_invalid');
     }
   }
 
@@ -331,7 +351,9 @@ class ProfileController extends Notifier<ProfileState> {
       ref.invalidate(linkedAccountsProvider);
       state = state.copyWith(isSaving: false);
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
     }
   }
 
@@ -342,16 +364,29 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
-    await _repository.logout();
-    state = state.copyWith(
-      isSaving: false,
-      clearSession: true,
-      clearProfile: true,
-      password: '',
-      confirmPassword: '',
-      successMessage: 'logout',
-    );
-    ref.read(appLaunchControllerProvider.notifier).markSignedOut();
+    try {
+      await _repository.logout();
+      try {
+        await ref
+            .read(externalAuthRepositoryProvider)
+            .clearSession(ExternalAuthProvider.google);
+      } catch (_) {
+        // Logout must still complete even if provider cleanup fails.
+      }
+      state = state.copyWith(
+        isSaving: false,
+        clearSession: true,
+        clearProfile: true,
+        password: '',
+        confirmPassword: '',
+        successMessage: 'logout',
+      );
+      ref.read(appLaunchControllerProvider.notifier).markSignedOut();
+    } on AppException catch (error) {
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
+    }
   }
 
   Future<void> uploadAvatar() async {
@@ -377,7 +412,9 @@ class ProfileController extends Notifier<ProfileState> {
         session: _replaceSessionUser(profile),
       );
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
     }
   }
 
@@ -395,7 +432,9 @@ class ProfileController extends Notifier<ProfileState> {
         session: _replaceSessionUser(profile),
       );
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
     }
   }
 
@@ -418,8 +457,27 @@ class ProfileController extends Notifier<ProfileState> {
         session: _replaceSessionUser(profile),
       );
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
     }
+  }
+
+  void _setFailure({
+    required String message,
+    String? email,
+    bool clearSession = false,
+    bool clearProfile = false,
+  }) {
+    state = state.copyWith(
+      isLoading: false,
+      isSaving: false,
+      email: email,
+      errorMessage: message,
+      clearSuccess: true,
+      clearSession: clearSession,
+      clearProfile: clearProfile,
+    );
   }
 
   AuthSession? _replaceSessionUser(MobileUserProfile profile) {

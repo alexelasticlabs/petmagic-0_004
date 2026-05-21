@@ -4,10 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
+import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
@@ -15,6 +19,7 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -26,6 +31,8 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
+  bool _isOpeningSubscription = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +51,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final state = ref.watch(profileControllerProvider);
     final walletState = ref.watch(walletControllerProvider);
     final controller = ref.read(profileControllerProvider.notifier);
+    final subscriptionSummary = ref.watch(premiumSubscriptionSummaryProvider);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomNavInset = petMagicBottomNavInset(context);
@@ -104,7 +112,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     if (state.errorMessage != null) ...[
                       const SizedBox(height: 18),
                       ProfileMessageCard(
-                        message: state.errorMessage!,
+                        message: mapProfileFeedbackMessage(
+                          state.errorMessage!,
+                          text,
+                        ),
                         tone: colors.danger,
                       ),
                     ],
@@ -127,18 +138,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         onTap: () => context.go(WalletPage.routePath),
                       ),
                       const SizedBox(height: 12),
-                      _PremiumBannerCard(
-                        isPremium: profile.isPremium,
-                        onTap: () => context.push(PremiumPage.routePath),
-                      ),
-                      const SizedBox(height: 12),
-                      _ProfileStatsCard(
-                        profile: profile,
-                        wallet: walletState.wallet,
-                      ),
-                      const SizedBox(height: 12),
-                      const _ProfileMagicMomentCard(),
-                      const SizedBox(height: 12),
+                      if (!profile.isPremium) ...[
+                        _PremiumBannerCard(
+                          onTap: () =>
+                              _handlePremiumTap(subscriptionSummary.value),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (subscriptionSummary.value?.isPremium == true) ...[
+                        _SubscriptionSummaryCard(
+                          summary: subscriptionSummary.value!,
+                          isOpening: _isOpeningSubscription,
+                          onManageTap: () => _handleSubscriptionAction(
+                            subscriptionSummary.value,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       ProfileGlassCard(
                         padding: EdgeInsets.zero,
                         child: Column(
@@ -192,6 +208,47 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
       ),
     );
+  }
+
+  Future<void> _handlePremiumTap(PremiumStatusModel? summary) async {
+    if (summary?.canManageSubscription == true) {
+      await _handleSubscriptionAction(summary);
+      return;
+    }
+
+    if (mounted) {
+      context.push(PremiumPage.routePath);
+    }
+  }
+
+  Future<void> _handleSubscriptionAction(PremiumStatusModel? summary) async {
+    if (summary == null || !summary.canManageSubscription) {
+      if (mounted) {
+        context.push(PremiumPage.routePath);
+      }
+
+      return;
+    }
+
+    setState(() => _isOpeningSubscription = true);
+
+    try {
+      final repository = ref.read(premiumRepositoryProvider);
+      final url = await repository.createManagementUrl(summary);
+      final uri = Uri.tryParse(url);
+      if (uri == null) {
+        return;
+      }
+
+      final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningSubscription = false);
+      }
+    }
   }
 }
 
@@ -481,54 +538,247 @@ class _WalletHighlightCard extends StatelessWidget {
 }
 
 class _PremiumBannerCard extends StatelessWidget {
-  const _PremiumBannerCard({required this.isPremium, required this.onTap});
+  const _PremiumBannerCard({required this.onTap});
 
-  final bool isPremium;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final title = isPremium
-        ? text.profilePremiumBannerActiveTitle
-        : text.profilePremiumBannerTitle;
-    final actionLabel = isPremium
-        ? text.premiumManageAction
-        : text.profilePremiumOpenAction;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colors.gold.withValues(alpha: 0.28)),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colors.gold.withValues(alpha: 0.18),
+                const Color(0xFF8A5A12).withValues(alpha: 0.22),
+                colors.surfaceGlass,
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colors.shadow,
+                blurRadius: 24,
+                offset: const Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colors.gold.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: colors.gold.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.workspace_premium_rounded,
+                    color: colors.gold,
+                    size: 21,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text.profilePremiumBannerTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        text.profilePremiumSubtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12.2,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.gold,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colors.gold.withValues(alpha: 0.22),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          text.profilePremiumOpenAction,
+                          style: TextStyle(
+                            color: colors.backgroundBottom,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: colors.backgroundBottom,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SubscriptionSummaryCard extends StatelessWidget {
+  const _SubscriptionSummaryCard({
+    required this.summary,
+    required this.isOpening,
+    required this.onManageTap,
+  });
+
+  final PremiumStatusModel summary;
+  final bool isOpening;
+  final VoidCallback onManageTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final format = DateFormat.yMMMd(locale);
+    final providerLabel = switch (summary.provider) {
+      PremiumPaymentProvider.appStore => text.premiumPaymentApple,
+      PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
+      PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
+      null => text.premiumPaymentStripe,
+    };
+    final subtitle = summary.planName?.trim().isNotEmpty == true
+        ? summary.planName!
+        : providerLabel;
+    final nextBillingValue = summary.currentPeriodEndUtc == null
+        ? null
+        : format.format(summary.currentPeriodEndUtc!.toLocal());
 
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colors.gold.withValues(alpha: 0.28)),
+        border: Border.all(color: colors.gold.withValues(alpha: 0.22)),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            colors.gold.withValues(alpha: 0.24),
-            const Color(0xFF8A5A12).withValues(alpha: 0.28),
+            colors.gold.withValues(alpha: 0.12),
             colors.surfaceGlass,
+            colors.surfaceStrong.withValues(alpha: 0.52),
           ],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: 24,
+            offset: const Offset(0, 16),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.auto_awesome_rounded, color: colors.gold, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colors.gold.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: colors.gold.withValues(alpha: 0.22),
                     ),
                   ),
+                  child: Icon(
+                    Icons.workspace_premium_rounded,
+                    color: colors.gold,
+                    size: 21,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text.profileSubscriptionTitle,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12.2,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _CompactPremiumAction(
+                  label: text.premiumManageAction,
+                  onTap: isOpening ? null : onManageTap,
+                  isLoading: isOpening,
                 ),
               ],
             ),
@@ -537,34 +787,27 @@ class _PremiumBannerCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _BenefitPill(
-                  label: text.profilePremiumBenefitUnlimitedTemplates,
+                ProfileStatusPill(
+                  label: summary.status,
+                  leading: Icons.verified_rounded,
+                  backgroundColor: colors.gold.withValues(alpha: 0.16),
+                  foregroundColor: colors.gold,
                 ),
-                _BenefitPill(
-                  label: text.profilePremiumBenefitPriorityGeneration,
+                ProfileStatusPill(
+                  label: providerLabel,
+                  leading: Icons.credit_card_rounded,
+                  backgroundColor: colors.surfaceStrong.withValues(alpha: 0.58),
+                  foregroundColor: colors.textStrong,
                 ),
-                _BenefitPill(label: text.profilePremiumBenefitNoWatermark),
               ],
             ),
-            const SizedBox(height: 14),
-            SizedBox(
-              height: 42,
-              child: ElevatedButton(
-                onPressed: onTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.gold,
-                  foregroundColor: colors.backgroundBottom,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: Text(
-                  actionLabel,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
+            if (nextBillingValue != null) ...[
+              const SizedBox(height: 12),
+              _SubscriptionMetaTile(
+                label: text.profileSubscriptionNextBillingLabel,
+                value: nextBillingValue,
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -572,101 +815,11 @@ class _PremiumBannerCard extends StatelessWidget {
   }
 }
 
-class _ProfileStatsCard extends StatelessWidget {
-  const _ProfileStatsCard({required this.profile, required this.wallet});
+class _SubscriptionMetaTile extends StatelessWidget {
+  const _SubscriptionMetaTile({required this.label, required this.value});
 
-  final MobileUserProfile profile;
-  final WalletStateModel? wallet;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final stats = [
-      _ProfileStatItem(
-        icon: Icons.savings_outlined,
-        value: wallet == null
-            ? '...'
-            : _formatProfileNumber(context, wallet!.balance),
-        label: text.profileStatBalanceLabel,
-        highlight: colors.accent,
-      ),
-      _ProfileStatItem(
-        icon: Icons.workspace_premium_outlined,
-        value: profile.isPremium ? text.premiumLabel : text.freeLabel,
-        label: text.profileStatPlanLabel,
-        highlight: profile.isPremium ? colors.gold : colors.accent,
-      ),
-      _ProfileStatItem(
-        icon: profile.emailConfirmed
-            ? Icons.verified_rounded
-            : Icons.mark_email_unread_outlined,
-        value: profile.emailConfirmed
-            ? text.profileStatReady
-            : text.profileStatPending,
-        label: text.profileEmailStat,
-        highlight: profile.emailConfirmed ? colors.blue : colors.gold,
-      ),
-      _ProfileStatItem(
-        icon: Icons.privacy_tip_outlined,
-        value: profile.legalAcceptance.isCurrentAccepted
-            ? text.profileStatReady
-            : text.profileStatPending,
-        label: text.profileStatLegalLabel,
-        highlight: profile.legalAcceptance.isCurrentAccepted
-            ? colors.accent
-            : colors.gold,
-      ),
-    ];
-
-    return ProfileGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ProfileSectionLabel(label: text.profileStatsSectionTitle),
-          const SizedBox(height: 6),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 10.0;
-              final tileWidth = (constraints.maxWidth - spacing) / 2;
-
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  for (final stat in stats)
-                    SizedBox(
-                      width: tileWidth,
-                      child: _ProfileStatPanel(stat: stat),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileStatItem {
-  const _ProfileStatItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.highlight,
-  });
-
-  final IconData icon;
-  final String value;
   final String label;
-  final Color highlight;
-}
-
-class _ProfileStatPanel extends StatelessWidget {
-  const _ProfileStatPanel({required this.stat});
-
-  final _ProfileStatItem stat;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
@@ -674,43 +827,35 @@ class _ProfileStatPanel extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: colors.surfaceStrong.withValues(alpha: 0.7),
-        border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+        color: colors.surfaceStrong.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border.withValues(alpha: 0.8)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: stat.highlight.withValues(alpha: 0.16),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 11.2,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              child: Icon(stat.icon, color: stat.highlight, size: 18),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(width: 12),
             Text(
-              stat.value,
+              value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: colors.textStrong,
-                fontSize: 16.5,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              stat.label,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 11.8,
-                height: 1.3,
-                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -720,98 +865,70 @@ class _ProfileStatPanel extends StatelessWidget {
   }
 }
 
-class _ProfileMagicMomentCard extends StatelessWidget {
-  const _ProfileMagicMomentCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-
-    return ProfileGlassCard(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colors.accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(Icons.pets_rounded, color: colors.accent, size: 22),
-                Positioned(
-                  top: 10,
-                  right: 9,
-                  child: Icon(Icons.star_rounded, color: colors.gold, size: 14),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  text.profileMagicMomentTitle,
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  text.profileMagicMomentSubtitle,
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 12.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BenefitPill extends StatelessWidget {
-  const _BenefitPill({required this.label});
+class _CompactPremiumAction extends StatelessWidget {
+  const _CompactPremiumAction({
+    required this.label,
+    required this.onTap,
+    this.isLoading = false,
+  });
 
   final String label;
+  final VoidCallback? onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.backgroundBottom.withValues(alpha: 0.18),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isLoading ? null : onTap,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.border.withValues(alpha: 0.8)),
-        boxShadow: [
-          BoxShadow(
-            color: colors.shadow.withValues(alpha: 0.14),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: colors.gold,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: colors.gold.withValues(alpha: 0.22),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: colors.textStrong,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isLoading)
+                  SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator.adaptive(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colors.backgroundBottom,
+                      ),
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.open_in_new_rounded,
+                    color: colors.backgroundBottom,
+                    size: 14,
+                  ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: colors.backgroundBottom,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

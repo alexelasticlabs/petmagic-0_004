@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 
@@ -284,16 +285,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
   }
 
   String _mapErrorMessage(String raw, AppLocalizations text) {
-    switch (raw) {
-      case 'auth.password_mismatch':
-        return text.authPasswordMismatch;
-      case 'auth.password_too_short':
-        return text.authPasswordTooShort;
-      case 'auth.password_reset_code_invalid':
-        return text.authPasswordResetCodeInvalid;
-      default:
-        return raw;
-    }
+    return mapProfileFeedbackMessage(raw, text);
   }
 
   String _mapSuccessMessage(String raw, AppLocalizations text) {

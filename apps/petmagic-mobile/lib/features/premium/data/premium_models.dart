@@ -15,6 +15,130 @@ enum PremiumPaymentProvider {
   }
 }
 
+class PremiumPaymentMethodModel {
+  const PremiumPaymentMethodModel({
+    required this.provider,
+    required this.purchaseChannel,
+    required this.platform,
+    required this.region,
+    required this.isEnabled,
+    required this.isSelectedByDefault,
+    required this.requiresExternalWarning,
+    required this.requiresStoreDisclosure,
+    required this.isRecommended,
+    required this.bonusTokensPercent,
+    this.displayLabel,
+    this.displaySubtitle,
+    this.warningTitle,
+    this.warningMessage,
+    this.notes,
+  });
+
+  final PremiumPaymentProvider provider;
+  final String purchaseChannel;
+  final String platform;
+  final String region;
+  final bool isEnabled;
+  final bool isSelectedByDefault;
+  final bool requiresExternalWarning;
+  final bool requiresStoreDisclosure;
+  final bool isRecommended;
+  final int bonusTokensPercent;
+  final String? displayLabel;
+  final String? displaySubtitle;
+  final String? warningTitle;
+  final String? warningMessage;
+  final String? notes;
+
+  bool get isStoreNative =>
+      purchaseChannel == 'in_app' && provider != PremiumPaymentProvider.stripe;
+
+  bool get isExternalStripeFlow =>
+      provider == PremiumPaymentProvider.stripe &&
+      purchaseChannel != 'web' &&
+      purchaseChannel != 'in_app';
+
+  factory PremiumPaymentMethodModel.fromJson(Map<String, dynamic> json) {
+    return PremiumPaymentMethodModel(
+      provider: PremiumPaymentProvider.fromValue(
+        json['provider'] as String? ?? 'stripe',
+      ),
+      purchaseChannel: json['purchaseChannel'] as String? ?? 'web',
+      platform: json['platform'] as String? ?? '',
+      region: json['region'] as String? ?? '',
+      isEnabled: json['isEnabled'] as bool? ?? false,
+      isSelectedByDefault: json['isSelectedByDefault'] as bool? ?? false,
+      requiresExternalWarning:
+          json['requiresExternalWarning'] as bool? ?? false,
+      requiresStoreDisclosure:
+          json['requiresStoreDisclosure'] as bool? ?? false,
+      isRecommended: json['isRecommended'] as bool? ?? false,
+      bonusTokensPercent: (json['bonusTokensPercent'] as num?)?.toInt() ?? 0,
+      displayLabel: json['displayLabel'] as String?,
+      displaySubtitle: json['displaySubtitle'] as String?,
+      warningTitle: json['warningTitle'] as String?,
+      warningMessage: json['warningMessage'] as String?,
+      notes: json['notes'] as String?,
+    );
+  }
+}
+
+class PremiumLegalTextsModel {
+  const PremiumLegalTextsModel({
+    required this.storeNotice,
+    required this.externalCheckoutNotice,
+    required this.stripeNotice,
+  });
+
+  final String storeNotice;
+  final String externalCheckoutNotice;
+  final String stripeNotice;
+
+  factory PremiumLegalTextsModel.fromJson(Map<String, dynamic> json) {
+    return PremiumLegalTextsModel(
+      storeNotice: json['storeNotice'] as String? ?? '',
+      externalCheckoutNotice: json['externalCheckoutNotice'] as String? ?? '',
+      stripeNotice: json['stripeNotice'] as String? ?? '',
+    );
+  }
+}
+
+class PremiumPaywallConfigModel {
+  const PremiumPaywallConfigModel({
+    required this.plans,
+    required this.paymentMethods,
+    required this.legalTexts,
+    required this.externalPaymentWarningRequired,
+    this.recommendedPlanCode,
+  });
+
+  final List<PremiumPlanModel> plans;
+  final String? recommendedPlanCode;
+  final List<PremiumPaymentMethodModel> paymentMethods;
+  final PremiumLegalTextsModel legalTexts;
+  final bool externalPaymentWarningRequired;
+
+  factory PremiumPaywallConfigModel.fromJson(Map<String, dynamic> json) {
+    return PremiumPaywallConfigModel(
+      plans: (json['plans'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(PremiumPlanModel.fromJson)
+          .toList(growable: false),
+      recommendedPlanCode: json['recommendedPlan'] as String?,
+      paymentMethods:
+          (json['availablePaymentMethods'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(PremiumPaymentMethodModel.fromJson)
+              .toList(growable: false),
+      legalTexts: PremiumLegalTextsModel.fromJson(
+        json['legalTexts'] as Map<String, dynamic>? ?? const {},
+      ),
+      externalPaymentWarningRequired:
+          json['externalPaymentWarningRequired'] as bool? ?? false,
+    );
+  }
+}
+
 class PremiumPlanModel {
   const PremiumPlanModel({
     required this.planCode,
@@ -46,18 +170,29 @@ class PremiumPlanModel {
 
   factory PremiumPlanModel.fromJson(Map<String, dynamic> json) {
     return PremiumPlanModel(
-      planCode: json['planCode'] as String? ?? '',
-      billingInterval: json['billingInterval'] as String? ?? 'month',
+      planCode: (json['planCode'] ?? json['planId']) as String? ?? '',
+      billingInterval:
+          (json['billingInterval'] ?? json['billingPeriod']) as String? ??
+          'month',
       priceAmount: (json['priceAmount'] as num?)?.toDouble() ?? 0,
       compareAtPriceAmount: (json['compareAtPriceAmount'] as num?)?.toDouble(),
       currencyCode: json['currencyCode'] as String? ?? 'USD',
-      tokenAllowance: (json['tokenAllowance'] as num?)?.toInt() ?? 0,
-      isPopular: json['isPopular'] as bool? ?? false,
+      tokenAllowance:
+          ((json['tokenAllowance'] ?? json['monthlyTokenLimit']) as num?)
+              ?.toInt() ??
+          0,
+      isPopular:
+          (json['isPopular'] as bool?) ??
+          (json['isRecommended'] as bool?) ??
+          false,
       discountPercent: (json['discountPercent'] as num?)?.toInt(),
-      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
-      stripeCheckoutEnabled: json['stripeCheckoutEnabled'] as bool? ?? false,
-      googlePlayProductId: json['googlePlayProductId'] as String?,
-      appStoreProductId: json['appStoreProductId'] as String?,
+      sortOrder:
+          ((json['sortOrder'] ?? json['displayOrder']) as num?)?.toInt() ?? 0,
+      stripeCheckoutEnabled: json['stripeCheckoutEnabled'] as bool? ?? true,
+      googlePlayProductId:
+          (json['googlePlayProductId'] ?? json['googleProductId']) as String?,
+      appStoreProductId:
+          (json['appStoreProductId'] ?? json['appleProductId']) as String?,
     );
   }
 
@@ -74,18 +209,65 @@ class PremiumStatusModel {
   const PremiumStatusModel({
     required this.isPremium,
     required this.canManageBilling,
+    required this.status,
+    required this.cancelAtPeriodEnd,
+    required this.monthlyTokenLimit,
+    required this.tokensAvailable,
+    required this.canManageSubscription,
+    required this.manageSubscriptionAction,
     this.paymentProvider,
+    this.purchaseChannel,
+    this.planName,
+    this.billingPeriod,
+    this.currentPeriodEndUtc,
   });
 
   final bool isPremium;
   final bool canManageBilling;
   final String? paymentProvider;
+  final String? purchaseChannel;
+  final String status;
+  final String? planName;
+  final String? billingPeriod;
+  final DateTime? currentPeriodEndUtc;
+  final bool cancelAtPeriodEnd;
+  final int monthlyTokenLimit;
+  final int tokensAvailable;
+  final bool canManageSubscription;
+  final String manageSubscriptionAction;
+
+  PremiumPaymentProvider? get provider {
+    final rawValue = paymentProvider;
+    if (rawValue == null || rawValue.isEmpty) {
+      return null;
+    }
+
+    return PremiumPaymentProvider.fromValue(rawValue);
+  }
 
   factory PremiumStatusModel.fromJson(Map<String, dynamic> json) {
     return PremiumStatusModel(
       isPremium: json['isPremium'] as bool? ?? false,
-      canManageBilling: json['canManageBilling'] as bool? ?? false,
-      paymentProvider: json['paymentProvider'] as String?,
+      canManageBilling:
+          (json['canManageBilling'] as bool?) ??
+          (json['canManageSubscription'] as bool?) ??
+          false,
+      paymentProvider: (json['paymentProvider'] ?? json['provider']) as String?,
+      purchaseChannel: json['purchaseChannel'] as String?,
+      status: json['status'] as String? ?? 'None',
+      planName: json['planName'] as String?,
+      billingPeriod: json['billingPeriod'] as String?,
+      currentPeriodEndUtc: json['currentPeriodEndUtc'] == null
+          ? (json['currentPeriodEnd'] == null
+                ? null
+                : DateTime.tryParse(json['currentPeriodEnd'] as String))
+          : DateTime.tryParse(json['currentPeriodEndUtc'] as String),
+      cancelAtPeriodEnd: json['cancelAtPeriodEnd'] as bool? ?? false,
+      monthlyTokenLimit: (json['monthlyTokenLimit'] as num?)?.toInt() ?? 0,
+      tokensAvailable: (json['tokensAvailable'] as num?)?.toInt() ?? 0,
+      canManageSubscription: json['canManageSubscription'] as bool? ?? false,
+      manageSubscriptionAction:
+          json['manageSubscriptionAction'] as String? ?? 'None',
     );
   }
 }

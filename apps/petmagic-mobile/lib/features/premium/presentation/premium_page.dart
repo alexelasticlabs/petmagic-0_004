@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +7,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -21,6 +24,12 @@ class PremiumPage extends ConsumerStatefulWidget {
 class _PremiumPageState extends ConsumerState<PremiumPage>
     with WidgetsBindingObserver {
   bool _shouldReloadOnResume = false;
+  bool _awaitingCheckoutVerification = false;
+  bool _isCheckingCheckout = false;
+  bool _wasPremiumBeforeCheckout = false;
+  String? _checkoutStatusMessage;
+  bool _checkoutStatusIsError = false;
+  bool _recentlyActivatedPremium = false;
 
   @override
   void initState() {
@@ -39,6 +48,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
       _shouldReloadOnResume = false;
+      if (_awaitingCheckoutVerification) {
+        unawaited(_refreshAfterCheckout());
+        return;
+      }
+
       ref.read(premiumControllerProvider.notifier).load(refresh: true);
     }
   }
@@ -55,6 +69,18 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       final externalUrl = next.externalUrl;
       if (externalUrl == null || externalUrl.isEmpty) {
         return;
+      }
+
+      final openedForCheckout =
+          previous?.isBuying == true &&
+          next.selectedProvider == PremiumPaymentProvider.stripe;
+
+      if (openedForCheckout) {
+        _awaitingCheckoutVerification = true;
+        _wasPremiumBeforeCheckout = previous?.isPremium ?? false;
+        _checkoutStatusMessage = null;
+        _checkoutStatusIsError = false;
+        _recentlyActivatedPremium = false;
       }
 
       controller.clearExternalUrl();
@@ -76,6 +102,24 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                       onRefresh: () => controller.load(refresh: true),
                     ),
                     const SizedBox(height: 14),
+                    if (_isCheckingCheckout) ...[
+                      ProfileProgressCard(
+                        title: text.externalCheckoutCheckingTitle,
+                        message: text.externalCheckoutCheckingMessage,
+                        tone: colors.accent,
+                        isLoading: true,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    if (_checkoutStatusMessage != null) ...[
+                      ProfileMessageCard(
+                        message: _checkoutStatusMessage!,
+                        tone: _checkoutStatusIsError
+                            ? colors.gold
+                            : colors.accent,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     if (state.errorMessage != null) ...[
                       ProfileMessageCard(
                         message: _friendlyPremiumMessage(
@@ -99,6 +143,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                     _PremiumHero(
                       status: state.status,
                       selectedPlan: state.selectedPlan,
+                      isRecentlyActivated: _recentlyActivatedPremium,
                     ),
                     const SizedBox(height: 16),
                     _PlansSection(state: state, controller: controller),
@@ -128,7 +173,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                       FilledButton.icon(
                         onPressed: state.isBuying || !state.canStartCheckout
                             ? null
-                            : controller.startCheckout,
+                            : () => _handleCheckoutTap(state, controller),
                         icon: state.isBuying
                             ? const SizedBox.square(
                                 dimension: 18,
@@ -138,7 +183,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                               )
                             : const Icon(Icons.arrow_forward_rounded),
                         label: Text(
-                          _ctaLabel(text),
+                          _ctaLabel(text, state),
                           maxLines: 2,
                           textAlign: TextAlign.center,
                         ),
@@ -160,7 +205,9 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      text.premiumTermsNotice,
+                      state.legalNotice.isEmpty
+                          ? text.premiumTermsNotice
+                          : state.legalNotice,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: colors.textMuted,
@@ -187,6 +234,69 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     if (!launched) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  Future<void> _refreshAfterCheckout() async {
+    if (!mounted) {
+      return;
+    }
+
+    final text = AppLocalizations.of(context);
+    setState(() {
+      _isCheckingCheckout = true;
+      _checkoutStatusMessage = null;
+      _checkoutStatusIsError = false;
+    });
+
+    await ref.read(profileControllerProvider.notifier).initialize();
+    await ref.read(premiumControllerProvider.notifier).load(refresh: true);
+
+    if (!mounted) {
+      return;
+    }
+
+    final updatedState = ref.read(premiumControllerProvider);
+    setState(() {
+      _isCheckingCheckout = false;
+      _awaitingCheckoutVerification = false;
+
+      if (updatedState.errorMessage != null) {
+        _checkoutStatusMessage = _friendlyPremiumMessage(
+          text,
+          updatedState.errorMessage!,
+        );
+        _checkoutStatusIsError = true;
+        _recentlyActivatedPremium = false;
+        return;
+      }
+
+      _recentlyActivatedPremium =
+          !_wasPremiumBeforeCheckout && updatedState.isPremium;
+      _checkoutStatusMessage = _recentlyActivatedPremium
+          ? text.premiumPurchaseActivated
+          : text.externalCheckoutPendingVerificationMessage;
+      _checkoutStatusIsError = false;
+    });
+  }
+
+  Future<void> _handleCheckoutTap(
+    PremiumState state,
+    PremiumController controller,
+  ) async {
+    if (state.selectedProvider == PremiumPaymentProvider.stripe && mounted) {
+      final confirmed = await showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => _ExternalCheckoutWarningSheet(state: state),
+      );
+
+      if (confirmed != true) {
+        return;
+      }
+    }
+
+    await controller.startCheckout();
   }
 }
 
@@ -236,10 +346,15 @@ class _PremiumHeader extends StatelessWidget {
 }
 
 class _PremiumHero extends StatelessWidget {
-  const _PremiumHero({required this.status, required this.selectedPlan});
+  const _PremiumHero({
+    required this.status,
+    required this.selectedPlan,
+    required this.isRecentlyActivated,
+  });
 
   final PremiumStatusModel? status;
   final PremiumPlanModel? selectedPlan;
+  final bool isRecentlyActivated;
 
   @override
   Widget build(BuildContext context) {
@@ -271,36 +386,65 @@ class _PremiumHero extends StatelessWidget {
             Row(
               children: [
                 ProfileStatusPill(
-                  label: status?.isPremium == true
+                  label: isRecentlyActivated
+                      ? text.premiumRecentlyActivatedBadge
+                      : status?.isPremium == true
                       ? text.premiumAlreadyActive
                       : text.premiumHeroEyebrow,
                   leading: Icons.workspace_premium_rounded,
-                  backgroundColor: colors.gold.withValues(alpha: 0.16),
-                  foregroundColor: colors.gold,
+                  backgroundColor: isRecentlyActivated
+                      ? colors.accent.withValues(alpha: 0.16)
+                      : colors.gold.withValues(alpha: 0.16),
+                  foregroundColor: isRecentlyActivated
+                      ? colors.accent
+                      : colors.gold,
                 ),
                 const Spacer(),
-                Icon(Icons.auto_awesome_rounded, color: colors.gold, size: 20),
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: isRecentlyActivated ? colors.accent : colors.gold,
+                  size: 20,
+                ),
               ],
             ),
             const SizedBox(height: 14),
-            Text(
-              text.premiumHeroTitle,
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 28,
-                height: 1.05,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              text.premiumHeroSubtitle,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 13,
-                height: 1.4,
-                fontWeight: FontWeight.w700,
-              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 360;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            text.premiumHeroTitle,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: compact ? 25 : 28,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            text.premiumHeroSubtitle,
+                            style: TextStyle(
+                              color: colors.textSoft,
+                              fontSize: 13,
+                              height: 1.4,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const _HeroPreviewStack(),
+                  ],
+                );
+              },
             ),
             if (selectedPlanLabel != null) ...[
               const SizedBox(height: 14),
@@ -313,6 +457,213 @@ class _PremiumHero extends StatelessWidget {
                 ),
               ),
             ],
+            if (isRecentlyActivated) ...[
+              const SizedBox(height: 12),
+              ProfileProgressCard(
+                title: text.premiumRecentlyActivatedTitle,
+                message: text.premiumRecentlyActivatedMessage,
+                tone: colors.accent,
+                icon: Icons.check_circle_rounded,
+              ),
+            ],
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _HeroMetric(
+                  icon: Icons.stacked_line_chart_rounded,
+                  label: selectedPlan == null
+                      ? text.premiumComparisonPremiumTokensFallback
+                      : _tokensLabel(text, selectedPlan!),
+                ),
+                _HeroMetric(
+                  icon: Icons.flash_on_rounded,
+                  label: text.premiumComparisonFast,
+                ),
+                _HeroMetric(
+                  icon: Icons.hd_rounded,
+                  label: text.premiumComparisonHighQuality,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroPreviewStack extends StatelessWidget {
+  const _HeroPreviewStack();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return SizedBox(
+      width: 148,
+      height: 210,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 6,
+            top: 30,
+            child: _PreviewCard(
+              angle: -0.14,
+              label: 'AI DANCE',
+              accent: colors.gold,
+              gradient: const [Color(0xFF4C2F12), Color(0xFF191B31)],
+            ),
+          ),
+          Positioned(
+            right: -6,
+            top: 38,
+            child: _PreviewCard(
+              angle: 0.12,
+              label: 'CINEMATIC',
+              accent: colors.gold,
+              gradient: const [Color(0xFF5A3A12), Color(0xFF141C2D)],
+            ),
+          ),
+          Positioned(
+            left: 22,
+            child: _PreviewCard(
+              width: 104,
+              height: 170,
+              angle: 0.04,
+              label: 'VIRAL VIDEO',
+              accent: colors.accent,
+              showPlay: true,
+              gradient: const [Color(0xFF7B3A17), Color(0xFF1B2440)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({
+    required this.angle,
+    required this.label,
+    required this.accent,
+    required this.gradient,
+    this.width = 92,
+    this.height = 148,
+    this.showPlay = false,
+  });
+
+  final double angle;
+  final String label;
+  final Color accent;
+  final List<Color> gradient;
+  final double width;
+  final double height;
+  final bool showPlay;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Transform.rotate(
+      angle: angle,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: colors.border.withValues(alpha: 0.75)),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: gradient,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 16,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: Icon(Icons.auto_awesome, size: 15, color: accent),
+              ),
+              const Spacer(),
+              if (showPlay)
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.black,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroMetric extends StatelessWidget {
+  const _HeroMetric({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong.withValues(alpha: 0.54),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: colors.accent),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ],
         ),
       ),
@@ -458,7 +809,12 @@ class _PlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final borderColor = selected ? colors.accent : colors.border;
+    final borderColor = selected
+        ? (plan.isPopular ? colors.accent : colors.gold)
+        : colors.border;
+    final approxMonthly = plan.billingInterval == 'yearly'
+        ? plan.priceAmount / 12
+        : null;
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
@@ -491,7 +847,7 @@ class _PlanCard extends StatelessWidget {
                             const SizedBox(width: 8),
                             ProfileStatusPill(
                               label: text.premiumPopularBadge,
-                              leading: Icons.star_rounded,
+                              leading: Icons.local_fire_department_rounded,
                               backgroundColor: colors.accent.withValues(
                                 alpha: 0.18,
                               ),
@@ -550,17 +906,40 @@ class _PlanCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      if (approxMonthly != null) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _PlanChip(
+                              icon: Icons.calculate_rounded,
+                              label:
+                                  '${_formatPrice(plan, approxMonthly)} ${text.premiumMonthlyPeriod}',
+                            ),
+                            if (plan.discountPercent != null)
+                              _PlanChip(
+                                icon: Icons.savings_rounded,
+                                label: text.premiumDiscountLabel(
+                                  plan.discountPercent!,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
-                  width: 24,
-                  height: 24,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: selected ? colors.accent : Colors.transparent,
+                    color: selected
+                        ? (plan.isPopular ? colors.accent : colors.gold)
+                        : Colors.transparent,
                     border: Border.all(color: borderColor, width: 1.4),
                   ),
                   child: selected
@@ -578,11 +957,6 @@ class _PlanCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (plan.discountPercent != null)
-                  _PlanChip(
-                    icon: Icons.savings_rounded,
-                    label: text.premiumDiscountLabel(plan.discountPercent!),
-                  ),
                 _PlanChip(
                   icon: Icons.event_available_rounded,
                   label: text.premiumCancelAnytime,
@@ -618,6 +992,10 @@ class _PaymentProviderSection extends StatelessWidget {
               for (final provider in state.availableProviders)
                 _ProviderRow(
                   provider: provider,
+                  paymentMethod: state.paymentMethods
+                      .where((method) => method.provider == provider)
+                      .cast<PremiumPaymentMethodModel?>()
+                      .firstOrNull,
                   enabled: state.isProviderAvailable(provider),
                   selected: provider == state.selectedProvider,
                   onTap: () => onSelect(provider),
@@ -633,12 +1011,14 @@ class _PaymentProviderSection extends StatelessWidget {
 class _ProviderRow extends StatelessWidget {
   const _ProviderRow({
     required this.provider,
+    required this.paymentMethod,
     required this.enabled,
     required this.selected,
     required this.onTap,
   });
 
   final PremiumPaymentProvider provider;
+  final PremiumPaymentMethodModel? paymentMethod;
   final bool enabled;
   final bool selected;
   final VoidCallback onTap;
@@ -646,7 +1026,15 @@ class _ProviderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final label = _providerLabel(AppLocalizations.of(context), provider);
+    final text = AppLocalizations.of(context);
+    final backendLabel = paymentMethod?.displayLabel?.trim();
+    final backendSubtitle = paymentMethod?.displaySubtitle?.trim();
+    final label = backendLabel == null || backendLabel.isEmpty
+        ? _providerLabel(text, provider)
+        : backendLabel;
+    final subtitle = backendSubtitle == null || backendSubtitle.isEmpty
+        ? paymentMethod?.notes
+        : backendSubtitle;
     final icon = switch (provider) {
       PremiumPaymentProvider.stripe => Icons.credit_card_rounded,
       PremiumPaymentProvider.googlePlay => Icons.shop_rounded,
@@ -668,24 +1056,99 @@ class _ProviderRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: enabled
-                      ? colors.textStrong
-                      : colors.textMuted.withValues(alpha: 0.75),
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: enabled
+                          ? colors.textStrong
+                          : colors.textMuted.withValues(alpha: 0.75),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (subtitle?.isNotEmpty == true)
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        color: colors.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  if (paymentMethod != null &&
+                      (paymentMethod!.isRecommended ||
+                          paymentMethod!.isSelectedByDefault ||
+                          paymentMethod!.bonusTokensPercent > 0)) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        if (paymentMethod!.isRecommended)
+                          _PaymentMethodBadge(
+                            label: text.premiumPaymentRecommendedBadge,
+                          ),
+                        if (paymentMethod!.isSelectedByDefault)
+                          _PaymentMethodBadge(
+                            label: text.premiumPaymentDefaultBadge,
+                          ),
+                        if (paymentMethod!.bonusTokensPercent > 0)
+                          _PaymentMethodBadge(
+                            label: text.paymentBonusPercentBadge(
+                              paymentMethod!.bonusTokensPercent,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
+            if (paymentMethod?.requiresExternalWarning == true) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.open_in_new_rounded, size: 16, color: colors.gold),
+            ],
+            const SizedBox(width: 8),
             Icon(
               enabled && selected
-                  ? Icons.radio_button_checked_rounded
+                  ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked_rounded,
               color: enabled && selected ? colors.accent : colors.textMuted,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentMethodBadge extends StatelessWidget {
+  const _PaymentMethodBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.accent.withValues(alpha: 0.34)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: colors.accent,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );
@@ -706,37 +1169,213 @@ class _ComparisonSection extends StatelessWidget {
       children: [
         ProfileSectionLabel(label: text.premiumComparisonTitle),
         const SizedBox(height: 2),
-        ProfileGlassCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              _ComparisonHeader(),
-              _ComparisonRow(
-                text.premiumComparisonPremiumTemplates,
-                false,
-                true,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _FeatureColumnCard(
+                title: text.premiumFreeColumn,
+                accent: false,
+                items: const [
+                  '20 токенов в месяц',
+                  'Водяной знак',
+                  'Базовые шаблоны',
+                  'Стандартное качество',
+                ],
               ),
-              _ComparisonTextRow(
-                text.premiumComparisonTokens,
-                '20',
-                selectedPlan == null
-                    ? text.premiumComparisonPremiumTokensFallback
-                    : text.premiumComparisonPremiumTokens(
-                        selectedPlan!.tokenAllowance,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _FeatureColumnCard(
+                title: text.premiumPremiumColumn,
+                accent: true,
+                items: [
+                  selectedPlan == null
+                      ? text.premiumComparisonPremiumTokensFallback
+                      : text.premiumComparisonPremiumTokens(
+                          selectedPlan!.tokenAllowance,
+                        ),
+                  text.premiumComparisonNoWatermark,
+                  text.premiumComparisonPremiumTemplates,
+                  text.premiumComparisonHighQuality,
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FeatureColumnCard extends StatelessWidget {
+  const _FeatureColumnCard({
+    required this.title,
+    required this.accent,
+    required this.items,
+  });
+
+  final String title;
+  final bool accent;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: accent
+              ? colors.accent.withValues(alpha: 0.8)
+              : colors.border.withValues(alpha: 0.7),
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: accent
+              ? [
+                  colors.accent.withValues(alpha: 0.18),
+                  colors.surfaceStrong.withValues(alpha: 0.9),
+                ]
+              : [
+                  colors.surfaceStrong.withValues(alpha: 0.78),
+                  colors.surfaceStrong.withValues(alpha: 0.55),
+                ],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: accent ? colors.accent : colors.textStrong,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final item in items) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    accent
+                        ? Icons.check_circle_rounded
+                        : Icons.remove_circle_outline_rounded,
+                    size: 16,
+                    color: accent ? colors.accent : colors.textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 12.5,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
                       ),
+                    ),
+                  ),
+                ],
               ),
-              _ComparisonRow(text.premiumComparisonFast, false, true),
-              _ComparisonRow(text.premiumComparisonNoWatermark, false, true),
-              _ComparisonRow(
-                text.premiumComparisonHighQuality,
-                false,
-                true,
-                showDivider: false,
+              const SizedBox(height: 9),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExternalCheckoutWarningSheet extends StatelessWidget {
+  const _ExternalCheckoutWarningSheet({required this.state});
+
+  final PremiumState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final paymentMethod = state.selectedPaymentMethod;
+    final warningTitle = paymentMethod?.warningTitle?.trim();
+    final warningMessage = paymentMethod?.warningMessage?.trim();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceStrong,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                warningTitle == null || warningTitle.isEmpty
+                    ? text.externalCheckoutStripeTitle
+                    : warningTitle,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                warningMessage == null || warningMessage.isEmpty
+                    ? text.externalCheckoutStripeMessage
+                    : warningMessage,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 13,
+                  height: 1.45,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                state.legalNotice,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 13,
+                  height: 1.45,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(
+                        MaterialLocalizations.of(context).cancelButtonLabel,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: Text(text.externalCheckoutContinueAction),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -812,165 +1451,6 @@ class _TrustSummary extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ComparisonHeader extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-      child: Row(
-        children: [
-          const Expanded(flex: 5, child: SizedBox.shrink()),
-          Expanded(
-            flex: 2,
-            child: Text(
-              text.premiumFreeColumn,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              text.premiumPremiumColumn,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colors.accent,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ComparisonRow extends StatelessWidget {
-  const _ComparisonRow(
-    this.label,
-    this.free,
-    this.premium, {
-    this.showDivider = true,
-  });
-
-  final String label;
-  final bool free;
-  final bool premium;
-  final bool showDivider;
-
-  @override
-  Widget build(BuildContext context) {
-    return _ComparisonBaseRow(
-      label: label,
-      free: _ComparisonIcon(value: free),
-      premium: _ComparisonIcon(value: premium),
-      showDivider: showDivider,
-    );
-  }
-}
-
-class _ComparisonTextRow extends StatelessWidget {
-  const _ComparisonTextRow(this.label, this.free, this.premium);
-
-  final String label;
-  final String free;
-  final String premium;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return _ComparisonBaseRow(
-      label: label,
-      free: Text(
-        free,
-        textAlign: TextAlign.center,
-        style: TextStyle(color: colors.textSoft, fontWeight: FontWeight.w800),
-      ),
-      premium: Text(
-        premium,
-        textAlign: TextAlign.center,
-        style: TextStyle(color: colors.accent, fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
-class _ComparisonBaseRow extends StatelessWidget {
-  const _ComparisonBaseRow({
-    required this.label,
-    required this.free,
-    required this.premium,
-    this.showDivider = true,
-  });
-
-  final String label;
-  final Widget free;
-  final Widget premium;
-  final bool showDivider;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: showDivider
-            ? Border(
-                top: BorderSide(color: colors.border.withValues(alpha: 0.5)),
-              )
-            : null,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 5,
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 12.5,
-                  height: 1.25,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Expanded(flex: 2, child: Center(child: free)),
-            Expanded(flex: 2, child: Center(child: premium)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ComparisonIcon extends StatelessWidget {
-  const _ComparisonIcon({required this.value});
-
-  final bool value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Icon(
-      value ? Icons.check_circle_rounded : Icons.close_rounded,
-      color: value ? colors.accent : colors.textMuted,
-      size: value ? 20 : 18,
     );
   }
 }
@@ -1057,8 +1537,14 @@ String _providerLabel(AppLocalizations text, PremiumPaymentProvider provider) {
   };
 }
 
-String _ctaLabel(AppLocalizations text) {
-  return text.premiumContinueAction;
+String _ctaLabel(AppLocalizations text, PremiumState state) {
+  return switch (state.selectedProvider) {
+    PremiumPaymentProvider.stripe => 'Stripe Checkout',
+    PremiumPaymentProvider.googlePlay =>
+      '${text.premiumContinueAction} · Google Play',
+    PremiumPaymentProvider.appStore =>
+      '${text.premiumContinueAction} · App Store',
+  };
 }
 
 int _estimatedVideoCount(int tokenAllowance) {

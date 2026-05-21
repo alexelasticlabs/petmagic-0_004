@@ -398,6 +398,41 @@ void main() {
     },
   );
 
+  test('logout clears cached google session', () async {
+    SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
+
+    final profileRepository = _FakeProfileRepository();
+    final externalAuthRepository = _TrackingExternalAuthRepository();
+    final container = ProviderContainer(
+      overrides: [
+        profileRepositoryProvider.overrideWith((ref) => profileRepository),
+        externalAuthRepositoryProvider.overrideWith(
+          (ref) => externalAuthRepository,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(appLaunchControllerProvider);
+    final controller = container.read(profileControllerProvider.notifier);
+
+    await controller.initialize();
+    await controller.login();
+    await controller.logout();
+
+    final loggedOutState = container.read(profileControllerProvider);
+    expect(loggedOutState.isAuthenticated, isFalse);
+    expect(loggedOutState.successMessage, 'logout');
+    expect(
+      externalAuthRepository.clearedProviders,
+      contains(ExternalAuthProvider.google),
+    );
+    expect(
+      container.read(appLaunchControllerProvider).isAuthenticated,
+      isFalse,
+    );
+  });
+
   testWidgets('opens templates directly for authenticated user', (
     tester,
   ) async {
@@ -1142,6 +1177,18 @@ class _FakeExternalAuthRepository implements ExternalAuthRepository {
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
     return const [];
   }
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {}
+}
+
+class _TrackingExternalAuthRepository extends _FakeExternalAuthRepository {
+  final List<ExternalAuthProvider> clearedProviders = [];
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {
+    clearedProviders.add(provider);
+  }
 }
 
 class _FailingExternalAuthRepository implements ExternalAuthRepository {
@@ -1158,6 +1205,11 @@ class _FailingExternalAuthRepository implements ExternalAuthRepository {
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
     throw error;
   }
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {
+    throw error;
+  }
 }
 
 class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
@@ -1169,6 +1221,11 @@ class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
     throw Exception('external account link failed unexpectedly');
+  }
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {
+    throw Exception('external account sign-out failed unexpectedly');
   }
 }
 

@@ -1,7 +1,7 @@
 {
   "@@locale": "en",
   "navTemplates": "Templates",
-  "navCreations": "Creations",
+  "navCreations": "Gallery",
   "navProfile": "Profile",
   "comingSoonMessage": "This section is prepared for the next product wave.",
   "createMagicTitle": "Create Magic",
@@ -58,8 +58,15 @@
   "profilePremiumBenefitPriorityGeneration": "Priority generation",
   "profilePremiumBenefitNoWatermark": "No watermark",
   "profilePremiumOpenAction": "Upgrade",
+  "profileSubscriptionTitle": "My subscription",
+  "profileSubscriptionStatusLabel": "Status",
+  "profileSubscriptionProviderLabel": "Provider",
+  "profileSubscriptionNextBillingLabel": "Next billing date",
+  "profileSubscriptionTokensLabel": "Tokens available",
   "profileWalletTitle": "Wallet",
   "profileWalletHistoryHint": "Open balance, purchases and history.",
+  "walletPageTitle": "PawSpark wallet",
+  "walletPageSubtitle": "Balance, promo codes, ad bonus, and PawSpark top-ups.",
   "profileWalletPreviewEyebrow": "PawSpark",
   "profileWalletPreviewSubtitle": "In-app currency for generations and bonus rewards.",
   "profileWalletPreviewAction": "Open",
@@ -75,41 +82,34 @@
   "profileWalletEmptyHint": "Open balance and history",
   "walletDataUnavailableFallback": "Wallet data is not available right now.",
   "walletRefreshTooltip": "Refresh wallet",
-  "walletBalanceTitle": "Available for generation",
-  "walletBalanceEyebrow": "Balance",
+  "walletBalanceTitle": "Ready for photos and videos",
+  "walletBalanceEyebrow": "Current balance",
   "walletBalanceUnit": "PawSpark",
-  "walletBalanceExplanation": "PawSpark is the in-app currency used for photo and video generations.",
+  "walletBalanceExplanation": "PawSpark is spent only inside PetMagic: generations, bonus actions, and new formats.",
   "walletPremiumStatus": "Premium wallet",
   "walletFreeStatus": "Free wallet",
-  "walletSavedCardsCount": "{count} saved cards",
-  "@walletSavedCardsCount": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "walletWeeklyReady": "Weekly ready",
-  "walletWeeklyPending": "Weekly pending",
   "walletAdRewardsCount": "{count} ad rewards",
   "@walletAdRewardsCount": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletQuickActionsTitle": "Wallet tools",
-  "walletPaymentMethodsAction": "Payment methods",
-  "walletRedeemAction": "Redeem code",
-  "walletRewardsTitle": "Rewards and bonuses",
-  "walletWeeklyRewardAction": "Weekly reward",
-  "walletRewardReadyDescription": "You can claim it now and top up your balance right away.",
-  "walletRewardPendingDescription": "It will unlock later. We keep the status visible without showing a scary error.",
+  "walletQuickActionsTitle": "Promo codes",
+  "walletRedeemAction": "Redeem promo code",
+  "walletRewardsTitle": "Ad bonus",
   "walletAdRewardAction": "Ad reward",
-  "walletAdRewardDescription": "Available today: {count}. Use it when you need a quick PawSpark top-up.",
-  "@walletAdRewardDescription": {
+  "walletAdRewardCompactTitle": "Quick ad bonus",
+  "walletAdRewardCompactDescription": "Watch a short ad and add PawSpark without paying.",
+  "walletAdRewardRemaining": "Left today: {count}",
+  "@walletAdRewardRemaining": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletBuySparkTitle": "Buy PawSpark",
+  "walletWatchAdAction": "Watch ad",
+  "walletPromoTitle": "Have a promo code?",
+  "walletPromoSubtitle": "Enter a code from PetMagic and add PawSpark to your balance.",
+  "walletBuySparkTitle": "Top up PawSpark",
   "walletPackTotalSpark": "{count} PawSpark",
   "@walletPackTotalSpark": {
     "placeholders": {
@@ -142,6 +142,17 @@
       "price": {}
     }
   },
+  "walletPackDetailsAction": "Details",
+  "walletPackDetailSubtitle": "Check what is included before opening checkout.",
+  "walletCheckoutHint": "Payment opens in secure Stripe Checkout. PetMagic does not store your card details.",
+  "walletCheckoutSucceeded": "Payment confirmed. +{spark} PawSpark is already in your wallet.",
+  "@walletCheckoutSucceeded": {
+    "placeholders": {
+      "spark": {
+        "type": "int"
+      }
+    }
+  },
   "walletPackBreakdown": "{base} base + {bonus} bonus",
   "@walletPackBreakdown": {
     "placeholders": {
@@ -165,31 +176,9 @@
       "date": {}
     }
   },
+  "walletPurchaseJustConfirmed": "Just confirmed",
   "walletUnavailableTitle": "Wallet is temporarily unavailable",
   "walletTryAgainAction": "Try again",
-  "walletPaymentMethodsTitle": "Payment methods",
-  "walletNoSavedCards": "No saved cards yet.",
-  "walletOpeningStripe": "Opening Stripe",
-  "walletAddCard": "Add card",
-  "walletRemoveCardTooltip": "Remove card",
-  "walletStripeCheckout": "Stripe Checkout",
-  "walletPayWithCard": "Pay with •••• {last4}",
-  "@walletPayWithCard": {
-    "placeholders": {
-      "last4": {}
-    }
-  },
-  "walletDefaultCard": "Default card",
-  "walletSavedCard": "Saved card",
-  "walletDefaultSuffix": " • default",
-  "walletExpires": "Expires {month}/{year}{suffix}",
-  "@walletExpires": {
-    "placeholders": {
-      "month": {},
-      "year": {},
-      "suffix": {}
-    }
-  },
   "walletPending": "Pending",
   "walletSourcePackPurchase": "Added funds",
   "walletSourceGenerationSpend": "Template generation",
@@ -201,18 +190,26 @@
   "walletPurchaseCompleted": "Completed",
   "walletPurchaseFailed": "Failed",
   "walletPartialActivityUnavailable": "Your balance is already available. History and some wallet actions will refresh a bit later.",
-  "walletPaymentMethodUnavailableError": "The selected saved card is no longer available. Choose another card or use Stripe Checkout.",
   "walletPaymentGatewayUnavailableError": "Payment is temporarily unavailable. Please try Stripe Checkout again in a moment.",
   "walletPackUnavailableError": "This PawSpark pack is no longer available.",
   "walletRedeemCodeNotFoundError": "Redeem code was not found.",
   "walletRedeemCodeAlreadyUsedError": "This redeem code was already used.",
   "walletRedeemCodeExpiredError": "Redeem code has expired.",
+  "walletRedeemCodeInactiveError": "This redeem code is not available right now.",
+  "walletRedeemCodeExhaustedError": "This redeem code has reached its usage limit.",
+  "walletRedeemCodeUserLimitError": "This user has already reached the redeem limit for this code.",
+  "walletRedeemOfflineError": "No internet connection. Check your network and try again.",
+  "walletRedeemServerError": "The promo code could not be applied because of a server error. Please try again later.",
   "walletInsufficientBalanceError": "Not enough PawSpark for this operation.",
   "walletUnavailableError": "Wallet data is temporarily unavailable. Please try again in a moment.",
-  "walletWeeklyNotReadyError": "Weekly reward is not ready yet.",
   "walletRedeemSheetTitle": "Redeem code",
+  "walletRedeemSheetSubtitle": "A code can be used once while it is active and not expired.",
+  "walletRedeemInputLabel": "Promo code",
   "walletRedeemHint": "WELCOME-100",
+  "walletRedeemCancelAction": "Cancel",
   "walletApplyCode": "Apply code",
+  "walletRedeemSuccessMessage": "Promo code applied successfully. Your balance is already updated.",
+  "walletRedeemSuccessAction": "Done",
   "profileStatsSectionTitle": "Account stats",
   "profileStatBalanceLabel": "Balance",
   "profileStatPlanLabel": "Plan",
@@ -269,6 +266,14 @@
   "premiumPaymentStripe": "Card via Stripe",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
+  "premiumPaymentRecommendedBadge": "Recommended",
+  "premiumPaymentDefaultBadge": "Default",
+  "paymentBonusPercentBadge": "+{percent}% bonus",
+  "@paymentBonusPercentBadge": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
   "premiumComparisonTitle": "What changes with Premium",
   "premiumFreeColumn": "Free",
   "premiumPremiumColumn": "Premium",
@@ -286,9 +291,19 @@
   "premiumComparisonHighQuality": "High quality export",
   "premiumComparisonNoWatermark": "No watermark",
   "premiumComparisonPrioritySupport": "Priority support",
+  "premiumFreeSummaryTokens": "20 tokens per month",
+  "premiumFreeSummaryWatermark": "Watermark on content",
+  "premiumFreeSummaryTemplates": "Basic templates",
+  "premiumFreeSummaryQuality": "Standard quality",
   "premiumSecurePaymentTitle": "Secure payment",
   "premiumSecurePaymentSubtitle": "Manage or cancel your subscription from billing settings at any time.",
   "premiumContinueAction": "Start Premium",
+  "externalCheckoutStripeTitle": "Payment via Stripe",
+  "externalCheckoutStripeMessage": "Stripe Checkout opens in a secure in-app browser. After you return to PetMagic, we automatically check the payment status before updating your access.",
+  "externalCheckoutContinueAction": "Continue",
+  "externalCheckoutCheckingTitle": "Checking payment",
+  "externalCheckoutCheckingMessage": "We are waiting for Stripe confirmation. This usually takes a few seconds.",
+  "externalCheckoutPendingVerificationMessage": "Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.",
   "premiumContinueWithPlan": "Continue with {plan} — {price} {period}",
   "@premiumContinueWithPlan": {
     "placeholders": {
@@ -306,6 +321,9 @@
   "premiumStorePurchaseInvalid": "The purchase could not be verified.",
   "premiumStorePurchaseInactive": "This subscription is no longer active.",
   "premiumPurchaseActivated": "Premium is active now.",
+  "premiumRecentlyActivatedBadge": "Just activated",
+  "premiumRecentlyActivatedTitle": "Premium confirmed",
+  "premiumRecentlyActivatedMessage": "Your Premium access is active on this device and ready to use.",
   "premiumPurchaseCancelled": "Purchase was cancelled.",
   "premiumCheckoutFailed": "Premium checkout is temporarily unavailable.",
   "premiumManageFailed": "Billing management is not available yet for this account.",
@@ -545,6 +563,7 @@
   "authExternalLaunchFailed": "Could not open the sign-in page.",
   "authExternalCallbackFailed": "We could not finish sign-in in the app.",
   "authExternalSessionExpired": "This sign-in session expired. Please try again.",
+  "profileActionFailed": "We could not complete this action. Please try again.",
   "authSecurePrivateTitle": "Secure & Private",
   "authSecurePrivateSubtitle": "Your data stays protected.",
   "authFastEasyTitle": "Fast & Easy",

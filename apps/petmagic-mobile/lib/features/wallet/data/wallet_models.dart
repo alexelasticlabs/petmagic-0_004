@@ -101,6 +101,94 @@ class CurrencyPackModel {
   }
 }
 
+class WalletPaymentMethodModel {
+  const WalletPaymentMethodModel({
+    required this.provider,
+    required this.purchaseChannel,
+    required this.platform,
+    required this.region,
+    required this.isEnabled,
+    required this.isSelectedByDefault,
+    required this.requiresExternalWarning,
+    required this.requiresStoreDisclosure,
+    required this.isRecommended,
+    required this.bonusTokensPercent,
+    this.displayLabel,
+    this.displaySubtitle,
+    this.warningTitle,
+    this.warningMessage,
+    this.notes,
+  });
+
+  final String provider;
+  final String purchaseChannel;
+  final String platform;
+  final String region;
+  final bool isEnabled;
+  final bool isSelectedByDefault;
+  final bool requiresExternalWarning;
+  final bool requiresStoreDisclosure;
+  final bool isRecommended;
+  final int bonusTokensPercent;
+  final String? displayLabel;
+  final String? displaySubtitle;
+  final String? warningTitle;
+  final String? warningMessage;
+  final String? notes;
+
+  bool get isStripe => provider == 'stripe';
+
+  factory WalletPaymentMethodModel.fromJson(Map<String, dynamic> json) {
+    return WalletPaymentMethodModel(
+      provider: json['provider'] as String? ?? 'stripe',
+      purchaseChannel: json['purchaseChannel'] as String? ?? 'web',
+      platform: json['platform'] as String? ?? '',
+      region: json['region'] as String? ?? '',
+      isEnabled: json['isEnabled'] as bool? ?? false,
+      isSelectedByDefault: json['isSelectedByDefault'] as bool? ?? false,
+      requiresExternalWarning:
+          json['requiresExternalWarning'] as bool? ?? false,
+      requiresStoreDisclosure:
+          json['requiresStoreDisclosure'] as bool? ?? false,
+      isRecommended: json['isRecommended'] as bool? ?? false,
+      bonusTokensPercent: (json['bonusTokensPercent'] as num?)?.toInt() ?? 0,
+      displayLabel: json['displayLabel'] as String?,
+      displaySubtitle: json['displaySubtitle'] as String?,
+      warningTitle: json['warningTitle'] as String?,
+      warningMessage: json['warningMessage'] as String?,
+      notes: json['notes'] as String?,
+    );
+  }
+}
+
+class WalletCheckoutConfigModel {
+  const WalletCheckoutConfigModel({
+    required this.packs,
+    required this.paymentMethods,
+    required this.externalPaymentWarningRequired,
+  });
+
+  final List<CurrencyPackModel> packs;
+  final List<WalletPaymentMethodModel> paymentMethods;
+  final bool externalPaymentWarningRequired;
+
+  factory WalletCheckoutConfigModel.fromJson(Map<String, dynamic> json) {
+    return WalletCheckoutConfigModel(
+      packs: (json['packs'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(CurrencyPackModel.fromJson)
+          .toList(growable: false),
+      paymentMethods:
+          (json['availablePaymentMethods'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(WalletPaymentMethodModel.fromJson)
+              .toList(growable: false),
+      externalPaymentWarningRequired:
+          json['externalPaymentWarningRequired'] as bool? ?? false,
+    );
+  }
+}
+
 class PurchaseCheckoutModel {
   const PurchaseCheckoutModel({
     required this.orderId,
@@ -120,63 +208,6 @@ class PurchaseCheckoutModel {
       paymentProvider: json['paymentProvider'] as String? ?? '',
       checkoutUrl: json['checkoutUrl'] as String? ?? '',
       status: json['status'] as String? ?? '',
-    );
-  }
-}
-
-class PaymentMethodModel {
-  const PaymentMethodModel({
-    required this.paymentMethodId,
-    required this.paymentProvider,
-    required this.brand,
-    required this.last4,
-    required this.isDefault,
-    required this.createdAtUtc,
-    this.expMonth,
-    this.expYear,
-  });
-
-  final String paymentMethodId;
-  final String paymentProvider;
-  final String brand;
-  final String last4;
-  final int? expMonth;
-  final int? expYear;
-  final bool isDefault;
-  final DateTime? createdAtUtc;
-
-  factory PaymentMethodModel.fromJson(Map<String, dynamic> json) {
-    return PaymentMethodModel(
-      paymentMethodId: json['paymentMethodId'] as String? ?? '',
-      paymentProvider: json['paymentProvider'] as String? ?? '',
-      brand: json['brand'] as String? ?? 'card',
-      last4: json['last4'] as String? ?? '',
-      expMonth: (json['expMonth'] as num?)?.toInt(),
-      expYear: (json['expYear'] as num?)?.toInt(),
-      isDefault: json['isDefault'] as bool? ?? false,
-      createdAtUtc: json['createdAtUtc'] is String
-          ? DateTime.tryParse(json['createdAtUtc'] as String)
-          : null,
-    );
-  }
-}
-
-class PaymentMethodSetupModel {
-  const PaymentMethodSetupModel({
-    required this.paymentProvider,
-    required this.externalSetupId,
-    required this.checkoutUrl,
-  });
-
-  final String paymentProvider;
-  final String externalSetupId;
-  final String checkoutUrl;
-
-  factory PaymentMethodSetupModel.fromJson(Map<String, dynamic> json) {
-    return PaymentMethodSetupModel(
-      paymentProvider: json['paymentProvider'] as String? ?? '',
-      externalSetupId: json['externalSetupId'] as String? ?? '',
-      checkoutUrl: json['checkoutUrl'] as String? ?? '',
     );
   }
 }

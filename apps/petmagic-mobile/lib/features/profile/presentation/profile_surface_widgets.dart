@@ -141,6 +141,89 @@ class ProfileMessageCard extends StatelessWidget {
   }
 }
 
+class ProfileProgressCard extends StatelessWidget {
+  const ProfileProgressCard({
+    required this.title,
+    required this.message,
+    required this.tone,
+    this.icon = Icons.shield_outlined,
+    this.isLoading = false,
+    super.key,
+  });
+
+  final String title;
+  final String message;
+  final Color tone;
+  final IconData icon;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: tone.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: tone.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: isLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator.adaptive(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(tone),
+                      ),
+                    )
+                  : Icon(icon, size: 18, color: tone),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 12.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ProfileAvatarBadge extends StatelessWidget {
   const ProfileAvatarBadge({
     required this.imageUrl,
@@ -245,22 +328,33 @@ class ProfileStatusPill extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (leading != null) ...[
-              Icon(leading, size: 13, color: fg),
-              const SizedBox(width: 6),
-            ],
-            Text(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final labelText = Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: fg,
                 fontSize: 11.8,
                 fontWeight: FontWeight.w700,
               ),
-            ),
-          ],
+            );
+
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (leading != null) ...[
+                  Icon(leading, size: 13, color: fg),
+                  const SizedBox(width: 6),
+                ],
+                if (constraints.hasBoundedWidth)
+                  Flexible(child: labelText)
+                else
+                  labelText,
+              ],
+            );
+          },
         ),
       ),
     );

@@ -56,6 +56,8 @@ class PasswordResetState {
 }
 
 class PasswordResetController extends Notifier<PasswordResetState> {
+  static const _genericActionError = 'profile.action_failed';
+
   late final ProfileRepository _repository;
 
   @override
@@ -117,7 +119,10 @@ class PasswordResetController extends Notifier<PasswordResetState> {
       );
       return true;
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(error.message);
+      return false;
+    } catch (_) {
+      _setFailure(_genericActionError);
       return false;
     }
   }
@@ -160,8 +165,19 @@ class PasswordResetController extends Notifier<PasswordResetState> {
       );
       return true;
     } on AppException catch (error) {
-      state = state.copyWith(isSaving: false, errorMessage: error.message);
+      _setFailure(error.message);
+      return false;
+    } catch (_) {
+      _setFailure(_genericActionError);
       return false;
     }
+  }
+
+  void _setFailure(String message) {
+    state = state.copyWith(
+      isSaving: false,
+      errorMessage: message,
+      clearSuccess: true,
+    );
   }
 }

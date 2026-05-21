@@ -12,7 +12,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navTemplates => 'Templates';
 
   @override
-  String get navCreations => 'Creations';
+  String get navCreations => 'Gallery';
 
   @override
   String get navProfile => 'Profile';
@@ -189,10 +189,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profilePremiumOpenAction => 'Upgrade';
 
   @override
+  String get profileSubscriptionTitle => 'My subscription';
+
+  @override
+  String get profileSubscriptionStatusLabel => 'Status';
+
+  @override
+  String get profileSubscriptionProviderLabel => 'Provider';
+
+  @override
+  String get profileSubscriptionNextBillingLabel => 'Next billing date';
+
+  @override
+  String get profileSubscriptionTokensLabel => 'Tokens available';
+
+  @override
   String get profileWalletTitle => 'Wallet';
 
   @override
   String get profileWalletHistoryHint => 'Open balance, purchases and history.';
+
+  @override
+  String get walletPageTitle => 'PawSpark wallet';
+
+  @override
+  String get walletPageSubtitle =>
+      'Balance, promo codes, ad bonus, and PawSpark top-ups.';
 
   @override
   String get profileWalletPreviewEyebrow => 'PawSpark';
@@ -229,17 +251,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletRefreshTooltip => 'Refresh wallet';
 
   @override
-  String get walletBalanceTitle => 'Available for generation';
+  String get walletBalanceTitle => 'Ready for photos and videos';
 
   @override
-  String get walletBalanceEyebrow => 'Balance';
+  String get walletBalanceEyebrow => 'Current balance';
 
   @override
   String get walletBalanceUnit => 'PawSpark';
 
   @override
   String get walletBalanceExplanation =>
-      'PawSpark is the in-app currency used for photo and video generations.';
+      'PawSpark is spent only inside PetMagic: generations, bonus actions, and new formats.';
 
   @override
   String get walletPremiumStatus => 'Premium wallet';
@@ -248,54 +270,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletFreeStatus => 'Free wallet';
 
   @override
-  String walletSavedCardsCount(Object count) {
-    return '$count saved cards';
-  }
-
-  @override
-  String get walletWeeklyReady => 'Weekly ready';
-
-  @override
-  String get walletWeeklyPending => 'Weekly pending';
-
-  @override
   String walletAdRewardsCount(Object count) {
     return '$count ad rewards';
   }
 
   @override
-  String get walletQuickActionsTitle => 'Wallet tools';
+  String get walletQuickActionsTitle => 'Promo codes';
 
   @override
-  String get walletPaymentMethodsAction => 'Payment methods';
+  String get walletRedeemAction => 'Redeem promo code';
 
   @override
-  String get walletRedeemAction => 'Redeem code';
-
-  @override
-  String get walletRewardsTitle => 'Rewards and bonuses';
-
-  @override
-  String get walletWeeklyRewardAction => 'Weekly reward';
-
-  @override
-  String get walletRewardReadyDescription =>
-      'You can claim it now and top up your balance right away.';
-
-  @override
-  String get walletRewardPendingDescription =>
-      'It will unlock later. We keep the status visible without showing a scary error.';
+  String get walletRewardsTitle => 'Ad bonus';
 
   @override
   String get walletAdRewardAction => 'Ad reward';
 
   @override
-  String walletAdRewardDescription(Object count) {
-    return 'Available today: $count. Use it when you need a quick PawSpark top-up.';
+  String get walletAdRewardCompactTitle => 'Quick ad bonus';
+
+  @override
+  String get walletAdRewardCompactDescription =>
+      'Watch a short ad and add PawSpark without paying.';
+
+  @override
+  String walletAdRewardRemaining(Object count) {
+    return 'Left today: $count';
   }
 
   @override
-  String get walletBuySparkTitle => 'Buy PawSpark';
+  String get walletWatchAdAction => 'Watch ad';
+
+  @override
+  String get walletPromoTitle => 'Have a promo code?';
+
+  @override
+  String get walletPromoSubtitle =>
+      'Enter a code from PetMagic and add PawSpark to your balance.';
+
+  @override
+  String get walletBuySparkTitle => 'Top up PawSpark';
 
   @override
   String walletPackTotalSpark(Object count) {
@@ -329,6 +343,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get walletPackDetailsAction => 'Details';
+
+  @override
+  String get walletPackDetailSubtitle =>
+      'Check what is included before opening checkout.';
+
+  @override
+  String get walletCheckoutHint =>
+      'Payment opens in secure Stripe Checkout. PetMagic does not store your card details.';
+
+  @override
+  String walletCheckoutSucceeded(int spark) {
+    return 'Payment confirmed. +$spark PawSpark is already in your wallet.';
+  }
+
+  @override
   String walletPackBreakdown(Object base, Object bonus) {
     return '$base base + $bonus bonus';
   }
@@ -353,47 +383,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get walletPurchaseJustConfirmed => 'Just confirmed';
+
+  @override
   String get walletUnavailableTitle => 'Wallet is temporarily unavailable';
 
   @override
   String get walletTryAgainAction => 'Try again';
-
-  @override
-  String get walletPaymentMethodsTitle => 'Payment methods';
-
-  @override
-  String get walletNoSavedCards => 'No saved cards yet.';
-
-  @override
-  String get walletOpeningStripe => 'Opening Stripe';
-
-  @override
-  String get walletAddCard => 'Add card';
-
-  @override
-  String get walletRemoveCardTooltip => 'Remove card';
-
-  @override
-  String get walletStripeCheckout => 'Stripe Checkout';
-
-  @override
-  String walletPayWithCard(Object last4) {
-    return 'Pay with •••• $last4';
-  }
-
-  @override
-  String get walletDefaultCard => 'Default card';
-
-  @override
-  String get walletSavedCard => 'Saved card';
-
-  @override
-  String get walletDefaultSuffix => ' • default';
-
-  @override
-  String walletExpires(Object month, Object year, Object suffix) {
-    return 'Expires $month/$year$suffix';
-  }
 
   @override
   String get walletPending => 'Pending';
@@ -430,10 +426,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your balance is already available. History and some wallet actions will refresh a bit later.';
 
   @override
-  String get walletPaymentMethodUnavailableError =>
-      'The selected saved card is no longer available. Choose another card or use Stripe Checkout.';
-
-  @override
   String get walletPaymentGatewayUnavailableError =>
       'Payment is temporarily unavailable. Please try Stripe Checkout again in a moment.';
 
@@ -452,6 +444,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletRedeemCodeExpiredError => 'Redeem code has expired.';
 
   @override
+  String get walletRedeemCodeInactiveError =>
+      'This redeem code is not available right now.';
+
+  @override
+  String get walletRedeemCodeExhaustedError =>
+      'This redeem code has reached its usage limit.';
+
+  @override
+  String get walletRedeemCodeUserLimitError =>
+      'This user has already reached the redeem limit for this code.';
+
+  @override
+  String get walletRedeemOfflineError =>
+      'No internet connection. Check your network and try again.';
+
+  @override
+  String get walletRedeemServerError =>
+      'The promo code could not be applied because of a server error. Please try again later.';
+
+  @override
   String get walletInsufficientBalanceError =>
       'Not enough PawSpark for this operation.';
 
@@ -460,16 +472,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'Wallet data is temporarily unavailable. Please try again in a moment.';
 
   @override
-  String get walletWeeklyNotReadyError => 'Weekly reward is not ready yet.';
+  String get walletRedeemSheetTitle => 'Redeem code';
 
   @override
-  String get walletRedeemSheetTitle => 'Redeem code';
+  String get walletRedeemSheetSubtitle =>
+      'A code can be used once while it is active and not expired.';
+
+  @override
+  String get walletRedeemInputLabel => 'Promo code';
 
   @override
   String get walletRedeemHint => 'WELCOME-100';
 
   @override
+  String get walletRedeemCancelAction => 'Cancel';
+
+  @override
   String get walletApplyCode => 'Apply code';
+
+  @override
+  String get walletRedeemSuccessMessage =>
+      'Promo code applied successfully. Your balance is already updated.';
+
+  @override
+  String get walletRedeemSuccessAction => 'Done';
 
   @override
   String get profileStatsSectionTitle => 'Account stats';
@@ -589,6 +615,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
+  String get premiumPaymentRecommendedBadge => 'Recommended';
+
+  @override
+  String get premiumPaymentDefaultBadge => 'Default';
+
+  @override
+  String paymentBonusPercentBadge(Object percent) {
+    return '+$percent% bonus';
+  }
+
+  @override
   String get premiumComparisonTitle => 'What changes with Premium';
 
   @override
@@ -627,6 +664,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumComparisonPrioritySupport => 'Priority support';
 
   @override
+  String get premiumFreeSummaryTokens => '20 tokens per month';
+
+  @override
+  String get premiumFreeSummaryWatermark => 'Watermark on content';
+
+  @override
+  String get premiumFreeSummaryTemplates => 'Basic templates';
+
+  @override
+  String get premiumFreeSummaryQuality => 'Standard quality';
+
+  @override
   String get premiumSecurePaymentTitle => 'Secure payment';
 
   @override
@@ -635,6 +684,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumContinueAction => 'Start Premium';
+
+  @override
+  String get externalCheckoutStripeTitle => 'Payment via Stripe';
+
+  @override
+  String get externalCheckoutStripeMessage =>
+      'Stripe Checkout opens in a secure in-app browser. After you return to PetMagic, we automatically check the payment status before updating your access.';
+
+  @override
+  String get externalCheckoutContinueAction => 'Continue';
+
+  @override
+  String get externalCheckoutCheckingTitle => 'Checking payment';
+
+  @override
+  String get externalCheckoutCheckingMessage =>
+      'We are waiting for Stripe confirmation. This usually takes a few seconds.';
+
+  @override
+  String get externalCheckoutPendingVerificationMessage =>
+      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -673,6 +743,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumPurchaseActivated => 'Premium is active now.';
+
+  @override
+  String get premiumRecentlyActivatedBadge => 'Just activated';
+
+  @override
+  String get premiumRecentlyActivatedTitle => 'Premium confirmed';
+
+  @override
+  String get premiumRecentlyActivatedMessage =>
+      'Your Premium access is active on this device and ready to use.';
 
   @override
   String get premiumPurchaseCancelled => 'Purchase was cancelled.';
@@ -1468,6 +1548,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This sign-in session expired. Please try again.';
 
   @override
+  String get profileActionFailed =>
+      'We could not complete this action. Please try again.';
+
+  @override
   String get authSecurePrivateTitle => 'Secure & Private';
 
   @override
@@ -1526,7 +1610,7 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   String get navTemplates => 'Templates';
 
   @override
-  String get navCreations => 'Creations';
+  String get navCreations => 'Gallery';
 
   @override
   String get navProfile => 'Profile';

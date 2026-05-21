@@ -37,6 +37,8 @@ abstract class ExternalAuthRepository {
   Future<AuthSession> authenticate(ExternalAuthProvider provider);
 
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider);
+
+  Future<void> clearSession(ExternalAuthProvider provider);
 }
 
 class MobileExternalAuthRepository implements ExternalAuthRepository {
@@ -87,6 +89,15 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) {
     return _linkWithBrowserFlow(provider);
+  }
+
+  @override
+  Future<void> clearSession(ExternalAuthProvider provider) async {
+    if (provider != ExternalAuthProvider.google) {
+      return;
+    }
+
+    await _resetGoogleSession(GoogleSignIn(scopes: const ['email']));
   }
 
   Future<AuthSession> _authenticateWithNativeGoogle() async {

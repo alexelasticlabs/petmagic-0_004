@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
@@ -10,10 +11,18 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_controller
 final premiumControllerProvider =
     NotifierProvider<PremiumController, PremiumState>(PremiumController.new);
 
+final premiumSubscriptionSummaryProvider =
+    FutureProvider.autoDispose<PremiumStatusModel>((ref) async {
+      final repository = ref.watch(premiumRepositoryProvider);
+      return repository.fetchStatus();
+    });
+
 class PremiumState {
   const PremiumState({
     this.plans = const [],
+    this.paymentMethods = const [],
     this.status,
+    this.legalTexts,
     this.selectedPlanCode = 'yearly',
     this.selectedProvider = PremiumPaymentProvider.stripe,
     this.isLoading = false,
@@ -28,7 +37,9 @@ class PremiumState {
   });
 
   final List<PremiumPlanModel> plans;
+  final List<PremiumPaymentMethodModel> paymentMethods;
   final PremiumStatusModel? status;
+  final PremiumLegalTextsModel? legalTexts;
   final String selectedPlanCode;
   final PremiumPaymentProvider selectedProvider;
   final bool isLoading;
@@ -55,9 +66,24 @@ class PremiumState {
 
   bool get isInitialLoading => isLoading && plans.isEmpty;
 
+  PremiumPaymentMethodModel? get selectedPaymentMethod {
+    for (final method in paymentMethods) {
+      if (method.provider == selectedProvider && method.isEnabled) {
+        return method;
+      }
+    }
+
+    return null;
+  }
+
   bool get canStartCheckout {
     final plan = selectedPlan;
     if (plan == null) {
+      return false;
+    }
+
+    final paymentMethod = selectedPaymentMethod;
+    if (paymentMethod == null) {
       return false;
     }
 
@@ -72,8 +98,15 @@ class PremiumState {
   }
 
   bool isProviderAvailable(PremiumPaymentProvider provider) {
+    final paymentMethod = paymentMethods.where(
+      (method) => method.provider == provider,
+    );
+    if (paymentMethod.isEmpty) {
+      return false;
+    }
+
     if (provider == PremiumPaymentProvider.stripe) {
-      return true;
+      return paymentMethod.any((method) => method.isEnabled);
     }
 
     final plan = selectedPlan;
@@ -84,19 +117,39 @@ class PremiumState {
   }
 
   List<PremiumPaymentProvider> get availableProviders {
-    final providers = <PremiumPaymentProvider>[PremiumPaymentProvider.stripe];
-    if (Platform.isAndroid) {
-      providers.add(PremiumPaymentProvider.googlePlay);
+    final providers = <PremiumPaymentProvider>[];
+    for (final method in paymentMethods) {
+      if (method.isEnabled && !providers.contains(method.provider)) {
+        providers.add(method.provider);
+      }
     }
-    if (Platform.isIOS) {
-      providers.add(PremiumPaymentProvider.appStore);
-    }
+
     return providers;
+  }
+
+  bool get showsExternalCheckoutWarning =>
+      selectedPaymentMethod?.requiresExternalWarning == true;
+
+  String get legalNotice {
+    final paymentMethod = selectedPaymentMethod;
+    if (legalTexts == null || paymentMethod == null) {
+      return '';
+    }
+
+    if (paymentMethod.isStoreNative) {
+      return legalTexts!.storeNotice;
+    }
+
+    return paymentMethod.provider == PremiumPaymentProvider.stripe
+        ? legalTexts!.stripeNotice
+        : legalTexts!.externalCheckoutNotice;
   }
 
   PremiumState copyWith({
     List<PremiumPlanModel>? plans,
+    List<PremiumPaymentMethodModel>? paymentMethods,
     PremiumStatusModel? status,
+    PremiumLegalTextsModel? legalTexts,
     String? selectedPlanCode,
     PremiumPaymentProvider? selectedProvider,
     bool? isLoading,
@@ -114,7 +167,9 @@ class PremiumState {
   }) {
     return PremiumState(
       plans: plans ?? this.plans,
+      paymentMethods: paymentMethods ?? this.paymentMethods,
       status: status ?? this.status,
+      legalTexts: legalTexts ?? this.legalTexts,
       selectedPlanCode: selectedPlanCode ?? this.selectedPlanCode,
       selectedProvider: selectedProvider ?? this.selectedProvider,
       isLoading: isLoading ?? this.isLoading,
@@ -160,13 +215,16 @@ class PremiumController extends Notifier<PremiumState> {
 
     try {
       final results = await Future.wait<Object>([
-        _repository.fetchPlans(),
+        _repository.fetchPaywallConfig(
+          locale: WidgetsBinding.instance.platformDispatcher.locale,
+        ),
         _repository.fetchStatus(),
       ]);
 
-      final plans = results[0] as List<PremiumPlanModel>;
+      final config = results[0] as PremiumPaywallConfigModel;
       final status = results[1] as PremiumStatusModel;
       final storeProvider = _platformStoreProvider();
+      final plans = config.plans;
       var storeAvailable = false;
       var availableStoreProductIds = <String>{};
 
@@ -185,16 +243,41 @@ class PremiumController extends Notifier<PremiumState> {
       }
 
       final selectedPlanCode =
-          plans.any((plan) => plan.planCode == state.selectedPlanCode)
+          plans.any((plan) => plan.planCode == config.recommendedPlanCode)
+          ? config.recommendedPlanCode!
+          : plans.any((plan) => plan.planCode == state.selectedPlanCode)
           ? state.selectedPlanCode
           : plans.isEmpty
           ? state.selectedPlanCode
           : plans.last.planCode;
 
+      final enabledMethods = config.paymentMethods
+          .where((method) => method.isEnabled)
+          .toList(growable: false);
+      final configuredProviders = enabledMethods
+          .map((method) => method.provider)
+          .toList(growable: false);
+      final defaultProvider = enabledMethods
+          .where((method) => method.isSelectedByDefault)
+          .map((method) => method.provider)
+          .cast<PremiumPaymentProvider?>()
+          .firstOrNull;
+
+      final selectedProvider =
+          configuredProviders.contains(state.selectedProvider)
+          ? state.selectedProvider
+          : defaultProvider ??
+                (configuredProviders.isEmpty
+                    ? state.selectedProvider
+                    : configuredProviders.first);
+
       state = state.copyWith(
         plans: plans,
+        paymentMethods: config.paymentMethods,
         status: status,
+        legalTexts: config.legalTexts,
         selectedPlanCode: selectedPlanCode,
+        selectedProvider: selectedProvider,
         isStoreAvailable: storeAvailable,
         availableStoreProductIds: availableStoreProductIds,
         isLoading: false,
@@ -236,7 +319,10 @@ class PremiumController extends Notifier<PremiumState> {
 
     try {
       if (state.selectedProvider == PremiumPaymentProvider.stripe) {
-        final checkout = await _repository.createStripeCheckout(plan);
+        final checkout = await _repository.createStripeCheckout(
+          plan,
+          WidgetsBinding.instance.platformDispatcher.locale,
+        );
         state = state.copyWith(
           isBuying: false,
           externalUrl: checkout.checkoutUrl,
@@ -267,8 +353,17 @@ class PremiumController extends Notifier<PremiumState> {
     );
 
     try {
-      final portal = await _repository.createBillingPortal();
-      state = state.copyWith(isManaging: false, externalUrl: portal.portalUrl);
+      final status = state.status;
+      if (status == null) {
+        state = state.copyWith(
+          isManaging: false,
+          errorMessage: 'premium.manage_failed',
+        );
+        return;
+      }
+
+      final managementUrl = await _repository.createManagementUrl(status);
+      state = state.copyWith(isManaging: false, externalUrl: managementUrl);
     } catch (error) {
       state = state.copyWith(isManaging: false, errorMessage: error.toString());
     }

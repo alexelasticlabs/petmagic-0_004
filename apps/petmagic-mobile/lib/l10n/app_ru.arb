@@ -1,7 +1,7 @@
 {
   "@@locale": "ru",
   "navTemplates": "Шаблоны",
-  "navCreations": "Создания",
+  "navCreations": "Галерея",
   "navProfile": "Профиль",
   "comingSoonMessage": "Раздел подготовлен для следующей продуктовой волны.",
   "createMagicTitle": "Создай магию",
@@ -58,8 +58,15 @@
   "profilePremiumBenefitPriorityGeneration": "Приоритетная генерация",
   "profilePremiumBenefitNoWatermark": "Без водяного знака",
   "profilePremiumOpenAction": "Открыть Premium",
+  "profileSubscriptionTitle": "Моя подписка",
+  "profileSubscriptionStatusLabel": "Статус",
+  "profileSubscriptionProviderLabel": "Провайдер",
+  "profileSubscriptionNextBillingLabel": "Следующее списание",
+  "profileSubscriptionTokensLabel": "Доступно токенов",
   "profileWalletTitle": "Кошелек",
   "profileWalletHistoryHint": "Баланс, покупки и история операций.",
+  "walletPageTitle": "PawSpark кошелек",
+  "walletPageSubtitle": "Баланс, промокоды, бонус за рекламу и пополнение PawSpark.",
   "profileWalletPreviewEyebrow": "PawSpark",
   "profileWalletPreviewSubtitle": "Внутренняя валюта для генераций и бонусов.",
   "profileWalletPreviewAction": "Открыть",
@@ -75,41 +82,34 @@
   "profileWalletEmptyHint": "Откройте баланс и историю",
   "walletDataUnavailableFallback": "Данные кошелька сейчас недоступны.",
   "walletRefreshTooltip": "Обновить кошелек",
-  "walletBalanceTitle": "Доступно для генераций",
-  "walletBalanceEyebrow": "Баланс",
+  "walletBalanceTitle": "Доступно для фото и видео",
+  "walletBalanceEyebrow": "Текущий баланс",
   "walletBalanceUnit": "PawSpark",
-  "walletBalanceExplanation": "PawSpark — внутренняя валюта для фото- и видео-генераций.",
+  "walletBalanceExplanation": "PawSpark тратится только внутри PetMagic: на генерации, бонусные действия и новые форматы.",
   "walletPremiumStatus": "Premium-кошелек",
   "walletFreeStatus": "Базовый кошелек",
-  "walletSavedCardsCount": "Сохраненных карт: {count}",
-  "@walletSavedCardsCount": {
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "walletWeeklyReady": "Недельная награда доступна",
-  "walletWeeklyPending": "Недельная награда ожидается",
   "walletAdRewardsCount": "Наград за рекламу: {count}",
   "@walletAdRewardsCount": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletQuickActionsTitle": "Инструменты кошелька",
-  "walletPaymentMethodsAction": "Способы оплаты",
-  "walletRedeemAction": "Промокод",
-  "walletRewardsTitle": "Бонусы и награды",
-  "walletWeeklyRewardAction": "Недельная награда",
-  "walletRewardReadyDescription": "Можно забрать прямо сейчас и сразу пополнить баланс.",
-  "walletRewardPendingDescription": "Станет доступна позже. Мы просто покажем статус без лишней тревоги.",
+  "walletQuickActionsTitle": "Промокоды",
+  "walletRedeemAction": "Активировать промокод",
+  "walletRewardsTitle": "Бонус за рекламу",
   "walletAdRewardAction": "Награда за рекламу",
-  "walletAdRewardDescription": "Доступно сегодня: {count}. Подходит для быстрого пополнения PawSpark.",
-  "@walletAdRewardDescription": {
+  "walletAdRewardCompactTitle": "Быстрый бонус за рекламу",
+  "walletAdRewardCompactDescription": "Посмотрите короткую рекламу и получите PawSpark без оплаты.",
+  "walletAdRewardRemaining": "Сегодня осталось: {count}",
+  "@walletAdRewardRemaining": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletBuySparkTitle": "Купить PawSpark",
+  "walletWatchAdAction": "Смотреть рекламу",
+  "walletPromoTitle": "Есть промокод?",
+  "walletPromoSubtitle": "Введите код от команды PetMagic и сразу получите PawSpark на баланс.",
+  "walletBuySparkTitle": "Пополнить PawSpark",
   "walletPackTotalSpark": "{count} PawSpark",
   "@walletPackTotalSpark": {
     "placeholders": {
@@ -142,6 +142,17 @@
       "price": {}
     }
   },
+  "walletPackDetailsAction": "Подробнее",
+  "walletPackDetailSubtitle": "Проверьте состав пакета перед переходом к оплате.",
+  "walletCheckoutHint": "Оплата откроется в защищенном Stripe Checkout. PetMagic не сохраняет данные карты.",
+  "walletCheckoutSucceeded": "Оплата подтверждена. +{spark} PawSpark уже в вашем кошельке.",
+  "@walletCheckoutSucceeded": {
+    "placeholders": {
+      "spark": {
+        "type": "int"
+      }
+    }
+  },
   "walletPackBreakdown": "{base} база + {bonus} бонус",
   "@walletPackBreakdown": {
     "placeholders": {
@@ -165,31 +176,9 @@
       "date": {}
     }
   },
+  "walletPurchaseJustConfirmed": "Только что подтверждено",
   "walletUnavailableTitle": "Кошелек временно недоступен",
   "walletTryAgainAction": "Попробовать снова",
-  "walletPaymentMethodsTitle": "Способы оплаты",
-  "walletNoSavedCards": "Сохраненных карт пока нет.",
-  "walletOpeningStripe": "Открываем Stripe",
-  "walletAddCard": "Добавить карту",
-  "walletRemoveCardTooltip": "Удалить карту",
-  "walletStripeCheckout": "Stripe Checkout",
-  "walletPayWithCard": "Оплатить картой •••• {last4}",
-  "@walletPayWithCard": {
-    "placeholders": {
-      "last4": {}
-    }
-  },
-  "walletDefaultCard": "Карта по умолчанию",
-  "walletSavedCard": "Сохраненная карта",
-  "walletDefaultSuffix": " • основная",
-  "walletExpires": "Действует до {month}/{year}{suffix}",
-  "@walletExpires": {
-    "placeholders": {
-      "month": {},
-      "year": {},
-      "suffix": {}
-    }
-  },
   "walletPending": "Ожидается",
   "walletSourcePackPurchase": "Пополнение",
   "walletSourceGenerationSpend": "Генерация шаблона",
@@ -201,18 +190,26 @@
   "walletPurchaseCompleted": "Завершено",
   "walletPurchaseFailed": "Ошибка",
   "walletPartialActivityUnavailable": "Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.",
-  "walletPaymentMethodUnavailableError": "Выбранная сохраненная карта больше недоступна. Выберите другую карту или используйте Stripe Checkout.",
   "walletPaymentGatewayUnavailableError": "Оплата временно недоступна. Попробуйте Stripe Checkout чуть позже.",
   "walletPackUnavailableError": "Этот набор PawSpark больше недоступен.",
   "walletRedeemCodeNotFoundError": "Промокод не найден.",
   "walletRedeemCodeAlreadyUsedError": "Этот промокод уже использован.",
   "walletRedeemCodeExpiredError": "Срок действия промокода истек.",
+  "walletRedeemCodeInactiveError": "Этот промокод сейчас недоступен.",
+  "walletRedeemCodeExhaustedError": "Лимит активаций этого промокода уже исчерпан.",
+  "walletRedeemCodeUserLimitError": "Для этого пользователя лимит активаций промокода уже исчерпан.",
+  "walletRedeemOfflineError": "Нет соединения с интернетом. Проверьте сеть и попробуйте снова.",
+  "walletRedeemServerError": "Не удалось применить промокод из-за ошибки сервера. Попробуйте позже.",
   "walletInsufficientBalanceError": "Для этой операции недостаточно PawSpark.",
   "walletUnavailableError": "Данные кошелька временно недоступны. Попробуйте еще раз чуть позже.",
-  "walletWeeklyNotReadyError": "Недельная награда пока недоступна.",
   "walletRedeemSheetTitle": "Промокод",
+  "walletRedeemSheetSubtitle": "Код можно использовать один раз, если он активен и не истек.",
+  "walletRedeemInputLabel": "Код промокода",
   "walletRedeemHint": "WELCOME-100",
+  "walletRedeemCancelAction": "Отмена",
   "walletApplyCode": "Применить код",
+  "walletRedeemSuccessMessage": "Промокод успешно применён. Баланс уже обновлён.",
+  "walletRedeemSuccessAction": "Готово",
   "profileStatsSectionTitle": "Статистика аккаунта",
   "profileStatBalanceLabel": "Баланс",
   "profileStatPlanLabel": "Тариф",
@@ -269,6 +266,14 @@
   "premiumPaymentStripe": "Карта через Stripe",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
+  "premiumPaymentRecommendedBadge": "Рекомендуем",
+  "premiumPaymentDefaultBadge": "По умолчанию",
+  "paymentBonusPercentBadge": "+{percent}% бонус",
+  "@paymentBonusPercentBadge": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
   "premiumComparisonTitle": "Что меняется с Premium",
   "premiumFreeColumn": "Бесплатно",
   "premiumPremiumColumn": "Premium",
@@ -286,9 +291,19 @@
   "premiumComparisonHighQuality": "Экспорт высокого качества",
   "premiumComparisonNoWatermark": "Без водяного знака",
   "premiumComparisonPrioritySupport": "Приоритетная поддержка",
+  "premiumFreeSummaryTokens": "20 токенов в месяц",
+  "premiumFreeSummaryWatermark": "Водяной знак",
+  "premiumFreeSummaryTemplates": "Базовые шаблоны",
+  "premiumFreeSummaryQuality": "Стандартное качество",
   "premiumSecurePaymentTitle": "Безопасная оплата",
   "premiumSecurePaymentSubtitle": "Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.",
   "premiumContinueAction": "Получить Premium",
+  "externalCheckoutStripeTitle": "Оплата через Stripe",
+  "externalCheckoutStripeMessage": "Stripe Checkout откроется в защищенном встроенном браузере. После возврата в PetMagic мы автоматически проверим статус оплаты и только потом обновим подписку или баланс.",
+  "externalCheckoutContinueAction": "Продолжить",
+  "externalCheckoutCheckingTitle": "Проверяем оплату",
+  "externalCheckoutCheckingMessage": "Ждем подтверждение от Stripe. Обычно это занимает несколько секунд.",
+  "externalCheckoutPendingVerificationMessage": "Оплата еще не подтверждена. Мы обновим Premium или баланс сразу после webhook от Stripe.",
   "premiumContinueWithPlan": "Продолжить с тарифом {plan} — {price} {period}",
   "@premiumContinueWithPlan": {
     "placeholders": {
@@ -306,6 +321,9 @@
   "premiumStorePurchaseInvalid": "Покупку не удалось подтвердить.",
   "premiumStorePurchaseInactive": "Эта подписка больше не активна.",
   "premiumPurchaseActivated": "Premium уже активен.",
+  "premiumRecentlyActivatedBadge": "Только что активирован",
+  "premiumRecentlyActivatedTitle": "Premium подтвержден",
+  "premiumRecentlyActivatedMessage": "Доступ Premium уже активен на этом устройстве и готов к использованию.",
   "premiumPurchaseCancelled": "Покупка была отменена.",
   "premiumCheckoutFailed": "Premium checkout временно недоступен.",
   "premiumManageFailed": "Управление оплатой пока недоступно для этого аккаунта.",
@@ -545,6 +563,7 @@
   "authExternalLaunchFailed": "Не удалось открыть страницу входа.",
   "authExternalCallbackFailed": "Не удалось завершить вход обратно в приложении.",
   "authExternalSessionExpired": "Сессия внешнего входа истекла. Попробуйте еще раз.",
+  "profileActionFailed": "Не удалось завершить действие. Попробуйте еще раз.",
   "authSecurePrivateTitle": "Безопасно",
   "authSecurePrivateSubtitle": "Ваши данные надежно защищены.",
   "authFastEasyTitle": "Быстро",

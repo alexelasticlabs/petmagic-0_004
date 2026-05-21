@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/data/external_auth_repository.d
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 
 enum ProfileSettingsDetailKind {
@@ -248,7 +249,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
               if (state.errorMessage != null) ...[
                 ProfileGlassCard(
                   child: Text(
-                    state.errorMessage!,
+                    mapProfileFeedbackMessage(state.errorMessage!, text),
                     style: TextStyle(
                       color: colors.danger,
                       fontSize: 15,
@@ -456,7 +457,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
               if (state.errorMessage != null) ...[
                 ProfileGlassCard(
                   child: Text(
-                    state.errorMessage!,
+                    mapProfileFeedbackMessage(state.errorMessage!, text),
                     style: TextStyle(
                       color: colors.danger,
                       fontSize: 15,

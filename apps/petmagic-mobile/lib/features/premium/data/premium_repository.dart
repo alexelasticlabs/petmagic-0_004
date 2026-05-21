@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -31,6 +32,26 @@ class PremiumRepository {
   Stream<List<PurchaseDetails>> get purchaseUpdates =>
       _inAppPurchase.purchaseStream;
 
+  Future<PremiumPaywallConfigModel> fetchPaywallConfig({
+    required Locale locale,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/economy/subscriptions/paywall-config',
+        queryParameters: {
+          'platform': _platformValue(),
+          'appVersion': '1.0.0',
+          'country': locale.countryCode ?? '*',
+          'locale': locale.toLanguageTag(),
+        },
+      );
+
+      return PremiumPaywallConfigModel.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: 'premium.plans_failed');
+    }
+  }
+
   Future<List<PremiumPlanModel>> fetchPlans() async {
     try {
       final response = await _dio.get<List<dynamic>>(
@@ -50,7 +71,7 @@ class PremiumRepository {
   Future<PremiumStatusModel> fetchStatus() async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
-        '/api/economy/premium/status',
+        '/api/economy/me/subscription',
         options: _authOptions(session.accessToken),
       ),
     );
@@ -60,6 +81,7 @@ class PremiumRepository {
 
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
+    Locale locale,
   ) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -67,6 +89,10 @@ class PremiumRepository {
         data: {
           'planCode': plan.planCode,
           'paymentProvider': PremiumPaymentProvider.stripe.value,
+          'platform': _platformValue(),
+          'appVersion': '1.0.0',
+          'country': locale.countryCode ?? '*',
+          'locale': locale.toLanguageTag(),
         },
         options: _authOptions(session.accessToken),
       ),
@@ -85,6 +111,20 @@ class PremiumRepository {
     );
 
     return PremiumBillingPortalModel.fromJson(response.data ?? const {});
+  }
+
+  Future<String> createManagementUrl(PremiumStatusModel status) async {
+    switch (status.manageSubscriptionAction) {
+      case 'AppleSettings':
+        return 'https://apps.apple.com/account/subscriptions';
+      case 'GooglePlaySettings':
+        return 'https://play.google.com/store/account/subscriptions';
+      case 'StripeCustomerPortal':
+        final portal = await createBillingPortal();
+        return portal.portalUrl;
+      default:
+        throw const AppException('premium.manage_failed');
+    }
   }
 
   Future<({bool isAvailable, Set<String> productIds})> fetchStoreAvailability(
@@ -175,6 +215,18 @@ class PremiumRepository {
     );
 
     return PremiumStoreVerificationModel.fromJson(response.data ?? const {});
+  }
+
+  String _platformValue() {
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+
+    return 'web';
   }
 
   Future<void> restoreStorePurchases() {

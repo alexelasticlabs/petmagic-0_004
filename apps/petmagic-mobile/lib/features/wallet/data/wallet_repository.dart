@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
@@ -67,6 +68,26 @@ class WalletRepository {
     }
   }
 
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/economy/wallet/checkout-config',
+        queryParameters: {
+          'platform': _platformValue(),
+          'appVersion': '1.0.0',
+          'country': locale.countryCode ?? '*',
+          'locale': locale.toLanguageTag(),
+        },
+      );
+
+      return WalletCheckoutConfigModel.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: 'wallet.packs_failed');
+    }
+  }
+
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
@@ -85,53 +106,20 @@ class WalletRepository {
     );
   }
 
-  Future<List<PaymentMethodModel>> fetchPaymentMethods() async {
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.get<List<dynamic>>(
-        '/api/economy/payment-methods',
-        options: _authOptions(session.accessToken),
-      ),
-    );
-
-    return (response.data ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(PaymentMethodModel.fromJson)
-        .toList(growable: false);
-  }
-
-  Future<PaymentMethodSetupModel> createPaymentMethodSetup() async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/payment-methods/setup',
-        data: {'paymentProvider': 'stripe'},
-        options: _authOptions(session.accessToken),
-      ),
-    );
-
-    return PaymentMethodSetupModel.fromJson(response.data ?? const {});
-  }
-
-  Future<void> removePaymentMethod(String paymentMethodId) async {
-    await _authorizedRequest<void>(
-      (session) => _dio.delete<void>(
-        '/api/economy/payment-methods/$paymentMethodId',
-        options: _authOptions(session.accessToken),
-      ),
-    );
-  }
-
   Future<PurchaseCheckoutModel> createPurchase(
-    CurrencyPackModel pack, {
-    String? paymentMethodId,
-  }) async {
+    CurrencyPackModel pack,
+    WalletPaymentMethodModel paymentMethod,
+    Locale locale,
+  ) async {
     final payload = <String, Object?>{
       'packId': pack.packId,
       'currencyCode': pack.currencyCode,
-      'paymentProvider': 'stripe',
+      'paymentProvider': paymentMethod.provider,
+      'platform': _platformValue(),
+      'appVersion': '1.0.0',
+      'country': locale.countryCode ?? '*',
+      'locale': locale.toLanguageTag(),
     };
-    if (paymentMethodId != null && paymentMethodId.isNotEmpty) {
-      payload['paymentMethodId'] = paymentMethodId;
-    }
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -142,17 +130,6 @@ class WalletRepository {
     );
 
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});
-  }
-
-  Future<WalletStateModel> claimWeeklyGrant() async {
-    await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/economy/wallet/claim-weekly',
-        options: _authOptions(session.accessToken),
-      ),
-    );
-
-    return fetchWallet();
   }
 
   Future<WalletStateModel> claimAdReward() async {
@@ -220,10 +197,43 @@ class WalletRepository {
     );
   }
 
+  String _platformValue() {
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+
+    return 'web';
+  }
+
   AppException _mapDioException(
     DioException error, {
     required String fallbackMessage,
   }) {
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.response == null) {
+      return AppException(
+        'wallet.network_unavailable',
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    }
+
+    final statusCode = error.response?.statusCode;
+    if (statusCode != null && statusCode >= 500) {
+      return AppException(
+        'wallet.server_unavailable',
+        statusCode: statusCode,
+        cause: error,
+      );
+    }
+
     final responseData = error.response?.data;
     if (responseData is Map<String, dynamic>) {
       final detail = responseData['detail'] as String?;

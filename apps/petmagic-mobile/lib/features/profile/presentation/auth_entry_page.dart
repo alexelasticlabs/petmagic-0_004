@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/data/external_auth_repository.d
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
@@ -510,32 +511,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   }
 
   String _mapErrorMessage(String raw, AppLocalizations text) {
-    switch (raw) {
-      case 'auth.password_mismatch':
-        return text.authPasswordMismatch;
-      case 'auth.password_too_short':
-        return text.authPasswordTooShort;
-      case 'auth.accept_terms_required':
-        return text.authAcceptTermsRequired;
-      case 'auth.legal_documents_unavailable':
-        return text.authLegalUnavailable;
-      case 'auth.external_cancelled':
-        return text.authExternalCancelled;
-      case 'auth.external_callback_failed':
-        return text.authExternalCallbackFailed;
-      case 'auth.external_launch_failed':
-        return text.authExternalLaunchFailed;
-      case 'auth.external_timed_out':
-        return text.authExternalTimedOut;
-      case 'auth.external_ticket_invalid':
-        return text.authExternalSessionExpired;
-      case 'auth.external_not_configured':
-      case 'auth.external_token_invalid':
-      case 'auth.external_invalid':
-        return text.authExternalFailed;
-      default:
-        return raw;
-    }
+    return mapProfileFeedbackMessage(raw, text);
   }
 }
 
