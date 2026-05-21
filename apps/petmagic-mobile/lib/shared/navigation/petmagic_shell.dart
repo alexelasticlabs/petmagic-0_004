@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 
 double petMagicBottomNavInset(BuildContext context) {
   final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
@@ -39,22 +40,24 @@ class _BottomNavBackdrop extends StatelessWidget {
     final colors = context.petMagicColors;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
 
-    return IgnorePointer(
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          height: 84 + bottomPadding,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                colors.backgroundBottom.withValues(alpha: 0),
-                colors.backgroundBottom.withValues(alpha: 0.18),
-                colors.backgroundBottom.withValues(alpha: 0.42),
-                colors.backgroundBottom.withValues(alpha: 0.74),
-              ],
-              stops: const [0, 0.34, 0.68, 1],
+    return RepaintBoundary(
+      child: IgnorePointer(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            height: 84 + bottomPadding,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colors.backgroundBottom.withValues(alpha: 0),
+                  colors.backgroundBottom.withValues(alpha: 0.18),
+                  colors.backgroundBottom.withValues(alpha: 0.42),
+                  colors.backgroundBottom.withValues(alpha: 0.74),
+                ],
+                stops: const [0, 0.34, 0.68, 1],
+              ),
             ),
           ),
         ),
@@ -76,79 +79,92 @@ class _FloatingBottomNav extends StatelessWidget {
     final items = [
       _NavItem('/templates', Icons.play_arrow_rounded, text.navTemplates),
       _NavItem('/creations', Icons.photo_library_outlined, text.navCreations),
+      _NavItem(
+        WalletPage.routePath,
+        Icons.wallet_rounded,
+        text.profileWalletTitle,
+      ),
       _NavItem('/profile', Icons.person_outline_rounded, text.navProfile),
     ];
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding == 0 ? 10 : 6),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned.fill(
-              top: 1,
-              bottom: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.shadow.withValues(alpha: 0.24),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(15),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+    return RepaintBoundary(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding == 0 ? 10 : 6),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(
+                top: 1,
+                bottom: 1,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colors.surfaceGlass.withValues(alpha: 0.58),
                     borderRadius: BorderRadius.circular(15),
-                    border: Border.all(
-                      color: colors.border.withValues(alpha: 0.12),
-                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colors.shadow.withValues(alpha: 0.24),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  child: SafeArea(
-                    top: false,
-                    minimum: const EdgeInsets.fromLTRB(3, 1, 3, 1),
-                    child: SizedBox(
-                      height: 42,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final item in items)
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                  vertical: 2,
-                                ),
-                                child: _BottomNavButton(
-                                  item: item,
-                                  selected: item.path == '/profile'
-                                      ? location.startsWith('/profile')
-                                      : location == item.path,
-                                  onTap: () => context.go(item.path),
+                ),
+              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.surfaceGlass.withValues(alpha: 0.58),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: colors.border.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      minimum: const EdgeInsets.fromLTRB(3, 1, 3, 1),
+                      child: SizedBox(
+                        height: 42,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final item in items)
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                    vertical: 2,
+                                  ),
+                                  child: _BottomNavButton(
+                                    item: item,
+                                    selected: _isSelected(item.path, location),
+                                    onTap: () => context.go(item.path),
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  bool _isSelected(String path, String location) {
+    return switch (path) {
+      '/profile' => location.startsWith('/profile'),
+      WalletPage.routePath => location.startsWith(WalletPage.routePath),
+      _ => location == path,
+    };
   }
 }
 

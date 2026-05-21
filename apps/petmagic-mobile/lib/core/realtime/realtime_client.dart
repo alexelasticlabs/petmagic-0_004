@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 
@@ -239,11 +238,7 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
           (key, value) => MapEntry(key.toString(), value as Object?),
         );
       }
-    } catch (_) {
-      if (kDebugMode) {
-        debugPrint('Failed to parse realtime payload: $rawPayload');
-      }
-    }
+    } catch (_) {}
 
     return const {};
   }
@@ -264,5 +259,11 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
 }
 
 final realtimeClientProvider = Provider<RealtimeClient>(
-  (ref) => ServerSentEventsRealtimeClient(),
+  (ref) {
+    final client = ServerSentEventsRealtimeClient();
+    ref.onDispose(() {
+      unawaited(client.disconnect());
+    });
+    return client;
+  },
 );

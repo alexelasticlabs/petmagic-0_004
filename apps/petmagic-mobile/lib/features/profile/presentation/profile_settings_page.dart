@@ -387,17 +387,7 @@ class _SettingsChoiceGroup extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (var index = 0; index < children.length; index++) ...[
-                if (index > 0) const SizedBox(width: 8),
-                children[index],
-              ],
-            ],
-          ),
-        ),
+        Wrap(spacing: 10, runSpacing: 10, children: children),
       ],
     );
   }
@@ -425,38 +415,84 @@ class _SettingsChoiceButton extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          width: 148,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
             color: isSelected
-                ? colors.accent.withValues(alpha: 0.16)
-                : colors.surfaceStrong.withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(18),
+                ? colors.accent.withValues(alpha: 0.14)
+                : colors.surfaceStrong.withValues(alpha: 0.82),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isSelected
                   ? colors.accent.withValues(alpha: 0.55)
                   : colors.border.withValues(alpha: 0.75),
             ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colors.accent.withValues(alpha: 0.14),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ]
+                : null,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                icon,
-                color: isSelected ? colors.accent : colors.textMuted,
-                size: 18,
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: isSelected
+                          ? colors.accent.withValues(alpha: 0.16)
+                          : colors.surfaceGlass,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: isSelected ? colors.accent : colors.textMuted,
+                      size: 18,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: isSelected ? colors.accent : colors.textMuted,
+                    size: 18,
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
+              const SizedBox(height: 12),
               Text(
                 label,
                 style: TextStyle(
                   color: colors.textStrong,
-                  fontSize: 12.4,
+                  fontSize: 13,
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (caption != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  caption!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 11.5,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

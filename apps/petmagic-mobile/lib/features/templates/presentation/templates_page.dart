@@ -69,7 +69,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         color: colors.accent,
         child: CustomScrollView(
           controller: _scrollController,
-          cacheExtent: 900,
+          cacheExtent: 560,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),

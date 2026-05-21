@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
@@ -120,7 +120,7 @@ class SupportChatController extends Notifier<SupportChatState> {
     await _refreshConversation(showLoading: false);
   }
 
-  Future<void> sendMessage(String value) async {
+  Future<void> sendMessage(String value, {required String localeTag}) async {
     final body = value.trim();
     final conversation = state.conversation;
     if (body.isEmpty || conversation == null || state.isSending) {
@@ -133,6 +133,7 @@ class SupportChatController extends Notifier<SupportChatState> {
       final message = await _repository.sendMessage(
         conversationId: conversation.conversationId,
         body: body,
+        localeTag: localeTag,
       );
 
       state = state.copyWith(
@@ -159,7 +160,31 @@ class SupportChatController extends Notifier<SupportChatState> {
     }
   }
 
-  Future<bool> sendImageAttachment(XFile file, {String? body}) async {
+  Future<bool> sendImageAttachment(
+    XFile file, {
+    String? body,
+    required String localeTag,
+  }) async {
+    return sendAttachment(
+      filePath: file.path,
+      fileName: file.name,
+      contentType: resolveContentTypeForUpload(file.path),
+      localeTag: localeTag,
+      body: body,
+    );
+  }
+
+  String resolveContentTypeForUpload(String path) {
+    return _resolveContentType(path);
+  }
+
+  Future<bool> sendAttachment({
+    required String filePath,
+    required String fileName,
+    required String contentType,
+    required String localeTag,
+    String? body,
+  }) async {
     final conversation = state.conversation;
     if (conversation == null || state.isSending) {
       return false;
@@ -168,11 +193,12 @@ class SupportChatController extends Notifier<SupportChatState> {
     state = state.copyWith(isSending: true, clearError: true);
 
     try {
-      final message = await _repository.sendImageAttachment(
+      final message = await _repository.sendAttachment(
         conversationId: conversation.conversationId,
-        filePath: file.path,
-        fileName: file.name,
-        contentType: _resolveImageContentType(file),
+        filePath: filePath,
+        fileName: fileName,
+        contentType: contentType,
+        localeTag: localeTag,
         body: body,
       );
 
@@ -307,8 +333,8 @@ class SupportChatController extends Notifier<SupportChatState> {
     }
   }
 
-  String _resolveImageContentType(XFile file) {
-    final lowerPath = file.path.toLowerCase();
+  String _resolveContentType(String path) {
+    final lowerPath = path.toLowerCase();
     if (lowerPath.endsWith('.png')) {
       return 'image/png';
     }
@@ -325,6 +351,50 @@ class SupportChatController extends Notifier<SupportChatState> {
       return 'image/gif';
     }
 
-    return 'image/jpeg';
+    if (lowerPath.endsWith('.pdf')) {
+      return 'application/pdf';
+    }
+
+    if (lowerPath.endsWith('.txt')) {
+      return 'text/plain';
+    }
+
+    if (lowerPath.endsWith('.csv')) {
+      return 'text/csv';
+    }
+
+    if (lowerPath.endsWith('.json')) {
+      return 'application/json';
+    }
+
+    if (lowerPath.endsWith('.doc')) {
+      return 'application/msword';
+    }
+
+    if (lowerPath.endsWith('.docx')) {
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+
+    if (lowerPath.endsWith('.xls')) {
+      return 'application/vnd.ms-excel';
+    }
+
+    if (lowerPath.endsWith('.xlsx')) {
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+
+    if (lowerPath.endsWith('.ppt')) {
+      return 'application/vnd.ms-powerpoint';
+    }
+
+    if (lowerPath.endsWith('.pptx')) {
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    }
+
+    if (lowerPath.endsWith('.zip')) {
+      return 'application/zip';
+    }
+
+    return 'application/octet-stream';
   }
 }

@@ -122,6 +122,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 const NoTransitionPage(child: ProfilePage()),
           ),
           GoRoute(
+            path: WalletPage.legacyRoutePath,
+            redirect: (context, state) => WalletPage.routePath,
+          ),
+          GoRoute(
             path: WalletPage.routePath,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: WalletPage()),

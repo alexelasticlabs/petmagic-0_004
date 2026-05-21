@@ -34,6 +34,8 @@
   "profileAvatarRemove": "Удалить аватар",
   "profileEmailConfirmed": "Email подтвержден",
   "profileEmailPending": "Email не подтвержден",
+  "profileEmailVerifiedShort": "Email подтвержден",
+  "profileEmailPendingShort": "Подтвердите email",
   "profileSignedOut": "Вы вышли на этом устройстве.",
   "profileAccountCenterTitle": "Центр аккаунта",
   "profileAccountCenterSubtitle": "Проверьте предпочтения, приватность и настройки приложения.",
@@ -48,9 +50,157 @@
   "profilePetsSubtitle": "Ваши любимцы и их профили в приложении.",
   "profilePremiumTitle": "Перейти на Premium",
   "profilePremiumSubtitle": "Откройте все шаблоны и premium-сценарии редактирования.",
+  "profilePremiumPlanLabel": "Premium тариф",
+  "profileFreePlanLabel": "Бесплатный тариф",
+  "profilePremiumBannerTitle": "Перейти на Premium",
+  "profilePremiumBannerActiveTitle": "Premium активен",
+  "profilePremiumBenefitUnlimitedTemplates": "Безлимитные шаблоны",
+  "profilePremiumBenefitPriorityGeneration": "Приоритетная генерация",
+  "profilePremiumBenefitNoWatermark": "Без водяного знака",
+  "profilePremiumOpenAction": "Открыть Premium",
+  "profileWalletTitle": "Кошелек",
+  "profileWalletHistoryHint": "Баланс, покупки и история операций.",
+  "profileWalletLoadingHint": "Загружаем баланс...",
+  "profileWalletEmptyHint": "Откройте баланс и историю",
+  "walletDataUnavailableFallback": "Данные кошелька сейчас недоступны.",
+  "walletRefreshTooltip": "Обновить кошелек",
+  "walletBalanceTitle": "Доступно для генераций",
+  "walletBalanceEyebrow": "Баланс",
+  "walletBalanceUnit": "PawSpark",
+  "walletBalanceExplanation": "PawSpark — внутренняя валюта для фото- и видео-генераций.",
+  "walletPremiumStatus": "Premium-кошелек",
+  "walletFreeStatus": "Базовый кошелек",
+  "walletSavedCardsCount": "Сохраненных карт: {count}",
+  "@walletSavedCardsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletWeeklyReady": "Недельная награда доступна",
+  "walletWeeklyPending": "Недельная награда ожидается",
+  "walletAdRewardsCount": "Наград за рекламу: {count}",
+  "@walletAdRewardsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletQuickActionsTitle": "Инструменты кошелька",
+  "walletPaymentMethodsAction": "Способы оплаты",
+  "walletRedeemAction": "Промокод",
+  "walletRewardsTitle": "Бонусы и награды",
+  "walletWeeklyRewardAction": "Недельная награда",
+  "walletRewardReadyDescription": "Можно забрать прямо сейчас и сразу пополнить баланс.",
+  "walletRewardPendingDescription": "Станет доступна позже. Мы просто покажем статус без лишней тревоги.",
+  "walletAdRewardAction": "Награда за рекламу",
+  "walletAdRewardDescription": "Доступно сегодня: {count}. Подходит для быстрого пополнения PawSpark.",
+  "@walletAdRewardDescription": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletBuySparkTitle": "Купить PawSpark",
+  "walletPackTotalSpark": "{count} PawSpark",
+  "@walletPackTotalSpark": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPopularBadge": "Популярно",
+  "walletBestValueLabel": "Лучшее соотношение",
+  "walletPackBonus": "+{count} бонус",
+  "@walletPackBonus": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletBuyForPrice": "Купить за {price}",
+  "@walletBuyForPrice": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "walletPackBreakdown": "{base} база + {bonus} бонус",
+  "@walletPackBreakdown": {
+    "placeholders": {
+      "base": {},
+      "bonus": {}
+    }
+  },
+  "walletRecentTransactionsTitle": "Последние операции",
+  "walletNoActivity": "Операций в кошельке пока нет.",
+  "walletBalanceAfter": "Баланс: {count}",
+  "@walletBalanceAfter": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPurchaseHistoryTitle": "История покупок",
+  "walletPurchaseSummary": "{count} PawSpark • {date}",
+  "@walletPurchaseSummary": {
+    "placeholders": {
+      "count": {},
+      "date": {}
+    }
+  },
+  "walletUnavailableTitle": "Кошелек временно недоступен",
+  "walletTryAgainAction": "Попробовать снова",
+  "walletPaymentMethodsTitle": "Способы оплаты",
+  "walletNoSavedCards": "Сохраненных карт пока нет.",
+  "walletOpeningStripe": "Открываем Stripe",
+  "walletAddCard": "Добавить карту",
+  "walletRemoveCardTooltip": "Удалить карту",
+  "walletStripeCheckout": "Stripe Checkout",
+  "walletPayWithCard": "Оплатить картой •••• {last4}",
+  "@walletPayWithCard": {
+    "placeholders": {
+      "last4": {}
+    }
+  },
+  "walletDefaultCard": "Карта по умолчанию",
+  "walletSavedCard": "Сохраненная карта",
+  "walletDefaultSuffix": " • основная",
+  "walletExpires": "Действует до {month}/{year}{suffix}",
+  "@walletExpires": {
+    "placeholders": {
+      "month": {},
+      "year": {},
+      "suffix": {}
+    }
+  },
+  "walletPending": "Ожидается",
+  "walletSourcePackPurchase": "Пополнение",
+  "walletSourceGenerationSpend": "Генерация шаблона",
+  "walletSourceGenerationRefund": "Возврат за генерацию",
+  "walletSourceWeeklyGrant": "Недельная награда",
+  "walletSourceAdReward": "Награда за рекламу",
+  "walletSourceAdminGrant": "Начисление поддержки",
+  "walletSourceAdminDebit": "Корректировка поддержки",
+  "walletPurchaseCompleted": "Завершено",
+  "walletPurchaseFailed": "Ошибка",
+  "walletPartialActivityUnavailable": "Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.",
+  "walletPaymentMethodUnavailableError": "Выбранная сохраненная карта больше недоступна. Выберите другую карту или используйте Stripe Checkout.",
+  "walletPaymentGatewayUnavailableError": "Оплата временно недоступна. Попробуйте Stripe Checkout чуть позже.",
+  "walletPackUnavailableError": "Этот набор PawSpark больше недоступен.",
+  "walletRedeemCodeNotFoundError": "Промокод не найден.",
+  "walletRedeemCodeAlreadyUsedError": "Этот промокод уже использован.",
+  "walletRedeemCodeExpiredError": "Срок действия промокода истек.",
+  "walletInsufficientBalanceError": "Для этой операции недостаточно PawSpark.",
+  "walletUnavailableError": "Данные кошелька временно недоступны. Попробуйте еще раз чуть позже.",
+  "walletWeeklyNotReadyError": "Недельная награда пока недоступна.",
+  "walletRedeemSheetTitle": "Промокод",
+  "walletRedeemHint": "WELCOME-100",
+  "walletApplyCode": "Применить код",
+  "profileStatsSectionTitle": "Статистика аккаунта",
+  "profileStatBalanceLabel": "Баланс",
+  "profileStatPlanLabel": "Тариф",
+  "profileStatLegalLabel": "Согласия",
+  "profileMagicMomentTitle": "Ваш следующий звездный момент",
+  "profileMagicMomentSubtitle": "Создайте что-то яркое для своих питомцев всего за пару касаний.",
   "premiumPageTitle": "PetMagic Premium",
   "premiumPageSubtitle": "Безлимитная магия для питомцев, быстрая генерация и premium-шаблоны в одном тарифе.",
   "premiumHeroEyebrow": "Premium магия",
+  "premiumHeroTitle": "Получите Premium и создавайте больше контента.",
+  "premiumHeroSubtitle": "Откройте premium-шаблоны, более быструю генерацию и больше возможностей для фото и видео в одном тарифе.",
   "premiumAlreadyActive": "Premium активен",
   "premiumBenefitUnlimitedTemplates": "Безлимитные шаблоны",
   "premiumBenefitFastGeneration": "Быстрая генерация",
@@ -83,11 +233,20 @@
     }
   },
   "premiumCancelAnytime": "Можно отменить в любой момент",
+  "premiumIncludesTitle": "Что входит в Premium",
+  "premiumTokenEstimate": "Примерно {videos} видео или {photos} фото в месяц, в зависимости от сложности шаблона.",
+  "@premiumTokenEstimate": {
+    "placeholders": {
+      "videos": {},
+      "photos": {}
+    }
+  },
+  "premiumSocialProof": "Самый популярный тариф для тех, кто регулярно создаёт контент в PetMagic.",
   "premiumPaymentTitle": "Способ оплаты",
   "premiumPaymentStripe": "Карта через Stripe",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
-  "premiumComparisonTitle": "Сравнение возможностей",
+  "premiumComparisonTitle": "Что меняется с Premium",
   "premiumFreeColumn": "Бесплатно",
   "premiumPremiumColumn": "Premium",
   "premiumComparisonFreeTemplates": "Бесплатные шаблоны",
@@ -106,7 +265,7 @@
   "premiumComparisonPrioritySupport": "Приоритетная поддержка",
   "premiumSecurePaymentTitle": "Безопасная оплата",
   "premiumSecurePaymentSubtitle": "Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.",
-  "premiumContinueAction": "Продолжить",
+  "premiumContinueAction": "Получить Premium",
   "premiumContinueWithPlan": "Продолжить с тарифом {plan} — {price} {period}",
   "@premiumContinueWithPlan": {
     "placeholders": {
@@ -134,10 +293,15 @@
   "profilePrivacyTitle": "Приватность и согласия",
   "profileTermsAccepted": "Ваш аккаунт принял Условия использования и Политику конфиденциальности.",
   "profileTermsPending": "Проверьте согласия в настройках аккаунта.",
+  "profileLegalShortcutTitle": "Приватность и правила",
+  "profileLegalShortcutAccepted": "Условия приняты • Настройки приватности",
+  "profileLegalShortcutPending": "Проверьте согласия",
   "profileSupportTitle": "Связаться с поддержкой",
   "profileSupportSubtitle": "Мы рядом, если нужна помощь с аккаунтом.",
+  "profileSupportCompactSubtitle": "Помощь с оплатой и доступом к аккаунту.",
   "profileSettingsShortcutTitle": "Настройки",
   "profileSettingsShortcutSubtitle": "Управляйте языком, темой и разделами аккаунта.",
+  "profileSettingsCompactSubtitle": "Язык, тема и настройки аккаунта.",
   "profilePreferenceEnabled": "Включено",
   "profilePreferenceOff": "Выкл",
   "profileSettingsTitle": "Настройки",
@@ -256,6 +420,8 @@
   "supportChatStatusInProgress": "В работе",
   "supportChatStatusResolved": "Решен",
   "supportChatStatusClosed": "Закрыт",
+  "supportChatMessageDelivered": "Доставлено",
+  "supportChatMessageRead": "Прочитано",
   "profileSettingsThemeSystem": "Системная",
   "profileSettingsThemeLight": "Светлая",
   "profileSettingsThemeDark": "Темная",

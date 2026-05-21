@@ -1,33 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_pack_selection.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
 
-  static const routePath = '/profile/wallet';
+  static const routePath = '/wallet';
+  static const legacyRoutePath = '/profile/wallet';
 
   @override
   ConsumerState<WalletPage> createState() => _WalletPageState();
 }
 
-class _WalletPageState extends ConsumerState<WalletPage> {
+class _WalletPageState extends ConsumerState<WalletPage>
+    with WidgetsBindingObserver {
+  bool _shouldReloadOnResume = false;
+
+  static const _warningTone = Color(0xFFD7A44A);
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() => ref.read(walletControllerProvider.notifier).load());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
+      _shouldReloadOnResume = false;
+      ref.read(walletControllerProvider.notifier).load(refresh: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(walletControllerProvider);
     final controller = ref.read(walletControllerProvider.notifier);
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final bottomNavInset = petMagicBottomNavInset(context);
 
     ref.listen(walletControllerProvider, (previous, next) {
       final checkoutUrl = next.checkoutUrl;
@@ -47,18 +73,21 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                 onRefresh: () => controller.load(refresh: true),
                 color: colors.accent,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 96),
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     _WalletHeader(
+                      title: text.profileWalletTitle,
+                      subtitle: text.profileWalletHistoryHint,
                       onRefresh: () => controller.load(refresh: true),
                     ),
                     if (state.wallet == null) ...[
                       const SizedBox(height: 18),
                       _WalletUnavailableCard(
                         message: _friendlyError(
+                          text,
                           state.errorMessage ??
-                              'Wallet data is not available right now.',
+                              text.walletDataUnavailableFallback,
                         ),
                         onRetry: () => controller.load(refresh: true),
                       ),
@@ -66,21 +95,22 @@ class _WalletPageState extends ConsumerState<WalletPage> {
                       if (state.errorMessage != null) ...[
                         const SizedBox(height: 14),
                         ProfileMessageCard(
-                          message: _friendlyError(state.errorMessage!),
-                          tone: colors.danger,
+                          message: _friendlyError(text, state.errorMessage!),
+                          tone: _warningTone,
                         ),
                       ],
                       const SizedBox(height: 16),
-                      _BalanceCard(
-                        wallet: state.wallet,
-                        paymentMethodCount: state.paymentMethods.length,
-                      ),
+                      _BalanceCard(wallet: state.wallet),
                       const SizedBox(height: 14),
-                      _QuickActions(
+                      _RewardsOverviewCard(
+                        wallet: state.wallet,
                         isClaimingWeekly: state.isClaimingWeekly,
                         isClaimingAd: state.isClaimingAd,
                         onClaimWeekly: controller.claimWeeklyGrant,
                         onClaimAd: controller.claimAdReward,
+                      ),
+                      const SizedBox(height: 14),
+                      _WalletToolsSection(
                         onShowRedeem: () =>
                             _showRedeemSheet(context, controller),
                         onShowPaymentMethods: () => _showPaymentMethodsSheet(
@@ -121,6 +151,7 @@ class _WalletPageState extends ConsumerState<WalletPage> {
       return;
     }
 
+    _shouldReloadOnResume = true;
     final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
     if (!launched) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -150,23 +181,53 @@ class _WalletPageState extends ConsumerState<WalletPage> {
 }
 
 class _WalletHeader extends StatelessWidget {
-  const _WalletHeader({required this.onRefresh});
+  const _WalletHeader({
+    required this.title,
+    required this.subtitle,
+    required this.onRefresh,
+  });
 
+  final String title;
+  final String subtitle;
   final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final canPop = Navigator.of(context).canPop();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+
+        if (compact) {
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  if (canPop)
+                    IconButton.filledTonal(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                    )
+                  else
+                    const SizedBox(width: 48, height: 48),
+                  const Spacer(),
+                  IconButton.filledTonal(
+                    onPressed: onRefresh,
+                    icon: const Icon(Icons.refresh_rounded),
+                    tooltip: text.walletRefreshTooltip,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Text(
-                'Wallet',
+                title,
                 style: TextStyle(
                   color: colors.textStrong,
                   fontSize: 25,
@@ -175,7 +236,7 @@ class _WalletHeader extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Balance, purchases and recent activity',
+                subtitle,
                 style: TextStyle(
                   color: colors.textSoft,
                   fontSize: 13,
@@ -184,150 +245,341 @@ class _WalletHeader extends StatelessWidget {
                 ),
               ),
             ],
-          ),
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (canPop)
+              IconButton.filledTonal(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+              )
+            else
+              const SizedBox(width: 48, height: 48),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 13,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            IconButton.filledTonal(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: text.walletRefreshTooltip,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({required this.wallet});
+
+  final WalletStateModel? wallet;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final balance = wallet?.balance ?? 0;
+
+    return ProfileGlassCard(
+      padding: const EdgeInsets.all(18),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 360;
+          final balanceStyle = TextStyle(
+            color: colors.textStrong,
+            fontSize: compact ? 26 : 34,
+            fontWeight: FontWeight.w900,
+            height: 0.98,
+          );
+          final graphic = _WalletAbstractGraphic(
+            accent: colors.accent,
+            gold: colors.gold,
+            blue: colors.blue,
+            surface: colors.surfaceStrong,
+          );
+
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                text.walletBalanceEyebrow,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                text.walletBalanceTitle,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  Text(
+                    NumberFormat.decimalPattern().format(balance),
+                    style: balanceStyle,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      text.walletBalanceUnit,
+                      style: TextStyle(
+                        color: colors.accent,
+                        fontSize: compact ? 18 : 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                text.walletBalanceExplanation,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ProfileStatusPill(
+                label: wallet?.isPremium == true
+                    ? text.walletPremiumStatus
+                    : text.walletFreeStatus,
+                leading: wallet?.isPremium == true
+                    ? Icons.workspace_premium_rounded
+                    : Icons.person_outline_rounded,
+                backgroundColor: wallet?.isPremium == true
+                    ? colors.gold.withValues(alpha: 0.18)
+                    : colors.accent.withValues(alpha: 0.13),
+                foregroundColor: wallet?.isPremium == true
+                    ? colors.gold
+                    : colors.accent,
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                content,
+                const SizedBox(height: 14),
+                Align(alignment: Alignment.centerRight, child: graphic),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: content),
+              const SizedBox(width: 14),
+              graphic,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RewardsOverviewCard extends StatelessWidget {
+  const _RewardsOverviewCard({
+    required this.wallet,
+    required this.isClaimingWeekly,
+    required this.isClaimingAd,
+    required this.onClaimWeekly,
+    required this.onClaimAd,
+  });
+
+  final WalletStateModel? wallet;
+  final bool isClaimingWeekly;
+  final bool isClaimingAd;
+  final VoidCallback onClaimWeekly;
+  final VoidCallback onClaimAd;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final weeklyReady =
+        wallet?.nextWeeklyGrantAtUtc == null ||
+        wallet!.nextWeeklyGrantAtUtc!.isBefore(DateTime.now().toUtc());
+    final cards = [
+      _RewardStatusCard(
+        icon: Icons.calendar_month_rounded,
+        title: text.walletWeeklyRewardAction,
+        subtitle: weeklyReady
+            ? text.walletRewardReadyDescription
+            : text.walletRewardPendingDescription,
+        badgeLabel: weeklyReady
+            ? text.walletWeeklyReady
+            : text.walletWeeklyPending,
+        accent: weeklyReady ? colors.accent : colors.gold,
+        onTap: isClaimingWeekly ? null : onClaimWeekly,
+        isLoading: isClaimingWeekly,
+      ),
+      _RewardStatusCard(
+        icon: Icons.play_circle_outline_rounded,
+        title: text.walletAdRewardAction,
+        subtitle: text.walletAdRewardDescription(
+          wallet?.adRewardsRemainingToday ?? 0,
         ),
-        const SizedBox(width: 12),
-        IconButton.filledTonal(
-          onPressed: onRefresh,
-          icon: const Icon(Icons.history_rounded),
-          tooltip: 'Refresh history',
+        badgeLabel: text.walletAdRewardsCount(
+          wallet?.adRewardsRemainingToday ?? 0,
         ),
-        const SizedBox(width: 8),
-        IconButton.filledTonal(
-          onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(Icons.close_rounded),
-          tooltip: 'Close',
+        accent: colors.blue,
+        onTap: isClaimingAd ? null : onClaimAd,
+        isLoading: isClaimingAd,
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(title: text.walletRewardsTitle),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 420;
+
+            if (compact) {
+              return Column(
+                children: [
+                  for (var index = 0; index < cards.length; index++) ...[
+                    cards[index],
+                    if (index != cards.length - 1) const SizedBox(height: 10),
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                for (var index = 0; index < cards.length; index++) ...[
+                  Expanded(child: cards[index]),
+                  if (index != cards.length - 1) const SizedBox(width: 10),
+                ],
+              ],
+            );
+          },
         ),
       ],
     );
   }
 }
 
-class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.wallet, required this.paymentMethodCount});
+class _RewardStatusCard extends StatelessWidget {
+  const _RewardStatusCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.badgeLabel,
+    required this.accent,
+    required this.onTap,
+    required this.isLoading,
+  });
 
-  final WalletStateModel? wallet;
-  final int paymentMethodCount;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String badgeLabel;
+  final Color accent;
+  final VoidCallback? onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final balance = wallet?.balance ?? 0;
-    final weeklyReady =
-        wallet?.nextWeeklyGrantAtUtc == null ||
-        wallet!.nextWeeklyGrantAtUtc!.isBefore(DateTime.now().toUtc());
-
     return ProfileGlassCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'PawSpark balance',
-                      style: TextStyle(
-                        color: colors.textSoft,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Icon(
-                          Icons.pets_rounded,
-                          color: colors.accent,
-                          size: 28,
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            NumberFormat.decimalPattern().format(balance),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontSize: 34,
-                              fontWeight: FontWeight.w900,
-                              height: 0.98,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ProfileStatusPill(
-                      label: wallet?.isPremium == true
-                          ? 'Premium wallet'
-                          : 'Free wallet',
-                      leading: wallet?.isPremium == true
-                          ? Icons.workspace_premium_rounded
-                          : Icons.person_outline_rounded,
-                      backgroundColor: wallet?.isPremium == true
-                          ? colors.gold.withValues(alpha: 0.18)
-                          : colors.accent.withValues(alpha: 0.13),
-                      foregroundColor: wallet?.isPremium == true
-                          ? colors.gold
-                          : colors.accent,
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _WalletMetricChip(
-                          icon: Icons.credit_card_rounded,
-                          label: '$paymentMethodCount cards',
-                        ),
-                        _WalletMetricChip(
-                          icon: Icons.calendar_month_rounded,
-                          label: weeklyReady
-                              ? 'Weekly ready'
-                              : 'Weekly pending',
-                        ),
-                        _WalletMetricChip(
-                          icon: Icons.play_circle_outline_rounded,
-                          label:
-                              '${wallet?.adRewardsRemainingToday ?? 0} ad rewards',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
               Container(
-                width: 78,
-                height: 78,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(26),
-                  gradient: RadialGradient(
-                    colors: [
-                      colors.accent.withValues(alpha: 0.95),
-                      colors.accent.withValues(alpha: 0.22),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.accent.withValues(alpha: 0.26),
-                      blurRadius: 24,
-                    ),
-                  ],
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  Icons.pets_rounded,
-                  color: colors.backgroundBottom,
-                  size: 36,
+                child: Icon(icon, color: accent, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          _WalletMetricChip(icon: icon, label: badgeLabel, accent: accent),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: colors.textSoft,
+              fontSize: 12,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonal(
+              onPressed: onTap,
+              child: Text(isLoading ? '...' : title),
+            ),
           ),
         ],
       ),
@@ -336,14 +588,20 @@ class _BalanceCard extends StatelessWidget {
 }
 
 class _WalletMetricChip extends StatelessWidget {
-  const _WalletMetricChip({required this.icon, required this.label});
+  const _WalletMetricChip({
+    required this.icon,
+    required this.label,
+    this.accent,
+  });
 
   final IconData icon;
   final String label;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final chipAccent = accent ?? colors.accent;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -355,14 +613,18 @@ class _WalletMetricChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: colors.accent),
+          Icon(icon, size: 15, color: chipAccent),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: colors.textSoft,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -371,62 +633,48 @@ class _WalletMetricChip extends StatelessWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({
-    required this.isClaimingWeekly,
-    required this.isClaimingAd,
-    required this.onClaimWeekly,
-    required this.onClaimAd,
+class _WalletToolsSection extends StatelessWidget {
+  const _WalletToolsSection({
     required this.onShowRedeem,
     required this.onShowPaymentMethods,
   });
 
-  final bool isClaimingWeekly;
-  final bool isClaimingAd;
-  final VoidCallback onClaimWeekly;
-  final VoidCallback onClaimAd;
   final VoidCallback onShowRedeem;
   final VoidCallback onShowPaymentMethods;
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(title: 'Quick actions'),
-        GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.5,
-          children: [
-            _ActionTile(
-              icon: Icons.credit_card_rounded,
-              label: 'Payment methods',
-              onTap: onShowPaymentMethods,
-            ),
-            _ActionTile(
-              icon: Icons.card_giftcard_rounded,
-              label: 'Redeem code',
-              onTap: onShowRedeem,
-            ),
-            _ActionTile(
-              icon: isClaimingWeekly
-                  ? Icons.hourglass_top_rounded
-                  : Icons.calendar_month_rounded,
-              label: 'Weekly reward',
-              onTap: isClaimingWeekly ? null : onClaimWeekly,
-            ),
-            _ActionTile(
-              icon: isClaimingAd
-                  ? Icons.hourglass_top_rounded
-                  : Icons.play_circle_outline_rounded,
-              label: 'Ad reward',
-              onTap: isClaimingAd ? null : onClaimAd,
-            ),
-          ],
+        _SectionTitle(title: text.walletQuickActionsTitle),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final singleColumn = constraints.maxWidth < 330;
+
+            return GridView.count(
+              crossAxisCount: singleColumn ? 1 : 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: singleColumn ? 4.8 : 2.2,
+              children: [
+                _ActionTile(
+                  icon: Icons.credit_card_rounded,
+                  label: text.walletPaymentMethodsAction,
+                  onTap: onShowPaymentMethods,
+                ),
+                _ActionTile(
+                  icon: Icons.card_giftcard_rounded,
+                  label: text.walletRedeemAction,
+                  onTap: onShowRedeem,
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -457,24 +705,52 @@ class _ActionTile extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Icon(icon, color: colors.accent, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 12,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 148;
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: colors.accent, size: 22),
+                      const SizedBox(height: 8),
+                      Text(
+                        label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Icon(icon, color: colors.accent, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -496,7 +772,9 @@ class _PacksSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final featuredPack = selectPopularPack(packs);
 
     if (packs.isEmpty) {
       return const SizedBox.shrink();
@@ -505,77 +783,222 @@ class _PacksSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(title: 'Buy PawSpark'),
-        SizedBox(
-          height: 138,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: packs.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final pack = packs[index];
-              return SizedBox(
-                width: 176,
-                child: ProfileGlassCard(
-                  padding: const EdgeInsets.all(13),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.pets_rounded, color: colors.accent),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              pack.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: colors.textStrong,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w900,
+        _SectionTitle(title: text.walletBuySparkTitle),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 430;
+            final cardWidth = compact
+                ? (constraints.maxWidth - 12).clamp(220.0, 320.0)
+                : 220.0;
+
+            return SizedBox(
+              height: compact ? 300 : 228,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: packs.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final pack = packs[index];
+                  final isFeatured = featuredPack?.packId == pack.packId;
+
+                  return SizedBox(
+                    width: cardWidth,
+                    child: ProfileGlassCard(
+                      padding: const EdgeInsets.all(13),
+                      child: LayoutBuilder(
+                        builder: (context, cardConstraints) {
+                          final stackHeader = cardConstraints.maxWidth <= 270;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (stackHeader) ...[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.pets_rounded,
+                                      color: colors.accent,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        pack.displayName,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: colors.textStrong,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (isFeatured) ...[
+                                  const SizedBox(height: 8),
+                                  ProfileStatusPill(
+                                    label: text.walletPopularBadge,
+                                    backgroundColor: colors.gold.withValues(
+                                      alpha: 0.18,
+                                    ),
+                                    foregroundColor: colors.gold,
+                                  ),
+                                ],
+                              ] else
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.pets_rounded,
+                                      color: colors.accent,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        pack.displayName,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: colors.textStrong,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isFeatured) ...[
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: ProfileStatusPill(
+                                          label: text.walletPopularBadge,
+                                          backgroundColor: colors.gold
+                                              .withValues(alpha: 0.18),
+                                          foregroundColor: colors.gold,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              const SizedBox(height: 8),
+                              Text(
+                                text.walletPackTotalSpark(pack.totalSpark),
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
-                            ),
-                          ),
-                        ],
+                              const SizedBox(height: 4),
+                              Text(
+                                _formatPrice(pack),
+                                style: TextStyle(
+                                  color: colors.accent,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              if (pack.bonusSpark > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    text.walletPackBonus(pack.bonusSpark),
+                                    style: TextStyle(
+                                      color: colors.gold,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 10),
+                              _PackDetailRow(
+                                icon: Icons.auto_awesome_rounded,
+                                label: text.walletPackBreakdown(
+                                  pack.grantedSpark,
+                                  pack.bonusSpark,
+                                ),
+                                accent: colors.accent,
+                              ),
+                              if (isFeatured) ...[
+                                const SizedBox(height: 8),
+                                _PackDetailRow(
+                                  icon: Icons.local_fire_department_rounded,
+                                  label: text.walletBestValueLabel,
+                                  accent: colors.gold,
+                                ),
+                              ],
+                              const Spacer(),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton(
+                                  onPressed: isBuying
+                                      ? null
+                                      : () => onBuy(pack),
+                                  child: Text(
+                                    text.walletBuyForPrice(_formatPrice(pack)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${pack.totalSpark} PawSpark',
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (pack.bonusSpark > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            '+${pack.bonusSpark} bonus',
-                            style: TextStyle(
-                              color: colors.gold,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: isBuying ? null : () => onBuy(pack),
-                          child: Text(_formatPrice(pack)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         ),
       ],
+    );
+  }
+}
+
+class _PackDetailRow extends StatelessWidget {
+  const _PackDetailRow({
+    required this.icon,
+    required this.label,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 15, color: accent),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -587,19 +1010,20 @@ class _LedgerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(title: 'Recent transactions'),
+        _SectionTitle(title: text.walletRecentTransactionsTitle),
         ProfileGlassCard(
           padding: EdgeInsets.zero,
           child: items.isEmpty
               ? Padding(
                   padding: const EdgeInsets.all(18),
                   child: Text(
-                    'No wallet activity yet.',
+                    text.walletNoActivity,
                     style: TextStyle(color: colors.textSoft),
                   ),
                 )
@@ -626,9 +1050,10 @@ class _LedgerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final positive = item.delta >= 0;
-    final tone = positive ? colors.accent : colors.danger;
+    final tone = _ledgerTone(item, colors);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -657,7 +1082,7 @@ class _LedgerRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _sourceLabel(item.source),
+                    _sourceLabel(text, item.source),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -668,7 +1093,7 @@ class _LedgerRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _formatDate(item.createdAtUtc),
+                    _formatDate(context, item.createdAtUtc),
                     style: TextStyle(
                       color: colors.textMuted,
                       fontSize: 11.5,
@@ -692,7 +1117,7 @@ class _LedgerRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Bal. ${item.balanceAfter}',
+                  text.walletBalanceAfter(item.balanceAfter),
                   style: TextStyle(
                     color: colors.textMuted,
                     fontSize: 11,
@@ -715,6 +1140,8 @@ class _PurchasesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+
     if (items.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -722,7 +1149,7 @@ class _PurchasesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(title: 'Purchase history'),
+        _SectionTitle(title: text.walletPurchaseHistoryTitle),
         ProfileGlassCard(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -743,6 +1170,7 @@ class _PurchaseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
     return Padding(
@@ -763,7 +1191,13 @@ class _PurchaseRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${item.sparkToGrant} PawSpark • ${_formatDate(item.confirmedAtUtc ?? item.createdAtUtc)}',
+                  text.walletPurchaseSummary(
+                    item.sparkToGrant,
+                    _formatDate(
+                      context,
+                      item.confirmedAtUtc ?? item.createdAtUtc,
+                    ),
+                  ),
                   style: TextStyle(
                     color: colors.textMuted,
                     fontSize: 11,
@@ -775,7 +1209,7 @@ class _PurchaseRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           ProfileStatusPill(
-            label: _purchaseStatusLabel(item.status),
+            label: _purchaseStatusLabel(text, item.status),
             backgroundColor: _purchaseStatusColor(
               item.status,
               colors,
@@ -819,6 +1253,7 @@ class _WalletUnavailableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
     return ProfileGlassCard(
@@ -840,7 +1275,7 @@ class _WalletUnavailableCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Wallet is temporarily unavailable',
+                  text.walletUnavailableTitle,
                   style: TextStyle(
                     color: colors.textStrong,
                     fontSize: 16,
@@ -863,7 +1298,95 @@ class _WalletUnavailableCard extends StatelessWidget {
           FilledButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Try again'),
+            label: Text(text.walletTryAgainAction),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletAbstractGraphic extends StatelessWidget {
+  const _WalletAbstractGraphic({
+    required this.accent,
+    required this.gold,
+    required this.blue,
+    required this.surface,
+  });
+
+  final Color accent;
+  final Color gold;
+  final Color blue;
+  final Color surface;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 84,
+      height: 84,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 10,
+            top: 10,
+            child: Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [accent, blue.withValues(alpha: 0.88)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.22),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: surface.withValues(alpha: 0.94),
+                border: Border.all(color: gold.withValues(alpha: 0.34)),
+              ),
+              child: Icon(Icons.bolt_rounded, color: gold, size: 14),
+            ),
+          ),
+          Positioned(
+            left: 24,
+            top: 24,
+            child: const Icon(
+              Icons.account_balance_wallet_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            bottom: 10,
+            child: Transform.rotate(
+              angle: -0.28,
+              child: Container(
+                width: 34,
+                height: 10,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  color: accent.withValues(alpha: 0.18),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -878,6 +1401,7 @@ Future<void> _showPaymentMethodsSheet(
   required bool isSettingUp,
   required String? removingPaymentMethodId,
 }) async {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
 
   await showModalBottomSheet<void>(
@@ -894,7 +1418,7 @@ Future<void> _showPaymentMethodsSheet(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Payment methods',
+              text.walletPaymentMethodsTitle,
               style: TextStyle(
                 color: colors.textStrong,
                 fontSize: 20,
@@ -906,7 +1430,7 @@ Future<void> _showPaymentMethodsSheet(
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Text(
-                  'No saved cards yet.',
+                  text.walletNoSavedCards,
                   style: TextStyle(
                     color: colors.textSoft,
                     height: 1.35,
@@ -942,7 +1466,9 @@ Future<void> _showPaymentMethodsSheet(
                       ? Icons.hourglass_top_rounded
                       : Icons.add_card_rounded,
                 ),
-                label: Text(isSettingUp ? 'Opening Stripe' : 'Add card'),
+                label: Text(
+                  isSettingUp ? text.walletOpeningStripe : text.walletAddCard,
+                ),
               ),
             ),
           ],
@@ -965,6 +1491,7 @@ class _PaymentMethodRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
     return Container(
@@ -1003,7 +1530,7 @@ class _PaymentMethodRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _formatCardExpiry(method),
+                  _formatCardExpiry(text, method),
                   style: TextStyle(
                     color: colors.textMuted,
                     fontSize: 11.5,
@@ -1018,7 +1545,7 @@ class _PaymentMethodRow extends StatelessWidget {
             icon: Icon(
               isRemoving ? Icons.hourglass_top_rounded : Icons.delete_outline,
             ),
-            tooltip: 'Remove card',
+            tooltip: text.walletRemoveCardTooltip,
           ),
         ],
       ),
@@ -1033,6 +1560,7 @@ Future<void> _showPackPaymentSheet(
   required Future<String?> Function() onStripeCheckout,
   required Future<String?> Function(PaymentMethodModel method) onSavedMethod,
 }) async {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
 
   await showModalBottomSheet<void>(
@@ -1058,7 +1586,7 @@ Future<void> _showPackPaymentSheet(
             ),
             const SizedBox(height: 4),
             Text(
-              '${pack.totalSpark} PawSpark',
+              text.walletPackTotalSpark(pack.totalSpark),
               style: TextStyle(
                 color: colors.textSoft,
                 fontWeight: FontWeight.w700,
@@ -1073,7 +1601,7 @@ Future<void> _showPackPaymentSheet(
                   await onStripeCheckout();
                 },
                 icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Stripe Checkout'),
+                label: Text(text.walletStripeCheckout),
               ),
             ),
             const SizedBox(height: 10),
@@ -1088,7 +1616,7 @@ Future<void> _showPackPaymentSheet(
                       await onSavedMethod(method);
                     },
                     icon: const Icon(Icons.credit_card_rounded),
-                    label: Text('Pay with •••• ${method.last4}'),
+                    label: Text(text.walletPayWithCard(method.last4)),
                   ),
                 ),
               ),
@@ -1100,16 +1628,16 @@ Future<void> _showPackPaymentSheet(
   );
 }
 
-String _formatCardExpiry(PaymentMethodModel method) {
+String _formatCardExpiry(AppLocalizations text, PaymentMethodModel method) {
   final month = method.expMonth;
   final year = method.expYear;
   if (month == null || year == null) {
-    return method.isDefault ? 'Default card' : 'Saved card';
+    return method.isDefault ? text.walletDefaultCard : text.walletSavedCard;
   }
 
   final paddedMonth = month.toString().padLeft(2, '0');
-  final suffix = method.isDefault ? ' • default' : '';
-  return 'Expires $paddedMonth/$year$suffix';
+  final suffix = method.isDefault ? text.walletDefaultSuffix : '';
+  return text.walletExpires(paddedMonth, year, suffix);
 }
 
 String _formatPrice(CurrencyPackModel pack) {
@@ -1118,23 +1646,25 @@ String _formatPrice(CurrencyPackModel pack) {
   ).format(pack.priceAmount);
 }
 
-String _formatDate(DateTime? value) {
+String _formatDate(BuildContext context, DateTime? value) {
   if (value == null) {
-    return 'Pending';
+    return AppLocalizations.of(context).walletPending;
   }
 
-  return DateFormat.MMMd().format(value.toLocal());
+  return DateFormat.MMMd(
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(value.toLocal());
 }
 
-String _sourceLabel(String source) {
+String _sourceLabel(AppLocalizations text, String source) {
   return switch (source) {
-    'pack_purchase' => 'Added funds',
-    'generation_spend' => 'Template generation',
-    'generation_refund' => 'Generation refund',
-    'weekly_grant' => 'Weekly reward',
-    'ad_reward' => 'Ad reward',
-    'admin_grant' => 'Support credit',
-    'admin_debit' => 'Support adjustment',
+    'pack_purchase' => text.walletSourcePackPurchase,
+    'generation_spend' => text.walletSourceGenerationSpend,
+    'generation_refund' => text.walletSourceGenerationRefund,
+    'weekly_grant' => text.walletSourceWeeklyGrant,
+    'ad_reward' => text.walletSourceAdReward,
+    'admin_grant' => text.walletSourceAdminGrant,
+    'admin_debit' => text.walletSourceAdminDebit,
     _ => source,
   };
 }
@@ -1152,11 +1682,11 @@ IconData _sourceIcon(String source) {
   };
 }
 
-String _purchaseStatusLabel(String status) {
+String _purchaseStatusLabel(AppLocalizations text, String status) {
   return switch (status) {
-    'succeeded' => 'Completed',
-    'failed' => 'Failed',
-    _ => 'Pending',
+    'succeeded' => text.walletPurchaseCompleted,
+    'failed' => text.walletPurchaseFailed,
+    _ => text.walletPending,
   };
 }
 
@@ -1168,30 +1698,56 @@ Color _purchaseStatusColor(String status, PetMagicColors colors) {
   };
 }
 
-String _friendlyError(String value) {
+Color _ledgerTone(WalletLedgerItem item, PetMagicColors colors) {
+  return switch (item.source) {
+    'generation_spend' || 'admin_debit' => colors.danger,
+    'generation_refund' => colors.textMuted,
+    _ => item.delta >= 0 ? colors.accent : colors.danger,
+  };
+}
+
+String _friendlyError(AppLocalizations text, String value) {
+  if (value.contains('wallet.ledger_failed') ||
+      value.contains('wallet.packs_failed') ||
+      value.contains('wallet.purchases_failed')) {
+    return text.walletPartialActivityUnavailable;
+  }
+
+  if (value.contains('economy.payment_method_not_found')) {
+    return text.walletPaymentMethodUnavailableError;
+  }
+
+  if (value.contains('payment_gateway_failed')) {
+    return text.walletPaymentGatewayUnavailableError;
+  }
+
+  if (value.contains('economy.pack_not_found')) {
+    return text.walletPackUnavailableError;
+  }
+
   if (value.contains('redeem_code_not_found')) {
-    return 'Redeem code was not found.';
+    return text.walletRedeemCodeNotFoundError;
   }
 
   if (value.contains('redeem_code_already_used')) {
-    return 'This redeem code was already used.';
+    return text.walletRedeemCodeAlreadyUsedError;
   }
 
   if (value.contains('redeem_code_expired')) {
-    return 'Redeem code has expired.';
+    return text.walletRedeemCodeExpiredError;
   }
 
   if (value.contains('economy.insufficient_balance')) {
-    return 'Not enough PawSpark for this operation.';
+    return text.walletInsufficientBalanceError;
   }
 
   if (value.contains('AppException(500)') ||
       value.contains('processing your request')) {
-    return 'Wallet data is temporarily unavailable. Please try again in a moment.';
+    return text.walletUnavailableError;
   }
 
   if (value.contains('weekly')) {
-    return 'Weekly reward is not ready yet.';
+    return text.walletWeeklyNotReadyError;
   }
 
   return value;
@@ -1201,6 +1757,7 @@ Future<void> _showRedeemSheet(
   BuildContext context,
   WalletController controller,
 ) async {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   final inputController = TextEditingController();
 
@@ -1224,7 +1781,7 @@ Future<void> _showRedeemSheet(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Redeem code',
+              text.walletRedeemSheetTitle,
               style: TextStyle(
                 color: colors.textStrong,
                 fontSize: 20,
@@ -1236,9 +1793,9 @@ Future<void> _showRedeemSheet(
               controller: inputController,
               autofocus: true,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                hintText: 'WELCOME-100',
-                prefixIcon: Icon(Icons.card_giftcard_rounded),
+              decoration: InputDecoration(
+                hintText: text.walletRedeemHint,
+                prefixIcon: const Icon(Icons.card_giftcard_rounded),
               ),
             ),
             const SizedBox(height: 16),
@@ -1253,7 +1810,7 @@ Future<void> _showRedeemSheet(
                 await controller.applyRedeemCode(code);
               },
               icon: const Icon(Icons.check_circle_outline_rounded),
-              label: const Text('Apply code'),
+              label: Text(text.walletApplyCode),
             ),
           ],
         ),

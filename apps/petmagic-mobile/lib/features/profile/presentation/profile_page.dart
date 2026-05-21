@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -10,6 +11,8 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_controller
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
@@ -32,12 +35,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       }
 
       ref.read(profileControllerProvider.notifier).initialize();
+      ref.read(walletControllerProvider.notifier).load();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(profileControllerProvider);
+    final walletState = ref.watch(walletControllerProvider);
     final controller = ref.read(profileControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
@@ -56,12 +61,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     final profile = state.profile;
-    final communicationsStatus = profile?.marketingEmailsEnabled == true
-        ? text.profileCommunicationsEnabled
-        : text.profileCommunicationsDisabled;
-    final privacyStatus = profile?.legalAcceptance.isCurrentAccepted == true
-        ? text.profileTermsAccepted
-        : text.profileTermsPending;
+    final legalStatus = profile?.legalAcceptance.isCurrentAccepted == true
+        ? text.profileLegalShortcutAccepted
+        : text.profileLegalShortcutPending;
 
     return ProfileScreenBackground(
       child: SafeArea(
@@ -74,7 +76,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           child: Column(
@@ -84,28 +86,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 text.profileTitle,
                                 style: TextStyle(
                                   color: colors.textStrong,
-                                  fontSize: 27,
+                                  fontSize: 25,
                                   fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                text.profileDashboardSubtitle,
-                                style: TextStyle(
-                                  color: colors.textSoft,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 12),
-                        _HeaderActionIcon(
-                          icon: Icons.notifications_none_rounded,
-                          badgeColor: colors.accent,
-                        ),
-                        const SizedBox(width: 10),
                         _HeaderActionIcon(
                           icon: Icons.settings_outlined,
                           onTap: () =>
@@ -131,45 +119,42 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     if (profile != null) ...[
                       _ProfileHeroCard(
                         profile: profile,
-                        isSaving: state.isSaving,
-                        onUploadAvatar: state.isSaving
-                            ? null
-                            : controller.uploadAvatar,
-                        onOpenSettings: () =>
-                            context.push(ProfileSettingsPage.routePath),
+                        wallet: walletState.wallet,
                       ),
-                      const SizedBox(height: 16),
-                      _ProfilePetsRow(onTap: () {}),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+                      _WalletHighlightCard(
+                        walletState: walletState,
+                        onTap: () => context.go(WalletPage.routePath),
+                      ),
+                      const SizedBox(height: 12),
+                      _PremiumBannerCard(
+                        isPremium: profile.isPremium,
+                        onTap: () => context.push(PremiumPage.routePath),
+                      ),
+                      const SizedBox(height: 12),
+                      _ProfileStatsCard(
+                        profile: profile,
+                        wallet: walletState.wallet,
+                      ),
+                      const SizedBox(height: 12),
+                      const _ProfileMagicMomentCard(),
+                      const SizedBox(height: 12),
                       ProfileGlassCard(
                         padding: EdgeInsets.zero,
                         child: Column(
                           children: [
                             ProfileSettingsRow(
-                              icon: Icons.account_balance_wallet_outlined,
-                              title: 'Wallet',
-                              subtitle:
-                                  'Balance, PawSpark purchases and transaction history',
-                              iconColor: colors.accent,
-                              onTap: () => context.push(WalletPage.routePath),
-                            ),
-                            ProfileSettingsRow(
-                              icon: Icons.workspace_premium_outlined,
-                              title: text.profilePremiumTitle,
-                              subtitle: text.profilePremiumSubtitle,
-                              iconColor: colors.gold,
-                              onTap: () => context.push(PremiumPage.routePath),
-                            ),
-                            ProfileSettingsRow(
                               icon: Icons.privacy_tip_outlined,
-                              title:
-                                  '${text.profileCommunicationsTitle} / ${text.profilePrivacyTitle}',
-                              subtitle: '$communicationsStatus $privacyStatus',
+                              title: text.profileLegalShortcutTitle,
+                              subtitle: legalStatus,
+                              iconColor: colors.accent,
+                              onTap: () =>
+                                  context.push(ProfileSettingsPage.routePath),
                             ),
                             ProfileSettingsRow(
                               icon: Icons.support_agent_rounded,
                               title: text.profileSupportTitle,
-                              subtitle: text.profileSupportSubtitle,
+                              subtitle: text.profileSupportCompactSubtitle,
                               iconColor: colors.blue,
                               onTap: () =>
                                   context.push(SupportChatPage.routePath),
@@ -177,7 +162,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             ProfileSettingsRow(
                               icon: Icons.settings_outlined,
                               title: text.profileSettingsShortcutTitle,
-                              subtitle: text.profileSettingsShortcutSubtitle,
+                              subtitle: text.profileSettingsCompactSubtitle,
                               showDivider: false,
                               onTap: () =>
                                   context.push(ProfileSettingsPage.routePath),
@@ -211,17 +196,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 }
 
 class _ProfileHeroCard extends StatelessWidget {
-  const _ProfileHeroCard({
-    required this.profile,
-    required this.isSaving,
-    required this.onUploadAvatar,
-    required this.onOpenSettings,
-  });
+  const _ProfileHeroCard({required this.profile, required this.wallet});
 
   final MobileUserProfile profile;
-  final bool isSaving;
-  final VoidCallback? onUploadAvatar;
-  final VoidCallback onOpenSettings;
+  final WalletStateModel? wallet;
 
   @override
   Widget build(BuildContext context) {
@@ -230,113 +208,101 @@ class _ProfileHeroCard extends StatelessWidget {
     final displayName = profile.displayName?.trim().isNotEmpty == true
         ? profile.displayName!
         : profile.email;
+    final membershipLabel = profile.isPremium
+        ? text.profilePremiumPlanLabel
+        : text.profileFreePlanLabel;
+    final emailLabel = profile.emailConfirmed
+        ? text.profileEmailVerifiedShort
+        : text.profileEmailPendingShort;
+    final balanceLabel = wallet == null
+        ? text.profileWalletLoadingHint
+        : '${_formatProfileNumber(context, wallet!.balance)} PawSpark';
 
     return ProfileGlassCard(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               ProfileAvatarBadge(
                 imageUrl: profile.avatar?.url,
                 fallbackLabel: displayName,
-                size: 80,
-                bottomBadge: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: onUploadAvatar,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: colors.accent,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: colors.backgroundBottom,
-                          width: 2,
-                        ),
-                      ),
-                      child: Icon(
-                        isSaving
-                            ? Icons.hourglass_top_rounded
-                            : Icons.camera_alt_rounded,
-                        color: colors.backgroundBottom,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ),
+                size: 72,
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            displayName,
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontSize: 19,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: onOpenSettings,
-                          icon: Icon(
-                            Icons.edit_rounded,
-                            color: colors.accent,
-                            size: 18,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      displayName,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      membershipLabel,
+                      style: TextStyle(
+                        color: profile.isPremium ? colors.gold : colors.accent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      profile.email,
+                      emailLabel,
                       style: TextStyle(
                         color: colors.textSoft,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ProfileStatusPill(
-                          label: profile.isPremium
-                              ? text.premiumLabel
-                              : text.freeLabel,
-                          leading: profile.isPremium
-                              ? Icons.workspace_premium_rounded
-                              : Icons.favorite_outline_rounded,
-                          backgroundColor: profile.isPremium
-                              ? colors.gold.withValues(alpha: 0.18)
-                              : colors.accentSoft,
-                          foregroundColor: profile.isPremium
-                              ? colors.gold
-                              : colors.accent,
-                        ),
-                        ProfileStatusPill(
-                          label: profile.emailConfirmed
-                              ? text.profileEmailConfirmed
-                              : text.profileEmailPending,
-                          leading: profile.emailConfirmed
-                              ? Icons.verified_rounded
-                              : Icons.mark_email_unread_outlined,
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            profile.email,
+            style: TextStyle(
+              color: colors.textStrong,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: colors.surfaceStrong.withValues(alpha: 0.42),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.border.withValues(alpha: 0.8)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: colors.accent,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    balanceLabel,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -344,10 +310,409 @@ class _ProfileHeroCard extends StatelessWidget {
   }
 }
 
-class _ProfilePetsRow extends StatelessWidget {
-  const _ProfilePetsRow({required this.onTap});
+class _WalletHighlightCard extends StatelessWidget {
+  const _WalletHighlightCard({required this.walletState, required this.onTap});
 
+  final WalletState walletState;
   final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final wallet = walletState.wallet;
+    final weeklyReady =
+      wallet?.nextWeeklyGrantAtUtc == null ||
+      wallet!.nextWeeklyGrantAtUtc!.isBefore(DateTime.now().toUtc());
+    final balanceText = wallet == null
+        ? (walletState.isLoading
+              ? text.profileWalletLoadingHint
+              : text.profileWalletEmptyHint)
+        : '${_formatProfileNumber(context, wallet.balance)} PawSpark';
+    final rewardLabel = wallet == null
+      ? text.profileWalletPreviewLoadingStatus
+      : weeklyReady
+      ? text.profileWalletPreviewWeeklyReady
+      : text.profileWalletPreviewAdCount(wallet.adRewardsRemainingToday);
+    final rewardColor = wallet == null
+      ? colors.textMuted
+      : weeklyReady
+      ? colors.gold
+      : colors.accent;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colors.border),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colors.accent.withValues(alpha: 0.26),
+                colors.blue.withValues(alpha: 0.2),
+                colors.surfaceGlass,
+              ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+            boxShadow: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: colors.backgroundBottom.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(
+                              Icons.account_balance_wallet_rounded,
+                              color: colors.textStrong,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  text.profileWalletPreviewEyebrow,
+                                  style: TextStyle(
+                                    color: colors.textSoft,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  text.profileWalletTitle,
+                                  style: TextStyle(
+                                    color: colors.textStrong,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            color: colors.textMuted,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        balanceText,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 24,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        text.profileWalletPreviewSubtitle,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: ProfileStatusPill(
+                              label: rewardLabel,
+                              leading: wallet == null
+                                  ? Icons.sync_rounded
+                                  : weeklyReady
+                                  ? Icons.card_giftcard_rounded
+                                  : Icons.play_circle_outline_rounded,
+                              backgroundColor: rewardColor.withValues(alpha: 0.14),
+                              foregroundColor: rewardColor,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            text.profileWalletPreviewAction,
+                            style: TextStyle(
+                              color: colors.accent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: colors.backgroundBottom.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: colors.textStrong,
+                    size: 26,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PremiumBannerCard extends StatelessWidget {
+  const _PremiumBannerCard({required this.isPremium, required this.onTap});
+
+  final bool isPremium;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final title = isPremium
+        ? text.profilePremiumBannerActiveTitle
+        : text.profilePremiumBannerTitle;
+    final actionLabel = isPremium
+        ? text.premiumManageAction
+        : text.profilePremiumOpenAction;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colors.gold.withValues(alpha: 0.28)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.gold.withValues(alpha: 0.24),
+            const Color(0xFF8A5A12).withValues(alpha: 0.28),
+            colors.surfaceGlass,
+          ],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, color: colors.gold, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _BenefitPill(
+                  label: text.profilePremiumBenefitUnlimitedTemplates,
+                ),
+                _BenefitPill(
+                  label: text.profilePremiumBenefitPriorityGeneration,
+                ),
+                _BenefitPill(label: text.profilePremiumBenefitNoWatermark),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 42,
+              child: ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.gold,
+                  foregroundColor: colors.backgroundBottom,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(
+                  actionLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileStatsCard extends StatelessWidget {
+  const _ProfileStatsCard({required this.profile, required this.wallet});
+
+  final MobileUserProfile profile;
+  final WalletStateModel? wallet;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final stats = [
+      _ProfileStatItem(
+        icon: Icons.savings_outlined,
+        value: wallet == null
+            ? '...'
+            : _formatProfileNumber(context, wallet!.balance),
+        label: text.profileStatBalanceLabel,
+        highlight: colors.accent,
+      ),
+      _ProfileStatItem(
+        icon: Icons.workspace_premium_outlined,
+        value: profile.isPremium ? text.premiumLabel : text.freeLabel,
+        label: text.profileStatPlanLabel,
+        highlight: profile.isPremium ? colors.gold : colors.accent,
+      ),
+      _ProfileStatItem(
+        icon: profile.emailConfirmed
+            ? Icons.verified_rounded
+            : Icons.mark_email_unread_outlined,
+        value: profile.emailConfirmed
+            ? text.profileStatReady
+            : text.profileStatPending,
+        label: text.profileEmailStat,
+        highlight: profile.emailConfirmed ? colors.blue : colors.gold,
+      ),
+      _ProfileStatItem(
+        icon: Icons.privacy_tip_outlined,
+        value: profile.legalAcceptance.isCurrentAccepted
+            ? text.profileStatReady
+            : text.profileStatPending,
+        label: text.profileStatLegalLabel,
+        highlight: profile.legalAcceptance.isCurrentAccepted
+            ? colors.accent
+            : colors.gold,
+      ),
+    ];
+
+    return ProfileGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ProfileSectionLabel(label: text.profileStatsSectionTitle),
+          const SizedBox(height: 6),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = 10.0;
+              final tileWidth = (constraints.maxWidth - spacing) / 2;
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final stat in stats)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _ProfileStatPanel(stat: stat),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileStatItem {
+  const _ProfileStatItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.highlight,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color highlight;
+}
+
+class _ProfileStatPanel extends StatelessWidget {
+  const _ProfileStatPanel({required this.stat});
+
+  final _ProfileStatItem stat;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: colors.surfaceStrong.withValues(alpha: 0.7),
+        border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: stat.highlight.withValues(alpha: 0.16),
+              ),
+              child: Icon(stat.icon, color: stat.highlight, size: 18),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              stat.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontSize: 16.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              stat.label,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 11.8,
+                height: 1.3,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileMagicMomentCard extends StatelessWidget {
+  const _ProfileMagicMomentCard();
 
   @override
   Widget build(BuildContext context) {
@@ -355,80 +720,82 @@ class _ProfilePetsRow extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return ProfileGlassCard(
-      padding: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(28),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.accent.withValues(alpha: 0.14),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colors.accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(Icons.pets_rounded, color: colors.accent, size: 22),
+                Positioned(
+                  top: 10,
+                  right: 9,
+                  child: Icon(Icons.star_rounded, color: colors.gold, size: 14),
                 ),
-                child: Icon(Icons.pets_rounded, color: colors.accent, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      text.profilePetsTitle,
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      text.profilePetsSubtitle,
-                      style: TextStyle(
-                        color: colors.textSoft,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              ...List.generate(
-                3,
-                (index) => Transform.translate(
-                  offset: Offset(index == 0 ? 0 : -10.0 * index, 0),
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.surfaceStrong,
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Icon(
-                      [
-                        Icons.pets_rounded,
-                        Icons.cruelty_free_outlined,
-                        Icons.favorite_rounded,
-                      ][index],
-                      color: [colors.accent, colors.gold, colors.blue][index],
-                      size: 18,
-                    ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text.profileMagicMomentTitle,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colors.textMuted,
-                size: 24,
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  text.profileMagicMomentSubtitle,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 12.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BenefitPill extends StatelessWidget {
+  const _BenefitPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.backgroundBottom.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border.withValues(alpha: 0.8)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: colors.textStrong,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -437,11 +804,10 @@ class _ProfilePetsRow extends StatelessWidget {
 }
 
 class _HeaderActionIcon extends StatelessWidget {
-  const _HeaderActionIcon({required this.icon, this.onTap, this.badgeColor});
+  const _HeaderActionIcon({required this.icon, this.onTap});
 
   final IconData icon;
   final VoidCallback? onTap;
-  final Color? badgeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -455,27 +821,14 @@ class _HeaderActionIcon extends StatelessWidget {
         child: SizedBox(
           width: 44,
           height: 44,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Center(child: Icon(icon, color: colors.textStrong, size: 26)),
-              if (badgeColor != null)
-                Positioned(
-                  top: 8,
-                  right: 4,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: badgeColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          child: Center(child: Icon(icon, color: colors.textStrong, size: 26)),
         ),
       ),
     );
   }
+}
+
+String _formatProfileNumber(BuildContext context, int value) {
+  final locale = Localizations.localeOf(context).toLanguageTag();
+  return NumberFormat.decimalPattern(locale).format(value);
 }

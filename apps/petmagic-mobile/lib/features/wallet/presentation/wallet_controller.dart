@@ -105,18 +105,36 @@ class WalletController extends Notifier<WalletState> {
     );
 
     try {
-      final results = await Future.wait<Object>([
-        _repository.fetchWallet(),
-        _repository.fetchLedger(take: 24),
-        _repository.fetchPacks(),
-        _repository.fetchPurchases(take: 12),
-      ]);
-
-      final wallet = results[0] as WalletStateModel;
-      final ledger = results[1] as OffsetPagedModel<WalletLedgerItem>;
-      final packs = results[2] as List<CurrencyPackModel>;
-      final purchases = results[3] as OffsetPagedModel<PurchaseHistoryItem>;
+      final wallet = await _repository.fetchWallet();
+      var ledger = const <WalletLedgerItem>[];
+      var packs = const <CurrencyPackModel>[];
+      var purchases = const <PurchaseHistoryItem>[];
       var paymentMethods = state.paymentMethods;
+      String? softError;
+
+      await Future.wait<void>([
+        () async {
+          try {
+            ledger = (await _repository.fetchLedger(take: 24)).items;
+          } catch (_) {
+            softError ??= 'wallet.ledger_failed';
+          }
+        }(),
+        () async {
+          try {
+            packs = await _repository.fetchPacks();
+          } catch (_) {
+            softError ??= 'wallet.packs_failed';
+          }
+        }(),
+        () async {
+          try {
+            purchases = (await _repository.fetchPurchases(take: 12)).items;
+          } catch (_) {
+            softError ??= 'wallet.purchases_failed';
+          }
+        }(),
+      ]);
 
       try {
         paymentMethods = await _repository.fetchPaymentMethods();
@@ -127,13 +145,13 @@ class WalletController extends Notifier<WalletState> {
 
       state = state.copyWith(
         wallet: wallet,
-        ledger: ledger.items,
+        ledger: ledger,
         packs: packs,
-        purchases: purchases.items,
+        purchases: purchases,
         paymentMethods: paymentMethods,
         isLoading: false,
         isRefreshing: false,
-        clearError: true,
+        errorMessage: softError,
       );
     } catch (error) {
       state = state.copyWith(

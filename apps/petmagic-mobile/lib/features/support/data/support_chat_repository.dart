@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:http_parser/http_parser.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -59,11 +59,12 @@ class SupportChatRepository {
   Future<SupportChatMessage> sendMessage({
     required String conversationId,
     required String body,
+    required String localeTag,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/messages',
-        data: {'body': body.trim()},
+        data: {'body': body.trim(), 'locale': localeTag},
         options: _authorizedOptions(session),
       ),
     );
@@ -71,11 +72,12 @@ class SupportChatRepository {
     return SupportChatMessage.fromJson(response.data ?? const {});
   }
 
-  Future<SupportChatMessage> sendImageAttachment({
+  Future<SupportChatMessage> sendAttachment({
     required String conversationId,
     required String filePath,
     required String fileName,
     required String contentType,
+    required String localeTag,
     String? body,
   }) async {
     final trimmedBody = body?.trim() ?? '';
@@ -84,6 +86,7 @@ class SupportChatRepository {
         '/api/support/conversation/$conversationId/attachments',
         data: FormData.fromMap({
           if (trimmedBody.isNotEmpty) 'body': trimmedBody,
+          'locale': localeTag,
           'file': MultipartFile.fromFileSync(
             filePath,
             filename: fileName,
@@ -97,6 +100,24 @@ class SupportChatRepository {
     );
 
     return SupportChatMessage.fromJson(response.data ?? const {});
+  }
+
+  Future<SupportChatMessage> sendImageAttachment({
+    required String conversationId,
+    required String filePath,
+    required String fileName,
+    required String contentType,
+    required String localeTag,
+    String? body,
+  }) {
+    return sendAttachment(
+      conversationId: conversationId,
+      filePath: filePath,
+      fileName: fileName,
+      contentType: contentType,
+      localeTag: localeTag,
+      body: body,
+    );
   }
 
   Future<void> markConversationRead(String conversationId) async {

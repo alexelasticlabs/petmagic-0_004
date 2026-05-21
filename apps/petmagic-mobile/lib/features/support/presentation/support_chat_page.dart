@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,10 +13,14 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _supportSecondaryGreen = Color(0xFF69D8A7);
 const _supportMessageGreen = Color(0xFF129369);
 const _supportMessageGreenBorder = Color(0xFF0D7752);
+const _supportComposerSendGreen = Color(0xFF00D97E);
+const _supportComposerIconColor = Color(0xFFA0AEC0);
+const _supportComposerHintColor = Color(0xFF7B8794);
 
 class SupportChatPage extends ConsumerStatefulWidget {
   const SupportChatPage({super.key});
@@ -40,11 +45,15 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   Timer? _loadingFallbackTimer;
   bool _showLoadingFallback = false;
   bool _showSecurityBanner = true;
+  bool _composerHasText = false;
+  bool _composerHasFocus = false;
 
   @override
   void initState() {
     super.initState();
     _controller = ref.read(supportChatControllerProvider.notifier);
+    _messageController.addListener(_handleComposerChanged);
+    _messageFocusNode.addListener(_handleComposerFocusChanged);
     _scrollController.addListener(_handleMessageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -58,6 +67,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   @override
   void dispose() {
     _loadingFallbackTimer?.cancel();
+    _messageController.removeListener(_handleComposerChanged);
+    _messageFocusNode.removeListener(_handleComposerFocusChanged);
     _scrollController.removeListener(_handleMessageScroll);
     _controller.stop();
     _messageController.dispose();
@@ -89,14 +100,199 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     _messageFocusNode.requestFocus();
   }
 
+  void _handleComposerChanged() {
+    final hasText = _messageController.text.trim().isNotEmpty;
+    if (hasText == _composerHasText || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _composerHasText = hasText;
+    });
+  }
+
+  void _handleComposerFocusChanged() {
+    final hasFocus = _messageFocusNode.hasFocus;
+    if (hasFocus == _composerHasFocus || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _composerHasFocus = hasFocus;
+    });
+  }
+
+  void _insertEmoji() {
+    const emoji = '😊';
+    final currentValue = _messageController.value;
+    final selection = currentValue.selection;
+    final start = selection.isValid
+        ? selection.start
+        : currentValue.text.length;
+    final end = selection.isValid ? selection.end : currentValue.text.length;
+    final safeStart = start < 0 ? currentValue.text.length : start;
+    final safeEnd = end < 0 ? currentValue.text.length : end;
+    final updatedText = currentValue.text.replaceRange(
+      safeStart,
+      safeEnd,
+      emoji,
+    );
+
+    _messageController.value = TextEditingValue(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: safeStart + emoji.length),
+    );
+    _messageFocusNode.requestFocus();
+  }
+
+  Future<void> _pickImageAttachment(String localeTag) async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 92,
+      maxWidth: 1800,
+    );
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    final wasSent = await _controller.sendImageAttachment(
+      picked,
+      body: _messageController.text,
+      localeTag: localeTag,
+    );
+    if (!mounted || !wasSent) {
+      return;
+    }
+
+    _messageController.clear();
+  }
+
+  Future<void> _pickFileAttachment(String localeTag) async {
+    final picked = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      type: FileType.any,
+    );
+    final file = picked?.files.single;
+    if (file == null || file.path == null || !mounted) {
+      return;
+    }
+
+    final wasSent = await _controller.sendAttachment(
+      filePath: file.path!,
+      fileName: file.name,
+      contentType: _controller.resolveContentTypeForUpload(file.path!),
+      localeTag: localeTag,
+      body: _messageController.text,
+    );
+    if (!mounted || !wasSent) {
+      return;
+    }
+
+    _messageController.clear();
+  }
+
+  Future<void> _showAttachmentOptions(String localeTag) async {
+    if (ref.read(supportChatControllerProvider).isSending) {
+      return;
+    }
+
+    final action = await showModalBottomSheet<_SupportAttachmentAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = sheetContext.petMagicColors;
+        final text = AppLocalizations.of(sheetContext);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surfaceStrong,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.85),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.border.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.photo_library_outlined,
+                      color: _supportComposerIconColor,
+                    ),
+                    title: Text(
+                      text.imageLabel,
+                      style: TextStyle(color: colors.textStrong),
+                    ),
+                    onTap: () => Navigator.of(
+                      sheetContext,
+                    ).pop(_SupportAttachmentAction.gallery),
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.attach_file_rounded,
+                      color: _supportComposerIconColor,
+                    ),
+                    title: Text(
+                      text.profileLegalDocumentSection,
+                      style: TextStyle(color: colors.textStrong),
+                    ),
+                    onTap: () => Navigator.of(
+                      sheetContext,
+                    ).pop(_SupportAttachmentAction.file),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    switch (action) {
+      case _SupportAttachmentAction.gallery:
+        await _pickImageAttachment(localeTag);
+      case _SupportAttachmentAction.file:
+        await _pickFileAttachment(localeTag);
+    }
+  }
+
+  Future<void> _sendCurrentMessage(String localeTag) async {
+    final body = _messageController.text;
+    await _controller.sendMessage(body, localeTag: localeTag);
+    if (!mounted) {
+      return;
+    }
+
+    if (body.trim().isNotEmpty) {
+      _messageController.clear();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(supportChatControllerProvider);
-    final controller = _controller;
     final conversation = state.conversation;
     final messages = conversation?.messages ?? const <SupportChatMessage>[];
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     final bottomNavInset = petMagicBottomNavInset(context);
     final isWaitingForInitialConversation =
         state.isLoading && conversation == null;
@@ -243,7 +439,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                                         setState(() {
                                           _showLoadingFallback = false;
                                         });
-                                        controller.initialize();
+                                        _controller.initialize();
                                       },
                                     ),
                                   ),
@@ -255,7 +451,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
 
                         if (messages.isEmpty) {
                           return RefreshIndicator(
-                            onRefresh: controller.refresh,
+                            onRefresh: _controller.refresh,
                             child: LayoutBuilder(
                               builder: (context, constraints) {
                                 return SingleChildScrollView(
@@ -288,7 +484,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                         }
 
                         return RefreshIndicator(
-                          onRefresh: controller.refresh,
+                          onRefresh: _controller.refresh,
                           child: ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(0, 6, 0, 24),
@@ -349,143 +545,150 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: colors.surface.withValues(alpha: 0.72),
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(
-                                color: colors.border.withValues(alpha: 0.8),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colors.shadow.withValues(alpha: 0.18),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  IconButton(
-                                    visualDensity: VisualDensity.compact,
-                                    splashRadius: 18,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 38,
-                                      minHeight: 38,
-                                    ),
-                                    onPressed: state.isSending
-                                        ? null
-                                        : () async {
-                                            final picked = await _imagePicker
-                                                .pickImage(
-                                                  source: ImageSource.gallery,
-                                                  imageQuality: 92,
-                                                  maxWidth: 1800,
-                                                );
-                                            if (picked == null || !mounted) {
-                                              return;
-                                            }
-
-                                            final wasSent = await controller
-                                                .sendImageAttachment(
-                                                  picked,
-                                                  body: _messageController.text,
-                                                );
-                                            if (!mounted || !wasSent) {
-                                              return;
-                                            }
-
-                                            _messageController.clear();
-                                          },
-                                    icon: Icon(
-                                      Icons.attach_file_rounded,
-                                      color: colors.textSoft,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _messageController,
-                                      focusNode: _messageFocusNode,
-                                      minLines: 1,
-                                      maxLines: 5,
-                                      textInputAction: TextInputAction.newline,
-                                      style: TextStyle(
-                                        color: colors.textStrong,
-                                        fontSize: 14.5,
-                                        height: 1.28,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText: text.supportChatInputHint,
-                                        hintStyle: TextStyle(
-                                          color: colors.textMuted,
-                                          fontSize: 13.5,
-                                          height: 1.25,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        border: InputBorder.none,
-                                        isDense: true,
-                                        contentPadding:
-                                            const EdgeInsets.fromLTRB(
-                                              0,
-                                              12,
-                                              0,
-                                              12,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOut,
+                      constraints: const BoxConstraints(minHeight: 62),
+                      padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: colors.accent.withValues(
+                            alpha: _composerHasFocus ? 0.2 : 0.08,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              elevation: 0.4,
-                              shadowColor: colors.accent.withValues(alpha: 0.2),
-                              shape: const CircleBorder(),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            splashRadius: 18,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 36,
+                              height: 36,
                             ),
                             onPressed: state.isSending
                                 ? null
-                                : () async {
-                                    final body = _messageController.text;
-                                    await controller.sendMessage(body);
-                                    if (!mounted) {
-                                      return;
-                                    }
-
-                                    if (body.trim().isNotEmpty) {
-                                      _messageController.clear();
-                                    }
-                                  },
-                            child: state.isSending
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.send_rounded, size: 20),
+                                : () => _showAttachmentOptions(localeTag),
+                            icon: const Icon(
+                              Icons.attach_file_rounded,
+                              size: 23,
+                              color: _supportComposerIconColor,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 2),
+                          Expanded(
+                            child: TextField(
+                              controller: _messageController,
+                              focusNode: _messageFocusNode,
+                              minLines: 1,
+                              maxLines: 5,
+                              textInputAction: TextInputAction.newline,
+                              style: TextStyle(
+                                color: colors.textStrong,
+                                fontSize: 15.5,
+                                height: 1.28,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: text.supportChatInputHint,
+                                hintStyle: TextStyle(
+                                  color: _supportComposerHintColor,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.fromLTRB(
+                                  4,
+                                  12,
+                                  4,
+                                  12,
+                                ),
+                                filled: false,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            splashRadius: 18,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 36,
+                              height: 36,
+                            ),
+                            onPressed: state.isSending ? null : _insertEmoji,
+                            icon: const Icon(
+                              Icons.sentiment_satisfied_alt_rounded,
+                              size: 23,
+                              color: _supportComposerIconColor,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          AnimatedScale(
+                            scale: _composerHasText ? 1 : 0.9,
+                            duration: const Duration(milliseconds: 150),
+                            curve: Curves.easeOut,
+                            child: IgnorePointer(
+                              ignoring: !_composerHasText || state.isSending,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                opacity: _composerHasText || state.isSending
+                                    ? 1
+                                    : 0.72,
+                                child: Material(
+                                  color: state.isSending
+                                      ? _supportComposerSendGreen.withValues(
+                                          alpha: 0.92,
+                                        )
+                                      : _composerHasText
+                                      ? _supportComposerSendGreen
+                                      : _supportComposerSendGreen.withValues(
+                                          alpha: 0.38,
+                                        ),
+                                  shape: const CircleBorder(),
+                                  child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: state.isSending || !_composerHasText
+                                        ? null
+                                        : () => _sendCurrentMessage(localeTag),
+                                    child: SizedBox(
+                                      width: 50,
+                                      height: 50,
+                                      child: Center(
+                                        child: state.isSending
+                                            ? const SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.send_rounded,
+                                                size: 21,
+                                                color: Colors.white,
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -515,6 +718,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
         localLeft.day == localRight.day;
   }
 }
+
+enum _SupportAttachmentAction { gallery, file }
 
 class _SupportHeader extends StatelessWidget {
   const _SupportHeader({
@@ -1083,6 +1288,14 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    final maxBubbleWidth = math.min(
+      MediaQuery.sizeOf(context).width * 0.68,
+      288.0,
+    );
+    final attachmentCacheWidth =
+        (maxBubbleWidth * MediaQuery.devicePixelRatioOf(context)).round();
+    final attachmentCacheHeight = (attachmentCacheWidth / 1.05).round();
     final bubbleColor = message.isFromAdmin
         ? colors.surfaceStrong
         : _supportMessageGreen;
@@ -1099,7 +1312,11 @@ class _MessageBubble extends StatelessWidget {
     final metaColor = message.isFromAdmin
         ? colors.textMuted
         : Colors.white.withValues(alpha: 0.78);
+    final deliveryLabel = message.isRead
+        ? text.supportChatMessageRead
+        : text.supportChatMessageDelivered;
     final hasImageAttachment = message.hasImageAttachment;
+    final hasFileAttachment = message.hasAttachment && !hasImageAttachment;
     final attachmentFileName = message.attachmentFileName?.trim();
     final shouldShowBody =
         message.body.trim().isNotEmpty &&
@@ -1124,9 +1341,7 @@ class _MessageBubble extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: math.min(MediaQuery.sizeOf(context).width * 0.68, 288),
-            ),
+            constraints: BoxConstraints(maxWidth: maxBubbleWidth),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: bubbleColor,
@@ -1164,6 +1379,8 @@ class _MessageBubble extends StatelessWidget {
                           child: Image.network(
                             message.attachmentUrl!,
                             fit: BoxFit.cover,
+                            cacheWidth: attachmentCacheWidth,
+                            cacheHeight: attachmentCacheHeight,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
                                 color: colors.surface,
@@ -1223,6 +1440,66 @@ class _MessageBubble extends StatelessWidget {
                       ],
                       if (shouldShowBody) const SizedBox(height: 8),
                     ],
+                    if (hasFileAttachment) ...[
+                      InkWell(
+                        onTap: () => _openAttachment(message.attachmentUrl),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 11,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.surface.withValues(alpha: 0.62),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: colors.border.withValues(alpha: 0.92),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.insert_drive_file_outlined,
+                                size: 18,
+                                color: metaColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      attachmentFileName ?? message.body,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: textColor,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _formatAttachmentSize(
+                                        message.attachmentFileSizeBytes,
+                                      ),
+                                      style: TextStyle(
+                                        color: metaColor,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (shouldShowBody) const SizedBox(height: 8),
+                    ],
                     if (shouldShowBody)
                       Text(
                         message.body,
@@ -1247,6 +1524,15 @@ class _MessageBubble extends StatelessWidget {
                         ),
                         if (!message.isFromAdmin) ...[
                           const SizedBox(width: 4),
+                          Text(
+                            deliveryLabel,
+                            style: TextStyle(
+                              color: metaColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                           Icon(
                             message.isRead
                                 ? Icons.done_all_rounded
@@ -1265,6 +1551,32 @@ class _MessageBubble extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _openAttachment(String? value) async {
+    final uri = value == null ? null : Uri.tryParse(value);
+    if (uri == null) {
+      return;
+    }
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  String _formatAttachmentSize(int? bytes) {
+    if (bytes == null || bytes <= 0) {
+      return 'File';
+    }
+
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+
+    final kilobytes = bytes / 1024;
+    if (kilobytes < 1024) {
+      return '${kilobytes.toStringAsFixed(1)} KB';
+    }
+
+    return '${(kilobytes / 1024).toStringAsFixed(1)} MB';
   }
 }
 

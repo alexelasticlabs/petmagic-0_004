@@ -18,11 +18,29 @@ class PremiumPage extends ConsumerStatefulWidget {
   ConsumerState<PremiumPage> createState() => _PremiumPageState();
 }
 
-class _PremiumPageState extends ConsumerState<PremiumPage> {
+class _PremiumPageState extends ConsumerState<PremiumPage>
+    with WidgetsBindingObserver {
+  bool _shouldReloadOnResume = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() => ref.read(premiumControllerProvider.notifier).load());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
+      _shouldReloadOnResume = false;
+      ref.read(premiumControllerProvider.notifier).load(refresh: true);
+    }
   }
 
   @override
@@ -51,7 +69,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                 onRefresh: () => controller.load(refresh: true),
                 color: colors.accent,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(18, 14, 18, bottomNavInset),
+                  padding: EdgeInsets.fromLTRB(18, 12, 18, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     _PremiumHeader(
@@ -78,20 +96,17 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                       ),
                       const SizedBox(height: 14),
                     ],
-                    _PremiumHero(status: state.status),
+                    _PremiumHero(
+                      status: state.status,
+                      selectedPlan: state.selectedPlan,
+                    ),
                     const SizedBox(height: 16),
-                    _BenefitsGrid(),
-                    const SizedBox(height: 18),
                     _PlansSection(state: state, controller: controller),
                     const SizedBox(height: 14),
                     _PaymentProviderSection(
                       state: state,
                       onSelect: controller.selectProvider,
                     ),
-                    const SizedBox(height: 14),
-                    _ComparisonSection(selectedPlan: state.selectedPlan),
-                    const SizedBox(height: 14),
-                    _SecurePaymentSection(),
                     const SizedBox(height: 18),
                     if (state.isPremium) ...[
                       FilledButton.icon(
@@ -123,13 +138,19 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
                               )
                             : const Icon(Icons.arrow_forward_rounded),
                         label: Text(
-                          _ctaLabel(text, state.selectedPlan),
+                          _ctaLabel(text),
                           maxLines: 2,
                           textAlign: TextAlign.center,
                         ),
                       ),
                       const SizedBox(height: 10),
                     ],
+                    _TrustSummary(selectedPlan: state.selectedPlan),
+                    const SizedBox(height: 18),
+                    _BenefitsList(selectedPlan: state.selectedPlan),
+                    const SizedBox(height: 14),
+                    _ComparisonSection(selectedPlan: state.selectedPlan),
+                    const SizedBox(height: 10),
                     TextButton.icon(
                       onPressed: state.isRestoring
                           ? null
@@ -161,6 +182,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage> {
       return;
     }
 
+    _shouldReloadOnResume = true;
     final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
     if (!launched) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -179,8 +201,14 @@ class _PremiumHeader extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        IconButton.filledTonal(
+          onPressed: () => Navigator.of(context).maybePop(),
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,34 +217,18 @@ class _PremiumHeader extends StatelessWidget {
                 text.premiumPageTitle,
                 style: TextStyle(
                   color: colors.textStrong,
-                  fontSize: 26,
+                  fontSize: 22,
                   fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                text.premiumPageSubtitle,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 13,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         IconButton.filledTonal(
           onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded),
           tooltip: text.retryAction,
-        ),
-        const SizedBox(width: 8),
-        IconButton.filledTonal(
-          onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(Icons.close_rounded),
-          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
         ),
       ],
     );
@@ -224,153 +236,180 @@ class _PremiumHeader extends StatelessWidget {
 }
 
 class _PremiumHero extends StatelessWidget {
-  const _PremiumHero({required this.status});
+  const _PremiumHero({required this.status, required this.selectedPlan});
 
   final PremiumStatusModel? status;
+  final PremiumPlanModel? selectedPlan;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final selectedPlanLabel = selectedPlan == null
+        ? null
+        : '${_planTitle(text, selectedPlan!)} · ${_tokensLabel(text, selectedPlan!)}';
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colors.surfaceStrong,
-              colors.accent.withValues(alpha: 0.22),
-              colors.gold.withValues(alpha: 0.18),
-            ],
-          ),
-          border: Border.all(color: colors.gold.withValues(alpha: 0.28)),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surfaceStrong,
+            colors.surfaceStrong.withValues(alpha: 0.96),
+            colors.gold.withValues(alpha: 0.08),
+          ],
         ),
-        child: SizedBox(
-          height: 330,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/auth/petmagic-auth-hero.png',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.bottomCenter,
+        border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                ProfileStatusPill(
+                  label: status?.isPremium == true
+                      ? text.premiumAlreadyActive
+                      : text.premiumHeroEyebrow,
+                  leading: Icons.workspace_premium_rounded,
+                  backgroundColor: colors.gold.withValues(alpha: 0.16),
+                  foregroundColor: colors.gold,
                 ),
+                const Spacer(),
+                Icon(Icons.auto_awesome_rounded, color: colors.gold, size: 20),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              text.premiumHeroTitle,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontSize: 28,
+                height: 1.05,
+                fontWeight: FontWeight.w900,
               ),
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        colors.surfaceStrong.withValues(alpha: 0.92),
-                        colors.surfaceStrong.withValues(alpha: 0.22),
-                        colors.surfaceStrong.withValues(alpha: 0.78),
-                      ],
-                    ),
-                  ),
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              text.premiumHeroSubtitle,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 13,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
               ),
-              Positioned(
-                left: 18,
-                top: 18,
-                right: 18,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ProfileStatusPill(
-                      label: status?.isPremium == true
-                          ? text.premiumAlreadyActive
-                          : text.premiumHeroEyebrow,
-                      leading: Icons.workspace_premium_rounded,
-                      backgroundColor: colors.gold.withValues(alpha: 0.18),
-                      foregroundColor: colors.gold,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      text.profilePremiumTitle,
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontSize: 30,
-                        height: 1.04,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 310),
-                      child: Text(
-                        text.profilePremiumSubtitle,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 13,
-                          height: 1.4,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+            ),
+            if (selectedPlanLabel != null) ...[
+              const SizedBox(height: 14),
+              Text(
+                selectedPlanLabel,
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _BenefitsGrid extends StatelessWidget {
+class _BenefitsList extends StatelessWidget {
+  const _BenefitsList({required this.selectedPlan});
+
+  final PremiumPlanModel? selectedPlan;
+
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final tokenAllowance = selectedPlan?.tokenAllowance;
     final benefits = [
-      _Benefit(Icons.pets_rounded, text.premiumBenefitUnlimitedTemplates),
-      _Benefit(Icons.flash_on_rounded, text.premiumBenefitFastGeneration),
-      _Benefit(Icons.cloud_upload_rounded, text.premiumBenefitHighQuality),
-      _Benefit(Icons.card_giftcard_rounded, text.premiumBenefitExclusive),
+      _Benefit(
+        Icons.workspace_premium_rounded,
+        text.premiumComparisonPremiumTemplates,
+      ),
+      _Benefit(Icons.visibility_off_rounded, text.premiumComparisonNoWatermark),
+      _Benefit(Icons.flash_on_rounded, text.premiumComparisonFast),
+      _Benefit(
+        Icons.auto_awesome_rounded,
+        tokenAllowance == null
+            ? text.premiumComparisonPremiumTokensFallback
+            : text.premiumComparisonPremiumTokens(tokenAllowance),
+      ),
     ];
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final benefit in benefits) ...[
-          Expanded(
-            child: Column(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: colors.accent.withValues(alpha: 0.13),
-                    border: Border.all(
-                      color: colors.gold.withValues(alpha: 0.22),
+        ProfileSectionLabel(label: text.premiumIncludesTitle),
+        const SizedBox(height: 2),
+        ProfileGlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Column(
+            children: [
+              for (var index = 0; index < benefits.length; index++) ...[
+                _BenefitLine(benefit: benefits[index]),
+                if (index < benefits.length - 1) const SizedBox(height: 10),
+              ],
+              if (selectedPlan != null) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    text.premiumTokenEstimate(
+                      _estimatedVideoCount(selectedPlan!.tokenAllowance),
+                      _estimatedPhotoCount(selectedPlan!.tokenAllowance),
                     ),
-                  ),
-                  child: Icon(benefit.icon, color: colors.accent, size: 25),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  benefit.label,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 11.5,
-                    height: 1.18,
-                    fontWeight: FontWeight.w800,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 11.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BenefitLine extends StatelessWidget {
+  const _BenefitLine({required this.benefit});
+
+  final _Benefit benefit;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Row(
+      children: [
+        Icon(Icons.check_circle_rounded, color: colors.textStrong, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            benefit.label,
+            style: TextStyle(
+              color: colors.textStrong,
+              fontSize: 12.5,
+              height: 1.25,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          if (benefit != benefits.last) const SizedBox(width: 8),
-        ],
+        ),
+        const SizedBox(width: 8),
+        Icon(benefit.icon, color: colors.textMuted, size: 18),
       ],
     );
   }
@@ -422,10 +461,10 @@ class _PlanCard extends StatelessWidget {
     final borderColor = selected ? colors.accent : colors.border;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
       onTap: onTap,
       child: ProfileGlassCard(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -443,7 +482,7 @@ class _PlanCard extends StatelessWidget {
                               _planTitle(text, plan),
                               style: TextStyle(
                                 color: colors.textStrong,
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -461,7 +500,7 @@ class _PlanCard extends StatelessWidget {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -470,7 +509,7 @@ class _PlanCard extends StatelessWidget {
                               _formatPrice(plan, plan.compareAtPriceAmount!),
                               style: TextStyle(
                                 color: colors.textMuted,
-                                fontSize: 13,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 decoration: TextDecoration.lineThrough,
                               ),
@@ -482,7 +521,7 @@ class _PlanCard extends StatelessWidget {
                               _formatPrice(plan, plan.priceAmount),
                               style: TextStyle(
                                 color: colors.textStrong,
-                                fontSize: 27,
+                                fontSize: 23,
                                 height: 1,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -495,12 +534,21 @@ class _PlanCard extends StatelessWidget {
                               _periodLabel(text, plan),
                               style: TextStyle(
                                 color: colors.textSoft,
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _tokensLabel(text, plan),
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ),
@@ -508,8 +556,8 @@ class _PlanCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
-                  width: 26,
-                  height: 26,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: selected ? colors.accent : Colors.transparent,
@@ -518,22 +566,18 @@ class _PlanCard extends StatelessWidget {
                   child: selected
                       ? Icon(
                           Icons.check_rounded,
-                          size: 17,
+                          size: 16,
                           color: colors.surface,
                         )
                       : null,
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                _PlanChip(
-                  icon: Icons.pets_rounded,
-                  label: _tokensLabel(text, plan),
-                ),
                 if (plan.discountPercent != null)
                   _PlanChip(
                     icon: Icons.savings_rounded,
@@ -667,7 +711,6 @@ class _ComparisonSection extends StatelessWidget {
           child: Column(
             children: [
               _ComparisonHeader(),
-              _ComparisonRow(text.premiumComparisonFreeTemplates, true, true),
               _ComparisonRow(
                 text.premiumComparisonPremiumTemplates,
                 false,
@@ -683,10 +726,9 @@ class _ComparisonSection extends StatelessWidget {
                       ),
               ),
               _ComparisonRow(text.premiumComparisonFast, false, true),
-              _ComparisonRow(text.premiumComparisonHighQuality, false, true),
               _ComparisonRow(text.premiumComparisonNoWatermark, false, true),
               _ComparisonRow(
-                text.premiumComparisonPrioritySupport,
+                text.premiumComparisonHighQuality,
                 false,
                 true,
                 showDivider: false,
@@ -695,6 +737,81 @@ class _ComparisonSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _TrustSummary extends StatelessWidget {
+  const _TrustSummary({required this.selectedPlan});
+
+  final PremiumPlanModel? selectedPlan;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final selectedPlanText = selectedPlan == null
+        ? null
+        : '${_planTitle(text, selectedPlan!)} · ${_formatPrice(selectedPlan!, selectedPlan!.priceAmount)} ${_periodLabel(text, selectedPlan!)}';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: colors.surfaceStrong.withValues(alpha: 0.58),
+        border: Border.all(color: colors.border.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (selectedPlanText != null) ...[
+              Text(
+                selectedPlanText,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _PlanChip(
+                  icon: Icons.workspace_premium_rounded,
+                  label: text.premiumPopularBadge,
+                ),
+                _PlanChip(
+                  icon: Icons.event_available_rounded,
+                  label: text.premiumCancelAnytime,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              text.premiumSocialProof,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              text.premiumSecurePaymentSubtitle,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 11.5,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -858,58 +975,6 @@ class _ComparisonIcon extends StatelessWidget {
   }
 }
 
-class _SecurePaymentSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-
-    return ProfileGlassCard(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: colors.accent.withValues(alpha: 0.12),
-            ),
-            child: Icon(Icons.verified_user_rounded, color: colors.textStrong),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  text.premiumSecurePaymentTitle,
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  text.premiumSecurePaymentSubtitle,
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 12,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Icon(Icons.credit_score_rounded, color: colors.accent),
-        ],
-      ),
-    );
-  }
-}
-
 class _PlanChip extends StatelessWidget {
   const _PlanChip({required this.icon, required this.label});
 
@@ -922,22 +987,22 @@ class _PlanChip extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.1),
+        color: colors.surfaceStrong.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.accent.withValues(alpha: 0.16)),
+        border: Border.all(color: colors.border.withValues(alpha: 0.6)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: colors.accent),
+            Icon(icon, size: 14, color: colors.textMuted),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: colors.accent,
-                fontSize: 11.5,
+                color: colors.textStrong,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -992,16 +1057,16 @@ String _providerLabel(AppLocalizations text, PremiumPaymentProvider provider) {
   };
 }
 
-String _ctaLabel(AppLocalizations text, PremiumPlanModel? plan) {
-  if (plan == null) {
-    return text.premiumContinueAction;
-  }
+String _ctaLabel(AppLocalizations text) {
+  return text.premiumContinueAction;
+}
 
-  return text.premiumContinueWithPlan(
-    _planTitle(text, plan).toLowerCase(),
-    _formatPrice(plan, plan.priceAmount),
-    _periodLabel(text, plan),
-  );
+int _estimatedVideoCount(int tokenAllowance) {
+  return tokenAllowance ~/ 20;
+}
+
+int _estimatedPhotoCount(int tokenAllowance) {
+  return tokenAllowance ~/ 5;
 }
 
 String _friendlyPremiumMessage(AppLocalizations text, String raw) {

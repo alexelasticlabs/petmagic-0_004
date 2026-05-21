@@ -589,7 +589,7 @@ void main() {
 
     final controller = container.read(supportChatControllerProvider.notifier);
     await controller.initialize();
-    await controller.sendMessage('I need billing help');
+    await controller.sendMessage('I need billing help', localeTag: 'en');
 
     final state = container.read(supportChatControllerProvider);
     expect(supportRepository.lastSentBody, 'I need billing help');
@@ -1224,6 +1224,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
   Future<SupportChatMessage> sendMessage({
     required String conversationId,
     required String body,
+    required String localeTag,
   }) async {
     lastSentBody = body;
     final message = SupportChatMessage(

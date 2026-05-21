@@ -115,6 +115,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileEmailPending => 'Email не подтвержден';
 
   @override
+  String get profileEmailVerifiedShort => 'Email подтвержден';
+
+  @override
+  String get profileEmailPendingShort => 'Подтвердите email';
+
+  @override
   String get profileSignedOut => 'Вы вышли на этом устройстве.';
 
   @override
@@ -159,6 +165,302 @@ class AppLocalizationsRu extends AppLocalizations {
       'Откройте все шаблоны и premium-сценарии редактирования.';
 
   @override
+  String get profilePremiumPlanLabel => 'Premium тариф';
+
+  @override
+  String get profileFreePlanLabel => 'Бесплатный тариф';
+
+  @override
+  String get profilePremiumBannerTitle => 'Перейти на Premium';
+
+  @override
+  String get profilePremiumBannerActiveTitle => 'Premium активен';
+
+  @override
+  String get profilePremiumBenefitUnlimitedTemplates => 'Безлимитные шаблоны';
+
+  @override
+  String get profilePremiumBenefitPriorityGeneration =>
+      'Приоритетная генерация';
+
+  @override
+  String get profilePremiumBenefitNoWatermark => 'Без водяного знака';
+
+  @override
+  String get profilePremiumOpenAction => 'Открыть Premium';
+
+  @override
+  String get profileWalletTitle => 'Кошелек';
+
+  @override
+  String get profileWalletHistoryHint => 'Баланс, покупки и история операций.';
+
+  @override
+  String get profileWalletLoadingHint => 'Загружаем баланс...';
+
+  @override
+  String get profileWalletEmptyHint => 'Откройте баланс и историю';
+
+  @override
+  String get walletDataUnavailableFallback =>
+      'Данные кошелька сейчас недоступны.';
+
+  @override
+  String get walletRefreshTooltip => 'Обновить кошелек';
+
+  @override
+  String get walletBalanceTitle => 'Доступно для генераций';
+
+  @override
+  String get walletBalanceEyebrow => 'Баланс';
+
+  @override
+  String get walletBalanceUnit => 'PawSpark';
+
+  @override
+  String get walletBalanceExplanation =>
+      'PawSpark — внутренняя валюта для фото- и видео-генераций.';
+
+  @override
+  String get walletPremiumStatus => 'Premium-кошелек';
+
+  @override
+  String get walletFreeStatus => 'Базовый кошелек';
+
+  @override
+  String walletSavedCardsCount(Object count) {
+    return 'Сохраненных карт: $count';
+  }
+
+  @override
+  String get walletWeeklyReady => 'Недельная награда доступна';
+
+  @override
+  String get walletWeeklyPending => 'Недельная награда ожидается';
+
+  @override
+  String walletAdRewardsCount(Object count) {
+    return 'Наград за рекламу: $count';
+  }
+
+  @override
+  String get walletQuickActionsTitle => 'Инструменты кошелька';
+
+  @override
+  String get walletPaymentMethodsAction => 'Способы оплаты';
+
+  @override
+  String get walletRedeemAction => 'Промокод';
+
+  @override
+  String get walletRewardsTitle => 'Бонусы и награды';
+
+  @override
+  String get walletWeeklyRewardAction => 'Недельная награда';
+
+  @override
+  String get walletRewardReadyDescription =>
+      'Можно забрать прямо сейчас и сразу пополнить баланс.';
+
+  @override
+  String get walletRewardPendingDescription =>
+      'Станет доступна позже. Мы просто покажем статус без лишней тревоги.';
+
+  @override
+  String get walletAdRewardAction => 'Награда за рекламу';
+
+  @override
+  String walletAdRewardDescription(Object count) {
+    return 'Доступно сегодня: $count. Подходит для быстрого пополнения PawSpark.';
+  }
+
+  @override
+  String get walletBuySparkTitle => 'Купить PawSpark';
+
+  @override
+  String walletPackTotalSpark(Object count) {
+    return '$count PawSpark';
+  }
+
+  @override
+  String get walletPopularBadge => 'Популярно';
+
+  @override
+  String get walletBestValueLabel => 'Лучшее соотношение';
+
+  @override
+  String walletPackBonus(Object count) {
+    return '+$count бонус';
+  }
+
+  @override
+  String walletBuyForPrice(Object price) {
+    return 'Купить за $price';
+  }
+
+  @override
+  String walletPackBreakdown(Object base, Object bonus) {
+    return '$base база + $bonus бонус';
+  }
+
+  @override
+  String get walletRecentTransactionsTitle => 'Последние операции';
+
+  @override
+  String get walletNoActivity => 'Операций в кошельке пока нет.';
+
+  @override
+  String walletBalanceAfter(Object count) {
+    return 'Баланс: $count';
+  }
+
+  @override
+  String get walletPurchaseHistoryTitle => 'История покупок';
+
+  @override
+  String walletPurchaseSummary(Object count, Object date) {
+    return '$count PawSpark • $date';
+  }
+
+  @override
+  String get walletUnavailableTitle => 'Кошелек временно недоступен';
+
+  @override
+  String get walletTryAgainAction => 'Попробовать снова';
+
+  @override
+  String get walletPaymentMethodsTitle => 'Способы оплаты';
+
+  @override
+  String get walletNoSavedCards => 'Сохраненных карт пока нет.';
+
+  @override
+  String get walletOpeningStripe => 'Открываем Stripe';
+
+  @override
+  String get walletAddCard => 'Добавить карту';
+
+  @override
+  String get walletRemoveCardTooltip => 'Удалить карту';
+
+  @override
+  String get walletStripeCheckout => 'Stripe Checkout';
+
+  @override
+  String walletPayWithCard(Object last4) {
+    return 'Оплатить картой •••• $last4';
+  }
+
+  @override
+  String get walletDefaultCard => 'Карта по умолчанию';
+
+  @override
+  String get walletSavedCard => 'Сохраненная карта';
+
+  @override
+  String get walletDefaultSuffix => ' • основная';
+
+  @override
+  String walletExpires(Object month, Object year, Object suffix) {
+    return 'Действует до $month/$year$suffix';
+  }
+
+  @override
+  String get walletPending => 'Ожидается';
+
+  @override
+  String get walletSourcePackPurchase => 'Пополнение';
+
+  @override
+  String get walletSourceGenerationSpend => 'Генерация шаблона';
+
+  @override
+  String get walletSourceGenerationRefund => 'Возврат за генерацию';
+
+  @override
+  String get walletSourceWeeklyGrant => 'Недельная награда';
+
+  @override
+  String get walletSourceAdReward => 'Награда за рекламу';
+
+  @override
+  String get walletSourceAdminGrant => 'Начисление поддержки';
+
+  @override
+  String get walletSourceAdminDebit => 'Корректировка поддержки';
+
+  @override
+  String get walletPurchaseCompleted => 'Завершено';
+
+  @override
+  String get walletPurchaseFailed => 'Ошибка';
+
+  @override
+  String get walletPartialActivityUnavailable =>
+      'Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.';
+
+  @override
+  String get walletPaymentMethodUnavailableError =>
+      'Выбранная сохраненная карта больше недоступна. Выберите другую карту или используйте Stripe Checkout.';
+
+  @override
+  String get walletPaymentGatewayUnavailableError =>
+      'Оплата временно недоступна. Попробуйте Stripe Checkout чуть позже.';
+
+  @override
+  String get walletPackUnavailableError =>
+      'Этот набор PawSpark больше недоступен.';
+
+  @override
+  String get walletRedeemCodeNotFoundError => 'Промокод не найден.';
+
+  @override
+  String get walletRedeemCodeAlreadyUsedError =>
+      'Этот промокод уже использован.';
+
+  @override
+  String get walletRedeemCodeExpiredError => 'Срок действия промокода истек.';
+
+  @override
+  String get walletInsufficientBalanceError =>
+      'Для этой операции недостаточно PawSpark.';
+
+  @override
+  String get walletUnavailableError =>
+      'Данные кошелька временно недоступны. Попробуйте еще раз чуть позже.';
+
+  @override
+  String get walletWeeklyNotReadyError => 'Недельная награда пока недоступна.';
+
+  @override
+  String get walletRedeemSheetTitle => 'Промокод';
+
+  @override
+  String get walletRedeemHint => 'WELCOME-100';
+
+  @override
+  String get walletApplyCode => 'Применить код';
+
+  @override
+  String get profileStatsSectionTitle => 'Статистика аккаунта';
+
+  @override
+  String get profileStatBalanceLabel => 'Баланс';
+
+  @override
+  String get profileStatPlanLabel => 'Тариф';
+
+  @override
+  String get profileStatLegalLabel => 'Согласия';
+
+  @override
+  String get profileMagicMomentTitle => 'Ваш следующий звездный момент';
+
+  @override
+  String get profileMagicMomentSubtitle =>
+      'Создайте что-то яркое для своих питомцев всего за пару касаний.';
+
+  @override
   String get premiumPageTitle => 'PetMagic Premium';
 
   @override
@@ -167,6 +469,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get premiumHeroEyebrow => 'Premium магия';
+
+  @override
+  String get premiumHeroTitle =>
+      'Получите Premium и создавайте больше контента.';
+
+  @override
+  String get premiumHeroSubtitle =>
+      'Откройте premium-шаблоны, более быструю генерацию и больше возможностей для фото и видео в одном тарифе.';
 
   @override
   String get premiumAlreadyActive => 'Premium активен';
@@ -226,6 +536,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumCancelAnytime => 'Можно отменить в любой момент';
 
   @override
+  String get premiumIncludesTitle => 'Что входит в Premium';
+
+  @override
+  String premiumTokenEstimate(Object videos, Object photos) {
+    return 'Примерно $videos видео или $photos фото в месяц, в зависимости от сложности шаблона.';
+  }
+
+  @override
+  String get premiumSocialProof =>
+      'Самый популярный тариф для тех, кто регулярно создаёт контент в PetMagic.';
+
+  @override
   String get premiumPaymentTitle => 'Способ оплаты';
 
   @override
@@ -238,7 +560,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
-  String get premiumComparisonTitle => 'Сравнение возможностей';
+  String get premiumComparisonTitle => 'Что меняется с Premium';
 
   @override
   String get premiumFreeColumn => 'Бесплатно';
@@ -283,7 +605,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.';
 
   @override
-  String get premiumContinueAction => 'Продолжить';
+  String get premiumContinueAction => 'Получить Premium';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -357,6 +679,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileTermsPending => 'Проверьте согласия в настройках аккаунта.';
 
   @override
+  String get profileLegalShortcutTitle => 'Приватность и правила';
+
+  @override
+  String get profileLegalShortcutAccepted =>
+      'Условия приняты • Настройки приватности';
+
+  @override
+  String get profileLegalShortcutPending => 'Проверьте согласия';
+
+  @override
   String get profileSupportTitle => 'Связаться с поддержкой';
 
   @override
@@ -364,11 +696,19 @@ class AppLocalizationsRu extends AppLocalizations {
       'Мы рядом, если нужна помощь с аккаунтом.';
 
   @override
+  String get profileSupportCompactSubtitle =>
+      'Помощь с оплатой и доступом к аккаунту.';
+
+  @override
   String get profileSettingsShortcutTitle => 'Настройки';
 
   @override
   String get profileSettingsShortcutSubtitle =>
       'Управляйте языком, темой и разделами аккаунта.';
+
+  @override
+  String get profileSettingsCompactSubtitle =>
+      'Язык, тема и настройки аккаунта.';
 
   @override
   String get profilePreferenceEnabled => 'Включено';
@@ -779,6 +1119,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatStatusClosed => 'Закрыт';
+
+  @override
+  String get supportChatMessageDelivered => 'Доставлено';
+
+  @override
+  String get supportChatMessageRead => 'Прочитано';
 
   @override
   String get profileSettingsThemeSystem => 'Системная';

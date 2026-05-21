@@ -313,6 +313,18 @@ abstract class AppLocalizations {
   /// **'Email not confirmed'**
   String get profileEmailPending;
 
+  /// No description provided for @profileEmailVerifiedShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified'**
+  String get profileEmailVerifiedShort;
+
+  /// No description provided for @profileEmailPendingShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify email'**
+  String get profileEmailPendingShort;
+
   /// No description provided for @profileSignedOut.
   ///
   /// In en, this message translates to:
@@ -397,6 +409,528 @@ abstract class AppLocalizations {
   /// **'Unlock all templates and premium editing flows.'**
   String get profilePremiumSubtitle;
 
+  /// No description provided for @profilePremiumPlanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium Plan'**
+  String get profilePremiumPlanLabel;
+
+  /// No description provided for @profileFreePlanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Free Plan'**
+  String get profileFreePlanLabel;
+
+  /// No description provided for @profilePremiumBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to Premium'**
+  String get profilePremiumBannerTitle;
+
+  /// No description provided for @profilePremiumBannerActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium active'**
+  String get profilePremiumBannerActiveTitle;
+
+  /// No description provided for @profilePremiumBenefitUnlimitedTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited templates'**
+  String get profilePremiumBenefitUnlimitedTemplates;
+
+  /// No description provided for @profilePremiumBenefitPriorityGeneration.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority generation'**
+  String get profilePremiumBenefitPriorityGeneration;
+
+  /// No description provided for @profilePremiumBenefitNoWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'No watermark'**
+  String get profilePremiumBenefitNoWatermark;
+
+  /// No description provided for @profilePremiumOpenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade'**
+  String get profilePremiumOpenAction;
+
+  /// No description provided for @profileWalletTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get profileWalletTitle;
+
+  /// No description provided for @profileWalletHistoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open balance, purchases and history.'**
+  String get profileWalletHistoryHint;
+
+  /// No description provided for @profileWalletLoadingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading balance...'**
+  String get profileWalletLoadingHint;
+
+  /// No description provided for @profileWalletEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open balance and history'**
+  String get profileWalletEmptyHint;
+
+  /// No description provided for @walletDataUnavailableFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet data is not available right now.'**
+  String get walletDataUnavailableFallback;
+
+  /// No description provided for @walletRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh wallet'**
+  String get walletRefreshTooltip;
+
+  /// No description provided for @walletBalanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Available for generation'**
+  String get walletBalanceTitle;
+
+  /// No description provided for @walletBalanceEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get walletBalanceEyebrow;
+
+  /// No description provided for @walletBalanceUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'PawSpark'**
+  String get walletBalanceUnit;
+
+  /// No description provided for @walletBalanceExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'PawSpark is the in-app currency used for photo and video generations.'**
+  String get walletBalanceExplanation;
+
+  /// No description provided for @walletPremiumStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium wallet'**
+  String get walletPremiumStatus;
+
+  /// No description provided for @walletFreeStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Free wallet'**
+  String get walletFreeStatus;
+
+  /// No description provided for @walletSavedCardsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} saved cards'**
+  String walletSavedCardsCount(Object count);
+
+  /// No description provided for @walletWeeklyReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly ready'**
+  String get walletWeeklyReady;
+
+  /// No description provided for @walletWeeklyPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly pending'**
+  String get walletWeeklyPending;
+
+  /// No description provided for @walletAdRewardsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} ad rewards'**
+  String walletAdRewardsCount(Object count);
+
+  /// No description provided for @walletQuickActionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet tools'**
+  String get walletQuickActionsTitle;
+
+  /// No description provided for @walletPaymentMethodsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment methods'**
+  String get walletPaymentMethodsAction;
+
+  /// No description provided for @walletRedeemAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem code'**
+  String get walletRedeemAction;
+
+  /// No description provided for @walletRewardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards and bonuses'**
+  String get walletRewardsTitle;
+
+  /// No description provided for @walletWeeklyRewardAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly reward'**
+  String get walletWeeklyRewardAction;
+
+  /// No description provided for @walletRewardReadyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'You can claim it now and top up your balance right away.'**
+  String get walletRewardReadyDescription;
+
+  /// No description provided for @walletRewardPendingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'It will unlock later. We keep the status visible without showing a scary error.'**
+  String get walletRewardPendingDescription;
+
+  /// No description provided for @walletAdRewardAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Ad reward'**
+  String get walletAdRewardAction;
+
+  /// No description provided for @walletAdRewardDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Available today: {count}. Use it when you need a quick PawSpark top-up.'**
+  String walletAdRewardDescription(Object count);
+
+  /// No description provided for @walletBuySparkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy PawSpark'**
+  String get walletBuySparkTitle;
+
+  /// No description provided for @walletPackTotalSpark.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} PawSpark'**
+  String walletPackTotalSpark(Object count);
+
+  /// No description provided for @walletPopularBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get walletPopularBadge;
+
+  /// No description provided for @walletBestValueLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Best value'**
+  String get walletBestValueLabel;
+
+  /// No description provided for @walletPackBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} bonus'**
+  String walletPackBonus(Object count);
+
+  /// No description provided for @walletBuyForPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy for {price}'**
+  String walletBuyForPrice(Object price);
+
+  /// No description provided for @walletPackBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{base} base + {bonus} bonus'**
+  String walletPackBreakdown(Object base, Object bonus);
+
+  /// No description provided for @walletRecentTransactionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent transactions'**
+  String get walletRecentTransactionsTitle;
+
+  /// No description provided for @walletNoActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'No wallet activity yet.'**
+  String get walletNoActivity;
+
+  /// No description provided for @walletBalanceAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Bal. {count}'**
+  String walletBalanceAfter(Object count);
+
+  /// No description provided for @walletPurchaseHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase history'**
+  String get walletPurchaseHistoryTitle;
+
+  /// No description provided for @walletPurchaseSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} PawSpark • {date}'**
+  String walletPurchaseSummary(Object count, Object date);
+
+  /// No description provided for @walletUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet is temporarily unavailable'**
+  String get walletUnavailableTitle;
+
+  /// No description provided for @walletTryAgainAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get walletTryAgainAction;
+
+  /// No description provided for @walletPaymentMethodsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment methods'**
+  String get walletPaymentMethodsTitle;
+
+  /// No description provided for @walletNoSavedCards.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved cards yet.'**
+  String get walletNoSavedCards;
+
+  /// No description provided for @walletOpeningStripe.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Stripe'**
+  String get walletOpeningStripe;
+
+  /// No description provided for @walletAddCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Add card'**
+  String get walletAddCard;
+
+  /// No description provided for @walletRemoveCardTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove card'**
+  String get walletRemoveCardTooltip;
+
+  /// No description provided for @walletStripeCheckout.
+  ///
+  /// In en, this message translates to:
+  /// **'Stripe Checkout'**
+  String get walletStripeCheckout;
+
+  /// No description provided for @walletPayWithCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay with •••• {last4}'**
+  String walletPayWithCard(Object last4);
+
+  /// No description provided for @walletDefaultCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Default card'**
+  String get walletDefaultCard;
+
+  /// No description provided for @walletSavedCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved card'**
+  String get walletSavedCard;
+
+  /// No description provided for @walletDefaultSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **' • default'**
+  String get walletDefaultSuffix;
+
+  /// No description provided for @walletExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires {month}/{year}{suffix}'**
+  String walletExpires(Object month, Object year, Object suffix);
+
+  /// No description provided for @walletPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get walletPending;
+
+  /// No description provided for @walletSourcePackPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Added funds'**
+  String get walletSourcePackPurchase;
+
+  /// No description provided for @walletSourceGenerationSpend.
+  ///
+  /// In en, this message translates to:
+  /// **'Template generation'**
+  String get walletSourceGenerationSpend;
+
+  /// No description provided for @walletSourceGenerationRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation refund'**
+  String get walletSourceGenerationRefund;
+
+  /// No description provided for @walletSourceWeeklyGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly reward'**
+  String get walletSourceWeeklyGrant;
+
+  /// No description provided for @walletSourceAdReward.
+  ///
+  /// In en, this message translates to:
+  /// **'Ad reward'**
+  String get walletSourceAdReward;
+
+  /// No description provided for @walletSourceAdminGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Support credit'**
+  String get walletSourceAdminGrant;
+
+  /// No description provided for @walletSourceAdminDebit.
+  ///
+  /// In en, this message translates to:
+  /// **'Support adjustment'**
+  String get walletSourceAdminDebit;
+
+  /// No description provided for @walletPurchaseCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get walletPurchaseCompleted;
+
+  /// No description provided for @walletPurchaseFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get walletPurchaseFailed;
+
+  /// No description provided for @walletPartialActivityUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Your balance is already available. History and some wallet actions will refresh a bit later.'**
+  String get walletPartialActivityUnavailable;
+
+  /// No description provided for @walletPaymentMethodUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected saved card is no longer available. Choose another card or use Stripe Checkout.'**
+  String get walletPaymentMethodUnavailableError;
+
+  /// No description provided for @walletPaymentGatewayUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment is temporarily unavailable. Please try Stripe Checkout again in a moment.'**
+  String get walletPaymentGatewayUnavailableError;
+
+  /// No description provided for @walletPackUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'This PawSpark pack is no longer available.'**
+  String get walletPackUnavailableError;
+
+  /// No description provided for @walletRedeemCodeNotFoundError.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem code was not found.'**
+  String get walletRedeemCodeNotFoundError;
+
+  /// No description provided for @walletRedeemCodeAlreadyUsedError.
+  ///
+  /// In en, this message translates to:
+  /// **'This redeem code was already used.'**
+  String get walletRedeemCodeAlreadyUsedError;
+
+  /// No description provided for @walletRedeemCodeExpiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem code has expired.'**
+  String get walletRedeemCodeExpiredError;
+
+  /// No description provided for @walletInsufficientBalanceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough PawSpark for this operation.'**
+  String get walletInsufficientBalanceError;
+
+  /// No description provided for @walletUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet data is temporarily unavailable. Please try again in a moment.'**
+  String get walletUnavailableError;
+
+  /// No description provided for @walletWeeklyNotReadyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly reward is not ready yet.'**
+  String get walletWeeklyNotReadyError;
+
+  /// No description provided for @walletRedeemSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem code'**
+  String get walletRedeemSheetTitle;
+
+  /// No description provided for @walletRedeemHint.
+  ///
+  /// In en, this message translates to:
+  /// **'WELCOME-100'**
+  String get walletRedeemHint;
+
+  /// No description provided for @walletApplyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply code'**
+  String get walletApplyCode;
+
+  /// No description provided for @profileStatsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account stats'**
+  String get profileStatsSectionTitle;
+
+  /// No description provided for @profileStatBalanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get profileStatBalanceLabel;
+
+  /// No description provided for @profileStatPlanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get profileStatPlanLabel;
+
+  /// No description provided for @profileStatLegalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal'**
+  String get profileStatLegalLabel;
+
+  /// No description provided for @profileMagicMomentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your next pet star moment'**
+  String get profileMagicMomentTitle;
+
+  /// No description provided for @profileMagicMomentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create something playful for your pets in just a few taps.'**
+  String get profileMagicMomentSubtitle;
+
   /// No description provided for @premiumPageTitle.
   ///
   /// In en, this message translates to:
@@ -414,6 +948,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Premium magic'**
   String get premiumHeroEyebrow;
+
+  /// No description provided for @premiumHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Premium and create more content.'**
+  String get premiumHeroTitle;
+
+  /// No description provided for @premiumHeroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock premium templates, faster generation and more room for photos and videos in one plan.'**
+  String get premiumHeroSubtitle;
 
   /// No description provided for @premiumAlreadyActive.
   ///
@@ -517,6 +1063,24 @@ abstract class AppLocalizations {
   /// **'Cancel anytime'**
   String get premiumCancelAnytime;
 
+  /// No description provided for @premiumIncludesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What Premium includes'**
+  String get premiumIncludesTitle;
+
+  /// No description provided for @premiumTokenEstimate.
+  ///
+  /// In en, this message translates to:
+  /// **'{videos} videos or {photos} photos per month, depending on template complexity.'**
+  String premiumTokenEstimate(Object videos, Object photos);
+
+  /// No description provided for @premiumSocialProof.
+  ///
+  /// In en, this message translates to:
+  /// **'Most chosen plan for regular PetMagic creators.'**
+  String get premiumSocialProof;
+
   /// No description provided for @premiumPaymentTitle.
   ///
   /// In en, this message translates to:
@@ -544,7 +1108,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumComparisonTitle.
   ///
   /// In en, this message translates to:
-  /// **'Feature comparison'**
+  /// **'What changes with Premium'**
   String get premiumComparisonTitle;
 
   /// No description provided for @premiumFreeColumn.
@@ -628,7 +1192,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumContinueAction.
   ///
   /// In en, this message translates to:
-  /// **'Continue'**
+  /// **'Start Premium'**
   String get premiumContinueAction;
 
   /// No description provided for @premiumContinueWithPlan.
@@ -751,6 +1315,24 @@ abstract class AppLocalizations {
   /// **'Complete consent review in account settings.'**
   String get profileTermsPending;
 
+  /// No description provided for @profileLegalShortcutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Legal'**
+  String get profileLegalShortcutTitle;
+
+  /// No description provided for @profileLegalShortcutAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms accepted • Privacy settings'**
+  String get profileLegalShortcutAccepted;
+
+  /// No description provided for @profileLegalShortcutPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Review permissions'**
+  String get profileLegalShortcutPending;
+
   /// No description provided for @profileSupportTitle.
   ///
   /// In en, this message translates to:
@@ -763,6 +1345,12 @@ abstract class AppLocalizations {
   /// **'We are here when you need help with your account.'**
   String get profileSupportSubtitle;
 
+  /// No description provided for @profileSupportCompactSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help with billing or account access.'**
+  String get profileSupportCompactSubtitle;
+
   /// No description provided for @profileSettingsShortcutTitle.
   ///
   /// In en, this message translates to:
@@ -774,6 +1362,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage language, theme and account sections.'**
   String get profileSettingsShortcutSubtitle;
+
+  /// No description provided for @profileSettingsCompactSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Language, theme and account settings.'**
+  String get profileSettingsCompactSubtitle;
 
   /// No description provided for @profilePreferenceEnabled.
   ///
@@ -1482,6 +2076,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Closed'**
   String get supportChatStatusClosed;
+
+  /// No description provided for @supportChatMessageDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get supportChatMessageDelivered;
+
+  /// No description provided for @supportChatMessageRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get supportChatMessageRead;
 
   /// No description provided for @profileSettingsThemeSystem.
   ///

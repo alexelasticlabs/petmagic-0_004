@@ -6,6 +6,29 @@ class AppConfig {
   const AppConfig._();
 
   static const configuredApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const enablePerformanceOverlay = bool.fromEnvironment(
+    'PETMAGIC_PROFILE_OVERLAY',
+  );
+  static const enableCheckerboardRasterCacheImages = bool.fromEnvironment(
+    'PETMAGIC_PROFILE_CHECKERBOARD_RASTER_CACHE',
+  );
+  static const enableCheckerboardOffscreenLayers = bool.fromEnvironment(
+    'PETMAGIC_PROFILE_CHECKERBOARD_OFFSCREEN_LAYERS',
+  );
+  static const enableFrameTelemetry = bool.fromEnvironment(
+    'PETMAGIC_PROFILE_FRAME_LOGS',
+  );
+  static const enableImageCacheTelemetry = bool.fromEnvironment(
+    'PETMAGIC_PROFILE_IMAGE_CACHE_LOGS',
+  );
+  static const targetFrameBudgetMs = int.fromEnvironment(
+    'PETMAGIC_TARGET_FRAME_BUDGET_MS',
+    defaultValue: 8,
+  );
+  static const imageCacheTelemetryIntervalSeconds = int.fromEnvironment(
+    'PETMAGIC_IMAGE_CACHE_LOG_INTERVAL_SECONDS',
+    defaultValue: 8,
+  );
 
   static List<String> get apiBaseUrls {
     if (configuredApiBaseUrl.isNotEmpty) {

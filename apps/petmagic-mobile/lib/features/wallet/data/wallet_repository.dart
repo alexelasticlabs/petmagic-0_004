@@ -124,15 +124,19 @@ class WalletRepository {
     CurrencyPackModel pack, {
     String? paymentMethodId,
   }) async {
+    final payload = <String, Object?>{
+      'packId': pack.packId,
+      'currencyCode': pack.currencyCode,
+      'paymentProvider': 'stripe',
+    };
+    if (paymentMethodId != null && paymentMethodId.isNotEmpty) {
+      payload['paymentMethodId'] = paymentMethodId;
+    }
+
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/purchases/create',
-        data: {
-          'packId': pack.packId,
-          'currencyCode': pack.currencyCode,
-          'paymentProvider': 'stripe',
-          'paymentMethodId': ?paymentMethodId,
-        },
+        data: payload,
         options: _authOptions(session.accessToken),
       ),
     );

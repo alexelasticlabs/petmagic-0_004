@@ -11,9 +11,13 @@ import 'package:signalr_netcore/hub_connection_builder.dart';
 final supportChatRealtimeClientProvider = Provider<SupportChatRealtimeClient>((
   ref,
 ) {
-  return SignalRSupportChatRealtimeClient(
+  final client = SignalRSupportChatRealtimeClient(
     sessionStorage: ref.watch(authSessionStorageProvider),
   );
+  ref.onDispose(() {
+    unawaited(client.disconnect());
+  });
+  return client;
 });
 
 class SupportChatRealtimeUpdate {

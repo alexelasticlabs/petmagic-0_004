@@ -34,6 +34,8 @@
   "profileAvatarRemove": "Remove avatar",
   "profileEmailConfirmed": "Email confirmed",
   "profileEmailPending": "Email not confirmed",
+  "profileEmailVerifiedShort": "Email verified",
+  "profileEmailPendingShort": "Verify email",
   "profileSignedOut": "Signed out on this device.",
   "profileAccountCenterTitle": "Account center",
   "profileAccountCenterSubtitle": "Review your preferences, privacy and app setup.",
@@ -48,9 +50,157 @@
   "profilePetsSubtitle": "Your favorite companions and pet profiles.",
   "profilePremiumTitle": "Go Premium",
   "profilePremiumSubtitle": "Unlock all templates and premium editing flows.",
+  "profilePremiumPlanLabel": "Premium Plan",
+  "profileFreePlanLabel": "Free Plan",
+  "profilePremiumBannerTitle": "Upgrade to Premium",
+  "profilePremiumBannerActiveTitle": "Premium active",
+  "profilePremiumBenefitUnlimitedTemplates": "Unlimited templates",
+  "profilePremiumBenefitPriorityGeneration": "Priority generation",
+  "profilePremiumBenefitNoWatermark": "No watermark",
+  "profilePremiumOpenAction": "Upgrade",
+  "profileWalletTitle": "Wallet",
+  "profileWalletHistoryHint": "Open balance, purchases and history.",
+  "profileWalletLoadingHint": "Loading balance...",
+  "profileWalletEmptyHint": "Open balance and history",
+  "walletDataUnavailableFallback": "Wallet data is not available right now.",
+  "walletRefreshTooltip": "Refresh wallet",
+  "walletBalanceTitle": "Available for generation",
+  "walletBalanceEyebrow": "Balance",
+  "walletBalanceUnit": "PawSpark",
+  "walletBalanceExplanation": "PawSpark is the in-app currency used for photo and video generations.",
+  "walletPremiumStatus": "Premium wallet",
+  "walletFreeStatus": "Free wallet",
+  "walletSavedCardsCount": "{count} saved cards",
+  "@walletSavedCardsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletWeeklyReady": "Weekly ready",
+  "walletWeeklyPending": "Weekly pending",
+  "walletAdRewardsCount": "{count} ad rewards",
+  "@walletAdRewardsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletQuickActionsTitle": "Wallet tools",
+  "walletPaymentMethodsAction": "Payment methods",
+  "walletRedeemAction": "Redeem code",
+  "walletRewardsTitle": "Rewards and bonuses",
+  "walletWeeklyRewardAction": "Weekly reward",
+  "walletRewardReadyDescription": "You can claim it now and top up your balance right away.",
+  "walletRewardPendingDescription": "It will unlock later. We keep the status visible without showing a scary error.",
+  "walletAdRewardAction": "Ad reward",
+  "walletAdRewardDescription": "Available today: {count}. Use it when you need a quick PawSpark top-up.",
+  "@walletAdRewardDescription": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletBuySparkTitle": "Buy PawSpark",
+  "walletPackTotalSpark": "{count} PawSpark",
+  "@walletPackTotalSpark": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPopularBadge": "Popular",
+  "walletBestValueLabel": "Best value",
+  "walletPackBonus": "+{count} bonus",
+  "@walletPackBonus": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletBuyForPrice": "Buy for {price}",
+  "@walletBuyForPrice": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "walletPackBreakdown": "{base} base + {bonus} bonus",
+  "@walletPackBreakdown": {
+    "placeholders": {
+      "base": {},
+      "bonus": {}
+    }
+  },
+  "walletRecentTransactionsTitle": "Recent transactions",
+  "walletNoActivity": "No wallet activity yet.",
+  "walletBalanceAfter": "Bal. {count}",
+  "@walletBalanceAfter": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPurchaseHistoryTitle": "Purchase history",
+  "walletPurchaseSummary": "{count} PawSpark • {date}",
+  "@walletPurchaseSummary": {
+    "placeholders": {
+      "count": {},
+      "date": {}
+    }
+  },
+  "walletUnavailableTitle": "Wallet is temporarily unavailable",
+  "walletTryAgainAction": "Try again",
+  "walletPaymentMethodsTitle": "Payment methods",
+  "walletNoSavedCards": "No saved cards yet.",
+  "walletOpeningStripe": "Opening Stripe",
+  "walletAddCard": "Add card",
+  "walletRemoveCardTooltip": "Remove card",
+  "walletStripeCheckout": "Stripe Checkout",
+  "walletPayWithCard": "Pay with •••• {last4}",
+  "@walletPayWithCard": {
+    "placeholders": {
+      "last4": {}
+    }
+  },
+  "walletDefaultCard": "Default card",
+  "walletSavedCard": "Saved card",
+  "walletDefaultSuffix": " • default",
+  "walletExpires": "Expires {month}/{year}{suffix}",
+  "@walletExpires": {
+    "placeholders": {
+      "month": {},
+      "year": {},
+      "suffix": {}
+    }
+  },
+  "walletPending": "Pending",
+  "walletSourcePackPurchase": "Added funds",
+  "walletSourceGenerationSpend": "Template generation",
+  "walletSourceGenerationRefund": "Generation refund",
+  "walletSourceWeeklyGrant": "Weekly reward",
+  "walletSourceAdReward": "Ad reward",
+  "walletSourceAdminGrant": "Support credit",
+  "walletSourceAdminDebit": "Support adjustment",
+  "walletPurchaseCompleted": "Completed",
+  "walletPurchaseFailed": "Failed",
+  "walletPartialActivityUnavailable": "Your balance is already available. History and some wallet actions will refresh a bit later.",
+  "walletPaymentMethodUnavailableError": "The selected saved card is no longer available. Choose another card or use Stripe Checkout.",
+  "walletPaymentGatewayUnavailableError": "Payment is temporarily unavailable. Please try Stripe Checkout again in a moment.",
+  "walletPackUnavailableError": "This PawSpark pack is no longer available.",
+  "walletRedeemCodeNotFoundError": "Redeem code was not found.",
+  "walletRedeemCodeAlreadyUsedError": "This redeem code was already used.",
+  "walletRedeemCodeExpiredError": "Redeem code has expired.",
+  "walletInsufficientBalanceError": "Not enough PawSpark for this operation.",
+  "walletUnavailableError": "Wallet data is temporarily unavailable. Please try again in a moment.",
+  "walletWeeklyNotReadyError": "Weekly reward is not ready yet.",
+  "walletRedeemSheetTitle": "Redeem code",
+  "walletRedeemHint": "WELCOME-100",
+  "walletApplyCode": "Apply code",
+  "profileStatsSectionTitle": "Account stats",
+  "profileStatBalanceLabel": "Balance",
+  "profileStatPlanLabel": "Plan",
+  "profileStatLegalLabel": "Legal",
+  "profileMagicMomentTitle": "Your next pet star moment",
+  "profileMagicMomentSubtitle": "Create something playful for your pets in just a few taps.",
   "premiumPageTitle": "PetMagic Premium",
   "premiumPageSubtitle": "Unlimited pet magic, faster generation and premium templates in one plan.",
   "premiumHeroEyebrow": "Premium magic",
+  "premiumHeroTitle": "Get Premium and create more content.",
+  "premiumHeroSubtitle": "Unlock premium templates, faster generation and more room for photos and videos in one plan.",
   "premiumAlreadyActive": "Premium active",
   "premiumBenefitUnlimitedTemplates": "Unlimited templates",
   "premiumBenefitFastGeneration": "Faster generation",
@@ -83,11 +233,20 @@
     }
   },
   "premiumCancelAnytime": "Cancel anytime",
+  "premiumIncludesTitle": "What Premium includes",
+  "premiumTokenEstimate": "{videos} videos or {photos} photos per month, depending on template complexity.",
+  "@premiumTokenEstimate": {
+    "placeholders": {
+      "videos": {},
+      "photos": {}
+    }
+  },
+  "premiumSocialProof": "Most chosen plan for regular PetMagic creators.",
   "premiumPaymentTitle": "Payment method",
   "premiumPaymentStripe": "Card via Stripe",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
-  "premiumComparisonTitle": "Feature comparison",
+  "premiumComparisonTitle": "What changes with Premium",
   "premiumFreeColumn": "Free",
   "premiumPremiumColumn": "Premium",
   "premiumComparisonFreeTemplates": "Free templates",
@@ -106,7 +265,7 @@
   "premiumComparisonPrioritySupport": "Priority support",
   "premiumSecurePaymentTitle": "Secure payment",
   "premiumSecurePaymentSubtitle": "Manage or cancel your subscription from billing settings at any time.",
-  "premiumContinueAction": "Continue",
+  "premiumContinueAction": "Start Premium",
   "premiumContinueWithPlan": "Continue with {plan} — {price} {period}",
   "@premiumContinueWithPlan": {
     "placeholders": {
@@ -134,10 +293,15 @@
   "profilePrivacyTitle": "Privacy and consent",
   "profileTermsAccepted": "Your account has accepted the Terms of Use and Privacy Policy.",
   "profileTermsPending": "Complete consent review in account settings.",
+  "profileLegalShortcutTitle": "Privacy & Legal",
+  "profileLegalShortcutAccepted": "Terms accepted • Privacy settings",
+  "profileLegalShortcutPending": "Review permissions",
   "profileSupportTitle": "Contact support",
   "profileSupportSubtitle": "We are here when you need help with your account.",
+  "profileSupportCompactSubtitle": "Get help with billing or account access.",
   "profileSettingsShortcutTitle": "Settings",
   "profileSettingsShortcutSubtitle": "Manage language, theme and account sections.",
+  "profileSettingsCompactSubtitle": "Language, theme and account settings.",
   "profilePreferenceEnabled": "Enabled",
   "profilePreferenceOff": "Off",
   "profileSettingsTitle": "Settings",
@@ -256,6 +420,8 @@
   "supportChatStatusInProgress": "In progress",
   "supportChatStatusResolved": "Resolved",
   "supportChatStatusClosed": "Closed",
+  "supportChatMessageDelivered": "Delivered",
+  "supportChatMessageRead": "Read",
   "profileSettingsThemeSystem": "System",
   "profileSettingsThemeLight": "Light",
   "profileSettingsThemeDark": "Dark",

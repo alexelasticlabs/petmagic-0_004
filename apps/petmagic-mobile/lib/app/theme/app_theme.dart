@@ -117,8 +117,9 @@ extension PetMagicTheme on BuildContext {
 class AppTheme {
   static const _accent = Color(0xFF10C878);
 
-  static ThemeData light() {
-    const colors = PetMagicColors(
+  static final ThemeData _lightTheme = _base(
+    Brightness.light,
+    const PetMagicColors(
       backgroundTop: Color(0xFFFFFFFF),
       backgroundBottom: Color(0xFFF5F8FC),
       surface: Color(0xFFFFFFFF),
@@ -135,12 +136,12 @@ class AppTheme {
       blue: Color(0xFF0EA5E9),
       danger: Color(0xFFEF4444),
       shadow: Color(0x1A0F172A),
-    );
-    return _base(Brightness.light, colors);
-  }
+    ),
+  );
 
-  static ThemeData dark() {
-    const colors = PetMagicColors(
+  static final ThemeData _darkTheme = _base(
+    Brightness.dark,
+    const PetMagicColors(
       backgroundTop: Color(0xFF000306),
       backgroundBottom: Color(0xFF04070D),
       surface: Color(0xFF0A121B),
@@ -157,9 +158,12 @@ class AppTheme {
       blue: Color(0xFF38BDF8),
       danger: Color(0xFFFB7185),
       shadow: Color(0xCC00040A),
-    );
-    return _base(Brightness.dark, colors);
-  }
+    ),
+  );
+
+  static ThemeData light() => _lightTheme;
+
+  static ThemeData dark() => _darkTheme;
 
   static ThemeData _base(Brightness brightness, PetMagicColors colors) {
     final textTheme = _buildTextTheme(colors);

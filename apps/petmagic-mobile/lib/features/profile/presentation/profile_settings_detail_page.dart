@@ -203,11 +203,6 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
     final profile = state.profile;
-    final locale = Localizations.localeOf(context);
-    final localeTag = locale.toLanguageTag();
-    final legalDocumentsAsync = ref.watch(
-      currentLegalDocumentsProvider(localeTag),
-    );
 
     final title = switch (kind) {
       ProfileSettingsDetailKind.linkedAccounts =>
@@ -237,6 +232,12 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
 
     if (kind == ProfileSettingsDetailKind.terms ||
         kind == ProfileSettingsDetailKind.privacy) {
+      final locale = Localizations.localeOf(context);
+      final localeTag = locale.toLanguageTag();
+      final legalDocumentsAsync = ref.watch(
+        currentLegalDocumentsProvider(localeTag),
+      );
+
       return ProfileScreenBackground(
         child: SafeArea(
           child: ListView(
@@ -490,7 +491,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          text.profileLegalUnavailable,
+                          _linkedAccountsErrorText(text, linkedAccountsAsync),
                           style: TextStyle(
                             color: colors.danger,
                             fontSize: 15,
@@ -813,6 +814,9 @@ class _LinkedAccountRow extends StatelessWidget {
     final colors = context.petMagicColors;
     final isConnected = account != null;
     final canDisconnect = account?.canDisconnect ?? false;
+    final providerLabel = account?.displayName.trim().isNotEmpty == true
+        ? account!.displayName
+        : provider.apiValue;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -850,7 +854,7 @@ class _LinkedAccountRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    account?.displayName ?? provider.apiValue,
+                    providerLabel,
                     style: TextStyle(
                       color: colors.textStrong,
                       fontSize: 15,
@@ -902,6 +906,26 @@ class _LinkedAccountRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _linkedAccountsErrorText(
+  AppLocalizations text,
+  AsyncValue<List<MobileLinkedAccount>> value,
+) {
+  return value.when(
+    data: (_) => text.profileLegalUnavailable,
+    loading: () => text.profileLinkedAccountsLoading,
+    error: (error, _) {
+      final raw = error.toString();
+      if (raw.contains('401') || raw.contains('Sign in is required')) {
+        return 'Sign in again to manage linked accounts.';
+      }
+
+      return raw.contains('Request failed')
+          ? 'Linked accounts are temporarily unavailable.'
+          : text.profileLegalUnavailable;
+    },
+  );
 }
 
 class _InfoRow extends StatelessWidget {

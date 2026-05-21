@@ -24,7 +24,17 @@ class TemplateCard extends StatefulWidget {
 
 class _TemplateCardState extends State<TemplateCard> {
   VideoPlayerController? _videoController;
-  bool _isVisible = false;
+  bool _isPreviewActive = false;
+
+  @override
+  void didUpdateWidget(covariant TemplateCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.template.templateId != widget.template.templateId) {
+      _isPreviewActive = false;
+      _disposeVideoController();
+    }
+  }
 
   @override
   void dispose() {
@@ -124,14 +134,12 @@ class _TemplateCardState extends State<TemplateCard> {
         info.visibleFraction > 0.58 &&
         widget.template.isVideo &&
         isVideoPreview(widget.template.previewAsset);
-    final nextVisible = info.visibleFraction > 0.05;
 
-    if (_isVisible != nextVisible && mounted) {
-      setState(() => _isVisible = nextVisible);
-    } else {
-      _isVisible = nextVisible;
+    if (_isPreviewActive == shouldPlay) {
+      return;
     }
 
+    _isPreviewActive = shouldPlay;
     if (shouldPlay) {
       _ensureVideoController();
     } else {
@@ -181,6 +189,7 @@ class _TemplateCardState extends State<TemplateCard> {
       await controller.play();
     } catch (_) {
       await controller.dispose();
+      _isPreviewActive = false;
       if (mounted) {
         setState(() => _videoController = null);
       }
@@ -200,29 +209,49 @@ class _TemplateMedia extends StatelessWidget {
     final showVideo = controller != null && controller!.value.isInitialized;
     final assetIsVideo = asset != null && isVideoPreview(asset);
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (showVideo)
-          FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: controller!.value.size.width,
-              height: controller!.value.size.height,
-              child: VideoPlayer(controller!),
-            ),
-          )
-        else if (asset != null && asset.url.isNotEmpty && !assetIsVideo)
-          CachedNetworkImage(
-            imageUrl: asset.url,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => const _MediaPlaceholder(),
-            errorWidget: (context, url, error) => const _MediaPlaceholder(),
-          )
-        else
-          const _MediaPlaceholder(),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+        final cacheWidth = _cacheDimension(constraints.maxWidth, pixelRatio);
+        final cacheHeight = _cacheDimension(constraints.maxHeight, pixelRatio);
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (showVideo)
+              FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: controller!.value.size.width,
+                  height: controller!.value.size.height,
+                  child: VideoPlayer(controller!),
+                ),
+              )
+            else if (asset != null && asset.url.isNotEmpty && !assetIsVideo)
+              CachedNetworkImage(
+                imageUrl: asset.url,
+                fit: BoxFit.cover,
+                memCacheWidth: cacheWidth,
+                memCacheHeight: cacheHeight,
+                maxWidthDiskCache: cacheWidth,
+                maxHeightDiskCache: cacheHeight,
+                placeholder: (context, url) => const _MediaPlaceholder(),
+                errorWidget: (context, url, error) => const _MediaPlaceholder(),
+              )
+            else
+              const _MediaPlaceholder(),
+          ],
+        );
+      },
     );
+  }
+
+  int? _cacheDimension(double logicalSize, double pixelRatio) {
+    if (!logicalSize.isFinite || logicalSize <= 0) {
+      return null;
+    }
+
+    return (logicalSize * pixelRatio).ceil();
   }
 }
 

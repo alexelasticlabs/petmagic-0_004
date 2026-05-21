@@ -29,9 +29,10 @@ class SupportChatMessage {
   final int? attachmentFileSizeBytes;
   final DateTime? readAtUtc;
 
+  bool get hasAttachment => attachmentUrl?.isNotEmpty == true;
+
   bool get hasImageAttachment =>
-      attachmentUrl?.isNotEmpty == true &&
-      (attachmentContentType?.startsWith('image/') ?? false);
+      hasAttachment && (attachmentContentType?.startsWith('image/') ?? false);
 
   SupportChatMessage copyWith({
     bool? isRead,

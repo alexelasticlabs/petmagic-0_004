@@ -78,26 +78,28 @@ class ProfileGlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colors.border),
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow,
-                blurRadius: 24,
-                offset: const Offset(0, 16),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: padding ?? const EdgeInsets.all(16),
-            child: child,
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surfaceGlass,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: colors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.shadow,
+                  blurRadius: 24,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: padding ?? const EdgeInsets.all(16),
+              child: child,
+            ),
           ),
         ),
       ),
@@ -159,6 +161,8 @@ class ProfileAvatarBadge extends StatelessWidget {
     final initials = fallbackLabel.trim().isNotEmpty
         ? fallbackLabel.trim().substring(0, 1).toUpperCase()
         : '?';
+    final avatarCacheSize = (size * MediaQuery.devicePixelRatioOf(context))
+        .round();
 
     return SizedBox(
       width: size + 18,
@@ -176,7 +180,14 @@ class ProfileAvatarBadge extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: imageUrl != null && imageUrl!.isNotEmpty
-                ? Image.network(imageUrl!, fit: BoxFit.cover)
+                ? Image.network(
+                    imageUrl!,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    cacheWidth: avatarCacheSize,
+                    cacheHeight: avatarCacheSize,
+                  )
                 : Center(
                     child: Text(
                       initials,
