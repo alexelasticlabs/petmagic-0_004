@@ -226,26 +226,37 @@ class ProfileStatusPill extends StatelessWidget {
     final colors = context.petMagicColors;
     final bg = backgroundColor ?? colors.accentSoft;
     final fg = foregroundColor ?? colors.textStrong;
+    final borderColor = (foregroundColor ?? colors.border).withValues(
+      alpha: foregroundColor != null ? 0.24 : 0.8,
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (leading != null) ...[
-              Icon(leading, size: 14, color: fg),
-              const SizedBox(width: 5),
+              Icon(leading, size: 13, color: fg),
+              const SizedBox(width: 6),
             ],
             Text(
               label,
               style: TextStyle(
                 color: fg,
-                fontSize: 11.5,
+                fontSize: 11.8,
                 fontWeight: FontWeight.w700,
               ),
             ),

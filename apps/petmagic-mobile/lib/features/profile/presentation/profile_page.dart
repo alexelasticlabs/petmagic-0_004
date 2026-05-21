@@ -243,23 +243,38 @@ class _ProfileHeroCard extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      membershipLabel,
-                      style: TextStyle(
-                        color: profile.isPremium ? colors.gold : colors.accent,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      emailLabel,
-                      style: TextStyle(
-                        color: colors.textSoft,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ProfileStatusPill(
+                          label: membershipLabel,
+                          leading: profile.isPremium
+                              ? Icons.workspace_premium_rounded
+                              : Icons.pets_rounded,
+                          backgroundColor:
+                              (profile.isPremium ? colors.gold : colors.accent)
+                                  .withValues(alpha: 0.14),
+                          foregroundColor: profile.isPremium
+                              ? colors.gold
+                              : colors.accent,
+                        ),
+                        ProfileStatusPill(
+                          label: emailLabel,
+                          leading: profile.emailConfirmed
+                              ? Icons.verified_rounded
+                              : Icons.mark_email_unread_outlined,
+                          backgroundColor:
+                              (profile.emailConfirmed
+                                      ? colors.blue
+                                      : colors.textMuted)
+                                  .withValues(alpha: 0.14),
+                          foregroundColor: profile.emailConfirmed
+                              ? colors.blue
+                              : colors.textSoft,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -438,29 +453,22 @@ class _WalletHighlightCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
-                      child: ProfileStatusPill(
-                        label: rewardLabel,
-                        leading: wallet == null
-                            ? Icons.sync_rounded
-                            : weeklyReady
-                            ? Icons.card_giftcard_rounded
-                            : Icons.play_circle_outline_rounded,
-                        backgroundColor: rewardColor.withValues(alpha: 0.14),
-                        foregroundColor: rewardColor,
-                      ),
+                    ProfileStatusPill(
+                      label: rewardLabel,
+                      leading: wallet == null
+                          ? Icons.sync_rounded
+                          : weeklyReady
+                          ? Icons.card_giftcard_rounded
+                          : Icons.play_circle_outline_rounded,
+                      backgroundColor: rewardColor.withValues(alpha: 0.14),
+                      foregroundColor: rewardColor,
                     ),
-                    const SizedBox(width: 10),
-                    Text(
-                      text.profileWalletPreviewAction,
-                      style: TextStyle(
-                        color: colors.accent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    _ProfileActionChip(label: text.profileWalletPreviewAction),
                   ],
                 ),
               ],
@@ -788,9 +796,16 @@ class _BenefitPill extends StatelessWidget {
         color: colors.backgroundBottom.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: colors.border.withValues(alpha: 0.8)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.14),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
         child: Text(
           label,
           style: TextStyle(
@@ -798,6 +813,43 @@ class _BenefitPill extends StatelessWidget {
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileActionChip extends StatelessWidget {
+  const _ProfileActionChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.accent.withValues(alpha: 0.24)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: colors.accent,
+                fontSize: 11.8,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Icon(Icons.arrow_forward_rounded, color: colors.accent, size: 14),
+          ],
         ),
       ),
     );
