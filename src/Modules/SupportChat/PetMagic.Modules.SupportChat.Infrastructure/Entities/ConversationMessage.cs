@@ -10,8 +10,6 @@ public sealed class ConversationMessage
 
     public bool IsFromAdmin { get; set; }
 
-    public bool IsInternalNote { get; set; }
-
     public string Body { get; set; } = string.Empty;
 
     public string? AttachmentUrl { get; set; }

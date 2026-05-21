@@ -37,7 +37,8 @@ public static class SupportChatEndpoints
         adminGroup.MapGet("/conversations/{conversationId:guid}", GetAdminConversationAsync);
         adminGroup.MapPost("/conversations/{conversationId:guid}/messages", SendAdminMessageAsync)
             .RequireRateLimiting("support-chat");
-        adminGroup.MapPost("/conversations/{conversationId:guid}/notes", SendAdminInternalNoteAsync)
+        adminGroup.MapPost("/conversations/{conversationId:guid}/attachments", SendAdminAttachmentAsync)
+            .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
         adminGroup.MapPost("/conversations/{conversationId:guid}/read", MarkAdminReadAsync);
         adminGroup.MapPut("/conversations/{conversationId:guid}/status", UpdateConversationStatusAsync);
@@ -113,7 +114,12 @@ public static class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var command = new SendSupportMessageCommand(conversationId, userId, request.Body, IsAdmin: false);
+        var command = new SendSupportMessageCommand(
+            conversationId,
+            userId,
+            request.Body,
+            IsAdmin: false,
+            Locale: ResolvePreferredLocale(request.Locale, httpContext));
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -134,6 +140,7 @@ public static class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromForm] IFormFile? file,
         [FromForm] string? body,
+        [FromForm] string? locale,
         [FromServices] IValidator<SendSupportMessageCommand> validator,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
         [FromServices] ISupportChatService service,
@@ -149,14 +156,6 @@ public static class SupportChatEndpoints
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
                 [nameof(file)] = ["Support attachment file is required."]
-            });
-        }
-
-        if (!(file.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ?? false))
-        {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [nameof(file)] = ["Only image attachments are supported."]
             });
         }
 
@@ -185,7 +184,77 @@ public static class SupportChatEndpoints
             userId,
             normalizedBody,
             IsAdmin: false,
-            IsInternalNote: false,
+            AttachmentUrl: storeResult.Value.Url,
+            AttachmentFileName: storeResult.Value.FileName,
+            AttachmentContentType: storeResult.Value.ContentType,
+            AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes,
+            Locale: ResolvePreferredLocale(locale, httpContext));
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.SendMessageAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendAdminAttachmentAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromForm] IFormFile? file,
+        [FromForm] string? body,
+        [FromServices] IValidator<SendSupportMessageCommand> validator,
+        [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(file)] = ["Support attachment file is required."]
+            });
+        }
+
+        await using var stream = file.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, cancellationToken);
+
+        var storeResult = await attachmentStorage.StoreAsync(
+            new SupportAttachmentUploadCommand(
+                Path.GetFileName(file.FileName),
+                file.ContentType ?? "application/octet-stream",
+                memoryStream.ToArray()),
+            cancellationToken);
+
+        if (storeResult.IsFailure)
+        {
+            return ToProblem(storeResult.Error);
+        }
+
+        var normalizedBody = string.IsNullOrWhiteSpace(body)
+            ? Path.GetFileName(file.FileName)
+            : body.Trim();
+
+        var command = new SendSupportMessageCommand(
+            conversationId,
+            userId,
+            normalizedBody,
+            IsAdmin: true,
             AttachmentUrl: storeResult.Value.Url,
             AttachmentFileName: storeResult.Value.FileName,
             AttachmentContentType: storeResult.Value.ContentType,
@@ -301,35 +370,6 @@ public static class SupportChatEndpoints
         }
 
         var command = new SendSupportMessageCommand(conversationId, userId, request.Body, IsAdmin: true);
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
-        {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
-        }
-
-        var result = await service.SendMessageAsync(command, cancellationToken);
-        if (result.IsFailure)
-        {
-            return ToProblem(result.Error);
-        }
-
-        return TypedResults.Ok(result.Value);
-    }
-
-    private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendAdminInternalNoteAsync(
-        HttpContext httpContext,
-        [FromRoute] Guid conversationId,
-        [FromBody] SendSupportMessageRequest request,
-        [FromServices] IValidator<SendSupportMessageCommand> validator,
-        [FromServices] ISupportChatService service,
-        CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
-        {
-            return unauthorized!;
-        }
-
-        var command = new SendSupportMessageCommand(conversationId, userId, request.Body, IsAdmin: true, IsInternalNote: true);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -464,12 +504,7 @@ public static class SupportChatEndpoints
             return unauthorized!;
         }
 
-        if (!TryParseTemplateKind(request.Kind, out var kind, out var invalidProblem))
-        {
-            return invalidProblem!;
-        }
-
-        var command = new UpsertSupportReplyTemplateCommand(null, userId, request.Title, request.Body, kind, request.IsEnabled, request.SortOrder);
+        var command = new UpsertSupportReplyTemplateCommand(null, userId, request.Title, request.Body, request.IsEnabled, request.SortOrder);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -498,12 +533,7 @@ public static class SupportChatEndpoints
             return unauthorized!;
         }
 
-        if (!TryParseTemplateKind(request.Kind, out var kind, out var invalidProblem))
-        {
-            return invalidProblem!;
-        }
-
-        var command = new UpsertSupportReplyTemplateCommand(templateId, userId, request.Title, request.Body, kind, request.IsEnabled, request.SortOrder);
+        var command = new UpsertSupportReplyTemplateCommand(templateId, userId, request.Title, request.Body, request.IsEnabled, request.SortOrder);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -581,28 +611,29 @@ public static class SupportChatEndpoints
         return false;
     }
 
-    private static bool TryParseTemplateKind(string kindRaw, out SupportReplyTemplateKind kind, out ProblemHttpResult? invalidProblem)
+    private static string? ResolvePreferredLocale(string? requestLocale, HttpContext context)
     {
-        if (Enum.TryParse<SupportReplyTemplateKind>(kindRaw, true, out kind))
+        if (!string.IsNullOrWhiteSpace(requestLocale))
         {
-            invalidProblem = null;
-            return true;
+            return requestLocale.Trim();
         }
 
-        invalidProblem = TypedResults.Problem(
-            title: "support.template_kind_invalid",
-            detail: "Support reply template kind is not supported.",
-            statusCode: StatusCodes.Status400BadRequest);
-        return false;
+        var acceptLanguage = context.Request.Headers.AcceptLanguage.ToString();
+        if (string.IsNullOrWhiteSpace(acceptLanguage))
+        {
+            return null;
+        }
+
+        return acceptLanguage.Split(',', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
     }
 
     public sealed record OpenConversationRequest(string? InitialMessage, SupportConversationPriority Priority = SupportConversationPriority.Normal);
 
-    public sealed record SendSupportMessageRequest(string Body);
+    public sealed record SendSupportMessageRequest(string Body, string? Locale = null);
 
     public sealed record UpdateSupportConversationStatusRequest(string Status);
 
     public sealed record AssignSupportConversationRequest(Guid? AssignedAdminId);
 
-    public sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, string Kind, bool IsEnabled = true, int SortOrder = 0);
+    public sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, bool IsEnabled = true, int SortOrder = 0);
 }

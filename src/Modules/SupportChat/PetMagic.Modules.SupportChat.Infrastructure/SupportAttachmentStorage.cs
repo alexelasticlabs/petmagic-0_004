@@ -26,7 +26,7 @@ internal sealed class LocalSupportAttachmentStorage(
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
         }
 
-        if (!attachment.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        if (!IsAllowedContentType(attachment.ContentType))
         {
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentContentTypeNotAllowed);
         }
@@ -41,8 +41,9 @@ internal sealed class LocalSupportAttachmentStorage(
 
         var extension = Path.GetExtension(attachment.FileName);
         var safeName = $"{Guid.NewGuid():N}{extension}";
-        var year = DateTime.UtcNow.ToString("yyyy");
-        var month = DateTime.UtcNow.ToString("MM");
+        var now = DateTime.UtcNow;
+        var year = now.ToString("yyyy");
+        var month = now.ToString("MM");
         var relativePath = Path.Combine("support-attachments", year, month, safeName);
         var physicalPath = Path.Combine(root, year, month, safeName);
 
@@ -143,5 +144,32 @@ internal sealed class LocalSupportAttachmentStorage(
         }
 
         return relativePath.Replace('\\', '/');
+    }
+
+    private static bool IsAllowedContentType(string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return false;
+        }
+
+        if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/zip", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/x-zip-compressed", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("text/plain", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("text/csv", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/msword", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/vnd.ms-excel", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/vnd.ms-powerpoint", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", StringComparison.OrdinalIgnoreCase)
+            || contentType.Equals("application/vnd.openxmlformats-officedocument.presentationml.presentation", StringComparison.OrdinalIgnoreCase);
     }
 }

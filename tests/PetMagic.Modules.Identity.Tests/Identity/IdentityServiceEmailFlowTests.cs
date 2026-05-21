@@ -267,7 +267,9 @@ public sealed class IdentityServiceEmailFlowTests
             roleManager,
             dbContext,
             economyDbContext,
-            CreateEconomyService(economyDbContext),
+            new ServiceCollection()
+                .AddSingleton(CreateEconomyService(economyDbContext))
+                .BuildServiceProvider(),
             templatesDbContext,
             new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),

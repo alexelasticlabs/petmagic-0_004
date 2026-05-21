@@ -1,7 +1,5 @@
 using FluentValidation;
 using PetMagic.Modules.SupportChat.Application.Contracts;
-using PetMagic.Modules.SupportChat.Domain.Enums;
-
 namespace PetMagic.Modules.SupportChat.Application.Validation;
 
 public sealed class OpenSupportConversationCommandValidator : AbstractValidator<OpenSupportConversationCommand>
@@ -21,10 +19,6 @@ public sealed class SendSupportMessageCommandValidator : AbstractValidator<SendS
     {
         RuleFor(x => x.ConversationId).NotEmpty();
         RuleFor(x => x.SenderUserId).NotEmpty();
-        RuleFor(x => x.IsInternalNote)
-            .Equal(false)
-            .When(x => !x.IsAdmin)
-            .WithMessage("Internal notes are only supported for admin senders.");
         RuleFor(x => x.Body)
             .MaximumLength(4000);
         RuleFor(x => x.Body)
@@ -85,9 +79,6 @@ public sealed class UpsertSupportReplyTemplateCommandValidator : AbstractValidat
         RuleFor(x => x.AdminUserId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(120);
         RuleFor(x => x.Body).NotEmpty().MaximumLength(4000);
-        RuleFor(x => x.Kind)
-            .Must(kind => Enum.IsDefined(kind))
-            .WithMessage("Support reply template kind is not supported.");
         RuleFor(x => x.SortOrder).GreaterThanOrEqualTo(0);
     }
 }

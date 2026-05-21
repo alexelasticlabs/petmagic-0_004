@@ -34,7 +34,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.AttachmentFileName).HasMaxLength(256);
             entity.Property(x => x.AttachmentContentType).HasMaxLength(128);
             entity.HasIndex(x => new { x.ConversationId, x.CreatedAtUtc });
-            entity.HasIndex(x => new { x.ConversationId, x.IsFromAdmin, x.IsInternalNote, x.ReadAtUtc });
+            entity.HasIndex(x => new { x.ConversationId, x.IsFromAdmin, x.ReadAtUtc });
             entity.HasOne(x => x.Conversation)
                 .WithMany(x => x.Messages)
                 .HasForeignKey(x => x.ConversationId)
@@ -47,8 +47,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Title).HasMaxLength(120).IsRequired();
             entity.Property(x => x.Body).HasMaxLength(4000).IsRequired();
-            entity.Property(x => x.Kind).HasConversion<int>().IsRequired();
-            entity.HasIndex(x => new { x.Kind, x.SortOrder, x.IsEnabled });
+            entity.HasIndex(x => new { x.SortOrder, x.IsEnabled });
         });
     }
 }

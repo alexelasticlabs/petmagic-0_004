@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using PetMagic.BuildingBlocks.Results;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -18,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.SupportChat.Api;
@@ -89,7 +89,6 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal(created.ConversationId, conversation.ConversationId);
         Assert.Equal("Open", conversation.Status);
         Assert.Equal("user@petmagic.test", conversation.UserEmail);
-        Assert.False(conversation.LastMessageIsInternalNote);
     }
 
     [Fact]
@@ -150,13 +149,6 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.True(replied.IsFromAdmin);
         Assert.Equal("System Admin", replied.SenderDisplayName);
 
-        var internalNote = await PostAsJsonAsync<SupportMessageResponse>(
-            adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}/notes",
-            new SendSupportMessageRequest("Suspect stale auth refresh session"));
-
-        Assert.True(internalNote.IsInternalNote);
-
         var assigned = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
             $"/api/admin/support/conversations/{created.ConversationId}/assignment",
@@ -179,7 +171,6 @@ public sealed class SupportChatEndpointsIntegrationTests
             userClient,
             "/api/support/conversation");
 
-        Assert.DoesNotContain(beforeUserRead.Messages, x => x.IsInternalNote);
         Assert.Equal(1, beforeUserRead.UserUnreadCount);
         Assert.Equal(0, beforeUserRead.AdminUnreadCount);
 
@@ -200,8 +191,37 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("Open", afterReopen.Status);
         Assert.Equal(1, afterReopen.AdminUnreadCount);
         Assert.Equal(0, afterReopen.UserUnreadCount);
-        Assert.Equal(4, afterReopen.Messages.Count);
-        Assert.Contains(afterReopen.Messages, x => x.IsInternalNote);
+        Assert.Equal(3, afterReopen.Messages.Count);
+    }
+
+    [Fact]
+    public async Task AdminStatusEndpoint_ShouldRejectInvalidStatusTransition()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var adminClient = application.CreateClient(AdminId, "Admin");
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need help", SupportConversationPriority.Normal));
+
+        var closed = await PutAsJsonAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            new UpdateSupportConversationStatusRequest("Closed"));
+
+        Assert.Equal("Closed", closed.Status);
+
+        using var invalidTransitionResponse = await adminClient.PutAsJsonAsync(
+            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            new UpdateSupportConversationStatusRequest("Resolved"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, invalidTransitionResponse.StatusCode);
+
+        var body = await invalidTransitionResponse.Content.ReadAsStringAsync();
+        Assert.Contains("support.status_transition_invalid", body);
     }
 
     [Fact]
@@ -243,6 +263,75 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task UserMessageEndpoint_ShouldAppendLocalizedAutomaticReply_ForFirstMessage()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest(null, SupportConversationPriority.Normal));
+
+        var sent = await PostAsJsonAsync<SupportMessageResponse>(
+            userClient,
+            $"/api/support/conversation/{created.ConversationId}/messages",
+            new SendSupportMessageRequest("Bonjour", "fr-FR"));
+
+        Assert.False(sent.IsFromAdmin);
+
+        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation");
+
+        Assert.Equal(2, conversation.Messages.Count);
+        Assert.Equal("Bonjour", conversation.Messages[0].Body);
+        Assert.Equal(
+            "Message livre. Je repondrai en francais, car l'interface de l'application utilise cette langue. L'equipe PetMagic a deja recu votre demande.",
+            conversation.Messages[1].Body);
+        Assert.True(conversation.Messages[1].IsFromAdmin);
+        Assert.True(conversation.Messages[1].IsRead);
+    }
+
+    [Fact]
+    public async Task AdminAttachmentEndpoint_ShouldUploadFileAndExposeAttachmentMetadata()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need invoice copy", SupportConversationPriority.Normal));
+
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x25, 0x50, 0x44, 0x46]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        form.Add(fileContent, "file", "invoice.pdf");
+        form.Add(new StringContent("Invoice copy attached"), "body");
+
+        using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
+            $"/api/admin/support/conversations/{created.ConversationId}/attachments",
+            form);
+
+        await AssertSuccessAsync(response);
+
+        var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+        Assert.True(message.IsFromAdmin);
+        Assert.Equal("Invoice copy attached", message.Body);
+        Assert.Equal("invoice.pdf", message.AttachmentFileName);
+        Assert.Equal("application/pdf", message.AttachmentContentType);
+        Assert.NotNull(message.AttachmentUrl);
+
+        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation");
+
+        var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
+        Assert.Equal("invoice.pdf", attachmentMessage.AttachmentFileName);
+        Assert.Equal("application/pdf", attachmentMessage.AttachmentContentType);
+    }
+
+    [Fact]
     public async Task UpdateStatusEndpoint_ShouldRejectInvalidStatusValues()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -276,25 +365,21 @@ public sealed class SupportChatEndpointsIntegrationTests
             new UpsertSupportReplyTemplateRequest(
                 "Custom reply",
                 "Please reinstall the app and try again.",
-                "Reply",
                 true,
                 99));
 
         Assert.Equal("Custom reply", created.Title);
-        Assert.Equal("Reply", created.Kind);
 
         var updated = await PutAsJsonAsync<SupportReplyTemplateResponse>(
             adminClient,
             $"/api/admin/support/templates/{created.TemplateId}",
             new UpsertSupportReplyTemplateRequest(
-                "Escalate note",
+                "Escalate case",
                 "Escalate this case to backend if repro persists.",
-                "InternalNote",
                 true,
                 15));
 
-        Assert.Equal("Escalate note", updated.Title);
-        Assert.Equal("InternalNote", updated.Kind);
+        Assert.Equal("Escalate case", updated.Title);
 
         using var deleteResponse = await adminClient.DeleteAsync($"/api/admin/support/templates/{created.TemplateId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
@@ -615,13 +700,13 @@ public sealed class SupportChatEndpointsIntegrationTests
 
     private sealed record OpenConversationRequest(string? InitialMessage, SupportConversationPriority Priority);
 
-    private sealed record SendSupportMessageRequest(string Body);
+    private sealed record SendSupportMessageRequest(string Body, string? Locale = null);
 
     private sealed record UpdateSupportConversationStatusRequest(string Status);
 
     private sealed record AssignSupportConversationRequest(Guid? AssignedAdminId);
 
-    private sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, string Kind, bool IsEnabled, int SortOrder);
+    private sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, bool IsEnabled, int SortOrder);
 
     private sealed record SupportConversationUpdatedEvent(Guid ConversationId, Guid InitiatorUserId, DateTime UpdatedAtUtc);
 

@@ -19,19 +19,6 @@ internal static class PremiumPlanCatalog
     private static readonly IReadOnlyList<PremiumPlanDefinition> Plans =
     [
         new(
-            "weekly",
-            "PetMagic Premium Weekly",
-            "week",
-            4.99m,
-            null,
-            "USD",
-            100,
-            false,
-            null,
-            1,
-            "com.petmagic.app.premium.weekly",
-            "com.petmagic.app.premium.weekly"),
-        new(
             "monthly",
             "PetMagic Premium Monthly",
             "month",
@@ -41,7 +28,7 @@ internal static class PremiumPlanCatalog
             500,
             false,
             null,
-            2,
+            1,
             "com.petmagic.app.premium.monthly",
             "com.petmagic.app.premium.monthly"),
         new(
@@ -54,7 +41,7 @@ internal static class PremiumPlanCatalog
             1000,
             true,
             33,
-            3,
+                2,
             "com.petmagic.app.premium.yearly",
             "com.petmagic.app.premium.yearly")
     ];

@@ -15,8 +15,7 @@ public sealed class SupportReplyTemplateCatalogService(SupportChatDbContext supp
     {
         var templates = await supportChatDbContext.SupportReplyTemplates
             .AsNoTracking()
-            .OrderBy(x => x.Kind)
-            .ThenBy(x => x.SortOrder)
+            .OrderBy(x => x.SortOrder)
             .ThenBy(x => x.Title)
             .ToListAsync(cancellationToken);
 
@@ -47,7 +46,6 @@ public sealed class SupportReplyTemplateCatalogService(SupportChatDbContext supp
 
         template.Title = command.Title.Trim();
         template.Body = command.Body.Trim();
-        template.Kind = command.Kind;
         template.IsEnabled = command.IsEnabled;
         template.SortOrder = command.SortOrder;
         template.UpdatedAtUtc = now;
@@ -77,7 +75,6 @@ public sealed class SupportReplyTemplateCatalogService(SupportChatDbContext supp
             template.Id,
             template.Title,
             template.Body,
-            template.Kind.ToString(),
             template.IsEnabled,
             template.SortOrder,
             template.CreatedAtUtc,

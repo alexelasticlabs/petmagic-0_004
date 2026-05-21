@@ -161,7 +161,8 @@ public sealed class EconomyServiceTests
         var result = await service.ListPremiumPlansAsync(CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(3, result.Value.Count);
+        Assert.Equal(2, result.Value.Count);
+        Assert.DoesNotContain(result.Value, plan => plan.PlanCode == "weekly");
         Assert.Contains(result.Value, plan => plan.PlanCode == "yearly" && plan.IsPopular);
         Assert.All(result.Value, plan =>
         {

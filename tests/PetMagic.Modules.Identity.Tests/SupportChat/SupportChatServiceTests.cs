@@ -110,47 +110,6 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
-    public async Task SendMessageAsync_InternalNote_ShouldStayHiddenFromUserConversation()
-    {
-        var store = CreateStore();
-
-        var userId = Guid.NewGuid();
-        var adminId = Guid.NewGuid();
-        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
-        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
-
-        Guid conversationId;
-        await using (var openScope = await store.CreateScopeAsync())
-        {
-            var openResult = await openScope.CreateService().OpenConversationAsync(
-                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
-                CancellationToken.None);
-            conversationId = openResult.Value.ConversationId;
-        }
-
-        await using (var noteScope = await store.CreateScopeAsync())
-        {
-            var noteResult = await noteScope.CreateService().SendMessageAsync(
-                new SendSupportMessageCommand(conversationId, adminId, "User likely hit stale token state", true, true),
-                CancellationToken.None);
-
-            Assert.True(noteResult.IsSuccess);
-            Assert.True(noteResult.Value.IsInternalNote);
-        }
-
-        await using var verificationScope = await store.CreateScopeAsync();
-        var adminDetail = await verificationScope.CreateService().GetAdminConversationAsync(conversationId, CancellationToken.None);
-        var userDetail = await verificationScope.CreateService().GetUserConversationAsync(userId, CancellationToken.None);
-
-        Assert.True(adminDetail.IsSuccess);
-        Assert.True(userDetail.IsSuccess);
-        Assert.Equal(2, adminDetail.Value.Messages.Count);
-        Assert.Single(userDetail.Value.Messages);
-        Assert.DoesNotContain(userDetail.Value.Messages, x => x.IsInternalNote);
-        Assert.Equal(0, userDetail.Value.UserUnreadCount);
-    }
-
-    [Fact]
     public async Task SendMessageAsync_WithAttachment_ShouldPersistAttachmentMetadata()
     {
         var store = CreateStore();
@@ -175,7 +134,6 @@ public sealed class SupportChatServiceTests
                 conversationId,
                 userId,
                 "Screenshot from the broken screen",
-                false,
                 false,
                 attachmentUrl,
                 "broken-screen.png",
@@ -369,6 +327,88 @@ public sealed class SupportChatServiceTests
 
         Assert.True(forbiddenResult.IsFailure);
         Assert.Equal("support.forbidden", forbiddenResult.Error.Code);
+    }
+
+    [Fact]
+    public async Task UpdateConversationStatusAsync_FromClosedToResolved_ShouldFail()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var service = openScope.CreateService();
+            conversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+
+            var closeResult = await service.UpdateConversationStatusAsync(
+                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Closed),
+                CancellationToken.None);
+
+            Assert.True(closeResult.IsSuccess);
+            Assert.Equal("Closed", closeResult.Value.Status);
+        }
+
+        await using var invalidScope = await store.CreateScopeAsync();
+        var invalidResult = await invalidScope.CreateService().UpdateConversationStatusAsync(
+            new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Resolved),
+            CancellationToken.None);
+
+        Assert.True(invalidResult.IsFailure);
+        Assert.Equal("support.status_transition_invalid", invalidResult.Error.Code);
+
+        var conversation = await invalidScope.SupportDbContext.SupportConversations.SingleAsync();
+        Assert.Equal(SupportConversationStatus.Closed, conversation.Status);
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_FirstUserMessage_ShouldAppendLocalizedAutomaticReply()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, null, SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using (var sendScope = await store.CreateScopeAsync())
+        {
+            var sendResult = await sendScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(conversationId, userId, "Necesito ayuda", false, Locale: "es-ES"),
+                CancellationToken.None);
+
+            Assert.True(sendResult.IsSuccess);
+            Assert.False(sendResult.Value.IsFromAdmin);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var detail = await verificationScope.CreateService().GetUserConversationAsync(userId, CancellationToken.None);
+
+        Assert.True(detail.IsSuccess);
+        Assert.Equal("Open", detail.Value.Status);
+        Assert.Null(detail.Value.AssignedAdminId);
+        Assert.Equal(2, detail.Value.Messages.Count);
+        Assert.Equal("Necesito ayuda", detail.Value.Messages[0].Body);
+        Assert.Equal(
+            "Mensaje entregado. Respondere en espanol porque la interfaz de la aplicacion usa ese idioma. El equipo de PetMagic ya recibio tu solicitud.",
+            detail.Value.Messages[1].Body);
+        Assert.True(detail.Value.Messages[1].IsFromAdmin);
+        Assert.True(detail.Value.Messages[1].IsRead);
+        Assert.Equal(1, detail.Value.AdminUnreadCount);
+        Assert.Equal(0, detail.Value.UserUnreadCount);
     }
 
     private static TestStore CreateStore(ISupportChatRealtimeNotifier? realtimeNotifier = null)

@@ -477,7 +477,9 @@ public sealed class IdentityServiceProfileTests
             roleManager,
             identityDbContext,
             economyDbContext,
-            CreateEconomyService(economyDbContext),
+            new ServiceCollection()
+                .AddSingleton(CreateEconomyService(economyDbContext))
+                .BuildServiceProvider(),
             templatesDbContext,
             new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),

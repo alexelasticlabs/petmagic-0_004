@@ -14,9 +14,11 @@ public sealed class SupportChatService(
     IdentityDbContext identityDbContext,
     ISupportChatRealtimeNotifier realtimeNotifier) : ISupportChatService
 {
+    private static readonly Guid AutomatedAssistantUserId = Guid.Parse("2F1E3B3B-8A2E-4A8E-9EE5-97BF31B33218");
     private static readonly Error ConversationNotFound = new("support.conversation_not_found", "Support conversation was not found.");
     private static readonly Error Forbidden = new("support.forbidden", "You do not have access to this support conversation.");
     private static readonly Error InvalidStatus = new("support.status_invalid", "Support conversation status is not supported.");
+    private static readonly Error InvalidStatusTransition = new("support.status_transition_invalid", "Support conversation status transition is not allowed.");
 
     public async Task<Result<SupportConversationDetailResponse>> OpenConversationAsync(OpenSupportConversationCommand command, CancellationToken cancellationToken)
     {
@@ -28,14 +30,15 @@ public sealed class SupportChatService(
 
         if (conversation is null)
         {
+            var now = DateTime.UtcNow;
             conversation = new SupportConversation
             {
                 Id = Guid.NewGuid(),
                 InitiatorUserId = command.UserId,
                 Priority = command.Priority,
                 Status = SupportConversationStatus.Open,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
             };
 
             supportChatDbContext.SupportConversations.Add(conversation);
@@ -49,12 +52,12 @@ public sealed class SupportChatService(
                 command.UserId,
                 command.InitialMessage,
                 isAdmin: false,
-                isInternalNote: false,
                 attachmentUrl: null,
                 attachmentFileName: null,
                 attachmentContentType: null,
                 attachmentFileSizeBytes: null,
-                cancellationToken);
+                markAsReadAtUtc: null,
+                updateAssignmentAndStatus: true);
             appendedInitialMessage = true;
         }
 
@@ -64,7 +67,7 @@ public sealed class SupportChatService(
             await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         }
 
-        return Result.Success(await BuildConversationDetailAsync(conversation.Id, includeInternalNotes: false, cancellationToken));
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
     }
 
     public async Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(Guid userId, CancellationToken cancellationToken)
@@ -79,7 +82,7 @@ public sealed class SupportChatService(
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
-        return Result.Success(await BuildConversationDetailAsync(conversationId.Value, includeInternalNotes: false, cancellationToken));
+        return Result.Success(await BuildConversationDetailAsync(conversationId.Value, cancellationToken));
     }
 
     public async Task<Result<IReadOnlyList<SupportConversationSummaryResponse>>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken)
@@ -135,8 +138,8 @@ public sealed class SupportChatService(
             }
 
             var lastMessage = conversation.Messages.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault();
-            var unreadAdminCount = conversation.Messages.Count(x => !x.IsInternalNote && !x.IsFromAdmin && x.ReadAtUtc is null);
-            var unreadUserCount = conversation.Messages.Count(x => !x.IsInternalNote && x.IsFromAdmin && x.ReadAtUtc is null);
+            var unreadAdminCount = conversation.Messages.Count(x => !x.IsFromAdmin && x.ReadAtUtc is null);
+            var unreadUserCount = conversation.Messages.Count(x => x.IsFromAdmin && x.ReadAtUtc is null);
 
             return new SupportConversationSummaryResponse(
                 conversation.Id,
@@ -148,8 +151,7 @@ public sealed class SupportChatService(
                 conversation.Status.ToString(),
                 conversation.Priority.ToString(),
                 lastMessage is null ? null : Truncate(lastMessage.Body, 140),
-                lastMessage?.IsInternalNote ?? false,
-                conversation.LastMessageAtUtc,
+                lastMessage?.CreatedAtUtc ?? conversation.LastMessageAtUtc,
                 unreadUserCount,
                 unreadAdminCount,
                 conversation.CreatedAtUtc,
@@ -169,7 +171,7 @@ public sealed class SupportChatService(
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
-        return Result.Success(await BuildConversationDetailAsync(conversationId, includeInternalNotes: true, cancellationToken));
+        return Result.Success(await BuildConversationDetailAsync(conversationId, cancellationToken));
     }
 
     public async Task<Result<SupportMessageResponse>> SendMessageAsync(SendSupportMessageCommand command, CancellationToken cancellationToken)
@@ -187,17 +189,34 @@ public sealed class SupportChatService(
             return Result.Failure<SupportMessageResponse>(Forbidden);
         }
 
+        var shouldAppendAutomaticReply = !command.IsAdmin && !conversation.Messages.Any();
+
         var message = await AppendMessageAsync(
             conversation,
             command.SenderUserId,
             command.Body,
             command.IsAdmin,
-            command.IsInternalNote,
             command.AttachmentUrl,
             command.AttachmentFileName,
             command.AttachmentContentType,
             command.AttachmentFileSizeBytes,
-            cancellationToken);
+            markAsReadAtUtc: null,
+            updateAssignmentAndStatus: true);
+
+        if (shouldAppendAutomaticReply)
+        {
+            await AppendMessageAsync(
+                conversation,
+                AutomatedAssistantUserId,
+                SupportChatAutoReplyLocalizer.BuildFirstReplyAcknowledgement(command.Locale),
+                isAdmin: true,
+                attachmentUrl: null,
+                attachmentFileName: null,
+                attachmentContentType: null,
+                attachmentFileSizeBytes: null,
+                markAsReadAtUtc: DateTime.UtcNow,
+                updateAssignmentAndStatus: false);
+        }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
@@ -223,7 +242,7 @@ public sealed class SupportChatService(
         var now = DateTime.UtcNow;
         var changed = false;
 
-        foreach (var message in conversation.Messages.Where(x => !x.IsInternalNote && x.IsFromAdmin == markAdminMessages && x.ReadAtUtc is null))
+        foreach (var message in conversation.Messages.Where(x => x.IsFromAdmin == markAdminMessages && x.ReadAtUtc is null))
         {
             message.ReadAtUtc = now;
             changed = true;
@@ -248,16 +267,35 @@ public sealed class SupportChatService(
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
+        var now = DateTime.UtcNow;
+
+        if (conversation.Status != command.Status && !IsAllowedStatusTransition(conversation.Status, command.Status))
+        {
+            return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
+        }
+
         conversation.Status = command.Status;
         conversation.AssignedAdminId ??= command.AdminUserId;
-        conversation.UpdatedAtUtc = DateTime.UtcNow;
+        conversation.UpdatedAtUtc = now;
         conversation.ResolvedAtUtc = command.Status is SupportConversationStatus.Resolved or SupportConversationStatus.Closed
-            ? DateTime.UtcNow
+            ? now
             : null;
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
-        return Result.Success(await BuildConversationDetailAsync(conversation.Id, includeInternalNotes: true, cancellationToken));
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
+    private static bool IsAllowedStatusTransition(SupportConversationStatus currentStatus, SupportConversationStatus nextStatus)
+    {
+        return currentStatus switch
+        {
+            SupportConversationStatus.Open => nextStatus is SupportConversationStatus.InProgress or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
+            SupportConversationStatus.InProgress => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
+            SupportConversationStatus.Resolved => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.Closed,
+            SupportConversationStatus.Closed => nextStatus is SupportConversationStatus.Open,
+            _ => false
+        };
     }
 
     public async Task<Result<SupportConversationDetailResponse>> AssignConversationAsync(AssignSupportConversationCommand command, CancellationToken cancellationToken)
@@ -269,12 +307,14 @@ public sealed class SupportChatService(
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
+        var now = DateTime.UtcNow;
+
         conversation.AssignedAdminId = command.AssignedAdminId;
-        conversation.UpdatedAtUtc = DateTime.UtcNow;
+        conversation.UpdatedAtUtc = now;
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
-        return Result.Success(await BuildConversationDetailAsync(conversation.Id, includeInternalNotes: true, cancellationToken));
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
     }
 
     private async Task NotifyConversationUpdatedAsync(SupportConversation conversation, CancellationToken cancellationToken)
@@ -292,22 +332,23 @@ public sealed class SupportChatService(
         {
             throw;
         }
-        catch
+        catch (Exception)
         {
+            // Realtime fan-out is best-effort and must not break the primary support flow.
         }
     }
 
-    private async Task<ConversationMessage> AppendMessageAsync(
+    private Task<ConversationMessage> AppendMessageAsync(
         SupportConversation conversation,
         Guid senderUserId,
         string body,
         bool isAdmin,
-        bool isInternalNote,
         string? attachmentUrl,
         string? attachmentFileName,
         string? attachmentContentType,
         long? attachmentFileSizeBytes,
-        CancellationToken cancellationToken)
+        DateTime? markAsReadAtUtc,
+        bool updateAssignmentAndStatus)
     {
         var now = DateTime.UtcNow;
         var trimmedBody = body.Trim();
@@ -318,49 +359,40 @@ public sealed class SupportChatService(
             SenderUserId = senderUserId,
             Body = trimmedBody,
             IsFromAdmin = isAdmin,
-            IsInternalNote = isInternalNote,
             AttachmentUrl = attachmentUrl,
             AttachmentFileName = attachmentFileName,
             AttachmentContentType = attachmentContentType,
             AttachmentFileSizeBytes = attachmentFileSizeBytes,
+            ReadAtUtc = markAsReadAtUtc,
             CreatedAtUtc = now
         };
 
-        if (isAdmin)
+        if (isAdmin && updateAssignmentAndStatus)
         {
             conversation.AssignedAdminId ??= senderUserId;
-            if (!isInternalNote)
-            {
-                conversation.Status = SupportConversationStatus.InProgress;
-            }
+            conversation.Status = SupportConversationStatus.InProgress;
         }
-        else if (conversation.Status is SupportConversationStatus.Resolved or SupportConversationStatus.Closed)
+        else if (!isAdmin && (conversation.Status is SupportConversationStatus.Resolved or SupportConversationStatus.Closed))
         {
             conversation.Status = SupportConversationStatus.Open;
             conversation.ResolvedAtUtc = null;
         }
 
-        if (!isInternalNote)
-        {
-            conversation.LastMessageAtUtc = now;
-        }
+        conversation.LastMessageAtUtc = now;
 
         conversation.UpdatedAtUtc = now;
         supportChatDbContext.ConversationMessages.Add(message);
-        await Task.CompletedTask;
-        return message;
+        return Task.FromResult(message);
     }
 
-    private async Task<SupportConversationDetailResponse> BuildConversationDetailAsync(Guid conversationId, bool includeInternalNotes, CancellationToken cancellationToken)
+    private async Task<SupportConversationDetailResponse> BuildConversationDetailAsync(Guid conversationId, CancellationToken cancellationToken)
     {
         var conversation = await supportChatDbContext.SupportConversations
             .AsNoTracking()
             .Include(x => x.Messages.OrderBy(message => message.CreatedAtUtc))
             .FirstAsync(x => x.Id == conversationId, cancellationToken);
 
-        var visibleMessages = includeInternalNotes
-            ? conversation.Messages.OrderBy(x => x.CreatedAtUtc).ToList()
-            : conversation.Messages.Where(x => !x.IsInternalNote).OrderBy(x => x.CreatedAtUtc).ToList();
+        var visibleMessages = conversation.Messages.OrderBy(x => x.CreatedAtUtc).ToList();
 
         var userIds = visibleMessages
             .Select(x => x.SenderUserId)
@@ -392,7 +424,6 @@ public sealed class SupportChatService(
                 message.SenderUserId,
                 ResolveDisplayName(sender?.Email, sender?.DisplayName, message.IsFromAdmin),
                 message.IsFromAdmin,
-                message.IsInternalNote,
                 message.Body,
                 message.AttachmentUrl,
                 message.AttachmentFileName,
@@ -403,8 +434,8 @@ public sealed class SupportChatService(
                 message.CreatedAtUtc));
         }
 
-        var userUnreadCount = conversation.Messages.Count(x => !x.IsInternalNote && x.IsFromAdmin && x.ReadAtUtc is null);
-        var adminUnreadCount = conversation.Messages.Count(x => !x.IsInternalNote && !x.IsFromAdmin && x.ReadAtUtc is null);
+        var userUnreadCount = conversation.Messages.Count(x => x.IsFromAdmin && x.ReadAtUtc is null);
+        var adminUnreadCount = conversation.Messages.Count(x => !x.IsFromAdmin && x.ReadAtUtc is null);
 
         return new SupportConversationDetailResponse(
             conversation.Id,
@@ -415,11 +446,11 @@ public sealed class SupportChatService(
             ResolveDisplayName(assignedAdmin?.Email, assignedAdmin?.DisplayName, isAdminSender: true),
             conversation.Status.ToString(),
             conversation.Priority.ToString(),
-                userUnreadCount,
-                adminUnreadCount,
+            userUnreadCount,
+            adminUnreadCount,
             conversation.CreatedAtUtc,
             conversation.UpdatedAtUtc,
-                conversation.LastMessageAtUtc ?? visibleMessages.LastOrDefault()?.CreatedAtUtc,
+            conversation.LastMessageAtUtc ?? visibleMessages.LastOrDefault()?.CreatedAtUtc,
             messages);
     }
 
@@ -437,7 +468,6 @@ public sealed class SupportChatService(
             message.SenderUserId,
             ResolveDisplayName(sender?.Email, sender?.DisplayName, message.IsFromAdmin),
             message.IsFromAdmin,
-            message.IsInternalNote,
             message.Body,
             message.AttachmentUrl,
             message.AttachmentFileName,

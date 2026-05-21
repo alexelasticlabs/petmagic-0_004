@@ -1,5 +1,3 @@
-using PetMagic.Modules.SupportChat.Domain.Enums;
-
 namespace PetMagic.Modules.SupportChat.Infrastructure.Entities;
 
 public sealed class SupportReplyTemplate
@@ -9,8 +7,6 @@ public sealed class SupportReplyTemplate
     public string Title { get; set; } = string.Empty;
 
     public string Body { get; set; } = string.Empty;
-
-    public SupportReplyTemplateKind Kind { get; set; }
 
     public bool IsEnabled { get; set; }
 

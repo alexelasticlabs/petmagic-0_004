@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PetMagic.BuildingBlocks.Results;
@@ -31,7 +32,7 @@ public sealed class IdentityService(
     RoleManager<IdentityRole<Guid>> roleManager,
     IdentityDbContext dbContext,
     EconomyDbContext economyDbContext,
-    IEconomyService economyService,
+    IServiceProvider serviceProvider,
     TemplatesDbContext templatesDbContext,
     ILegalDocumentsCatalog legalDocumentsCatalog,
     IIdentityEmailTemplateRenderer emailTemplateRenderer,
@@ -1036,6 +1037,7 @@ public sealed class IdentityService(
             return Result.Failure<AdminUserWalletOperationResponse>(IdentityErrors.UserNotFound);
         }
 
+        var economyService = serviceProvider.GetRequiredService<IEconomyService>();
         var normalizedOperation = command.Operation.Trim().ToLowerInvariant();
         Result<WalletOperationResponse> operationResult = normalizedOperation switch
         {

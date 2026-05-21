@@ -17,11 +17,11 @@ public sealed record SendSupportMessageCommand(
     Guid SenderUserId,
     string Body,
     bool IsAdmin,
-    bool IsInternalNote = false,
     string? AttachmentUrl = null,
     string? AttachmentFileName = null,
     string? AttachmentContentType = null,
-    long? AttachmentFileSizeBytes = null);
+    long? AttachmentFileSizeBytes = null,
+    string? Locale = null);
 
 public sealed record MarkSupportConversationReadCommand(
     Guid ConversationId,
@@ -43,7 +43,6 @@ public sealed record UpsertSupportReplyTemplateCommand(
     Guid AdminUserId,
     string Title,
     string Body,
-    SupportReplyTemplateKind Kind,
     bool IsEnabled,
     int SortOrder);
 
@@ -61,7 +60,6 @@ public sealed record SupportConversationSummaryResponse(
     string Status,
     string Priority,
     string? LastMessagePreview,
-    bool LastMessageIsInternalNote,
     DateTime? LastMessageAtUtc,
     int UserUnreadCount,
     int AdminUnreadCount,
@@ -74,7 +72,6 @@ public sealed record SupportMessageResponse(
     Guid SenderUserId,
     string SenderDisplayName,
     bool IsFromAdmin,
-    bool IsInternalNote,
     string Body,
     string? AttachmentUrl,
     string? AttachmentFileName,
@@ -104,7 +101,6 @@ public sealed record SupportReplyTemplateResponse(
     Guid TemplateId,
     string Title,
     string Body,
-    string Kind,
     bool IsEnabled,
     int SortOrder,
     DateTime CreatedAtUtc,
