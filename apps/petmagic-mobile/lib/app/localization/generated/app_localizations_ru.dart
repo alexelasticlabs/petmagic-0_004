@@ -196,6 +196,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileWalletHistoryHint => 'Баланс, покупки и история операций.';
 
   @override
+  String get profileWalletPreviewEyebrow => 'PawSpark';
+
+  @override
+  String get profileWalletPreviewSubtitle =>
+      'Внутренняя валюта для генераций и бонусов.';
+
+  @override
+  String get profileWalletPreviewAction => 'Открыть';
+
+  @override
+  String get profileWalletPreviewLoadingStatus => 'Обновляем статус';
+
+  @override
+  String get profileWalletPreviewWeeklyReady => 'Недельная награда готова';
+
+  @override
+  String profileWalletPreviewAdCount(Object count) {
+    return 'Реклама сегодня: $count';
+  }
+
+  @override
   String get profileWalletLoadingHint => 'Загружаем баланс...';
 
   @override

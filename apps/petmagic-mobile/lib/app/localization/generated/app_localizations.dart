@@ -469,6 +469,42 @@ abstract class AppLocalizations {
   /// **'Open balance, purchases and history.'**
   String get profileWalletHistoryHint;
 
+  /// No description provided for @profileWalletPreviewEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'PawSpark'**
+  String get profileWalletPreviewEyebrow;
+
+  /// No description provided for @profileWalletPreviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app currency for generations and bonus rewards.'**
+  String get profileWalletPreviewSubtitle;
+
+  /// No description provided for @profileWalletPreviewAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get profileWalletPreviewAction;
+
+  /// No description provided for @profileWalletPreviewLoadingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing status'**
+  String get profileWalletPreviewLoadingStatus;
+
+  /// No description provided for @profileWalletPreviewWeeklyReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly reward ready'**
+  String get profileWalletPreviewWeeklyReady;
+
+  /// No description provided for @profileWalletPreviewAdCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Ads today: {count}'**
+  String profileWalletPreviewAdCount(Object count);
+
   /// No description provided for @profileWalletLoadingHint.
   ///
   /// In en, this message translates to:

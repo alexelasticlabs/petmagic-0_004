@@ -196,6 +196,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileWalletHistoryHint => 'Open balance, purchases and history.';
 
   @override
+  String get profileWalletPreviewEyebrow => 'PawSpark';
+
+  @override
+  String get profileWalletPreviewSubtitle =>
+      'In-app currency for generations and bonus rewards.';
+
+  @override
+  String get profileWalletPreviewAction => 'Open';
+
+  @override
+  String get profileWalletPreviewLoadingStatus => 'Refreshing status';
+
+  @override
+  String get profileWalletPreviewWeeklyReady => 'Weekly reward ready';
+
+  @override
+  String profileWalletPreviewAdCount(Object count) {
+    return 'Ads today: $count';
+  }
+
+  @override
   String get profileWalletLoadingHint => 'Loading balance...';
 
   @override
