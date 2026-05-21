@@ -103,6 +103,10 @@ export type Dictionary = {
   navTemplateAnalytics: string;
   navTemplateCategories: string;
   navPromoCodes: string;
+  navSectionOverview: string;
+  navSectionGrowth: string;
+  navSectionContent: string;
+  navSectionUsers: string;
   navLogout: string;
   promoCodesHeroEyebrow: string;
   promoCodesHeroDescription: string;
@@ -117,6 +121,9 @@ export type Dictionary = {
   promoCodesStatusFilterLabel: string;
   promoCodesSortLabel: string;
   promoCodesStatusAll: string;
+  promoCodesStatusDraft: string;
+  promoCodesStatusPaused: string;
+  promoCodesStatusLimitReached: string;
   promoCodesStatusArchived: string;
   promoCodesStatusExhausted: string;
   promoCodesStatusScheduled: string;
@@ -144,9 +151,27 @@ export type Dictionary = {
   promoCodesEditPanelTitle: string;
   promoCodesDuplicatePanelTitle: string;
   promoCodesRewardFixedLabel: string;
+  promoCodesFormCardDescription: string;
+  promoCodesSectionMainTitle: string;
+  promoCodesSectionCampaignTitle: string;
+  promoCodesSectionRewardTitle: string;
+  promoCodesSectionLimitsTitle: string;
   promoCodesNewDraftAction: string;
   promoCodesGenerateCodeAction: string;
   promoCodesCodeHelp: string;
+  promoCodesCampaignNameLabel: string;
+  promoCodesCampaignChannelLabel: string;
+  promoCodesCampaignCreatedByLabel: string;
+  promoCodesMinimumPurchasesLabel: string;
+  promoCodesMinimumPurchasesHint: string;
+  promoCodesStatusFieldLabel: string;
+  promoCodesStatusActiveOption: string;
+  promoCodesStatusPausedOption: string;
+  promoCodesRewardTypeLabel: string;
+  promoCodesRewardTypeSparkOption: string;
+  promoCodesRewardTypePremiumOption: string;
+  promoCodesRewardTypeHint: string;
+  promoCodesRewardValueLabel: string;
   promoCodesLimitLabel: string;
   promoCodesPerUserLimitLabel: string;
   promoCodesStartsLabel: string;
@@ -154,9 +179,33 @@ export type Dictionary = {
   promoCodesSaveUpdateAction: string;
   promoCodesSaveCreateAction: string;
   promoCodesRecentUsageTitle: string;
+  promoCodesNoCodeSelectedTitle: string;
+  promoCodesNoCodeSelectedDescription: string;
   promoCodesSelectForUsage: string;
   promoCodesRecentUsageEmpty: string;
+  promoCodesActivationsLoading: string;
+  promoCodesActivationsError: string;
+  promoCodesActivationUserColumn: string;
+  promoCodesActivationDateColumn: string;
+  promoCodesActivationRewardColumn: string;
+  promoCodesActivationStatusColumn: string;
+  promoCodesActivationStatusSuccess: string;
+  promoCodesViewAllActivationsAction: string;
+  promoCodesShowLatestActivationsAction: string;
+  promoCodesViewActivationsAction: string;
+  promoCodesPauseAction: string;
+  promoCodesResumeAction: string;
+  promoCodesActionsMenuLabel: string;
+  promoCodesUpdatedLabel: string;
+  promoCodesLastUsedLabel: string;
+  promoCodesUpdatingLabel: string;
+  promoCodesLast7DaysLabel: string;
+  promoCodesKpiTotalHint: string;
+  promoCodesKpiActiveHint: string;
+  promoCodesKpiUsesHint: string;
+  promoCodesKpiGrantedHint: string;
   promoCodesWindowAlways: string;
+  promoCodesRewardUnsupported: string;
   promoCodesInvalidCode: string;
   promoCodesInvalidNumbers: string;
   promoCodesLimitTooLow: string;
@@ -169,6 +218,10 @@ export type Dictionary = {
   promoCodesCreateError: string;
   promoCodesUpdateSuccess: string;
   promoCodesUpdateError: string;
+  promoCodesPauseSuccess: string;
+  promoCodesPauseError: string;
+  promoCodesResumeSuccess: string;
+  promoCodesResumeError: string;
   promoCodesArchiveSuccess: string;
   promoCodesArchiveError: string;
   promoCodesPreviousAction: string;
@@ -503,6 +556,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     navTemplateAnalytics: "Аналитика шаблонов",
     navTemplateCategories: "Категории",
     navPromoCodes: "Промокоды",
+    navSectionOverview: "Overview",
+    navSectionGrowth: "Growth",
+    navSectionContent: "Content",
+    navSectionUsers: "Users",
     navLogout: "Выйти",
     promoCodesHeroEyebrow: "Токены и активации",
     promoCodesHeroDescription: "Отдельная рабочая зона для token-only промокодов: создание, лимиты, окно действия и контроль последних активаций.",
@@ -517,8 +574,11 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesStatusFilterLabel: "Фильтр статуса",
     promoCodesSortLabel: "Сортировка",
     promoCodesStatusAll: "Все статусы",
+    promoCodesStatusDraft: "Черновик",
+    promoCodesStatusPaused: "Приостановлен",
+    promoCodesStatusLimitReached: "Лимит достигнут",
     promoCodesStatusArchived: "Архив",
-    promoCodesStatusExhausted: "Исчерпан",
+    promoCodesStatusExhausted: "Лимит достигнут",
     promoCodesStatusScheduled: "Запланирован",
     promoCodesStatusExpired: "Истек",
     promoCodesSortUpdated: "Сначала свежие",
@@ -543,10 +603,28 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesCreatePanelTitle: "Новый промокод",
     promoCodesEditPanelTitle: "Редактирование промокода",
     promoCodesDuplicatePanelTitle: "Дубликат промокода",
-    promoCodesRewardFixedLabel: "Фиксированная награда в PawSpark",
+    promoCodesRewardFixedLabel: "Тип награды: PawSpark-токены",
+    promoCodesFormCardDescription: "Соберите правила промокода, проверьте лимиты и запустите кампанию без перехода в другие разделы.",
+    promoCodesSectionMainTitle: "1. Основное",
+    promoCodesSectionCampaignTitle: "2. Кампания",
+    promoCodesSectionRewardTitle: "3. Награда",
+    promoCodesSectionLimitsTitle: "4. Ограничения",
     promoCodesNewDraftAction: "Новый драфт",
     promoCodesGenerateCodeAction: "Сгенерировать",
     promoCodesCodeHelp: "Код можно задавать вручную или сгенерировать. После создания он становится read-only.",
+    promoCodesCampaignNameLabel: "Название кампании",
+    promoCodesCampaignChannelLabel: "Канал",
+    promoCodesCampaignCreatedByLabel: "Создано кем",
+    promoCodesMinimumPurchasesLabel: "Мин. успешных покупок",
+    promoCodesMinimumPurchasesHint: "0 — без ограничений. Значение проверяется при активации промокода.",
+    promoCodesStatusFieldLabel: "Статус публикации",
+    promoCodesStatusActiveOption: "Активен",
+    promoCodesStatusPausedOption: "Приостановлен",
+    promoCodesRewardTypeLabel: "Тип награды",
+    promoCodesRewardTypeSparkOption: "PawSpark-токены",
+    promoCodesRewardTypePremiumOption: "Premium unlock (скоро)",
+    promoCodesRewardTypeHint: "Сейчас backend поддерживает только PawSpark-токены.",
+    promoCodesRewardValueLabel: "Количество",
     promoCodesLimitLabel: "Общий лимит",
     promoCodesPerUserLimitLabel: "Лимит на пользователя",
     promoCodesStartsLabel: "Старт",
@@ -554,9 +632,33 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesSaveUpdateAction: "Сохранить изменения",
     promoCodesSaveCreateAction: "Создать и сохранить",
     promoCodesRecentUsageTitle: "Последние активации",
+    promoCodesNoCodeSelectedTitle: "Промокод не выбран",
+    promoCodesNoCodeSelectedDescription: "Выберите строку в таблице, чтобы увидеть активации и быстрые действия.",
     promoCodesSelectForUsage: "Выберите строку в таблице, чтобы увидеть последних пользователей и время активации.",
     promoCodesRecentUsageEmpty: "У выбранного промокода еще нет активаций.",
+    promoCodesActivationsLoading: "Загружаем активации выбранного промокода...",
+    promoCodesActivationsError: "Не удалось загрузить активации. Попробуйте обновить список.",
+    promoCodesActivationUserColumn: "Пользователь",
+    promoCodesActivationDateColumn: "Дата",
+    promoCodesActivationRewardColumn: "Награда",
+    promoCodesActivationStatusColumn: "Статус",
+    promoCodesActivationStatusSuccess: "Успешно",
+    promoCodesViewAllActivationsAction: "Показать все активации",
+    promoCodesShowLatestActivationsAction: "Вернуть последние",
+    promoCodesViewActivationsAction: "Посмотреть активации",
+    promoCodesPauseAction: "Приостановить",
+    promoCodesResumeAction: "Возобновить",
+    promoCodesActionsMenuLabel: "Меню действий",
+    promoCodesUpdatedLabel: "Обновлен",
+    promoCodesLastUsedLabel: "Последнее использование",
+    promoCodesUpdatingLabel: "Обновляем...",
+    promoCodesLast7DaysLabel: "за 7 дней",
+    promoCodesKpiTotalHint: "Новые коды за неделю",
+    promoCodesKpiActiveHint: "Активные кампании с изменениями",
+    promoCodesKpiUsesHint: "Новые активации за неделю",
+    promoCodesKpiGrantedHint: "Выдано через промокоды",
     promoCodesWindowAlways: "Без ограничения по времени",
+    promoCodesRewardUnsupported: "Этот тип награды пока не поддерживается backend.",
     promoCodesInvalidCode: "Код должен содержать от 4 до 48 символов.",
     promoCodesInvalidNumbers: "Укажите положительные значения для награды и лимитов.",
     promoCodesLimitTooLow: "Общий лимит не может быть меньше уже использованных активаций.",
@@ -569,6 +671,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesCreateError: "Не удалось создать промокод.",
     promoCodesUpdateSuccess: "Промокод обновлен.",
     promoCodesUpdateError: "Не удалось обновить промокод.",
+    promoCodesPauseSuccess: "Промокод приостановлен.",
+    promoCodesPauseError: "Не удалось приостановить промокод.",
+    promoCodesResumeSuccess: "Промокод снова активен.",
+    promoCodesResumeError: "Не удалось возобновить промокод.",
     promoCodesArchiveSuccess: "Промокод архивирован.",
     promoCodesArchiveError: "Не удалось архивировать промокод.",
     promoCodesPreviousAction: "Назад",
@@ -901,6 +1007,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     navTemplateAnalytics: "Template Analytics",
     navTemplateCategories: "Categories",
     navPromoCodes: "Promo Codes",
+    navSectionOverview: "Overview",
+    navSectionGrowth: "Growth",
+    navSectionContent: "Content",
+    navSectionUsers: "Users",
     navLogout: "Logout",
     promoCodesHeroEyebrow: "Tokens and redemption flow",
     promoCodesHeroDescription: "Dedicated token-only workspace for promo code creation, limits, availability windows, and recent redemptions.",
@@ -915,8 +1025,11 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesStatusFilterLabel: "Status filter",
     promoCodesSortLabel: "Sort by",
     promoCodesStatusAll: "All statuses",
+    promoCodesStatusDraft: "Draft",
+    promoCodesStatusPaused: "Paused",
+    promoCodesStatusLimitReached: "Limit reached",
     promoCodesStatusArchived: "Archived",
-    promoCodesStatusExhausted: "Exhausted",
+    promoCodesStatusExhausted: "Limit reached",
     promoCodesStatusScheduled: "Scheduled",
     promoCodesStatusExpired: "Expired",
     promoCodesSortUpdated: "Recently updated",
@@ -941,10 +1054,28 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesCreatePanelTitle: "New promo code",
     promoCodesEditPanelTitle: "Edit promo code",
     promoCodesDuplicatePanelTitle: "Duplicate promo code",
-    promoCodesRewardFixedLabel: "Fixed PawSpark reward",
+    promoCodesRewardFixedLabel: "Reward type: PawSpark tokens",
+    promoCodesFormCardDescription: "Configure promo code rules, verify limits, and launch campaign-ready entries from one panel.",
+    promoCodesSectionMainTitle: "1. Basics",
+    promoCodesSectionCampaignTitle: "2. Campaign",
+    promoCodesSectionRewardTitle: "3. Reward",
+    promoCodesSectionLimitsTitle: "4. Limits",
     promoCodesNewDraftAction: "New draft",
     promoCodesGenerateCodeAction: "Generate",
     promoCodesCodeHelp: "Set a custom code or generate one automatically. After creation it becomes read-only.",
+    promoCodesCampaignNameLabel: "Campaign name",
+    promoCodesCampaignChannelLabel: "Channel",
+    promoCodesCampaignCreatedByLabel: "Created by",
+    promoCodesMinimumPurchasesLabel: "Min successful purchases",
+    promoCodesMinimumPurchasesHint: "0 means no purchase gate. Value is validated during redemption.",
+    promoCodesStatusFieldLabel: "Publishing status",
+    promoCodesStatusActiveOption: "Active",
+    promoCodesStatusPausedOption: "Paused",
+    promoCodesRewardTypeLabel: "Reward type",
+    promoCodesRewardTypeSparkOption: "PawSpark tokens",
+    promoCodesRewardTypePremiumOption: "Premium unlock (soon)",
+    promoCodesRewardTypeHint: "Backend currently supports PawSpark token rewards only.",
+    promoCodesRewardValueLabel: "Amount",
     promoCodesLimitLabel: "Total limit",
     promoCodesPerUserLimitLabel: "Per-user limit",
     promoCodesStartsLabel: "Starts",
@@ -952,9 +1083,33 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesSaveUpdateAction: "Save changes",
     promoCodesSaveCreateAction: "Create and save",
     promoCodesRecentUsageTitle: "Recent redemptions",
+    promoCodesNoCodeSelectedTitle: "No promo code selected",
+    promoCodesNoCodeSelectedDescription: "Select a table row to inspect activations and quick actions.",
     promoCodesSelectForUsage: "Pick a row in the table to inspect the latest users and redemption timestamps.",
     promoCodesRecentUsageEmpty: "The selected promo code has no redemptions yet.",
+    promoCodesActivationsLoading: "Loading activations for the selected promo code...",
+    promoCodesActivationsError: "Failed to load activations. Try refreshing the list.",
+    promoCodesActivationUserColumn: "User",
+    promoCodesActivationDateColumn: "Date",
+    promoCodesActivationRewardColumn: "Reward",
+    promoCodesActivationStatusColumn: "Status",
+    promoCodesActivationStatusSuccess: "Success",
+    promoCodesViewAllActivationsAction: "View all activations",
+    promoCodesShowLatestActivationsAction: "Show latest only",
+    promoCodesViewActivationsAction: "View activations",
+    promoCodesPauseAction: "Pause",
+    promoCodesResumeAction: "Resume",
+    promoCodesActionsMenuLabel: "Actions menu",
+    promoCodesUpdatedLabel: "Updated",
+    promoCodesLastUsedLabel: "Last used",
+    promoCodesUpdatingLabel: "Refreshing...",
+    promoCodesLast7DaysLabel: "in last 7 days",
+    promoCodesKpiTotalHint: "New codes in the last week",
+    promoCodesKpiActiveHint: "Active campaigns with recent changes",
+    promoCodesKpiUsesHint: "New redemptions in the last week",
+    promoCodesKpiGrantedHint: "Granted through promo codes",
     promoCodesWindowAlways: "Always available",
+    promoCodesRewardUnsupported: "This reward type is not supported by backend yet.",
     promoCodesInvalidCode: "Code must be between 4 and 48 characters.",
     promoCodesInvalidNumbers: "Enter positive values for reward and limits.",
     promoCodesLimitTooLow: "Total limit cannot be lower than existing redemptions.",
@@ -967,6 +1122,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesCreateError: "Failed to create promo code.",
     promoCodesUpdateSuccess: "Promo code updated.",
     promoCodesUpdateError: "Failed to update promo code.",
+    promoCodesPauseSuccess: "Promo code paused.",
+    promoCodesPauseError: "Failed to pause promo code.",
+    promoCodesResumeSuccess: "Promo code resumed.",
+    promoCodesResumeError: "Failed to resume promo code.",
     promoCodesArchiveSuccess: "Promo code archived.",
     promoCodesArchiveError: "Failed to archive promo code.",
     promoCodesPreviousAction: "Previous",

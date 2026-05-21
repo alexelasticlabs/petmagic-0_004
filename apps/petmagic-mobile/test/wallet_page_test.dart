@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
@@ -36,17 +37,14 @@ void main() {
       expect(find.textContaining('Недельная награда'), findsNothing);
       expect(find.text('Способы оплаты'), findsNothing);
 
-      await tester.scrollUntilVisible(
-        find.text(text.walletAdRewardCompactTitle),
-        120,
-      );
-      expect(find.text(text.walletAdRewardCompactTitle), findsOneWidget);
+      expect(find.text(text.walletAdRewardCompactTitle), findsWidgets);
 
-      await tester.scrollUntilVisible(find.text(text.walletPromoTitle), 120);
-      expect(find.text(text.walletPromoTitle), findsOneWidget);
+      expect(find.text(text.walletPromoTitle), findsNothing);
 
-      await tester.scrollUntilVisible(find.text(text.walletBuySparkTitle), 220);
+      await tester.drag(find.byType(ListView).first, const Offset(0, -520));
       await tester.pumpAndSettle();
+
+      expect(find.text(text.walletBuySparkTitle), findsWidgets);
 
       expect(find.text(text.walletPackDetailsAction), findsWidgets);
 
@@ -54,10 +52,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(text.walletPackDetailSubtitle), findsOneWidget);
-      expect(
-        find.textContaining(text.walletBuyForPrice('').trim()),
-        findsOneWidget,
-      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -95,7 +89,9 @@ void main() {
     );
   });
 
-  testWidgets('wallet tab is available in bottom navigation', (tester) async {
+  testWidgets('rewards tab replaces wallet in bottom navigation', (
+    tester,
+  ) async {
     final router = GoRouter(
       initialLocation: '/templates',
       routes: [
@@ -116,9 +112,9 @@ void main() {
               ),
             ),
             GoRoute(
-              path: WalletPage.routePath,
+              path: RewardsPage.routePath,
               pageBuilder: (context, state) => const NoTransitionPage(
-                child: Scaffold(body: Text('Wallet route')),
+                child: Scaffold(body: Text('Rewards route')),
               ),
             ),
             GoRoute(
@@ -148,13 +144,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Кошелек'), findsOneWidget);
+    expect(find.text('Бонусы'), findsOneWidget);
+    expect(find.text('Кошелек'), findsNothing);
     expect(find.text('Галерея'), findsOneWidget);
 
-    await tester.tap(find.text('Кошелек'));
+    await tester.tap(find.text('Бонусы'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Wallet route'), findsOneWidget);
+    expect(find.text('Rewards route'), findsOneWidget);
   });
 
   testWidgets('wallet navigation hides while keyboard is open', (tester) async {
@@ -179,17 +176,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Кошелек'), findsNothing);
+    expect(find.text('Бонусы'), findsNothing);
     expect(find.text('Wallet route'), findsOneWidget);
   });
 
-  testWidgets('redeem sheet keeps focus and shows friendly error on failure', (
+  testWidgets('rewards page redeems promo codes with friendly errors', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await _pumpWalletPage(
+    await _pumpRewardsPage(
       tester,
       repository: _FakeWalletRepository(
         wallet: _walletState,
@@ -200,155 +197,45 @@ void main() {
       ),
     );
 
-    final walletContext = tester.element(find.byType(WalletPage));
-    final text = AppLocalizations.of(walletContext);
-    final walletScrollView = find.byType(Scrollable).first;
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
 
-    final promoCardTitle = find.text(text.walletPromoTitle).last;
-    await tester.scrollUntilVisible(
-      promoCardTitle,
-      120,
-      scrollable: walletScrollView,
+    await tester.enterText(
+      find.byKey(const Key('rewards_promo_input')),
+      'WELCOME-100',
     );
-    await tester.tap(promoCardTitle);
+    await tester.tap(find.byKey(const Key('rewards_promo_submit')));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'WELCOME-100');
-    await tester.tap(find.text(text.walletApplyCode));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-
-    expect(find.text(text.walletRedeemSheetTitle), findsOneWidget);
     expect(find.text(text.walletRedeemOfflineError), findsAtLeastNWidgets(1));
   });
 
-  testWidgets('redeem sheet hides bottom navigation and can be canceled', (
-    tester,
-  ) async {
+  testWidgets('rewards page activates referral codes', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          walletRepositoryProvider.overrideWithValue(
-            _FakeWalletRepository(
-              wallet: _walletState,
-              ledger: _ledgerItems,
-              packs: _packs,
-              purchases: _purchases,
-            ),
-          ),
-        ],
-        child: MaterialApp(
-          theme: AppTheme.dark(),
-          locale: const Locale('ru'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const [
-            Locale('ru'),
-            Locale('en'),
-            Locale('en', 'US'),
-          ],
-          home: const PetMagicShell(
-            location: WalletPage.routePath,
-            child: WalletPage(),
-          ),
-        ),
+    await _pumpRewardsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
       ),
     );
 
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
 
-    final walletContext = tester.element(find.byType(WalletPage));
-    final text = AppLocalizations.of(walletContext);
-    final walletScrollView = find.byType(Scrollable).first;
-
-    await tester.scrollUntilVisible(
-      find.text(text.walletPromoTitle).last,
-      120,
-      scrollable: walletScrollView,
+    await tester.enterText(
+      find.byKey(const Key('rewards_referral_input')),
+      'PMFRIEND1',
     );
-    await tester.tap(find.text(text.walletPromoTitle).last);
+    await tester.tap(find.byKey(const Key('rewards_referral_submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text(text.walletRedeemSheetTitle), findsOneWidget);
-    expect(find.text('Кошелек'), findsNothing);
-
-    await tester.tap(find.text(text.walletRedeemCancelAction));
-    await tester.pumpAndSettle();
-
-    expect(find.text(text.walletRedeemSheetTitle), findsNothing);
-    expect(find.text('Кошелек'), findsOneWidget);
+    expect(find.text(text.rewardsReferralStatusPending), findsOneWidget);
   });
-
-  testWidgets(
-    'redeem sheet stays above bottom safe area when keyboard is closed',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(390, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-
-      await tester.pumpWidget(
-        MediaQuery(
-          data: const MediaQueryData(viewPadding: EdgeInsets.only(bottom: 34)),
-          child: ProviderScope(
-            overrides: [
-              walletRepositoryProvider.overrideWithValue(
-                _FakeWalletRepository(
-                  wallet: _walletState,
-                  ledger: _ledgerItems,
-                  packs: _packs,
-                  purchases: _purchases,
-                ),
-              ),
-            ],
-            child: MaterialApp(
-              theme: AppTheme.dark(),
-              locale: const Locale('ru'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: const [
-                Locale('ru'),
-                Locale('en'),
-                Locale('en', 'US'),
-              ],
-              home: const PetMagicShell(
-                location: WalletPage.routePath,
-                child: WalletPage(),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-
-      final walletContext = tester.element(find.byType(WalletPage));
-      final text = AppLocalizations.of(walletContext);
-      final walletScrollView = find.byType(Scrollable).first;
-      final reservedBottomInset = petMagicBottomNavInset(walletContext);
-
-      await tester.scrollUntilVisible(
-        find.text(text.walletPromoTitle).last,
-        120,
-        scrollable: walletScrollView,
-      );
-      await tester.tap(find.text(text.walletPromoTitle).last);
-      await tester.pumpAndSettle();
-
-      final cancelRect = tester.getRect(
-        find.text(text.walletRedeemCancelAction),
-      );
-      final applyRect = tester.getRect(find.text(text.walletApplyCode));
-      final lowestButtonBottom = cancelRect.bottom > applyRect.bottom
-          ? cancelRect.bottom
-          : applyRect.bottom;
-
-      expect(lowestButtonBottom, lessThanOrEqualTo(900 - reservedBottomInset));
-      expect(find.text(text.walletRedeemCancelAction), findsOneWidget);
-      expect(find.text(text.walletApplyCode), findsOneWidget);
-    },
-  );
 }
 
 Future<void> _pumpWalletPage(
@@ -368,6 +255,31 @@ Future<void> _pumpWalletPage(
           Locale('en', 'US'),
         ],
         home: const WalletPage(),
+      ),
+    ),
+  );
+
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 200));
+}
+
+Future<void> _pumpRewardsPage(
+  WidgetTester tester, {
+  required WalletRepository repository,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        locale: const Locale('ru'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: const [
+          Locale('ru'),
+          Locale('en'),
+          Locale('en', 'US'),
+        ],
+        home: const RewardsPage(),
       ),
     ),
   );
@@ -417,6 +329,20 @@ class _FakeWalletRepository extends WalletRepository {
   Future<List<CurrencyPackModel>> fetchPacks() async => packs;
 
   @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+  }) async {
+    return WalletCheckoutConfigModel(
+      packs: packs,
+      paymentMethods: _paymentMethods,
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards() async => _rewardsSummary;
+
+  @override
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
@@ -437,7 +363,31 @@ class _FakeWalletRepository extends WalletRepository {
 
     return wallet;
   }
+
+  @override
+  Future<RewardsSummaryModel> applyReferralCode(String code) async {
+    return const RewardsSummaryModel(
+      referralCode: 'PMME12345',
+      referralBonusSpark: 15,
+      referralStatus: 'pending',
+      referrerCode: 'PMFRIEND1',
+      totalReferralBonusEarned: 0,
+      referredUsersCount: 0,
+      pendingReferredUsersCount: 0,
+      rewardedReferredUsersCount: 0,
+    );
+  }
 }
+
+const _rewardsSummary = RewardsSummaryModel(
+  referralCode: 'PMME12345',
+  referralBonusSpark: 15,
+  referralStatus: 'none',
+  totalReferralBonusEarned: 15,
+  referredUsersCount: 1,
+  pendingReferredUsersCount: 0,
+  rewardedReferredUsersCount: 1,
+);
 
 const _walletState = WalletStateModel(
   userId: 'user-1',
@@ -489,6 +439,21 @@ const _packs = [
     grantedSpark: 350,
     bonusSpark: 30,
     totalSpark: 380,
+  ),
+];
+
+const _paymentMethods = [
+  WalletPaymentMethodModel(
+    provider: 'stripe',
+    purchaseChannel: 'web',
+    platform: 'web',
+    region: '*',
+    isEnabled: true,
+    isSelectedByDefault: true,
+    requiresExternalWarning: false,
+    requiresStoreDisclosure: false,
+    isRecommended: true,
+    bonusTokensPercent: 0,
   ),
 ];
 

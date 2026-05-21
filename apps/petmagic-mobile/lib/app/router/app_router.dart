@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
+import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
@@ -129,6 +130,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: WalletPage.routePath,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: WalletPage()),
+          ),
+          GoRoute(
+            path: RewardsPage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: RewardsPage()),
           ),
           GoRoute(
             path: PremiumPage.routePath,

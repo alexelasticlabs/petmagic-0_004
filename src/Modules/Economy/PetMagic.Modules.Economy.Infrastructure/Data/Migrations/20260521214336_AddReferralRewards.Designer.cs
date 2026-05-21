@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PetMagic.Modules.Economy.Infrastructure.Data;
 namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(EconomyDbContext))]
-    partial class EconomyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260521214336_AddReferralRewards")]
+    partial class AddReferralRewards
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -287,14 +290,6 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CampaignChannel")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("CampaignName")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -313,10 +308,6 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -332,9 +323,6 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("MaxRedemptionsPerUser")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MinimumSuccessfulPurchases")
                         .HasColumnType("integer");
 
                     b.Property<int>("RedeemedCount")

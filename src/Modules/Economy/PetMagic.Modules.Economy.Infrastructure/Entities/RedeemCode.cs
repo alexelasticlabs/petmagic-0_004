@@ -12,6 +12,14 @@ public sealed class RedeemCode
 
     public string Description { get; set; } = string.Empty;
 
+    public string? CampaignName { get; set; }
+
+    public string? CampaignChannel { get; set; }
+
+    public int MinimumSuccessfulPurchases { get; set; }
+
+    public string? CreatedBy { get; set; }
+
     public string RewardKind { get; set; } = Domain.Enums.RedeemCodeRewardKind.Spark;
 
     public int RewardValue { get; set; }

@@ -16,6 +16,8 @@ public static class WalletLedgerSource
 
     public const string RedeemCode = "redeem_code";
 
+    public const string ReferralBonus = "referral_bonus";
+
     public const string AdminGrant = "admin_grant";
 
     public const string AdminDebit = "admin_debit";

@@ -12,6 +12,8 @@ public sealed class EconomyOptions
 
     public int AdRewardDailyLimit { get; init; } = 5;
 
+    public int ReferralBonusSpark { get; init; } = 15;
+
     public string StripeSecretKey { get; init; } = string.Empty;
 
     public string StripeWebhookSecret { get; init; } = string.Empty;

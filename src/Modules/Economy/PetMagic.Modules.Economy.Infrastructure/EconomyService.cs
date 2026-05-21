@@ -151,6 +151,21 @@ public sealed class EconomyService(
             return Result.Failure<RedeemCodeAppliedResponse>(EconomyErrors.RedeemCodeExhausted);
         }
 
+        if (redeemCode.MinimumSuccessfulPurchases > 0)
+        {
+            var successfulPurchases = await dbContext.PurchaseOrders
+                .AsNoTracking()
+                .CountAsync(
+                    x => x.UserId == command.UserId
+                        && x.Status == PurchaseOrderStatus.Succeeded,
+                    cancellationToken);
+
+            if (successfulPurchases < redeemCode.MinimumSuccessfulPurchases)
+            {
+                return Result.Failure<RedeemCodeAppliedResponse>(EconomyErrors.RedeemCodePurchaseRequirementNotMet);
+            }
+        }
+
         var userRedemptionCount = await dbContext.RedeemCodeRedemptions
             .CountAsync(x => x.RedeemCodeId == redeemCode.Id && x.UserId == command.UserId, cancellationToken);
 
@@ -214,6 +229,99 @@ public sealed class EconomyService(
             premiumExpiresAtUtc));
     }
 
+    public async Task<Result<RewardsSummaryResponse>> GetRewardsSummaryAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var profile = await GetOrCreateReferralProfileAsync(userId, cancellationToken);
+        var activatedReferral = await dbContext.ReferralAttributions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.RefereeUserId == userId, cancellationToken);
+
+        var referredUsers = await dbContext.ReferralAttributions
+            .AsNoTracking()
+            .Where(x => x.ReferrerUserId == userId)
+            .ToListAsync(cancellationToken);
+
+        var rewarded = referredUsers
+            .Where(x => string.Equals(x.Status, ReferralAttributionStatus.Rewarded, StringComparison.Ordinal))
+            .ToList();
+
+        return Result.Success(new RewardsSummaryResponse(
+            profile.Code,
+            options.Value.ReferralBonusSpark,
+            activatedReferral?.Status ?? "none",
+            activatedReferral?.ReferrerCode,
+            activatedReferral?.CreatedAtUtc,
+            activatedReferral?.QualifiedAtUtc,
+            rewarded.Sum(x => x.RewardSpark),
+            referredUsers.Count,
+            referredUsers.Count(x => string.Equals(x.Status, ReferralAttributionStatus.Pending, StringComparison.Ordinal)),
+            rewarded.Count));
+    }
+
+    public async Task<Result<ReferralCodeAppliedResponse>> ApplyReferralCodeAsync(ApplyReferralCodeCommand command, CancellationToken cancellationToken)
+    {
+        var normalizedCode = NormalizeReferralCode(command.Code);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            return Result.Failure<ReferralCodeAppliedResponse>(EconomyErrors.ReferralCodeNotFound);
+        }
+
+        var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        var referrerProfile = await dbContext.ReferralProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Code == normalizedCode, cancellationToken);
+
+        if (referrerProfile is null)
+        {
+            return Result.Failure<ReferralCodeAppliedResponse>(EconomyErrors.ReferralCodeNotFound);
+        }
+
+        if (referrerProfile.UserId == command.UserId)
+        {
+            return Result.Failure<ReferralCodeAppliedResponse>(EconomyErrors.ReferralSelfReferral);
+        }
+
+        var alreadyLinked = await dbContext.ReferralAttributions
+            .AnyAsync(x => x.RefereeUserId == command.UserId, cancellationToken);
+        if (alreadyLinked)
+        {
+            return Result.Failure<ReferralCodeAppliedResponse>(EconomyErrors.ReferralAlreadyLinked);
+        }
+
+        if (await HasCompletedPaidTransactionAsync(command.UserId, cancellationToken))
+        {
+            return Result.Failure<ReferralCodeAppliedResponse>(EconomyErrors.ReferralPaidUserIneligible);
+        }
+
+        var now = DateTime.UtcNow;
+        dbContext.ReferralAttributions.Add(new ReferralAttribution
+        {
+            Id = Guid.NewGuid(),
+            ReferrerUserId = referrerProfile.UserId,
+            RefereeUserId = command.UserId,
+            ReferrerCode = referrerProfile.Code,
+            Status = ReferralAttributionStatus.Pending,
+            RewardSpark = options.Value.ReferralBonusSpark,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return Result.Success(new ReferralCodeAppliedResponse(
+            referrerProfile.Code,
+            ReferralAttributionStatus.Pending,
+            options.Value.ReferralBonusSpark,
+            now));
+    }
+
     public async Task<Result<IReadOnlyList<CurrencyPackResponse>>> ListPacksAsync(CancellationToken cancellationToken)
     {
         var packs = await dbContext.CurrencyPacks
@@ -234,19 +342,22 @@ public sealed class EconomyService(
         return Result.Success<IReadOnlyList<CurrencyPackResponse>>(packs);
     }
 
-    public async Task<Result<WalletCheckoutConfigResponse>> GetWalletCheckoutConfigAsync(
-        GetWalletCheckoutConfigQuery query,
-        CancellationToken cancellationToken)
+    public async Task<Result<WalletCheckoutConfigResponse>> GetWalletCheckoutConfigAsync(GetWalletCheckoutConfigQuery query, CancellationToken cancellationToken)
     {
         var packsResult = await ListPacksAsync(cancellationToken);
-        var methods = await BuildAvailablePaymentMethodsAsync(
+        if (packsResult.IsFailure)
+        {
+            return Result.Failure<WalletCheckoutConfigResponse>(packsResult.Error);
+        }
+
+        var availablePaymentMethods = await BuildAvailablePaymentMethodsAsync(
             new GetPaywallConfigQuery(query.Platform, query.AppVersion, query.Country, query.Locale),
             cancellationToken);
 
         return Result.Success(new WalletCheckoutConfigResponse(
             packsResult.Value,
-            methods,
-            methods.Any(x => x.RequiresExternalWarning)));
+            availablePaymentMethods,
+            availablePaymentMethods.Any(x => x.RequiresExternalWarning)));
     }
 
     public async Task<Result<IReadOnlyList<PremiumPlanResponse>>> ListPremiumPlansAsync(CancellationToken cancellationToken)
@@ -592,6 +703,9 @@ public sealed class EconomyService(
             verification.Value.ExternalSubscriptionId,
             null,
             cancellationToken);
+
+        await SettlePendingReferralBonusAsync(command.UserId, $"premium:{provider}:{plan.PlanCode}", DateTime.UtcNow, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new PremiumStoreVerificationResponse(
             provider,
@@ -1263,6 +1377,53 @@ public sealed class EconomyService(
         return Result.Success<IReadOnlyList<AdminRedeemCodeResponse>>(result);
     }
 
+    public async Task<Result<OffsetPagedResponse<AdminRedeemCodeRedemptionResponse>>> GetAdminRedeemCodeActivationsAsync(
+        Guid redeemCodeId,
+        int skip,
+        int take,
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
+        var codeExists = await dbContext.RedeemCodes
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == redeemCodeId, cancellationToken);
+
+        if (!codeExists)
+        {
+            return Result.Failure<OffsetPagedResponse<AdminRedeemCodeRedemptionResponse>>(EconomyErrors.RedeemCodeNotFound);
+        }
+
+        var normalizedSkip = Math.Max(0, skip);
+        var normalizedTake = NormalizeTake(take, 20, 200);
+
+        var query = dbContext.RedeemCodeRedemptions
+            .AsNoTracking()
+            .Where(x => x.RedeemCodeId == redeemCodeId)
+            .AsQueryable();
+
+        if (userId.HasValue)
+        {
+            query = query.Where(x => x.UserId == userId.Value);
+        }
+
+        var items = await query
+            .OrderByDescending(x => x.RedeemedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .Skip(normalizedSkip)
+            .Take(normalizedTake + 1)
+            .Select(x => new AdminRedeemCodeRedemptionResponse(
+                x.Id,
+                x.UserId,
+                x.RewardKind,
+                x.RewardValue,
+                x.WalletLedgerEntryId,
+                x.PremiumExpiresAtUtc,
+                x.RedeemedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
+    }
+
     public async Task<Result<OffsetPagedResponse<AdminSubscriptionEventResponse>>> GetAdminSubscriptionEventsAsync(
         int skip,
         int take,
@@ -1345,6 +1506,10 @@ public sealed class EconomyService(
             CodeHash = codeHash,
             CodePrefix = BuildRedeemCodePrefix(normalizedCode),
             Description = command.Description.Trim(),
+            CampaignName = NullIfWhiteSpace(command.CampaignName),
+            CampaignChannel = NullIfWhiteSpace(command.CampaignChannel),
+            MinimumSuccessfulPurchases = command.MinimumSuccessfulPurchases,
+            CreatedBy = NullIfWhiteSpace(command.CreatedBy),
             RewardKind = rewardKind,
             RewardValue = command.RewardValue,
             MaxRedemptions = command.MaxRedemptions,
@@ -1403,6 +1568,10 @@ public sealed class EconomyService(
         }
 
         code.Description = command.Description.Trim();
+        code.CampaignName = NullIfWhiteSpace(command.CampaignName);
+        code.CampaignChannel = NullIfWhiteSpace(command.CampaignChannel);
+        code.MinimumSuccessfulPurchases = command.MinimumSuccessfulPurchases;
+        code.CreatedBy = NullIfWhiteSpace(command.CreatedBy);
         code.RewardKind = rewardKind;
         code.RewardValue = command.RewardValue;
         code.MaxRedemptions = command.MaxRedemptions;
@@ -1549,6 +1718,12 @@ public sealed class EconomyService(
                         eventId,
                         subscription.ExternalSubscriptionId,
                         command.RawBody,
+                        cancellationToken);
+
+                    await SettlePendingReferralBonusAsync(
+                        parsedEvent.UserId.Value,
+                        $"premium:stripe:{subscription.PlanId}",
+                        DateTime.UtcNow,
                         cancellationToken);
                 }
             }
@@ -1972,6 +2147,112 @@ public sealed class EconomyService(
         return wallet;
     }
 
+    private async Task<ReferralProfile> GetOrCreateReferralProfileAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var profile = await dbContext.ReferralProfiles.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        if (profile is not null)
+        {
+            return profile;
+        }
+
+        var now = DateTime.UtcNow;
+        profile = new ReferralProfile
+        {
+            UserId = userId,
+            Code = await GenerateUniqueReferralCodeAsync(cancellationToken),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        dbContext.ReferralProfiles.Add(profile);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return profile;
+    }
+
+    private async Task<string> GenerateUniqueReferralCodeAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var code = GenerateReferralCode();
+            if (!await dbContext.ReferralProfiles.AnyAsync(x => x.Code == code, cancellationToken))
+            {
+                return code;
+            }
+        }
+
+        return $"PM{Guid.NewGuid():N}"[..12].ToUpperInvariant();
+    }
+
+    private static string GenerateReferralCode()
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        Span<byte> bytes = stackalloc byte[8];
+        RandomNumberGenerator.Fill(bytes);
+
+        var builder = new StringBuilder("PM", 10);
+        foreach (var value in bytes)
+        {
+            builder.Append(alphabet[value % alphabet.Length]);
+        }
+
+        return builder.ToString();
+    }
+
+    private async Task<bool> HasCompletedPaidTransactionAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var hasSucceededPackPurchase = await dbContext.PurchaseOrders
+            .AsNoTracking()
+            .AnyAsync(x => x.UserId == userId && x.Status == PurchaseOrderStatus.Succeeded, cancellationToken);
+        if (hasSucceededPackPurchase)
+        {
+            return true;
+        }
+
+        return await dbContext.UserSubscriptions
+            .AsNoTracking()
+            .AnyAsync(x => x.UserId == userId, cancellationToken);
+    }
+
+    private async Task SettlePendingReferralBonusAsync(Guid refereeUserId, string triggerReason, DateTime now, CancellationToken cancellationToken)
+    {
+        var referral = await dbContext.ReferralAttributions
+            .FirstOrDefaultAsync(
+                x => x.RefereeUserId == refereeUserId
+                    && x.Status == ReferralAttributionStatus.Pending,
+                cancellationToken);
+
+        if (referral is null)
+        {
+            return;
+        }
+
+        var referrerWallet = await GetOrCreateWalletAsync(referral.ReferrerUserId, cancellationToken);
+        var refereeWallet = await GetOrCreateWalletAsync(referral.RefereeUserId, cancellationToken);
+        var rewardSpark = referral.RewardSpark > 0 ? referral.RewardSpark : options.Value.ReferralBonusSpark;
+
+        ApplyWalletDelta(
+            referrerWallet,
+            rewardSpark,
+            WalletLedgerSource.ReferralBonus,
+            $"referral:inviter:{referral.RefereeUserId:D}:{triggerReason}",
+            now,
+            out var referrerLedgerEntryId);
+
+        ApplyWalletDelta(
+            refereeWallet,
+            rewardSpark,
+            WalletLedgerSource.ReferralBonus,
+            $"referral:friend:{referral.ReferrerUserId:D}:{triggerReason}",
+            now,
+            out var refereeLedgerEntryId);
+
+        referral.Status = ReferralAttributionStatus.Rewarded;
+        referral.ReferrerLedgerEntryId = referrerLedgerEntryId;
+        referral.RefereeLedgerEntryId = refereeLedgerEntryId;
+        referral.QualifiedAtUtc = now;
+        referral.UpdatedAtUtc = now;
+    }
+
     private WalletOperationResponse ApplyWalletDelta(Wallet wallet, int delta, string source, string reason, DateTime now)
     {
         return ApplyWalletDelta(wallet, delta, source, reason, now, out _);
@@ -2045,6 +2326,7 @@ public sealed class EconomyService(
         var now = DateTime.UtcNow;
 
         ApplyWalletDelta(wallet, order.SparkToGrant, WalletLedgerSource.PackPurchase, $"purchase:{order.Id:D}", now);
+        await SettlePendingReferralBonusAsync(order.UserId, $"purchase:{order.Id:D}", now, cancellationToken);
 
         order.Status = PurchaseOrderStatus.Succeeded;
         order.ConfirmedAtUtc = now;
@@ -2125,6 +2407,11 @@ public sealed class EconomyService(
         RedeemCode code,
         IReadOnlyList<AdminRedeemCodeRedemptionResponse> redemptions)
     {
+        var lastRedeemedAtUtc = redemptions
+            .OrderByDescending(x => x.RedeemedAtUtc)
+            .Select(x => (DateTime?)x.RedeemedAtUtc)
+            .FirstOrDefault();
+
         return new AdminRedeemCodeResponse(
             code.Id,
             string.IsNullOrWhiteSpace(code.Code) ? $"{code.CodePrefix}..." : code.Code,
@@ -2140,7 +2427,12 @@ public sealed class EconomyService(
             code.ExpiresAtUtc,
             code.CreatedAtUtc,
             code.UpdatedAtUtc,
-            redemptions);
+                redemptions,
+                code.CampaignName,
+                code.CampaignChannel,
+                code.MinimumSuccessfulPurchases,
+                code.CreatedBy,
+                lastRedeemedAtUtc);
     }
 
     private static AdminRedeemCodeRedemptionResponse ToAdminRedeemCodeRedemptionResponse(RedeemCodeRedemption redemption)
@@ -2179,6 +2471,11 @@ public sealed class EconomyService(
     private static string NormalizeRedeemCode(string rawCode)
     {
         return Regex.Replace(rawCode.Trim().ToUpperInvariant(), "\\s+", string.Empty, RegexOptions.CultureInvariant);
+    }
+
+    private static string NormalizeReferralCode(string rawCode)
+    {
+        return Regex.Replace(rawCode.Trim().ToUpperInvariant(), "[^A-Z0-9]", string.Empty, RegexOptions.CultureInvariant);
     }
 
     private static string NormalizeRewardKind(string rawRewardKind)

@@ -31,6 +31,7 @@ public static class AdminEconomyEndpoints
         group.MapPut("/payment-provider-configs/{configurationId:guid}", UpdatePaymentProviderConfigurationAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/redeem-codes", ListRedeemCodesAsync);
+        group.MapGet("/redeem-codes/{redeemCodeId:guid}/activations", ListRedeemCodeActivationsAsync);
         group.MapPost("/redeem-codes", CreateRedeemCodeAsync)
             .RequireAuthorization("AdminOnly");
         group.MapPut("/redeem-codes/{redeemCodeId:guid}", UpdateRedeemCodeAsync)
@@ -253,6 +254,26 @@ public static class AdminEconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<OffsetPagedResponse<AdminRedeemCodeRedemptionResponse>>, ProblemHttpResult>> ListRedeemCodeActivationsAsync(
+        [FromRoute] Guid redeemCodeId,
+        [FromQuery] int skip,
+        [FromQuery] int take,
+        [FromQuery] Guid? userId,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminRedeemCodeActivationsAsync(redeemCodeId, skip, take, userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code == "economy.redeem_code_not_found"
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<AdminRedeemCodeResponse>, ValidationProblem, ProblemHttpResult>> CreateRedeemCodeAsync(
         [FromBody] CreateRedeemCodeRequest request,
         [FromServices] IValidator<CreateRedeemCodeCommand> validator,
@@ -268,7 +289,11 @@ public static class AdminEconomyEndpoints
             request.MaxRedemptionsPerUser,
             request.IsActive,
             request.StartsAtUtc,
-            request.ExpiresAtUtc);
+            request.ExpiresAtUtc,
+            request.CampaignName,
+            request.CampaignChannel,
+            request.MinimumSuccessfulPurchases,
+            request.CreatedBy);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -304,7 +329,11 @@ public static class AdminEconomyEndpoints
             request.MaxRedemptionsPerUser,
             request.IsActive,
             request.StartsAtUtc,
-            request.ExpiresAtUtc);
+            request.ExpiresAtUtc,
+            request.CampaignName,
+            request.CampaignChannel,
+            request.MinimumSuccessfulPurchases,
+            request.CreatedBy);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -370,7 +399,11 @@ public static class AdminEconomyEndpoints
         int MaxRedemptionsPerUser,
         bool IsActive,
         DateTime? StartsAtUtc,
-        DateTime? ExpiresAtUtc);
+        DateTime? ExpiresAtUtc,
+        string? CampaignName = null,
+        string? CampaignChannel = null,
+        int MinimumSuccessfulPurchases = 0,
+        string? CreatedBy = null);
 
     public sealed record UpdateRedeemCodeRequest(
         string Description,
@@ -380,5 +413,9 @@ public static class AdminEconomyEndpoints
         int MaxRedemptionsPerUser,
         bool IsActive,
         DateTime? StartsAtUtc,
-        DateTime? ExpiresAtUtc);
+        DateTime? ExpiresAtUtc,
+        string? CampaignName = null,
+        string? CampaignChannel = null,
+        int MinimumSuccessfulPurchases = 0,
+        string? CreatedBy = null);
 }

@@ -202,6 +202,15 @@ public sealed class ApplyRedeemCodeCommandValidator : AbstractValidator<ApplyRed
     }
 }
 
+public sealed class ApplyReferralCodeCommandValidator : AbstractValidator<ApplyReferralCodeCommand>
+{
+    public ApplyReferralCodeCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Code).NotEmpty().MinimumLength(4).MaximumLength(32);
+    }
+}
+
 public sealed class CreateRedeemCodeCommandValidator : AbstractValidator<CreateRedeemCodeCommand>
 {
     public CreateRedeemCodeCommandValidator()
@@ -214,6 +223,10 @@ public sealed class CreateRedeemCodeCommandValidator : AbstractValidator<CreateR
         RuleFor(x => x.RewardValue).GreaterThan(0);
         RuleFor(x => x.MaxRedemptions).GreaterThan(0);
         RuleFor(x => x.MaxRedemptionsPerUser).GreaterThan(0);
+        RuleFor(x => x.CampaignName).MaximumLength(120);
+        RuleFor(x => x.CampaignChannel).MaximumLength(64);
+        RuleFor(x => x.MinimumSuccessfulPurchases).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.CreatedBy).MaximumLength(120);
         RuleFor(x => x.ExpiresAtUtc)
             .GreaterThan(x => x.StartsAtUtc)
             .When(x => x.StartsAtUtc.HasValue && x.ExpiresAtUtc.HasValue);
@@ -232,6 +245,10 @@ public sealed class UpdateRedeemCodeCommandValidator : AbstractValidator<UpdateR
         RuleFor(x => x.RewardValue).GreaterThan(0);
         RuleFor(x => x.MaxRedemptions).GreaterThan(0);
         RuleFor(x => x.MaxRedemptionsPerUser).GreaterThan(0);
+        RuleFor(x => x.CampaignName).MaximumLength(120);
+        RuleFor(x => x.CampaignChannel).MaximumLength(64);
+        RuleFor(x => x.MinimumSuccessfulPurchases).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.CreatedBy).MaximumLength(120);
         RuleFor(x => x.ExpiresAtUtc)
             .GreaterThan(x => x.StartsAtUtc)
             .When(x => x.StartsAtUtc.HasValue && x.ExpiresAtUtc.HasValue);

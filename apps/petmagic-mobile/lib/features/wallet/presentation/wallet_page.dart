@@ -137,19 +137,12 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         isClaimingAd: state.isClaimingAd,
                         onClaimAd: controller.claimAdReward,
                       ),
-                      const SizedBox(height: 14),
-                      _WalletToolsSection(
-                        onShowRedeem: () =>
-                            _showRedeemSheet(context, controller),
-                      ),
-                      const SizedBox(height: 14),
                       _PacksSection(
                         packs: state.packs,
                         isBuying: state.isBuying,
                         onSelect: (pack) => _showPackDetailSheet(
                           context,
                           pack,
-                          paymentMethod: state.selectedPaymentMethod,
                           isBuying: state.isBuying,
                           onBuy: () => controller.buyPack(pack),
                         ),
@@ -622,113 +615,6 @@ class _RewardStatusCard extends StatelessWidget {
   }
 }
 
-class _WalletPromoCard extends StatelessWidget {
-  const _WalletPromoCard({required this.onShowRedeem});
-
-  final VoidCallback onShowRedeem;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onShowRedeem,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: colors.accent.withValues(alpha: 0.22)),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.accent.withValues(alpha: 0.16),
-                colors.surfaceGlass,
-              ],
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: colors.accent.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(
-                    Icons.confirmation_number_rounded,
-                    color: colors.accent,
-                    size: 21,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        text.walletPromoTitle,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        text.walletPromoSubtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 12.2,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: colors.accent,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WalletToolsSection extends StatelessWidget {
-  const _WalletToolsSection({required this.onShowRedeem});
-
-  final VoidCallback onShowRedeem;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionTitle(title: text.walletQuickActionsTitle),
-        _WalletPromoCard(onShowRedeem: onShowRedeem),
-      ],
-    );
-  }
-}
-
 class _PacksSection extends StatelessWidget {
   const _PacksSection({
     required this.packs,
@@ -1006,36 +892,6 @@ class _PackDetailRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _WalletPaymentBadge extends StatelessWidget {
-  const _WalletPaymentBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.accent.withValues(alpha: 0.32)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: colors.accent,
-            fontSize: 10.5,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
       ),
     );
   }
@@ -1379,17 +1235,12 @@ class _WalletUnavailableCard extends StatelessWidget {
 Future<void> _showPackDetailSheet(
   BuildContext context,
   CurrencyPackModel pack, {
-  required WalletPaymentMethodModel? paymentMethod,
   required bool isBuying,
   required Future<String?> Function() onBuy,
 }) async {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   final price = _formatPrice(pack);
-  final warningTitle = paymentMethod?.warningTitle?.trim();
-  final warningMessage = paymentMethod?.warningMessage?.trim();
-  final displayLabel = paymentMethod?.displayLabel?.trim();
-  final displaySubtitle = paymentMethod?.displaySubtitle?.trim();
 
   await showModalBottomSheet<void>(
     context: context,
@@ -1506,48 +1357,16 @@ Future<void> _showPackDetailSheet(
             ],
             const SizedBox(height: 12),
             ProfileProgressCard(
-              title: warningTitle == null || warningTitle.isEmpty
-                  ? text.externalCheckoutStripeTitle
-                  : warningTitle,
-              message: warningMessage == null || warningMessage.isEmpty
-                  ? text.externalCheckoutStripeMessage
-                  : warningMessage,
+              title: text.externalCheckoutStripeTitle,
+              message: text.externalCheckoutStripeMessage,
               tone: colors.gold,
               icon: Icons.lock_outline_rounded,
             ),
-            if (paymentMethod != null) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  _WalletPaymentBadge(
-                    label: displayLabel == null || displayLabel.isEmpty
-                        ? 'Stripe'
-                        : displayLabel,
-                  ),
-                  if (displaySubtitle != null && displaySubtitle.isNotEmpty)
-                    _WalletPaymentBadge(label: displaySubtitle),
-                  if (paymentMethod.isRecommended)
-                    _WalletPaymentBadge(
-                      label: text.premiumPaymentRecommendedBadge,
-                    ),
-                  if (paymentMethod.isSelectedByDefault)
-                    _WalletPaymentBadge(label: text.premiumPaymentDefaultBadge),
-                  if (paymentMethod.bonusTokensPercent > 0)
-                    _WalletPaymentBadge(
-                      label: text.paymentBonusPercentBadge(
-                        paymentMethod.bonusTokensPercent,
-                      ),
-                    ),
-                ],
-              ),
-            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: isBuying || paymentMethod == null
+                onPressed: isBuying
                     ? null
                     : () async {
                         Navigator.of(sheetContext).pop();
@@ -1701,230 +1520,4 @@ String _friendlyError(AppLocalizations text, String value) {
   }
 
   return value;
-}
-
-Future<void> _showRedeemSheet(
-  BuildContext context,
-  WalletController controller,
-) async {
-  final colors = context.petMagicColors;
-
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: colors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-    ),
-    builder: (_) => _RedeemSheet(controller: controller),
-  );
-}
-
-class _RedeemSheet extends StatefulWidget {
-  const _RedeemSheet({required this.controller});
-
-  final WalletController controller;
-
-  @override
-  State<_RedeemSheet> createState() => _RedeemSheetState();
-}
-
-class _RedeemSheetState extends State<_RedeemSheet> {
-  late final TextEditingController _inputController;
-  bool _isSubmitting = false;
-  bool _isSuccess = false;
-  String? _localError;
-
-  @override
-  void initState() {
-    super.initState();
-    _inputController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _inputController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final code = _inputController.text.trim();
-    if (code.isEmpty || _isSubmitting || _isSuccess) {
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
-      _localError = null;
-    });
-
-    final errorMessage = await widget.controller.applyRedeemCode(code);
-    if (!mounted) {
-      return;
-    }
-
-    final text = AppLocalizations.of(context);
-    if (errorMessage != null) {
-      setState(() {
-        _isSubmitting = false;
-        _localError = _friendlyError(text, errorMessage);
-      });
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = false;
-      _isSuccess = true;
-    });
-
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (mounted) {
-      Navigator.of(context).pop();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final bottomNavInset = petMagicBottomNavInset(context);
-    final bottomSheetBottomInset = keyboardInset > 0
-        ? keyboardInset
-        : bottomNavInset;
-
-    return SafeArea(
-      top: false,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.fromLTRB(20, 18, 20, 28 + bottomSheetBottomInset),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: colors.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      _isSuccess
-                          ? Icons.check_circle_rounded
-                          : Icons.confirmation_number_rounded,
-                      color: colors.accent,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          text.walletRedeemSheetTitle,
-                          style: TextStyle(
-                            color: colors.textStrong,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _isSuccess
-                              ? text.walletRedeemSuccessMessage
-                              : text.walletRedeemSheetSubtitle,
-                          style: TextStyle(
-                            color: _isSuccess ? colors.accent : colors.textSoft,
-                            fontSize: 12.5,
-                            height: 1.35,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _inputController,
-                autofocus: true,
-                enabled: !_isSubmitting && !_isSuccess,
-                textCapitalization: TextCapitalization.characters,
-                textInputAction: TextInputAction.done,
-                onChanged: (_) {
-                  if (_localError == null) {
-                    return;
-                  }
-
-                  setState(() {
-                    _localError = null;
-                  });
-                },
-                onSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  labelText: text.walletRedeemInputLabel,
-                  hintText: text.walletRedeemHint,
-                  prefixIcon: const Icon(Icons.confirmation_number_outlined),
-                ),
-              ),
-              if (_localError != null) ...[
-                const SizedBox(height: 12),
-                ProfileMessageCard(message: _localError!, tone: colors.danger),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isSubmitting
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      child: Text(text.walletRedeemCancelAction),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: _isSubmitting || _isSuccess ? null : _submit,
-                      icon: _isSubmitting
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator.adaptive(
-                                strokeWidth: 2.2,
-                                backgroundColor: colors.textMuted.withValues(
-                                  alpha: 0.22,
-                                ),
-                              ),
-                            )
-                          : Icon(
-                              _isSuccess
-                                  ? Icons.check_circle_rounded
-                                  : Icons.check_circle_outline_rounded,
-                            ),
-                      label: Text(
-                        _isSubmitting
-                            ? text.walletPending
-                            : _isSuccess
-                            ? text.walletRedeemSuccessAction
-                            : text.walletApplyCode,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

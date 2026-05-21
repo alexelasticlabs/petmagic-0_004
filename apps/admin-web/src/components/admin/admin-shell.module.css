@@ -74,10 +74,37 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.45rem;
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.2rem;
+}
+
+.navSection {
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.46rem;
+  border-top: 1px solid rgba(43, 54, 68, 0.72);
+}
+
+.navSection:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.navSectionTitle {
+  padding: 0 0.68rem;
+  color: rgba(163, 176, 194, 0.78);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.navSectionItems {
+  display: grid;
+  gap: 0.22rem;
 }
 
 .navGroup {
@@ -121,8 +148,8 @@
 
 .navLabel {
   min-width: 0;
-  font-size: 0.8125rem;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -174,7 +201,7 @@
 
 .navChildLabel {
   min-width: 0;
-  font-size: 0.78rem;
+  font-size: 0.81rem;
   font-weight: 500;
   line-height: 1.2;
 }

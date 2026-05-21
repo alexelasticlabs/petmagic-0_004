@@ -19,6 +19,10 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
 
     public DbSet<RedeemCodeRedemption> RedeemCodeRedemptions => Set<RedeemCodeRedemption>();
 
+    public DbSet<ReferralProfile> ReferralProfiles => Set<ReferralProfile>();
+
+    public DbSet<ReferralAttribution> ReferralAttributions => Set<ReferralAttribution>();
+
     public DbSet<PaymentCustomer> PaymentCustomers => Set<PaymentCustomer>();
 
     public DbSet<SavedPaymentMethod> SavedPaymentMethods => Set<SavedPaymentMethod>();
@@ -98,6 +102,10 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.CodeHash).HasMaxLength(96).IsRequired();
             entity.Property(x => x.CodePrefix).HasMaxLength(16).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.CampaignName).HasMaxLength(120);
+            entity.Property(x => x.CampaignChannel).HasMaxLength(64);
+            entity.Property(x => x.MinimumSuccessfulPurchases).IsRequired();
+            entity.Property(x => x.CreatedBy).HasMaxLength(120);
             entity.Property(x => x.RewardKind).HasMaxLength(32).IsRequired();
             entity.Property(x => x.RewardValue).IsRequired();
             entity.Property(x => x.MaxRedemptions).IsRequired();
@@ -119,6 +127,30 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.RedeemedAtUtc).IsRequired();
             entity.HasIndex(x => new { x.RedeemCodeId, x.UserId });
             entity.HasIndex(x => new { x.UserId, x.RedeemedAtUtc });
+        });
+
+        builder.Entity<ReferralProfile>(entity =>
+        {
+            entity.ToTable("economy_referral_profiles");
+            entity.HasKey(x => x.UserId);
+            entity.Property(x => x.Code).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        builder.Entity<ReferralAttribution>(entity =>
+        {
+            entity.ToTable("economy_referral_attributions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ReferrerCode).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(24).IsRequired();
+            entity.Property(x => x.RewardSpark).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(x => x.ReferrerUserId);
+            entity.HasIndex(x => x.RefereeUserId).IsUnique();
+            entity.HasIndex(x => new { x.ReferrerUserId, x.Status });
         });
 
         builder.Entity<PaymentCustomer>(entity =>

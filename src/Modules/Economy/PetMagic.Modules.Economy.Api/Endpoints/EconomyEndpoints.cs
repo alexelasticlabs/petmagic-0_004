@@ -44,6 +44,12 @@ public static class EconomyEndpoints
         group.MapPost("/wallet/redeem", RedeemCodeAsync)
             .RequireAuthorization();
 
+        group.MapGet("/rewards", GetRewardsSummaryAsync)
+            .RequireAuthorization();
+
+        group.MapPost("/referrals/activate", ActivateReferralCodeAsync)
+            .RequireAuthorization();
+
         group.MapGet("/packs", ListPacksAsync)
             .AllowAnonymous();
 
@@ -263,6 +269,64 @@ public static class EconomyEndpoints
                 "economy.redeem_code_already_used" => StatusCodes.Status409Conflict,
                 "economy.redeem_code_user_limit_reached" => StatusCodes.Status409Conflict,
                 "economy.redeem_code_exhausted" => StatusCodes.Status409Conflict,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<RewardsSummaryResponse>, ProblemHttpResult>> GetRewardsSummaryAsync(
+        HttpContext context,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.GetRewardsSummaryAsync(userId!.Value, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<ReferralCodeAppliedResponse>, ValidationProblem, ProblemHttpResult>> ActivateReferralCodeAsync(
+        HttpContext context,
+        ReferralCodeRequest request,
+        IValidator<ApplyReferralCodeCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new ApplyReferralCodeCommand(userId!.Value, request.Code);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ApplyReferralCodeAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                "economy.referral_code_not_found" => StatusCodes.Status404NotFound,
+                "economy.referral_self_referral" => StatusCodes.Status409Conflict,
+                "economy.referral_already_linked" => StatusCodes.Status409Conflict,
+                "economy.referral_paid_user_ineligible" => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status400BadRequest,
             };
 
@@ -815,6 +879,8 @@ public static class EconomyEndpoints
     public sealed record SpendRequest(int Amount, string Reason);
 
     public sealed record RedeemCodeRequest(string Code);
+
+    public sealed record ReferralCodeRequest(string Code);
 
     public sealed record PaymentMethodSetupRequest(string PaymentProvider = "stripe");
 

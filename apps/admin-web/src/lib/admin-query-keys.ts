@@ -10,6 +10,7 @@ export const adminQueryKeys = {
   economySubscriptionEvents: (provider: string, status: string) => ["admin", "economy", "subscription-events", provider, status] as const,
   economyPacks: ["admin", "economy", "packs"] as const,
   economyRedeemCodes: ["admin", "economy", "redeem-codes"] as const,
+  economyRedeemCodeActivations: (redeemCodeId: string, skip: number, take: number) => ["admin", "economy", "redeem-codes", redeemCodeId, "activations", skip, take] as const,
   supportInbox: (status: string, assignment: string) => ["admin", "support", "inbox", status, assignment] as const,
   supportConversation: (conversationId: string) => ["admin", "support", conversationId, "detail"] as const,
   supportTemplates: ["admin", "support", "templates"] as const,

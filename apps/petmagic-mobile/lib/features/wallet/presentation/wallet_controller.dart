@@ -11,6 +11,7 @@ final walletControllerProvider =
 class WalletState {
   const WalletState({
     this.wallet,
+    this.rewards,
     this.ledger = const [],
     this.packs = const [],
     this.paymentMethods = const [],
@@ -20,12 +21,14 @@ class WalletState {
     this.isBuying = false,
     this.isClaimingAd = false,
     this.isRedeeming = false,
+    this.isApplyingReferral = false,
     this.errorMessage,
     this.checkoutUrl,
     this.pendingCheckoutOrderId,
   });
 
   final WalletStateModel? wallet;
+  final RewardsSummaryModel? rewards;
   final List<WalletLedgerItem> ledger;
   final List<CurrencyPackModel> packs;
   final List<WalletPaymentMethodModel> paymentMethods;
@@ -35,6 +38,7 @@ class WalletState {
   final bool isBuying;
   final bool isClaimingAd;
   final bool isRedeeming;
+  final bool isApplyingReferral;
   final String? errorMessage;
   final String? checkoutUrl;
   final String? pendingCheckoutOrderId;
@@ -62,6 +66,7 @@ class WalletState {
 
   WalletState copyWith({
     WalletStateModel? wallet,
+    RewardsSummaryModel? rewards,
     List<WalletLedgerItem>? ledger,
     List<CurrencyPackModel>? packs,
     List<WalletPaymentMethodModel>? paymentMethods,
@@ -71,6 +76,7 @@ class WalletState {
     bool? isBuying,
     bool? isClaimingAd,
     bool? isRedeeming,
+    bool? isApplyingReferral,
     String? errorMessage,
     String? checkoutUrl,
     String? pendingCheckoutOrderId,
@@ -80,6 +86,7 @@ class WalletState {
   }) {
     return WalletState(
       wallet: wallet ?? this.wallet,
+      rewards: rewards ?? this.rewards,
       ledger: ledger ?? this.ledger,
       packs: packs ?? this.packs,
       paymentMethods: paymentMethods ?? this.paymentMethods,
@@ -89,6 +96,7 @@ class WalletState {
       isBuying: isBuying ?? this.isBuying,
       isClaimingAd: isClaimingAd ?? this.isClaimingAd,
       isRedeeming: isRedeeming ?? this.isRedeeming,
+      isApplyingReferral: isApplyingReferral ?? this.isApplyingReferral,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       checkoutUrl: clearCheckoutUrl ? null : checkoutUrl ?? this.checkoutUrl,
       pendingCheckoutOrderId: clearPendingCheckout
@@ -118,6 +126,7 @@ class WalletController extends Notifier<WalletState> {
     try {
       final wallet = await _repository.fetchWallet();
       var ledger = const <WalletLedgerItem>[];
+      RewardsSummaryModel? rewards;
       var packs = const <CurrencyPackModel>[];
       var paymentMethods = const <WalletPaymentMethodModel>[];
       var purchases = const <PurchaseHistoryItem>[];
@@ -129,6 +138,13 @@ class WalletController extends Notifier<WalletState> {
             ledger = (await _repository.fetchLedger(take: 24)).items;
           } catch (_) {
             softError ??= 'wallet.ledger_failed';
+          }
+        }(),
+        () async {
+          try {
+            rewards = await _repository.fetchRewards();
+          } catch (_) {
+            softError ??= 'rewards.summary_failed';
           }
         }(),
         () async {
@@ -153,6 +169,7 @@ class WalletController extends Notifier<WalletState> {
 
       state = state.copyWith(
         wallet: wallet,
+        rewards: rewards,
         ledger: ledger,
         packs: packs,
         paymentMethods: paymentMethods,
@@ -233,8 +250,10 @@ class WalletController extends Notifier<WalletState> {
     try {
       final wallet = await _repository.applyRedeemCode(code);
       final ledger = await _repository.fetchLedger(take: 24);
+      final rewards = await _repository.fetchRewards();
       state = state.copyWith(
         wallet: wallet,
+        rewards: rewards,
         ledger: ledger.items,
         isRedeeming: false,
         clearError: true,
@@ -243,6 +262,30 @@ class WalletController extends Notifier<WalletState> {
     } catch (error) {
       state = state.copyWith(
         isRedeeming: false,
+        errorMessage: error.toString(),
+      );
+      return error.toString();
+    }
+  }
+
+  Future<String?> applyReferralCode(String code) async {
+    if (code.trim().isEmpty) {
+      return null;
+    }
+
+    state = state.copyWith(isApplyingReferral: true, clearError: true);
+
+    try {
+      final rewards = await _repository.applyReferralCode(code);
+      state = state.copyWith(
+        rewards: rewards,
+        isApplyingReferral: false,
+        clearError: true,
+      );
+      return null;
+    } catch (error) {
+      state = state.copyWith(
+        isApplyingReferral: false,
         errorMessage: error.toString(),
       );
       return error.toString();

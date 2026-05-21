@@ -56,9 +56,19 @@ public static class EconomyErrors
 
     public static readonly Error RedeemCodeUserLimitReached = new("economy.redeem_code_user_limit_reached", "Redeem code is no longer available for this user.");
 
+    public static readonly Error RedeemCodePurchaseRequirementNotMet = new("economy.redeem_code_purchase_requirement_not_met", "Redeem code requires a paid purchase history.");
+
     public static readonly Error RedeemCodeExhausted = new("economy.redeem_code_exhausted", "Redeem code redemption limit reached.");
 
     public static readonly Error RedeemCodeAlreadyExists = new("economy.redeem_code_exists", "Redeem code already exists.");
 
     public static readonly Error RedeemCodeRewardUnsupported = new("economy.redeem_code_reward_unsupported", "Redeem code reward is not supported.");
+
+    public static readonly Error ReferralCodeNotFound = new("economy.referral_code_not_found", "Referral code was not found.");
+
+    public static readonly Error ReferralSelfReferral = new("economy.referral_self_referral", "Users cannot activate their own referral code.");
+
+    public static readonly Error ReferralAlreadyLinked = new("economy.referral_already_linked", "Referral code is already activated for this user.");
+
+    public static readonly Error ReferralPaidUserIneligible = new("economy.referral_paid_user_ineligible", "Referral code must be activated before the first paid purchase.");
 }

@@ -58,6 +58,26 @@ public sealed record RemovePaymentMethodCommand(Guid UserId, Guid PaymentMethodI
 
 public sealed record ApplyRedeemCodeCommand(Guid UserId, string Code);
 
+public sealed record ApplyReferralCodeCommand(Guid UserId, string Code);
+
+public sealed record RewardsSummaryResponse(
+    string ReferralCode,
+    int ReferralBonusSpark,
+    string ReferralStatus,
+    string? ReferrerCode,
+    DateTime? ReferralActivatedAtUtc,
+    DateTime? ReferralQualifiedAtUtc,
+    int TotalReferralBonusEarned,
+    int ReferredUsersCount,
+    int PendingReferredUsersCount,
+    int RewardedReferredUsersCount);
+
+public sealed record ReferralCodeAppliedResponse(
+    string ReferralCode,
+    string Status,
+    int ReferralBonusSpark,
+    DateTime ActivatedAtUtc);
+
 public sealed record CreateRedeemCodeCommand(
     string Code,
     string Description,
@@ -67,7 +87,11 @@ public sealed record CreateRedeemCodeCommand(
     int MaxRedemptionsPerUser,
     bool IsActive,
     DateTime? StartsAtUtc,
-    DateTime? ExpiresAtUtc);
+    DateTime? ExpiresAtUtc,
+    string? CampaignName = null,
+    string? CampaignChannel = null,
+    int MinimumSuccessfulPurchases = 0,
+    string? CreatedBy = null);
 
 public sealed record UpdateRedeemCodeCommand(
     Guid RedeemCodeId,
@@ -78,7 +102,11 @@ public sealed record UpdateRedeemCodeCommand(
     int MaxRedemptionsPerUser,
     bool IsActive,
     DateTime? StartsAtUtc,
-    DateTime? ExpiresAtUtc);
+    DateTime? ExpiresAtUtc,
+    string? CampaignName = null,
+    string? CampaignChannel = null,
+    int MinimumSuccessfulPurchases = 0,
+    string? CreatedBy = null);
 
 public sealed record UpdateCurrencyPackCommand(
     Guid PackId,
@@ -183,7 +211,12 @@ public sealed record AdminRedeemCodeResponse(
     DateTime? ExpiresAtUtc,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    IReadOnlyList<AdminRedeemCodeRedemptionResponse> Redemptions);
+    IReadOnlyList<AdminRedeemCodeRedemptionResponse> Redemptions,
+    string? CampaignName = null,
+    string? CampaignChannel = null,
+    int MinimumSuccessfulPurchases = 0,
+    string? CreatedBy = null,
+    DateTime? LastRedeemedAtUtc = null);
 
 public sealed record CurrencyPackResponse(
     Guid PackId,

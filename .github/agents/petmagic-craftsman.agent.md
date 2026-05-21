@@ -2,7 +2,6 @@
 name: "PetMagic Craftsman"
 description: "Use for PetMagic admin/backend implementation and cleanup tasks. If the feature description is unclear, ask for clarification before proceeding."
 tools: [read, edit, search, execute, todo]
-model: "GPT-5.4"
 argument-hint: "Describe the feature or cleanup task (e.g. 'Add pets section to admin', 'Clean up Identity module', 'Add POST /economy/plans endpoint')"
 ---
 

@@ -15,6 +15,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get navCreations => 'Galerie';
 
   @override
+  String get navRewards => 'Rewards';
+
+  @override
   String get navProfile => 'Profil';
 
   @override
@@ -307,6 +310,117 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get walletPromoSubtitle =>
       'Enter a code from PetMagic and add PawSpark to your balance.';
+
+  @override
+  String get rewardsPageTitle => 'Rewards';
+
+  @override
+  String get rewardsPageSubtitle =>
+      'Promo codes, referral bonuses and reward history in one place.';
+
+  @override
+  String get rewardsPromoTitle => 'Promo codes';
+
+  @override
+  String get rewardsPromoSubtitle =>
+      'Redeem PetMagic codes and add PawSpark to your balance.';
+
+  @override
+  String get rewardsReferralTitle => 'Referral bonuses';
+
+  @override
+  String get rewardsReferralSubtitle =>
+      'Share your code. The referral bonus is paid after your friend completes their first purchase.';
+
+  @override
+  String get rewardsYourReferralCode => 'Your code';
+
+  @override
+  String get rewardsCopyReferralCodeAction => 'Copy referral code';
+
+  @override
+  String get rewardsReferralCopiedMessage => 'Referral code copied.';
+
+  @override
+  String get rewardsReferralInputLabel => 'Friend code';
+
+  @override
+  String get rewardsReferralInputHint => 'PMABC12345';
+
+  @override
+  String get rewardsReferralActivateAction => 'Activate referral code';
+
+  @override
+  String get rewardsReferralActivatedMessage =>
+      'Referral code activated. Bonus unlocks after your first purchase.';
+
+  @override
+  String get rewardsReferralStatusLoading => 'Loading referral status...';
+
+  @override
+  String get rewardsReferralStatusNone =>
+      'Enter a friend\'s code before your first purchase to unlock the referral bonus.';
+
+  @override
+  String get rewardsReferralStatusPending =>
+      'Referral connected. Bonus will be paid after your first purchase.';
+
+  @override
+  String get rewardsReferralStatusRewarded =>
+      'Referral bonus paid. Thanks for growing PetMagic.';
+
+  @override
+  String get rewardsReferralEarnedLabel => 'Earned';
+
+  @override
+  String get rewardsReferralFriendsLabel => 'Friends';
+
+  @override
+  String get rewardsReferralBonusLabel => 'Bonus';
+
+  @override
+  String get rewardsHistoryTitle => 'Bonus history';
+
+  @override
+  String get rewardsHistorySubtitle =>
+      'Recent promo, referral, ad and weekly rewards.';
+
+  @override
+  String get rewardsHistoryEmpty =>
+      'No bonuses yet. Promo and referral rewards will appear here.';
+
+  @override
+  String get rewardsSourcePromo => 'Promo code';
+
+  @override
+  String get rewardsSourceReferral => 'Referral bonus';
+
+  @override
+  String get rewardsSourceAd => 'Ad reward';
+
+  @override
+  String get rewardsSourceWeekly => 'Weekly reward';
+
+  @override
+  String get rewardsSourcePremium => 'Premium grant';
+
+  @override
+  String get rewardsSourceBonus => 'Bonus';
+
+  @override
+  String get rewardsReferralCodeNotFoundError => 'Referral code was not found.';
+
+  @override
+  String get rewardsReferralSelfError =>
+      'You cannot activate your own referral code.';
+
+  @override
+  String get rewardsReferralAlreadyLinkedError =>
+      'A referral code is already activated for this account.';
+
+  @override
+  String get rewardsReferralPaidUserError =>
+      'Referral code must be activated before your first purchase.';
 
   @override
   String get walletBuySparkTitle => 'Top up PawSpark';

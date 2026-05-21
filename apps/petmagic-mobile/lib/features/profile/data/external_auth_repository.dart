@@ -238,7 +238,8 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         },
       ),
     );
-    final ticket = prepareResponse.data?['ticket'] as String? ??
+    final ticket =
+        prepareResponse.data?['ticket'] as String? ??
         prepareResponse.data?['Ticket'] as String?;
     if (ticket == null || ticket.isEmpty) {
       throw const AppException(_invalidSessionCode);

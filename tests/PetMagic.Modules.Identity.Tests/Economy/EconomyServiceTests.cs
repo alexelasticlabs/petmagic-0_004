@@ -94,6 +94,139 @@ public sealed class EconomyServiceTests
     }
 
     [Fact]
+    public async Task GetRewardsSummaryAsync_ShouldCreateStableReferralCode()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var first = await service.GetRewardsSummaryAsync(userId, CancellationToken.None);
+        var second = await service.GetRewardsSummaryAsync(userId, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value.ReferralCode, second.Value.ReferralCode);
+        Assert.StartsWith("PM", first.Value.ReferralCode, StringComparison.Ordinal);
+        Assert.Equal("none", first.Value.ReferralStatus);
+        Assert.Equal(15, first.Value.ReferralBonusSpark);
+    }
+
+    [Fact]
+    public async Task ApplyReferralCodeAsync_ShouldRejectSelfReferralAndDuplicateActivation()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var referrerId = Guid.NewGuid();
+        var refereeId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var referrerRewards = await service.GetRewardsSummaryAsync(referrerId, CancellationToken.None);
+        Assert.True(referrerRewards.IsSuccess);
+
+        var selfReferral = await service.ApplyReferralCodeAsync(
+            new ApplyReferralCodeCommand(referrerId, referrerRewards.Value.ReferralCode),
+            CancellationToken.None);
+
+        Assert.True(selfReferral.IsFailure);
+        Assert.Equal(EconomyErrors.ReferralSelfReferral.Code, selfReferral.Error.Code);
+
+        var firstActivation = await service.ApplyReferralCodeAsync(
+            new ApplyReferralCodeCommand(refereeId, referrerRewards.Value.ReferralCode),
+            CancellationToken.None);
+        var duplicateActivation = await service.ApplyReferralCodeAsync(
+            new ApplyReferralCodeCommand(refereeId, referrerRewards.Value.ReferralCode),
+            CancellationToken.None);
+
+        Assert.True(firstActivation.IsSuccess);
+        Assert.True(duplicateActivation.IsFailure);
+        Assert.Equal(EconomyErrors.ReferralAlreadyLinked.Code, duplicateActivation.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyReferralCodeAsync_ShouldRejectUsersAfterFirstPaidPurchase()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var referrerId = Guid.NewGuid();
+        var refereeId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var service = CreateService(dbContext);
+
+        var purchase = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(refereeId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+        Assert.True(purchase.IsSuccess);
+
+        var confirm = await service.ConfirmPackPurchaseAsync(
+            new ConfirmPackPurchaseCommand(refereeId, purchase.Value.OrderId),
+            CancellationToken.None);
+        Assert.True(confirm.IsSuccess);
+
+        var referrerRewards = await service.GetRewardsSummaryAsync(referrerId, CancellationToken.None);
+        var activation = await service.ApplyReferralCodeAsync(
+            new ApplyReferralCodeCommand(refereeId, referrerRewards.Value.ReferralCode),
+            CancellationToken.None);
+
+        Assert.True(activation.IsFailure);
+        Assert.Equal(EconomyErrors.ReferralPaidUserIneligible.Code, activation.Error.Code);
+    }
+
+    [Fact]
+    public async Task ConfirmPackPurchaseAsync_ShouldSettlePendingReferralBonusOnce()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var referrerId = Guid.NewGuid();
+        var refereeId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var service = CreateService(dbContext);
+
+        var referrerRewards = await service.GetRewardsSummaryAsync(referrerId, CancellationToken.None);
+        var activation = await service.ApplyReferralCodeAsync(
+            new ApplyReferralCodeCommand(refereeId, referrerRewards.Value.ReferralCode),
+            CancellationToken.None);
+
+        Assert.True(activation.IsSuccess);
+
+        await service.ClaimAdRewardAsync(new ClaimAdRewardCommand(refereeId), CancellationToken.None);
+        Assert.False(await dbContext.WalletLedgerEntries.AnyAsync(x => x.Source == WalletLedgerSource.ReferralBonus));
+
+        var purchase = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(refereeId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+        Assert.True(purchase.IsSuccess);
+
+        var firstConfirm = await service.ConfirmPackPurchaseAsync(
+            new ConfirmPackPurchaseCommand(refereeId, purchase.Value.OrderId),
+            CancellationToken.None);
+        var secondConfirm = await service.ConfirmPackPurchaseAsync(
+            new ConfirmPackPurchaseCommand(refereeId, purchase.Value.OrderId),
+            CancellationToken.None);
+
+        Assert.True(firstConfirm.IsSuccess);
+        Assert.True(secondConfirm.IsFailure);
+
+        var referrerWallet = await dbContext.Wallets.SingleAsync(x => x.UserId == referrerId);
+        var refereeWallet = await dbContext.Wallets.SingleAsync(x => x.UserId == refereeId);
+        var referralEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.Source == WalletLedgerSource.ReferralBonus)
+            .ToListAsync();
+        var attribution = await dbContext.ReferralAttributions.SingleAsync(x => x.RefereeUserId == refereeId);
+
+        Assert.Equal(15, referrerWallet.Balance);
+        Assert.Equal(150, refereeWallet.Balance);
+        Assert.Equal(2, referralEntries.Count);
+        Assert.Equal(ReferralAttributionStatus.Rewarded, attribution.Status);
+        Assert.NotNull(attribution.QualifiedAtUtc);
+
+        var summary = await service.GetRewardsSummaryAsync(referrerId, CancellationToken.None);
+        Assert.True(summary.IsSuccess);
+        Assert.Equal(15, summary.Value.TotalReferralBonusEarned);
+        Assert.Equal(1, summary.Value.RewardedReferredUsersCount);
+    }
+
+    [Fact]
     public async Task GetWalletLedgerAsync_ShouldReturnRecentUserEntries()
     {
         await using var dbContext = CreateDbContext();
@@ -461,6 +594,99 @@ public sealed class EconomyServiceTests
         Assert.True(secondApply.IsSuccess);
         Assert.True(thirdApply.IsFailure);
         Assert.Equal(EconomyErrors.RedeemCodeUserLimitReached.Code, thirdApply.Error.Code);
+    }
+
+    [Fact]
+    public async Task ApplyRedeemCodeAsync_ShouldRequireMinimumSuccessfulPurchases()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand(
+                "LOYAL-50",
+                "Loyal users promo",
+                RedeemCodeRewardKind.Spark,
+                50,
+                10,
+                1,
+                true,
+                null,
+                DateTime.UtcNow.AddDays(7),
+                MinimumSuccessfulPurchases: 1),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var firstAttempt = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(userId, "LOYAL-50"),
+            CancellationToken.None);
+
+        Assert.True(firstAttempt.IsFailure);
+        Assert.Equal(EconomyErrors.RedeemCodePurchaseRequirementNotMet.Code, firstAttempt.Error.Code);
+
+        var packId = AddStarterPack(dbContext);
+        var purchase = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+
+        Assert.True(purchase.IsSuccess);
+
+        var confirm = await service.ConfirmPackPurchaseAsync(
+            new ConfirmPackPurchaseCommand(userId, purchase.Value.OrderId),
+            CancellationToken.None);
+
+        Assert.True(confirm.IsSuccess);
+
+        var secondAttempt = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(userId, "LOYAL-50"),
+            CancellationToken.None);
+
+        Assert.True(secondAttempt.IsSuccess);
+    }
+
+    [Fact]
+    public async Task GetAdminRedeemCodeActivationsAsync_ShouldSupportPaginationAndUserFilter()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        var thirdUserId = Guid.NewGuid();
+
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("FEED", "Feed campaign", RedeemCodeRewardKind.Spark, 20, 10, 1, true, null, DateTime.UtcNow.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var firstApply = await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(firstUserId, "FEED"), CancellationToken.None);
+        var secondApply = await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(secondUserId, "FEED"), CancellationToken.None);
+        var thirdApply = await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(thirdUserId, "FEED"), CancellationToken.None);
+
+        Assert.True(firstApply.IsSuccess);
+        Assert.True(secondApply.IsSuccess);
+        Assert.True(thirdApply.IsSuccess);
+
+        var firstPage = await service.GetAdminRedeemCodeActivationsAsync(codeResult.Value.RedeemCodeId, 0, 2, null, CancellationToken.None);
+        var secondPage = await service.GetAdminRedeemCodeActivationsAsync(codeResult.Value.RedeemCodeId, 2, 2, null, CancellationToken.None);
+        var filtered = await service.GetAdminRedeemCodeActivationsAsync(codeResult.Value.RedeemCodeId, 0, 10, secondUserId, CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.Equal(2, firstPage.Value.Items.Count);
+        Assert.True(firstPage.Value.HasMore);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.Single(secondPage.Value.Items);
+        Assert.False(secondPage.Value.HasMore);
+
+        Assert.True(filtered.IsSuccess);
+        var filteredItem = Assert.Single(filtered.Value.Items);
+        Assert.Equal(secondUserId, filteredItem.UserId);
+        Assert.False(filtered.Value.HasMore);
     }
 
     [Fact]
@@ -887,6 +1113,7 @@ public sealed class EconomyServiceTests
             WeeklyPremiumSpark = 250,
             AdRewardSpark = 15,
             AdRewardDailyLimit = 5,
+            ReferralBonusSpark = 15,
             StripeSecretKey = "test_stripe_secret_key",
             StripeWebhookSecret = "test_webhook_secret",
             StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
@@ -929,6 +1156,25 @@ public sealed class EconomyServiceTests
         dbContext.SaveChanges();
 
         return dbContext;
+    }
+
+    private static Guid AddStarterPack(EconomyDbContext dbContext)
+    {
+        var packId = Guid.NewGuid();
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = $"starter-{Guid.NewGuid():N}",
+            DisplayName = "Starter PawSpark",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        dbContext.SaveChanges();
+        return packId;
     }
 
     private static string BuildStripeSignature(string payload, string secret)

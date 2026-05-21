@@ -80,6 +80,10 @@ export function MenuIcon({ className }: IconProps) {
   return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
 }
 
+export function MoreHorizontalIcon({ className }: IconProps) {
+  return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><circle cx="6" cy="12" r="1.6" fill="currentColor" /><circle cx="12" cy="12" r="1.6" fill="currentColor" /><circle cx="18" cy="12" r="1.6" fill="currentColor" /></svg>;
+}
+
 export function GlobeIcon({ className }: IconProps) {
   return <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" /><path d="M12 2C8 6 8 12 8 12C8 18 12 22 12 22" stroke="currentColor" strokeWidth="1.6" /><path d="M12 2C16 6 16 12 16 12C16 18 12 22 12 22" stroke="currentColor" strokeWidth="1.6" /><path d="M2 12H22M4 7H20M4 17H20" stroke="currentColor" strokeWidth="1.4" /></svg>;
 }

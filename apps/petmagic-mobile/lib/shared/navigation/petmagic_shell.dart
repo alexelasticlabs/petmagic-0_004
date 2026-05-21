@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 
 const _bottomNavHeight = 42.0;
 const _bottomNavOuterGap = 10.0;
 const _bottomNavContentInsetExtra = 18.0;
 const _bottomNavBackdropExtra = 28.0;
+const _bottomSheetBottomGap = 14.0;
 
 double petMagicBottomNavInset(BuildContext context) {
   final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
@@ -17,6 +18,20 @@ double petMagicBottomNavInset(BuildContext context) {
       _bottomNavHeight +
       _bottomNavOuterGap +
       _bottomNavContentInsetExtra;
+}
+
+double petMagicBottomSheetOffset(BuildContext context) {
+  final viewMediaQuery = MediaQueryData.fromView(View.of(context));
+  final keyboardInset = viewMediaQuery.viewInsets.bottom;
+  if (keyboardInset > 0) {
+    return keyboardInset + _bottomSheetBottomGap;
+  }
+
+  final bottomPadding = viewMediaQuery.viewPadding.bottom;
+  return bottomPadding +
+      _bottomNavHeight +
+      _bottomNavOuterGap +
+      _bottomSheetBottomGap;
 }
 
 class PetMagicShell extends StatelessWidget {
@@ -96,9 +111,9 @@ class _FloatingBottomNav extends StatelessWidget {
       _NavItem('/templates', Icons.play_arrow_rounded, text.navTemplates),
       _NavItem('/creations', Icons.photo_library_outlined, text.navCreations),
       _NavItem(
-        WalletPage.routePath,
-        Icons.wallet_rounded,
-        text.profileWalletTitle,
+        RewardsPage.routePath,
+        Icons.card_giftcard_rounded,
+        text.navRewards,
       ),
       _NavItem('/profile', Icons.person_outline_rounded, text.navProfile),
     ];
@@ -187,7 +202,7 @@ class _FloatingBottomNav extends StatelessWidget {
   bool _isSelected(String path, String location) {
     return switch (path) {
       '/profile' => location.startsWith('/profile'),
-      WalletPage.routePath => location.startsWith(WalletPage.routePath),
+      RewardsPage.routePath => location.startsWith(RewardsPage.routePath),
       _ => location == path,
     };
   }

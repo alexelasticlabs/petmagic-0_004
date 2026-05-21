@@ -66,6 +66,57 @@ class WalletLedgerItem {
   }
 }
 
+class RewardsSummaryModel {
+  const RewardsSummaryModel({
+    required this.referralCode,
+    required this.referralBonusSpark,
+    required this.referralStatus,
+    required this.totalReferralBonusEarned,
+    required this.referredUsersCount,
+    required this.pendingReferredUsersCount,
+    required this.rewardedReferredUsersCount,
+    this.referrerCode,
+    this.referralActivatedAtUtc,
+    this.referralQualifiedAtUtc,
+  });
+
+  final String referralCode;
+  final int referralBonusSpark;
+  final String referralStatus;
+  final String? referrerCode;
+  final DateTime? referralActivatedAtUtc;
+  final DateTime? referralQualifiedAtUtc;
+  final int totalReferralBonusEarned;
+  final int referredUsersCount;
+  final int pendingReferredUsersCount;
+  final int rewardedReferredUsersCount;
+
+  bool get hasActivatedReferral => referralStatus != 'none';
+  bool get isReferralRewarded => referralStatus == 'rewarded';
+
+  factory RewardsSummaryModel.fromJson(Map<String, dynamic> json) {
+    return RewardsSummaryModel(
+      referralCode: json['referralCode'] as String? ?? '',
+      referralBonusSpark: (json['referralBonusSpark'] as num?)?.toInt() ?? 0,
+      referralStatus: json['referralStatus'] as String? ?? 'none',
+      referrerCode: json['referrerCode'] as String?,
+      referralActivatedAtUtc: json['referralActivatedAtUtc'] is String
+          ? DateTime.tryParse(json['referralActivatedAtUtc'] as String)
+          : null,
+      referralQualifiedAtUtc: json['referralQualifiedAtUtc'] is String
+          ? DateTime.tryParse(json['referralQualifiedAtUtc'] as String)
+          : null,
+      totalReferralBonusEarned:
+          (json['totalReferralBonusEarned'] as num?)?.toInt() ?? 0,
+      referredUsersCount: (json['referredUsersCount'] as num?)?.toInt() ?? 0,
+      pendingReferredUsersCount:
+          (json['pendingReferredUsersCount'] as num?)?.toInt() ?? 0,
+      rewardedReferredUsersCount:
+          (json['rewardedReferredUsersCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class CurrencyPackModel {
   const CurrencyPackModel({
     required this.packId,

@@ -80,10 +80,16 @@ public sealed class StoreWebhookSecurityValidator(
                 return Result.Failure(EconomyErrors.InvalidStoreWebhookSignature);
             }
 
+#pragma warning disable SYSLIB0057
             var certificates = chainElement.EnumerateArray()
                 .Where(x => x.ValueKind == JsonValueKind.String)
-                .Select(x => X509CertificateLoader.LoadCertificate(Convert.FromBase64String(x.GetString()!)))
+                .Select(x =>
+                {
+                    var certificateBytes = Convert.FromBase64String(x.GetString()!);
+                    return X509CertificateLoader.LoadCertificate(certificateBytes.AsSpan());
+                })
                 .ToArray();
+#pragma warning restore SYSLIB0057
 
             if (certificates.Length == 0)
             {

@@ -56,6 +56,17 @@ class WalletRepository {
     );
   }
 
+  Future<RewardsSummaryModel> fetchRewards() async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.get<Map<String, dynamic>>(
+        '/api/economy/rewards',
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return RewardsSummaryModel.fromJson(response.data ?? const {});
+  }
+
   Future<List<CurrencyPackModel>> fetchPacks() async {
     try {
       final response = await _dio.get<List<dynamic>>('/api/economy/packs');
@@ -153,6 +164,18 @@ class WalletRepository {
     );
 
     return fetchWallet();
+  }
+
+  Future<RewardsSummaryModel> applyReferralCode(String code) async {
+    await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/economy/referrals/activate',
+        data: {'code': code.trim()},
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return fetchRewards();
   }
 
   Future<Response<T>> _authorizedRequest<T>(

@@ -121,6 +121,12 @@ abstract class AppLocalizations {
   /// **'Gallery'**
   String get navCreations;
 
+  /// No description provided for @navRewards.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards'**
+  String get navRewards;
+
   /// No description provided for @navProfile.
   ///
   /// In en, this message translates to:
@@ -672,6 +678,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a code from PetMagic and add PawSpark to your balance.'**
   String get walletPromoSubtitle;
+
+  /// No description provided for @rewardsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards'**
+  String get rewardsPageTitle;
+
+  /// No description provided for @rewardsPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo codes, referral bonuses and reward history in one place.'**
+  String get rewardsPageSubtitle;
+
+  /// No description provided for @rewardsPromoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo codes'**
+  String get rewardsPromoTitle;
+
+  /// No description provided for @rewardsPromoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem PetMagic codes and add PawSpark to your balance.'**
+  String get rewardsPromoSubtitle;
+
+  /// No description provided for @rewardsReferralTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral bonuses'**
+  String get rewardsReferralTitle;
+
+  /// No description provided for @rewardsReferralSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share your code. The referral bonus is paid after your friend completes their first purchase.'**
+  String get rewardsReferralSubtitle;
+
+  /// No description provided for @rewardsYourReferralCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Your code'**
+  String get rewardsYourReferralCode;
+
+  /// No description provided for @rewardsCopyReferralCodeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy referral code'**
+  String get rewardsCopyReferralCodeAction;
+
+  /// No description provided for @rewardsReferralCopiedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral code copied.'**
+  String get rewardsReferralCopiedMessage;
+
+  /// No description provided for @rewardsReferralInputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Friend code'**
+  String get rewardsReferralInputLabel;
+
+  /// No description provided for @rewardsReferralInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'PMABC12345'**
+  String get rewardsReferralInputHint;
+
+  /// No description provided for @rewardsReferralActivateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate referral code'**
+  String get rewardsReferralActivateAction;
+
+  /// No description provided for @rewardsReferralActivatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral code activated. Bonus unlocks after your first purchase.'**
+  String get rewardsReferralActivatedMessage;
+
+  /// No description provided for @rewardsReferralStatusLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading referral status...'**
+  String get rewardsReferralStatusLoading;
+
+  /// No description provided for @rewardsReferralStatusNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a friend\'s code before your first purchase to unlock the referral bonus.'**
+  String get rewardsReferralStatusNone;
+
+  /// No description provided for @rewardsReferralStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral connected. Bonus will be paid after your first purchase.'**
+  String get rewardsReferralStatusPending;
+
+  /// No description provided for @rewardsReferralStatusRewarded.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral bonus paid. Thanks for growing PetMagic.'**
+  String get rewardsReferralStatusRewarded;
+
+  /// No description provided for @rewardsReferralEarnedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned'**
+  String get rewardsReferralEarnedLabel;
+
+  /// No description provided for @rewardsReferralFriendsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Friends'**
+  String get rewardsReferralFriendsLabel;
+
+  /// No description provided for @rewardsReferralBonusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus'**
+  String get rewardsReferralBonusLabel;
+
+  /// No description provided for @rewardsHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus history'**
+  String get rewardsHistoryTitle;
+
+  /// No description provided for @rewardsHistorySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent promo, referral, ad and weekly rewards.'**
+  String get rewardsHistorySubtitle;
+
+  /// No description provided for @rewardsHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No bonuses yet. Promo and referral rewards will appear here.'**
+  String get rewardsHistoryEmpty;
+
+  /// No description provided for @rewardsSourcePromo.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo code'**
+  String get rewardsSourcePromo;
+
+  /// No description provided for @rewardsSourceReferral.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral bonus'**
+  String get rewardsSourceReferral;
+
+  /// No description provided for @rewardsSourceAd.
+  ///
+  /// In en, this message translates to:
+  /// **'Ad reward'**
+  String get rewardsSourceAd;
+
+  /// No description provided for @rewardsSourceWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly reward'**
+  String get rewardsSourceWeekly;
+
+  /// No description provided for @rewardsSourcePremium.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium grant'**
+  String get rewardsSourcePremium;
+
+  /// No description provided for @rewardsSourceBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus'**
+  String get rewardsSourceBonus;
+
+  /// No description provided for @rewardsReferralCodeNotFoundError.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral code was not found.'**
+  String get rewardsReferralCodeNotFoundError;
+
+  /// No description provided for @rewardsReferralSelfError.
+  ///
+  /// In en, this message translates to:
+  /// **'You cannot activate your own referral code.'**
+  String get rewardsReferralSelfError;
+
+  /// No description provided for @rewardsReferralAlreadyLinkedError.
+  ///
+  /// In en, this message translates to:
+  /// **'A referral code is already activated for this account.'**
+  String get rewardsReferralAlreadyLinkedError;
+
+  /// No description provided for @rewardsReferralPaidUserError.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral code must be activated before your first purchase.'**
+  String get rewardsReferralPaidUserError;
 
   /// No description provided for @walletBuySparkTitle.
   ///

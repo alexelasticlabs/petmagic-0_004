@@ -296,6 +296,10 @@ export type AdminRedeemCode = {
   code: string;
   codePrefix: string;
   description: string;
+  campaignName?: string | null;
+  campaignChannel?: string | null;
+  minimumSuccessfulPurchases: number;
+  createdBy?: string | null;
   rewardKind: AdminRedeemRewardKind;
   rewardValue: number;
   maxRedemptions: number;
@@ -306,6 +310,7 @@ export type AdminRedeemCode = {
   expiresAtUtc?: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
+  lastRedeemedAtUtc?: string | null;
   redemptions: AdminRedeemCodeRedemption[];
 };
 
@@ -1229,6 +1234,10 @@ export async function fetchAdminRedeemCodes(): Promise<AdminRedeemCode[]> {
 export async function createAdminRedeemCode(payload: {
   code: string;
   description: string;
+  campaignName?: string | null;
+  campaignChannel?: string | null;
+  minimumSuccessfulPurchases?: number;
+  createdBy?: string | null;
   rewardKind: AdminRedeemRewardKind;
   rewardValue: number;
   maxRedemptions: number;
@@ -1243,9 +1252,26 @@ export async function createAdminRedeemCode(payload: {
   });
 }
 
+export async function fetchAdminRedeemCodeActivations(
+  redeemCodeId: string,
+  params?: {
+    skip?: number;
+    take?: number;
+    userId?: string;
+  },
+): Promise<OffsetPagedResponse<AdminRedeemCodeRedemption>> {
+  const search = new URLSearchParams();
+  if (params?.skip) search.set("skip", String(params.skip));
+  if (params?.take) search.set("take", String(params.take));
+  if (params?.userId) search.set("userId", params.userId);
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<OffsetPagedResponse<AdminRedeemCodeRedemption>>(`/api/admin/economy/redeem-codes/${redeemCodeId}/activations${query}`, { method: "GET" });
+}
+
 export async function updateAdminRedeemCode(
   redeemCodeId: string,
-  payload: Pick<AdminRedeemCode, "description" | "rewardKind" | "rewardValue" | "maxRedemptions" | "maxRedemptionsPerUser" | "isActive" | "startsAtUtc" | "expiresAtUtc">,
+  payload: Pick<AdminRedeemCode, "description" | "campaignName" | "campaignChannel" | "minimumSuccessfulPurchases" | "createdBy" | "rewardKind" | "rewardValue" | "maxRedemptions" | "maxRedemptionsPerUser" | "isActive" | "startsAtUtc" | "expiresAtUtc">,
 ): Promise<AdminRedeemCode> {
   return apiRequest<AdminRedeemCode>(`/api/admin/economy/redeem-codes/${redeemCodeId}`, {
     method: "PUT",

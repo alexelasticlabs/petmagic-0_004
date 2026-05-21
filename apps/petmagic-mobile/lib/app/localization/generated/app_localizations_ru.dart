@@ -15,6 +15,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navCreations => 'Галерея';
 
   @override
+  String get navRewards => 'Бонусы';
+
+  @override
   String get navProfile => 'Профиль';
 
   @override
@@ -308,6 +311,117 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get walletPromoSubtitle =>
       'Введите код от команды PetMagic и сразу получите PawSpark на баланс.';
+
+  @override
+  String get rewardsPageTitle => 'Бонусы';
+
+  @override
+  String get rewardsPageSubtitle =>
+      'Промокоды, реферальные бонусы и история наград в одном месте.';
+
+  @override
+  String get rewardsPromoTitle => 'Промокоды';
+
+  @override
+  String get rewardsPromoSubtitle =>
+      'Активируйте коды PetMagic и пополняйте баланс PawSpark.';
+
+  @override
+  String get rewardsReferralTitle => 'Реферальные бонусы';
+
+  @override
+  String get rewardsReferralSubtitle =>
+      'Поделитесь кодом. Бонус начислится после первой покупки приглашенного друга.';
+
+  @override
+  String get rewardsYourReferralCode => 'Ваш код';
+
+  @override
+  String get rewardsCopyReferralCodeAction => 'Скопировать реферальный код';
+
+  @override
+  String get rewardsReferralCopiedMessage => 'Реферальный код скопирован.';
+
+  @override
+  String get rewardsReferralInputLabel => 'Код друга';
+
+  @override
+  String get rewardsReferralInputHint => 'PMABC12345';
+
+  @override
+  String get rewardsReferralActivateAction => 'Активировать реферальный код';
+
+  @override
+  String get rewardsReferralActivatedMessage =>
+      'Реферальный код активирован. Бонус откроется после вашей первой покупки.';
+
+  @override
+  String get rewardsReferralStatusLoading => 'Загружаем статус рефералки...';
+
+  @override
+  String get rewardsReferralStatusNone =>
+      'Введите код друга до первой покупки, чтобы открыть реферальный бонус.';
+
+  @override
+  String get rewardsReferralStatusPending =>
+      'Рефералка подключена. Бонус начислится после вашей первой покупки.';
+
+  @override
+  String get rewardsReferralStatusRewarded =>
+      'Реферальный бонус начислен. Спасибо, что развиваете PetMagic.';
+
+  @override
+  String get rewardsReferralEarnedLabel => 'Получено';
+
+  @override
+  String get rewardsReferralFriendsLabel => 'Друзья';
+
+  @override
+  String get rewardsReferralBonusLabel => 'Бонус';
+
+  @override
+  String get rewardsHistoryTitle => 'История бонусов';
+
+  @override
+  String get rewardsHistorySubtitle =>
+      'Последние промокоды, рефералки, реклама и еженедельные награды.';
+
+  @override
+  String get rewardsHistoryEmpty =>
+      'Бонусов пока нет. Промокоды и реферальные награды появятся здесь.';
+
+  @override
+  String get rewardsSourcePromo => 'Промокод';
+
+  @override
+  String get rewardsSourceReferral => 'Реферальный бонус';
+
+  @override
+  String get rewardsSourceAd => 'Реклама';
+
+  @override
+  String get rewardsSourceWeekly => 'Еженедельная награда';
+
+  @override
+  String get rewardsSourcePremium => 'Premium начисление';
+
+  @override
+  String get rewardsSourceBonus => 'Бонус';
+
+  @override
+  String get rewardsReferralCodeNotFoundError => 'Реферальный код не найден.';
+
+  @override
+  String get rewardsReferralSelfError =>
+      'Нельзя активировать собственный реферальный код.';
+
+  @override
+  String get rewardsReferralAlreadyLinkedError =>
+      'Для этого аккаунта уже активирован реферальный код.';
+
+  @override
+  String get rewardsReferralPaidUserError =>
+      'Реферальный код нужно активировать до первой покупки.';
 
   @override
   String get walletBuySparkTitle => 'Пополнить PawSpark';
