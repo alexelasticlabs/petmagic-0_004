@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
@@ -12,8 +13,14 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(6)
-            .WithMessage("Password must be at least 6 characters long.");
+            .MinimumLength(8)
+            .WithMessage("Password must be at least 8 characters long.")
+            .Matches("[A-Z]")
+            .WithMessage("Password must contain at least one uppercase letter.")
+            .Matches("[a-z]")
+            .WithMessage("Password must contain at least one lowercase letter.")
+            .Matches("[0-9]")
+            .WithMessage("Password must contain at least one digit.");
         RuleFor(x => x.TermsOfUseAccepted)
             .Equal(true)
             .WithMessage("Terms of Use must be accepted.");
@@ -62,7 +69,7 @@ public sealed class ConfirmEmailCommandValidator : AbstractValidator<ConfirmEmai
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Code)
             .NotEmpty()
-            .MinimumLength(6)
+            .MinimumLength(8)
             .MaximumLength(12);
     }
 }
@@ -82,12 +89,18 @@ public sealed class ConfirmPasswordResetCommandValidator : AbstractValidator<Con
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Code)
             .NotEmpty()
-            .MinimumLength(6)
+            .MinimumLength(8)
             .MaximumLength(12);
         RuleFor(x => x.NewPassword)
             .NotEmpty()
-            .MinimumLength(6)
-            .WithMessage("Password must be at least 6 characters long.");
+            .MinimumLength(8)
+            .WithMessage("Password must be at least 8 characters long.")
+            .Matches("[A-Z]")
+            .WithMessage("Password must contain at least one uppercase letter.")
+            .Matches("[a-z]")
+            .WithMessage("Password must contain at least one lowercase letter.")
+            .Matches("[0-9]")
+            .WithMessage("Password must contain at least one digit.");
     }
 }
 

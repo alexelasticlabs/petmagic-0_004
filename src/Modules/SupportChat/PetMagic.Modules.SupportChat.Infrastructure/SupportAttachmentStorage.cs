@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 
@@ -17,6 +18,55 @@ internal sealed class LocalSupportAttachmentStorage(
     SupportAttachmentStorageOptions options,
     IHostEnvironment hostEnvironment) : ISupportAttachmentStorage
 {
+    private static readonly Dictionary<string, string> ImageSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["jpeg"] = ".jpg",
+        ["jpg"] = ".jpg",
+        ["png"] = ".png",
+        ["webp"] = ".webp",
+        ["gif"] = ".gif",
+        ["heic"] = ".heic",
+        ["heif"] = ".heif"
+    };
+
+    private static readonly Dictionary<string, string> ExactContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["application/pdf"] = ".pdf",
+        ["application/json"] = ".json",
+        ["application/zip"] = ".zip",
+        ["application/x-zip-compressed"] = ".zip",
+        ["text/plain"] = ".txt",
+        ["text/csv"] = ".csv",
+        ["application/msword"] = ".doc",
+        ["application/vnd.ms-excel"] = ".xls",
+        ["application/vnd.ms-powerpoint"] = ".ppt",
+        ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] = ".docx",
+        ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] = ".xlsx",
+        ["application/vnd.openxmlformats-officedocument.presentationml.presentation"] = ".pptx"
+    };
+
+    private static readonly Dictionary<string, string> ExtensionContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".jpg"] = "image/jpeg",
+        [".jpeg"] = "image/jpeg",
+        [".png"] = "image/png",
+        [".webp"] = "image/webp",
+        [".gif"] = "image/gif",
+        [".heic"] = "image/heic",
+        [".heif"] = "image/heif",
+        [".pdf"] = "application/pdf",
+        [".json"] = "application/json",
+        [".zip"] = "application/zip",
+        [".txt"] = "text/plain",
+        [".csv"] = "text/csv",
+        [".doc"] = "application/msword",
+        [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        [".xls"] = "application/vnd.ms-excel",
+        [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        [".ppt"] = "application/vnd.ms-powerpoint",
+        [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    };
+
     public async Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
         SupportAttachmentUploadCommand attachment,
         CancellationToken cancellationToken)
@@ -26,7 +76,7 @@ internal sealed class LocalSupportAttachmentStorage(
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
         }
 
-        if (!IsAllowedContentType(attachment.ContentType))
+        if (!TryResolveStoredFileFormat(attachment.ContentType, attachment.FileName, out var extension, out var normalizedContentType))
         {
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentContentTypeNotAllowed);
         }
@@ -39,7 +89,6 @@ internal sealed class LocalSupportAttachmentStorage(
         var root = ResolveRootPath();
         Directory.CreateDirectory(root);
 
-        var extension = Path.GetExtension(attachment.FileName);
         var safeName = $"{Guid.NewGuid():N}{extension}";
         var now = DateTime.UtcNow;
         var year = now.ToString("yyyy");
@@ -66,7 +115,7 @@ internal sealed class LocalSupportAttachmentStorage(
             url,
             normalizedRelativePath,
             attachment.FileName,
-            attachment.ContentType,
+            normalizedContentType,
             attachment.Content.LongLength,
             physicalPath));
     }
@@ -146,30 +195,72 @@ internal sealed class LocalSupportAttachmentStorage(
         return relativePath.Replace('\\', '/');
     }
 
-    private static bool IsAllowedContentType(string contentType)
+    private static bool TryResolveStoredFileFormat(
+        string contentType,
+        string fileName,
+        out string extension,
+        out string normalizedContentType)
     {
-        if (string.IsNullOrWhiteSpace(contentType))
+        extension = string.Empty;
+        normalizedContentType = NormalizeContentType(contentType);
+        if (string.IsNullOrWhiteSpace(normalizedContentType))
         {
             return false;
         }
 
-        if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        if (normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
+            var subtype = normalizedContentType["image/".Length..];
+            if (!ImageSubtypeExtensions.TryGetValue(subtype, out string? mappedImageExtension)
+                || string.IsNullOrWhiteSpace(mappedImageExtension))
+            {
+                return false;
+            }
+
+            extension = mappedImageExtension;
+            normalizedContentType = string.Equals(subtype, "jpg", StringComparison.OrdinalIgnoreCase)
+                ? "image/jpeg"
+                : $"image/{subtype}";
             return true;
         }
 
-        return contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/zip", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/x-zip-compressed", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("text/plain", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("text/csv", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/msword", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/vnd.ms-excel", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/vnd.ms-powerpoint", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", StringComparison.OrdinalIgnoreCase)
-            || contentType.Equals("application/vnd.openxmlformats-officedocument.presentationml.presentation", StringComparison.OrdinalIgnoreCase);
+        if (ExactContentTypeExtensions.TryGetValue(normalizedContentType, out string? mappedExactExtension)
+            && !string.IsNullOrWhiteSpace(mappedExactExtension))
+        {
+            extension = mappedExactExtension;
+            return true;
+        }
+
+        if (!string.Equals(normalizedContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var fileExtension = Path.GetExtension(fileName).Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(fileExtension)
+            || !ExtensionContentTypes.TryGetValue(fileExtension, out string? extensionContentType)
+            || string.IsNullOrWhiteSpace(extensionContentType))
+        {
+            return false;
+        }
+
+        extension = fileExtension;
+        normalizedContentType = extensionContentType;
+        return true;
+    }
+
+    private static string NormalizeContentType(string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return string.Empty;
+        }
+
+        var separatorIndex = contentType.IndexOf(';');
+        var normalized = separatorIndex >= 0
+            ? contentType[..separatorIndex]
+            : contentType;
+
+        return normalized.Trim();
     }
 }

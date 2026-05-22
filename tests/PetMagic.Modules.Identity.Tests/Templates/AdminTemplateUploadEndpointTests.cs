@@ -1,7 +1,9 @@
 using System.Text;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Api.Endpoints;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -144,6 +146,27 @@ public sealed class AdminTemplateUploadEndpointTests
         var result = await AdminTemplateEndpoints.UploadMediaAsync(
             file,
             TemplateAssetKind.ReferenceMotion.ToString(),
+            new RecordingMediaStorage(),
+            CreateLifecycleService(dbContext),
+            new FixedTemplateMediaUploadPolicy(2048),
+            new RecordingMediaMetadataReader(),
+            CancellationToken.None);
+
+        var response = await ExecuteAsync(result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
+        Assert.Contains("File content type is not allowed", response.Body);
+    }
+
+    [Fact]
+    public async Task UploadMediaAsync_ShouldRejectSvgPreviewUpload()
+    {
+        await using var dbContext = CreateDbContext();
+        var file = CreateFormFile("preview.svg", "image/svg+xml", Encoding.UTF8.GetBytes("<svg></svg>"));
+
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            file,
+            TemplateAssetKind.Preview.ToString(),
             new RecordingMediaStorage(),
             CreateLifecycleService(dbContext),
             new FixedTemplateMediaUploadPolicy(2048),

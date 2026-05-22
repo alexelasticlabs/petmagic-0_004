@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Threading.RateLimiting;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Api;
 using PetMagic.Modules.Identity.Api.Endpoints;
@@ -56,6 +58,33 @@ public sealed class AuthEndpointsNativeGoogleTests
         Assert.NotNull(service.LastExternalLoginCommand);
         Assert.Equal("Google", service.LastExternalLoginCommand!.Provider);
         Assert.Equal("google-subject-1", service.LastExternalLoginCommand.ProviderSubject);
+        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var setCookieValues));
+        Assert.Contains(
+            setCookieValues,
+            value => value.Contains("petmagic_refresh_token=refresh-token", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldUseCookieToken_WhenRequestBodyDoesNotContainToken()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+        app.Client.DefaultRequestHeaders.Add("Cookie", "petmagic_refresh_token=cookie-refresh-token");
+
+        var response = await app.Client.PostAsJsonAsync("/api/auth/refresh", new { refreshToken = string.Empty });
+        var payload = await response.Content.ReadFromJsonAsync<TokenPairResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(service.LastRefreshCommand);
+        Assert.Equal("cookie-refresh-token", service.LastRefreshCommand!.RefreshToken);
+        Assert.NotNull(payload);
+        Assert.Equal("rotated-refresh-token", payload!.RefreshToken);
+        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var setCookieValues));
+        Assert.Contains(
+            setCookieValues,
+            value => value.Contains("petmagic_refresh_token=rotated-refresh-token", StringComparison.Ordinal));
     }
 
     private sealed class GoogleMobileConfigResponse
@@ -151,6 +180,8 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         public ExternalLoginCallbackCommand? LastExternalLoginCommand { get; private set; }
 
+        public RefreshTokenCommand? LastRefreshCommand { get; private set; }
+
         public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
         public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
@@ -190,7 +221,27 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result<IReadOnlyList<LinkedAccountResponse>>> UnlinkExternalLoginAsync(Guid userId, string provider, CancellationToken cancellationToken)
             => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
 
-        public Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
+        public Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken)
+        {
+            LastRefreshCommand = command;
+
+            return Task.FromResult(Result.Success(new TokenPairResponse(
+                "access-token-rotated",
+                "rotated-refresh-token",
+                DateTime.UtcNow.AddMinutes(30),
+                new UserProfileResponse(
+                    Guid.NewGuid(),
+                    "pet@example.com",
+                    "Pet Parent",
+                    false,
+                    true,
+                    true,
+                    false,
+                    false,
+                    DefaultLegalAcceptance,
+                    ["user"],
+                    null))));
+        }
         public Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> AcceptLegalDocumentsAsync(Guid userId, AcceptLegalDocumentsCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();

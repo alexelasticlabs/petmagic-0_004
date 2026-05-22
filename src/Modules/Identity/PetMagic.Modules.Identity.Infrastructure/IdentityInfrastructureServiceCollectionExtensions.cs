@@ -42,10 +42,10 @@ public static class IdentityInfrastructureServiceCollectionExtensions
 
         services.AddIdentityCore<AppUser>(options =>
             {
-                options.Password.RequiredLength = 6;
-                options.Password.RequireDigit = false;
-                options.Password.RequireUppercase = false;
-                options.Password.RequireLowercase = false;
+                options.Password.RequiredLength = 8;
+                options.Password.RequireDigit = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireLowercase = true;
                 options.Password.RequireNonAlphanumeric = false;
                 options.User.RequireUniqueEmail = true;
                 options.Lockout.MaxFailedAccessAttempts = 8;
@@ -265,7 +265,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             UseSsl = ParseBool(ReadValue(section, "UseSsl", "EMAIL_USE_SSL"), true),
             FromAddress = ReadValue(section, "FromAddress", "EMAIL_FROM_ADDRESS") ?? "no-reply@petmagic.local",
             FromName = ReadValue(section, "FromName", "EMAIL_FROM_NAME") ?? "PetMagic",
-            VerificationCodeLength = ParseInt(section["VerificationCodeLength"], 6),
+            VerificationCodeLength = Math.Clamp(ParseInt(section["VerificationCodeLength"], 8), 6, 12),
             VerificationCodeTtlMinutes = ParseInt(section["VerificationCodeTtlMinutes"], 15),
             PasswordResetCodeTtlMinutes = ParseInt(section["PasswordResetCodeTtlMinutes"], 15),
             ConfirmationResendCooldownSeconds = ParseInt(section["ConfirmationResendCooldownSeconds"], 60),

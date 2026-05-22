@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
@@ -26,6 +27,17 @@ public interface IAvatarStorage
 
 internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvironment hostEnvironment) : IAvatarStorage
 {
+    private static readonly Dictionary<string, string> ImageSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["jpeg"] = ".jpg",
+        ["jpg"] = ".jpg",
+        ["png"] = ".png",
+        ["webp"] = ".webp",
+        ["gif"] = ".gif",
+        ["heic"] = ".heic",
+        ["heif"] = ".heif"
+    };
+
     public async Task<Result<StoredAvatarResponse>> StoreAsync(AvatarUploadCommand avatar, CancellationToken cancellationToken)
     {
         if (avatar.Content.Length == 0)
@@ -33,10 +45,14 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
             return Result.Failure<StoredAvatarResponse>(IdentityErrors.InvalidAvatarUpload);
         }
 
+        if (!TryResolveAvatarFileFormat(avatar.ContentType, out var extension, out var normalizedContentType))
+        {
+            return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarContentTypeNotAllowed);
+        }
+
         var root = ResolveRootPath();
         Directory.CreateDirectory(root);
 
-        var extension = Path.GetExtension(avatar.FileName);
         var safeName = $"{Guid.NewGuid():N}{extension}";
         var year = DateTime.UtcNow.ToString("yyyy");
         var month = DateTime.UtcNow.ToString("MM");
@@ -54,7 +70,7 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
             url,
             normalizedRelativePath,
             avatar.FileName,
-            avatar.ContentType,
+            normalizedContentType,
             avatar.Content.LongLength,
             physicalPath));
     }
@@ -132,5 +148,43 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
         }
 
         return relativePath.Replace('\\', '/');
+    }
+
+    private static bool TryResolveAvatarFileFormat(string contentType, out string extension, out string normalizedContentType)
+    {
+        extension = string.Empty;
+        normalizedContentType = NormalizeContentType(contentType);
+        if (!normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var subtype = normalizedContentType["image/".Length..];
+        if (!ImageSubtypeExtensions.TryGetValue(subtype, out string? mappedExtension)
+            || string.IsNullOrWhiteSpace(mappedExtension))
+        {
+            return false;
+        }
+
+        extension = mappedExtension;
+        normalizedContentType = string.Equals(subtype, "jpg", StringComparison.OrdinalIgnoreCase)
+            ? "image/jpeg"
+            : $"image/{subtype}";
+        return true;
+    }
+
+    private static string NormalizeContentType(string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return string.Empty;
+        }
+
+        var separatorIndex = contentType.IndexOf(';');
+        var normalized = separatorIndex >= 0
+            ? contentType[..separatorIndex]
+            : contentType;
+
+        return normalized.Trim();
     }
 }

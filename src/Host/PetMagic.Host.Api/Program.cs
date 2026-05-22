@@ -78,7 +78,7 @@ builder.Services.AddCors(options =>
                 "Cors:AllowedOrigins must be configured for non-development environments.");
         }
 
-        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
     });
 });
 
@@ -169,13 +169,63 @@ Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
+    context.Response.Headers.TryAdd("Referrer-Policy", "no-referrer");
+    await next();
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
 app.UseCors("AdminWeb");
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = static staticFileContext =>
+    {
+        staticFileContext.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+        var requestPath = staticFileContext.Context.Request.Path.Value ?? string.Empty;
+        var contentType = staticFileContext.Context.Response.ContentType ?? string.Empty;
+        var isManagedMediaPath = requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
+            || requestPath.StartsWith("/user-avatars", StringComparison.OrdinalIgnoreCase)
+            || requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase);
+
+        if (!isManagedMediaPath)
+        {
+            return;
+        }
+
+        staticFileContext.Context.Response.Headers["Cache-Control"] = "public,max-age=31536000,immutable";
+
+        var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+        var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+
+        if (requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
+            && !isImage)
+        {
+            staticFileContext.Context.Response.Headers["Content-Disposition"] = "attachment";
+            return;
+        }
+
+        if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase)
+            && !isImage
+            && !isVideo)
+        {
+            staticFileContext.Context.Response.Headers["Content-Disposition"] = "attachment";
+        }
+    }
+});
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

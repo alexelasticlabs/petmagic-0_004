@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -8,9 +9,51 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvironment hostEnvironment) : IMediaStorage
 {
+    private static readonly Dictionary<string, string> ImageSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["jpeg"] = ".jpg",
+        ["jpg"] = ".jpg",
+        ["png"] = ".png",
+        ["webp"] = ".webp",
+        ["gif"] = ".gif",
+        ["heic"] = ".heic",
+        ["heif"] = ".heif"
+    };
+
+    private static readonly Dictionary<string, string> VideoSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["mp4"] = ".mp4",
+        ["quicktime"] = ".mov",
+        ["webm"] = ".webm"
+    };
+
+    private static readonly Dictionary<string, string> ExactContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["application/mp4"] = ".mp4"
+    };
+
+    private static readonly Dictionary<string, string> ExtensionContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".jpg"] = "image/jpeg",
+        [".jpeg"] = "image/jpeg",
+        [".png"] = "image/png",
+        [".webp"] = "image/webp",
+        [".gif"] = "image/gif",
+        [".heic"] = "image/heic",
+        [".heif"] = "image/heif",
+        [".mp4"] = "video/mp4",
+        [".mov"] = "video/quicktime",
+        [".webm"] = "video/webm"
+    };
+
     public async Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
     {
         if (asset.Content.Length == 0)
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+        }
+
+        if (!TryResolveStoredFileFormat(asset.ContentType, asset.FileName, out var extension, out var normalizedContentType))
         {
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
         }
@@ -21,7 +64,6 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
 
         Directory.CreateDirectory(root);
 
-        var extension = Path.GetExtension(asset.FileName);
         var safeName = $"{Guid.NewGuid():N}{extension}";
         var relativePath = Path.Combine("templates-media", DateTime.UtcNow.ToString("yyyy"), DateTime.UtcNow.ToString("MM"), safeName);
         var physicalPath = Path.Combine(root, DateTime.UtcNow.ToString("yyyy"), DateTime.UtcNow.ToString("MM"), safeName);
@@ -33,7 +75,7 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
         var url = $"{baseUrl}/{normalizedRelativePath}";
 
-        return Result.Success(new StoredMediaResponse(url, normalizedRelativePath, asset.FileName, asset.ContentType, asset.Content.LongLength, physicalPath));
+        return Result.Success(new StoredMediaResponse(url, normalizedRelativePath, asset.FileName, normalizedContentType, asset.Content.LongLength, physicalPath));
     }
 
     public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
@@ -109,5 +151,91 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         }
 
         return relativePath.Replace('\\', '/');
+    }
+
+    private static bool TryResolveStoredFileFormat(
+        string contentType,
+        string fileName,
+        out string extension,
+        out string normalizedContentType)
+    {
+        extension = string.Empty;
+        normalizedContentType = NormalizeContentType(contentType);
+        if (string.IsNullOrWhiteSpace(normalizedContentType))
+        {
+            return false;
+        }
+
+        if (normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            var subtype = normalizedContentType["image/".Length..];
+            if (!ImageSubtypeExtensions.TryGetValue(subtype, out string? mappedImageExtension)
+                || string.IsNullOrWhiteSpace(mappedImageExtension))
+            {
+                return false;
+            }
+
+            extension = mappedImageExtension;
+            normalizedContentType = string.Equals(subtype, "jpg", StringComparison.OrdinalIgnoreCase)
+                ? "image/jpeg"
+                : $"image/{subtype}";
+            return true;
+        }
+
+        if (normalizedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+        {
+            var subtype = normalizedContentType["video/".Length..];
+            if (!VideoSubtypeExtensions.TryGetValue(subtype, out string? mappedVideoExtension)
+                || string.IsNullOrWhiteSpace(mappedVideoExtension))
+            {
+                return false;
+            }
+
+            extension = mappedVideoExtension;
+            normalizedContentType = $"video/{subtype}";
+            return true;
+        }
+
+        if (ExactContentTypeExtensions.TryGetValue(normalizedContentType, out string? mappedExactExtension)
+            && !string.IsNullOrWhiteSpace(mappedExactExtension))
+        {
+            extension = mappedExactExtension;
+            normalizedContentType = extension == ".mp4"
+                ? "video/mp4"
+                : normalizedContentType;
+            return true;
+        }
+
+        if (!string.Equals(normalizedContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var fileExtension = Path.GetExtension(fileName).Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(fileExtension)
+            || !ExtensionContentTypes.TryGetValue(fileExtension, out string? extensionContentType)
+            || string.IsNullOrWhiteSpace(extensionContentType))
+        {
+            return false;
+        }
+
+        extension = fileExtension;
+        normalizedContentType = extensionContentType;
+        return true;
+    }
+
+    private static string NormalizeContentType(string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return string.Empty;
+        }
+
+        var separatorIndex = contentType.IndexOf(';');
+        var normalized = separatorIndex >= 0
+            ? contentType[..separatorIndex]
+            : contentType;
+
+        return normalized.Trim();
     }
 }

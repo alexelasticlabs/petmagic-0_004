@@ -271,7 +271,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                         <span>{formatClockTime(message.createdAtUtc, locale)}</span>
                                                     </div>
                                                     {hasImageAttachment(message) ? (
-                                                        <a href={message.attachmentUrl!} target="_blank" rel="noreferrer" className={styles.messageImageLink}>
+                                                        <a href={message.attachmentUrl!} target="_blank" rel="noopener noreferrer" className={styles.messageImageLink}>
                                                             <Image
                                                                 src={message.attachmentUrl!}
                                                                 alt={message.attachmentFileName ?? message.body}
@@ -284,7 +284,13 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                             />
                                                         </a>
                                                     ) : hasAttachment(message) ? (
-                                                        <a href={message.attachmentUrl!} target="_blank" rel="noreferrer" className={styles.messageAttachmentCard}>
+                                                        <a
+                                                            href={message.attachmentUrl!}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            download={message.attachmentFileName ?? "attachment"}
+                                                            className={styles.messageAttachmentCard}
+                                                        >
                                                             <div className={styles.messageAttachmentIcon}>FILE</div>
                                                             <div className={styles.messageAttachmentMeta}>
                                                                 <strong>{message.attachmentFileName ?? message.body}</strong>
@@ -347,7 +353,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                     {selectedAttachment ? (
                                         <div className={styles.attachmentPreviewCard}>
                                             {attachmentPreviewUrl ? (
-                                                <a href={attachmentPreviewUrl} target="_blank" rel="noreferrer" className={styles.attachmentPreviewImageLink}>
+                                                <a href={attachmentPreviewUrl} target="_blank" rel="noopener noreferrer" className={styles.attachmentPreviewImageLink}>
                                                     <Image
                                                         src={attachmentPreviewUrl}
                                                         alt={selectedAttachment.name}
@@ -368,7 +374,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             </div>
                                             <div className={styles.attachmentPreviewActions}>
                                                 {attachmentPreviewUrl ? (
-                                                    <a href={attachmentPreviewUrl} target="_blank" rel="noreferrer" className={styles.attachmentActionLink}>
+                                                    <a href={attachmentPreviewUrl} target="_blank" rel="noopener noreferrer" className={styles.attachmentActionLink}>
                                                         {text.supportAttachmentOpenAction}
                                                     </a>
                                                 ) : null}

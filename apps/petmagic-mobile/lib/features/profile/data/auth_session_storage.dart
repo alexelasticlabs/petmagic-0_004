@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 
 final authSessionStorageProvider = Provider<AuthSessionStorage>((ref) {
@@ -9,11 +9,19 @@ final authSessionStorageProvider = Provider<AuthSessionStorage>((ref) {
 });
 
 class AuthSessionStorage {
-  static const _sessionKey = 'petmagic_mobile_auth_session';
+  AuthSessionStorage({FlutterSecureStorage? secureStorage})
+    : _secureStorage =
+          secureStorage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+          );
+
+  static const sessionKey = 'petmagic_mobile_auth_session';
+
+  final FlutterSecureStorage _secureStorage;
 
   Future<AuthSession?> read() async {
-    final preferences = await SharedPreferences.getInstance();
-    final raw = preferences.getString(_sessionKey);
+    final raw = await _secureStorage.read(key: sessionKey);
     if (raw == null || raw.isEmpty) {
       return null;
     }
@@ -26,12 +34,10 @@ class AuthSessionStorage {
   }
 
   Future<void> save(AuthSession session) async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_sessionKey, jsonEncode(session.toJson()));
+    await _secureStorage.write(key: sessionKey, value: jsonEncode(session.toJson()));
   }
 
   Future<void> clear() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.remove(_sessionKey);
+    await _secureStorage.delete(key: sessionKey);
   }
 }

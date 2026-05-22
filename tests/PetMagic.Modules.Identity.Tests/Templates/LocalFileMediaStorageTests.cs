@@ -1,5 +1,6 @@
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -45,6 +46,50 @@ public sealed class LocalFileMediaStorageTests
             var deleted = await storage.DeleteAsync("https://cdn.example.com/preview.jpg", CancellationToken.None);
 
             Assert.True(deleted.IsSuccess);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldUseExtensionFromContentType_WhenFileNameExtensionIsUnsafe()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            var stored = await storage.StoreAsync(
+                new MediaUploadCommand("preview.html", "image/png", [1, 2, 3]),
+                CancellationToken.None);
+
+            Assert.True(stored.IsSuccess);
+            Assert.EndsWith(".png", stored.Value.StorageKey, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("image/png", stored.Value.ContentType);
+            Assert.DoesNotContain(".html", stored.Value.StorageKey, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldRejectUnsafeOctetStreamExtension()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            var stored = await storage.StoreAsync(
+                new MediaUploadCommand("payload.exe", "application/octet-stream", [1, 2, 3]),
+                CancellationToken.None);
+
+            Assert.True(stored.IsFailure);
+            Assert.Equal("templates.invalid_media_upload", stored.Error.Code);
         }
         finally
         {

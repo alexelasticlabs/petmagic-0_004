@@ -23,7 +23,7 @@ public sealed class RegisterUserCommandValidatorTests
     public void Should_Fail_When_Terms_Are_Not_Accepted()
     {
         var validator = new RegisterUserCommandValidator(new FakeLegalDocumentsCatalog());
-        var command = new RegisterUserCommand("demo@petmagic.app", "pet123", "Demo", false, true, CurrentLegalVersion, CurrentLegalVersion, false);
+        var command = new RegisterUserCommand("demo@petmagic.app", "Pet12345", "Demo", false, true, CurrentLegalVersion, CurrentLegalVersion, false);
 
         var result = validator.Validate(command);
 
@@ -34,7 +34,7 @@ public sealed class RegisterUserCommandValidatorTests
     public void Should_Pass_When_Payload_Is_Valid()
     {
         var validator = new RegisterUserCommandValidator(new FakeLegalDocumentsCatalog());
-        var command = new RegisterUserCommand("demo@petmagic.app", "pet123", "Demo", true, true, CurrentLegalVersion, CurrentLegalVersion, true);
+        var command = new RegisterUserCommand("demo@petmagic.app", "Pet12345", "Demo", true, true, CurrentLegalVersion, CurrentLegalVersion, true);
 
         var result = validator.Validate(command);
 

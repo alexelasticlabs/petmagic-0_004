@@ -22,7 +22,7 @@ export type UserAvatar = {
 
 export type AuthSession = {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
   expiresAtUtc: string;
   user: UserProfile;
 };
@@ -754,6 +754,7 @@ type AuthSessionSnapshot = AuthSession | null | undefined;
 
 let cachedAuthRaw: string | null | undefined;
 let cachedAuthSession: AuthSession | null = null;
+let volatileRefreshToken: string | null = null;
 const cachedUsersLists = new Map<string, { value: UserListItem[]; expiresAt: number }>();
 const cachedAdminUserDetails = new Map<string, { value: AdminUserDetail; expiresAt: number }>();
 const cachedAdminUserAnalytics = new Map<string, { value: AdminUserAnalytics; expiresAt: number }>();
@@ -844,7 +845,7 @@ export function getSession(): AuthSession | null {
     return null;
   }
 
-  const raw = window.localStorage.getItem(AUTH_KEY);
+  const raw = window.sessionStorage.getItem(AUTH_KEY);
   if (raw === cachedAuthRaw) {
     return cachedAuthSession;
   }
@@ -856,12 +857,26 @@ export function getSession(): AuthSession | null {
   }
 
   try {
-    cachedAuthSession = JSON.parse(raw) as AuthSession;
+    const parsed = JSON.parse(raw) as AuthSession;
+    if (typeof parsed.refreshToken === "string" && parsed.refreshToken.trim().length > 0) {
+      volatileRefreshToken = parsed.refreshToken;
+    }
+
+    cachedAuthSession = parsed;
     return cachedAuthSession;
   } catch {
     cachedAuthSession = null;
     return null;
   }
+}
+
+export function isAuthSessionExpired(session: AuthSession | null | undefined): boolean {
+  if (!session?.expiresAtUtc) {
+    return true;
+  }
+
+  const expiresAtMs = Date.parse(session.expiresAtUtc);
+  return Number.isNaN(expiresAtMs) || expiresAtMs <= Date.now();
 }
 
 function notifyAuthSessionChanged(): void {
@@ -906,18 +921,25 @@ export function useAuthSession(): AuthSessionSnapshot {
 
 export function clearSession(): void {
   clearAdminListCaches();
+  volatileRefreshToken = null;
 
   if (typeof window !== "undefined") {
-    window.localStorage.removeItem(AUTH_KEY);
+    window.sessionStorage.removeItem(AUTH_KEY);
     notifyAuthSessionChanged();
   }
 }
 
+function sanitizeSessionForStorage(session: AuthSession): AuthSession {
+  const { refreshToken: _ignoredRefreshToken, ...persistedSession } = session;
+  return persistedSession;
+}
+
 function saveSession(session: AuthSession): void {
   clearAdminListCaches();
+  volatileRefreshToken = session.refreshToken?.trim() ? session.refreshToken : null;
 
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(session)));
     notifyAuthSessionChanged();
   }
 }
@@ -932,7 +954,7 @@ async function apiRequest<TResponse>(
   const session = getSession();
 
   const headers = new Headers(init.headers);
-  if (!(init.body instanceof FormData)) {
+  if (typeof init.body !== "undefined" && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -965,6 +987,7 @@ async function apiRequest<TResponse>(
     response = await fetch(`${getApiBaseUrl()}${path}`, {
       ...init,
       headers,
+      credentials: "include",
       signal: abortController.signal,
     });
   } catch (error) {
@@ -984,9 +1007,11 @@ async function apiRequest<TResponse>(
     }
   }
 
-  if (response.status === 401 && allowRefresh && session?.refreshToken) {
-    await refreshSession(session.refreshToken);
-    return apiRequest<TResponse>(path, init, { requireAuth, allowRefresh: false });
+  if (response.status === 401 && allowRefresh && requireAuth) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      return apiRequest<TResponse>(path, init, { requireAuth, allowRefresh: false });
+    }
   }
 
   if (!response.ok) {
@@ -1027,20 +1052,30 @@ async function apiRequest<TResponse>(
   return (await response.json()) as TResponse;
 }
 
-async function refreshSession(refreshToken: string): Promise<void> {
-  const refreshed = await apiRequest<AuthSession>(
-    "/api/auth/refresh",
-    {
-      method: "POST",
-      body: JSON.stringify({ refreshToken })
-    },
-    {
-      requireAuth: false,
-      allowRefresh: false
-    }
-  );
+async function refreshSession(): Promise<boolean> {
+  const body = volatileRefreshToken?.trim()
+    ? JSON.stringify({ refreshToken: volatileRefreshToken })
+    : undefined;
 
-  saveSession(refreshed);
+  try {
+    const refreshed = await apiRequest<AuthSession>(
+      "/api/auth/refresh",
+      {
+        method: "POST",
+        body
+      },
+      {
+        requireAuth: false,
+        allowRefresh: false
+      }
+    );
+
+    saveSession(refreshed);
+    return true;
+  } catch {
+    clearSession();
+    return false;
+  }
 }
 
 export async function login(email: string, password: string): Promise<AuthSession> {
@@ -1062,19 +1097,27 @@ export async function login(email: string, password: string): Promise<AuthSessio
 
 export async function logout(): Promise<void> {
   const session = getSession();
+  const refreshToken = volatileRefreshToken?.trim() ? volatileRefreshToken : null;
 
   clearSession();
 
-  if (session?.refreshToken) {
-    const headers = new Headers({ "Content-Type": "application/json" });
-    if (session.accessToken) {
+  if (session?.accessToken || refreshToken) {
+    const headers = new Headers();
+    const requestBody = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
+
+    if (requestBody) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    if (session?.accessToken) {
       headers.set("Authorization", `Bearer ${session.accessToken}`);
     }
 
     void fetch(`${getApiBaseUrl()}/api/auth/logout`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ refreshToken: session.refreshToken })
+        body: requestBody,
+        credentials: "include"
       })
       .catch(() => {
         // Logout must stay locally instant even when the API is slow or unavailable.

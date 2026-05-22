@@ -369,6 +369,9 @@ void main() {
           externalAuthRepositoryProvider.overrideWith(
             (ref) => _ThrowingExternalAuthRepository(),
           ),
+          authSessionStorageProvider.overrideWith(
+            (ref) => _TestAuthSessionStorage(),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -408,6 +411,9 @@ void main() {
         profileRepositoryProvider.overrideWith((ref) => profileRepository),
         externalAuthRepositoryProvider.overrideWith(
           (ref) => externalAuthRepository,
+        ),
+        authSessionStorageProvider.overrideWith(
+          (ref) => _TestAuthSessionStorage(),
         ),
       ],
     );
@@ -493,12 +499,13 @@ void main() {
   testWidgets('settings screen renders account and preferences sections', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({_sessionKey: _buildSessionJson()});
-
     final container = ProviderContainer(
       overrides: [
         profileRepositoryProvider.overrideWith(
           (ref) => _FakeProfileRepository(),
+        ),
+        authSessionStorageProvider.overrideWith(
+          (ref) => _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
         ),
       ],
     );
@@ -529,7 +536,6 @@ void main() {
   testWidgets('account details screen renders stored profile fields', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({_sessionKey: _buildSessionJson()});
     final profileRepository = _FakeProfileRepository()
       ..storedSession = AuthSession.fromJson(
         jsonDecode(_buildSessionJson()) as Map<String, dynamic>,
@@ -538,6 +544,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         profileRepositoryProvider.overrideWith((ref) => profileRepository),
+        authSessionStorageProvider.overrideWith(
+          (ref) => _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -827,11 +836,20 @@ Future<void> _pumpApp(
   ProfileRepository? profileRepository,
   ExternalAuthRepository? externalAuthRepository,
 }) async {
-  SharedPreferences.setMockInitialValues(sharedPrefs);
+  final sharedPrefsWithoutSession = Map<String, Object>.from(sharedPrefs)
+    ..remove(_sessionKey);
+  SharedPreferences.setMockInitialValues(sharedPrefsWithoutSession);
+
+  final authStorage = _TestAuthSessionStorage(
+    rawSessionJson: sharedPrefs[_sessionKey] is String
+        ? sharedPrefs[_sessionKey] as String
+        : null,
+  );
 
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        authSessionStorageProvider.overrideWith((ref) => authStorage),
         templatesRepositoryProvider.overrideWith(
           (ref) => repository ?? _FakeTemplatesRepository(),
         ),
@@ -880,6 +898,40 @@ String _buildSessionJson() {
   );
 }
 
+class _TestAuthSessionStorage extends AuthSessionStorage {
+  _TestAuthSessionStorage({String? rawSessionJson})
+    : _session = _deserialize(rawSessionJson);
+
+  AuthSession? _session;
+
+  static AuthSession? _deserialize(String? rawSessionJson) {
+    if (rawSessionJson == null || rawSessionJson.isEmpty) {
+      return null;
+    }
+
+    try {
+      return AuthSession.fromJson(
+        jsonDecode(rawSessionJson) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<AuthSession?> read() async => _session;
+
+  @override
+  Future<void> save(AuthSession session) async {
+    _session = session;
+  }
+
+  @override
+  Future<void> clear() async {
+    _session = null;
+  }
+}
+
 const _sampleLegalAcceptance = MobileLegalAcceptanceStatus(
   termsOfUseAccepted: true,
   termsOfUseAcceptedVersion: '2026-05-20',
@@ -921,7 +973,7 @@ const _sampleLegalDocuments = MobileLegalDocuments(
   ),
 );
 
-const _sessionKey = 'petmagic_mobile_auth_session';
+const _sessionKey = AuthSessionStorage.sessionKey;
 const _onboardingSeenKey = 'petmagic_mobile_guest_onboarding_seen';
 
 const _sampleTemplate = TemplateItem(

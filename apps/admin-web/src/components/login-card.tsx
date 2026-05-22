@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import styles from "@/components/login-card.module.css";
-import { login, useAuthSession } from "@/lib/api-client";
+import { isAuthSessionExpired, login, useAuthSession } from "@/lib/api-client";
 import { type Locale, getDictionary } from "@/lib/i18n";
 
 /* ── SVG icons ────────────────────────────────────────────────────── */
@@ -77,13 +77,14 @@ export function LoginCard({ locale }: LoginCardProps) {
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const existingSession = useAuthSession();
   const isCheckingSession = existingSession === undefined;
-  const isRedirecting = Boolean(existingSession?.accessToken);
+  const hasValidExistingSession = Boolean(existingSession?.accessToken) && !isAuthSessionExpired(existingSession);
+  const isRedirecting = hasValidExistingSession;
 
   useEffect(() => {
-    if (existingSession?.accessToken) {
+    if (hasValidExistingSession) {
       router.replace(`/${locale}/dashboard`);
     }
-  }, [existingSession?.accessToken, locale, router]);
+  }, [hasValidExistingSession, locale, router]);
 
   useEffect(() => {
     router.prefetch(`/${locale}/dashboard`);

@@ -1,5 +1,7 @@
 using System.Security.Claims;
+
 using FluentValidation;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
+
 using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
@@ -19,6 +22,9 @@ public static class AuthEndpoints
     private const string InvalidSubjectCode = "auth.invalid_subject";
     private const string RefreshTokenOwnershipViolationCode = "auth.refresh_token_not_owned";
     private const string EmailNotConfirmedCode = "auth.email_not_confirmed";
+    private const string RefreshTokenCookieName = "petmagic_refresh_token";
+    private const string RefreshTokenCookiePath = "/api/auth";
+    private const int RefreshTokenCookieLifetimeDays = 30;
     private const string ExternalRedirectUriProperty = "mobile_redirect_uri";
     private const string ExternalLinkTicketProperty = "external_link_ticket";
     private const string ExternalFlowModeProperty = "external_flow_mode";
@@ -124,6 +130,7 @@ public static class AuthEndpoints
     }
 
     private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> LoginAsync(
+        HttpContext context,
         LoginCommand command,
         IValidator<LoginCommand> validator,
         IIdentityService service,
@@ -145,6 +152,7 @@ public static class AuthEndpoints
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
+        WriteRefreshTokenCookie(context, result.Value.RefreshToken);
         return TypedResults.Ok(result.Value);
     }
 
@@ -233,11 +241,14 @@ public static class AuthEndpoints
     }
 
     private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> RefreshAsync(
-        RefreshTokenCommand command,
+        HttpContext context,
+        RefreshTokenCommand? request,
         IValidator<RefreshTokenCommand> validator,
         IIdentityService service,
         CancellationToken cancellationToken)
     {
+        var resolvedRefreshToken = ResolveRefreshToken(context, request?.RefreshToken);
+        var command = new RefreshTokenCommand(resolvedRefreshToken ?? string.Empty);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -250,12 +261,13 @@ public static class AuthEndpoints
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        WriteRefreshTokenCookie(context, result.Value.RefreshToken);
         return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> LogoutAsync(
         HttpContext context,
-        RefreshTokenCommand command,
+        RefreshTokenCommand? request,
         IValidator<LogoutCommand> validator,
         IIdentityService service,
         CancellationToken cancellationToken)
@@ -269,7 +281,8 @@ public static class AuthEndpoints
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        var logoutCommand = new LogoutCommand(userId, command.RefreshToken);
+        var resolvedRefreshToken = ResolveRefreshToken(context, request?.RefreshToken);
+        var logoutCommand = new LogoutCommand(userId, resolvedRefreshToken ?? string.Empty);
         var validation = await validator.ValidateAsync(logoutCommand, cancellationToken);
         if (!validation.IsValid)
         {
@@ -289,6 +302,7 @@ public static class AuthEndpoints
                 statusCode: statusCode);
         }
 
+        DeleteRefreshTokenCookie(context);
         return TypedResults.NoContent();
     }
 
@@ -448,6 +462,7 @@ public static class AuthEndpoints
             return Results.Redirect(redirectUrl);
         }
 
+        WriteRefreshTokenCookie(httpContext, result.Value.RefreshToken);
         return TypedResults.Ok(result.Value);
     }
 
@@ -466,6 +481,7 @@ public static class AuthEndpoints
     }
 
     private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> GoogleNativeLoginAsync(
+        HttpContext context,
         GoogleNativeLoginCommand command,
         IValidator<GoogleNativeLoginCommand> validator,
         IGoogleIdentityTokenVerifier verifier,
@@ -500,10 +516,12 @@ public static class AuthEndpoints
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        WriteRefreshTokenCookie(context, result.Value.RefreshToken);
         return TypedResults.Ok(result.Value);
     }
 
     private static Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult> ExchangeExternalLoginAsync(
+        HttpContext context,
         ExternalLoginExchangeRequest request,
         ExternalLoginCompletionStore completionStore)
     {
@@ -523,6 +541,7 @@ public static class AuthEndpoints
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        WriteRefreshTokenCookie(context, session.RefreshToken);
         return TypedResults.Ok(session);
     }
 
@@ -713,6 +732,66 @@ public static class AuthEndpoints
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static string? ResolveRefreshToken(HttpContext context, string? requestRefreshToken)
+    {
+        if (!string.IsNullOrWhiteSpace(requestRefreshToken))
+        {
+            return requestRefreshToken;
+        }
+
+        if (context.Request.Cookies.TryGetValue(RefreshTokenCookieName, out var refreshTokenFromCookie)
+            && !string.IsNullOrWhiteSpace(refreshTokenFromCookie))
+        {
+            return refreshTokenFromCookie;
+        }
+
+        return null;
+    }
+
+    private static void WriteRefreshTokenCookie(HttpContext context, string refreshToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return;
+        }
+
+        context.Response.Cookies.Append(RefreshTokenCookieName, refreshToken, BuildRefreshCookieOptions(context));
+    }
+
+    private static void DeleteRefreshTokenCookie(HttpContext context)
+    {
+        context.Response.Cookies.Delete(RefreshTokenCookieName, BuildRefreshCookieDeletionOptions(context));
+    }
+
+    private static CookieOptions BuildRefreshCookieOptions(HttpContext context)
+    {
+        var secureCookie = context.Request.IsHttps;
+
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = secureCookie,
+            SameSite = secureCookie ? SameSiteMode.None : SameSiteMode.Lax,
+            IsEssential = true,
+            Path = RefreshTokenCookiePath,
+            Expires = DateTimeOffset.UtcNow.AddDays(RefreshTokenCookieLifetimeDays)
+        };
+    }
+
+    private static CookieOptions BuildRefreshCookieDeletionOptions(HttpContext context)
+    {
+        var secureCookie = context.Request.IsHttps;
+
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = secureCookie,
+            SameSite = secureCookie ? SameSiteMode.None : SameSiteMode.Lax,
+            IsEssential = true,
+            Path = RefreshTokenCookiePath
+        };
     }
 
     private static string? NormalizeExternalProvider(string provider)

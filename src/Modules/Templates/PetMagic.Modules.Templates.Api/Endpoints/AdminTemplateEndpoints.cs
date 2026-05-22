@@ -1,9 +1,11 @@
 using FluentValidation;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -557,13 +559,15 @@ public static class AdminTemplateEndpoints
 
     private static bool IsAllowedUpload(string fileName, TemplateAssetKind assetKind, string contentType)
     {
+        var normalizedContentType = NormalizeMediaContentType(contentType);
+
         if (assetKind == TemplateAssetKind.ReferenceMotion)
         {
-            return IsAllowedReferenceMotionUpload(fileName, contentType);
+            return IsAllowedReferenceMotionUpload(fileName, normalizedContentType);
         }
 
-        return contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-            || contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+        return IsAllowedImageUpload(normalizedContentType)
+            || IsAllowedVideoUpload(normalizedContentType);
     }
 
     private static bool IsAllowedReferenceMotionUpload(string fileName, string contentType)
@@ -581,6 +585,39 @@ public static class AdminTemplateEndpoints
 
         return string.IsNullOrWhiteSpace(contentType)
             || string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAllowedImageUpload(string contentType)
+    {
+        return string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/png", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/gif", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/heic", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/heif", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAllowedVideoUpload(string contentType)
+    {
+        return string.Equals(contentType, "video/mp4", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "application/mp4", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "video/quicktime", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "video/webm", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeMediaContentType(string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return string.Empty;
+        }
+
+        var separatorIndex = contentType.IndexOf(';');
+        var normalized = separatorIndex >= 0
+            ? contentType[..separatorIndex]
+            : contentType;
+
+        return normalized.Trim();
     }
 
     public sealed record UpdateImageTemplateRequest(
