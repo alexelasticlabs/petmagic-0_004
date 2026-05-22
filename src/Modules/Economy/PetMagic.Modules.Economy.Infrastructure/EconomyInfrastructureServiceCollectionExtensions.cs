@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -43,6 +44,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         });
 
         services.AddScoped<IEconomyService, EconomyService>();
+        services.AddScoped<IAdminUserEconomyAnalyticsReader, AdminUserEconomyAnalyticsReader>();
         services.AddSingleton<IGoogleStoreWebhookTokenVerifier, GoogleStoreWebhookTokenVerifier>();
         services.AddSingleton<IStoreWebhookSecurityValidator, StoreWebhookSecurityValidator>();
         services.AddSingleton<IPaymentGateway>(_ => new StripePaymentGateway(economyOptions));

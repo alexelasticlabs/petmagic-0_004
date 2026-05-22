@@ -3,7 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PetMagic.Modules.SupportChat.Application\PetMagic.Modules.SupportChat.Application.csproj" />
     <ProjectReference Include="..\PetMagic.Modules.SupportChat.Domain\PetMagic.Modules.SupportChat.Domain.csproj" />
-    <ProjectReference Include="..\..\Identity\PetMagic.Modules.Identity.Infrastructure\PetMagic.Modules.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
   </ItemGroup>
 
@@ -13,6 +13,10 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <PropertyGroup>

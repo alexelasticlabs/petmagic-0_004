@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.BuildingBlocks.Results;
-using PetMagic.Modules.Identity.Infrastructure.Data;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
@@ -11,7 +12,7 @@ namespace PetMagic.Modules.SupportChat.Infrastructure;
 
 public sealed class SupportChatService(
     SupportChatDbContext supportChatDbContext,
-    IdentityDbContext identityDbContext,
+    IIdentityUserLookupService identityUserLookupService,
     ISupportChatRealtimeNotifier realtimeNotifier) : ISupportChatService
 {
     private static readonly Guid AutomatedAssistantUserId = Guid.Parse("2F1E3B3B-8A2E-4A8E-9EE5-97BF31B33218");
@@ -122,16 +123,12 @@ public sealed class SupportChatService(
             .Distinct()
             .ToList();
 
-        var users = await identityDbContext.Users
-            .AsNoTracking()
-            .Where(x => relatedUserIds.Contains(x.Id))
-            .Select(x => new UserLookup(x.Id, x.Email!, x.DisplayName))
-            .ToDictionaryAsync(x => x.Id, cancellationToken);
+        var users = await identityUserLookupService.GetUsersByIdsAsync(relatedUserIds, cancellationToken);
 
         var summaries = conversations.Select(conversation =>
         {
             users.TryGetValue(conversation.InitiatorUserId, out var initiator);
-            UserLookup? assignedAdmin = null;
+            IdentityUserLookup? assignedAdmin = null;
             if (conversation.AssignedAdminId.HasValue)
             {
                 users.TryGetValue(conversation.AssignedAdminId.Value, out assignedAdmin);
@@ -401,14 +398,10 @@ public sealed class SupportChatService(
             .Distinct()
             .ToList();
 
-        var users = await identityDbContext.Users
-            .AsNoTracking()
-            .Where(x => userIds.Contains(x.Id))
-            .Select(x => new UserLookup(x.Id, x.Email!, x.DisplayName))
-            .ToDictionaryAsync(x => x.Id, cancellationToken);
+        var users = await identityUserLookupService.GetUsersByIdsAsync(userIds, cancellationToken);
 
         users.TryGetValue(conversation.InitiatorUserId, out var initiator);
-        UserLookup? assignedAdmin = null;
+        IdentityUserLookup? assignedAdmin = null;
         if (conversation.AssignedAdminId.HasValue)
         {
             users.TryGetValue(conversation.AssignedAdminId.Value, out assignedAdmin);
@@ -456,11 +449,7 @@ public sealed class SupportChatService(
 
     private async Task<SupportMessageResponse> BuildMessageResponseAsync(ConversationMessage message, CancellationToken cancellationToken)
     {
-        var sender = await identityDbContext.Users
-            .AsNoTracking()
-            .Where(x => x.Id == message.SenderUserId)
-            .Select(x => new UserLookup(x.Id, x.Email!, x.DisplayName))
-            .FirstOrDefaultAsync(cancellationToken);
+        var sender = await identityUserLookupService.GetUserByIdAsync(message.SenderUserId, cancellationToken);
 
         return new SupportMessageResponse(
             message.Id,
@@ -502,6 +491,4 @@ public sealed class SupportChatService(
 
         return string.Concat(value.AsSpan(0, maxLength), "...");
     }
-
-    private sealed record UserLookup(Guid Id, string Email, string? DisplayName);
 }

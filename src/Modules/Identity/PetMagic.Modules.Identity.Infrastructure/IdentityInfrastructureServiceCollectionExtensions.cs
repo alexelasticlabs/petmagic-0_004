@@ -1,4 +1,5 @@
 using System.Text;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
@@ -31,6 +33,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         var avatarStorageOptions = BuildAvatarStorageOptions(configuration.GetSection(AvatarStorageOptions.SectionName));
 
         ValidateExternalAuthConfiguration(externalAuth);
+        ValidateJwtConfiguration(jwtOptions, environment);
 
         services.AddDbContext<IdentityDbContext>(options =>
         {
@@ -112,6 +115,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddSingleton<IIdentityEmailTemplateRenderer, IdentityEmailTemplateRenderer>();
         services.AddSingleton<IAvatarStorage, LocalAvatarStorage>();
         services.AddScoped<IGoogleIdentityTokenVerifier, GoogleIdentityTokenVerifier>();
+        services.AddScoped<IIdentityUserLookupService, IdentityUserLookupService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<EmailDispatchProcessor>();
         services.AddHostedService<EmailDispatchWorker>();
@@ -343,6 +347,30 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         if (appleCredentialsConfigured && !appleAllConfigured)
         {
             throw new InvalidOperationException("Apple external auth configuration is incomplete. Configure ClientId, ClientSecret, AuthorizationEndpoint, and TokenEndpoint together.");
+        }
+    }
+
+    private static void ValidateJwtConfiguration(JwtOptions options, IHostEnvironment? environment)
+    {
+        if (environment is null || environment.IsDevelopment())
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.SigningKey))
+        {
+            throw new InvalidOperationException("Jwt:SigningKey must be configured outside development.");
+        }
+
+        if (options.SigningKey.Contains("CHANGE_ME_IN_PRODUCTION", StringComparison.OrdinalIgnoreCase)
+            || options.SigningKey.Contains("DEV_ONLY", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Jwt:SigningKey contains a placeholder value and must be replaced outside development.");
+        }
+
+        if (options.SigningKey.Length < 32)
+        {
+            throw new InvalidOperationException("Jwt:SigningKey must be at least 32 characters long outside development.");
         }
     }
 

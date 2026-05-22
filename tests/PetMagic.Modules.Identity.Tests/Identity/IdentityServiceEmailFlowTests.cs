@@ -1,11 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -19,7 +21,6 @@ using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
-using PetMagic.Modules.Templates.Infrastructure.Data;
 
 using IdentityModuleDbContext = PetMagic.Modules.Identity.Infrastructure.Data.IdentityDbContext;
 
@@ -221,9 +222,7 @@ public sealed class IdentityServiceEmailFlowTests
     {
         await dbContext.Database.EnsureCreatedAsync();
         var economyDbContext = CreateEconomyDbContext();
-        var templatesDbContext = CreateTemplatesDbContext();
         await economyDbContext.Database.EnsureCreatedAsync();
-        await templatesDbContext.Database.EnsureCreatedAsync();
 
         var identityOptions = new IdentityOptions();
         identityOptions.Password.RequiredLength = 10;
@@ -266,11 +265,9 @@ public sealed class IdentityServiceEmailFlowTests
             userManager,
             roleManager,
             dbContext,
-            economyDbContext,
             new ServiceCollection()
                 .AddSingleton(CreateEconomyService(economyDbContext))
                 .BuildServiceProvider(),
-            templatesDbContext,
             new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),
             new InMemoryAvatarStorage(),
@@ -345,15 +342,6 @@ public sealed class IdentityServiceEmailFlowTests
             .Options;
 
         return new EconomyDbContext(options);
-    }
-
-    private static TemplatesDbContext CreateTemplatesDbContext()
-    {
-        var options = new DbContextOptionsBuilder<TemplatesDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-
-        return new TemplatesDbContext(options);
     }
 
     private static string HashValue(string value)

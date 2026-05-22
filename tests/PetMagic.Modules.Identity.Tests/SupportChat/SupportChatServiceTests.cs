@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+
+using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
@@ -476,7 +478,10 @@ public sealed class SupportChatServiceTests
 
         public SupportChatService CreateService()
         {
-            return new SupportChatService(SupportDbContext, IdentityDbContext, realtimeNotifier);
+            return new SupportChatService(
+                SupportDbContext,
+                new IdentityUserLookupService(IdentityDbContext),
+                realtimeNotifier);
         }
 
         public async ValueTask DisposeAsync()

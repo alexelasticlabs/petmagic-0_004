@@ -2,13 +2,19 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 
 namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
-public sealed class StoreSubscriptionVerifier(HttpClient httpClient, IOptions<EconomyOptions> options) : IStoreSubscriptionVerifier
+public sealed class StoreSubscriptionVerifier(
+    HttpClient httpClient,
+    IOptions<EconomyOptions> options,
+    ILogger<StoreSubscriptionVerifier>? logger = null) : IStoreSubscriptionVerifier
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -105,8 +111,13 @@ public sealed class StoreSubscriptionVerifier(HttpClient httpClient, IOptions<Ec
 
             return Result.Success(new StoreSubscriptionVerificationResponse(true, expiresAtUtc, subscriptionState, externalSubscriptionId));
         }
-        catch
+        catch (Exception ex)
         {
+            logger?.LogWarning(
+                ex,
+                "Google Play subscription verification failed for product {ProductId}.",
+                request.ProductId);
+
             return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
         }
     }
@@ -231,8 +242,14 @@ public sealed class StoreSubscriptionVerifier(HttpClient httpClient, IOptions<Ec
 
             return (Result.Success(result), false);
         }
-        catch
+        catch (Exception ex)
         {
+            logger?.LogWarning(
+                ex,
+                "App Store receipt verification failed for endpoint {Endpoint} and product {ProductId}.",
+                url,
+                productId);
+
             return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StoreVerificationUnavailable), false);
         }
     }

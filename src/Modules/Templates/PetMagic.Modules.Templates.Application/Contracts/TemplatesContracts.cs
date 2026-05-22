@@ -258,6 +258,56 @@ public sealed record AdminTemplateFeedbackItemResponse(
     Guid? GenerationId,
     DateTime CreatedAtUtc);
 
+public sealed record AdminUserTemplateGenerationResponse(
+    Guid GenerationId,
+    Guid TemplateId,
+    string TemplateTitle,
+    string TemplateType,
+    string Status,
+    int TokenCost,
+    string? FailureCode,
+    string? FailureMessage,
+    string? OutputUrl,
+    DateTime CreatedAtUtc,
+    DateTime? CompletedAtUtc);
+
+public sealed record AdminUserTemplateEventResponse(
+    Guid EventId,
+    Guid TemplateId,
+    string TemplateTitle,
+    string EventType,
+    string Source,
+    string DeviceClass,
+    string CountryCode,
+    Guid? GenerationId,
+    string? FeedbackMessage,
+    DateTime CreatedAtUtc);
+
+public sealed record AdminUserTemplateFailureBreakdownItemResponse(
+    string FailureCode,
+    int Count,
+    DateTime? LastOccurredAtUtc);
+
+public sealed record AdminUserTemplateActivityResponse(
+    string Kind,
+    string Title,
+    string? Details,
+    DateTime OccurredAtUtc);
+
+public sealed record AdminUserTemplateAnalyticsResponse(
+    int TotalGenerations,
+    int CompletedGenerations,
+    int FailedGenerations,
+    DateTime? LastGenerationAtUtc,
+    int TotalViews,
+    int TotalVideoViews,
+    int TemplateAnalyticsEvents,
+    DateTime? LastTemplateEventAtUtc,
+    IReadOnlyList<AdminUserTemplateGenerationResponse> RecentGenerations,
+    IReadOnlyList<AdminUserTemplateEventResponse> RecentTemplateEvents,
+    IReadOnlyList<AdminUserTemplateFailureBreakdownItemResponse> FailureBreakdown,
+    IReadOnlyList<AdminUserTemplateActivityResponse> RecentActivity);
+
 public sealed record AdminTemplateFeedbackQuery(
     string? Type,
     string? Search,

@@ -1,10 +1,13 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.RateLimiting;
+
 using Microsoft.AspNetCore.DataProtection;
+
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+
 using PetMagic.Modules.Economy.Api;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Identity.Api;
@@ -13,6 +16,7 @@ using PetMagic.Modules.SupportChat.Api;
 using PetMagic.Modules.SupportChat.Infrastructure;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Infrastructure;
+
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,6 +60,7 @@ if (builder.Environment.IsDevelopment())
 }
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
 
 builder.Services.AddCors(options =>
 {
@@ -63,8 +68,14 @@ builder.Services.AddCors(options =>
     {
         if (allowedOrigins.Length == 0)
         {
-            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-            return;
+            if (allowAnyCorsInDevelopment)
+            {
+                policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "Cors:AllowedOrigins must be configured for non-development environments.");
         }
 
         policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();

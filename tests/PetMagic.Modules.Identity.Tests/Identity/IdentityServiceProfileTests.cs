@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -18,11 +20,13 @@ using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 using IdentityModuleDbContext = PetMagic.Modules.Identity.Infrastructure.Data.IdentityDbContext;
+using TemplatesContracts = PetMagic.Modules.Templates.Application.Contracts;
 
 namespace PetMagic.Modules.Identity.Tests.Identity;
 
@@ -472,15 +476,17 @@ public sealed class IdentityServiceProfileTests
             }
         }
 
+        var serviceProvider = new ServiceCollection()
+            .AddSingleton(CreateEconomyService(economyDbContext))
+            .AddSingleton<IAdminUserEconomyAnalyticsReader>(new TestAdminUserEconomyAnalyticsReader(economyDbContext))
+            .AddSingleton<IAdminUserTemplateAnalyticsReader>(new TestAdminUserTemplateAnalyticsReader(templatesDbContext))
+            .BuildServiceProvider();
+
         return new IdentityService(
             userManager,
             roleManager,
             identityDbContext,
-            economyDbContext,
-            new ServiceCollection()
-                .AddSingleton(CreateEconomyService(economyDbContext))
-                .BuildServiceProvider(),
-            templatesDbContext,
+            serviceProvider,
             new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),
             avatarStorage,
@@ -498,6 +504,187 @@ public sealed class IdentityServiceProfileTests
                 MaxFileSizeBytes = maxAvatarSizeBytes
             },
             Options.Create(new JwtOptions()));
+    }
+
+    private sealed class TestAdminUserEconomyAnalyticsReader(EconomyDbContext dbContext) : IAdminUserEconomyAnalyticsReader
+    {
+        public async Task<Result<AdminUserEconomyAnalyticsResponse>> GetAdminUserEconomyAnalyticsAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            var wallet = await dbContext.Wallets
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+
+            var purchases = await dbContext.PurchaseOrders
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .ToListAsync(cancellationToken);
+
+            var recentPurchases = purchases
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .Take(10)
+                .Select(x => new AdminUserEconomyPurchaseResponse(
+                    x.Id,
+                    x.Status,
+                    x.PriceAmount,
+                    x.CurrencyCode,
+                    x.SparkToGrant,
+                    x.PaymentProvider,
+                    x.CreatedAtUtc,
+                    x.ConfirmedAtUtc))
+                .ToList();
+
+            var ledgerEntries = await dbContext.WalletLedgerEntries
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .ToListAsync(cancellationToken);
+
+            var recentLedgerEntries = ledgerEntries
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .Take(12)
+                .Select(x => new AdminUserEconomyWalletLedgerResponse(
+                    x.Id,
+                    x.Delta,
+                    x.BalanceAfter,
+                    x.Source,
+                    x.Reason,
+                    x.CreatedAtUtc))
+                .ToList();
+
+            var recentActivity = recentPurchases
+                .Select(x => new AdminUserEconomyActivityResponse(
+                    "purchase",
+                    $"Purchase {x.Status}",
+                    $"{x.SparkToGrant} spark - {x.PriceAmount} {x.CurrencyCode}",
+                    x.ConfirmedAtUtc ?? x.CreatedAtUtc))
+                .Concat(recentLedgerEntries.Select(x => new AdminUserEconomyActivityResponse(
+                    "wallet",
+                    x.Source,
+                    $"{x.Delta} - {x.Reason}",
+                    x.CreatedAtUtc)))
+                .ToList();
+
+            var successfulPurchases = purchases
+                .Where(x => string.Equals(x.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            return Result.Success(new AdminUserEconomyAnalyticsResponse(
+                wallet?.Balance ?? 0,
+                ledgerEntries.Where(x => x.Delta > 0).Sum(x => x.Delta),
+                ledgerEntries.Where(x => x.Delta < 0).Sum(x => -x.Delta),
+                ledgerEntries.Where(x => x.Delta > 0 && string.Equals(x.Source, "admin_grant", StringComparison.Ordinal)).Sum(x => x.Delta),
+                ledgerEntries.Where(x => x.Delta < 0 && string.Equals(x.Source, "admin_debit", StringComparison.Ordinal)).Sum(x => -x.Delta),
+                purchases.Count,
+                successfulPurchases.Count,
+                successfulPurchases.Sum(x => x.SparkToGrant),
+                successfulPurchases.Count > 0 ? successfulPurchases.Max(x => x.ConfirmedAtUtc ?? x.CreatedAtUtc) : null,
+                recentLedgerEntries.Count > 0 ? recentLedgerEntries[0].CreatedAtUtc : null,
+                recentPurchases,
+                recentLedgerEntries,
+                recentActivity));
+        }
+    }
+
+    private sealed class TestAdminUserTemplateAnalyticsReader(TemplatesDbContext dbContext) : IAdminUserTemplateAnalyticsReader
+    {
+        public async Task<Result<TemplatesContracts.AdminUserTemplateAnalyticsResponse>> GetAdminUserTemplateAnalyticsAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            var templateItemsById = await dbContext.TemplateItems
+                .AsNoTracking()
+                .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+            var generations = await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .ToListAsync(cancellationToken);
+
+            var recentGenerations = generations
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .Take(10)
+                .Select(x =>
+                {
+                    templateItemsById.TryGetValue(x.TemplateId, out var template);
+                    return new TemplatesContracts.AdminUserTemplateGenerationResponse(
+                        x.Id,
+                        x.TemplateId,
+                        template?.Title ?? string.Empty,
+                        template?.TemplateType.ToString() ?? string.Empty,
+                        x.Status.ToString(),
+                        x.TokenCost,
+                        x.FailureCode,
+                        x.FailureMessage,
+                        x.OutputUrl,
+                        x.CreatedAtUtc,
+                        x.CompletedAtUtc);
+                })
+                .ToList();
+
+            var failureBreakdown = generations
+                .Where(x => x.Status == TemplateGenerationStatus.Failed)
+                .GroupBy(x => string.IsNullOrWhiteSpace(x.FailureCode) ? "templates.unknown_failure" : x.FailureCode)
+                .Select(group => new TemplatesContracts.AdminUserTemplateFailureBreakdownItemResponse(
+                    group.Key,
+                    group.Count(),
+                    group.Max(x => x.CompletedAtUtc ?? x.UpdatedAtUtc)))
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.FailureCode)
+                .ToList();
+
+            var templateEvents = await dbContext.TemplateAnalyticsEvents
+                .AsNoTracking()
+                .Where(x => x.UserId == userId)
+                .ToListAsync(cancellationToken);
+
+            var recentTemplateEvents = templateEvents
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .Take(10)
+                .Select(x =>
+                {
+                    templateItemsById.TryGetValue(x.TemplateId, out var template);
+                    return new TemplatesContracts.AdminUserTemplateEventResponse(
+                        x.Id,
+                        x.TemplateId,
+                        template?.Title ?? string.Empty,
+                        x.EventType,
+                        x.Source,
+                        x.DeviceClass,
+                        x.CountryCode,
+                        x.GenerationId,
+                        x.FeedbackMessage,
+                        x.CreatedAtUtc);
+                })
+                .ToList();
+
+            var recentActivity = recentGenerations
+                .Select(x => new TemplatesContracts.AdminUserTemplateActivityResponse(
+                    "generation",
+                    $"Generation {x.Status}",
+                    x.TemplateTitle,
+                    x.CompletedAtUtc ?? x.CreatedAtUtc))
+                .Concat(recentTemplateEvents.Select(x => new TemplatesContracts.AdminUserTemplateActivityResponse(
+                    "template-event",
+                    x.EventType,
+                    x.TemplateTitle,
+                    x.CreatedAtUtc)))
+                .ToList();
+
+            return Result.Success(new TemplatesContracts.AdminUserTemplateAnalyticsResponse(
+                generations.Count,
+                generations.Count(x => x.Status == TemplateGenerationStatus.Completed),
+                generations.Count(x => x.Status == TemplateGenerationStatus.Failed),
+                generations.Count > 0 ? generations.Max(x => x.CreatedAtUtc) : null,
+                templateEvents.Count(x => string.Equals(x.EventType, "view", StringComparison.OrdinalIgnoreCase)),
+                templateEvents.Count(x => string.Equals(x.EventType, "video_view", StringComparison.OrdinalIgnoreCase)),
+                templateEvents.Count,
+                templateEvents.Count > 0 ? templateEvents.Max(x => x.CreatedAtUtc) : null,
+                recentGenerations,
+                recentTemplateEvents,
+                failureBreakdown,
+                recentActivity));
+        }
     }
 
     private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog

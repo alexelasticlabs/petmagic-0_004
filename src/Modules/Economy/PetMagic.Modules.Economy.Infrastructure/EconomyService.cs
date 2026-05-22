@@ -1,10 +1,12 @@
 using System.Data;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
+
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -15,6 +17,7 @@ using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
+
 using Stripe;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
@@ -24,7 +27,8 @@ public sealed class EconomyService(
     IPaymentGateway paymentGateway,
     IStoreSubscriptionVerifier storeSubscriptionVerifier,
     IOptions<EconomyOptions> options,
-    IIdentityService? identityService = null) : IEconomyService
+    IIdentityService? identityService = null,
+    ILogger<EconomyService>? logger = null) : IEconomyService
 {
     public async Task<Result<WalletStateResponse>> GetWalletAsync(Guid userId, bool isPremium, CancellationToken cancellationToken)
     {
@@ -93,7 +97,10 @@ public sealed class EconomyService(
         }
 
         var now = DateTime.UtcNow;
-        var response = ApplyWalletDelta(wallet, -command.Amount, WalletLedgerSource.GenerationSpend, command.Reason, now);
+        var source = string.IsNullOrWhiteSpace(command.Source)
+            ? WalletLedgerSource.GenerationSpend
+            : command.Source;
+        var response = ApplyWalletDelta(wallet, -command.Amount, source, command.Reason, now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(response);
@@ -683,7 +690,7 @@ public sealed class EconomyService(
             "in_app",
             string.Empty,
             plan.PlanCode,
-            MapStoreSubscriptionStatus(verification.Value.Status, verification.Value.IsActive),
+            EconomyWebhookParser.MapStoreSubscriptionStatus(verification.Value.Status, verification.Value.IsActive),
             null,
             externalSubscriptionId,
             string.Equals(provider, "google_play", StringComparison.Ordinal) ? command.ServerVerificationData : command.PurchaseId,
@@ -1307,7 +1314,7 @@ public sealed class EconomyService(
             return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationNotFound);
         }
 
-        configuration.Region = NormalizeConfigRegion(command.Region);
+        configuration.Region = EconomyPaymentProviderPolicy.NormalizeConfigRegion(command.Region);
         configuration.IsEnabled = command.IsEnabled;
         configuration.IsRecommended = command.IsRecommended;
         configuration.IsSelectedByDefault = command.IsSelectedByDefault;
@@ -1601,14 +1608,18 @@ public sealed class EconomyService(
             eventId = stripeEvent.Id;
             eventType = stripeEvent.Type;
         }
-        catch
+        catch (Exception ex)
         {
-            if (!VerifyStripeSignatureFallback(command.RawBody, command.StripeSignature, options.Value.StripeWebhookSecret))
+            logger?.LogWarning(
+                ex,
+                "Stripe SDK signature verification failed. Falling back to manual signature validation.");
+
+            if (!EconomyWebhookParser.VerifyStripeSignatureFallback(command.RawBody, command.StripeSignature, options.Value.StripeWebhookSecret))
             {
                 return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidStripeSignature);
             }
 
-            var envelope = ParseStripeEnvelope(command.RawBody);
+            var envelope = EconomyWebhookParser.ParseStripeEnvelope(command.RawBody);
             if (!envelope.Success)
             {
                 return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
@@ -1623,7 +1634,7 @@ public sealed class EconomyService(
             return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
         }
 
-        var parsedEvent = ParseStripeEvent(command.RawBody);
+        var parsedEvent = EconomyWebhookParser.ParseStripeEvent(command.RawBody);
         if (!parsedEvent.Success)
         {
             return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
@@ -1769,7 +1780,7 @@ public sealed class EconomyService(
                     var resolvedPlanId = resolvedPlan?.PlanCode ?? existingSubscription!.PlanId;
                     var monthlyTokenLimit = resolvedPlan?.MonthlyTokenLimit ?? existingSubscription!.MonthlyTokenLimit;
                     var subscriptionStatus = isActive
-                        ? (parsedEvent.CancelAtPeriodEnd ? "Canceled" : MapStripeSubscriptionStatus(parsedEvent.Status))
+                        ? (parsedEvent.CancelAtPeriodEnd ? "Canceled" : EconomyWebhookParser.MapStripeSubscriptionStatus(parsedEvent.Status))
                         : "Expired";
 
                     var subscription = await UpsertUserSubscriptionAsync(
@@ -1829,7 +1840,7 @@ public sealed class EconomyService(
         AppStoreServerNotificationCommand command,
         CancellationToken cancellationToken)
     {
-        var parsed = ParseAppStoreServerNotification(command.SignedPayload);
+        var parsed = EconomyWebhookParser.ParseAppStoreServerNotification(command.SignedPayload);
         if (!parsed.Success || string.IsNullOrWhiteSpace(parsed.EventId))
         {
             return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
@@ -1871,8 +1882,8 @@ public sealed class EconomyService(
             return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumPlanNotFound);
         }
 
-        var status = MapAppStoreNotificationStatus(parsed.NotificationType, parsed.Subtype, parsed.ExpiresAtUtc);
-        var isPremium = IsStoreSubscriptionPremium(status, parsed.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
+        var status = EconomyWebhookParser.MapAppStoreNotificationStatus(parsed.NotificationType, parsed.Subtype, parsed.ExpiresAtUtc);
+        var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(status, parsed.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
 
         if (identityService is null)
         {
@@ -1922,7 +1933,7 @@ public sealed class EconomyService(
         GooglePlayDeveloperNotificationCommand command,
         CancellationToken cancellationToken)
     {
-        var parsed = ParseGooglePlayDeveloperNotification(command.MessageData, command.MessageId);
+        var parsed = EconomyWebhookParser.ParseGooglePlayDeveloperNotification(command.MessageData, command.MessageId);
         if (!parsed.Success || string.IsNullOrWhiteSpace(parsed.EventId))
         {
             return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
@@ -1981,9 +1992,9 @@ public sealed class EconomyService(
             return Result.Failure<StoreWebhookResultResponse>(verification.Error);
         }
 
-        var status = MapGooglePlayNotificationStatus(parsed.NotificationType, verification.Value.Status, verification.Value.IsActive);
+        var status = EconomyWebhookParser.MapGooglePlayNotificationStatus(parsed.NotificationType, verification.Value.Status, verification.Value.IsActive);
         var cancelAtPeriodEnd = parsed.NotificationType == 3;
-        var isPremium = IsStoreSubscriptionPremium(status, verification.Value.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
+        var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(status, verification.Value.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
 
         if (identityService is null)
         {
@@ -2498,9 +2509,9 @@ public sealed class EconomyService(
         GetPaywallConfigQuery query,
         CancellationToken cancellationToken)
     {
-        var platform = NormalizePlatform(query.Platform);
-        var region = NormalizeRegion(query.Country);
-        var isEuRegion = IsEuRegion(region);
+        var platform = EconomyPaymentProviderPolicy.NormalizePlatform(query.Platform);
+        var region = EconomyPaymentProviderPolicy.NormalizeRegion(query.Country);
+        var isEuRegion = EconomyPaymentProviderPolicy.IsEuRegion(region);
         var configs = await dbContext.PaymentProviderConfigurations
             .AsNoTracking()
             .Where(x => x.IsEnabled)
@@ -2510,7 +2521,7 @@ public sealed class EconomyService(
 
         if (string.Equals(platform, "web", StringComparison.Ordinal))
         {
-            var stripeConfig = SelectProviderConfig(configs, "stripe", platform, region, isEuRegion, query.AppVersion);
+            var stripeConfig = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, "stripe", platform, region, isEuRegion, query.AppVersion);
             if (stripeConfig is not null)
             {
                 methods.Add(ToPaywallPaymentMethodResponse(stripeConfig, platform, region, "web"));
@@ -2520,13 +2531,13 @@ public sealed class EconomyService(
         }
 
         var nativeProvider = string.Equals(platform, "ios", StringComparison.Ordinal) ? "app_store" : "google_play";
-        var nativeConfig = SelectProviderConfig(configs, nativeProvider, platform, region, isEuRegion, query.AppVersion);
+        var nativeConfig = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, nativeProvider, platform, region, isEuRegion, query.AppVersion);
         if (nativeConfig is not null)
         {
             methods.Add(ToPaywallPaymentMethodResponse(nativeConfig, platform, region, "in_app"));
         }
 
-        var stripeMobileConfig = SelectProviderConfig(configs, "stripe", platform, region, isEuRegion, query.AppVersion);
+        var stripeMobileConfig = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, "stripe", platform, region, isEuRegion, query.AppVersion);
         if (stripeMobileConfig is not null && stripeMobileConfig.ExternalCheckoutAllowed)
         {
             methods.Add(ToPaywallPaymentMethodResponse(
@@ -2930,25 +2941,6 @@ public sealed class EconomyService(
             && subscription.MonthlyTokensGranted < subscription.MonthlyTokenLimit;
     }
 
-    private static PaymentProviderConfiguration? SelectProviderConfig(
-        IEnumerable<PaymentProviderConfiguration> configs,
-        string provider,
-        string platform,
-        string region,
-        bool isEuRegion,
-        string appVersion)
-    {
-        return configs
-            .Where(x => string.Equals(x.Provider, provider, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(x.Platform, platform, StringComparison.OrdinalIgnoreCase)
-                && MatchesRegion(x.Region, region, isEuRegion)
-                && IsAppVersionAllowed(x.AllowedFromAppVersion, appVersion))
-            .OrderByDescending(x => string.Equals(x.Region, region, StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(x => string.Equals(x.Region, "EU", StringComparison.OrdinalIgnoreCase) && isEuRegion)
-            .ThenByDescending(x => string.Equals(x.Region, "*", StringComparison.OrdinalIgnoreCase))
-            .FirstOrDefault();
-    }
-
     private async Task<bool> IsPaymentProviderAllowedAsync(
         string provider,
         string platform,
@@ -2956,30 +2948,21 @@ public sealed class EconomyService(
         string appVersion,
         CancellationToken cancellationToken)
     {
-        var normalizedPlatform = NormalizePlatform(platform);
-        var normalizedRegion = NormalizeRegion(country);
-        var isEuRegion = IsEuRegion(normalizedRegion);
+        var normalizedPlatform = EconomyPaymentProviderPolicy.NormalizePlatform(platform);
+        var normalizedRegion = EconomyPaymentProviderPolicy.NormalizeRegion(country);
+        var isEuRegion = EconomyPaymentProviderPolicy.IsEuRegion(normalizedRegion);
         var configs = await dbContext.PaymentProviderConfigurations
             .AsNoTracking()
             .Where(x => x.IsEnabled)
             .ToListAsync(cancellationToken);
 
-        var config = SelectProviderConfig(configs, provider, normalizedPlatform, normalizedRegion, isEuRegion, appVersion);
+        var config = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, provider, normalizedPlatform, normalizedRegion, isEuRegion, appVersion);
         if (config is null)
         {
             return false;
         }
 
-        return string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
-            ? string.Equals(normalizedPlatform, "web", StringComparison.Ordinal) || config.ExternalCheckoutAllowed
-            : true;
-    }
-
-    private static bool MatchesRegion(string configuredRegion, string region, bool isEuRegion)
-    {
-        return string.Equals(configuredRegion, "*", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(configuredRegion, region, StringComparison.OrdinalIgnoreCase)
-            || (isEuRegion && string.Equals(configuredRegion, "EU", StringComparison.OrdinalIgnoreCase));
+        return EconomyPaymentProviderPolicy.IsProviderAllowedForCheckout(provider, normalizedPlatform, config);
     }
 
     private static DateTime? ResolveNotificationPeriodStartUtc(string billingPeriod, DateTime? currentPeriodEndUtc, DateTime? fallbackPeriodStartUtc)
@@ -2992,206 +2975,9 @@ public sealed class EconomyService(
         return fallbackPeriodStartUtc;
     }
 
-    private static bool IsStoreSubscriptionPremium(string status, DateTime? currentPeriodEndUtc)
-    {
-        if (!string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(status, "Trialing", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(status, "GracePeriod", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(status, "Canceled", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return currentPeriodEndUtc is null || currentPeriodEndUtc >= DateTime.UtcNow;
-    }
-
-    private static string MapAppStoreNotificationStatus(string? notificationType, string? subtype, DateTime? expiresAtUtc)
-    {
-        if (string.Equals(notificationType, "EXPIRED", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(notificationType, "REFUND", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(notificationType, "REVOKE", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(notificationType, "GRACE_PERIOD_EXPIRED", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Expired";
-        }
-
-        if (string.Equals(notificationType, "DID_FAIL_TO_RENEW", StringComparison.OrdinalIgnoreCase))
-        {
-            return expiresAtUtc.HasValue && expiresAtUtc.Value > DateTime.UtcNow ? "GracePeriod" : "Expired";
-        }
-
-        if (string.Equals(notificationType, "DID_CHANGE_RENEWAL_STATUS", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(subtype, "AUTO_RENEW_DISABLED", StringComparison.OrdinalIgnoreCase))
-        {
-            return expiresAtUtc.HasValue && expiresAtUtc.Value > DateTime.UtcNow ? "Canceled" : "Expired";
-        }
-
-        return expiresAtUtc.HasValue && expiresAtUtc.Value <= DateTime.UtcNow ? "Expired" : "Active";
-    }
-
-    private static string MapGooglePlayNotificationStatus(int notificationType, string providerStatus, bool isActive)
-    {
-        return notificationType switch
-        {
-            3 => isActive ? "Canceled" : "Expired",
-            5 or 6 => "GracePeriod",
-            12 or 13 => "Expired",
-            _ => MapStoreSubscriptionStatus(providerStatus, isActive)
-        };
-    }
-
-    private static (bool Success, string? EventId, string? NotificationType, string? Subtype, string? ProductId, string? ExternalSubscriptionId, string? ExternalPurchaseId, DateTime? ExpiresAtUtc, bool CancelAtPeriodEnd) ParseAppStoreServerNotification(string signedPayload)
-    {
-        try
-        {
-            using var rootDocument = JsonDocument.Parse(DecodeJwsPayloadJson(signedPayload));
-            var root = rootDocument.RootElement;
-            var eventId = root.TryGetProperty("notificationUUID", out var eventIdElement) && eventIdElement.ValueKind == JsonValueKind.String
-                ? eventIdElement.GetString()
-                : null;
-            var notificationType = root.TryGetProperty("notificationType", out var typeElement) && typeElement.ValueKind == JsonValueKind.String
-                ? typeElement.GetString()
-                : null;
-            var subtype = root.TryGetProperty("subtype", out var subtypeElement) && subtypeElement.ValueKind == JsonValueKind.String
-                ? subtypeElement.GetString()
-                : null;
-
-            string? productId = null;
-            string? externalSubscriptionId = null;
-            string? externalPurchaseId = null;
-            DateTime? expiresAtUtc = null;
-            var cancelAtPeriodEnd = string.Equals(subtype, "AUTO_RENEW_DISABLED", StringComparison.OrdinalIgnoreCase);
-
-            if (root.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Object)
-            {
-                if (dataElement.TryGetProperty("signedTransactionInfo", out var transactionInfoElement)
-                    && transactionInfoElement.ValueKind == JsonValueKind.String)
-                {
-                    using var transactionDocument = JsonDocument.Parse(DecodeJwsPayloadJson(transactionInfoElement.GetString()!));
-                    var transaction = transactionDocument.RootElement;
-                    productId = transaction.TryGetProperty("productId", out var productElement) && productElement.ValueKind == JsonValueKind.String
-                        ? productElement.GetString()
-                        : null;
-                    externalSubscriptionId = transaction.TryGetProperty("originalTransactionId", out var originalElement) && originalElement.ValueKind == JsonValueKind.String
-                        ? originalElement.GetString()
-                        : null;
-                    externalPurchaseId = transaction.TryGetProperty("transactionId", out var transactionIdElement) && transactionIdElement.ValueKind == JsonValueKind.String
-                        ? transactionIdElement.GetString()
-                        : null;
-                    expiresAtUtc = transaction.TryGetProperty("expiresDate", out var expiresElement)
-                        ? ParseUnixMilliseconds(expiresElement)
-                        : null;
-                }
-
-                if (dataElement.TryGetProperty("signedRenewalInfo", out var renewalInfoElement)
-                    && renewalInfoElement.ValueKind == JsonValueKind.String)
-                {
-                    using var renewalDocument = JsonDocument.Parse(DecodeJwsPayloadJson(renewalInfoElement.GetString()!));
-                    var renewal = renewalDocument.RootElement;
-                    if (renewal.TryGetProperty("autoRenewStatus", out var autoRenewElement))
-                    {
-                        var autoRenewDisabled = autoRenewElement.ValueKind switch
-                        {
-                            JsonValueKind.Number => autoRenewElement.GetInt32() == 0,
-                            JsonValueKind.String => autoRenewElement.GetString() == "0",
-                            _ => false
-                        };
-
-                        cancelAtPeriodEnd = cancelAtPeriodEnd || autoRenewDisabled;
-                    }
-                }
-            }
-
-            return (!string.IsNullOrWhiteSpace(eventId), eventId, notificationType, subtype, productId, externalSubscriptionId, externalPurchaseId, expiresAtUtc, cancelAtPeriodEnd);
-        }
-        catch
-        {
-            return (false, null, null, null, null, null, null, null, false);
-        }
-    }
-
-    private static (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken) ParseGooglePlayDeveloperNotification(string messageData, string? messageId)
-    {
-        try
-        {
-            var payloadBytes = Convert.FromBase64String(PadBase64(messageData));
-            using var document = JsonDocument.Parse(payloadBytes);
-            var root = document.RootElement;
-
-            if (!root.TryGetProperty("subscriptionNotification", out var subscriptionElement)
-                || subscriptionElement.ValueKind != JsonValueKind.Object)
-            {
-                return (false, null, 0, null, null);
-            }
-
-            var productId = subscriptionElement.TryGetProperty("subscriptionId", out var productElement) && productElement.ValueKind == JsonValueKind.String
-                ? productElement.GetString()
-                : null;
-            var purchaseToken = subscriptionElement.TryGetProperty("purchaseToken", out var tokenElement) && tokenElement.ValueKind == JsonValueKind.String
-                ? tokenElement.GetString()
-                : null;
-            var notificationType = subscriptionElement.TryGetProperty("notificationType", out var typeElement) && typeElement.ValueKind == JsonValueKind.Number
-                ? typeElement.GetInt32()
-                : 0;
-
-            var eventId = !string.IsNullOrWhiteSpace(messageId)
-                ? messageId
-                : $"{purchaseToken}:{notificationType}";
-
-            return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken);
-        }
-        catch
-        {
-            return (false, null, 0, null, null);
-        }
-    }
-
-    private static string DecodeJwsPayloadJson(string signedPayload)
-    {
-        var parts = signedPayload.Split('.');
-        if (parts.Length < 2)
-        {
-            throw new InvalidOperationException("Invalid JWS payload.");
-        }
-
-        return Encoding.UTF8.GetString(DecodeBase64Url(parts[1]));
-    }
-
-    private static byte[] DecodeBase64Url(string value)
-    {
-        return Convert.FromBase64String(PadBase64(value.Replace('-', '+').Replace('_', '/')));
-    }
-
-    private static string PadBase64(string value)
-    {
-        var remainder = value.Length % 4;
-        return remainder == 0 ? value : value.PadRight(value.Length + (4 - remainder), '=');
-    }
-
-    private static DateTime? ParseUnixMilliseconds(JsonElement element)
-    {
-        if (element.ValueKind == JsonValueKind.String && long.TryParse(element.GetString(), out var stringValue))
-        {
-            return DateTimeOffset.FromUnixTimeMilliseconds(stringValue).UtcDateTime;
-        }
-
-        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var numericValue))
-        {
-            return DateTimeOffset.FromUnixTimeMilliseconds(numericValue).UtcDateTime;
-        }
-
-        return null;
-    }
-
     private static string? NullIfWhiteSpace(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    private static string NormalizeConfigRegion(string value)
-    {
-        var normalized = value.Trim();
-        return string.Equals(normalized, "*", StringComparison.Ordinal) ? "*" : normalized.ToUpperInvariant();
     }
 
     private sealed record ResolvedPremiumPlan(
@@ -3205,302 +2991,4 @@ public sealed class EconomyService(
         string? GoogleProductId,
         string? AppleProductId);
 
-    private static bool IsAppVersionAllowed(string configuredVersion, string appVersion)
-    {
-        if (!Version.TryParse(configuredVersion, out var minimumVersion))
-        {
-            return true;
-        }
-
-        if (!Version.TryParse(appVersion, out var currentVersion))
-        {
-            return true;
-        }
-
-        return currentVersion >= minimumVersion;
-    }
-
-    private static string NormalizePlatform(string platform)
-    {
-        var normalized = platform.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            "iphone" => "ios",
-            "ipad" => "ios",
-            _ => normalized
-        };
-    }
-
-    private static string NormalizeRegion(string region)
-    {
-        return string.IsNullOrWhiteSpace(region) ? "*" : region.Trim().ToUpperInvariant();
-    }
-
-    private static bool IsEuRegion(string region)
-    {
-        return region is "AT" or "BE" or "BG" or "HR" or "CY" or "CZ" or "DK" or "EE" or "FI" or "FR"
-            or "DE" or "GR" or "HU" or "IE" or "IT" or "LV" or "LT" or "LU" or "MT" or "NL"
-            or "PL" or "PT" or "RO" or "SK" or "SI" or "ES" or "SE";
-    }
-
-    private static string MapStoreSubscriptionStatus(string providerStatus, bool isActive)
-    {
-        if (!isActive)
-        {
-            return "Expired";
-        }
-
-        return providerStatus.Contains("GRACE", StringComparison.OrdinalIgnoreCase)
-            ? "GracePeriod"
-            : "Active";
-    }
-
-    private static string MapStripeSubscriptionStatus(string? providerStatus)
-    {
-        if (string.Equals(providerStatus, "trialing", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Trialing";
-        }
-
-        if (string.Equals(providerStatus, "past_due", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(providerStatus, "unpaid", StringComparison.OrdinalIgnoreCase))
-        {
-            return "PastDue";
-        }
-
-        if (string.Equals(providerStatus, "canceled", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(providerStatus, "cancelled", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Canceled";
-        }
-
-        return "Active";
-    }
-
-    private static (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? Purpose, string? SetupIntentId, string? Status, string? PlanCode, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) ParseStripeEvent(string rawBody)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(rawBody);
-            var root = document.RootElement;
-
-            if (!root.TryGetProperty("data", out var dataElement)
-                || dataElement.ValueKind != JsonValueKind.Object
-                || !dataElement.TryGetProperty("object", out var objectElement)
-                || objectElement.ValueKind != JsonValueKind.Object)
-            {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, false);
-            }
-
-            string? objectId = null;
-            if (objectElement.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.String)
-            {
-                objectId = idElement.GetString();
-            }
-
-            string? setupIntentId = null;
-            if (objectElement.TryGetProperty("setup_intent", out var setupIntentElement) && setupIntentElement.ValueKind == JsonValueKind.String)
-            {
-                setupIntentId = setupIntentElement.GetString();
-            }
-
-            string? status = null;
-            if (objectElement.TryGetProperty("status", out var statusElement) && statusElement.ValueKind == JsonValueKind.String)
-            {
-                status = statusElement.GetString();
-            }
-
-            string? customerId = null;
-            if (objectElement.TryGetProperty("customer", out var customerElement) && customerElement.ValueKind == JsonValueKind.String)
-            {
-                customerId = customerElement.GetString();
-            }
-
-            string? subscriptionId = null;
-            if (objectElement.TryGetProperty("subscription", out var subscriptionElement) && subscriptionElement.ValueKind == JsonValueKind.String)
-            {
-                subscriptionId = subscriptionElement.GetString();
-            }
-            else if (string.Equals(objectElement.GetProperty("object").GetString(), "subscription", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(objectId))
-            {
-                subscriptionId = objectId;
-            }
-
-            DateTime? currentPeriodStartUtc = null;
-            if (objectElement.TryGetProperty("current_period_start", out var currentPeriodStartElement)
-                && currentPeriodStartElement.TryGetInt64(out var currentPeriodStartUnix))
-            {
-                currentPeriodStartUtc = DateTimeOffset.FromUnixTimeSeconds(currentPeriodStartUnix).UtcDateTime;
-            }
-
-            DateTime? currentPeriodEndUtc = null;
-            if (objectElement.TryGetProperty("current_period_end", out var currentPeriodEndElement)
-                && currentPeriodEndElement.TryGetInt64(out var currentPeriodEndUnix))
-            {
-                currentPeriodEndUtc = DateTimeOffset.FromUnixTimeSeconds(currentPeriodEndUnix).UtcDateTime;
-            }
-
-            var cancelAtPeriodEnd = false;
-            if (objectElement.TryGetProperty("cancel_at_period_end", out var cancelAtPeriodEndElement)
-                && (cancelAtPeriodEndElement.ValueKind == JsonValueKind.True || cancelAtPeriodEndElement.ValueKind == JsonValueKind.False))
-            {
-                cancelAtPeriodEnd = cancelAtPeriodEndElement.GetBoolean();
-            }
-
-            Guid? orderId = null;
-            Guid? userId = null;
-            string? purpose = null;
-            string? planCode = null;
-            if (objectElement.TryGetProperty("metadata", out var metadataElement)
-                && metadataElement.ValueKind == JsonValueKind.Object)
-            {
-                if (metadataElement.TryGetProperty("order_id", out var orderIdElement)
-                    && orderIdElement.ValueKind == JsonValueKind.String)
-                {
-                    var rawOrderId = orderIdElement.GetString();
-                    if (Guid.TryParse(rawOrderId, out var parsedOrderId))
-                    {
-                        orderId = parsedOrderId;
-                    }
-                }
-
-                if (metadataElement.TryGetProperty("user_id", out var userIdElement)
-                    && userIdElement.ValueKind == JsonValueKind.String)
-                {
-                    var rawUserId = userIdElement.GetString();
-                    if (Guid.TryParse(rawUserId, out var parsedUserId))
-                    {
-                        userId = parsedUserId;
-                    }
-                }
-
-                if (metadataElement.TryGetProperty("purpose", out var purposeElement)
-                    && purposeElement.ValueKind == JsonValueKind.String)
-                {
-                    purpose = purposeElement.GetString();
-                }
-
-                if (metadataElement.TryGetProperty("plan_code", out var planCodeElement)
-                    && planCodeElement.ValueKind == JsonValueKind.String)
-                {
-                    planCode = planCodeElement.GetString();
-                }
-            }
-
-            return (true, orderId, userId, objectId, purpose, setupIntentId, status, planCode, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd);
-        }
-        catch
-        {
-            var orderIdMatch = Regex.Match(rawBody, "\"order_id\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.CultureInvariant);
-            Guid? orderId = null;
-            if (orderIdMatch.Success)
-            {
-                var rawOrderId = orderIdMatch.Groups["value"].Value;
-                if (Guid.TryParse(rawOrderId, out var parsedOrderId))
-                {
-                    orderId = parsedOrderId;
-                }
-            }
-
-            string? objectId = null;
-            var objectIdMatch = Regex.Match(
-                rawBody,
-                "\"data\"\\s*:\\s*\\{\\s*\"object\"\\s*:\\s*\\{.*?\"id\"\\s*:\\s*\"(?<value>[^\"]+)\"",
-                RegexOptions.CultureInvariant | RegexOptions.Singleline);
-
-            if (objectIdMatch.Success)
-            {
-                objectId = objectIdMatch.Groups["value"].Value;
-            }
-
-            if (!orderId.HasValue && string.IsNullOrWhiteSpace(objectId))
-            {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, false);
-            }
-
-            return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, false);
-        }
-    }
-
-    private static (bool Success, string? EventId, string? EventType) ParseStripeEnvelope(string rawBody)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(rawBody);
-            var root = document.RootElement;
-
-            if (!root.TryGetProperty("id", out var idElement)
-                || idElement.ValueKind != JsonValueKind.String
-                || !root.TryGetProperty("type", out var typeElement)
-                || typeElement.ValueKind != JsonValueKind.String)
-            {
-                return (false, null, null);
-            }
-
-            var eventId = idElement.GetString();
-            var eventType = typeElement.GetString();
-            if (string.IsNullOrWhiteSpace(eventId) || string.IsNullOrWhiteSpace(eventType))
-            {
-                return (false, null, null);
-            }
-
-            return (true, eventId, eventType);
-        }
-        catch
-        {
-            var idMatch = Regex.Match(rawBody, "\"id\"\\s*:\\s*\"(?<value>evt_[^\"]+)\"", RegexOptions.CultureInvariant);
-            var typeMatch = Regex.Match(rawBody, "\"type\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.CultureInvariant);
-
-            if (!idMatch.Success || !typeMatch.Success)
-            {
-                return (false, null, null);
-            }
-
-            var eventId = idMatch.Groups["value"].Value;
-            var eventType = typeMatch.Groups["value"].Value;
-            if (string.IsNullOrWhiteSpace(eventId) || string.IsNullOrWhiteSpace(eventType))
-            {
-                return (false, null, null);
-            }
-
-            return (true, eventId, eventType);
-        }
-    }
-
-    private static bool VerifyStripeSignatureFallback(string rawBody, string signatureHeader, string secret)
-    {
-        if (string.IsNullOrWhiteSpace(signatureHeader) || string.IsNullOrWhiteSpace(secret))
-        {
-            return false;
-        }
-
-        string? timestamp = null;
-        string? expectedSignature = null;
-
-        var parts = signatureHeader.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var part in parts)
-        {
-            if (part.StartsWith("t=", StringComparison.Ordinal))
-            {
-                timestamp = part[2..];
-            }
-            else if (part.StartsWith("v1=", StringComparison.Ordinal))
-            {
-                expectedSignature = part[3..];
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(timestamp) || string.IsNullOrWhiteSpace(expectedSignature))
-        {
-            return false;
-        }
-
-        var signedPayload = $"{timestamp}.{rawBody}";
-        var keyBytes = Encoding.UTF8.GetBytes(secret);
-        var payloadBytes = Encoding.UTF8.GetBytes(signedPayload);
-
-        using var hmac = new HMACSHA256(keyBytes);
-        var computed = Convert.ToHexString(hmac.ComputeHash(payloadBytes)).ToLowerInvariant();
-        return string.Equals(computed, expectedSignature, StringComparison.OrdinalIgnoreCase);
-    }
 }

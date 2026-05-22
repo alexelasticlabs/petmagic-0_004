@@ -3,27 +3,24 @@ using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
-using PetMagic.Modules.Economy.Infrastructure.Data;
-using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
-using PetMagic.Modules.Templates.Domain;
-using PetMagic.Modules.Templates.Domain.Enums;
-using PetMagic.Modules.Templates.Infrastructure.Data;
-using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Application.Abstractions;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
 
@@ -31,9 +28,7 @@ public sealed class IdentityService(
     UserManager<AppUser> userManager,
     RoleManager<IdentityRole<Guid>> roleManager,
     IdentityDbContext dbContext,
-    EconomyDbContext economyDbContext,
     IServiceProvider serviceProvider,
-    TemplatesDbContext templatesDbContext,
     ILegalDocumentsCatalog legalDocumentsCatalog,
     IIdentityEmailTemplateRenderer emailTemplateRenderer,
     IAvatarStorage avatarStorage,
@@ -684,14 +679,29 @@ public sealed class IdentityService(
             return Result.Failure<AdminUserAnalyticsResponse>(IdentityErrors.UserNotFound);
         }
 
-        var economySliceTask = LoadEconomySliceAsync();
-        var templateSliceTask = LoadTemplateSliceAsync();
+        var economyAnalyticsReader = serviceProvider.GetRequiredService<IAdminUserEconomyAnalyticsReader>();
+        var templateAnalyticsReader = serviceProvider.GetRequiredService<IAdminUserTemplateAnalyticsReader>();
+
+        var economySliceTask = economyAnalyticsReader.GetAdminUserEconomyAnalyticsAsync(userId, cancellationToken);
+        var templateSliceTask = templateAnalyticsReader.GetAdminUserTemplateAnalyticsAsync(userId, cancellationToken);
         var auditSliceTask = LoadAuditSliceAsync();
 
         await Task.WhenAll(economySliceTask, templateSliceTask, auditSliceTask);
 
-        var economySlice = await economySliceTask;
-        var templateSlice = await templateSliceTask;
+        var economySliceResult = await economySliceTask;
+        if (economySliceResult.IsFailure)
+        {
+            return Result.Failure<AdminUserAnalyticsResponse>(economySliceResult.Error);
+        }
+
+        var templateSliceResult = await templateSliceTask;
+        if (templateSliceResult.IsFailure)
+        {
+            return Result.Failure<AdminUserAnalyticsResponse>(templateSliceResult.Error);
+        }
+
+        var economySlice = economySliceResult.Value;
+        var templateSlice = templateSliceResult.Value;
         var auditSlice = await auditSliceTask;
 
         var activityMoments = new[]
@@ -727,261 +737,81 @@ public sealed class IdentityService(
             activityMoments.Length > 0 ? activityMoments.Max() : null);
 
         var recentActivity = auditSlice.RecentActivity
-            .Concat(economySlice.RecentActivity)
-            .Concat(templateSlice.RecentActivity)
+            .Concat(economySlice.RecentActivity.Select(x =>
+                new AdminUserActivityItemResponse(x.Kind, x.Title, x.Details, x.OccurredAtUtc)))
+            .Concat(templateSlice.RecentActivity.Select(x =>
+                new AdminUserActivityItemResponse(x.Kind, x.Title, x.Details, x.OccurredAtUtc)))
             .OrderByDescending(x => x.OccurredAtUtc)
             .Take(20)
+            .ToList();
+
+        var recentPurchases = economySlice.RecentPurchases
+            .Select(x => new AdminUserPurchaseResponse(
+                x.OrderId,
+                x.Status,
+                x.PriceAmount,
+                x.CurrencyCode,
+                x.SparkToGrant,
+                x.PaymentProvider,
+                x.CreatedAtUtc,
+                x.ConfirmedAtUtc))
+            .ToList();
+
+        var recentWalletLedger = economySlice.RecentWalletLedger
+            .Select(x => new AdminUserWalletLedgerItemResponse(
+                x.EntryId,
+                x.Delta,
+                x.BalanceAfter,
+                x.Source,
+                x.Reason,
+                x.CreatedAtUtc))
+            .ToList();
+
+        var recentGenerations = templateSlice.RecentGenerations
+            .Select(x => new AdminUserGenerationResponse(
+                x.GenerationId,
+                x.TemplateId,
+                x.TemplateTitle,
+                x.TemplateType,
+                x.Status,
+                x.TokenCost,
+                x.FailureCode,
+                x.FailureMessage,
+                x.OutputUrl,
+                x.CreatedAtUtc,
+                x.CompletedAtUtc))
+            .ToList();
+
+        var recentTemplateEvents = templateSlice.RecentTemplateEvents
+            .Select(x => new AdminUserTemplateEventResponse(
+                x.EventId,
+                x.TemplateId,
+                x.TemplateTitle,
+                x.EventType,
+                x.Source,
+                x.DeviceClass,
+                x.CountryCode,
+                x.GenerationId,
+                x.FeedbackMessage,
+                x.CreatedAtUtc))
+            .ToList();
+
+        var failureBreakdown = templateSlice.FailureBreakdown
+            .Select(x => new AdminUserFailureBreakdownItemResponse(
+                x.FailureCode,
+                x.Count,
+                x.LastOccurredAtUtc))
             .ToList();
 
         return Result.Success(new AdminUserAnalyticsResponse(
             summary,
             recentActivity,
             auditSlice.RecentAuditEvents,
-            economySlice.RecentPurchases,
-            templateSlice.RecentGenerations,
-            templateSlice.RecentTemplateEvents,
-            economySlice.RecentWalletLedger,
-            templateSlice.FailureBreakdown));
-
-        async Task<(
-            int WalletBalance,
-            int TotalTokensCredited,
-            int TotalTokensSpent,
-            int ManualTokensGranted,
-            int ManualTokensDebited,
-            int TotalPurchases,
-            int SuccessfulPurchases,
-            int TotalPurchasedSpark,
-            DateTime? LastPurchaseAtUtc,
-            DateTime? LastWalletActivityAtUtc,
-            IReadOnlyList<AdminUserPurchaseResponse> RecentPurchases,
-            IReadOnlyList<AdminUserWalletLedgerItemResponse> RecentWalletLedger,
-            IReadOnlyList<AdminUserActivityItemResponse> RecentActivity)> LoadEconomySliceAsync()
-        {
-            var wallet = await economyDbContext.Wallets
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-
-            var purchaseSummary = await economyDbContext.PurchaseOrders
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .GroupBy(_ => 1)
-                .Select(group => new
-                {
-                    TotalPurchases = group.Count(),
-                    SuccessfulPurchases = group.Count(x => x.Status == "succeeded"),
-                    TotalPurchasedSpark = group.Where(x => x.Status == "succeeded").Sum(x => (int?)x.SparkToGrant) ?? 0,
-                    LastPurchaseAtUtc = group.Where(x => x.Status == "succeeded").Max(x => (DateTime?)(x.ConfirmedAtUtc ?? x.CreatedAtUtc))
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var recentPurchases = await economyDbContext.PurchaseOrders
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .Take(10)
-                .Select(x => new AdminUserPurchaseResponse(
-                    x.Id,
-                    x.Status,
-                    x.PriceAmount,
-                    x.CurrencyCode,
-                    x.SparkToGrant,
-                    x.PaymentProvider,
-                    x.CreatedAtUtc,
-                    x.ConfirmedAtUtc))
-                .ToListAsync(cancellationToken);
-
-            var walletLedgerSummary = await economyDbContext.WalletLedgerEntries
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .GroupBy(_ => 1)
-                .Select(group => new
-                {
-                    TotalTokensCredited = group.Where(x => x.Delta > 0).Sum(x => (int?)x.Delta) ?? 0,
-                    TotalTokensSpent = group.Where(x => x.Delta < 0).Sum(x => (int?)(-x.Delta)) ?? 0,
-                    ManualTokensGranted = group.Where(x => x.Source == WalletLedgerSource.AdminGrant && x.Delta > 0).Sum(x => (int?)x.Delta) ?? 0,
-                    ManualTokensDebited = group.Where(x => x.Source == WalletLedgerSource.AdminDebit && x.Delta < 0).Sum(x => (int?)(-x.Delta)) ?? 0
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var recentWalletLedgerEntries = await economyDbContext.WalletLedgerEntries
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .Take(12)
-                .ToListAsync(cancellationToken);
-
-            var recentWalletLedger = recentWalletLedgerEntries
-                .Select(x => new AdminUserWalletLedgerItemResponse(
-                    x.Id,
-                    x.Delta,
-                    x.BalanceAfter,
-                    x.Source,
-                    x.Reason,
-                    x.CreatedAtUtc))
-                .ToList();
-
-            var recentActivity = recentPurchases
-                .Select(x => new AdminUserActivityItemResponse(
-                    "purchase",
-                    $"Purchase {x.Status}",
-                    $"{x.SparkToGrant} spark • {x.PriceAmount} {x.CurrencyCode}",
-                    x.ConfirmedAtUtc ?? x.CreatedAtUtc))
-                .Concat(recentWalletLedgerEntries.Select(x => new AdminUserActivityItemResponse(
-                    "wallet",
-                    DescribeWalletLedgerTitle(x),
-                    $"{DescribeWalletLedgerAmount(x.Delta)} • {x.Reason}",
-                    x.CreatedAtUtc)))
-                .ToList();
-
-            return (
-                wallet?.Balance ?? 0,
-                walletLedgerSummary?.TotalTokensCredited ?? 0,
-                walletLedgerSummary?.TotalTokensSpent ?? 0,
-                walletLedgerSummary?.ManualTokensGranted ?? 0,
-                walletLedgerSummary?.ManualTokensDebited ?? 0,
-                purchaseSummary?.TotalPurchases ?? 0,
-                purchaseSummary?.SuccessfulPurchases ?? 0,
-                purchaseSummary?.TotalPurchasedSpark ?? 0,
-                purchaseSummary?.LastPurchaseAtUtc,
-                recentWalletLedger.Count > 0 ? recentWalletLedger[0].CreatedAtUtc : null,
-                recentPurchases,
-                recentWalletLedger,
-                recentActivity);
-        }
-
-        async Task<(
-            int TotalGenerations,
-            int CompletedGenerations,
-            int FailedGenerations,
-            DateTime? LastGenerationAtUtc,
-            int TotalViews,
-            int TotalVideoViews,
-            int TemplateAnalyticsEvents,
-            DateTime? LastTemplateEventAtUtc,
-            IReadOnlyList<AdminUserGenerationResponse> RecentGenerations,
-            IReadOnlyList<AdminUserTemplateEventResponse> RecentTemplateEvents,
-            IReadOnlyList<AdminUserFailureBreakdownItemResponse> FailureBreakdown,
-            IReadOnlyList<AdminUserActivityItemResponse> RecentActivity)> LoadTemplateSliceAsync()
-        {
-            var generationSummary = await templatesDbContext.TemplateGenerationJobs
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .GroupBy(_ => 1)
-                .Select(group => new
-                {
-                    TotalGenerations = group.Count(),
-                    CompletedGenerations = group.Count(x => x.Status == TemplateGenerationStatus.Completed),
-                    FailedGenerations = group.Count(x => x.Status == TemplateGenerationStatus.Failed),
-                    LastGenerationAtUtc = group.Max(x => (DateTime?)x.CreatedAtUtc)
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var recentGenerations = await templatesDbContext.TemplateGenerationJobs
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .Join(
-                    templatesDbContext.TemplateItems.AsNoTracking(),
-                    generation => generation.TemplateId,
-                    template => template.Id,
-                    (generation, template) => new AdminUserGenerationResponse(
-                        generation.Id,
-                        generation.TemplateId,
-                        template.Title,
-                        template.TemplateType.ToString(),
-                        generation.Status.ToString(),
-                        generation.TokenCost,
-                        generation.FailureCode,
-                        generation.FailureMessage,
-                        generation.OutputUrl,
-                        generation.CreatedAtUtc,
-                        generation.CompletedAtUtc))
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .Take(10)
-                .ToListAsync(cancellationToken);
-
-            var failureBreakdown = await templatesDbContext.TemplateGenerationJobs
-                .AsNoTracking()
-                .Where(x => x.UserId == userId && x.Status == TemplateGenerationStatus.Failed)
-                .Select(x => new
-                {
-                    x.FailureCode,
-                    LastOccurredAtUtc = x.CompletedAtUtc ?? x.UpdatedAtUtc
-                })
-                .ToListAsync(cancellationToken);
-
-            var failureBreakdownItems = failureBreakdown
-                .GroupBy(x => string.IsNullOrWhiteSpace(x.FailureCode) ? "templates.unknown_failure" : x.FailureCode)
-                .Select(group => new AdminUserFailureBreakdownItemResponse(
-                    group.Key,
-                    group.Count(),
-                    group.Max(x => x.LastOccurredAtUtc)))
-                .OrderByDescending(x => x.Count)
-                .ThenBy(x => x.FailureCode)
-                .ToList();
-
-            var templateEventSummary = await templatesDbContext.TemplateAnalyticsEvents
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .GroupBy(_ => 1)
-                .Select(group => new
-                {
-                    TemplateAnalyticsEvents = group.Count(),
-                    TotalViews = group.Count(x => x.EventType == TemplateAnalyticsEventTypes.View),
-                    TotalVideoViews = group.Count(x => x.EventType == TemplateAnalyticsEventTypes.VideoView),
-                    LastTemplateEventAtUtc = group.Max(x => (DateTime?)x.CreatedAtUtc)
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var recentTemplateEvents = await templatesDbContext.TemplateAnalyticsEvents
-                .AsNoTracking()
-                .Where(x => x.UserId == userId)
-                .Join(
-                    templatesDbContext.TemplateItems.AsNoTracking(),
-                    templateEvent => templateEvent.TemplateId,
-                    template => template.Id,
-                    (templateEvent, template) => new AdminUserTemplateEventResponse(
-                        templateEvent.Id,
-                        templateEvent.TemplateId,
-                        template.Title,
-                        templateEvent.EventType,
-                        templateEvent.Source,
-                        templateEvent.DeviceClass,
-                        templateEvent.CountryCode,
-                        templateEvent.GenerationId,
-                        templateEvent.FeedbackMessage,
-                        templateEvent.CreatedAtUtc))
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .Take(10)
-                .ToListAsync(cancellationToken);
-
-            var recentActivity = recentGenerations
-                .Select(x => new AdminUserActivityItemResponse(
-                    "generation",
-                    $"Generation {x.Status}",
-                    x.TemplateTitle,
-                    x.CompletedAtUtc ?? x.CreatedAtUtc))
-                .Concat(recentTemplateEvents.Select(x => new AdminUserActivityItemResponse(
-                    "template-event",
-                    x.EventType,
-                    x.TemplateTitle,
-                    x.CreatedAtUtc)))
-                .ToList();
-
-            return (
-                generationSummary?.TotalGenerations ?? 0,
-                generationSummary?.CompletedGenerations ?? 0,
-                generationSummary?.FailedGenerations ?? 0,
-                generationSummary?.LastGenerationAtUtc,
-                templateEventSummary?.TotalViews ?? 0,
-                templateEventSummary?.TotalVideoViews ?? 0,
-                templateEventSummary?.TemplateAnalyticsEvents ?? 0,
-                templateEventSummary?.LastTemplateEventAtUtc,
-                recentGenerations,
-                recentTemplateEvents,
-                failureBreakdownItems,
-                recentActivity);
-        }
+            recentPurchases,
+            recentGenerations,
+            recentTemplateEvents,
+            recentWalletLedger,
+            failureBreakdown));
 
         async Task<(
             int SuccessfulLogins,
@@ -1039,13 +869,14 @@ public sealed class IdentityService(
 
         var economyService = serviceProvider.GetRequiredService<IEconomyService>();
         var normalizedOperation = command.Operation.Trim().ToLowerInvariant();
+        var reason = command.Reason.Trim();
         Result<WalletOperationResponse> operationResult = normalizedOperation switch
         {
             "credit" => await economyService.CreditAsync(
-                new CreditBalanceCommand(command.UserId, command.Amount, WalletLedgerSource.AdminGrant, command.Reason.Trim()),
+                new CreditBalanceCommand(command.UserId, command.Amount, WalletLedgerSource.AdminGrant, reason),
                 cancellationToken),
             "debit" => await economyService.SpendAsync(
-                new SpendBalanceCommand(command.UserId, command.Amount, command.Reason.Trim()),
+                new SpendBalanceCommand(command.UserId, command.Amount, reason, WalletLedgerSource.AdminDebit),
                 cancellationToken),
             _ => Result.Failure<WalletOperationResponse>(IdentityErrors.OperationFailed)
         };
@@ -1056,23 +887,11 @@ public sealed class IdentityService(
         }
 
         var source = normalizedOperation == "credit" ? WalletLedgerSource.AdminGrant : WalletLedgerSource.AdminDebit;
-        if (normalizedOperation == "debit")
-        {
-            var latestDebitEntry = await economyDbContext.WalletLedgerEntries
-                .Where(x => x.UserId == command.UserId)
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .FirstAsync(cancellationToken);
-
-            latestDebitEntry.Source = WalletLedgerSource.AdminDebit;
-            latestDebitEntry.Reason = command.Reason.Trim();
-            await economyDbContext.SaveChangesAsync(cancellationToken);
-            source = latestDebitEntry.Source;
-        }
 
         await WriteAuditAsync(
             command.UserId,
             normalizedOperation == "credit" ? "admin.user.wallet.credited" : "admin.user.wallet.debited",
-            $"{command.Amount} tokens. Reason: {command.Reason.Trim()}",
+            $"{command.Amount} tokens. Reason: {reason}",
             cancellationToken);
 
         return Result.Success(new AdminUserWalletOperationResponse(
@@ -1081,7 +900,7 @@ public sealed class IdentityService(
             normalizedOperation == "credit" ? command.Amount : -command.Amount,
             operationResult.Value.NewBalance,
             source,
-            command.Reason.Trim(),
+            reason,
             operationResult.Value.OccurredAtUtc));
     }
 
@@ -1377,49 +1196,6 @@ public sealed class IdentityService(
         {
             session.RevokedAtUtc = revokedAtUtc;
         }
-    }
-
-    private static bool IsSuccessfulLoginAction(string action)
-    {
-        return string.Equals(action, "auth.login.succeeded", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(action, "auth.external_login.succeeded", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsFailedLoginAction(string action)
-    {
-        return string.Equals(action, "auth.login.failed", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(action, "auth.login.denied", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsTemplateViewEvent(string eventType)
-    {
-        return string.Equals(eventType, "view", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsTemplateVideoViewEvent(string eventType)
-    {
-        return string.Equals(eventType, "video_view", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string DescribeWalletLedgerTitle(WalletLedgerEntry entry)
-    {
-        return entry.Source switch
-        {
-            WalletLedgerSource.AdminGrant => "Admin token grant",
-            WalletLedgerSource.AdminDebit => "Admin token debit",
-            WalletLedgerSource.PackPurchase => "Pack purchase credited",
-            WalletLedgerSource.AdReward => "Ad reward credited",
-            WalletLedgerSource.WeeklyGrant => "Weekly grant credited",
-            WalletLedgerSource.GenerationRefund => "Generation refunded",
-            WalletLedgerSource.GenerationSpend => "Generation spend",
-            _ => entry.Source
-        };
-    }
-
-    private static string DescribeWalletLedgerAmount(int delta)
-    {
-        var sign = delta > 0 ? "+" : string.Empty;
-        return $"{sign}{delta} tokens";
     }
 
     private static string CreateVerificationCode(int length)

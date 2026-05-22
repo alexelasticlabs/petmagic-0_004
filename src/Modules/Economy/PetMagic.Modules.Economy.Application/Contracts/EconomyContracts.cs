@@ -4,7 +4,7 @@ public sealed record ClaimWeeklyGrantCommand(Guid UserId, bool IsPremium);
 
 public sealed record ClaimAdRewardCommand(Guid UserId);
 
-public sealed record SpendBalanceCommand(Guid UserId, int Amount, string Reason);
+public sealed record SpendBalanceCommand(Guid UserId, int Amount, string Reason, string? Source = null);
 
 public sealed record CreditBalanceCommand(Guid UserId, int Amount, string Source, string Reason);
 
@@ -376,6 +376,45 @@ public sealed record AdminUserSubscriptionResponse(
     DateTime? LastTokenGrantAtUtc,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
+
+public sealed record AdminUserEconomyPurchaseResponse(
+    Guid OrderId,
+    string Status,
+    decimal PriceAmount,
+    string CurrencyCode,
+    int SparkToGrant,
+    string PaymentProvider,
+    DateTime CreatedAtUtc,
+    DateTime? ConfirmedAtUtc);
+
+public sealed record AdminUserEconomyWalletLedgerResponse(
+    Guid EntryId,
+    int Delta,
+    int BalanceAfter,
+    string Source,
+    string Reason,
+    DateTime CreatedAtUtc);
+
+public sealed record AdminUserEconomyActivityResponse(
+    string Kind,
+    string Title,
+    string? Details,
+    DateTime OccurredAtUtc);
+
+public sealed record AdminUserEconomyAnalyticsResponse(
+    int WalletBalance,
+    int TotalTokensCredited,
+    int TotalTokensSpent,
+    int ManualTokensGranted,
+    int ManualTokensDebited,
+    int TotalPurchases,
+    int SuccessfulPurchases,
+    int TotalPurchasedSpark,
+    DateTime? LastPurchaseAtUtc,
+    DateTime? LastWalletActivityAtUtc,
+    IReadOnlyList<AdminUserEconomyPurchaseResponse> RecentPurchases,
+    IReadOnlyList<AdminUserEconomyWalletLedgerResponse> RecentWalletLedger,
+    IReadOnlyList<AdminUserEconomyActivityResponse> RecentActivity);
 
 public sealed record AdminSubscriptionEventResponse(
     Guid EventId,

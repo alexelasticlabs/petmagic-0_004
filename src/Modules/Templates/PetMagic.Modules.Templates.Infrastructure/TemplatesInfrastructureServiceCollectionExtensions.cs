@@ -1,9 +1,11 @@
 using Amazon.Runtime;
 using Amazon.S3;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -109,6 +111,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplatesService, TemplatesService>();
+        services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
         services.AddScoped<TemplateGenerationJobProcessor>();
         services.AddScoped<TemplateMediaCleanupProcessor>();

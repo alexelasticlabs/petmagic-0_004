@@ -4,7 +4,9 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+
 using FluentValidation;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Connections;
@@ -17,7 +19,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.SupportChat.Api;
@@ -522,6 +526,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             builder.Services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase(identityDatabaseName, identityDatabaseRoot));
 
+            builder.Services.AddScoped<IIdentityUserLookupService, TestIdentityUserLookupService>();
             builder.Services.AddSingleton<ISupportAttachmentStorage, FakeSupportAttachmentStorage>();
             builder.Services.AddScoped<ISupportChatService, SupportChatService>();
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
@@ -605,6 +610,37 @@ public sealed class SupportChatEndpointsIntegrationTests
                 DisplayName = displayName,
                 IsActive = true,
             };
+        }
+
+        private sealed class TestIdentityUserLookupService(IdentityDbContext identityDbContext) : IIdentityUserLookupService
+        {
+            public async Task<IReadOnlyDictionary<Guid, IdentityUserLookup>> GetUsersByIdsAsync(
+                IReadOnlyCollection<Guid> userIds,
+                CancellationToken cancellationToken)
+            {
+                if (userIds.Count == 0)
+                {
+                    return new Dictionary<Guid, IdentityUserLookup>();
+                }
+
+                var distinctUserIds = userIds.Distinct().ToArray();
+                var users = await identityDbContext.Users
+                    .AsNoTracking()
+                    .Where(x => distinctUserIds.Contains(x.Id))
+                    .Select(x => new IdentityUserLookup(x.Id, x.Email ?? string.Empty, x.DisplayName))
+                    .ToListAsync(cancellationToken);
+
+                return users.ToDictionary(x => x.UserId);
+            }
+
+            public async Task<IdentityUserLookup?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken)
+            {
+                return await identityDbContext.Users
+                    .AsNoTracking()
+                    .Where(x => x.Id == userId)
+                    .Select(x => new IdentityUserLookup(x.Id, x.Email ?? string.Empty, x.DisplayName))
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
         }
     }
 
