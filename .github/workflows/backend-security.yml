@@ -1,0 +1,68 @@
+name: backend-security
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - src/**
+      - tests/**
+      - PetMagic.slnx
+      - .github/workflows/backend-security.yml
+  pull_request:
+    paths:
+      - src/**
+      - tests/**
+      - PetMagic.slnx
+      - .github/workflows/backend-security.yml
+
+jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+
+  package-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore PetMagic.slnx
+
+      - name: Audit NuGet vulnerabilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet list PetMagic.slnx package --vulnerable --include-transitive | tee vulnerability-report.txt
+
+          if grep -q "has the following vulnerable packages" vulnerability-report.txt; then
+            echo "::error::Vulnerable NuGet packages found. See vulnerability-report.txt output."
+            exit 1
+          fi
+
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-vulnerability-report
+          path: vulnerability-report.txt

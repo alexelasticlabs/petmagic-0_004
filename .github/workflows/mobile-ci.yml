@@ -1,0 +1,41 @@
+name: mobile-ci
+
+on:
+  pull_request:
+    paths:
+      - apps/petmagic-mobile/**
+      - .github/workflows/mobile-ci.yml
+  push:
+    branches:
+      - main
+    paths:
+      - apps/petmagic-mobile/**
+      - .github/workflows/mobile-ci.yml
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Generate localization
+        run: flutter gen-l10n
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test

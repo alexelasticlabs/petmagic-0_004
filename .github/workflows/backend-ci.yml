@@ -1,0 +1,55 @@
+name: backend-ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - src/**
+      - tests/**
+      - PetMagic.slnx
+      - Directory.Build.props
+      - .editorconfig
+      - .github/workflows/backend-ci.yml
+  pull_request:
+    paths:
+      - src/**
+      - tests/**
+      - PetMagic.slnx
+      - Directory.Build.props
+      - .editorconfig
+      - .github/workflows/backend-ci.yml
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore PetMagic.slnx
+
+      - name: Build
+        run: dotnet build PetMagic.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test PetMagic.slnx --configuration Release --no-build --logger "trx;LogFileName=backend-tests.trx" --collect:"XPlat Code Coverage"
+
+      - name: Upload test and coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-artifacts
+          path: |
+            **/*.trx
+            **/TestResults/**/*
