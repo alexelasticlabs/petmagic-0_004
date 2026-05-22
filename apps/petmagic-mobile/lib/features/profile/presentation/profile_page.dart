@@ -4,8 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
-import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -15,7 +13,6 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_m
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
@@ -130,7 +127,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     if (profile != null) ...[
                       _ProfileHeroCard(
                         profile: profile,
-                        wallet: walletState.wallet,
+                        walletBalance: walletState.wallet?.balance,
                       ),
                       const SizedBox(height: 12),
                       _WalletHighlightCard(
@@ -210,7 +207,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  Future<void> _handlePremiumTap(PremiumStatusModel? summary) async {
+  Future<void> _handlePremiumTap(
+    PremiumSubscriptionSummaryView? summary,
+  ) async {
     if (summary?.canManageSubscription == true) {
       await _handleSubscriptionAction(summary);
       return;
@@ -221,7 +220,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
   }
 
-  Future<void> _handleSubscriptionAction(PremiumStatusModel? summary) async {
+  Future<void> _handleSubscriptionAction(
+    PremiumSubscriptionSummaryView? summary,
+  ) async {
     if (summary == null || !summary.canManageSubscription) {
       if (mounted) {
         context.push(PremiumPage.routePath);
@@ -233,8 +234,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     setState(() => _isOpeningSubscription = true);
 
     try {
-      final repository = ref.read(premiumRepositoryProvider);
-      final url = await repository.createManagementUrl(summary);
+      final managementService = ref.read(
+        premiumSubscriptionManagementServiceProvider,
+      );
+      final url = await managementService.createManagementUrl(
+        summary.manageSubscriptionAction,
+      );
       final uri = Uri.tryParse(url);
       if (uri == null) {
         return;
@@ -253,10 +258,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 }
 
 class _ProfileHeroCard extends StatelessWidget {
-  const _ProfileHeroCard({required this.profile, required this.wallet});
+  const _ProfileHeroCard({required this.profile, required this.walletBalance});
 
   final MobileUserProfile profile;
-  final WalletStateModel? wallet;
+  final int? walletBalance;
 
   @override
   Widget build(BuildContext context) {
@@ -271,9 +276,9 @@ class _ProfileHeroCard extends StatelessWidget {
     final emailLabel = profile.emailConfirmed
         ? text.profileEmailVerifiedShort
         : text.profileEmailPendingShort;
-    final balanceLabel = wallet == null
+    final balanceLabel = walletBalance == null
         ? text.profileWalletLoadingHint
-        : '${_formatProfileNumber(context, wallet!.balance)} PawSpark';
+        : '${_formatProfileNumber(context, walletBalance!)} PawSpark';
 
     return ProfileGlassCard(
       child: Column(
@@ -678,7 +683,7 @@ class _SubscriptionSummaryCard extends StatelessWidget {
     required this.onManageTap,
   });
 
-  final PremiumStatusModel summary;
+  final PremiumSubscriptionSummaryView summary;
   final bool isOpening;
   final VoidCallback onManageTap;
 
@@ -689,10 +694,11 @@ class _SubscriptionSummaryCard extends StatelessWidget {
     final locale = Localizations.localeOf(context).toLanguageTag();
     final format = DateFormat.yMMMd(locale);
     final providerLabel = switch (summary.provider) {
-      PremiumPaymentProvider.appStore => text.premiumPaymentApple,
-      PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
-      PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
-      null => text.premiumPaymentStripe,
+      PremiumSubscriptionProviderView.appStore => text.premiumPaymentApple,
+      PremiumSubscriptionProviderView.googlePlay =>
+        text.premiumPaymentGooglePlay,
+      PremiumSubscriptionProviderView.stripe => text.premiumPaymentStripe,
+      PremiumSubscriptionProviderView.unknown => text.premiumPaymentStripe,
     };
     final subtitle = summary.planName?.trim().isNotEmpty == true
         ? summary.planName!

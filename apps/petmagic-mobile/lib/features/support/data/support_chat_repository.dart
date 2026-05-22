@@ -3,17 +3,19 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 
 final supportChatRepositoryProvider = Provider<SupportChatRepository>((ref) {
   return SupportChatRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
+    authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
   );
 });
 
@@ -21,11 +23,14 @@ class SupportChatRepository {
   SupportChatRepository({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
+    AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
-       _sessionStorage = sessionStorage;
+       _authSessionCoordinator =
+           authSessionCoordinator ??
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionCoordinator _authSessionCoordinator;
 
   Future<SupportChatConversation> openConversation({
     String? initialMessage,
@@ -102,24 +107,6 @@ class SupportChatRepository {
     return SupportChatMessage.fromJson(response.data ?? const {});
   }
 
-  Future<SupportChatMessage> sendImageAttachment({
-    required String conversationId,
-    required String filePath,
-    required String fileName,
-    required String contentType,
-    required String localeTag,
-    String? body,
-  }) {
-    return sendAttachment(
-      conversationId: conversationId,
-      filePath: filePath,
-      fileName: fileName,
-      contentType: contentType,
-      localeTag: localeTag,
-      body: body,
-    );
-  }
-
   Future<void> markConversationRead(String conversationId) async {
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
@@ -140,80 +127,46 @@ class SupportChatRepository {
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request,
   ) async {
-    var session = await _sessionStorage.read();
-    if (session == null) {
-      throw const AppException('Sign in is required.', statusCode: 401);
-    }
-
-    try {
-      return await request(session);
-    } on DioException catch (error) {
-      if (error.response?.statusCode == 401) {
-        session = await _refreshSession(session.refreshToken);
-        return request(session);
-      }
-
-      throw _mapDioException(error, fallbackMessage: 'Support request failed.');
-    }
-  }
-
-  Future<AuthSession> _refreshSession(String refreshToken) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/refresh',
-        data: {'refreshToken': refreshToken},
-      );
-
-      final refreshed = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(refreshed);
-      return refreshed;
-    } on DioException catch (error) {
-      await _sessionStorage.clear();
-      throw _mapDioException(error, fallbackMessage: 'Session expired.');
-    }
+    return _authSessionCoordinator.authorizedRequest(
+      request: request,
+      mapError: _mapDioException,
+      requestFailedMessage: 'Support request failed.',
+      sessionExpiredMessage: 'Session expired.',
+    );
   }
 
   AppException _mapDioException(
     DioException error, {
     required String fallbackMessage,
   }) {
-    final responseData = error.response?.data;
-    if (responseData is Map<String, dynamic>) {
-      final detail = responseData['detail'] as String?;
-      final title = responseData['title'] as String?;
-      final errors = responseData['errors'];
-      if (errors is Map<String, dynamic>) {
-        final flattened = errors.values
-            .whereType<List<dynamic>>()
-            .expand((value) => value.whereType<String>())
-            .join(' ');
-        if (flattened.isNotEmpty) {
-          return AppException(
-            flattened,
-            statusCode: error.response?.statusCode,
-          );
-        }
-      }
-
-      if ((detail?.isNotEmpty ?? false) || (title?.isNotEmpty ?? false)) {
-        return AppException(
-          detail?.isNotEmpty == true ? detail! : title!,
-          statusCode: error.response?.statusCode,
-        );
-      }
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+    if (payload.flattened != null) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        payload.flattened!,
+        includeCause: false,
+      );
     }
 
-    if (error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.connectionError) {
+    if (payload.detail != null || payload.title != null) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        payload.detail ?? payload.title!,
+        includeCause: false,
+      );
+    }
+
+    if (NetworkErrorMapper.isConnectionUnavailable(error)) {
       return const AppException(
         'Unable to reach support right now. Please check your connection and try again.',
         statusCode: 503,
       );
     }
 
-    return AppException(
-      fallbackMessage,
-      statusCode: error.response?.statusCode,
+    return NetworkErrorMapper.fallback(
+      error,
+      fallbackMessage: fallbackMessage,
+      includeCause: false,
     );
   }
 }

@@ -6,6 +6,10 @@ class AppConfig {
   const AppConfig._();
 
   static const configuredApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const appVersion = String.fromEnvironment(
+    'PETMAGIC_APP_VERSION',
+    defaultValue: '1.0.0',
+  );
   static const enablePerformanceOverlay = bool.fromEnvironment(
     'PETMAGIC_PROFILE_OVERLAY',
   );

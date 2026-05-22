@@ -117,7 +117,7 @@ class SupportChatController extends Notifier<SupportChatState> {
   }
 
   Future<void> refresh() async {
-    await _refreshConversation(showLoading: false);
+    await _refreshConversation();
   }
 
   Future<void> sendMessage(String value, {required String localeTag}) async {
@@ -138,20 +138,7 @@ class SupportChatController extends Notifier<SupportChatState> {
 
       state = state.copyWith(
         isSending: false,
-        conversation: conversation.copyWith(
-          assignedAdminId: conversation.assignedAdminId,
-          assignedAdminDisplayName: conversation.assignedAdminDisplayName,
-          status:
-              conversation.status == 'Resolved' ||
-                  conversation.status == 'Closed'
-              ? 'Open'
-              : conversation.status,
-          userUnreadCount: 0,
-          adminUnreadCount: conversation.adminUnreadCount + 1,
-          updatedAtUtc: message.createdAtUtc,
-          lastMessageAtUtc: message.createdAtUtc,
-          messages: [...conversation.messages, message],
-        ),
+        conversation: _appendOutgoingMessage(conversation, message),
         clearError: true,
       );
       _resumePendingRealtimeRefreshIfNeeded();
@@ -204,20 +191,7 @@ class SupportChatController extends Notifier<SupportChatState> {
 
       state = state.copyWith(
         isSending: false,
-        conversation: conversation.copyWith(
-          assignedAdminId: conversation.assignedAdminId,
-          assignedAdminDisplayName: conversation.assignedAdminDisplayName,
-          status:
-              conversation.status == 'Resolved' ||
-                  conversation.status == 'Closed'
-              ? 'Open'
-              : conversation.status,
-          userUnreadCount: 0,
-          adminUnreadCount: conversation.adminUnreadCount + 1,
-          updatedAtUtc: message.createdAtUtc,
-          lastMessageAtUtc: message.createdAtUtc,
-          messages: [...conversation.messages, message],
-        ),
+        conversation: _appendOutgoingMessage(conversation, message),
         clearError: true,
       );
       _resumePendingRealtimeRefreshIfNeeded();
@@ -246,12 +220,25 @@ class SupportChatController extends Notifier<SupportChatState> {
     _scheduleRealtimeRefresh();
   }
 
-  Future<void> _refreshConversation({required bool showLoading}) async {
-    if (showLoading) {
-      state = state.copyWith(isLoading: true, clearError: true);
-    } else {
-      state = state.copyWith(isRefreshing: true, clearError: true);
-    }
+  SupportChatConversation _appendOutgoingMessage(
+    SupportChatConversation conversation,
+    SupportChatMessage message,
+  ) {
+    return conversation.copyWith(
+      status:
+          conversation.status == 'Resolved' || conversation.status == 'Closed'
+          ? 'Open'
+          : conversation.status,
+      userUnreadCount: 0,
+      adminUnreadCount: conversation.adminUnreadCount + 1,
+      updatedAtUtc: message.createdAtUtc,
+      lastMessageAtUtc: message.createdAtUtc,
+      messages: [...conversation.messages, message],
+    );
+  }
+
+  Future<void> _refreshConversation() async {
+    state = state.copyWith(isRefreshing: true, clearError: true);
 
     try {
       final conversation = await _repository.getConversation();
@@ -297,7 +284,7 @@ class SupportChatController extends Notifier<SupportChatState> {
     }
 
     _hasPendingRealtimeRefresh = false;
-    unawaited(_refreshConversation(showLoading: false));
+    unawaited(_refreshConversation());
   }
 
   void _resumePendingRealtimeRefreshIfNeeded() {

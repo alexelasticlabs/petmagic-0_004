@@ -8,6 +8,14 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 final walletControllerProvider =
     NotifierProvider<WalletController, WalletState>(WalletController.new);
 
+enum WalletCheckoutVerificationState {
+  idle,
+  checking,
+  succeeded,
+  pending,
+  error,
+}
+
 class WalletState {
   const WalletState({
     this.wallet,
@@ -25,6 +33,10 @@ class WalletState {
     this.errorMessage,
     this.checkoutUrl,
     this.pendingCheckoutOrderId,
+    this.checkoutVerificationState = WalletCheckoutVerificationState.idle,
+    this.checkoutGrantedSpark,
+    this.checkoutErrorMessage,
+    this.highlightedPurchaseOrderId,
   });
 
   final WalletStateModel? wallet;
@@ -42,6 +54,10 @@ class WalletState {
   final String? errorMessage;
   final String? checkoutUrl;
   final String? pendingCheckoutOrderId;
+  final WalletCheckoutVerificationState checkoutVerificationState;
+  final int? checkoutGrantedSpark;
+  final String? checkoutErrorMessage;
+  final String? highlightedPurchaseOrderId;
 
   bool get isInitialLoading => isLoading && wallet == null;
 
@@ -80,9 +96,16 @@ class WalletState {
     String? errorMessage,
     String? checkoutUrl,
     String? pendingCheckoutOrderId,
+    WalletCheckoutVerificationState? checkoutVerificationState,
+    int? checkoutGrantedSpark,
+    String? checkoutErrorMessage,
+    String? highlightedPurchaseOrderId,
     bool clearError = false,
     bool clearCheckoutUrl = false,
     bool clearPendingCheckout = false,
+    bool clearCheckoutGrantedSpark = false,
+    bool clearCheckoutError = false,
+    bool clearHighlightedPurchaseOrderId = false,
   }) {
     return WalletState(
       wallet: wallet ?? this.wallet,
@@ -102,6 +125,17 @@ class WalletState {
       pendingCheckoutOrderId: clearPendingCheckout
           ? null
           : pendingCheckoutOrderId ?? this.pendingCheckoutOrderId,
+      checkoutVerificationState:
+          checkoutVerificationState ?? this.checkoutVerificationState,
+      checkoutGrantedSpark: clearCheckoutGrantedSpark
+          ? null
+          : checkoutGrantedSpark ?? this.checkoutGrantedSpark,
+      checkoutErrorMessage: clearCheckoutError
+          ? null
+          : checkoutErrorMessage ?? this.checkoutErrorMessage,
+      highlightedPurchaseOrderId: clearHighlightedPurchaseOrderId
+          ? null
+          : highlightedPurchaseOrderId ?? this.highlightedPurchaseOrderId,
     );
   }
 }
@@ -199,6 +233,10 @@ class WalletController extends Notifier<WalletState> {
       clearError: true,
       clearCheckoutUrl: true,
       clearPendingCheckout: true,
+      checkoutVerificationState: WalletCheckoutVerificationState.idle,
+      clearCheckoutGrantedSpark: true,
+      clearCheckoutError: true,
+      clearHighlightedPurchaseOrderId: true,
     );
 
     try {
@@ -292,7 +330,65 @@ class WalletController extends Notifier<WalletState> {
     }
   }
 
-  void clearCheckoutUrl() {
-    state = state.copyWith(clearCheckoutUrl: true, clearPendingCheckout: true);
+  void consumeCheckoutUrl() {
+    state = state.copyWith(clearCheckoutUrl: true);
+  }
+
+  void resetCheckoutVerification() {
+    state = state.copyWith(
+      checkoutVerificationState: WalletCheckoutVerificationState.idle,
+      clearCheckoutGrantedSpark: true,
+      clearCheckoutError: true,
+      clearHighlightedPurchaseOrderId: true,
+    );
+  }
+
+  Future<void> verifyCheckoutStatus() async {
+    final pendingOrderId = state.pendingCheckoutOrderId;
+    if (pendingOrderId == null || pendingOrderId.isEmpty) {
+      return;
+    }
+
+    state = state.copyWith(
+      checkoutVerificationState: WalletCheckoutVerificationState.checking,
+      clearCheckoutGrantedSpark: true,
+      clearCheckoutError: true,
+      clearHighlightedPurchaseOrderId: true,
+    );
+
+    await load(refresh: true);
+
+    final refreshedState = state;
+    if (refreshedState.wallet == null && refreshedState.errorMessage != null) {
+      state = state.copyWith(
+        checkoutVerificationState: WalletCheckoutVerificationState.error,
+        checkoutErrorMessage: refreshedState.errorMessage,
+      );
+      return;
+    }
+
+    PurchaseHistoryItem? purchase;
+    for (final item in refreshedState.purchases) {
+      if (item.orderId == pendingOrderId) {
+        purchase = item;
+        break;
+      }
+    }
+
+    if (purchase != null && purchase.status == 'succeeded') {
+      state = state.copyWith(
+        checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+        checkoutGrantedSpark: purchase.sparkToGrant,
+        highlightedPurchaseOrderId: purchase.orderId,
+        clearPendingCheckout: true,
+        clearCheckoutError: true,
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      checkoutVerificationState: WalletCheckoutVerificationState.pending,
+      clearCheckoutError: true,
+    );
   }
 }

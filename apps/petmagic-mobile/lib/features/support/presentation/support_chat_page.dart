@@ -41,17 +41,50 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   final FocusNode _messageFocusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
   late final SupportChatController _controller;
-  int _lastMessageCount = 0;
   Timer? _loadingFallbackTimer;
   bool _showLoadingFallback = false;
   bool _showSecurityBanner = true;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
 
+  bool _isWaitingForInitialConversation(SupportChatState state) {
+    return state.isLoading && state.conversation == null;
+  }
+
+  void _scheduleLoadingFallbackIfNeeded() {
+    _loadingFallbackTimer ??= Timer(_loadingFallbackDelay, () {
+      _loadingFallbackTimer = null;
+      if (!mounted ||
+          !_isWaitingForInitialConversation(
+            ref.read(supportChatControllerProvider),
+          )) {
+        return;
+      }
+
+      setState(() {
+        _showLoadingFallback = true;
+      });
+    });
+  }
+
+  void _clearLoadingFallback({bool notify = false}) {
+    _loadingFallbackTimer?.cancel();
+    _loadingFallbackTimer = null;
+    if (notify && mounted && _showLoadingFallback) {
+      setState(() {
+        _showLoadingFallback = false;
+      });
+      return;
+    }
+
+    _showLoadingFallback = false;
+  }
+
   @override
   void initState() {
     super.initState();
     _controller = ref.read(supportChatControllerProvider.notifier);
+    _scheduleLoadingFallbackIfNeeded();
     _messageController.addListener(_handleComposerChanged);
     _messageFocusNode.addListener(_handleComposerFocusChanged);
     _scrollController.addListener(_handleMessageScroll);
@@ -66,7 +99,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
 
   @override
   void dispose() {
-    _loadingFallbackTimer?.cancel();
+    _clearLoadingFallback();
     _messageController.removeListener(_handleComposerChanged);
     _messageFocusNode.removeListener(_handleComposerFocusChanged);
     _scrollController.removeListener(_handleMessageScroll);
@@ -290,12 +323,49 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(supportChatControllerProvider);
+
+    ref.listen<SupportChatState>(supportChatControllerProvider, (
+      previous,
+      next,
+    ) {
+      final wasWaiting =
+          previous != null && _isWaitingForInitialConversation(previous);
+      final isWaiting = _isWaitingForInitialConversation(next);
+      if (isWaiting && !wasWaiting) {
+        _scheduleLoadingFallbackIfNeeded();
+      } else if (!isWaiting &&
+          (wasWaiting ||
+              _loadingFallbackTimer != null ||
+              _showLoadingFallback)) {
+        _clearLoadingFallback();
+      }
+
+      final previousMessageCount = previous?.conversation?.messages.length ?? 0;
+      final nextMessageCount = next.conversation?.messages.length ?? 0;
+      if (nextMessageCount == 0 || nextMessageCount == previousMessageCount) {
+        return;
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) {
+          return;
+        }
+
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        );
+      });
+    });
+
     final conversation = state.conversation;
     final messages = conversation?.messages ?? const <SupportChatMessage>[];
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     final bottomNavInset = petMagicBottomNavInset(context);
-    final isWaitingForInitialConversation =
-        state.isLoading && conversation == null;
+    final isWaitingForInitialConversation = _isWaitingForInitialConversation(
+      state,
+    );
     final quickActions = [
       _SupportQuickActionData(
         icon: Icons.auto_awesome_rounded,
@@ -335,38 +405,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
         body: text.supportChatFaqRefundBody,
       ),
     ];
-
-    if (isWaitingForInitialConversation) {
-      _loadingFallbackTimer ??= Timer(_loadingFallbackDelay, () {
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _loadingFallbackTimer = null;
-          _showLoadingFallback = true;
-        });
-      });
-    } else {
-      _loadingFallbackTimer?.cancel();
-      _loadingFallbackTimer = null;
-      _showLoadingFallback = false;
-    }
-
-    if (messages.length != _lastMessageCount) {
-      _lastMessageCount = messages.length;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_scrollController.hasClients) {
-          return;
-        }
-
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOut,
-        );
-      });
-    }
 
     return ProfileScreenBackground(
       child: Scaffold(
@@ -434,11 +472,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                                               : text.supportChatEmptyMessage),
                                       actionLabel: text.retryAction,
                                       onAction: () {
-                                        _loadingFallbackTimer?.cancel();
-                                        _loadingFallbackTimer = null;
-                                        setState(() {
-                                          _showLoadingFallback = false;
-                                        });
+                                        _clearLoadingFallback(notify: true);
                                         _controller.initialize();
                                       },
                                     ),

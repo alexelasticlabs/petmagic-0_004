@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -11,11 +12,92 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_controller
 final premiumControllerProvider =
     NotifierProvider<PremiumController, PremiumState>(PremiumController.new);
 
+enum PremiumCheckoutVerificationState {
+  idle,
+  checking,
+  activated,
+  pending,
+  error,
+}
+
+enum PremiumSubscriptionProviderView { stripe, googlePlay, appStore, unknown }
+
+class PremiumSubscriptionSummaryView {
+  const PremiumSubscriptionSummaryView({
+    required this.isPremium,
+    required this.canManageSubscription,
+    required this.status,
+    required this.manageSubscriptionAction,
+    required this.provider,
+    this.planName,
+    this.currentPeriodEndUtc,
+  });
+
+  final bool isPremium;
+  final bool canManageSubscription;
+  final String status;
+  final String? planName;
+  final DateTime? currentPeriodEndUtc;
+  final String manageSubscriptionAction;
+  final PremiumSubscriptionProviderView provider;
+
+  factory PremiumSubscriptionSummaryView.fromStatus(PremiumStatusModel status) {
+    final provider = switch (status.provider) {
+      PremiumPaymentProvider.stripe => PremiumSubscriptionProviderView.stripe,
+      PremiumPaymentProvider.googlePlay =>
+        PremiumSubscriptionProviderView.googlePlay,
+      PremiumPaymentProvider.appStore =>
+        PremiumSubscriptionProviderView.appStore,
+      null => PremiumSubscriptionProviderView.unknown,
+    };
+
+    return PremiumSubscriptionSummaryView(
+      isPremium: status.isPremium,
+      canManageSubscription: status.canManageSubscription,
+      status: status.status,
+      planName: status.planName,
+      currentPeriodEndUtc: status.currentPeriodEndUtc,
+      manageSubscriptionAction: status.manageSubscriptionAction,
+      provider: provider,
+    );
+  }
+}
+
 final premiumSubscriptionSummaryProvider =
-    FutureProvider.autoDispose<PremiumStatusModel>((ref) async {
+    FutureProvider.autoDispose<PremiumSubscriptionSummaryView>((ref) async {
       final repository = ref.watch(premiumRepositoryProvider);
-      return repository.fetchStatus();
+      final status = await repository.fetchStatus();
+      return PremiumSubscriptionSummaryView.fromStatus(status);
     });
+
+final premiumSubscriptionManagementServiceProvider =
+    Provider<PremiumSubscriptionManagementService>((ref) {
+      return PremiumSubscriptionManagementService(
+        repository: ref.watch(premiumRepositoryProvider),
+      );
+    });
+
+class PremiumSubscriptionManagementService {
+  const PremiumSubscriptionManagementService({
+    required PremiumRepository repository,
+  }) : _repository = repository;
+
+  final PremiumRepository _repository;
+
+  Future<String> createManagementUrl(String manageSubscriptionAction) async {
+    switch (manageSubscriptionAction) {
+      case 'AppleSettings':
+        return 'https://apps.apple.com/account/subscriptions';
+      case 'GooglePlaySettings':
+        return 'https://play.google.com/store/account/subscriptions';
+      case 'StripeCustomerPortal':
+        final portal = await _repository.createBillingPortal();
+        return portal.portalUrl;
+      default:
+        throw const AppException('premium.manage_failed');
+    }
+  }
+}
 
 class PremiumState {
   const PremiumState({
@@ -34,6 +116,11 @@ class PremiumState {
     this.errorMessage,
     this.externalUrl,
     this.successMessage,
+    this.checkoutVerificationState = PremiumCheckoutVerificationState.idle,
+    this.isAwaitingCheckoutVerification = false,
+    this.wasPremiumBeforeCheckout = false,
+    this.checkoutErrorMessage,
+    this.recentlyActivatedPremium = false,
   });
 
   final List<PremiumPlanModel> plans;
@@ -51,6 +138,11 @@ class PremiumState {
   final String? errorMessage;
   final String? externalUrl;
   final String? successMessage;
+  final PremiumCheckoutVerificationState checkoutVerificationState;
+  final bool isAwaitingCheckoutVerification;
+  final bool wasPremiumBeforeCheckout;
+  final String? checkoutErrorMessage;
+  final bool recentlyActivatedPremium;
 
   PremiumPlanModel? get selectedPlan {
     for (final plan in plans) {
@@ -161,9 +253,15 @@ class PremiumState {
     String? errorMessage,
     String? externalUrl,
     String? successMessage,
+    PremiumCheckoutVerificationState? checkoutVerificationState,
+    bool? isAwaitingCheckoutVerification,
+    bool? wasPremiumBeforeCheckout,
+    String? checkoutErrorMessage,
+    bool? recentlyActivatedPremium,
     bool clearError = false,
     bool clearExternalUrl = false,
     bool clearSuccess = false,
+    bool clearCheckoutError = false,
   }) {
     return PremiumState(
       plans: plans ?? this.plans,
@@ -184,6 +282,17 @@ class PremiumState {
       successMessage: clearSuccess
           ? null
           : successMessage ?? this.successMessage,
+      checkoutVerificationState:
+          checkoutVerificationState ?? this.checkoutVerificationState,
+      isAwaitingCheckoutVerification:
+          isAwaitingCheckoutVerification ?? this.isAwaitingCheckoutVerification,
+      wasPremiumBeforeCheckout:
+          wasPremiumBeforeCheckout ?? this.wasPremiumBeforeCheckout,
+      checkoutErrorMessage: clearCheckoutError
+          ? null
+          : checkoutErrorMessage ?? this.checkoutErrorMessage,
+      recentlyActivatedPremium:
+          recentlyActivatedPremium ?? this.recentlyActivatedPremium,
     );
   }
 }
@@ -315,6 +424,10 @@ class PremiumController extends Notifier<PremiumState> {
       clearError: true,
       clearExternalUrl: true,
       clearSuccess: true,
+      checkoutVerificationState: PremiumCheckoutVerificationState.idle,
+      isAwaitingCheckoutVerification: false,
+      clearCheckoutError: true,
+      recentlyActivatedPremium: false,
     );
 
     try {
@@ -408,8 +521,55 @@ class PremiumController extends Notifier<PremiumState> {
     );
   }
 
-  void clearExternalUrl() {
+  void consumeExternalUrl() {
     state = state.copyWith(clearExternalUrl: true);
+  }
+
+  void markCheckoutOpened({required bool wasPremiumBeforeCheckout}) {
+    state = state.copyWith(
+      isAwaitingCheckoutVerification: true,
+      wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
+      checkoutVerificationState: PremiumCheckoutVerificationState.idle,
+      clearCheckoutError: true,
+      recentlyActivatedPremium: false,
+    );
+  }
+
+  Future<void> verifyCheckoutStatus() async {
+    if (!state.isAwaitingCheckoutVerification) {
+      return;
+    }
+
+    state = state.copyWith(
+      checkoutVerificationState: PremiumCheckoutVerificationState.checking,
+      clearCheckoutError: true,
+      recentlyActivatedPremium: false,
+    );
+
+    await ref.read(profileControllerProvider.notifier).initialize();
+    await load(refresh: true);
+
+    final updatedState = state;
+    if (updatedState.errorMessage != null) {
+      state = state.copyWith(
+        checkoutVerificationState: PremiumCheckoutVerificationState.error,
+        checkoutErrorMessage: updatedState.errorMessage,
+        isAwaitingCheckoutVerification: false,
+        recentlyActivatedPremium: false,
+      );
+      return;
+    }
+
+    final recentlyActivated =
+        !updatedState.wasPremiumBeforeCheckout && updatedState.isPremium;
+    state = state.copyWith(
+      checkoutVerificationState: recentlyActivated
+          ? PremiumCheckoutVerificationState.activated
+          : PremiumCheckoutVerificationState.pending,
+      isAwaitingCheckoutVerification: false,
+      recentlyActivatedPremium: recentlyActivated,
+      clearCheckoutError: true,
+    );
   }
 
   PremiumPaymentProvider? _platformStoreProvider() {

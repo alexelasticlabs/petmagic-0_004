@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:signalr_netcore/http_connection_options.dart';
 import 'package:signalr_netcore/hub_connection.dart';
 import 'package:signalr_netcore/hub_connection_builder.dart';
@@ -21,13 +20,9 @@ final supportChatRealtimeClientProvider = Provider<SupportChatRealtimeClient>((
 });
 
 class SupportChatRealtimeUpdate {
-  const SupportChatRealtimeUpdate({
-    required this.conversationId,
-    required this.updatedAtUtc,
-  });
+  const SupportChatRealtimeUpdate({required this.conversationId});
 
   final String conversationId;
-  final DateTime? updatedAtUtc;
 }
 
 abstract interface class SupportChatRealtimeClient {
@@ -112,14 +107,8 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       return;
     }
 
-    final updatedAtUtc = DateTime.tryParse(
-      payload['updatedAtUtc']?.toString() ?? '',
-    );
     _eventsController.add(
-      SupportChatRealtimeUpdate(
-        conversationId: conversationId,
-        updatedAtUtc: updatedAtUtc,
-      ),
+      SupportChatRealtimeUpdate(conversationId: conversationId),
     );
   }
 }

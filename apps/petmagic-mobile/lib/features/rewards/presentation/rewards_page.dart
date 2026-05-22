@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
@@ -36,8 +35,28 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomNavInset = petMagicBottomNavInset(context);
+    final rewards = state.rewards;
+    final rewardsSummary = rewards == null
+        ? null
+        : _RewardsSummaryView(
+            referralCode: rewards.referralCode,
+            referralBonusSpark: rewards.referralBonusSpark,
+            referralStatus: rewards.referralStatus,
+            totalReferralBonusEarned: rewards.totalReferralBonusEarned,
+            referredUsersCount: rewards.referredUsersCount,
+            pendingReferredUsersCount: rewards.pendingReferredUsersCount,
+            rewardedReferredUsersCount: rewards.rewardedReferredUsersCount,
+          );
     final bonusLedger = state.ledger
         .where((item) => _bonusSources.contains(item.source))
+        .map(
+          (item) => _BonusHistoryEntryView(
+            source: item.source,
+            reason: item.reason,
+            createdAtUtc: item.createdAtUtc,
+            delta: item.delta,
+          ),
+        )
         .toList(growable: false);
 
     return ProfileScreenBackground(
@@ -71,7 +90,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                     ),
                     const SizedBox(height: 14),
                     _ReferralCard(
-                      rewards: state.rewards,
+                      rewards: rewardsSummary,
                       isSubmitting: state.isApplyingReferral,
                       onSubmit: controller.applyReferralCode,
                     ),
@@ -92,6 +111,43 @@ const _bonusSources = {
   'weekly_grant',
   'premium_subscription_grant',
 };
+
+class _RewardsSummaryView {
+  const _RewardsSummaryView({
+    required this.referralCode,
+    required this.referralBonusSpark,
+    required this.referralStatus,
+    required this.totalReferralBonusEarned,
+    required this.referredUsersCount,
+    required this.pendingReferredUsersCount,
+    required this.rewardedReferredUsersCount,
+  });
+
+  final String referralCode;
+  final int referralBonusSpark;
+  final String referralStatus;
+  final int totalReferralBonusEarned;
+  final int referredUsersCount;
+  final int pendingReferredUsersCount;
+  final int rewardedReferredUsersCount;
+
+  bool get hasActivatedReferral => referralStatus != 'none';
+  bool get isReferralRewarded => referralStatus == 'rewarded';
+}
+
+class _BonusHistoryEntryView {
+  const _BonusHistoryEntryView({
+    required this.source,
+    required this.reason,
+    required this.createdAtUtc,
+    required this.delta,
+  });
+
+  final String source;
+  final String reason;
+  final DateTime? createdAtUtc;
+  final int delta;
+}
 
 class _RewardsHeader extends StatelessWidget {
   const _RewardsHeader({required this.onRefresh});
@@ -265,7 +321,7 @@ class _ReferralCard extends StatefulWidget {
     required this.onSubmit,
   });
 
-  final RewardsSummaryModel? rewards;
+  final _RewardsSummaryView? rewards;
   final bool isSubmitting;
   final Future<String?> Function(String code) onSubmit;
 
@@ -457,7 +513,7 @@ class _ReferralCardState extends State<_ReferralCard> {
 class _ReferralStats extends StatelessWidget {
   const _ReferralStats({required this.rewards});
 
-  final RewardsSummaryModel? rewards;
+  final _RewardsSummaryView? rewards;
 
   @override
   Widget build(BuildContext context) {
@@ -494,7 +550,7 @@ class _ReferralStats extends StatelessWidget {
 class _BonusHistoryCard extends StatelessWidget {
   const _BonusHistoryCard({required this.items});
 
-  final List<WalletLedgerItem> items;
+  final List<_BonusHistoryEntryView> items;
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +592,7 @@ class _BonusHistoryCard extends StatelessWidget {
 class _BonusHistoryRow extends StatelessWidget {
   const _BonusHistoryRow({required this.item});
 
-  final WalletLedgerItem item;
+  final _BonusHistoryEntryView item;
 
   @override
   Widget build(BuildContext context) {
@@ -746,7 +802,7 @@ class _InlineStatus extends StatelessWidget {
   }
 }
 
-String _referralStatusText(AppLocalizations text, RewardsSummaryModel rewards) {
+String _referralStatusText(AppLocalizations text, _RewardsSummaryView rewards) {
   if (rewards.isReferralRewarded) {
     return text.rewardsReferralStatusRewarded;
   }

@@ -3,17 +3,20 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 
 final walletRepositoryProvider = Provider<WalletRepository>((ref) {
   return WalletRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
+    authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
   );
 });
 
@@ -21,11 +24,14 @@ class WalletRepository {
   WalletRepository({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
+    AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
-       _sessionStorage = sessionStorage;
+       _authSessionCoordinator =
+           authSessionCoordinator ??
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionCoordinator _authSessionCoordinator;
 
   Future<WalletStateModel> fetchWallet() async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -87,7 +93,7 @@ class WalletRepository {
         '/api/economy/wallet/checkout-config',
         queryParameters: {
           'platform': _platformValue(),
-          'appVersion': '1.0.0',
+          'appVersion': AppConfig.appVersion,
           'country': locale.countryCode ?? '*',
           'locale': locale.toLanguageTag(),
         },
@@ -127,7 +133,7 @@ class WalletRepository {
       'currencyCode': pack.currencyCode,
       'paymentProvider': paymentMethod.provider,
       'platform': _platformValue(),
-      'appVersion': '1.0.0',
+      'appVersion': AppConfig.appVersion,
       'country': locale.countryCode ?? '*',
       'locale': locale.toLanguageTag(),
     };
@@ -181,37 +187,12 @@ class WalletRepository {
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request,
   ) async {
-    var session = await _sessionStorage.read();
-    if (session == null) {
-      throw const AppException('Sign in is required.', statusCode: 401);
-    }
-
-    try {
-      return await request(session);
-    } on DioException catch (error) {
-      if (error.response?.statusCode == 401) {
-        session = await _refreshSession(session.refreshToken);
-        return request(session);
-      }
-
-      throw _mapDioException(error, fallbackMessage: 'wallet.request_failed');
-    }
-  }
-
-  Future<AuthSession> _refreshSession(String refreshToken) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/refresh',
-        data: {'refreshToken': refreshToken},
-      );
-
-      final refreshed = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(refreshed);
-      return refreshed;
-    } on DioException catch (error) {
-      await _sessionStorage.clear();
-      throw _mapDioException(error, fallbackMessage: 'Session expired.');
-    }
+    return _authSessionCoordinator.authorizedRequest(
+      request: request,
+      mapError: _mapDioException,
+      requestFailedMessage: 'wallet.request_failed',
+      sessionExpiredMessage: 'Session expired.',
+    );
   }
 
   Options _authOptions(String accessToken) {
@@ -236,67 +217,30 @@ class WalletRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
-    if (error.type == DioExceptionType.connectionError ||
-        error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.receiveTimeout ||
-        error.type == DioExceptionType.sendTimeout ||
-        error.response == null) {
-      return AppException(
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
+      return NetworkErrorMapper.fromMessage(
+        error,
         'wallet.network_unavailable',
-        statusCode: error.response?.statusCode,
-        cause: error,
       );
     }
 
-    final statusCode = error.response?.statusCode;
-    if (statusCode != null && statusCode >= 500) {
-      return AppException(
-        'wallet.server_unavailable',
-        statusCode: statusCode,
-        cause: error,
-      );
+    if (NetworkErrorMapper.isServerError(error)) {
+      return NetworkErrorMapper.fromMessage(error, 'wallet.server_unavailable');
     }
 
-    final responseData = error.response?.data;
-    if (responseData is Map<String, dynamic>) {
-      final detail = responseData['detail'] as String?;
-      final title = responseData['title'] as String?;
-      final errors = responseData['errors'];
-      if (errors is Map<String, dynamic>) {
-        final flattened = errors.values
-            .whereType<List<dynamic>>()
-            .expand((value) => value.whereType<String>())
-            .join(' ');
-        if (flattened.isNotEmpty) {
-          return AppException(
-            flattened,
-            statusCode: error.response?.statusCode,
-            cause: error,
-          );
-        }
-      }
-
-      if (detail != null && detail.isNotEmpty) {
-        return AppException(
-          detail,
-          statusCode: error.response?.statusCode,
-          cause: error,
-        );
-      }
-
-      if (title != null && title.isNotEmpty) {
-        return AppException(
-          title,
-          statusCode: error.response?.statusCode,
-          cause: error,
-        );
-      }
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+    if (payload.flattened != null) {
+      return NetworkErrorMapper.fromMessage(error, payload.flattened!);
     }
 
-    return AppException(
-      fallbackMessage,
-      statusCode: error.response?.statusCode,
-      cause: error,
-    );
+    if (payload.detail != null) {
+      return NetworkErrorMapper.fromMessage(error, payload.detail!);
+    }
+
+    if (payload.title != null) {
+      return NetworkErrorMapper.fromMessage(error, payload.title!);
+    }
+
+    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
 }

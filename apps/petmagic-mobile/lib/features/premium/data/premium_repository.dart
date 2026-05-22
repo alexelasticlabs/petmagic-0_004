@@ -4,17 +4,20 @@ import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 
 final premiumRepositoryProvider = Provider<PremiumRepository>((ref) {
   return PremiumRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
+    authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
   );
 });
 
@@ -22,11 +25,14 @@ class PremiumRepository {
   PremiumRepository({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
+    AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
-       _sessionStorage = sessionStorage;
+       _authSessionCoordinator =
+           authSessionCoordinator ??
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
-  final AuthSessionStorage _sessionStorage;
+  final AuthSessionCoordinator _authSessionCoordinator;
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
 
   Stream<List<PurchaseDetails>> get purchaseUpdates =>
@@ -40,7 +46,7 @@ class PremiumRepository {
         '/api/economy/subscriptions/paywall-config',
         queryParameters: {
           'platform': _platformValue(),
-          'appVersion': '1.0.0',
+          'appVersion': AppConfig.appVersion,
           'country': locale.countryCode ?? '*',
           'locale': locale.toLanguageTag(),
         },
@@ -90,7 +96,7 @@ class PremiumRepository {
           'planCode': plan.planCode,
           'paymentProvider': PremiumPaymentProvider.stripe.value,
           'platform': _platformValue(),
-          'appVersion': '1.0.0',
+          'appVersion': AppConfig.appVersion,
           'country': locale.countryCode ?? '*',
           'locale': locale.toLanguageTag(),
         },
@@ -240,37 +246,12 @@ class PremiumRepository {
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request,
   ) async {
-    var session = await _sessionStorage.read();
-    if (session == null) {
-      throw const AppException('Sign in is required.', statusCode: 401);
-    }
-
-    try {
-      return await request(session);
-    } on DioException catch (error) {
-      if (error.response?.statusCode == 401) {
-        session = await _refreshSession(session.refreshToken);
-        return request(session);
-      }
-
-      throw _mapDioException(error, fallbackMessage: 'premium.request_failed');
-    }
-  }
-
-  Future<AuthSession> _refreshSession(String refreshToken) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/refresh',
-        data: {'refreshToken': refreshToken},
-      );
-
-      final refreshed = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(refreshed);
-      return refreshed;
-    } on DioException catch (error) {
-      await _sessionStorage.clear();
-      throw _mapDioException(error, fallbackMessage: 'Session expired.');
-    }
+    return _authSessionCoordinator.authorizedRequest(
+      request: request,
+      mapError: _mapDioException,
+      requestFailedMessage: 'premium.request_failed',
+      sessionExpiredMessage: 'Session expired.',
+    );
   }
 
   Options _authOptions(String accessToken) {
@@ -283,55 +264,25 @@ class PremiumRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
-    final responseData = error.response?.data;
-    if (responseData is Map<String, dynamic>) {
-      final detail = responseData['detail'] as String?;
-      final title = responseData['title'] as String?;
-      final errors = responseData['errors'];
-      if (errors is Map<String, dynamic>) {
-        final flattened = errors.values
-            .whereType<List<dynamic>>()
-            .expand((value) => value.whereType<String>())
-            .join(' ');
-        if (flattened.isNotEmpty) {
-          return AppException(
-            flattened,
-            statusCode: error.response?.statusCode,
-            cause: error,
-          );
-        }
-      }
-
-      if (title != null &&
-          (title.startsWith('economy.') || title.startsWith('premium.'))) {
-        return AppException(
-          title,
-          statusCode: error.response?.statusCode,
-          cause: error,
-        );
-      }
-
-      if (detail != null && detail.isNotEmpty) {
-        return AppException(
-          detail,
-          statusCode: error.response?.statusCode,
-          cause: error,
-        );
-      }
-
-      if (title != null && title.isNotEmpty) {
-        return AppException(
-          title,
-          statusCode: error.response?.statusCode,
-          cause: error,
-        );
-      }
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+    if (payload.flattened != null) {
+      return NetworkErrorMapper.fromMessage(error, payload.flattened!);
     }
 
-    return AppException(
-      fallbackMessage,
-      statusCode: error.response?.statusCode,
-      cause: error,
-    );
+    final title = payload.title;
+    if (title != null &&
+        (title.startsWith('economy.') || title.startsWith('premium.'))) {
+      return NetworkErrorMapper.fromMessage(error, title);
+    }
+
+    if (payload.detail != null) {
+      return NetworkErrorMapper.fromMessage(error, payload.detail!);
+    }
+
+    if (title != null) {
+      return NetworkErrorMapper.fromMessage(error, title);
+    }
+
+    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
 }

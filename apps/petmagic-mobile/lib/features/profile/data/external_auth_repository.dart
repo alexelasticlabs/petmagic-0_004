@@ -5,11 +5,12 @@ import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 final appLinksProvider = Provider<AppLinks>((ref) {
@@ -21,6 +22,7 @@ final externalAuthRepositoryProvider = Provider<ExternalAuthRepository>((ref) {
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
     appLinks: ref.watch(appLinksProvider),
+    authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
   );
 });
 
@@ -53,9 +55,13 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     required Dio dio,
     required AuthSessionStorage sessionStorage,
     required AppLinks appLinks,
+    AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
-       _appLinks = appLinks;
+       _appLinks = appLinks,
+       _authSessionCoordinator =
+           authSessionCoordinator ??
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   static final Uri _callbackUri = Uri(
     scheme: 'petmagic',
@@ -66,6 +72,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   final Dio _dio;
   final AuthSessionStorage _sessionStorage;
   final AppLinks _appLinks;
+  final AuthSessionCoordinator _authSessionCoordinator;
 
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
@@ -317,32 +324,10 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<AuthSession> _readAuthorizedSession() async {
-    var session = await _sessionStorage.read();
-    if (session == null) {
-      throw const AppException('Sign in is required.', statusCode: 401);
-    }
-
-    if (session.expiresAtUtc.isAfter(DateTime.now().toUtc())) {
-      return session;
-    }
-
-    return _refreshSession(session.refreshToken);
-  }
-
-  Future<AuthSession> _refreshSession(String refreshToken) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/refresh',
-        data: {'refreshToken': refreshToken},
-      );
-
-      final refreshed = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(refreshed);
-      return refreshed;
-    } on DioException catch (error) {
-      await _sessionStorage.clear();
-      throw _mapDioException(error, fallbackMessage: 'Session expired.');
-    }
+    return _authSessionCoordinator.requireValidSession(
+      mapError: _mapDioException,
+      sessionExpiredMessage: 'Session expired.',
+    );
   }
 
   Future<List<MobileLinkedAccount>> _fetchLinkedAccounts() async {
@@ -366,46 +351,24 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
-    final responseData = error.response?.data;
-    if (responseData is Map<String, dynamic>) {
-      final detail = responseData['detail'] as String?;
-      final title = responseData['title'] as String?;
-      final errors = responseData['errors'];
-      if (errors is Map<String, dynamic>) {
-        final flattened = errors.values
-            .whereType<List<dynamic>>()
-            .expand((value) => value.whereType<String>())
-            .join(' ');
-        if (flattened.isNotEmpty) {
-          return AppException(
-            flattened,
-            statusCode: error.response?.statusCode,
-            cause: error,
-          );
-        }
-      }
-
-      if (detail != null && detail.isNotEmpty) {
-        return AppException(
-          title != null && title.startsWith('auth.') ? title : detail,
-          statusCode: error.response?.statusCode,
-          cause: error,
-        );
-      }
-
-      if (title != null && title.isNotEmpty) {
-        return AppException(
-          title,
-          statusCode: error.response?.statusCode,
-          cause: error,
-        );
-      }
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+    if (payload.flattened != null) {
+      return NetworkErrorMapper.fromMessage(error, payload.flattened!);
     }
 
-    return AppException(
-      fallbackMessage,
-      statusCode: error.response?.statusCode,
-      cause: error,
-    );
+    final title = payload.title;
+    final detail = payload.detail;
+    if (detail != null) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        title != null && title.startsWith('auth.') ? title : detail,
+      );
+    }
+
+    if (title != null) {
+      return NetworkErrorMapper.fromMessage(error, title);
+    }
+
+    return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
 }
