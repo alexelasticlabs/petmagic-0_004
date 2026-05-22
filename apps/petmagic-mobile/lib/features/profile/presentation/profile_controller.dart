@@ -296,6 +296,19 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> authenticateWithProvider(ExternalAuthProvider provider) async {
+    return _authenticateWithProvider(provider, useBrowserFlow: false);
+  }
+
+  Future<void> authenticateWithProviderInBrowser(
+    ExternalAuthProvider provider,
+  ) async {
+    return _authenticateWithProvider(provider, useBrowserFlow: true);
+  }
+
+  Future<void> _authenticateWithProvider(
+    ExternalAuthProvider provider, {
+    required bool useBrowserFlow,
+  }) async {
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -303,9 +316,10 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     try {
-      final session = await ref
-          .read(externalAuthRepositoryProvider)
-          .authenticate(provider);
+      final repository = ref.read(externalAuthRepositoryProvider);
+      final session = useBrowserFlow
+          ? await repository.authenticateInBrowser(provider)
+          : await repository.authenticate(provider);
       state = state.copyWith(
         isSaving: false,
         session: session,

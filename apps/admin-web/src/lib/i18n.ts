@@ -176,6 +176,9 @@ export type Dictionary = {
   promoCodesPerUserLimitLabel: string;
   promoCodesStartsLabel: string;
   promoCodesExpiresLabel: string;
+  promoCodesDatesOptionalHint: string;
+  promoCodesNoExpiryAction: string;
+  promoCodesPickDateAction: string;
   promoCodesSaveUpdateAction: string;
   promoCodesSaveCreateAction: string;
   promoCodesRecentUsageTitle: string;
@@ -465,7 +468,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     signIn: "Войти",
     usersTitle: "Пользователи",
     usersHeroEyebrow: "Управление доступом",
-    usersHeroDescription: "Управление ролями, премиум-статусом и активностью пользователей в едином стиле админ-панели.",
+    usersHeroDescription:
+      "Управление ролями, премиум-статусом и активностью пользователей в едином стиле админ-панели.",
     usersHeroBadge: "Роли и доступ",
     usersMetaCountLabel: "Пользователей",
     usersMetaAdminEnabled: "Админ-функции включены",
@@ -473,7 +477,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     usersMetaLiveControls: "Живое управление статусами",
     usersLoadingDescription: "Загрузка списка пользователей",
     usersCardDescription: "Роли, премиум-статус и активность пользователей",
-    usersEmptyDescription: "Когда пользователи появятся, здесь будут доступны их роли и переключатели доступа.",
+    usersEmptyDescription:
+      "Когда пользователи появятся, здесь будут доступны их роли и переключатели доступа.",
     usersChangesSaved: "Изменения сохранены",
     avatarLabel: "Аватар",
     openLabel: "Открыть",
@@ -481,12 +486,15 @@ const dictionaries: Record<Locale, Dictionary> = {
     createdAtLabel: "Создан",
     userDetailOpen: "Открыть карточку",
     userInlineAnalyticsTitle: "Аналитика выбранного пользователя",
-    userInlineAnalyticsDescription: "Живая сводка по покупкам, генерациям, активности и событиям прямо на странице пользователей.",
+    userInlineAnalyticsDescription:
+      "Живая сводка по покупкам, генерациям, активности и событиям прямо на странице пользователей.",
     userOpenFullProfile: "Полный профиль",
-    userSelectForAnalytics: "Выберите пользователя, чтобы справа появилась аналитика и история активности.",
+    userSelectForAnalytics:
+      "Выберите пользователя, чтобы справа появилась аналитика и история активности.",
     userDetailsTitle: "Карточка пользователя",
     userDetailsEyebrow: "Профиль и аналитика",
-    userDetailsDescription: "Подробная сводка по профилю, покупкам, генерациям и действиям пользователя.",
+    userDetailsDescription:
+      "Подробная сводка по профилю, покупкам, генерациям и действиям пользователя.",
     userAnalyticsTitle: "Аналитика пользователя",
     userActivityTitle: "Лента активности",
     userPurchasesTitle: "Покупки",
@@ -494,7 +502,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     userEventsTitle: "Template events",
     userFailureBreakdownTitle: "Сбои генераций",
     userWalletTitle: "Токены и кошелек",
-    userWalletDescription: "Текущий баланс, история движений токенов и ручная выдача или списание прямо из админки.",
+    userWalletDescription:
+      "Текущий баланс, история движений токенов и ручная выдача или списание прямо из админки.",
     userNoWalletActivity: "Движений токенов пока нет.",
     tokenBalanceLabel: "Токены на балансе",
     tokensGrantedLabel: "Всего начислено",
@@ -507,7 +516,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     failedLoginsLabel: "Неуспешные входы",
     lastLoginLabel: "Последний вход",
     walletAdjustmentTitle: "Управление токенами",
-    walletAdjustmentHint: "Используйте ручную выдачу и списание только для поддержки, компенсаций и корректировок баланса.",
+    walletAdjustmentHint:
+      "Используйте ручную выдачу и списание только для поддержки, компенсаций и корректировок баланса.",
     walletOperationCredit: "Начислить",
     walletOperationDebit: "Списать",
     walletOperationLabel: "Операция",
@@ -562,14 +572,17 @@ const dictionaries: Record<Locale, Dictionary> = {
     navSectionUsers: "Users",
     navLogout: "Выйти",
     promoCodesHeroEyebrow: "Токены и активации",
-    promoCodesHeroDescription: "Отдельная рабочая зона для token-only промокодов: создание, лимиты, окно действия и контроль последних активаций.",
-    promoCodesTokenOnlyBadge: "Только PawSpark",
-    promoCodesLoadingDescription: "Подтягиваем активные и архивные промокоды из economy backend.",
-    promoCodesErrorDescription: "Не удалось загрузить список промокодов. Проверьте backend и повторите запрос.",
+    promoCodesHeroDescription:
+      "Раздел управления промокодами: создание, лимиты, сроки действия и история активаций.",
+    promoCodesTokenOnlyBadge: "Промокоды на PawSpark",
+    promoCodesLoadingDescription: "Загружаем активные и архивные промокоды.",
+    promoCodesErrorDescription:
+      "Не удалось загрузить список промокодов. Проверьте API и повторите запрос.",
     promoCodesCreateAction: "Создать промокод",
     promoCodesExportAction: "Экспорт CSV",
     promoCodesRefreshAction: "Обновить",
-    promoCodesTableDescription: "Быстрый поиск по коду, фильтрация по статусу и ручные действия без перехода в другие разделы.",
+    promoCodesTableDescription:
+      "Быстрый поиск по коду, фильтрация по статусу и ручные действия без перехода в другие разделы.",
     promoCodesSearchPlaceholder: "Поиск по коду или описанию",
     promoCodesStatusFilterLabel: "Фильтр статуса",
     promoCodesSortLabel: "Сортировка",
@@ -590,7 +603,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesActiveLabel: "Активно сейчас",
     promoCodesUsesLabel: "Активаций",
     promoCodesGrantedLabel: "Выдано токенов",
-    promoCodesEmptyDescription: "Промокодов пока нет. Создайте первый token-only код в панели справа.",
+    promoCodesEmptyDescription: "Промокодов пока нет. Нажмите «Создать промокод».",
     promoCodesNoResults: "Фильтры не дали результатов. Ослабьте поиск или сбросьте статус.",
     promoCodesCodeLabel: "Код",
     promoCodesDescriptionLabel: "Описание",
@@ -604,40 +617,49 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesEditPanelTitle: "Редактирование промокода",
     promoCodesDuplicatePanelTitle: "Дубликат промокода",
     promoCodesRewardFixedLabel: "Тип награды: PawSpark-токены",
-    promoCodesFormCardDescription: "Соберите правила промокода, проверьте лимиты и запустите кампанию без перехода в другие разделы.",
-    promoCodesSectionMainTitle: "1. Основное",
-    promoCodesSectionCampaignTitle: "2. Кампания",
-    promoCodesSectionRewardTitle: "3. Награда",
-    promoCodesSectionLimitsTitle: "4. Ограничения",
-    promoCodesNewDraftAction: "Новый драфт",
+    promoCodesFormCardDescription:
+      "Настройте параметры промокода, проверьте ограничения и сохраните изменения.",
+    promoCodesSectionMainTitle: "Основное",
+    promoCodesSectionCampaignTitle: "Условия",
+    promoCodesSectionRewardTitle: "Награда",
+    promoCodesSectionLimitsTitle: "Лимиты",
+    promoCodesNewDraftAction: "Создать промокод",
     promoCodesGenerateCodeAction: "Сгенерировать",
-    promoCodesCodeHelp: "Код можно задавать вручную или сгенерировать. После создания он становится read-only.",
+    promoCodesCodeHelp:
+      "Код можно задать вручную или сгенерировать. После создания код нельзя изменить.",
     promoCodesCampaignNameLabel: "Название кампании",
     promoCodesCampaignChannelLabel: "Канал",
-    promoCodesCampaignCreatedByLabel: "Создано кем",
+    promoCodesCampaignCreatedByLabel: "Создал",
     promoCodesMinimumPurchasesLabel: "Мин. успешных покупок",
-    promoCodesMinimumPurchasesHint: "0 — без ограничений. Значение проверяется при активации промокода.",
+    promoCodesMinimumPurchasesHint:
+      "0 — без ограничений. Значение проверяется при активации промокода.",
     promoCodesStatusFieldLabel: "Статус публикации",
     promoCodesStatusActiveOption: "Активен",
     promoCodesStatusPausedOption: "Приостановлен",
     promoCodesRewardTypeLabel: "Тип награды",
     promoCodesRewardTypeSparkOption: "PawSpark-токены",
-    promoCodesRewardTypePremiumOption: "Premium unlock (скоро)",
-    promoCodesRewardTypeHint: "Сейчас backend поддерживает только PawSpark-токены.",
+    promoCodesRewardTypePremiumOption: "Премиум (скоро)",
+    promoCodesRewardTypeHint: "Сейчас доступны только PawSpark-токены.",
     promoCodesRewardValueLabel: "Количество",
     promoCodesLimitLabel: "Общий лимит",
     promoCodesPerUserLimitLabel: "Лимит на пользователя",
-    promoCodesStartsLabel: "Старт",
-    promoCodesExpiresLabel: "Окончание",
+    promoCodesStartsLabel: "Начало действия",
+    promoCodesExpiresLabel: "Окончание действия",
+    promoCodesDatesOptionalHint:
+      "Необязательно. Если поле пустое, ограничение по времени не применяется.",
+    promoCodesNoExpiryAction: "Без срока",
+    promoCodesPickDateAction: "Выбрать дату",
     promoCodesSaveUpdateAction: "Сохранить изменения",
     promoCodesSaveCreateAction: "Создать и сохранить",
     promoCodesRecentUsageTitle: "Последние активации",
     promoCodesNoCodeSelectedTitle: "Промокод не выбран",
-    promoCodesNoCodeSelectedDescription: "Выберите строку в таблице, чтобы увидеть активации и быстрые действия.",
-    promoCodesSelectForUsage: "Выберите строку в таблице, чтобы увидеть последних пользователей и время активации.",
+    promoCodesNoCodeSelectedDescription:
+      "Выберите строку в таблице, чтобы увидеть активации и быстрые действия.",
+    promoCodesSelectForUsage:
+      "Выберите строку в таблице, чтобы увидеть последних пользователей и время активации.",
     promoCodesRecentUsageEmpty: "У выбранного промокода еще нет активаций.",
     promoCodesActivationsLoading: "Загружаем активации выбранного промокода...",
-    promoCodesActivationsError: "Не удалось загрузить активации. Попробуйте обновить список.",
+    promoCodesActivationsError: "Не удалось загрузить историю активаций.",
     promoCodesActivationUserColumn: "Пользователь",
     promoCodesActivationDateColumn: "Дата",
     promoCodesActivationRewardColumn: "Награда",
@@ -658,11 +680,12 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesKpiUsesHint: "Новые активации за неделю",
     promoCodesKpiGrantedHint: "Выдано через промокоды",
     promoCodesWindowAlways: "Без ограничения по времени",
-    promoCodesRewardUnsupported: "Этот тип награды пока не поддерживается backend.",
+    promoCodesRewardUnsupported: "Этот тип награды пока не поддерживается.",
     promoCodesInvalidCode: "Код должен содержать от 4 до 48 символов.",
     promoCodesInvalidNumbers: "Укажите положительные значения для награды и лимитов.",
     promoCodesLimitTooLow: "Общий лимит не может быть меньше уже использованных активаций.",
-    promoCodesPerUserLimitTooLow: "Лимит на пользователя не может быть меньше уже достигнутого значения.",
+    promoCodesPerUserLimitTooLow:
+      "Лимит на пользователя не может быть меньше уже достигнутого значения.",
     promoCodesInvalidWindow: "Дата начала не может быть позже даты окончания.",
     promoCodesCopied: "Код скопирован в буфер обмена.",
     promoCodesExported: "CSV выгружен локально.",
@@ -684,7 +707,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     errorLoadingTemplates: "Не удалось загрузить шаблоны.",
     errorSavingTemplate: "Не удалось сохранить шаблон.",
     errorActivatingTemplate: "Не удалось активировать шаблон.",
-    activationRequirementsMissing: "Чтобы активировать шаблон, сначала заполните обязательные поля:",
+    activationRequirementsMissing:
+      "Чтобы активировать шаблон, сначала заполните обязательные поля:",
     errorDeletingTemplate: "Не удалось удалить шаблон.",
     templateStatusUpdated: "Статус обновлен.",
     templateDeleted: "Шаблон удален.",
@@ -750,8 +774,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     uploadReference: "Загрузить референсное видео",
     uploadAction: "Загрузить",
     uploadingMedia: "Загрузка файла...",
-    mediaUploadHint: "После загрузки сервер сам определяет URL, имя файла, тип, размер и длительность медиа.",
-    referenceMotionUploadHint: "Для референсного движения поддерживается только MP4: сервер использует этот формат для расчета длительности и ориентации персонажа.",
+    mediaUploadHint:
+      "После загрузки сервер сам определяет URL, имя файла, тип, размер и длительность медиа.",
+    referenceMotionUploadHint:
+      "Для референсного движения поддерживается только MP4: сервер использует этот формат для расчета длительности и ориентации персонажа.",
     mediaDropzoneHint: "Кликните по области или перетащите файл сюда.",
     selectedFileLabel: "Выбранный файл",
     chooseFile: "Выбрать файл",
@@ -762,22 +788,28 @@ const dictionaries: Record<Locale, Dictionary> = {
     videoTemplateCreatePageTitle: "Создать новый шаблон",
     videoTemplateCreatePageHint: "Создайте шаблон для генерации видео в формате TikTok (9:16).",
     videoTemplateEditPageTitle: "Редактировать шаблон",
-    videoTemplateEditPageHint: "Обновите медиа, AI-настройки и готовность к публикации без выхода из editor flow.",
+    videoTemplateEditPageHint:
+      "Обновите медиа, AI-настройки и готовность к публикации без выхода из editor flow.",
     editorStepBasics: "Основная информация",
     editorStepMedia: "Медиа и превью",
     editorStepAi: "AI настройки",
     editorStepReview: "Проверка и публикация",
     editorBasicsHint: "Название, описание, категория, теги и правила доступа к шаблону.",
-    editorMediaHint: "Загрузите preview video и reference motion video, затем проверьте вычисленные metadata.",
+    editorMediaHint:
+      "Загрузите preview video и reference motion video, затем проверьте вычисленные metadata.",
     editorAiHint: "Настройте preprocessing и motion control до публикации шаблона.",
     editorReviewHint: "Проверьте итоговую карточку и readiness сигнал перед сохранением.",
     editorPreviewInApp: "Предпросмотр в приложении",
-    editorPreviewRailHint: "Так карточка шаблона будет смотреться в мобильной ленте до запуска генерации.",
+    editorPreviewRailHint:
+      "Так карточка шаблона будет смотреться в мобильной ленте до запуска генерации.",
     editorChecklistTitle: "Проверка шаблона",
     editorTipsTitle: "Подсказка",
-    editorTipOrientation: "Короткий reference лучше работает как быстрый визуальный ориентир, длинный даёт более выраженное motion-направление.",
-    editorTipDuration: "Самые чистые результаты обычно получаются на коротких вертикальных клипах без лишнего фона и резких скачков камеры.",
-    editorTipKling: "В motion prompt лучше описывать ритм, жест и настроение сцены, а не повторять базовое описание питомца.",
+    editorTipOrientation:
+      "Короткий reference лучше работает как быстрый визуальный ориентир, длинный даёт более выраженное motion-направление.",
+    editorTipDuration:
+      "Самые чистые результаты обычно получаются на коротких вертикальных клипах без лишнего фона и резких скачков камеры.",
+    editorTipKling:
+      "В motion prompt лучше описывать ритм, жест и настроение сцены, а не повторять базовое описание питомца.",
     editorCancel: "Отмена",
     editorSaveAndContinue: "Сохранить и продолжить",
     editorReady: "Готово",
@@ -795,14 +827,18 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorAccessFreeHint: "Доступно всем пользователям.",
     editorAccessPremiumHint: "Только для Premium пользователей.",
     editorReviewReadyHint: "Шаблон выглядит цельным и готовым к следующему шагу публикации.",
-    editorReviewIncompleteHint: "Перед публикацией лучше закрыть незаполненные медиа или AI-блоки, чтобы карточка выглядела завершённой.",
-    editorMediaRequirements: "Все видео должны быть вертикальными 9:16. Для reference motion поддерживается только MP4, потому что его длительность влияет на auto-detected character orientation.",
+    editorReviewIncompleteHint:
+      "Перед публикацией лучше закрыть незаполненные медиа или AI-блоки, чтобы карточка выглядела завершённой.",
+    editorMediaRequirements:
+      "Все видео должны быть вертикальными 9:16. Для reference motion поддерживается только MP4, потому что его длительность влияет на auto-detected character orientation.",
     supportTitle: "Поддержка",
-    supportDescription: "Управляйте диалогами поддержки и отвечайте пользователям из одной очереди.",
+    supportDescription:
+      "Управляйте диалогами поддержки и отвечайте пользователям из одной очереди.",
     supportInboxTitle: "Очередь чатов",
     supportInboxDescription: "Открытые, активные и завершенные диалоги с пользователями.",
     supportConversationTitle: "Диалог поддержки",
-    supportConversationDescription: "История сообщений, статус обращения и быстрый ответ оператора.",
+    supportConversationDescription:
+      "История сообщений, статус обращения и быстрый ответ оператора.",
     supportEmpty: "Диалогов поддержки пока нет.",
     supportLoadError: "Не удалось загрузить диалоги поддержки.",
     supportRefresh: "Обновить",
@@ -814,11 +850,16 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportStatusInProgress: "В работе",
     supportStatusResolved: "Решен",
     supportStatusClosed: "Закрыт",
-    supportStatusOpenHint: "Диалог ждёт первой реакции поддержки или нового действия со стороны пользователя.",
-    supportStatusInProgressHint: "Диалог взят в работу, оператор ведёт переписку и собирает детали решения.",
-    supportStatusResolvedHint: "Решение уже предложено. Если пользователь ответит снова, диалог автоматически вернётся в статус «Открыт».",
-    supportStatusClosedHint: "Диалог завершён вручную и исключён из активной очереди, пока пользователь не напишет заново.",
-    supportStatusAutomationHint: "Ответ поддержки автоматически переводит диалог в «В работе» и назначает текущего администратора, если диалог ещё не закреплён. Сообщение пользователя после «Решен» или «Закрыт» автоматически снова открывает диалог.",
+    supportStatusOpenHint:
+      "Диалог ждёт первой реакции поддержки или нового действия со стороны пользователя.",
+    supportStatusInProgressHint:
+      "Диалог взят в работу, оператор ведёт переписку и собирает детали решения.",
+    supportStatusResolvedHint:
+      "Решение уже предложено. Если пользователь ответит снова, диалог автоматически вернётся в статус «Открыт».",
+    supportStatusClosedHint:
+      "Диалог завершён вручную и исключён из активной очереди, пока пользователь не напишет заново.",
+    supportStatusAutomationHint:
+      "Ответ поддержки автоматически переводит диалог в «В работе» и назначает текущего администратора, если диалог ещё не закреплён. Сообщение пользователя после «Решен» или «Закрыт» автоматически снова открывает диалог.",
     supportBackToInbox: "К очереди",
     supportOpenConversation: "Открыть диалог",
     supportAssignedTo: "Ответственный",
@@ -906,7 +947,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportLastPaymentLabel: "Последний платеж",
     supportCountryLabel: "Страна",
     supportLastSeenLabel: "Последняя активность",
-    supportAiContextTitle: "PetMagic AI context"
+    supportAiContextTitle: "PetMagic AI context",
   },
   en: {
     loginTitle: "Sign in",
@@ -916,7 +957,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     signIn: "Sign in",
     usersTitle: "Users",
     usersHeroEyebrow: "Access control",
-    usersHeroDescription: "Manage roles, premium status, and activity with the same visual rhythm as the catalog, editor, and dashboard.",
+    usersHeroDescription:
+      "Manage roles, premium status, and activity with the same visual rhythm as the catalog, editor, and dashboard.",
     usersHeroBadge: "Roles & access",
     usersMetaCountLabel: "Users",
     usersMetaAdminEnabled: "Admin controls enabled",
@@ -924,7 +966,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     usersMetaLiveControls: "Live status controls",
     usersLoadingDescription: "Loading users list",
     usersCardDescription: "Roles, premium status, and user access controls",
-    usersEmptyDescription: "User roles and access toggles will appear here once the list is populated.",
+    usersEmptyDescription:
+      "User roles and access toggles will appear here once the list is populated.",
     usersChangesSaved: "Changes saved",
     avatarLabel: "Avatar",
     openLabel: "Open",
@@ -932,12 +975,14 @@ const dictionaries: Record<Locale, Dictionary> = {
     createdAtLabel: "Created",
     userDetailOpen: "Open profile",
     userInlineAnalyticsTitle: "Selected user analytics",
-    userInlineAnalyticsDescription: "Live summary of purchases, generations, activity, and events directly on the users page.",
+    userInlineAnalyticsDescription:
+      "Live summary of purchases, generations, activity, and events directly on the users page.",
     userOpenFullProfile: "Full profile",
     userSelectForAnalytics: "Select a user to load analytics and recent activity on this page.",
     userDetailsTitle: "User detail",
     userDetailsEyebrow: "Profile and analytics",
-    userDetailsDescription: "Detailed summary of profile, purchases, generations, and user activity.",
+    userDetailsDescription:
+      "Detailed summary of profile, purchases, generations, and user activity.",
     userAnalyticsTitle: "User analytics",
     userActivityTitle: "Activity timeline",
     userPurchasesTitle: "Purchases",
@@ -945,7 +990,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     userEventsTitle: "Template events",
     userFailureBreakdownTitle: "Generation failures",
     userWalletTitle: "Tokens and wallet",
-    userWalletDescription: "Current balance, token movement history, and manual grant or debit controls directly from admin.",
+    userWalletDescription:
+      "Current balance, token movement history, and manual grant or debit controls directly from admin.",
     userNoWalletActivity: "No token movements yet.",
     tokenBalanceLabel: "Balance tokens",
     tokensGrantedLabel: "Total credited",
@@ -958,7 +1004,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     failedLoginsLabel: "Failed logins",
     lastLoginLabel: "Last login",
     walletAdjustmentTitle: "Token controls",
-    walletAdjustmentHint: "Use manual grant and debit only for support cases, compensation, and balance corrections.",
+    walletAdjustmentHint:
+      "Use manual grant and debit only for support cases, compensation, and balance corrections.",
     walletOperationCredit: "Grant",
     walletOperationDebit: "Debit",
     walletOperationLabel: "Operation",
@@ -1013,14 +1060,18 @@ const dictionaries: Record<Locale, Dictionary> = {
     navSectionUsers: "Users",
     navLogout: "Logout",
     promoCodesHeroEyebrow: "Tokens and redemption flow",
-    promoCodesHeroDescription: "Dedicated token-only workspace for promo code creation, limits, availability windows, and recent redemptions.",
+    promoCodesHeroDescription:
+      "Promo code operations: creation, limits, validity windows, and redemption history.",
     promoCodesTokenOnlyBadge: "PawSpark only",
-    promoCodesLoadingDescription: "Loading active and archived promo codes from the economy backend.",
-    promoCodesErrorDescription: "Failed to load promo codes. Check backend availability and try again.",
+    promoCodesLoadingDescription:
+      "Loading active and archived promo codes from the economy backend.",
+    promoCodesErrorDescription:
+      "Failed to load promo codes. Check backend availability and try again.",
     promoCodesCreateAction: "Create promo code",
     promoCodesExportAction: "Export CSV",
     promoCodesRefreshAction: "Refresh",
-    promoCodesTableDescription: "Search by code, filter by status, and run manual actions without leaving this page.",
+    promoCodesTableDescription:
+      "Search by code, filter by status, and run manual actions without leaving this page.",
     promoCodesSearchPlaceholder: "Search by code or description",
     promoCodesStatusFilterLabel: "Status filter",
     promoCodesSortLabel: "Sort by",
@@ -1041,8 +1092,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesActiveLabel: "Live now",
     promoCodesUsesLabel: "Redemptions",
     promoCodesGrantedLabel: "Tokens granted",
-    promoCodesEmptyDescription: "No promo codes yet. Create the first token-only code from the panel on the right.",
-    promoCodesNoResults: "No promo codes match the current filters. Clear the search or change status.",
+    promoCodesEmptyDescription:
+      'No promo codes yet. Click "Create promo code" to add the first one.',
+    promoCodesNoResults:
+      "No promo codes match the current filters. Clear the search or change status.",
     promoCodesCodeLabel: "Code",
     promoCodesDescriptionLabel: "Description",
     promoCodesRewardLabel: "Reward",
@@ -1055,40 +1108,48 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesEditPanelTitle: "Edit promo code",
     promoCodesDuplicatePanelTitle: "Duplicate promo code",
     promoCodesRewardFixedLabel: "Reward type: PawSpark tokens",
-    promoCodesFormCardDescription: "Configure promo code rules, verify limits, and launch campaign-ready entries from one panel.",
-    promoCodesSectionMainTitle: "1. Basics",
-    promoCodesSectionCampaignTitle: "2. Campaign",
-    promoCodesSectionRewardTitle: "3. Reward",
-    promoCodesSectionLimitsTitle: "4. Limits",
-    promoCodesNewDraftAction: "New draft",
+    promoCodesFormCardDescription:
+      "Configure promo code rules, verify limits, and launch campaign-ready entries from one panel.",
+    promoCodesSectionMainTitle: "Basics",
+    promoCodesSectionCampaignTitle: "Conditions",
+    promoCodesSectionRewardTitle: "Reward",
+    promoCodesSectionLimitsTitle: "Limits",
+    promoCodesNewDraftAction: "Create promo code",
     promoCodesGenerateCodeAction: "Generate",
-    promoCodesCodeHelp: "Set a custom code or generate one automatically. After creation it becomes read-only.",
+    promoCodesCodeHelp:
+      "Set a custom code or generate one automatically. After creation it becomes read-only.",
     promoCodesCampaignNameLabel: "Campaign name",
     promoCodesCampaignChannelLabel: "Channel",
     promoCodesCampaignCreatedByLabel: "Created by",
     promoCodesMinimumPurchasesLabel: "Min successful purchases",
-    promoCodesMinimumPurchasesHint: "0 means no purchase gate. Value is validated during redemption.",
+    promoCodesMinimumPurchasesHint:
+      "0 means no purchase gate. Value is validated during redemption.",
     promoCodesStatusFieldLabel: "Publishing status",
     promoCodesStatusActiveOption: "Active",
     promoCodesStatusPausedOption: "Paused",
     promoCodesRewardTypeLabel: "Reward type",
     promoCodesRewardTypeSparkOption: "PawSpark tokens",
-    promoCodesRewardTypePremiumOption: "Premium unlock (soon)",
-    promoCodesRewardTypeHint: "Backend currently supports PawSpark token rewards only.",
+    promoCodesRewardTypePremiumOption: "Premium (soon)",
+    promoCodesRewardTypeHint: "Only PawSpark token rewards are currently available.",
     promoCodesRewardValueLabel: "Amount",
     promoCodesLimitLabel: "Total limit",
     promoCodesPerUserLimitLabel: "Per-user limit",
-    promoCodesStartsLabel: "Starts",
-    promoCodesExpiresLabel: "Expires",
+    promoCodesStartsLabel: "Start date",
+    promoCodesExpiresLabel: "End date",
+    promoCodesDatesOptionalHint: "Optional. Leave empty to remove time limits.",
+    promoCodesNoExpiryAction: "No end date",
+    promoCodesPickDateAction: "Pick date",
     promoCodesSaveUpdateAction: "Save changes",
     promoCodesSaveCreateAction: "Create and save",
     promoCodesRecentUsageTitle: "Recent redemptions",
     promoCodesNoCodeSelectedTitle: "No promo code selected",
-    promoCodesNoCodeSelectedDescription: "Select a table row to inspect activations and quick actions.",
-    promoCodesSelectForUsage: "Pick a row in the table to inspect the latest users and redemption timestamps.",
+    promoCodesNoCodeSelectedDescription:
+      "Select a table row to inspect activations and quick actions.",
+    promoCodesSelectForUsage:
+      "Pick a row in the table to inspect the latest users and redemption timestamps.",
     promoCodesRecentUsageEmpty: "The selected promo code has no redemptions yet.",
     promoCodesActivationsLoading: "Loading activations for the selected promo code...",
-    promoCodesActivationsError: "Failed to load activations. Try refreshing the list.",
+    promoCodesActivationsError: "Failed to load redemption history.",
     promoCodesActivationUserColumn: "User",
     promoCodesActivationDateColumn: "Date",
     promoCodesActivationRewardColumn: "Reward",
@@ -1109,11 +1170,12 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesKpiUsesHint: "New redemptions in the last week",
     promoCodesKpiGrantedHint: "Granted through promo codes",
     promoCodesWindowAlways: "Always available",
-    promoCodesRewardUnsupported: "This reward type is not supported by backend yet.",
+    promoCodesRewardUnsupported: "This reward type is not supported yet.",
     promoCodesInvalidCode: "Code must be between 4 and 48 characters.",
     promoCodesInvalidNumbers: "Enter positive values for reward and limits.",
     promoCodesLimitTooLow: "Total limit cannot be lower than existing redemptions.",
-    promoCodesPerUserLimitTooLow: "Per-user limit cannot be lower than the highest existing user usage.",
+    promoCodesPerUserLimitTooLow:
+      "Per-user limit cannot be lower than the highest existing user usage.",
     promoCodesInvalidWindow: "Start date cannot be later than the expiry date.",
     promoCodesCopied: "Promo code copied to clipboard.",
     promoCodesExported: "CSV exported locally.",
@@ -1168,7 +1230,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     categoryLabel: "Category",
     promoBadgeLabel: "Promo badge",
     promoBadgeAutoLabel: "Automatic",
-    promoBadgeAutoHint: "NEW only for the first month, then the badge switches by template conditions.",
+    promoBadgeAutoHint:
+      "NEW only for the first month, then the badge switches by template conditions.",
     promoBadgeNewHint: "Force NEW regardless of creation date.",
     promoBadgeTrendingHint: "Use for fresh templates you are actively pushing.",
     promoBadgePopularHint: "Fits evergreen winners and premium hits.",
@@ -1201,8 +1264,10 @@ const dictionaries: Record<Locale, Dictionary> = {
     uploadReference: "Upload reference video",
     uploadAction: "Upload",
     uploadingMedia: "Uploading file...",
-    mediaUploadHint: "After upload, the backend fills the media URL, file name, type, size, and duration automatically.",
-    referenceMotionUploadHint: "Reference motion supports MP4 only because the backend relies on that format to calculate duration and character orientation.",
+    mediaUploadHint:
+      "After upload, the backend fills the media URL, file name, type, size, and duration automatically.",
+    referenceMotionUploadHint:
+      "Reference motion supports MP4 only because the backend relies on that format to calculate duration and character orientation.",
     mediaDropzoneHint: "Click the area or drag a file here.",
     selectedFileLabel: "Selected file",
     chooseFile: "Choose file",
@@ -1211,24 +1276,31 @@ const dictionaries: Record<Locale, Dictionary> = {
     freeLabel: "Free",
     clearAsset: "Clear",
     videoTemplateCreatePageTitle: "Create new template",
-    videoTemplateCreatePageHint: "Create a template for TikTok-style vertical video generation (9:16).",
+    videoTemplateCreatePageHint:
+      "Create a template for TikTok-style vertical video generation (9:16).",
     videoTemplateEditPageTitle: "Edit template",
-    videoTemplateEditPageHint: "Update media, AI settings, and publishing readiness without leaving the editor flow.",
+    videoTemplateEditPageHint:
+      "Update media, AI settings, and publishing readiness without leaving the editor flow.",
     editorStepBasics: "Basic info",
     editorStepMedia: "Media and preview",
     editorStepAi: "AI settings",
     editorStepReview: "Review and publish",
     editorBasicsHint: "Name, description, category, tags, and access rules for the template.",
-    editorMediaHint: "Upload the preview video and reference motion video, then verify the computed metadata.",
+    editorMediaHint:
+      "Upload the preview video and reference motion video, then verify the computed metadata.",
     editorAiHint: "Configure preprocessing and motion control before publishing the template.",
     editorReviewHint: "Review the final card and readiness signal before saving.",
     editorPreviewInApp: "Preview in app",
-    editorPreviewRailHint: "This is how the template card will feel in the mobile feed before generation starts.",
+    editorPreviewRailHint:
+      "This is how the template card will feel in the mobile feed before generation starts.",
     editorChecklistTitle: "Template checklist",
     editorTipsTitle: "Tips",
-    editorTipOrientation: "Short references work best as fast visual anchors, while longer clips give the motion pass a stronger direction.",
-    editorTipDuration: "The cleanest outputs usually come from short vertical clips with minimal background noise and steady framing.",
-    editorTipKling: "Use the motion prompt to shape rhythm, gesture, and scene energy instead of restating the pet description.",
+    editorTipOrientation:
+      "Short references work best as fast visual anchors, while longer clips give the motion pass a stronger direction.",
+    editorTipDuration:
+      "The cleanest outputs usually come from short vertical clips with minimal background noise and steady framing.",
+    editorTipKling:
+      "Use the motion prompt to shape rhythm, gesture, and scene energy instead of restating the pet description.",
     editorCancel: "Cancel",
     editorSaveAndContinue: "Save and continue",
     editorReady: "Ready",
@@ -1246,14 +1318,17 @@ const dictionaries: Record<Locale, Dictionary> = {
     editorAccessFreeHint: "Available to all users.",
     editorAccessPremiumHint: "Only for Premium users.",
     editorReviewReadyHint: "The template feels cohesive and ready for the next publishing step.",
-    editorReviewIncompleteHint: "Before publishing, close the remaining media or AI gaps so the card reads as complete.",
-    editorMediaRequirements: "All videos should stay vertical 9:16. Reference motion supports MP4 only because its duration drives the auto-detected character orientation.",
+    editorReviewIncompleteHint:
+      "Before publishing, close the remaining media or AI gaps so the card reads as complete.",
+    editorMediaRequirements:
+      "All videos should stay vertical 9:16. Reference motion supports MP4 only because its duration drives the auto-detected character orientation.",
     supportTitle: "Support",
     supportDescription: "Manage support conversations and reply to users from a single inbox.",
     supportInboxTitle: "Support inbox",
     supportInboxDescription: "Open, active, and completed user support conversations.",
     supportConversationTitle: "Support conversation",
-    supportConversationDescription: "Message history, conversation status, and a fast operator reply flow.",
+    supportConversationDescription:
+      "Message history, conversation status, and a fast operator reply flow.",
     supportEmpty: "No support conversations yet.",
     supportLoadError: "Failed to load support conversations.",
     supportRefresh: "Refresh",
@@ -1265,11 +1340,16 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportStatusInProgress: "In progress",
     supportStatusResolved: "Resolved",
     supportStatusClosed: "Closed",
-    supportStatusOpenHint: "The conversation is waiting for the first support action or for a new user update.",
-    supportStatusInProgressHint: "An operator is actively handling the case and working through the resolution.",
-    supportStatusResolvedHint: "A solution has been given. If the user replies again, the conversation automatically returns to Open.",
-    supportStatusClosedHint: "The conversation was manually finished and removed from the active queue until the user writes again.",
-    supportStatusAutomationHint: "A support reply automatically moves the conversation to In progress and assigns the current admin when the chat is still unassigned. A user reply after Resolved or Closed automatically reopens the conversation.",
+    supportStatusOpenHint:
+      "The conversation is waiting for the first support action or for a new user update.",
+    supportStatusInProgressHint:
+      "An operator is actively handling the case and working through the resolution.",
+    supportStatusResolvedHint:
+      "A solution has been given. If the user replies again, the conversation automatically returns to Open.",
+    supportStatusClosedHint:
+      "The conversation was manually finished and removed from the active queue until the user writes again.",
+    supportStatusAutomationHint:
+      "A support reply automatically moves the conversation to In progress and assigns the current admin when the chat is still unassigned. A user reply after Resolved or Closed automatically reopens the conversation.",
     supportBackToInbox: "Back to inbox",
     supportOpenConversation: "Open conversation",
     supportAssignedTo: "Assigned to",
@@ -1357,8 +1437,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     supportLastPaymentLabel: "Last payment",
     supportCountryLabel: "Country",
     supportLastSeenLabel: "Last activity",
-    supportAiContextTitle: "PetMagic AI context"
-  }
+    supportAiContextTitle: "PetMagic AI context",
+  },
 };
 
 export function isLocale(value: string): value is Locale {

@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Api\PetMagic.Modules.Economy.Api.csproj" />
     <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Application\PetMagic.Modules.Economy.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Domain\PetMagic.Modules.Economy.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Economy\PetMagic.Modules.Economy.Infrastructure\PetMagic.Modules.Economy.Infrastructure.csproj" />

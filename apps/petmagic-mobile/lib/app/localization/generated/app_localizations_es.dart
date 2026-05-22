@@ -1636,6 +1636,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get authContinueWithApple => 'Continuar con Apple';
 
   @override
+  String get authGoogleBrowserFallbackAction =>
+      'Iniciar sesión con Google en el navegador';
+
+  @override
   String get authNoAccountPrompt => '¿No tienes una cuenta?';
 
   @override

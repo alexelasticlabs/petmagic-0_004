@@ -1630,6 +1630,10 @@ class AppLocalizationsPl extends AppLocalizations {
   String get authContinueWithApple => 'Kontynuuj z Apple';
 
   @override
+  String get authGoogleBrowserFallbackAction =>
+      'Zaloguj się przez Google w przeglądarce';
+
+  @override
   String get authNoAccountPrompt => 'Nie masz konta?';
 
   @override

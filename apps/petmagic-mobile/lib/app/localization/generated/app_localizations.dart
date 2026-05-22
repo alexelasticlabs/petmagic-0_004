@@ -2983,6 +2983,12 @@ abstract class AppLocalizations {
   /// **'Continue with Apple'**
   String get authContinueWithApple;
 
+  /// No description provided for @authGoogleBrowserFallbackAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Google in browser'**
+  String get authGoogleBrowserFallbackAction;
+
   /// No description provided for @authNoAccountPrompt.
   ///
   /// In en, this message translates to:

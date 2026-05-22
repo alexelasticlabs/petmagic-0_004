@@ -586,6 +586,7 @@
   "authAppleShortLabel": "Apple",
   "authContinueWithGoogle": "Продолжить с Google",
   "authContinueWithApple": "Продолжить с Apple",
+  "authGoogleBrowserFallbackAction": "Войти через Google в браузере",
   "authNoAccountPrompt": "Еще нет аккаунта?",
   "authHaveAccountPrompt": "Уже есть аккаунт?",
   "authSignUpAction": "Регистрация",

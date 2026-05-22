@@ -18,7 +18,7 @@ public sealed class EmailOptions
 
     public string FromName { get; init; } = "PetMagic";
 
-    public int VerificationCodeLength { get; init; } = 6;
+    public int VerificationCodeLength { get; init; } = 8;
 
     public int VerificationCodeTtlMinutes { get; init; } = 15;
 

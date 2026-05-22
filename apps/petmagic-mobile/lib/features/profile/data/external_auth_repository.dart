@@ -38,6 +38,8 @@ enum ExternalAuthProvider {
 abstract class ExternalAuthRepository {
   Future<AuthSession> authenticate(ExternalAuthProvider provider);
 
+  Future<AuthSession> authenticateInBrowser(ExternalAuthProvider provider);
+
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider);
 
   Future<void> clearSession(ExternalAuthProvider provider);
@@ -56,12 +58,15 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     required AuthSessionStorage sessionStorage,
     required AppLinks appLinks,
     AuthSessionCoordinator? authSessionCoordinator,
+    Future<bool> Function(Uri uri, LaunchMode mode)? launchUrlDelegate,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
        _appLinks = appLinks,
        _authSessionCoordinator =
            authSessionCoordinator ??
-           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
+       _launchUrl =
+           launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode));
 
   static final Uri _callbackUri = Uri(
     scheme: 'petmagic',
@@ -73,23 +78,19 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   final AuthSessionStorage _sessionStorage;
   final AppLinks _appLinks;
   final AuthSessionCoordinator _authSessionCoordinator;
+  final Future<bool> Function(Uri uri, LaunchMode mode) _launchUrl;
 
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     if (provider == ExternalAuthProvider.google) {
-      try {
-        return await _authenticateWithNativeGoogle();
-      } on AppException catch (error) {
-        if (error.message == _cancelledCode) {
-          rethrow;
-        }
-
-        return _authenticateWithBrowserFlow(provider);
-      } catch (_) {
-        return _authenticateWithBrowserFlow(provider);
-      }
+      return _authenticateWithNativeGoogle();
     }
 
+    return _authenticateWithBrowserFlow(provider);
+  }
+
+  @override
+  Future<AuthSession> authenticateInBrowser(ExternalAuthProvider provider) {
     return _authenticateWithBrowserFlow(provider);
   }
 
@@ -312,15 +313,15 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<bool> _launchAuthUri(Uri authUri) async {
-    final launchedInApp = await launchUrl(
+    final launchedInApp = await _launchUrl(
       authUri,
-      mode: LaunchMode.inAppBrowserView,
+      LaunchMode.inAppBrowserView,
     );
     if (launchedInApp) {
       return true;
     }
 
-    return launchUrl(authUri, mode: LaunchMode.externalApplication);
+    return _launchUrl(authUri, LaunchMode.externalApplication);
   }
 
   Future<AuthSession> _readAuthorizedSession() async {

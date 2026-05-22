@@ -67,10 +67,30 @@ export function getAdminNavItems(locale: Locale): AdminNavEntry[] {
       href: `/${locale}/templates/video`,
       label: text.navTemplates,
       items: [
-        { type: "link", key: "video-templates", href: `/${locale}/templates/video`, label: text.navVideoTemplates },
-        { type: "link", key: "image-templates", href: `/${locale}/templates/image`, label: text.navImageTemplates },
-        { type: "link", key: "template-analytics", href: `/${locale}/templates/analytics`, label: text.navTemplateAnalytics },
-        { type: "link", key: "template-categories", href: `/${locale}/templates/categories`, label: text.navTemplateCategories },
+        {
+          type: "link",
+          key: "video-templates",
+          href: `/${locale}/templates/video`,
+          label: text.navVideoTemplates,
+        },
+        {
+          type: "link",
+          key: "image-templates",
+          href: `/${locale}/templates/image`,
+          label: text.navImageTemplates,
+        },
+        {
+          type: "link",
+          key: "template-analytics",
+          href: `/${locale}/templates/analytics`,
+          label: text.navTemplateAnalytics,
+        },
+        {
+          type: "link",
+          key: "template-categories",
+          href: `/${locale}/templates/categories`,
+          label: text.navTemplateCategories,
+        },
       ],
     },
   ];
@@ -80,10 +100,16 @@ function matchesAnyAdminPath(currentPath: string, ...targetPaths: string[]) {
   return targetPaths.some((targetPath) => matchesAdminPath(currentPath, targetPath));
 }
 
-export function getAdminPageMeta(locale: Locale, currentPath: string, userName: string): AdminPageMeta {
+export function getAdminPageMeta(
+  locale: Locale,
+  currentPath: string,
+  userName: string
+): AdminPageMeta {
   const trimmedName = userName.trim();
   const fallbackName = locale === "ru" ? "администратор" : "administrator";
-  const normalizedName = trimmedName ? trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1) : fallbackName;
+  const normalizedName = trimmedName
+    ? trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1)
+    : fallbackName;
 
   if (matchesAdminPath(currentPath, "/dashboard")) {
     return {
@@ -110,8 +136,8 @@ export function getAdminPageMeta(locale: Locale, currentPath: string, userName: 
       title: locale === "ru" ? "Промокоды" : "Promo codes",
       description:
         locale === "ru"
-          ? "Token-only промокоды: создание, лимиты, период действия и история активаций."
-          : "Token-only promo codes: creation, limits, availability window, and redemption history.",
+          ? "Промокоды: создание, лимиты, период действия и история активаций."
+          : "Promo codes: creation, limits, availability window, and redemption history.",
     };
   }
 

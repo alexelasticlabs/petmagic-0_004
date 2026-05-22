@@ -1627,6 +1627,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authContinueWithApple => 'Continue with Apple';
 
   @override
+  String get authGoogleBrowserFallbackAction =>
+      'Sign in with Google in browser';
+
+  @override
   String get authNoAccountPrompt => 'Don\'t have an account?';
 
   @override
@@ -2744,6 +2748,10 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get authContinueWithApple => 'Continue with Apple';
+
+  @override
+  String get authGoogleBrowserFallbackAction =>
+      'Sign in with Google in browser';
 
   @override
   String get authNoAccountPrompt => 'Don\'t have an account?';

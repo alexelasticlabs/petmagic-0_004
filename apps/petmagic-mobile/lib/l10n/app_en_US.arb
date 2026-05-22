@@ -316,6 +316,7 @@
   "authAppleShortLabel": "Apple",
   "authContinueWithGoogle": "Continue with Google",
   "authContinueWithApple": "Continue with Apple",
+  "authGoogleBrowserFallbackAction": "Sign in with Google in browser",
   "authNoAccountPrompt": "Don't have an account?",
   "authHaveAccountPrompt": "Already have an account?",
   "authSignUpAction": "Sign Up",

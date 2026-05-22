@@ -29,6 +29,7 @@ public static class EconomyApiModule
         services.AddScoped<IValidator<UpdateSubscriptionPlanCommand>, UpdateSubscriptionPlanCommandValidator>();
         services.AddScoped<IValidator<UpdatePaymentProviderConfigurationCommand>, UpdatePaymentProviderConfigurationCommandValidator>();
         services.AddScoped<IValidator<ApplyRedeemCodeCommand>, ApplyRedeemCodeCommandValidator>();
+        services.AddScoped<IValidator<ApplyReferralCodeCommand>, ApplyReferralCodeCommandValidator>();
         services.AddScoped<IValidator<CreateRedeemCodeCommand>, CreateRedeemCodeCommandValidator>();
         services.AddScoped<IValidator<UpdateRedeemCodeCommand>, UpdateRedeemCodeCommandValidator>();
 

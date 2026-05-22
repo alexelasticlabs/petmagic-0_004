@@ -101,6 +101,7 @@
   "authOrContinueWith": "oder weitermachen",
   "authContinueWithGoogle": "Weiter mit Google",
   "authContinueWithApple": "Weiter mit Apple",
+  "authGoogleBrowserFallbackAction": "Mit Google im Browser anmelden",
   "authNoAccountPrompt": "Sie haben noch kein Konto?",
   "authHaveAccountPrompt": "Sie haben bereits ein Konto?",
   "authSignUpAction": "Melden Sie sich an",

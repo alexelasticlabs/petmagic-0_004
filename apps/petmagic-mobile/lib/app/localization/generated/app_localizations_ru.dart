@@ -1628,6 +1628,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authContinueWithApple => 'Продолжить с Apple';
 
   @override
+  String get authGoogleBrowserFallbackAction => 'Войти через Google в браузере';
+
+  @override
   String get authNoAccountPrompt => 'Еще нет аккаунта?';
 
   @override
