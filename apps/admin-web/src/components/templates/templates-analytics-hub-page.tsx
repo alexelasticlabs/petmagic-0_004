@@ -1,5 +1,10 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+
 import {
     CalendarIcon,
     ChartIcon,
@@ -27,10 +32,6 @@ import {
     type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Locale as AppLocale } from "@/lib/i18n";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 
 type TemplatesAnalyticsHubPageProps = {
   locale: AppLocale;

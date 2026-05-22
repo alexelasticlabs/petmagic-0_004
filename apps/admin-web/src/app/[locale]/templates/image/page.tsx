@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { TemplatesCatalogView } from "@/components/templates/templates-catalog-view";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type ImageTemplatesCatalogPageProps = {
   params: Promise<{ locale: string }>;

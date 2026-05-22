@@ -1,5 +1,7 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
     fetchAdminUser,
@@ -7,7 +9,6 @@ import {
     type AdminUserAnalytics,
     type AdminUserDetail,
 } from "@/lib/api-client";
-import { useQuery } from "@tanstack/react-query";
 
 type UseAdminUserProfileOptions = {
   userId: string | null;
@@ -15,13 +16,13 @@ type UseAdminUserProfileOptions = {
 
 export function useAdminUserProfile({ userId }: UseAdminUserProfileOptions) {
   const userQuery = useQuery<AdminUserDetail>({
-    queryKey: userId ? adminQueryKeys.userDetail(userId) : ["admin", "users", "detail", "disabled"],
+    queryKey: userId ? adminQueryKeys.userDetail(userId) : adminQueryKeys.userDetailDisabled,
     queryFn: () => fetchAdminUser(userId!),
     enabled: Boolean(userId),
   });
 
   const analyticsQuery = useQuery<AdminUserAnalytics>({
-    queryKey: userId ? adminQueryKeys.userAnalytics(userId) : ["admin", "users", "analytics", "disabled"],
+    queryKey: userId ? adminQueryKeys.userAnalytics(userId) : adminQueryKeys.userAnalyticsDisabled,
     queryFn: () => fetchAdminUserAnalytics(userId!),
     enabled: Boolean(userId),
   });

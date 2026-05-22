@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+
 import { ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
 import { AdminCard, AdminKpiCard, AdminPage, AdminPageGrid, AdminPageHero, AdminStateCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
@@ -16,9 +20,6 @@ import {
     type AdminTemplateCategory,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 
 type TemplatesCategoriesViewProps = {
   locale: Locale;

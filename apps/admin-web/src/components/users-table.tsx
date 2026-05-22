@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { useState } from "react";
+
 import {
     CancelCircleIcon,
     DollarIcon,
@@ -9,10 +12,10 @@ import {
 import { AdminBadge, AdminCard, AdminPage, AdminPageHero, AdminStateCard, AdminStatusBadge, adminTableStyles, type AdminTone } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
+import { useUsersAdmin } from "@/components/users/use-users-admin";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import { UserInlineAnalytics } from "@/components/users/user-inline-analytics";
 import styles from "@/components/users-table.module.css";
-import { useUsersAdmin } from "@/components/users/use-users-admin";
 import {
     assignRole,
     revokeRole,
@@ -20,8 +23,6 @@ import {
     setPremium,
 } from "@/lib/api-client";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
-import Link from "next/link";
-import { useState } from "react";
 
 type UsersTableProps = {
   locale: Locale;

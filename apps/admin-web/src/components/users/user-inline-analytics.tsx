@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
+
 import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-inline-analytics.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
+import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Link from "next/link";
 
 type UserInlineAnalyticsProps = {
   locale: Locale;
@@ -138,15 +140,4 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
       />
     </AdminCard>
   );
-}
-
-function formatDateTime(value: string | null | undefined, locale: Locale) {
-  if (!value) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

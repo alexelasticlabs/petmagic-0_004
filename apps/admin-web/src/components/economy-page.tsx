@@ -1,30 +1,23 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
+
 import { AdminCard, AdminKpiCard, AdminMetricStrip, AdminPage, AdminPageGrid, AdminPageHero, AdminSelectField, AdminStateCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
-import { ensureAdminSession } from "@/components/admin/admin-session";
-import { Button } from "@/components/ui/button";
 import styles from "@/components/economy-page.module.css";
+import { Button } from "@/components/ui/button";
+import { useEconomyPageController } from "@/components/use-economy-page-controller";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    fetchAdminCurrencyPacks,
-    fetchAdminEconomyLedger,
-    fetchAdminEconomyPurchases,
-    fetchAdminEconomySubscriptions,
-    fetchAdminPaymentProviderConfigs,
-    fetchAdminSubscriptionEvents,
-    fetchAdminSubscriptionPlans,
     updateAdminPaymentProviderConfig,
-    updateAdminSubscriptionPlan,
     updateAdminCurrencyPack,
-    useAuthSession,
+    updateAdminSubscriptionPlan,
     type AdminCurrencyPack,
     type AdminPaymentProviderConfiguration,
     type AdminSubscriptionPlan,
 } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 
 type EconomyPageProps = {
     locale: Locale;
@@ -68,6 +61,12 @@ type ProviderConfigDraft = {
     warningMessage: string;
     mode: string;
     notes: string;
+};
+
+type TableOrEmptyProps = {
+    hasItems: boolean;
+    emptyTitle: string;
+    children: ReactNode;
 };
 
 const ledgerSourceOptions = {
@@ -163,66 +162,50 @@ const eventStatusOptions = {
     ],
 } as const;
 
+function TableOrEmpty({ hasItems, emptyTitle, children }: TableOrEmptyProps) {
+    if (!hasItems) {
+        return <AdminStateCard tone="info" title={emptyTitle} />;
+    }
+
+    return <>{children}</>;
+}
+
 export function EconomyPage({ locale }: EconomyPageProps) {
     const text = getText(locale);
-    const router = useRouter();
     const queryClient = useQueryClient();
-    const session = useAuthSession();
-    const [ledgerSource, setLedgerSource] = useState("");
-    const [purchaseStatus, setPurchaseStatus] = useState("");
-    const [subscriptionStatus, setSubscriptionStatus] = useState("");
-    const [subscriptionProvider, setSubscriptionProvider] = useState("");
-    const [eventStatus, setEventStatus] = useState("");
-    const [eventProvider, setEventProvider] = useState("");
+    const {
+        eventProvider,
+        eventStatus,
+        hasError,
+        isLoading,
+        ledgerItems,
+        ledgerSource,
+        metrics,
+        packs,
+        providerConfigs,
+        purchaseItems,
+        purchaseStatus,
+        premiumMetrics,
+        setEventProvider,
+        setEventStatus,
+        setLedgerSource,
+        setPurchaseStatus,
+        setSubscriptionProvider,
+        setSubscriptionStatus,
+        subscriptionEvents,
+        subscriptionItems,
+        subscriptionPlans,
+        subscriptionProvider,
+        subscriptionStatus,
+    } = useEconomyPageController({ locale });
     const [drafts, setDrafts] = useState<Record<string, PackDraft>>({});
     const [planDrafts, setPlanDrafts] = useState<Record<string, SubscriptionPlanDraft>>({});
     const [providerConfigDrafts, setProviderConfigDrafts] = useState<Record<string, ProviderConfigDraft>>({});
     const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
 
-    useEffect(() => {
-        if (!session) {
-            ensureAdminSession(locale, router);
-        }
-    }, [locale, router, session]);
-
-    const ledgerQuery = useQuery({
-        queryKey: adminQueryKeys.economyLedger(ledgerSource || "all", "all"),
-        queryFn: () => fetchAdminEconomyLedger({ take: 20, source: ledgerSource || undefined }),
-    });
-
-    const purchasesQuery = useQuery({
-        queryKey: adminQueryKeys.economyPurchases(purchaseStatus || "all"),
-        queryFn: () => fetchAdminEconomyPurchases({ take: 20, status: purchaseStatus || undefined }),
-    });
-
-    const subscriptionsQuery = useQuery({
-        queryKey: adminQueryKeys.economySubscriptions(subscriptionStatus || "all", subscriptionProvider || "all"),
-        queryFn: () => fetchAdminEconomySubscriptions({ take: 20, status: subscriptionStatus || undefined, provider: subscriptionProvider || undefined }),
-    });
-
-    const subscriptionPlansQuery = useQuery({
-        queryKey: adminQueryKeys.economySubscriptionPlans,
-        queryFn: fetchAdminSubscriptionPlans,
-    });
-
-    const providerConfigsQuery = useQuery({
-        queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-        queryFn: fetchAdminPaymentProviderConfigs,
-    });
-
-    const subscriptionEventsQuery = useQuery({
-        queryKey: adminQueryKeys.economySubscriptionEvents(eventProvider || "all", eventStatus || "all"),
-        queryFn: () => fetchAdminSubscriptionEvents({ take: 20, provider: eventProvider || undefined, status: eventStatus || undefined }),
-    });
-
-    const packsQuery = useQuery({
-        queryKey: adminQueryKeys.economyPacks,
-        queryFn: fetchAdminCurrencyPacks,
-    });
-
     const savePackMutation = useMutation({
         mutationFn: async (packId: string) => {
-            const pack = packsQuery.data?.find((item) => item.packId === packId);
+            const pack = packs.find((item) => item.packId === packId);
             const draft = drafts[packId] ?? (pack ? toDraft(pack) : null);
             if (!draft) {
                 throw new Error("Missing draft");
@@ -287,46 +270,6 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         },
     });
 
-    const ledgerItems = useMemo(() => ledgerQuery.data?.items ?? [], [ledgerQuery.data?.items]);
-    const purchaseItems = useMemo(() => purchasesQuery.data?.items ?? [], [purchasesQuery.data?.items]);
-    const subscriptionItems = useMemo(() => subscriptionsQuery.data?.items ?? [], [subscriptionsQuery.data?.items]);
-    const subscriptionPlans = subscriptionPlansQuery.data ?? [];
-    const providerConfigs = providerConfigsQuery.data ?? [];
-    const subscriptionEvents = useMemo(() => subscriptionEventsQuery.data?.items ?? [], [subscriptionEventsQuery.data?.items]);
-    const packs = useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
-
-    const metrics = useMemo(() => {
-        const credited = ledgerItems.filter((item) => item.delta > 0).reduce((sum, item) => sum + item.delta, 0);
-        const debited = ledgerItems.filter((item) => item.delta < 0).reduce((sum, item) => sum + Math.abs(item.delta), 0);
-        const grossRevenue = purchaseItems.reduce((sum, item) => sum + item.priceAmount, 0);
-        const activePacks = packs.filter((pack) => pack.isActive).length;
-
-        return { credited, debited, grossRevenue, activePacks };
-    }, [ledgerItems, packs, purchaseItems]);
-
-    const activeSubscriptions = subscriptionItems.filter((item) => item.status === "active").length;
-    const renewalStops = subscriptionItems.filter((item) => item.cancelAtPeriodEnd).length;
-    const activePlans = subscriptionPlans.filter((item) => item.isActive).length;
-    const enabledRoutes = providerConfigs.filter((item) => item.isEnabled).length;
-    const premiumMetrics = { activeSubscriptions, renewalStops, activePlans, enabledRoutes };
-
-    const isLoading =
-        ledgerQuery.isLoading ||
-        purchasesQuery.isLoading ||
-        subscriptionsQuery.isLoading ||
-        subscriptionPlansQuery.isLoading ||
-        providerConfigsQuery.isLoading ||
-        subscriptionEventsQuery.isLoading ||
-        packsQuery.isLoading;
-    const hasError =
-        ledgerQuery.isError ||
-        purchasesQuery.isError ||
-        subscriptionsQuery.isError ||
-        subscriptionPlansQuery.isError ||
-        providerConfigsQuery.isError ||
-        subscriptionEventsQuery.isError ||
-        packsQuery.isError;
-
     if (isLoading) {
         return (
             <AdminPage className={styles.page}>
@@ -385,7 +328,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                     className={styles.metricStrip}
                 />
 
-                {packs.length ? (
+                <TableOrEmpty hasItems={packs.length > 0} emptyTitle={text.noPacks}>
                     <div className={adminTableStyles.tableWrap}>
                         <table className={adminTableStyles.table}>
                             <thead>
@@ -469,9 +412,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                             </tbody>
                         </table>
                     </div>
-                ) : (
-                    <AdminStateCard tone="info" title={text.noPacks} />
-                )}
+                </TableOrEmpty>
             </AdminCard>
 
             <AdminPageGrid columns="two">
@@ -488,7 +429,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         />
                     }
                 >
-                    {ledgerItems.length ? (
+                    <TableOrEmpty hasItems={ledgerItems.length > 0} emptyTitle={text.noLedger}>
                         <div className={adminTableStyles.tableWrap}>
                             <table className={adminTableStyles.table}>
                                 <thead>
@@ -519,9 +460,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                 </tbody>
                             </table>
                         </div>
-                    ) : (
-                        <AdminStateCard tone="info" title={text.noLedger} />
-                    )}
+                    </TableOrEmpty>
                 </AdminCard>
 
                 <AdminCard
@@ -537,7 +476,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         />
                     }
                 >
-                    {purchaseItems.length ? (
+                    <TableOrEmpty hasItems={purchaseItems.length > 0} emptyTitle={text.noPurchases}>
                         <div className={adminTableStyles.tableWrap}>
                             <table className={adminTableStyles.table}>
                                 <thead>
@@ -569,9 +508,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                 </tbody>
                             </table>
                         </div>
-                    ) : (
-                        <AdminStateCard tone="info" title={text.noPurchases} />
-                    )}
+                    </TableOrEmpty>
                 </AdminCard>
             </AdminPageGrid>
 
@@ -585,7 +522,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         className={styles.metricStrip}
                     />
 
-                    {subscriptionPlans.length ? (
+                    <TableOrEmpty hasItems={subscriptionPlans.length > 0} emptyTitle={text.noSubscriptionPlans}>
                         <div className={adminTableStyles.tableWrap}>
                             <table className={adminTableStyles.table}>
                                 <thead>
@@ -714,13 +651,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                 </tbody>
                             </table>
                         </div>
-                    ) : (
-                        <AdminStateCard tone="info" title={text.noSubscriptionPlans} />
-                    )}
+                    </TableOrEmpty>
                 </AdminCard>
 
                 <AdminCard title={text.providerConfigsTitle} description={text.providerConfigsDescription}>
-                    {providerConfigs.length ? (
+                    <TableOrEmpty hasItems={providerConfigs.length > 0} emptyTitle={text.noProviderConfigs}>
                         <div className={adminTableStyles.tableWrap}>
                             <table className={adminTableStyles.table}>
                                 <thead>
@@ -891,9 +826,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                 </tbody>
                             </table>
                         </div>
-                    ) : (
-                        <AdminStateCard tone="info" title={text.noProviderConfigs} />
-                    )}
+                    </TableOrEmpty>
                 </AdminCard>
             </AdminPageGrid>
 
@@ -920,7 +853,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         </div>
                     }
                 >
-                    {subscriptionItems.length ? (
+                    <TableOrEmpty hasItems={subscriptionItems.length > 0} emptyTitle={text.noSubscriptions}>
                         <div className={adminTableStyles.tableWrap}>
                             <table className={adminTableStyles.table}>
                                 <thead>
@@ -960,9 +893,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                 </tbody>
                             </table>
                         </div>
-                    ) : (
-                        <AdminStateCard tone="info" title={text.noSubscriptions} />
-                    )}
+                    </TableOrEmpty>
                 </AdminCard>
 
                 <AdminCard
@@ -987,7 +918,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         </div>
                     }
                 >
-                    {subscriptionEvents.length ? (
+                    <TableOrEmpty hasItems={subscriptionEvents.length > 0} emptyTitle={text.noSubscriptionEvents}>
                         <div className={adminTableStyles.tableWrap}>
                             <table className={adminTableStyles.table}>
                                 <thead>
@@ -1019,9 +950,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                 </tbody>
                             </table>
                         </div>
-                    ) : (
-                        <AdminStateCard tone="info" title={text.noSubscriptionEvents} />
-                    )}
+                    </TableOrEmpty>
                 </AdminCard>
             </AdminPageGrid>
         </AdminPage>
@@ -1039,7 +968,6 @@ function getText(locale: Locale) {
             errorTitle: "Не удалось загрузить экономику",
             errorDescription: "Проверьте доступ к backend и повторите запрос.",
             metaPacks: "Пакетов",
-            metaRedeem: "Промокодов",
             metaLedger: "Операций",
             metaPurchases: "Покупок",
             metaSubscriptions: "Подписок",
@@ -1091,46 +1019,7 @@ function getText(locale: Locale) {
             noProviderConfigs: "Правила маршрутизации платежей пока не настроены.",
             noSubscriptions: "Подписки пока не найдены.",
             noSubscriptionEvents: "События подписок пока не записаны.",
-            redeemTitle: "Промокоды",
-            redeemDescription: "Создание и контроль redeem-кодов для начисления PawSpark или временного Premium через кошелек пользователя.",
-            redeemCreated: "Промокод создан.",
-            redeemCreateError: "Не удалось создать промокод.",
-            redeemUpdated: "Промокод обновлен.",
-            redeemUpdateError: "Не удалось обновить промокод.",
-            redeemArchived: "Промокод архивирован.",
-            redeemArchiveError: "Не удалось архивировать промокод.",
-            redeemMissingDraft: "Промокод не найден в текущем списке.",
-            redeemInvalidNumbers: "Укажите корректный тип награды и лимиты промокода.",
-            redeemInvalidWindow: "Начало действия не может быть позже окончания.",
-            redeemLimitTooLow: "Лимит не может быть меньше уже использованных активаций.",
-            redeemPerUserLimitTooLow: "Лимит на пользователя не может быть меньше уже использованных активаций одним пользователем.",
-            redeemCodeLabel: "Код",
-            redeemDescriptionLabel: "Описание",
-            redeemRewardLabel: "Награда",
-            redeemRewardTypeLabel: "Тип награды",
-            redeemRewardSparkLabel: "PawSpark",
-            redeemRewardPremiumLabel: "Premium дни",
-            redeemLimitLabel: "Лимит",
-            redeemPerUserLimitLabel: "Лимит на пользователя",
-            redeemStartsLabel: "Начинает действовать",
-            redeemExpiresLabel: "Истекает",
-            redeemCreateAction: "Создать промокод",
-            redeemArchiveAction: "Архивировать",
-            redeemCodeColumn: "Код",
-            redeemUsageColumn: "Использовано",
-            redeemUsageHistoryLabel: "Последние активации",
-            redeemUsageEmpty: "Активаций пока нет.",
-            redeemUsageMore: (count: number) => `Еще ${count} активаций в истории`,
-            redeemPremiumUntilLabel: "Premium до",
-            redeemStatusColumn: "Статус",
-            redeemWindowColumn: "Период работы",
-            redeemStatusArchived: "Архив",
-            redeemStatusExhausted: "Исчерпан",
-            redeemStatusScheduled: "Запланирован",
-            redeemStatusExpired: "Истек",
-            redeemWindowAlways: "Без ограничения по времени",
             noDescription: "Без описания",
-            noRedeemCodes: "Промокодов пока нет.",
             ledgerTitle: "Ledger операций",
             ledgerDescription: "Последние движения баланса по всем пользователям с источником и причиной.",
             ledgerFilterLabel: "Источник",
@@ -1187,7 +1076,6 @@ function getText(locale: Locale) {
         errorTitle: "Failed to load economy",
         errorDescription: "Check backend availability and try again.",
         metaPacks: "Packs",
-        metaRedeem: "Redeem codes",
         metaLedger: "Ledger rows",
         metaPurchases: "Purchases",
         metaSubscriptions: "Subscriptions",
@@ -1239,46 +1127,7 @@ function getText(locale: Locale) {
         noProviderConfigs: "No payment routing rules configured yet.",
         noSubscriptions: "No subscriptions found yet.",
         noSubscriptionEvents: "No subscription events recorded yet.",
-        redeemTitle: "Redeem codes",
-        redeemDescription: "Create and monitor wallet redeem codes that grant PawSpark or temporary Premium to users.",
-        redeemCreated: "Redeem code created.",
-        redeemCreateError: "Failed to create redeem code.",
-        redeemUpdated: "Redeem code updated.",
-        redeemUpdateError: "Failed to update redeem code.",
-        redeemArchived: "Redeem code archived.",
-        redeemArchiveError: "Failed to archive redeem code.",
-        redeemMissingDraft: "Redeem code was not found in the current list.",
-        redeemInvalidNumbers: "Enter a valid reward type and redemption limits.",
-        redeemInvalidWindow: "The start time cannot be later than the end time.",
-        redeemLimitTooLow: "The limit cannot be lower than the already used activations.",
-        redeemPerUserLimitTooLow: "The per-user limit cannot be lower than the highest existing usage by one user.",
-        redeemCodeLabel: "Code",
-        redeemDescriptionLabel: "Description",
-        redeemRewardLabel: "Reward",
-        redeemRewardTypeLabel: "Reward type",
-        redeemRewardSparkLabel: "PawSpark",
-        redeemRewardPremiumLabel: "Premium days",
-        redeemLimitLabel: "Limit",
-        redeemPerUserLimitLabel: "Per-user limit",
-        redeemStartsLabel: "Starts",
-        redeemExpiresLabel: "Expires",
-        redeemCreateAction: "Create redeem code",
-        redeemArchiveAction: "Archive",
-        redeemCodeColumn: "Code",
-        redeemUsageColumn: "Used",
-        redeemUsageHistoryLabel: "Recent redemptions",
-        redeemUsageEmpty: "No redemptions yet.",
-        redeemUsageMore: (count: number) => `${count} more redemptions in history`,
-        redeemPremiumUntilLabel: "Premium until",
-        redeemStatusColumn: "Status",
-        redeemWindowColumn: "Active window",
-        redeemStatusArchived: "Archived",
-        redeemStatusExhausted: "Exhausted",
-        redeemStatusScheduled: "Scheduled",
-        redeemStatusExpired: "Expired",
-        redeemWindowAlways: "No time limit",
         noDescription: "No description",
-        noRedeemCodes: "No redeem codes yet.",
         ledgerTitle: "Wallet ledger",
         ledgerDescription: "Recent balance movements across users with source and reason.",
         ledgerFilterLabel: "Source",
@@ -1520,17 +1369,6 @@ function formatCurrency(value: number, locale: Locale, currencyCode: string) {
         currency: currencyCode,
         maximumFractionDigits: 2,
     }).format(value);
-}
-
-function formatDateTime(value: string | null | undefined, locale: Locale) {
-    if (!value) {
-        return "—";
-    }
-
-    return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-    }).format(new Date(value));
 }
 
 function humanizeSource(value: string, locale: Locale) {

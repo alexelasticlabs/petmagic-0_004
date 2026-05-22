@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { PromoCodesView } from "@/components/promo-codes-view";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type PromoCodesRouteProps = {
     params: Promise<{ locale: string }>;

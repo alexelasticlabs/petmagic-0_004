@@ -1,8 +1,9 @@
 "use client";
 
+import { useParams } from "next/navigation";
+
 import { AdminPage, AdminPageHero, AdminStateCard } from "@/components/admin/admin-primitives";
 import { getDictionary, isLocale } from "@/lib/i18n";
-import { useParams } from "next/navigation";
 
 export default function Loading() {
   const params = useParams<{ locale?: string | string[] }>();

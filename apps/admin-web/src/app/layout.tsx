@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
 import { IBM_Plex_Sans, Manrope } from "next/font/google";
+
+import type { Metadata } from "next";
 import "./globals.css";
 
 const bodyFont = IBM_Plex_Sans({

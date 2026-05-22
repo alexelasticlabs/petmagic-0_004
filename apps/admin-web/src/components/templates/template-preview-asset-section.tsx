@@ -1,10 +1,11 @@
+import Image from "next/image";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+
 import styles from "@/components/templates/template-editor.module.css";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
 import type { Dictionary } from "@/lib/i18n";
-import Image from "next/image";
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type TemplatePreviewAssetSectionProps = {
   text: Dictionary;

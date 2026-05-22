@@ -1,7 +1,8 @@
 "use client";
 
-import styles from "@/components/ui/select.module.css";
 import { useEffect, useId, useRef, useState } from "react";
+
+import styles from "@/components/ui/select.module.css";
 
 export type SelectOption = {
   value: string;

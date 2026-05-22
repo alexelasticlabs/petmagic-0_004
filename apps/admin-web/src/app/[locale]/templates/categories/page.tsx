@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { TemplatesCategoriesView } from "@/components/templates/templates-categories-view";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type TemplateCategoriesPageProps = {
   params: Promise<{ locale: string }>;

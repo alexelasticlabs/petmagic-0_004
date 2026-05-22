@@ -1,8 +1,9 @@
+import { type ReactNode } from "react";
+
 import { BrandMark } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import styles from "@/components/admin/admin-login-screen.module.css";
 import { type Locale } from "@/lib/i18n";
-import { type ReactNode } from "react";
 
 type AdminLoginScreenProps = {
   locale: Locale;

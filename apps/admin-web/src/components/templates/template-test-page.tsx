@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
+
 import {
     CalendarIcon,
     ChartIcon,
@@ -23,9 +27,6 @@ import {
     type AdminTemplateTestRun,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 
 type TemplateTestPageProps = {
   locale: Locale;

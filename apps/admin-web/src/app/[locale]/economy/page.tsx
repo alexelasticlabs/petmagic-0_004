@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { EconomyPage } from "@/components/economy-page";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type EconomyRouteProps = {
     params: Promise<{ locale: string }>;

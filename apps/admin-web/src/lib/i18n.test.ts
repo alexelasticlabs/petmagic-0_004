@@ -16,7 +16,7 @@ describe("i18n", () => {
 
     expect(ru.navDashboard.length).toBeGreaterThan(0);
     expect(en.navDashboard.length).toBeGreaterThan(0);
-    expect(ru.promoCodesTitle.length).toBeGreaterThan(0);
-    expect(en.promoCodesTitle.length).toBeGreaterThan(0);
+    expect(ru.promoCodesCodeLabel.length).toBeGreaterThan(0);
+    expect(en.promoCodesCodeLabel.length).toBeGreaterThan(0);
   });
 });

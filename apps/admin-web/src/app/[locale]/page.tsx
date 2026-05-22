@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { LoginCard } from "@/components/login-card";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type LocalePageProps = {
   params: Promise<{ locale: string }>;

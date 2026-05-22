@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+
 import styles from "@/components/users/user-avatar.module.css";
 import type { UserAvatar } from "@/lib/api-client";
 

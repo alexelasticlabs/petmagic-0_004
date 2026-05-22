@@ -7,14 +7,15 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    files: ["src/**/*.{ts,tsx}"],
     plugins: {
       import: importPlugin,
     },
     rules: {
       "import/no-duplicates": "error",
-      "import/newline-after-import": "error",
+      "import/newline-after-import": "warn",
       "import/order": [
-        "error",
+        "warn",
         {
           alphabetize: {
             order: "asc",

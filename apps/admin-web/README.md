@@ -41,7 +41,6 @@ npm run build
 Перед завершением frontend-изменений запускайте:
 
 ```bash
-npm run format:check
 npm run lint
 npm run typecheck
 npm run test

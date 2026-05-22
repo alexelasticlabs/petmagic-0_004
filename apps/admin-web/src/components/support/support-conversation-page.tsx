@@ -1,442 +1,117 @@
 "use client";
 
-import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
-import { ensureAdminSession } from "@/components/admin/admin-session";
-import { SupportOptionGroup } from "@/components/support/support-option-group";
-import styles from "@/components/support/support-page.module.css";
-import { Button } from "@/components/ui/button";
-import { Toast } from "@/components/ui/toast";
-import { adminQueryKeys } from "@/lib/admin-query-keys";
-import {
-    assignSupportConversation,
-    createSupportReplyTemplate,
-    deleteSupportReplyTemplate,
-    fetchAdminUser,
-    fetchAdminUserAnalytics,
-    fetchSupportConversation,
-    fetchSupportInbox,
-    fetchSupportReplyTemplates,
-    markSupportConversationRead,
-    sendSupportAttachment,
-    sendSupportMessage,
-    updateSupportConversationStatus,
-    updateSupportReplyTemplate,
-    useAuthSession,
-    type AdminSupportConversation,
-    type AdminSupportConversationSummary,
-    type AdminSupportReplyTemplate,
-    type AdminUserAnalytics,
-    type AdminUserDetail,
-    type SupportConversationStatus,
-} from "@/lib/api-client";
-import { getDictionary, type Locale } from "@/lib/i18n";
-import { useSupportRealtime } from "@/lib/support-realtime";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import {
+    formatAccountAge,
+    formatClockTime,
+    formatDateTime,
+    formatFileSize,
+    formatMoney,
+    formatRelativeTime,
+    getConversationSla,
+    hasAttachment,
+    hasImageAttachment,
+    initialsFor,
+    shortId,
+    shouldRenderMessageBody,
+} from "@/components/support/support-conversation-helpers";
+import {
+    SectionBlock,
+    SidePanelAsyncState,
+    TimelineCard,
+} from "@/components/support/support-conversation-ui-primitives";
+import { SupportOptionGroup } from "@/components/support/support-option-group";
+import styles from "@/components/support/support-page.module.css";
+import {
+    priorityLabel,
+    priorityTone,
+    statusHint,
+    statusLabel,
+    toneForGeneration,
+    toneForStatus,
+} from "@/components/support/support-status-helpers";
+import {
+    emptyTemplateDraft,
+    statusOptions,
+    type SupportFilter,
+    useSupportConversationController,
+} from "@/components/support/use-support-conversation-controller";
+import { Button } from "@/components/ui/button";
+import { Toast } from "@/components/ui/toast";
+import { type Locale } from "@/lib/i18n";
 
 type SupportConversationPageProps = {
     locale: Locale;
     conversationId: string;
 };
 
-type ToastState = {
-    type: "success" | "error";
-    message: string;
-};
-
-type StatusActionDescriptor = {
-    status: SupportConversationStatus;
-    label: string;
-    variant: "primary" | "secondary" | "danger";
-};
-
-type SupportFilter = "all" | SupportConversationStatus;
-type SidePanelTab = "profile" | "purchases" | "generations" | "errors" | "history" | "templates";
-
-type TimelineItem = {
-    id: string;
-    title: string;
-    subtitle: string;
-    occurredAtUtc: string;
-    tone: "neutral" | "primary" | "info" | "success" | "warning" | "danger";
-};
-
-type TemplateDraft = {
-    templateId: string | null;
-    title: string;
-    body: string;
-    isEnabled: boolean;
-    sortOrder: number;
-};
-
-const statusOptions: SupportConversationStatus[] = ["Open", "InProgress", "Resolved", "Closed"];
-const emptyTemplateDraft: TemplateDraft = {
-    templateId: null,
-    title: "",
-    body: "",
-    isEnabled: true,
-    sortOrder: 0,
-};
-
 export function SupportConversationPage({ locale, conversationId }: SupportConversationPageProps) {
-    const text = getDictionary(locale);
-    const router = useRouter();
-    const session = useAuthSession();
-    const queryClient = useQueryClient();
-    const [statusFilter, setStatusFilter] = useState<SupportFilter>("all");
-    const [searchQuery, setSearchQuery] = useState("");
-    const [reply, setReply] = useState("");
-    const [templateDraft, setTemplateDraft] = useState<TemplateDraft>(emptyTemplateDraft);
-    const [templateSearchQuery, setTemplateSearchQuery] = useState("");
-    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-    const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
-    const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("profile");
-    const [isSidePanelOpen, setIsSidePanelOpen] = useState(() => typeof window !== "undefined"
-        && window.matchMedia("(min-width: 1321px)").matches);
-    const [toast, setToast] = useState<ToastState | null>(null);
-    const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
-    const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-    const markReadRequestRef = useRef<Promise<void> | null>(null);
-
-    const resetSelectedAttachment = useCallback(() => {
-        setSelectedAttachment(null);
-        if (attachmentInputRef.current) {
-            attachmentInputRef.current.value = "";
-        }
-    }, []);
-
-    const refreshConversationData = useCallback(async () => {
-        await Promise.all([
-            queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportConversation(conversationId) }),
-            queryClient.invalidateQueries({ queryKey: ["admin", "support", "inbox"] }),
-        ]);
-    }, [conversationId, queryClient]);
-
-    const refreshTemplateCatalog = async () => {
-        await queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportTemplates });
-    };
-
-    useEffect(() => {
-        if (!session) {
-            ensureAdminSession(locale, router);
-        }
-    }, [locale, router, session]);
-
-    useEffect(() => {
-        if (!toast) {
-            return;
-        }
-
-        const timer = window.setTimeout(() => setToast(null), 2400);
-        return () => window.clearTimeout(timer);
-    }, [toast]);
-
-    const attachmentPreviewUrl = useMemo(() => {
-        if (!selectedAttachment || !selectedAttachment.type.startsWith("image/")) {
-            return null;
-        }
-
-        return URL.createObjectURL(selectedAttachment);
-    }, [selectedAttachment]);
-
-    useEffect(() => {
-        return () => {
-            if (attachmentPreviewUrl) {
-                URL.revokeObjectURL(attachmentPreviewUrl);
-            }
-        };
-    }, [attachmentPreviewUrl]);
-
-    const conversationQuery = useQuery<AdminSupportConversation>({
-        queryKey: adminQueryKeys.supportConversation(conversationId),
-        queryFn: () => fetchSupportConversation(conversationId),
-        enabled: Boolean(session),
-    });
-
-    const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
-        queryKey: adminQueryKeys.supportInbox(statusFilter, "all"),
-        queryFn: () => fetchSupportInbox(statusFilter === "all" ? undefined : statusFilter, "all"),
-        enabled: Boolean(session),
-    });
-
-    const templatesQuery = useQuery<AdminSupportReplyTemplate[]>({
-        queryKey: adminQueryKeys.supportTemplates,
-        queryFn: () => fetchSupportReplyTemplates(),
-        enabled: Boolean(session),
-    });
-
-    useSupportRealtime(session?.accessToken, (event) => {
-        void queryClient.invalidateQueries({ queryKey: ["admin", "support", "inbox"] });
-        if (event.conversationId === conversationId) {
-            void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportConversation(conversationId) });
-        }
-    });
-
-    useEffect(() => {
-        if (!conversationQuery.data) {
-            return;
-        }
-
-        if (conversationQuery.data.adminUnreadCount > 0 && !markReadRequestRef.current) {
-            markReadRequestRef.current = markSupportConversationRead(conversationId)
-                .then(refreshConversationData)
-                .catch(() => undefined)
-                .finally(() => {
-                    markReadRequestRef.current = null;
-                });
-        }
-    }, [conversationId, conversationQuery.data, refreshConversationData]);
-
-    const sendMutation = useMutation({
-        mutationFn: async () => selectedAttachment
-            ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim())
-            : sendSupportMessage(conversationId, reply.trim()),
-        onSuccess: async () => {
-            setReply("");
-            resetSelectedAttachment();
-            setToast({ type: "success", message: text.supportReplySent });
-            await refreshConversationData();
-        },
-        onError: () => {
-            setToast({ type: "error", message: text.supportLoadError });
-        },
-    });
-
-    const statusMutation = useMutation({
-        mutationFn: async (status: SupportConversationStatus) => updateSupportConversationStatus(conversationId, status),
-        onSuccess: async () => {
-            setToast({ type: "success", message: text.supportStatusSaved });
-            await refreshConversationData();
-        },
-        onError: () => {
-            setToast({ type: "error", message: text.supportLoadError });
-        },
-    });
-
-    const assignmentMutation = useMutation({
-        mutationFn: async (assignedAdminId?: string | null) => assignSupportConversation(conversationId, assignedAdminId),
-        onSuccess: async () => {
-            setToast({ type: "success", message: text.supportAssignmentSaved });
-            await refreshConversationData();
-        },
-        onError: () => {
-            setToast({ type: "error", message: text.supportLoadError });
-        },
-    });
-
-    const templateSaveMutation = useMutation({
-        mutationFn: async () => {
-            const payload = {
-                title: templateDraft.title.trim(),
-                body: templateDraft.body.trim(),
-                isEnabled: templateDraft.isEnabled,
-                sortOrder: templateDraft.sortOrder,
-            };
-
-            return templateDraft.templateId
-                ? updateSupportReplyTemplate(templateDraft.templateId, payload)
-                : createSupportReplyTemplate(payload);
-        },
-        onSuccess: async (savedTemplate) => {
-            setTemplateDraft(emptyTemplateDraft);
-            setSelectedTemplateId(savedTemplate.templateId);
-            setIsTemplateEditorOpen(false);
-            setToast({ type: "success", message: text.supportTemplateSaved });
-            await refreshTemplateCatalog();
-        },
-        onError: () => {
-            setToast({ type: "error", message: text.supportLoadError });
-        },
-    });
-
-    const templateDeleteMutation = useMutation({
-        mutationFn: async (templateId: string) => deleteSupportReplyTemplate(templateId),
-        onSuccess: async () => {
-            setTemplateDraft(emptyTemplateDraft);
-            setSelectedTemplateId(null);
-            setIsTemplateEditorOpen(false);
-            setToast({ type: "success", message: text.supportTemplateDeleted });
-            await refreshTemplateCatalog();
-        },
-        onError: () => {
-            setToast({ type: "error", message: text.supportLoadError });
-        },
-    });
-
-    const conversation = conversationQuery.data;
-    const sessionUserId = session?.user.userId ?? null;
-    const isAssignedToCurrentAdmin = Boolean(sessionUserId && conversation?.assignedAdminId === sessionUserId);
-    const subjectUserId = conversation?.initiatorUserId ?? null;
-    const userQuery = useQuery<AdminUserDetail>({
-        queryKey: ["admin", "users", subjectUserId],
-        queryFn: () => fetchAdminUser(subjectUserId!),
-        enabled: Boolean(session && subjectUserId),
-    });
-    const analyticsQuery = useQuery<AdminUserAnalytics>({
-        queryKey: ["admin", "users", subjectUserId, "analytics"],
-        queryFn: () => fetchAdminUserAnalytics(subjectUserId!),
-        enabled: Boolean(session && subjectUserId),
-    });
-    const inboxItems = useMemo(() => inboxQuery.data ?? [], [inboxQuery.data]);
-    const filteredInboxItems = useMemo(() => {
-        const normalizedQuery = searchQuery.trim().toLowerCase();
-        if (!normalizedQuery) {
-            return inboxItems;
-        }
-
-        return inboxItems.filter((item) => {
-            const haystacks = [
-                item.userDisplayName,
-                item.userEmail,
-                item.lastMessagePreview,
-                item.assignedAdminDisplayName,
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase();
-
-            return haystacks.includes(normalizedQuery);
-        });
-    }, [inboxItems, searchQuery]);
-    const sortedTemplates = useMemo(
-        () =>
-            (templatesQuery.data ?? []).slice().sort((left, right) => {
-                if (left.sortOrder !== right.sortOrder) {
-                    return left.sortOrder - right.sortOrder;
-                }
-
-                return left.title.localeCompare(right.title, locale === "ru" ? "ru" : "en");
-            }),
-        [locale, templatesQuery.data],
-    );
-    const filteredTemplates = useMemo(() => {
-        const normalizedQuery = templateSearchQuery.trim().toLowerCase();
-
-        return sortedTemplates.filter((template) => {
-            if (!normalizedQuery) {
-                return true;
-            }
-
-            return `${template.title} ${template.body}`.toLowerCase().includes(normalizedQuery);
-        });
-    }, [sortedTemplates, templateSearchQuery]);
-    const visibleTemplates = useMemo(
-        () =>
-            sortedTemplates
-                .filter((template) => template.isEnabled)
-                .slice(0, 4),
-        [sortedTemplates],
-    );
-    const composerValue = reply;
-    const composerPlaceholder = text.supportReplyPlaceholder;
-    const userDisplayName = conversation?.userDisplayName?.trim() || conversation?.userEmail || text.supportConversationTitle;
-    const hasComposerAttachment = selectedAttachment !== null;
-    const sidePanelTabs: ReadonlyArray<{ value: SidePanelTab; label: string }> = [
-        { value: "profile", label: text.supportViewProfileTab },
-        { value: "purchases", label: text.supportViewPurchasesTab },
-        { value: "generations", label: text.supportViewGenerationsTab },
-        { value: "errors", label: text.supportViewErrorsTab },
-        { value: "history", label: text.supportViewHistoryTab },
-        { value: "templates", label: text.supportViewTemplatesTab },
-    ];
-    const sidePanelTitle = activeSidePanelTab === "profile"
-        ? text.supportUserInformationTitle
-        : activeSidePanelTab === "purchases"
-            ? text.supportRecentPurchasesTitle
-            : activeSidePanelTab === "generations"
-                ? text.supportRecentGenerationsTitle
-                : activeSidePanelTab === "errors"
-                    ? text.supportGenerationErrorsTitle
-                    : activeSidePanelTab === "templates"
-                        ? text.supportTemplatesManagerTitle
-                        : text.supportTimelineTitle;
-    const sidePanelDescription = activeSidePanelTab === "templates"
-        ? text.supportTemplatesManagerDescription
-        : activeSidePanelTab === "history"
-            ? text.supportConversationDescription
-            : null;
-    const selectedTemplate = filteredTemplates.find((template) => template.templateId === selectedTemplateId) ?? filteredTemplates[0] ?? null;
-    const accountCreatedAt = userQuery.data?.createdAtUtc ?? conversation?.createdAtUtc ?? null;
-    const conversationWaitingSince = conversation?.lastMessageAtUtc ?? conversation?.createdAtUtc ?? null;
-    const conversationSla = getConversationSla(conversationWaitingSince, locale, conversation?.adminUnreadCount ?? 0);
-    const totalPurchases = analyticsQuery.data?.summary.totalPurchases ?? 0;
-    const failedGenerations = analyticsQuery.data?.recentGenerations.filter((generation) => generation.status.toLowerCase() === "failed") ?? [];
-    const recentFailures = analyticsQuery.data?.failureBreakdown.slice(0, 4) ?? [];
-    const chatFacts = [
-        userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel,
-        formatAccountAgeFact(accountCreatedAt, locale),
-        formatCountFact(conversation?.messages.length ?? 0, locale, "messages"),
-        formatCountFact(totalPurchases, locale, "purchases"),
-    ];
-    const activityTimeline: TimelineItem[] = [
-        ...(analyticsQuery.data?.recentActivity ?? []).slice(0, 4).map((item) => ({
-            id: `activity:${item.kind}:${item.occurredAtUtc}:${item.title}`,
-            title: item.title,
-            subtitle: item.details || item.kind,
-            occurredAtUtc: item.occurredAtUtc,
-            tone: "info" as const,
-        })),
-        ...(analyticsQuery.data?.recentAuditEvents ?? []).slice(0, 4).map((item) => ({
-            id: `audit:${item.auditEventId}`,
-            title: item.action,
-            subtitle: item.details,
-            occurredAtUtc: item.occurredAtUtc,
-            tone: "warning" as const,
-        })),
-    ].sort((left, right) => new Date(right.occurredAtUtc).getTime() - new Date(left.occurredAtUtc).getTime());
-    const availableStatusActions = conversation ? getAvailableStatusActions(conversation.status, text) : [];
-    const primaryStatusAction = availableStatusActions.find((action) => action.variant === "primary") ?? null;
-    const secondaryStatusActions = availableStatusActions.filter((action) => action.variant === "secondary");
-    const destructiveStatusAction = availableStatusActions.find((action) => action.variant === "danger") ?? null;
-    const conversationTimeline: TimelineItem[] = !conversation
-        ? []
-        : [
-            {
-                id: `conversation:${conversation.conversationId}`,
-                title: text.supportTimelineConversationCreated,
-                subtitle: userDisplayName,
-                occurredAtUtc: conversation.createdAtUtc,
-                tone: "info" as const,
-            },
-            ...conversation.messages.map((message) => ({
-                id: message.messageId,
-                title: message.isFromAdmin
-                    ? text.supportTimelineAdminReply
-                    : text.supportTimelineUserMessage,
-                subtitle: `${message.senderDisplayName} • ${truncateText(message.body, 112)}`,
-                occurredAtUtc: message.createdAtUtc,
-                tone: message.isFromAdmin ? "success" as const : "primary" as const,
-            })),
-        ].sort((left, right) => new Date(right.occurredAtUtc).getTime() - new Date(left.occurredAtUtc).getTime());
-
-    const applyTemplate = useCallback((template: AdminSupportReplyTemplate) => {
-        setSelectedTemplateId(template.templateId);
-        setReply((current) => mergeTemplateDraft(current, template.body));
-    }, []);
-
-    const openTemplateEditor = useCallback((template?: AdminSupportReplyTemplate) => {
-        if (template) {
-            setSelectedTemplateId(template.templateId);
-            setTemplateDraft({
-                templateId: template.templateId,
-                title: template.title,
-                body: template.body,
-                isEnabled: template.isEnabled,
-                sortOrder: template.sortOrder,
-            });
-            setIsTemplateEditorOpen(true);
-            return;
-        }
-
-        setTemplateDraft({
-            ...emptyTemplateDraft,
-        });
-        setSelectedTemplateId(null);
-        setIsTemplateEditorOpen(true);
-    }, []);
+    const {
+        activeSidePanelTab,
+        accountCreatedAt,
+        activityTimeline,
+        analyticsQuery,
+        applyTemplate,
+        assignmentMutation,
+        attachmentInputRef,
+        attachmentPreviewUrl,
+        chatFacts,
+        composerPlaceholder,
+        composerValue,
+        conversation,
+        conversationQuery,
+        conversationSla,
+        conversationTimeline,
+        destructiveStatusAction,
+        failedGenerations,
+        filteredInboxItems,
+        filteredTemplates,
+        hasComposerAttachment,
+        inboxQuery,
+        isAssignedToCurrentAdmin,
+        isSidePanelOpen,
+        isTemplateEditorOpen,
+        openTemplateEditor,
+        primaryStatusAction,
+        recentFailures,
+        reply,
+        resetSelectedAttachment,
+        searchQuery,
+        selectedAttachment,
+        selectedTemplate,
+        secondaryStatusActions,
+        sendMutation,
+        sessionUserId,
+        setActiveSidePanelTab,
+        setIsSidePanelOpen,
+        setIsTemplateEditorOpen,
+        setReply,
+        setSearchQuery,
+        setSelectedAttachment,
+        setSelectedTemplateId,
+        setStatusFilter,
+        setTemplateDraft,
+        setTemplateSearchQuery,
+        sidePanelDescription,
+        sidePanelTabs,
+        sidePanelTitle,
+        statusFilter,
+        statusMutation,
+        templateDeleteMutation,
+        templateDraft,
+        templateSaveMutation,
+        templateSearchQuery,
+        templatesQuery,
+        text,
+        toast,
+        totalPurchases,
+        userDisplayName,
+        userQuery,
+        visibleTemplates,
+    } = useSupportConversationController({ locale, conversationId });
 
     return (
         <AdminPage className={styles.page}>
@@ -507,34 +182,42 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                 <AdminStateCard tone="info" title={text.supportEmpty} />
                             ) : (
                                 <div className={styles.list}>
-                                    {filteredInboxItems.map((item) => (
-                                        <Link
-                                            key={item.conversationId}
-                                            href={`/${locale}/support/${item.conversationId}`}
-                                            className={`${styles.conversationRow} ${item.conversationId === conversationId ? styles.conversationRowActive : ""}`}
-                                        >
-                                            <div className={styles.rowHeader}>
-                                                <div className={styles.rowIdentity}>
-                                                    <span className={styles.avatar}>{initialsFor(item.userDisplayName?.trim() || item.userEmail)}</span>
-                                                    <div className={styles.rowTextStack}>
-                                                        <div className={styles.rowTitle}>{item.userDisplayName?.trim() || item.userEmail}</div>
-                                                        <div className={styles.rowPreview}><span>{item.lastMessagePreview || text.supportNoMessages}</span></div>
+                                    {filteredInboxItems.map((item) => {
+                                        const itemSla = getConversationSla(
+                                            item.lastMessageAtUtc ?? item.createdAtUtc,
+                                            locale,
+                                            item.adminUnreadCount,
+                                        );
+
+                                        return (
+                                            <Link
+                                                key={item.conversationId}
+                                                href={`/${locale}/support/${item.conversationId}`}
+                                                className={`${styles.conversationRow} ${item.conversationId === conversationId ? styles.conversationRowActive : ""}`}
+                                            >
+                                                <div className={styles.rowHeader}>
+                                                    <div className={styles.rowIdentity}>
+                                                        <span className={styles.avatar}>{initialsFor(item.userDisplayName?.trim() || item.userEmail)}</span>
+                                                        <div className={styles.rowTextStack}>
+                                                            <div className={styles.rowTitle}>{item.userDisplayName?.trim() || item.userEmail}</div>
+                                                            <div className={styles.rowPreview}><span>{item.lastMessagePreview || text.supportNoMessages}</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <span className={styles.timePill}>{formatRelativeTime(item.lastMessageAtUtc ?? item.updatedAtUtc, locale)}</span>
+                                                </div>
+                                                <div className={styles.rowSlaLine}>
+                                                    <span className={`${styles.slaPill} ${styles[`slaPill_${itemSla.level}`]}`}>
+                                                        {itemSla.primaryLabel}
+                                                    </span>
+                                                    <div className={styles.rowMetaGroup}>
+                                                        {item.adminUnreadCount > 0 ? <span className={styles.unreadDot}>{item.adminUnreadCount}</span> : null}
+                                                        {item.status !== "Open" ? <span className={styles.rowSecondaryMeta}>{statusLabel(item.status, text)}</span> : null}
+                                                        {item.priority.toLowerCase() === "high" ? <span className={styles.rowSecondaryMeta}>{priorityLabel(item.priority, text)}</span> : null}
                                                     </div>
                                                 </div>
-                                                <span className={styles.timePill}>{formatRelativeTime(item.lastMessageAtUtc ?? item.updatedAtUtc, locale)}</span>
-                                            </div>
-                                            <div className={styles.rowSlaLine}>
-                                                <span className={`${styles.slaPill} ${styles[`slaPill_${getConversationSla(item.lastMessageAtUtc ?? item.createdAtUtc, locale, item.adminUnreadCount).level}`]}`}>
-                                                    {getConversationSla(item.lastMessageAtUtc ?? item.createdAtUtc, locale, item.adminUnreadCount).primaryLabel}
-                                                </span>
-                                                <div className={styles.rowMetaGroup}>
-                                                    {item.adminUnreadCount > 0 ? <span className={styles.unreadDot}>{item.adminUnreadCount}</span> : null}
-                                                    {item.status !== "Open" ? <span className={styles.rowSecondaryMeta}>{statusLabel(item.status, text)}</span> : null}
-                                                    {item.priority.toLowerCase() === "high" ? <span className={styles.rowSecondaryMeta}>{priorityLabel(item.priority, text)}</span> : null}
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    ))}
+                                            </Link>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </AdminCard>
@@ -833,10 +516,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             <div className={styles.metricTile}><span>{text.supportPurchasesLabel}</span><strong>{String(totalPurchases)}</strong></div>
                                         </div>
 
-                                        <div className={styles.sectionBlock}>
-                                            <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.supportConversationMetaTitle}</strong>
-                                            </div>
+                                        <SectionBlock title={text.supportConversationMetaTitle}>
                                             <div className={styles.detailGrid}>
                                                 <div className={styles.detailRow}><span>{text.statusLabel}</span><strong>{statusLabel(conversation.status, text)}</strong></div>
                                                 <div className={styles.detailRow}><span>{text.supportAssignedTo}</span><strong>{conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}</strong></div>
@@ -844,7 +524,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                 <div className={styles.detailRow}><span>{text.supportLastMessage}</span><strong>{formatDateTime(conversation.lastMessageAtUtc ?? conversation.createdAtUtc, locale)}</strong></div>
                                                 <div className={styles.detailRow}><span>{text.supportLastSeenLabel}</span><strong>{formatRelativeTime(analyticsQuery.data?.summary.lastActivityAtUtc, locale)}</strong></div>
                                             </div>
-                                        </div>
+                                        </SectionBlock>
                                     </div>
                                 ) : null}
 
@@ -855,34 +535,33 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             <div className={styles.metricTile}><span>{text.supportLastPaymentLabel}</span><strong>{analyticsQuery.data?.summary.lastPurchaseAtUtc ? formatRelativeTime(analyticsQuery.data.summary.lastPurchaseAtUtc, locale) : "—"}</strong></div>
                                         </div>
 
-                                        <div className={styles.sectionBlock}>
-                                            <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.supportRecentPurchasesTitle}</strong>
-                                            </div>
-                                            {analyticsQuery.isLoading ? (
-                                                <AdminStateCard tone="info" title={text.loading} />
-                                            ) : analyticsQuery.isError ? (
-                                                <AdminStateCard tone="danger" title={text.supportLoadError} />
-                                            ) : analyticsQuery.data?.recentPurchases.length ? (
+                                        <SectionBlock title={text.supportRecentPurchasesTitle}>
+                                            <SidePanelAsyncState
+                                                isLoading={analyticsQuery.isLoading}
+                                                isError={analyticsQuery.isError}
+                                                hasContent={Boolean(analyticsQuery.data?.recentPurchases.length)}
+                                                loadingTitle={text.loading}
+                                                errorTitle={text.supportLoadError}
+                                                emptyTitle={text.supportNoPurchases}
+                                            >
                                                 <div className={styles.timelineList}>
-                                                    {analyticsQuery.data.recentPurchases.slice(0, 4).map((purchase) => (
-                                                        <article key={purchase.orderId} className={styles.timelineCard}>
-                                                            <div className={styles.timelineCardHeader}>
-                                                                <strong>{formatMoney(purchase.priceAmount, purchase.currencyCode, locale)}</strong>
-                                                                <span>{formatRelativeTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}</span>
-                                                            </div>
-                                                            <div className={styles.rowMetaGroup}>
-                                                                <AdminBadge tone={purchase.status.toLowerCase() === "paid" || purchase.status.toLowerCase() === "completed" ? "success" : "warning"}>{purchase.status}</AdminBadge>
-                                                                <span className={styles.subtle}>{`${purchase.sparkToGrant} spark`}</span>
-                                                            </div>
-                                                            <p className={styles.timelineCardBody}>{purchase.paymentProvider}</p>
-                                                        </article>
+                                                    {(analyticsQuery.data?.recentPurchases ?? []).slice(0, 4).map((purchase) => (
+                                                        <TimelineCard
+                                                            key={purchase.orderId}
+                                                            title={formatMoney(purchase.priceAmount, purchase.currencyCode, locale)}
+                                                            timestampLabel={formatRelativeTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}
+                                                            meta={(
+                                                                <>
+                                                                    <AdminBadge tone={purchase.status.toLowerCase() === "paid" || purchase.status.toLowerCase() === "completed" ? "success" : "warning"}>{purchase.status}</AdminBadge>
+                                                                    <span className={styles.subtle}>{`${purchase.sparkToGrant} spark`}</span>
+                                                                </>
+                                                            )}
+                                                            details={purchase.paymentProvider}
+                                                        />
                                                     ))}
                                                 </div>
-                                            ) : (
-                                                <AdminStateCard tone="info" title={text.supportNoPurchases} />
-                                            )}
-                                        </div>
+                                            </SidePanelAsyncState>
+                                        </SectionBlock>
                                     </div>
                                 ) : null}
 
@@ -893,34 +572,33 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             <div className={styles.metricTile}><span>{text.supportLastGenerationLabel}</span><strong>{formatRelativeTime(analyticsQuery.data?.summary.lastGenerationAtUtc, locale)}</strong></div>
                                         </div>
 
-                                        <div className={styles.sectionBlock}>
-                                            <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.supportRecentGenerationsTitle}</strong>
-                                            </div>
-                                            {analyticsQuery.isLoading ? (
-                                                <AdminStateCard tone="info" title={text.loading} />
-                                            ) : analyticsQuery.isError ? (
-                                                <AdminStateCard tone="danger" title={text.supportLoadError} />
-                                            ) : analyticsQuery.data?.recentGenerations.length ? (
+                                        <SectionBlock title={text.supportRecentGenerationsTitle}>
+                                            <SidePanelAsyncState
+                                                isLoading={analyticsQuery.isLoading}
+                                                isError={analyticsQuery.isError}
+                                                hasContent={Boolean(analyticsQuery.data?.recentGenerations.length)}
+                                                loadingTitle={text.loading}
+                                                errorTitle={text.supportLoadError}
+                                                emptyTitle={text.userNoGenerations}
+                                            >
                                                 <div className={styles.timelineList}>
-                                                    {analyticsQuery.data.recentGenerations.slice(0, 4).map((generation) => (
-                                                        <article key={generation.generationId} className={styles.timelineCard}>
-                                                            <div className={styles.timelineCardHeader}>
-                                                                <strong>{generation.templateTitle}</strong>
-                                                                <span>{formatRelativeTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
-                                                            </div>
-                                                            <div className={styles.rowMetaGroup}>
-                                                                <AdminBadge tone={toneForGeneration(generation.status)}>{generation.status}</AdminBadge>
-                                                                <span className={styles.subtle}>{`${generation.tokenCost} spark`}</span>
-                                                            </div>
-                                                            {generation.failureMessage ? <p className={styles.timelineCardBody}>{generation.failureMessage}</p> : null}
-                                                        </article>
+                                                    {(analyticsQuery.data?.recentGenerations ?? []).slice(0, 4).map((generation) => (
+                                                        <TimelineCard
+                                                            key={generation.generationId}
+                                                            title={generation.templateTitle}
+                                                            timestampLabel={formatRelativeTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}
+                                                            meta={(
+                                                                <>
+                                                                    <AdminBadge tone={toneForGeneration(generation.status)}>{generation.status}</AdminBadge>
+                                                                    <span className={styles.subtle}>{`${generation.tokenCost} spark`}</span>
+                                                                </>
+                                                            )}
+                                                            details={generation.failureMessage || undefined}
+                                                        />
                                                     ))}
                                                 </div>
-                                            ) : (
-                                                <AdminStateCard tone="info" title={text.userNoGenerations} />
-                                            )}
-                                        </div>
+                                            </SidePanelAsyncState>
+                                        </SectionBlock>
                                     </div>
                                 ) : null}
 
@@ -931,42 +609,40 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             <div className={styles.metricTile}><span>{text.supportLastSeenLabel}</span><strong>{recentFailures[0]?.lastOccurredAtUtc ? formatRelativeTime(recentFailures[0].lastOccurredAtUtc, locale) : "—"}</strong></div>
                                         </div>
 
-                                        <div className={styles.sectionBlock}>
-                                            <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.supportGenerationErrorsTitle}</strong>
-                                            </div>
-                                            {analyticsQuery.isLoading ? (
-                                                <AdminStateCard tone="info" title={text.loading} />
-                                            ) : analyticsQuery.isError ? (
-                                                <AdminStateCard tone="danger" title={text.supportLoadError} />
-                                            ) : recentFailures.length ? (
-                                                <div className={styles.timelineList}>
-                                                    {recentFailures.map((item) => (
-                                                        <article key={item.failureCode} className={styles.timelineCard}>
-                                                            <div className={styles.timelineCardHeader}>
-                                                                <strong>{item.failureCode}</strong>
-                                                                <span>{formatRelativeTime(item.lastOccurredAtUtc, locale)}</span>
-                                                            </div>
-                                                            <p className={styles.timelineCardBody}>{`${text.supportOccurrencesLabel}: ${item.count}`}</p>
-                                                        </article>
-                                                    ))}
-                                                </div>
-                                            ) : failedGenerations.length ? (
-                                                <div className={styles.timelineList}>
-                                                    {failedGenerations.slice(0, 3).map((generation) => (
-                                                        <article key={generation.generationId} className={styles.timelineCard}>
-                                                            <div className={styles.timelineCardHeader}>
-                                                                <strong>{generation.templateTitle}</strong>
-                                                                <span>{formatRelativeTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
-                                                            </div>
-                                                            <p className={styles.timelineCardBody}>{generation.failureMessage ?? generation.failureCode ?? generation.status}</p>
-                                                        </article>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <AdminStateCard tone="info" title={text.supportNoGenerationErrors} />
-                                            )}
-                                        </div>
+                                        <SectionBlock title={text.supportGenerationErrorsTitle}>
+                                            <SidePanelAsyncState
+                                                isLoading={analyticsQuery.isLoading}
+                                                isError={analyticsQuery.isError}
+                                                hasContent={recentFailures.length > 0 || failedGenerations.length > 0}
+                                                loadingTitle={text.loading}
+                                                errorTitle={text.supportLoadError}
+                                                emptyTitle={text.supportNoGenerationErrors}
+                                            >
+                                                {recentFailures.length ? (
+                                                    <div className={styles.timelineList}>
+                                                        {recentFailures.map((item) => (
+                                                            <TimelineCard
+                                                                key={item.failureCode}
+                                                                title={item.failureCode}
+                                                                timestampLabel={formatRelativeTime(item.lastOccurredAtUtc, locale)}
+                                                                details={`${text.supportOccurrencesLabel}: ${item.count}`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className={styles.timelineList}>
+                                                        {failedGenerations.slice(0, 3).map((generation) => (
+                                                            <TimelineCard
+                                                                key={generation.generationId}
+                                                                title={generation.templateTitle}
+                                                                timestampLabel={formatRelativeTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}
+                                                                details={generation.failureMessage ?? generation.failureCode ?? generation.status}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </SidePanelAsyncState>
+                                        </SectionBlock>
                                     </div>
                                 ) : null}
 
@@ -989,13 +665,14 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             </div>
                                         </div>
 
-                                        {templatesQuery.isLoading ? (
-                                            <AdminStateCard tone="info" title={text.loading} />
-                                        ) : templatesQuery.isError ? (
-                                            <AdminStateCard tone="danger" title={text.supportLoadError} />
-                                        ) : filteredTemplates.length === 0 ? (
-                                            <AdminStateCard tone="info" title={text.supportTemplateNoTemplates} />
-                                        ) : (
+                                        <SidePanelAsyncState
+                                            isLoading={templatesQuery.isLoading}
+                                            isError={templatesQuery.isError}
+                                            hasContent={filteredTemplates.length > 0}
+                                            loadingTitle={text.loading}
+                                            errorTitle={text.supportLoadError}
+                                            emptyTitle={text.supportTemplateNoTemplates}
+                                        >
                                             <>
                                                 <div className={styles.templateCatalogList}>
                                                     {filteredTemplates.map((template) => (
@@ -1121,60 +798,51 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                     </div>
                                                 ) : null}
                                             </>
-                                        )}
+                                        </SidePanelAsyncState>
                                     </div>
                                 ) : null}
 
                                 {activeSidePanelTab === "history" ? (
                                     <div className={styles.sidePanelContent}>
-                                        <div className={styles.sectionBlock}>
-                                            <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.supportTimelineTitle}</strong>
-                                            </div>
+                                        <SectionBlock title={text.supportTimelineTitle}>
                                             {conversationTimeline.length ? (
                                                 <div className={styles.timelineList}>
                                                     {conversationTimeline.map((item) => (
-                                                        <article key={item.id} className={styles.timelineCard}>
-                                                            <div className={styles.timelineCardHeader}>
-                                                                <strong>{item.title}</strong>
-                                                                <span>{formatRelativeTime(item.occurredAtUtc, locale)}</span>
-                                                            </div>
-                                                            <div className={styles.rowMetaGroup}>
-                                                                <AdminBadge tone={item.tone}>{formatDateTime(item.occurredAtUtc, locale)}</AdminBadge>
-                                                            </div>
-                                                            <p className={styles.timelineCardBody}>{item.subtitle}</p>
-                                                        </article>
+                                                        <TimelineCard
+                                                            key={item.id}
+                                                            title={item.title}
+                                                            timestampLabel={formatRelativeTime(item.occurredAtUtc, locale)}
+                                                            meta={<AdminBadge tone={item.tone}>{formatDateTime(item.occurredAtUtc, locale)}</AdminBadge>}
+                                                            details={item.subtitle}
+                                                        />
                                                     ))}
                                                 </div>
                                             ) : (
                                                 <AdminStateCard tone="info" title={text.supportHistoryEmpty} />
                                             )}
-                                        </div>
+                                        </SectionBlock>
 
-                                        <div className={styles.sectionBlock}>
-                                            <div className={styles.sectionHeaderCompact}>
-                                                <strong>{text.userActivityTitle}</strong>
-                                            </div>
-                                            {analyticsQuery.isLoading ? (
-                                                <AdminStateCard tone="info" title={text.loading} />
-                                            ) : analyticsQuery.isError ? (
-                                                <AdminStateCard tone="danger" title={text.supportLoadError} />
-                                            ) : activityTimeline.length ? (
+                                        <SectionBlock title={text.userActivityTitle}>
+                                            <SidePanelAsyncState
+                                                isLoading={analyticsQuery.isLoading}
+                                                isError={analyticsQuery.isError}
+                                                hasContent={activityTimeline.length > 0}
+                                                loadingTitle={text.loading}
+                                                errorTitle={text.supportLoadError}
+                                                emptyTitle={text.supportHistoryEmpty}
+                                            >
                                                 <div className={styles.timelineList}>
                                                     {activityTimeline.map((item) => (
-                                                        <article key={item.id} className={styles.timelineCard}>
-                                                            <div className={styles.timelineCardHeader}>
-                                                                <strong>{item.title}</strong>
-                                                                <span>{formatRelativeTime(item.occurredAtUtc, locale)}</span>
-                                                            </div>
-                                                            <p className={styles.timelineCardBody}>{item.subtitle}</p>
-                                                        </article>
+                                                        <TimelineCard
+                                                            key={item.id}
+                                                            title={item.title}
+                                                            timestampLabel={formatRelativeTime(item.occurredAtUtc, locale)}
+                                                            details={item.subtitle}
+                                                        />
                                                     ))}
                                                 </div>
-                                            ) : (
-                                                <AdminStateCard tone="info" title={text.supportHistoryEmpty} />
-                                            )}
-                                        </div>
+                                            </SidePanelAsyncState>
+                                        </SectionBlock>
                                     </div>
                                 ) : null}
                             </AdminCard>
@@ -1186,335 +854,3 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     );
 }
 
-function statusLabel(status: string, text: ReturnType<typeof getDictionary>) {
-    switch (status.toLowerCase()) {
-        case "open":
-            return text.supportStatusOpen;
-        case "inprogress":
-            return text.supportStatusInProgress;
-        case "resolved":
-            return text.supportStatusResolved;
-        case "closed":
-            return text.supportStatusClosed;
-        default:
-            return status;
-    }
-}
-
-function toneForStatus(status: string) {
-    switch (status.toLowerCase()) {
-        case "open":
-            return "warning" as const;
-        case "inprogress":
-            return "primary" as const;
-        case "resolved":
-            return "success" as const;
-        case "closed":
-            return "neutral" as const;
-        default:
-            return "neutral" as const;
-    }
-}
-
-function statusHint(status: SupportConversationStatus, text: ReturnType<typeof getDictionary>) {
-    switch (status) {
-        case "Open":
-            return text.supportStatusOpenHint;
-        case "InProgress":
-            return text.supportStatusInProgressHint;
-        case "Resolved":
-            return text.supportStatusResolvedHint;
-        case "Closed":
-            return text.supportStatusClosedHint;
-        default:
-            return text.supportConversationDescription;
-    }
-}
-
-function getAvailableStatusActions(status: SupportConversationStatus, text: ReturnType<typeof getDictionary>): StatusActionDescriptor[] {
-    switch (status) {
-        case "Open":
-            return [
-                { status: "InProgress", label: text.supportMarkInProgressAction, variant: "primary" },
-                { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
-                { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
-            ];
-        case "InProgress":
-            return [
-                { status: "Resolved", label: text.supportResolveConversationAction, variant: "primary" },
-                { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
-                { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
-            ];
-        case "Resolved":
-            return [
-                { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
-                { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
-            ];
-        case "Closed":
-            return [
-                { status: "Open", label: text.supportReopenConversationAction, variant: "primary" },
-            ];
-        default:
-            return [];
-    }
-}
-
-function priorityLabel(priority: string, text: ReturnType<typeof getDictionary>) {
-    switch (priority.toLowerCase()) {
-        case "high":
-            return text.supportPriorityHigh;
-        case "low":
-            return text.supportPriorityLow;
-        default:
-            return text.supportPriorityNormal;
-    }
-}
-
-function priorityTone(priority: string) {
-    switch (priority.toLowerCase()) {
-        case "high":
-            return "danger" as const;
-        case "low":
-            return "neutral" as const;
-        default:
-            return "success" as const;
-    }
-}
-
-function toneForGeneration(status: string) {
-    switch (status.toLowerCase()) {
-        case "completed":
-            return "success" as const;
-        case "failed":
-            return "danger" as const;
-        case "processing":
-            return "warning" as const;
-        default:
-            return "info" as const;
-    }
-}
-
-function formatDateTime(value: string | null | undefined, locale: Locale) {
-    if (!value) {
-        return "—";
-    }
-
-    return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-    }).format(new Date(value));
-}
-
-function formatClockTime(value: string, locale: Locale) {
-    return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-    }).format(new Date(value));
-}
-
-function formatRelativeTime(value: string | null | undefined, locale: Locale) {
-    if (!value) {
-        return "—";
-    }
-
-    const timestamp = new Date(value).getTime();
-    const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
-    if (diffMinutes < 1) {
-        return locale === "ru" ? "только что" : "just now";
-    }
-
-    if (diffMinutes < 60) {
-        return locale === "ru" ? `${diffMinutes} мин назад` : `${diffMinutes}m ago`;
-    }
-
-    const diffHours = Math.round(diffMinutes / 60);
-    if (diffHours < 24) {
-        return locale === "ru" ? `${diffHours} ч назад` : `${diffHours}h ago`;
-    }
-
-    const diffDays = Math.round(diffHours / 24);
-    return locale === "ru" ? `${diffDays} дн назад` : `${diffDays}d ago`;
-}
-
-function getConversationSla(value: string | null | undefined, locale: Locale, unreadCount = 0) {
-    const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(value ?? Date.now()).getTime()) / 60000));
-
-    let level: "good" | "warning" | "risk" | "critical" = "critical";
-    if (diffMinutes < 30) {
-        level = "good";
-    } else if (diffMinutes < 180) {
-        level = "warning";
-    } else if (diffMinutes < 720) {
-        level = "risk";
-    }
-
-    const waitLabel = locale === "ru"
-        ? `${getWaitPrefix(locale)} ${formatWaitTime(value, locale)}`
-        : `${getWaitPrefix(locale)} ${formatWaitTime(value, locale)}`;
-
-    return {
-        level,
-        waitLabel,
-        primaryLabel: unreadCount > 0
-            ? (locale === "ru" ? "Новый ответ пользователя" : "New user reply")
-            : waitLabel,
-    };
-}
-
-function formatWaitTime(value: string | null | undefined, locale: Locale) {
-    if (!value) {
-        return "—";
-    }
-
-    const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
-    if (diffMinutes < 60) {
-        return locale === "ru" ? `${diffMinutes} мин` : `${diffMinutes} min`;
-    }
-
-    const diffHours = Math.floor(diffMinutes / 60);
-    const restMinutes = diffMinutes % 60;
-    if (restMinutes === 0) {
-        return locale === "ru" ? `${diffHours} ч` : `${diffHours} h`;
-    }
-
-    return locale === "ru" ? `${diffHours} ч ${restMinutes} мин` : `${diffHours} h ${restMinutes} min`;
-}
-
-function getWaitPrefix(locale: Locale) {
-    return locale === "ru" ? "Ожидает" : "Waiting";
-}
-
-function formatAccountAge(value: string | null | undefined, locale: Locale) {
-    if (!value) {
-        return locale === "ru" ? "новый" : "new";
-    }
-
-    const diffDays = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
-    if (diffDays < 30) {
-        return locale === "ru" ? `${diffDays} дн` : `${diffDays}d`;
-    }
-
-    if (diffDays < 365) {
-        const diffMonths = Math.max(1, Math.floor(diffDays / 30));
-        return locale === "ru" ? `${diffMonths} мес` : `${diffMonths} mo`;
-    }
-
-    const diffYears = Math.max(1, Math.floor(diffDays / 365));
-    return locale === "ru" ? `${diffYears} г` : `${diffYears} yr`;
-}
-
-function formatAccountAgeFact(value: string | null | undefined, locale: Locale) {
-    return locale === "ru" ? `Аккаунт ${formatAccountAge(value, locale)}` : `Account ${formatAccountAge(value, locale)}`;
-}
-
-function formatCountFact(value: number, locale: Locale, kind: "messages" | "purchases") {
-    if (locale === "ru") {
-        if (kind === "messages") {
-            return `${value} ${pluralizeRu(value, "сообщение", "сообщения", "сообщений")}`;
-        }
-
-        return `${value} ${pluralizeRu(value, "покупка", "покупки", "покупок")}`;
-    }
-
-    if (kind === "messages") {
-        return `${value} ${value === 1 ? "message" : "messages"}`;
-    }
-
-    return `${value} ${value === 1 ? "purchase" : "purchases"}`;
-}
-
-function pluralizeRu(value: number, one: string, few: string, many: string) {
-    const abs = Math.abs(value) % 100;
-    const last = abs % 10;
-
-    if (abs > 10 && abs < 20) {
-        return many;
-    }
-
-    if (last === 1) {
-        return one;
-    }
-
-    if (last >= 2 && last <= 4) {
-        return few;
-    }
-
-    return many;
-}
-
-function formatMoney(amount: number, currencyCode: string, locale: Locale) {
-    return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
-        style: "currency",
-        currency: currencyCode,
-        maximumFractionDigits: 2,
-    }).format(amount);
-}
-
-function hasAttachment(message: Pick<AdminSupportConversation["messages"][number], "attachmentUrl">) {
-    return Boolean(message.attachmentUrl?.trim());
-}
-
-function hasImageAttachment(message: Pick<AdminSupportConversation["messages"][number], "attachmentUrl" | "attachmentContentType">) {
-    return hasAttachment(message) && Boolean(message.attachmentContentType?.startsWith("image/"));
-}
-
-function shouldRenderMessageBody(message: Pick<AdminSupportConversation["messages"][number], "body" | "attachmentFileName" | "attachmentUrl">) {
-    const normalizedBody = message.body.trim();
-    if (!normalizedBody) {
-        return false;
-    }
-
-    if (!hasAttachment(message)) {
-        return true;
-    }
-
-    return normalizedBody !== (message.attachmentFileName?.trim() ?? "");
-}
-
-function formatFileSize(value: number | null | undefined, locale: Locale) {
-    if (!value || value <= 0) {
-        return locale === "ru" ? "Размер не указан" : "Size unavailable";
-    }
-
-    if (value < 1024) {
-        return `${value} B`;
-    }
-
-    const kilobytes = value / 1024;
-    if (kilobytes < 1024) {
-        return locale === "ru" ? `${kilobytes.toFixed(1)} КБ` : `${kilobytes.toFixed(1)} KB`;
-    }
-
-    const megabytes = kilobytes / 1024;
-    return locale === "ru" ? `${megabytes.toFixed(1)} МБ` : `${megabytes.toFixed(1)} MB`;
-}
-
-function initialsFor(value: string) {
-    return value
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() ?? "")
-        .join("") || "PM";
-}
-
-function shortId(value: string) {
-    return value.length > 8 ? `#${value.slice(0, 8)}` : value;
-}
-
-function mergeTemplateDraft(currentValue: string, template: string) {
-    const normalizedCurrentValue = currentValue.trim();
-    if (!normalizedCurrentValue) {
-        return template;
-    }
-
-    return `${normalizedCurrentValue}\n\n${template}`;
-}
-
-function truncateText(value: string, maxLength: number) {
-    if (value.length <= maxLength) {
-        return value;
-    }
-
-    return `${value.slice(0, maxLength - 1).trimEnd()}…`;
-}

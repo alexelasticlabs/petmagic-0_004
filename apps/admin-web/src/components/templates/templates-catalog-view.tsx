@@ -1,5 +1,10 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from "react";
+
 import {
     CalendarIcon,
     CancelCircleIcon,
@@ -33,10 +38,6 @@ import {
     type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from "react";
 
 type TemplatesCatalogViewProps = {
   locale: Locale;

@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { TemplateEditor } from "@/components/template-editor";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type VideoTemplateEditorPageProps = {
   params: Promise<{ locale: string }>;

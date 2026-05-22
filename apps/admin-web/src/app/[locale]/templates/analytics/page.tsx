@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { TemplatesAnalyticsHubPage } from "@/components/templates/templates-analytics-hub-page";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type TemplatesAnalyticsPageProps = {
   params: Promise<{ locale: string }>;

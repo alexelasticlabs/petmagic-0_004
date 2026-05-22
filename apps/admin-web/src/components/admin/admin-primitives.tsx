@@ -1,5 +1,6 @@
-import styles from "@/components/admin/admin-primitives.module.css";
 import { type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
+
+import styles from "@/components/admin/admin-primitives.module.css";
 
 export type AdminTone = "neutral" | "primary" | "info" | "success" | "warning" | "danger" | "magenta";
 

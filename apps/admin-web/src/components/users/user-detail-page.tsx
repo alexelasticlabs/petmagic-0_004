@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type ReactElement, useEffect, useMemo } from "react";
+
 import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminPage, AdminPageGrid, AdminPageHero, AdminStateCard, AdminStatusBadge } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
@@ -7,10 +11,8 @@ import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-detail-page.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { useAuthSession } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type ReactElement, useEffect, useMemo } from "react";
 
 type UserDetailPageProps = {
   locale: Locale;
@@ -227,15 +229,4 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
-}
-
-function formatDateTime(value: string | null | undefined, locale: Locale) {
-  if (!value) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

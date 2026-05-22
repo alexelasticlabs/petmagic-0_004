@@ -1,5 +1,9 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
@@ -8,9 +12,6 @@ import {
     type UserListItem,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 
 export type UsersToastState = {
   type: "success" | "error";

@@ -1,5 +1,7 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
     fetchAdminTemplate,
@@ -15,7 +17,6 @@ import {
     type AdminTemplateStatistics,
     type AdminTemplateTrendPoint,
 } from "@/lib/api-client";
-import { useQuery } from "@tanstack/react-query";
 
 type AdminTemplateAnalyticsOverview = {
   eventAnalytics: AdminTemplateEventAnalytics;

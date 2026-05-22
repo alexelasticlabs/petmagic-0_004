@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { TemplateTestPage } from "@/components/templates/template-test-page";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type VideoTemplateTestRoutePageProps = {
   params: Promise<{ locale: string; templateId: string }>;

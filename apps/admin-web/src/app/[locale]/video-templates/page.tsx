@@ -1,5 +1,6 @@
-import { isLocale } from "@/lib/i18n";
 import { notFound, redirect } from "next/navigation";
+
+import { isLocale } from "@/lib/i18n";
 
 type VideoTemplatesPageProps = {
   params: Promise<{ locale: string }>;

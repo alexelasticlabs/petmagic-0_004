@@ -1,10 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
 import styles from "@/components/login-card.module.css";
 import { login, useAuthSession } from "@/lib/api-client";
 import { type Locale, getDictionary } from "@/lib/i18n";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 
 /* ── SVG icons ────────────────────────────────────────────────────── */
 function IconEmail() {

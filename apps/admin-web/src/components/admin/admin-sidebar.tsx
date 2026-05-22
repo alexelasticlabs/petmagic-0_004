@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
     BrandMark,
     CaretDownIcon,
@@ -15,7 +17,6 @@ import {
 import styles from "@/components/admin/admin-shell.module.css";
 import { getAdminNavItems, matchesAdminPath, type AdminNavEntry, type AdminSectionKey } from "@/lib/admin-navigation";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Link from "next/link";
 
 type AdminSidebarProps = {
   locale: Locale;

@@ -1,5 +1,9 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { buildTemplateEditorModel } from "@/components/templates/template-editor-model";
 import {
@@ -23,9 +27,6 @@ import {
     type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 
 type TemplateEditorControllerOptions = {
   initialTemplateId?: string;

@@ -1,8 +1,9 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { fetchAdminTemplateCategories, type AdminTemplateCategory } from "@/lib/api-client";
-import { useQuery } from "@tanstack/react-query";
 
 type UseAdminTemplateCategoriesOptions = {
   enabled?: boolean;

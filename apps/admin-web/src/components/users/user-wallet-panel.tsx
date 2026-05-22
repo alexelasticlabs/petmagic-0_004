@@ -1,14 +1,16 @@
 "use client";
 
+import { useState } from "react";
+
 import { AdminCard, AdminKpiCard, AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
+import styles from "@/components/users/user-wallet-panel.module.css";
 import {
   adjustAdminUserWallet,
   type AdminUserAnalytics,
 } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { useState } from "react";
-import styles from "@/components/users/user-wallet-panel.module.css";
 
 type UserWalletPanelProps = {
   locale: Locale;
@@ -134,15 +136,4 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
       </div>
     </AdminCard>
   );
-}
-
-function formatDateTime(value: string | null | undefined, locale: Locale) {
-  if (!value) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

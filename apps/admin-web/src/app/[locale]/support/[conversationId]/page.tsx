@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { SupportConversationPage } from "@/components/support/support-conversation-page";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type SupportConversationRouteProps = {
     params: Promise<{ locale: string; conversationId: string }>;

@@ -1,11 +1,12 @@
 "use client";
 
-import { AdminPage, AdminPageHero, AdminStateCard } from "@/components/admin/admin-primitives";
-import { Button } from "@/components/ui/button";
-import { getDictionary, isLocale } from "@/lib/i18n";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect } from "react";
+
+import { AdminPage, AdminPageHero, AdminStateCard } from "@/components/admin/admin-primitives";
+import { Button } from "@/components/ui/button";
+import { getDictionary, isLocale } from "@/lib/i18n";
 
 type ErrorPageProps = {
   error: Error & { digest?: string };

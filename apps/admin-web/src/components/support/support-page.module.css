@@ -37,8 +37,7 @@
 .rowMetaGroup,
 .chatMetaLine,
 .composerContextHint,
-.templateToolbarCompact,
-.actionListCompact {
+.templateToolbarCompact {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -80,8 +79,7 @@
 
 .inboxPane,
 .chatShell,
-.sideCard,
-.templatesPane {
+.sideCard {
     background: linear-gradient(180deg, rgba(12, 18, 31, 0.94), rgba(10, 14, 24, 0.98));
 }
 
@@ -96,7 +94,6 @@
 }
 
 .sidePane {
-    min-width: 0;
     width: 100%;
 }
 
@@ -268,76 +265,6 @@
     box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.24);
 }
 
-.list {
-    display: grid;
-    gap: 10px;
-}
-
-.inboxHeaderBar {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    padding-bottom: 14px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid rgba(26, 39, 56, 0.72);
-}
-
-.inboxHeroBlock,
-.inboxControlCluster {
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-}
-
-.inboxSummary {
-    display: grid;
-    gap: 3px;
-    min-width: 0;
-}
-
-.inboxSummary strong {
-    color: #f7fbff;
-    font-size: 1.5rem;
-    line-height: 1;
-}
-
-.inboxSummary span {
-    color: #8fa2b8;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.inboxMetricStrip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.inboxMetricChip {
-    display: grid;
-    gap: 3px;
-    min-width: 7rem;
-    padding: 0.72rem 0.82rem;
-    border-radius: 0.95rem;
-    background: rgba(12, 19, 31, 0.82);
-    border: 1px solid rgba(26, 39, 56, 0.72);
-}
-
-.inboxMetricChip span {
-    color: #8ea0b6;
-    font-size: 0.72rem;
-    font-weight: 700;
-}
-
-.inboxMetricChip strong {
-    color: #f7fbff;
-    font-size: 1rem;
-    line-height: 1.1;
-}
-
 .inboxQueueGrid {
     display: grid;
     gap: 10px;
@@ -377,11 +304,8 @@
 .rowHeader,
 .rowFooter,
 .messageHeader,
-.templateRowHeader,
 .composerActions,
-.chatTopbar,
-.chatActionsBar,
-.detailHeader {
+.chatTopbar {
     display: flex;
     justify-content: space-between;
     gap: 12px;
@@ -390,7 +314,6 @@
 }
 
 .rowIdentity,
-.chatIdentity,
 .messageSenderWrap,
 .userCard {
     display: flex;
@@ -401,13 +324,10 @@
 
 .rowIdentity>div,
 .chatIdentityCompact,
-.chatActionsBar,
-.chatStatusControls,
 .templateRowActions,
 .templateTitleStack,
 .userSummaryHeader,
-.sidePanelContent,
-.paneTitleGroup {
+.sidePanelContent {
     min-width: 0;
 }
 
@@ -498,10 +418,6 @@
     border-color: rgba(239, 68, 68, 0.32);
 }
 
-.rowInlineBadge {
-    flex: 0 0 auto;
-}
-
 .rowFooter {
     align-items: center;
     padding-top: 2px;
@@ -510,7 +426,6 @@
 .rowMeta,
 .templateRowActions,
 .chatStatusControls,
-.actionList,
 .templateList {
     display: flex;
     flex-wrap: wrap;
@@ -518,7 +433,6 @@
 }
 
 .avatar,
-.avatarLarge,
 .avatarHero,
 .avatarTiny {
     display: inline-flex;
@@ -535,12 +449,6 @@
     width: 38px;
     height: 38px;
     font-size: 0.82rem;
-}
-
-.avatarLarge {
-    width: 54px;
-    height: 54px;
-    font-size: 1rem;
 }
 
 .avatarHero {
@@ -640,8 +548,6 @@
     box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
 }
 
-.chatMeta,
-.chatTimestampBlock span,
 .detailRow span,
 .userCardBody span {
     color: #8fa2b8;
@@ -651,21 +557,6 @@
 .chatMetaLine {
     color: #8fa2b8;
     font-size: 0.8rem;
-}
-
-.chatTimestampBlock {
-    display: grid;
-    gap: 3px;
-    text-align: right;
-}
-
-.chatTimestampBlock strong {
-    color: #f4f8fe;
-    font-size: 0.9rem;
-}
-
-.chatStatusGroup {
-    flex: 1 1 100%;
 }
 
 .chatHeaderAside {
@@ -887,27 +778,6 @@
     background: rgba(15, 23, 36, 0.98);
 }
 
-.composerTabs {
-    display: flex;
-    gap: 8px;
-}
-
-.composerTab {
-    border: 0;
-    background: transparent;
-    color: #8ea0b6;
-    padding: 0 0 8px;
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-}
-
-.composerTabActive {
-    color: #f8fbff;
-    border-bottom-color: #22c55e;
-}
-
 .textarea {
     min-height: 128px;
     resize: vertical;
@@ -966,17 +836,6 @@
     border-radius: 0.9rem;
     border: 1px solid rgba(26, 39, 56, 0.72);
     background: rgba(10, 16, 27, 0.82);
-}
-
-.statusActionGrid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.statusActionGrid :global(.ui-button) {
-    width: 100%;
-    justify-content: center;
 }
 
 .workflowPrimaryRow,
@@ -1097,8 +956,6 @@
     gap: 8px;
 }
 
-.actionList,
-.templateCard,
 .templateCatalogControls,
 .templateSection,
 .templateForm,
@@ -1128,17 +985,6 @@
     white-space: nowrap;
 }
 
-.actionListCompact {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-}
-
-.actionListCompact :global(.ui-button) {
-    width: 100%;
-    justify-content: center;
-}
-
 .detailGrid {
     display: grid;
     gap: 8px;
@@ -1162,52 +1008,6 @@
     color: #f6faff;
     font-size: 0.9rem;
     text-align: right;
-}
-
-.actionList {
-    align-content: start;
-}
-
-.actionList :global(.ui-button) {
-    width: 100%;
-    justify-content: center;
-}
-
-.templateFilterChips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.templateFilterChip {
-    border: 1px solid #1a2738;
-    border-radius: 999px;
-    background: rgba(13, 20, 33, 0.96);
-    color: #8fa2b8;
-    padding: 0.55rem 0.9rem;
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
-}
-
-.templateFilterChip:hover {
-    border-color: rgba(34, 197, 94, 0.42);
-    color: #f5fbff;
-}
-
-.templateFilterChipActive {
-    border-color: rgba(34, 197, 94, 0.62);
-    background: rgba(34, 197, 94, 0.16);
-    color: #effcf4;
-}
-
-.templateWorkspace {
-    display: grid;
-    gap: 14px;
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-    align-items: start;
 }
 
 .templateCatalogList {
@@ -1302,19 +1102,7 @@
     font-size: 0.95rem;
 }
 
-.toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    justify-content: flex-end;
-}
-
 @media (max-width: 1320px) {
-
-    .page {
-        width: min(100%, var(--support-page-max));
-    }
 
     .workspace,
     .workspaceCompact,
@@ -1324,15 +1112,6 @@
     }
 
     .sidePane {
-        grid-column: 1 / -1;
-        width: 100%;
-    }
-
-    .chatPane {
-        width: 100%;
-    }
-
-    .templateCard {
         grid-column: 1 / -1;
     }
 
@@ -1351,10 +1130,6 @@
 
 @media (max-width: 1180px) {
 
-    .page {
-        width: min(100%, var(--support-page-max));
-    }
-
     .workspace,
     .workspaceCompact,
     .workspaceWithSidebar {
@@ -1366,7 +1141,6 @@
         align-items: flex-start;
     }
 
-    .chatActionsBar,
     .chatStatusControls {
         width: 100%;
     }
@@ -1397,25 +1171,6 @@
         justify-content: flex-start;
     }
 
-    .templateWorkspace {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .inboxHeaderBar {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .inboxMetricChip {
-        min-width: minmax(0, 1fr);
-        flex: 1 1 140px;
-    }
-
-    .toolbar {
-        width: 100%;
-        justify-content: stretch;
-    }
-
     .chatShell {
         min-height: auto;
     }
@@ -1428,10 +1183,6 @@
         overflow-x: auto;
         flex-wrap: nowrap;
         padding-bottom: 2px;
-    }
-
-    .chatShell {
-        min-height: auto;
     }
 
     .sidePanelCard {
@@ -1456,12 +1207,10 @@
     .rowFooter,
     .composerActions,
     .compactHeader,
-    .detailHeader,
     .templateListItemHeader,
     .templatePreviewHeader,
     .templateEditorHeader,
     .chatTopbar,
-    .chatActionsBar,
     .userSummaryHeader,
     .sectionHeaderCompact,
     .timelineCardHeader,
@@ -1491,10 +1240,6 @@
 
     .messageItem {
         justify-self: stretch;
-    }
-
-    .chatTimestampBlock {
-        text-align: left;
     }
 
     .compactHeaderTrail strong,
@@ -1555,10 +1300,6 @@
     .rowSlaLine,
     .chatFacts {
         gap: 6px;
-    }
-
-    .statusActionGrid {
-        grid-template-columns: minmax(0, 1fr);
     }
 
     .avatar {

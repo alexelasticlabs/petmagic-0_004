@@ -1,5 +1,8 @@
 "use client";
 
+import Image from "next/image";
+import { useState } from "react";
+
 import {
     ChartIcon,
     DashboardIcon,
@@ -33,8 +36,6 @@ import {
     type AdminTemplateTrendPoint,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import Image from "next/image";
-import { useState } from "react";
 
 type AnalyticsText = Record<string, string>;
 type MetricAccent = "blue" | "green" | "red" | "cyan" | "neutral";

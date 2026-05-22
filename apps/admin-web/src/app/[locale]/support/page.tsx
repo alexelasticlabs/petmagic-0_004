@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { SupportInboxPage } from "@/components/support/support-inbox-page";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type SupportInboxRouteProps = {
     params: Promise<{ locale: string }>;

@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { UsersTable } from "@/components/users-table";
 import { isLocale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type UsersPageProps = {
   params: Promise<{ locale: string }>;

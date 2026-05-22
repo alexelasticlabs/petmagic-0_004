@@ -1,10 +1,11 @@
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+
 import styles from "@/components/templates/template-editor.module.css";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
 import { getImageModelPrice, getMotionModelPrice, formatPrice } from "@/lib/model-pricing";
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
 

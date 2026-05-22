@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+
 import { CaretDownIcon, GlobeIcon } from "@/components/admin/admin-icons";
 import styles from "@/components/admin/admin-shell.module.css";
 import { type Locale } from "@/lib/i18n";
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 
 type AdminLangDropdownProps = {
   locale: Locale;

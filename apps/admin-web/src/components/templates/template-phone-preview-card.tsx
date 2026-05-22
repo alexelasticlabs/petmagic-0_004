@@ -1,9 +1,10 @@
+import Image from "next/image";
+
 import { formatDuration, formatPromoBadge } from "@/components/templates/template-editor-model";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import styles from "@/components/templates/template-phone-preview-card.module.css";
 import { type TemplatePromoBadgeMode } from "@/lib/api-client";
 import { joinClassNames } from "@/lib/join-class-names";
-import Image from "next/image";
 
 type TemplatePreviewCardProps = {
   title: string;

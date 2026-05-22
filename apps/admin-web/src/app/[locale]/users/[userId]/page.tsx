@@ -1,6 +1,7 @@
+import { notFound } from "next/navigation";
+
 import { UserDetailPage } from "@/components/users/user-detail-page";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { notFound } from "next/navigation";
 
 type UserDetailRouteProps = {
   params: Promise<{

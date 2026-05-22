@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { type CSSProperties, type ReactNode } from "react";
+
 import {
     ArrowUpSmallIcon,
     CalendarIcon,
@@ -16,12 +19,10 @@ import {
     UsersIcon,
 } from "@/components/admin/admin-icons";
 import { AdminBadge, AdminCard, AdminPage, AdminPageGrid, AdminPageHero, AdminStatCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
-import styles from "@/components/dashboard-view.module.css";
 import { DonutChart, RevenueChart } from "@/components/dashboard/dashboard-charts";
 import { buildDashboardViewModel, type DashboardActivityType, type DashboardStatIcon } from "@/components/dashboard/dashboard-view-model";
+import styles from "@/components/dashboard-view.module.css";
 import { type Locale } from "@/lib/i18n";
-import Link from "next/link";
-import { type CSSProperties, type ReactNode } from "react";
 
 type DashboardViewProps = { locale: Locale };
 const STAT_ICONS: Record<DashboardStatIcon, ReactNode> = {

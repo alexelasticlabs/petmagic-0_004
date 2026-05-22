@@ -1,7 +1,8 @@
+import { notFound } from "next/navigation";
+
 import { AdminShell } from "@/components/admin-shell";
 import { isLocale } from "@/lib/i18n";
 import { Providers } from "@/lib/providers";
-import { notFound } from "next/navigation";
 
 type LocaleLayoutProps = {
   children: React.ReactNode;
