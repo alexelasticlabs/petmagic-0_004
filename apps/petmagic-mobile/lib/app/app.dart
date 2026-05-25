@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/router/app_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/notifications/push_notifications_bootstrap.dart';
 
 const _supportedAppLocales = <Locale>[
   Locale('ru'),
@@ -37,7 +38,10 @@ class PetMagicApp extends ConsumerWidget {
       themeMode: preferences.themeMode,
       routerConfig: router,
       builder: (context, child) {
-        final appChild = child ?? const SizedBox.shrink();
+        final appChild = PushNotificationsBootstrap(
+          router: router,
+          child: child ?? const SizedBox.shrink(),
+        );
         if (!AppConfig.enableFrameTelemetry &&
             !AppConfig.enableImageCacheTelemetry) {
           return appChild;

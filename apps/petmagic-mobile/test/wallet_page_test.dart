@@ -316,8 +316,8 @@ void main() {
       final rewardsContext = tester.element(find.byType(RewardsPage));
       final text = AppLocalizations.of(rewardsContext);
 
-      expect(find.text(text.rewardsBalanceTitle), findsOneWidget);
-      expect(find.text(text.rewardsFreeTokensTitle), findsOneWidget);
+      expect(find.text(text.walletBalanceEyebrow), findsOneWidget);
+      expect(find.text(text.rewardsPageTitle), findsOneWidget);
       expect(find.text(text.rewardsPromoTitle), findsOneWidget);
       expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
       expect(find.text('wallet.purchases_failed'), findsNothing);
@@ -340,7 +340,7 @@ void main() {
     },
   );
 
-  testWidgets('rewards page shows payment unavailable hint without raw key', (
+  testWidgets('rewards page hides payment unavailable purchase hint', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -363,7 +363,7 @@ void main() {
     await tester.drag(find.byType(ListView).first, const Offset(0, -620));
     await tester.pumpAndSettle();
 
-    expect(find.text(text.rewardsPaymentUnavailableHint), findsOneWidget);
+    expect(find.text(text.walletPaymentGatewayUnavailableError), findsNothing);
     expect(find.textContaining('wallet.payment_unavailable'), findsNothing);
   });
 }

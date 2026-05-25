@@ -17,6 +17,10 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateAnalyticsEvent> TemplateAnalyticsEvents => Set<TemplateAnalyticsEvent>();
 
+    public DbSet<TemplateGenerationFeedback> TemplateGenerationFeedback => Set<TemplateGenerationFeedback>();
+
+    public DbSet<TemplatePushDeviceToken> TemplatePushDeviceTokens => Set<TemplatePushDeviceToken>();
+
     public DbSet<TemplateMediaRecord> TemplateMediaRecords => Set<TemplateMediaRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -87,6 +91,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
             entity.Property(x => x.UserMediaCleanupFailureCode).HasMaxLength(128);
             entity.HasIndex(x => x.UserMediaDeletedAtUtc);
+            entity.HasIndex(x => new { x.UserId, x.Status, x.ResultViewedAtUtc });
             entity.HasIndex(x => x.LastUserMediaCleanupAttemptAtUtc);
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
             entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
@@ -97,6 +102,40 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateGenerationFeedback>(entity =>
+        {
+            entity.ToTable("templates_generation_feedback");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SelectedReasons).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.Comment).HasMaxLength(2000);
+            entity.Property(x => x.ModelUsed).HasMaxLength(256);
+            entity.Property(x => x.ProviderRequestId).HasMaxLength(128);
+            entity.HasIndex(x => new { x.TemplateId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.GenerationId, x.UserId });
+            entity.HasIndex(x => new { x.TemplateId, x.Rating, x.CreatedAtUtc });
+            entity.HasOne(x => x.Generation)
+                .WithMany()
+                .HasForeignKey(x => x.GenerationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Template)
+                .WithMany()
+                .HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplatePushDeviceToken>(entity =>
+        {
+            entity.ToTable("templates_push_device_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Token).HasMaxLength(4096).IsRequired();
+            entity.Property(x => x.Platform).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.DeviceId).HasMaxLength(128);
+            entity.Property(x => x.AppVersion).HasMaxLength(64);
+            entity.Property(x => x.Locale).HasMaxLength(16);
+            entity.HasIndex(x => x.Token).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc, x.LastSeenAtUtc });
         });
 
         builder.Entity<TemplateAnalyticsEvent>(entity =>

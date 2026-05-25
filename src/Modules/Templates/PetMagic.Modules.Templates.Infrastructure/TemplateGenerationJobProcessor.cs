@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -17,6 +18,8 @@ internal sealed class TemplateGenerationJobProcessor(
     IGeneratedMediaImporter generatedMediaImporter,
     IMediaMetadataReader mediaMetadataReader,
     ITemplateGenerationBilling billing,
+    ITemplateFeedRealtimeService realtimeService,
+    ITemplateGenerationPushNotificationSender pushNotificationSender,
     TemplatesOptions options,
     ILogger<TemplateGenerationJobProcessor> logger)
 {
@@ -46,7 +49,7 @@ internal sealed class TemplateGenerationJobProcessor(
         var now = DateTime.UtcNow;
         var staleThreshold = now.AddMilliseconds(-options.StaleProcessingRecoveryDelayMilliseconds);
         var staleJob = await dbContext.TemplateGenerationJobs
-            .Where(x => x.Status == TemplateGenerationStatus.Processing
+            .Where(x => ActiveStatuses.Contains(x.Status)
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && (x.LastAttemptAtUtc ?? x.StartedAtUtc ?? x.UpdatedAtUtc) <= staleThreshold)
             .OrderBy(x => x.LastAttemptAtUtc ?? x.StartedAtUtc ?? x.UpdatedAtUtc)
@@ -160,6 +163,15 @@ internal sealed class TemplateGenerationJobProcessor(
         job.UpdatedAtUtc = now;
         ResetAttemptState(job);
     }
+
+    private static readonly TemplateGenerationStatus[] ActiveStatuses =
+    [
+        TemplateGenerationStatus.Processing,
+        TemplateGenerationStatus.Uploading,
+        TemplateGenerationStatus.Preprocessing,
+        TemplateGenerationStatus.Generating,
+        TemplateGenerationStatus.Finalizing
+    ];
 
     private static void MarkQueuedForRecovery(TemplateGenerationJob job, DateTime now)
     {
@@ -296,6 +308,8 @@ internal sealed class TemplateGenerationJobProcessor(
         var imageModel = job.Template.ImageModel!;
         var imagePrompt = TemplateGenerationService.ResolvePrompt(job.Template.ImagePrompt, options.DefaultImagePrompt);
 
+        await MarkStatusAsync(job, TemplateGenerationStatus.Preprocessing, cancellationToken);
+
         job.UsedPreprocessingModel = imageModel;
 
         var generated = await imageGenerator.CreateAsync(
@@ -317,6 +331,8 @@ internal sealed class TemplateGenerationJobProcessor(
         job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await MarkStatusAsync(job, TemplateGenerationStatus.Finalizing, cancellationToken);
+
         var storedOutput = await generatedMediaImporter.ImportImageAsync(generated.Value.ImageUrl, job.Id, cancellationToken);
         if (storedOutput.IsFailure)
         {
@@ -326,10 +342,11 @@ internal sealed class TemplateGenerationJobProcessor(
 
         job.OutputUrl = storedOutput.Value.Url;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
-        job.Status = TemplateGenerationStatus.Completed;
+        job.Status = TemplateGenerationStatus.Succeeded;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishStatusChangedAsync(job, cancellationToken);
     }
 
     private async Task ProcessVideoAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
@@ -339,6 +356,8 @@ internal sealed class TemplateGenerationJobProcessor(
         var preprocessingPrompt = TemplateGenerationService.ResolvePrompt(job.Template.PreprocessingPrompt, options.DefaultPreprocessingPrompt);
         var motionModel = job.Template.KlingModel!;
         var motionPrompt = TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt);
+
+        await MarkStatusAsync(job, TemplateGenerationStatus.Preprocessing, cancellationToken);
 
         job.UsedPreprocessingModel = preprocessingModel;
         job.UsedKlingModel = motionModel;
@@ -362,6 +381,8 @@ internal sealed class TemplateGenerationJobProcessor(
         job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await MarkStatusAsync(job, TemplateGenerationStatus.Generating, cancellationToken);
+
         var generated = await videoMotionGenerator.CreateAsync(
             normalized.Value.ImageUrl,
             referenceMotion.Url,
@@ -383,6 +404,8 @@ internal sealed class TemplateGenerationJobProcessor(
         job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await MarkStatusAsync(job, TemplateGenerationStatus.Finalizing, cancellationToken);
+
         var storedOutput = await generatedMediaImporter.ImportVideoAsync(generated.Value.VideoUrl, job.Id, cancellationToken);
         if (storedOutput.IsFailure)
         {
@@ -403,10 +426,19 @@ internal sealed class TemplateGenerationJobProcessor(
 
         job.OutputUrl = storedOutput.Value.Url;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
-        job.Status = TemplateGenerationStatus.Completed;
+        job.Status = TemplateGenerationStatus.Succeeded;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishStatusChangedAsync(job, cancellationToken);
+    }
+
+    private async Task MarkStatusAsync(TemplateGenerationJob job, TemplateGenerationStatus status, CancellationToken cancellationToken)
+    {
+        job.Status = status;
+        job.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishStatusChangedAsync(job, cancellationToken);
     }
 
     private async Task MarkFailedAsync(TemplateGenerationJob job, Error error, CancellationToken cancellationToken)
@@ -422,6 +454,17 @@ internal sealed class TemplateGenerationJobProcessor(
         job.UpdatedAtUtc = DateTime.UtcNow;
         job.CompletedAtUtc = job.UpdatedAtUtc;
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PublishStatusChangedAsync(job, cancellationToken);
+    }
+
+    private async ValueTask PublishStatusChangedAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
+    {
+        var response = TemplateGenerationService.MapResponse(job);
+        await realtimeService.PublishGenerationStatusChangedAsync(response, cancellationToken);
+        if (job.Status is TemplateGenerationStatus.Succeeded or TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed)
+        {
+            await pushNotificationSender.NotifyGenerationTerminalAsync(response, cancellationToken);
+        }
     }
 
     private async Task<bool> TryRefundAsync(TemplateGenerationJob job, CancellationToken cancellationToken)

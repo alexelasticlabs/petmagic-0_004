@@ -73,6 +73,120 @@ class TemplateGenerationRepository {
     return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
   }
 
+  Future<List<TemplateGenerationResult>> fetchGenerations({
+    String? status,
+    int? skip,
+    int? take,
+  }) async {
+    final queryParameters = <String, Object?>{};
+    if (status != null && status.isNotEmpty) {
+      queryParameters['status'] = status;
+    }
+    if (skip != null) {
+      queryParameters['skip'] = skip;
+    }
+    if (take != null) {
+      queryParameters['take'] = take;
+    }
+
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.get<List<dynamic>>(
+        '/api/templates/generations',
+        queryParameters: queryParameters,
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return (response.data ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => TemplateGenerationDto.fromJson(
+            Map<String, dynamic>.from(item),
+          ).toDomain(),
+        )
+        .toList(growable: false);
+  }
+
+  Future<int> fetchUnreadGenerationCount() async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.get<Map<String, dynamic>>(
+        '/api/templates/generations/unread-count',
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return (response.data?['count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> markGenerationRead(String generationId) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.post<void>(
+        '/api/templates/generations/$generationId/mark-read',
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
+  Future<void> submitGenerationFeedback({
+    required String generationId,
+    required int rating,
+    List<String> selectedReasons = const [],
+    String? comment,
+    double? inputPhotoQualityScore,
+  }) async {
+    final data = <String, Object?>{
+      'rating': rating,
+      'selectedReasons': selectedReasons,
+    };
+    if (comment != null && comment.isNotEmpty) {
+      data['comment'] = comment;
+    }
+    if (inputPhotoQualityScore != null) {
+      data['inputPhotoQualityScore'] = inputPhotoQualityScore;
+    }
+
+    await _authorizedRequest<void>(
+      (session) => _dio.post<void>(
+        '/api/templates/generations/$generationId/feedback',
+        data: data,
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
+  Future<void> registerPushToken({
+    required String token,
+    required String platform,
+    String? deviceId,
+    String? appVersion,
+    String? locale,
+  }) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.put<void>(
+        '/api/templates/notifications/push-token',
+        data: {
+          'token': token,
+          'platform': platform,
+          if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+          if (appVersion != null && appVersion.isNotEmpty)
+            'appVersion': appVersion,
+          if (locale != null && locale.isNotEmpty) 'locale': locale,
+        },
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
+  Future<void> unregisterPushToken(String token) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.delete<void>(
+        '/api/templates/notifications/push-token',
+        data: {'token': token},
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request,
   ) async {
@@ -173,6 +287,14 @@ class TemplateGenerationDto {
     this.motionGenerationCompletedAtUtc,
     this.mediaImportCompletedAtUtc,
     this.completedAtUtc,
+    this.templateTitle,
+    this.templateType,
+    this.stage,
+    this.progressPercent,
+    this.estimatedDurationLabel,
+    this.chargedAtUtc,
+    this.refundedAtUtc,
+    this.isUnread = false,
   });
 
   final String generationId;
@@ -197,7 +319,15 @@ class TemplateGenerationDto {
   final DateTime? motionGenerationCompletedAtUtc;
   final DateTime? mediaImportCompletedAtUtc;
   final DateTime? completedAtUtc;
+  final String? templateTitle;
+  final String? templateType;
+  final String? stage;
+  final int? progressPercent;
+  final String? estimatedDurationLabel;
+  final DateTime? chargedAtUtc;
+  final DateTime? refundedAtUtc;
   final bool userMediaExpired;
+  final bool isUnread;
 
   factory TemplateGenerationDto.fromJson(Map<String, dynamic> json) {
     final rawSourceImageAsset = json['sourceImageAsset'];
@@ -234,7 +364,15 @@ class TemplateGenerationDto {
       ),
       mediaImportCompletedAtUtc: _dateTime(json['mediaImportCompletedAtUtc']),
       completedAtUtc: _dateTime(json['completedAtUtc']),
+      templateTitle: json['templateTitle'] as String?,
+      templateType: json['templateType'] as String?,
+      stage: json['stage'] as String?,
+      progressPercent: (json['progressPercent'] as num?)?.toInt(),
+      estimatedDurationLabel: json['estimatedDurationLabel'] as String?,
+      chargedAtUtc: _dateTime(json['chargedAtUtc']),
+      refundedAtUtc: _dateTime(json['refundedAtUtc']),
       userMediaExpired: json['userMediaExpired'] as bool? ?? false,
+      isUnread: json['isUnread'] as bool? ?? false,
     );
   }
 
@@ -257,12 +395,20 @@ class TemplateGenerationDto {
       failureMessage: failureMessage,
       createdAtUtc: createdAtUtc,
       updatedAtUtc: updatedAtUtc,
+      templateTitle: templateTitle,
+      templateType: templateType,
+      stage: stage,
+      progressPercent: progressPercent,
+      estimatedDurationLabel: estimatedDurationLabel,
       startedAtUtc: startedAtUtc,
       preprocessingCompletedAtUtc: preprocessingCompletedAtUtc,
       motionGenerationCompletedAtUtc: motionGenerationCompletedAtUtc,
       mediaImportCompletedAtUtc: mediaImportCompletedAtUtc,
       completedAtUtc: completedAtUtc,
+      chargedAtUtc: chargedAtUtc,
+      refundedAtUtc: refundedAtUtc,
       userMediaExpired: userMediaExpired,
+      isUnread: isUnread,
     );
   }
 

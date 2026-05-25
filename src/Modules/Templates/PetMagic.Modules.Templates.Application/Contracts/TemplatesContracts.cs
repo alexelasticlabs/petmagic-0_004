@@ -239,6 +239,33 @@ public sealed record RecordTemplateAnalyticsEventCommand(
     Guid? GenerationId,
     string? FeedbackMessage = null);
 
+public sealed record TemplateGenerationHistoryQuery(
+    string? Status,
+    int? Skip,
+    int? Take);
+
+public sealed record TemplateGenerationUnreadCountResponse(int Count);
+
+public sealed record RecordTemplateGenerationFeedbackCommand(
+    Guid UserId,
+    Guid GenerationId,
+    int Rating,
+    string[] SelectedReasons,
+    string? Comment,
+    double? InputPhotoQualityScore = null);
+
+public sealed record RegisterTemplatePushTokenCommand(
+    Guid UserId,
+    string Token,
+    string Platform,
+    string? DeviceId,
+    string? AppVersion,
+    string? Locale);
+
+public sealed record UnregisterTemplatePushTokenCommand(
+    Guid UserId,
+    string Token);
+
 public sealed record AdminTemplateAnalyticsDimensionResponse(
     string Key,
     string Label,
@@ -494,4 +521,12 @@ public sealed record TemplateGenerationResponse(
     DateTime? MotionGenerationCompletedAtUtc,
     DateTime? MediaImportCompletedAtUtc,
     DateTime? CompletedAtUtc,
-    bool UserMediaExpired);
+    bool UserMediaExpired,
+    string? TemplateTitle = null,
+    string? TemplateType = null,
+    string? Stage = null,
+    int? ProgressPercent = null,
+    string? EstimatedDurationLabel = null,
+    DateTime? ChargedAtUtc = null,
+    DateTime? RefundedAtUtc = null,
+    bool IsUnread = false);

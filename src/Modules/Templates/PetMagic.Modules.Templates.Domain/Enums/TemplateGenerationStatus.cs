@@ -4,6 +4,11 @@ public enum TemplateGenerationStatus
 {
     Queued = 1,
     Processing = 2,
-    Completed = 3,
-    Failed = 4
+    Succeeded = 3,
+    Completed = Succeeded,
+    Failed = 4,
+    Uploading = 5,
+    Preprocessing = 6,
+    Generating = 7,
+    Finalizing = 8
 }

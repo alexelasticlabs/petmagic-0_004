@@ -126,6 +126,44 @@ class _FakeTemplateGenerationRepository
 
     return _generation(status: TemplateGenerationStatus.completed);
   }
+
+  @override
+  Future<List<TemplateGenerationResult>> fetchGenerations({
+    String? status,
+    int? skip,
+    int? take,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<int> fetchUnreadGenerationCount() async {
+    return 0;
+  }
+
+  @override
+  Future<void> markGenerationRead(String generationId) async {}
+
+  @override
+  Future<void> submitGenerationFeedback({
+    required String generationId,
+    required int rating,
+    List<String> selectedReasons = const [],
+    String? comment,
+    double? inputPhotoQualityScore,
+  }) async {}
+
+  @override
+  Future<void> registerPushToken({
+    required String token,
+    required String platform,
+    String? deviceId,
+    String? appVersion,
+    String? locale,
+  }) async {}
+
+  @override
+  Future<void> unregisterPushToken(String token) async {}
 }
 
 class _FakeWalletController extends WalletController {

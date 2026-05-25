@@ -759,13 +759,13 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Rewards and promo codes'**
+  /// **'Rewards'**
   String get rewardsPageTitle;
 
   /// No description provided for @rewardsPageSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Activate promo codes, invite friends, and earn rewards.'**
+  /// **'Earn PawSpark with promo codes and invitations'**
   String get rewardsPageSubtitle;
 
   /// No description provided for @rewardsLastUpdatedLabel.
@@ -795,13 +795,13 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsPromoTitle.
   ///
   /// In en, this message translates to:
-  /// **'Promo codes'**
+  /// **'Promo code'**
   String get rewardsPromoTitle;
 
   /// No description provided for @rewardsPromoSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Enter a promo code to top up your PawSpark balance.'**
+  /// **'Enter a promo code and receive a bonus'**
   String get rewardsPromoSubtitle;
 
   /// No description provided for @rewardsPromoEmptyError.
@@ -819,7 +819,7 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralTitle.
   ///
   /// In en, this message translates to:
-  /// **'Referral bonuses'**
+  /// **'Invite a friend'**
   String get rewardsReferralTitle;
 
   /// No description provided for @rewardsReferralSubtitle.
@@ -827,6 +827,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Share your code with a friend. Referral bonus is not paid for signup and is credited only after their first successful paid purchase.'**
   String get rewardsReferralSubtitle;
+
+  /// No description provided for @rewardsReferralInvitePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Your friend gets a bonus before their first purchase, and you get'**
+  String get rewardsReferralInvitePrefix;
+
+  /// No description provided for @rewardsReferralInviteSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'after their first successful payment.'**
+  String get rewardsReferralInviteSuffix;
 
   /// No description provided for @rewardsYourReferralCode.
   ///
@@ -867,7 +879,7 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralFriendCodeHint.
   ///
   /// In en, this message translates to:
-  /// **'Enter it before your first purchase.'**
+  /// **'Enter a friend\'s code before your first purchase and get a bonus.'**
   String get rewardsReferralFriendCodeHint;
 
   /// No description provided for @rewardsReferralInputLabel.
@@ -933,19 +945,19 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralEarnedLabel.
   ///
   /// In en, this message translates to:
-  /// **'PawSpark earned'**
+  /// **'Earned'**
   String get rewardsReferralEarnedLabel;
 
   /// No description provided for @rewardsReferralFriendsLabel.
   ///
   /// In en, this message translates to:
-  /// **'Friends invited'**
+  /// **'Friends'**
   String get rewardsReferralFriendsLabel;
 
   /// No description provided for @rewardsReferralBonusLabel.
   ///
   /// In en, this message translates to:
-  /// **'Completed purchases'**
+  /// **'Friend purchases'**
   String get rewardsReferralBonusLabel;
 
   /// No description provided for @rewardsReferralBonusPerFriend.
@@ -957,8 +969,14 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralRulesNote.
   ///
   /// In en, this message translates to:
-  /// **'No signup bonus. Referral reward is credited only after a successful first paid purchase.'**
+  /// **'Bonus is credited after your friend\'s first successful purchase.'**
   String get rewardsReferralRulesNote;
+
+  /// No description provided for @rewardsReferralHowItWorksAction.
+  ///
+  /// In en, this message translates to:
+  /// **'How does it work?'**
+  String get rewardsReferralHowItWorksAction;
 
   /// No description provided for @rewardsReferralShareMessage.
   ///
@@ -969,7 +987,7 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsHistoryTitle.
   ///
   /// In en, this message translates to:
-  /// **'Bonus history'**
+  /// **'History'**
   String get rewardsHistoryTitle;
 
   /// No description provided for @rewardsHistorySubtitle.

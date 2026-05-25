@@ -1,10 +1,13 @@
 using System.Security.Claims;
+
 using FluentValidation;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -27,7 +30,25 @@ public static class TemplateGenerationEndpoints
             .RequireAuthorization()
             .DisableAntiforgery();
 
+        group.MapGet("/generations", ListGenerationsAsync)
+            .RequireAuthorization();
+
+        group.MapGet("/generations/unread-count", GetUnreadCountAsync)
+            .RequireAuthorization();
+
         group.MapGet("/generations/{generationId:guid}", GetGenerationAsync)
+            .RequireAuthorization();
+
+        group.MapPost("/generations/{generationId:guid}/mark-read", MarkReadAsync)
+            .RequireAuthorization();
+
+        group.MapPost("/generations/{generationId:guid}/feedback", RecordFeedbackAsync)
+            .RequireAuthorization();
+
+        group.MapPut("/notifications/push-token", RegisterPushTokenAsync)
+            .RequireAuthorization();
+
+        group.MapDelete("/notifications/push-token", UnregisterPushTokenAsync)
             .RequireAuthorization();
 
         return endpoints;
@@ -114,6 +135,159 @@ public static class TemplateGenerationEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<IReadOnlyList<TemplateGenerationResponse>>, ProblemHttpResult>> ListGenerationsAsync(
+        HttpContext context,
+        [FromQuery] string? status,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
+        ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await generationService.ListAsync(
+            userId!.Value,
+            new TemplateGenerationHistoryQuery(status, skip, take),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<TemplateGenerationUnreadCountResponse>, ProblemHttpResult>> GetUnreadCountAsync(
+        HttpContext context,
+        ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await generationService.GetUnreadCountAsync(userId!.Value, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> MarkReadAsync(
+        HttpContext context,
+        Guid generationId,
+        ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await generationService.MarkReadAsync(userId!.Value, generationId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> RegisterPushTokenAsync(
+        HttpContext context,
+        [FromBody] RegisterPushTokenRequest request,
+        ITemplatePushTokenService pushTokenService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await pushTokenService.RegisterAsync(
+            new RegisterTemplatePushTokenCommand(
+                userId!.Value,
+                request.Token,
+                request.Platform,
+                request.DeviceId,
+                request.AppVersion,
+                request.Locale),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> UnregisterPushTokenAsync(
+        HttpContext context,
+        [FromBody] UnregisterPushTokenRequest request,
+        ITemplatePushTokenService pushTokenService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        await pushTokenService.UnregisterAsync(
+            new UnregisterTemplatePushTokenCommand(userId!.Value, request.Token),
+            cancellationToken);
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> RecordFeedbackAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromBody] RecordTemplateGenerationFeedbackRequest request,
+        ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await generationService.RecordFeedbackAsync(
+            new RecordTemplateGenerationFeedbackCommand(
+                userId!.Value,
+                generationId,
+                request.Rating,
+                request.SelectedReasons ?? [],
+                request.Comment,
+                request.InputPhotoQualityScore),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: result.Error.Code == "templates.not_found"
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
+    }
+
     private static Dictionary<string, string[]> ValidateSourceImage(IFormFile? sourceImage, long maxSizeBytes)
     {
         var errors = new Dictionary<string, string[]>();
@@ -162,4 +336,10 @@ public static class TemplateGenerationEndpoints
 
         return (userId, null);
     }
+
+    private sealed record RecordTemplateGenerationFeedbackRequest(int Rating, string[]? SelectedReasons, string? Comment, double? InputPhotoQualityScore);
+
+    private sealed record RegisterPushTokenRequest(string Token, string Platform, string? DeviceId, string? AppVersion, string? Locale);
+
+    private sealed record UnregisterPushTokenRequest(string Token);
 }

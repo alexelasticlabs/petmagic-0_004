@@ -1234,6 +1234,101 @@ public sealed class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GenerationHistoryFeedbackAsync_ShouldTrackUnreadAndTypedFeedback()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var userId = Guid.NewGuid();
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Feedback Portrait",
+                "Template for generation feedback",
+                "Portrait",
+                ["feedback"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = created.Value.TemplateId,
+            Status = TemplateGenerationStatus.Succeeded,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            OutputUrl = "https://cdn.example.com/output.png",
+            UsedPreprocessingModel = "openai/gpt-image-2/edit",
+            PreprocessingProviderRequestId = "image-request-123",
+            AttemptCount = 1,
+            CreatedAtUtc = now.AddMinutes(-3),
+            QueuedAtUtc = now.AddMinutes(-3),
+            StartedAtUtc = now.AddMinutes(-2),
+            CompletedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-3)
+        };
+
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("ready", null, 10), CancellationToken.None);
+
+        Assert.True(history.IsSuccess);
+        var item = Assert.Single(history.Value);
+        Assert.Equal(job.Id, item.GenerationId);
+        Assert.Equal("Succeeded", item.Status);
+        Assert.Equal("succeeded", item.Stage);
+        Assert.Equal(100, item.ProgressPercent);
+        Assert.True(item.IsUnread);
+        Assert.Equal("Feedback Portrait", item.TemplateTitle);
+
+        var unread = await generationService.GetUnreadCountAsync(userId, CancellationToken.None);
+        Assert.True(unread.IsSuccess);
+        Assert.Equal(1, unread.Value.Count);
+
+        var markedRead = await generationService.MarkReadAsync(userId, job.Id, CancellationToken.None);
+        Assert.True(markedRead.IsSuccess);
+
+        var unreadAfterRead = await generationService.GetUnreadCountAsync(userId, CancellationToken.None);
+        Assert.True(unreadAfterRead.IsSuccess);
+        Assert.Equal(0, unreadAfterRead.Value.Count);
+
+        var feedback = await generationService.RecordFeedbackAsync(
+            new RecordTemplateGenerationFeedbackCommand(
+                userId,
+                job.Id,
+                1,
+                ["face_distorted", "style_mismatch"],
+                "The result differs from preview.",
+                0.72),
+            CancellationToken.None);
+
+        Assert.True(feedback.IsSuccess);
+        var persistedFeedback = await dbContext.TemplateGenerationFeedback.SingleAsync();
+        Assert.Equal(job.Id, persistedFeedback.GenerationId);
+        Assert.Equal(created.Value.TemplateId, persistedFeedback.TemplateId);
+        Assert.Equal(1, persistedFeedback.Rating);
+        Assert.Contains("face_distorted", persistedFeedback.SelectedReasons);
+        Assert.Equal("The result differs from preview.", persistedFeedback.Comment);
+        Assert.Equal("openai/gpt-image-2/edit", persistedFeedback.ModelUsed);
+        Assert.Equal("image-request-123", persistedFeedback.ProviderRequestId);
+        Assert.NotNull(persistedFeedback.GenerationDurationSeconds);
+    }
+
+    [Fact]
     public async Task CreateVideoAsync_ShouldResolveNewBadgeInAutoMode_ForFreshTemplates()
     {
         await using var dbContext = CreateDbContext();
@@ -1454,6 +1549,11 @@ public sealed class TemplatesServiceTests
         public ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default)
         {
             InvalidatedCount++;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
+        {
             return ValueTask.CompletedTask;
         }
     }

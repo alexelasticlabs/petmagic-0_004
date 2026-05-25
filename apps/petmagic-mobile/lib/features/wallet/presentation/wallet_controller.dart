@@ -142,6 +142,7 @@ class WalletState {
 
 class WalletController extends Notifier<WalletState> {
   late final WalletRepository _repository;
+  Future<void>? _loadInFlight;
 
   @override
   WalletState build() {
@@ -150,6 +151,24 @@ class WalletController extends Notifier<WalletState> {
   }
 
   Future<void> load({bool refresh = false}) async {
+    final inFlight = _loadInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = _performLoad(refresh: refresh);
+    _loadInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_loadInFlight, operation)) {
+        _loadInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _performLoad({required bool refresh}) async {
     state = state.copyWith(
       isLoading: !refresh,
       isRefreshing: refresh,

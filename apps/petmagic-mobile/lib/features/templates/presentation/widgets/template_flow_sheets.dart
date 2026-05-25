@@ -1067,12 +1067,17 @@ double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
   }
   return switch (generation.status) {
     TemplateGenerationStatus.queued => 0.28,
+    TemplateGenerationStatus.uploading => 0.36,
+    TemplateGenerationStatus.preprocessing => 0.52,
     TemplateGenerationStatus.processing =>
       generation.motionGenerationCompletedAtUtc != null
           ? 0.82
           : generation.preprocessingCompletedAtUtc != null
           ? 0.64
           : 0.48,
+    TemplateGenerationStatus.generating => 0.74,
+    TemplateGenerationStatus.finalizing => 0.9,
+    TemplateGenerationStatus.succeeded => 1,
     TemplateGenerationStatus.completed => 1,
     TemplateGenerationStatus.failed => 1,
   };

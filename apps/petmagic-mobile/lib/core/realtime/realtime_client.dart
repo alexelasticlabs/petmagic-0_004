@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
 
 abstract final class RealtimeTopics {
   static const templatesFeedInvalidated = 'templates.feed.invalidated';
+  static const templatesGenerationStatusChanged =
+      'templates.generation.status_changed';
 }
 
 abstract interface class RealtimeClient {
@@ -86,10 +88,13 @@ class PollingRealtimeClient implements RealtimeClient {
 
 class ServerSentEventsRealtimeClient implements RealtimeClient {
   ServerSentEventsRealtimeClient({
+    required ApiBaseUrlResolver apiBaseUrlResolver,
     HttpClient? httpClient,
     this.reconnectDelay = const Duration(seconds: 3),
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : _apiBaseUrlResolver = apiBaseUrlResolver,
+       _httpClient = httpClient ?? HttpClient();
 
+  final ApiBaseUrlResolver _apiBaseUrlResolver;
   final HttpClient _httpClient;
   final Duration reconnectDelay;
 
@@ -135,7 +140,9 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
 
   Future<void> _runConnectionLoop() async {
     while (!_isStopping) {
-      for (final baseUrl in AppConfig.apiBaseUrls) {
+      final candidates = await _apiBaseUrlResolver.prioritizedCandidates();
+
+      for (final baseUrl in candidates) {
         if (_isStopping) {
           return;
         }
@@ -166,12 +173,15 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       final response = await request.close();
       if (response.statusCode != HttpStatus.ok) {
         await response.drain<void>();
+        await _apiBaseUrlResolver.invalidate(baseUrl);
         return false;
       }
 
+      await _apiBaseUrlResolver.markSuccessful(baseUrl);
       await _consumeResponse(response);
       return true;
     } catch (_) {
+      await _apiBaseUrlResolver.invalidate(baseUrl);
       return false;
     }
   }
@@ -258,12 +268,12 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   bool get _isStopping => _stopSignal?.isCompleted ?? true;
 }
 
-final realtimeClientProvider = Provider<RealtimeClient>(
-  (ref) {
-    final client = ServerSentEventsRealtimeClient();
-    ref.onDispose(() {
-      unawaited(client.disconnect());
-    });
-    return client;
-  },
-);
+final realtimeClientProvider = Provider<RealtimeClient>((ref) {
+  final client = ServerSentEventsRealtimeClient(
+    apiBaseUrlResolver: ref.watch(apiBaseUrlResolverProvider),
+  );
+  ref.onDispose(() {
+    unawaited(client.disconnect());
+  });
+  return client;
+});

@@ -13,9 +13,10 @@ import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart'
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
-import 'package:petmagic_mobile/shared/placeholders/coming_soon_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final launchState = ref.watch(appLaunchControllerProvider);
@@ -112,9 +113,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 const NoTransitionPage(child: TemplatesPage()),
           ),
           GoRoute(
-            path: '/creations',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ComingSoonPage(kind: ComingSoonKind.creations),
+            path: GenerationsGalleryPage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: GenerationsGalleryPage()),
+          ),
+          GoRoute(
+            path: '${GenerationStatusPage.routePrefix}/:generationId',
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: GenerationStatusPage(
+                generationId: state.pathParameters['generationId'] ?? '',
+              ),
             ),
           ),
           GoRoute(

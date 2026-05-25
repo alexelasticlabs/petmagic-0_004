@@ -78,6 +78,8 @@ public sealed class TemplateGenerationJob
 
     public DateTime? CompletedAtUtc { get; set; }
 
+    public DateTime? ResultViewedAtUtc { get; set; }
+
     public DateTime? UserMediaDeletedAtUtc { get; set; }
 
     public DateTime? LastUserMediaCleanupAttemptAtUtc { get; set; }

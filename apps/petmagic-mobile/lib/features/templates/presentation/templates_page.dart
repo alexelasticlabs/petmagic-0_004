@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
@@ -296,11 +297,30 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       return;
     }
 
-    unawaited(generationController.startGeneration(template));
-    await showTemplateGenerationProgressSheet(
-      context: context,
-      template: template,
-    );
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final generation = await generationController.startGeneration(template);
+    if (!mounted) {
+      return;
+    }
+
+    if (generation == null) {
+      final errorMessage = ref
+          .read(templateGenerationControllerProvider)
+          .errorMessage;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            errorMessage == null || errorMessage.isEmpty
+                ? 'Не удалось запустить генерацию. Попробуйте ещё раз.'
+                : _generationStartErrorText(errorMessage),
+          ),
+        ),
+      );
+      return;
+    }
+
+    router.go('${GenerationStatusPage.routePrefix}/${generation.generationId}');
   }
 
   Future<XFile?> _pickPetPhoto() async {
@@ -339,6 +359,22 @@ String _mapTemplatesError(AppLocalizations text, String raw) {
 
   if (value.contains('templates.request_failed')) {
     return text.templatesRequestFailedError;
+  }
+
+  return raw;
+}
+
+String _generationStartErrorText(String raw) {
+  if (raw.contains('templates.insufficient_balance')) {
+    return 'Недостаточно PawSpark для запуска генерации.';
+  }
+
+  if (raw.contains('templates.network_unavailable')) {
+    return 'Нет соединения. Проверьте интернет и попробуйте снова.';
+  }
+
+  if (raw.contains('templates.server_unavailable')) {
+    return 'Сервис временно недоступен. Попробуйте чуть позже.';
   }
 
   return raw;

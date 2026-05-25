@@ -63,6 +63,8 @@ public sealed class TemplatesOptions
     public R2StorageOptions R2 { get; init; } = new();
 
     public FalAiOptions Fal { get; init; } = new();
+
+    public FirebasePushOptions FirebasePush { get; init; } = new();
 }
 
 public static class TemplateStorageProviders
@@ -112,4 +114,20 @@ public sealed class FalAiOptions
     public int MaxPollingAttempts { get; init; } = 180;
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey);
+}
+
+public sealed class FirebasePushOptions
+{
+    public bool Enabled { get; init; }
+
+    public string ProjectId { get; init; } = string.Empty;
+
+    public string ServiceAccountJson { get; init; } = string.Empty;
+
+    public string ServiceAccountJsonPath { get; init; } = string.Empty;
+
+    public bool IsConfigured =>
+        Enabled
+        && !string.IsNullOrWhiteSpace(ProjectId)
+        && (!string.IsNullOrWhiteSpace(ServiceAccountJson) || !string.IsNullOrWhiteSpace(ServiceAccountJsonPath));
 }

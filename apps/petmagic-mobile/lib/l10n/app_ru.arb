@@ -123,8 +123,8 @@
   "walletSpendPremiumSubtitle": "Premium\nот 80 Spark",
   "walletContactSupportAction": "Связаться с поддержкой",
   "walletRetryAction": "Повторить",
-  "rewardsPageTitle": "Бонусы и промокоды",
-  "rewardsPageSubtitle": "Активируйте промокоды, приглашайте друзей и получайте награды.",
+  "rewardsPageTitle": "Бонусы",
+  "rewardsPageSubtitle": "Получайте PawSpark за промокоды и приглашения",
   "rewardsLastUpdatedLabel": "Обновлено: {value}",
   "@rewardsLastUpdatedLabel": {
     "placeholders": {
@@ -148,19 +148,21 @@
       }
     }
   },
-  "rewardsPromoTitle": "Промокоды",
-  "rewardsPromoSubtitle": "Введите промокод, чтобы пополнить баланс PawSpark.",
+  "rewardsPromoTitle": "Промокод",
+  "rewardsPromoSubtitle": "Введите промокод и получите бонус",
   "rewardsPromoEmptyError": "Введите промокод.",
   "rewardsPromoCheckingStatus": "Проверяем код...",
-  "rewardsReferralTitle": "Реферальные бонусы",
+  "rewardsReferralTitle": "Пригласи друга",
   "rewardsReferralSubtitle": "Поделитесь кодом с другом. Бонус начисляется не за регистрацию, а после его первой успешной платной покупки.",
+  "rewardsReferralInvitePrefix": "Друг получит бонус перед первой покупкой, а вы получите",
+  "rewardsReferralInviteSuffix": "после его первой успешной оплаты.",
   "rewardsYourReferralCode": "Ваш код",
   "rewardsCopyReferralCodeAction": "Скопировать",
   "rewardsReferralCopiedMessage": "Код скопирован.",
   "rewardsReferralShareCodeAction": "Поделиться кодом",
   "rewardsReferralUseFriendCodeAction": "Ввести код друга",
   "rewardsReferralFriendCodePrompt": "Есть код друга?",
-  "rewardsReferralFriendCodeHint": "Введите его до первой покупки.",
+  "rewardsReferralFriendCodeHint": "Введите код друга до первой покупки и получите бонус.",
   "rewardsReferralInputLabel": "Код друга",
   "rewardsReferralInputHint": "PMABC12345",
   "rewardsReferralActivateAction": "Активировать код",
@@ -171,9 +173,9 @@
   "rewardsReferralStatusNone": "Введите код друга перед первой покупкой. Бонус начисляется только после успешной оплаты.",
   "rewardsReferralStatusPending": "Рефералка подключена. Бонус начислится после вашей первой успешной платной покупки.",
   "rewardsReferralStatusRewarded": "Реферальный бонус начислен. Спасибо, что развиваете PetMagic.",
-  "rewardsReferralEarnedLabel": "PawSpark получено",
-  "rewardsReferralFriendsLabel": "Друзей приглашено",
-  "rewardsReferralBonusLabel": "Совершили покупку",
+  "rewardsReferralEarnedLabel": "Заработано",
+  "rewardsReferralFriendsLabel": "Друзей",
+  "rewardsReferralBonusLabel": "Покупок друзей",
   "rewardsReferralBonusPerFriend": "+{count} PawSpark за друга",
   "@rewardsReferralBonusPerFriend": {
     "placeholders": {
@@ -182,7 +184,8 @@
       }
     }
   },
-  "rewardsReferralRulesNote": "За регистрацию бонус не начисляется. Награда приходит только после первой успешной платной покупки.",
+  "rewardsReferralRulesNote": "Бонус начисляется после первой успешной покупки друга.",
+  "rewardsReferralHowItWorksAction": "Как это работает?",
   "rewardsReferralShareMessage": "Присоединяйся к PetMagic по моему коду {code}. Бонус начисляется после первой успешной платной покупки. После твоей первой покупки я получу +{bonus} PawSpark.",
   "@rewardsReferralShareMessage": {
     "placeholders": {
@@ -192,7 +195,7 @@
       }
     }
   },
-  "rewardsHistoryTitle": "История бонусов",
+  "rewardsHistoryTitle": "История",
   "rewardsHistorySubtitle": "Последние промокоды, рефералки, реклама и еженедельные награды.",
   "rewardsHistoryEmpty": "Бонусов пока нет. Промокоды и реферальные награды появятся здесь.",
   "rewardsSourcePromo": "Промокод",

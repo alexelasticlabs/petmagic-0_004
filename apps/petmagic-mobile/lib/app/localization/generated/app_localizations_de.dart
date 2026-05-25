@@ -355,11 +355,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get walletRetryAction => 'Retry';
 
   @override
-  String get rewardsPageTitle => 'Rewards and promo codes';
+  String get rewardsPageTitle => 'Rewards';
 
   @override
   String get rewardsPageSubtitle =>
-      'Activate promo codes, invite friends, and earn rewards.';
+      'Earn PawSpark with promo codes and invitations';
 
   @override
   String rewardsLastUpdatedLabel(Object value) {
@@ -380,11 +380,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get rewardsPromoTitle => 'Promo codes';
+  String get rewardsPromoTitle => 'Promo code';
 
   @override
-  String get rewardsPromoSubtitle =>
-      'Enter a promo code to top up your PawSpark balance.';
+  String get rewardsPromoSubtitle => 'Enter a promo code and receive a bonus';
 
   @override
   String get rewardsPromoEmptyError => 'Enter promo code.';
@@ -393,11 +392,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get rewardsPromoCheckingStatus => 'Checking code...';
 
   @override
-  String get rewardsReferralTitle => 'Referral bonuses';
+  String get rewardsReferralTitle => 'Invite a friend';
 
   @override
   String get rewardsReferralSubtitle =>
       'Share your code with a friend. Referral bonus is not paid for signup and is credited only after their first successful paid purchase.';
+
+  @override
+  String get rewardsReferralInvitePrefix =>
+      'Your friend gets a bonus before their first purchase, and you get';
+
+  @override
+  String get rewardsReferralInviteSuffix =>
+      'after their first successful payment.';
 
   @override
   String get rewardsYourReferralCode => 'Your code';
@@ -419,7 +426,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get rewardsReferralFriendCodeHint =>
-      'Enter it before your first purchase.';
+      'Enter a friend\'s code before your first purchase and get a bonus.';
 
   @override
   String get rewardsReferralInputLabel => 'Friend code';
@@ -456,13 +463,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Referral bonus paid. Thanks for growing PetMagic.';
 
   @override
-  String get rewardsReferralEarnedLabel => 'PawSpark earned';
+  String get rewardsReferralEarnedLabel => 'Earned';
 
   @override
-  String get rewardsReferralFriendsLabel => 'Friends invited';
+  String get rewardsReferralFriendsLabel => 'Friends';
 
   @override
-  String get rewardsReferralBonusLabel => 'Completed purchases';
+  String get rewardsReferralBonusLabel => 'Friend purchases';
 
   @override
   String rewardsReferralBonusPerFriend(int count) {
@@ -471,7 +478,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get rewardsReferralRulesNote =>
-      'No signup bonus. Referral reward is credited only after a successful first paid purchase.';
+      'Bonus is credited after your friend\'s first successful purchase.';
+
+  @override
+  String get rewardsReferralHowItWorksAction => 'How does it work?';
 
   @override
   String rewardsReferralShareMessage(Object code, int bonus) {
@@ -479,7 +489,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get rewardsHistoryTitle => 'Bonus history';
+  String get rewardsHistoryTitle => 'History';
 
   @override
   String get rewardsHistorySubtitle =>

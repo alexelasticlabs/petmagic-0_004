@@ -1,10 +1,15 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 
 const _bottomNavHeight = 42.0;
 const _bottomNavOuterGap = 10.0;
@@ -34,17 +39,25 @@ double petMagicBottomSheetOffset(BuildContext context) {
       _bottomSheetBottomGap;
 }
 
-class PetMagicShell extends StatelessWidget {
+class PetMagicShell extends ConsumerWidget {
   const PetMagicShell({required this.location, required this.child, super.key});
 
   final String location;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
     final showBottomNav = !hasKeyboard && isCurrentRoute;
+    final activeGeneration = ref.watch(
+      templateGenerationControllerProvider.select((state) => state.generation),
+    );
+    final showActiveBanner =
+        showBottomNav &&
+        activeGeneration != null &&
+        !activeGeneration.isTerminal &&
+        !location.startsWith(GenerationStatusPage.routePrefix);
 
     return Scaffold(
       body: Stack(
@@ -52,6 +65,10 @@ class PetMagicShell extends StatelessWidget {
         children: [
           child,
           if (showBottomNav) const _BottomNavBackdrop(),
+          if (showActiveBanner)
+            _ActiveGenerationBanner(
+              generationId: activeGeneration.generationId,
+            ),
           if (showBottomNav) _FloatingBottomNav(location: location),
         ],
       ),
@@ -97,19 +114,27 @@ class _BottomNavBackdrop extends StatelessWidget {
   }
 }
 
-class _FloatingBottomNav extends StatelessWidget {
+class _FloatingBottomNav extends ConsumerWidget {
   const _FloatingBottomNav({required this.location});
 
   final String location;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+    final unreadCount = ref.watch(
+      generationHistoryControllerProvider.select((state) => state.unreadCount),
+    );
     final items = [
       _NavItem('/templates', Icons.play_arrow_rounded, text.navTemplates),
-      _NavItem('/creations', Icons.photo_library_outlined, text.navCreations),
+      _NavItem(
+        GenerationsGalleryPage.routePath,
+        Icons.photo_library_outlined,
+        text.navCreations,
+        badgeCount: unreadCount,
+      ),
       _NavItem(
         RewardsPage.routePath,
         Icons.card_giftcard_rounded,
@@ -181,7 +206,9 @@ class _FloatingBottomNav extends StatelessWidget {
                                   child: _BottomNavButton(
                                     item: item,
                                     selected: _isSelected(item.path, location),
-                                    onTap: () => context.go(item.path),
+                                    onTap: _isSelected(item.path, location)
+                                        ? null
+                                        : () => context.go(item.path),
                                   ),
                                 ),
                               ),
@@ -203,8 +230,82 @@ class _FloatingBottomNav extends StatelessWidget {
     return switch (path) {
       '/profile' => location.startsWith('/profile'),
       RewardsPage.routePath => location.startsWith(RewardsPage.routePath),
+      GenerationsGalleryPage.routePath =>
+        location == GenerationsGalleryPage.routePath ||
+            location.startsWith(GenerationStatusPage.routePrefix),
       _ => location == path,
     };
+  }
+}
+
+class _ActiveGenerationBanner extends StatelessWidget {
+  const _ActiveGenerationBanner({required this.generationId});
+
+  final String generationId;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          bottomPadding + _bottomNavOuterGap + _bottomNavHeight + 10,
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () =>
+              context.go('${GenerationStatusPage.routePrefix}/$generationId'),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surfaceGlass.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.accent.withValues(alpha: 0.22)),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.shadow.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+              child: Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.3,
+                      color: colors.accent,
+                      backgroundColor: colors.border.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Генерация продолжается',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textStrong,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: colors.textMuted),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -217,7 +318,7 @@ class _BottomNavButton extends StatelessWidget {
 
   final _NavItem item;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -247,10 +348,33 @@ class _BottomNavButton extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                item.icon,
-                color: selected ? colors.accent : inactiveColor,
-                size: 17,
+              SizedBox(
+                width: 24,
+                height: 18,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      item.icon,
+                      color: selected ? colors.accent : inactiveColor,
+                      size: 17,
+                    ),
+                    if (item.badgeCount > 0)
+                      Positioned(
+                        right: 1,
+                        top: 0,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: colors.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 1),
               Text(
@@ -274,9 +398,10 @@ class _BottomNavButton extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem(this.path, this.icon, this.label);
+  const _NavItem(this.path, this.icon, this.label, {this.badgeCount = 0});
 
   final String path;
   final IconData icon;
   final String label;
+  final int badgeCount;
 }

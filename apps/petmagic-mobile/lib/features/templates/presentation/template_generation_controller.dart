@@ -137,10 +137,12 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     );
   }
 
-  Future<void> startGeneration(TemplateItem template) async {
+  Future<TemplateGenerationResult?> startGeneration(
+    TemplateItem template,
+  ) async {
     final photo = state.selectedPhoto;
     if (photo == null || state.isCreating) {
-      return;
+      return null;
     }
 
     _stopPolling();
@@ -168,6 +170,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       }
 
       await ref.read(walletControllerProvider.notifier).load(refresh: true);
+      return generation;
     } catch (error) {
       await ref.read(walletControllerProvider.notifier).load(refresh: true);
       state = state.copyWith(
@@ -175,6 +178,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         isPolling: false,
         errorMessage: _mapGenerationError(error),
       );
+      return null;
     }
   }
 

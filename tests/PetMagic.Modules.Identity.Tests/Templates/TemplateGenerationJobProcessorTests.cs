@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using System.Threading.Channels;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -354,8 +357,37 @@ public sealed class TemplateGenerationJobProcessorTests
             generatedMediaImporter ?? new NoopGeneratedMediaImporter(),
             mediaMetadataReader ?? new FixedDurationMetadataReader(),
             billing ?? new TestTemplateGenerationBilling(),
+            new RecordingTemplateFeedRealtimeService(),
+            new NoopPushNotificationSender(),
             options ?? CreateOptions(),
             NullLogger<TemplateGenerationJobProcessor>.Instance);
+    }
+
+    private sealed class NoopPushNotificationSender : ITemplateGenerationPushNotificationSender
+    {
+        public Task NotifyGenerationTerminalAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingTemplateFeedRealtimeService : ITemplateFeedRealtimeService
+    {
+        public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
+        {
+            var channel = Channel.CreateUnbounded<TemplateFeedRealtimeEvent>();
+            return channel.Reader;
+        }
+
+        public ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     private static TemplatesOptions CreateOptions(int refundRetryDelayMilliseconds = 30_000, int retentionDays = 7, int staleProcessingRecoveryDelayMilliseconds = 900_000)

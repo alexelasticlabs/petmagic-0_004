@@ -123,8 +123,8 @@
   "walletSpendPremiumSubtitle": "Premium\nfrom 80 Spark",
   "walletContactSupportAction": "Contact support",
   "walletRetryAction": "Retry",
-  "rewardsPageTitle": "Rewards and promo codes",
-  "rewardsPageSubtitle": "Activate promo codes, invite friends, and earn rewards.",
+  "rewardsPageTitle": "Rewards",
+  "rewardsPageSubtitle": "Earn PawSpark with promo codes and invitations",
   "rewardsLastUpdatedLabel": "Updated: {value}",
   "@rewardsLastUpdatedLabel": {
     "placeholders": {
@@ -148,19 +148,21 @@
       }
     }
   },
-  "rewardsPromoTitle": "Promo codes",
-  "rewardsPromoSubtitle": "Enter a promo code to top up your PawSpark balance.",
+  "rewardsPromoTitle": "Promo code",
+  "rewardsPromoSubtitle": "Enter a promo code and receive a bonus",
   "rewardsPromoEmptyError": "Enter promo code.",
   "rewardsPromoCheckingStatus": "Checking code...",
-  "rewardsReferralTitle": "Referral bonuses",
+  "rewardsReferralTitle": "Invite a friend",
   "rewardsReferralSubtitle": "Share your code with a friend. Referral bonus is not paid for signup and is credited only after their first successful paid purchase.",
+  "rewardsReferralInvitePrefix": "Your friend gets a bonus before their first purchase, and you get",
+  "rewardsReferralInviteSuffix": "after their first successful payment.",
   "rewardsYourReferralCode": "Your code",
   "rewardsCopyReferralCodeAction": "Copy",
   "rewardsReferralCopiedMessage": "Code copied.",
   "rewardsReferralShareCodeAction": "Share code",
   "rewardsReferralUseFriendCodeAction": "Enter friend code",
   "rewardsReferralFriendCodePrompt": "Have a friend's code?",
-  "rewardsReferralFriendCodeHint": "Enter it before your first purchase.",
+  "rewardsReferralFriendCodeHint": "Enter a friend's code before your first purchase and get a bonus.",
   "rewardsReferralInputLabel": "Friend code",
   "rewardsReferralInputHint": "PMABC12345",
   "rewardsReferralActivateAction": "Activate code",
@@ -171,9 +173,9 @@
   "rewardsReferralStatusNone": "Enter a friend's code before your first purchase. Bonus is credited only after a successful payment.",
   "rewardsReferralStatusPending": "Referral connected. Bonus will be paid after your first successful paid purchase.",
   "rewardsReferralStatusRewarded": "Referral bonus paid. Thanks for growing PetMagic.",
-  "rewardsReferralEarnedLabel": "PawSpark earned",
-  "rewardsReferralFriendsLabel": "Friends invited",
-  "rewardsReferralBonusLabel": "Completed purchases",
+  "rewardsReferralEarnedLabel": "Earned",
+  "rewardsReferralFriendsLabel": "Friends",
+  "rewardsReferralBonusLabel": "Friend purchases",
   "rewardsReferralBonusPerFriend": "+{count} PawSpark per invited friend",
   "@rewardsReferralBonusPerFriend": {
     "placeholders": {
@@ -182,7 +184,8 @@
       }
     }
   },
-  "rewardsReferralRulesNote": "No signup bonus. Referral reward is credited only after a successful first paid purchase.",
+  "rewardsReferralRulesNote": "Bonus is credited after your friend's first successful purchase.",
+  "rewardsReferralHowItWorksAction": "How does it work?",
   "rewardsReferralShareMessage": "Join me in PetMagic! Use my referral code {code}. Bonus is credited after your first successful paid purchase. After your first purchase I'll receive +{bonus} PawSpark.",
   "@rewardsReferralShareMessage": {
     "placeholders": {
@@ -192,7 +195,7 @@
       }
     }
   },
-  "rewardsHistoryTitle": "Bonus history",
+  "rewardsHistoryTitle": "History",
   "rewardsHistorySubtitle": "Recent promo, referral, ad and weekly rewards.",
   "rewardsHistoryEmpty": "No bonuses yet. Promo and referral rewards will appear here.",
   "rewardsSourcePromo": "Promo code",

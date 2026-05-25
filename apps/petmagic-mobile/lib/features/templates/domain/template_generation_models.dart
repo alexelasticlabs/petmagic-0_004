@@ -1,10 +1,25 @@
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
-enum TemplateGenerationStatus { queued, processing, completed, failed }
+enum TemplateGenerationStatus {
+  queued,
+  uploading,
+  processing,
+  preprocessing,
+  generating,
+  finalizing,
+  succeeded,
+  completed,
+  failed,
+}
 
 TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
   return switch (value.toLowerCase()) {
+    'uploading' => TemplateGenerationStatus.uploading,
     'processing' => TemplateGenerationStatus.processing,
+    'preprocessing' => TemplateGenerationStatus.preprocessing,
+    'generating' => TemplateGenerationStatus.generating,
+    'finalizing' => TemplateGenerationStatus.finalizing,
+    'succeeded' => TemplateGenerationStatus.succeeded,
     'completed' => TemplateGenerationStatus.completed,
     'failed' => TemplateGenerationStatus.failed,
     _ => TemplateGenerationStatus.queued,
@@ -22,6 +37,11 @@ class TemplateGenerationResult {
     required this.createdAtUtc,
     required this.updatedAtUtc,
     required this.userMediaExpired,
+    this.templateTitle,
+    this.templateType,
+    this.stage,
+    this.progressPercent,
+    this.estimatedDurationLabel,
     this.sourceImageAsset,
     this.normalizedImageUrl,
     this.referenceMotionUrl,
@@ -36,6 +56,9 @@ class TemplateGenerationResult {
     this.motionGenerationCompletedAtUtc,
     this.mediaImportCompletedAtUtc,
     this.completedAtUtc,
+    this.chargedAtUtc,
+    this.refundedAtUtc,
+    this.isUnread = false,
   });
 
   final String generationId;
@@ -55,18 +78,48 @@ class TemplateGenerationResult {
   final String? failureMessage;
   final DateTime createdAtUtc;
   final DateTime updatedAtUtc;
+  final String? templateTitle;
+  final String? templateType;
+  final String? stage;
+  final int? progressPercent;
+  final String? estimatedDurationLabel;
   final DateTime? startedAtUtc;
   final DateTime? preprocessingCompletedAtUtc;
   final DateTime? motionGenerationCompletedAtUtc;
   final DateTime? mediaImportCompletedAtUtc;
   final DateTime? completedAtUtc;
+  final DateTime? chargedAtUtc;
+  final DateTime? refundedAtUtc;
   final bool userMediaExpired;
+  final bool isUnread;
 
   bool get isTerminal =>
+      status == TemplateGenerationStatus.succeeded ||
       status == TemplateGenerationStatus.completed ||
       status == TemplateGenerationStatus.failed;
 
-  bool get isCompleted => status == TemplateGenerationStatus.completed;
+  bool get isCompleted =>
+      status == TemplateGenerationStatus.succeeded ||
+      status == TemplateGenerationStatus.completed;
 
   bool get isFailed => status == TemplateGenerationStatus.failed;
+
+  int get effectiveProgressPercent {
+    final explicit = progressPercent;
+    if (explicit != null) {
+      return explicit.clamp(0, 100);
+    }
+
+    return switch (status) {
+      TemplateGenerationStatus.succeeded ||
+      TemplateGenerationStatus.completed => 100,
+      TemplateGenerationStatus.failed => 100,
+      TemplateGenerationStatus.finalizing => 90,
+      TemplateGenerationStatus.generating => 65,
+      TemplateGenerationStatus.preprocessing ||
+      TemplateGenerationStatus.processing => 30,
+      TemplateGenerationStatus.uploading => 15,
+      TemplateGenerationStatus.queued => 10,
+    };
+  }
 }

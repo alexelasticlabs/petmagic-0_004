@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,10 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:share_plus/share_plus.dart';
 
 class RewardsPage extends ConsumerStatefulWidget {
   const RewardsPage({super.key});
@@ -57,41 +57,50 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
           );
     final warningMessage = _rewardsWarningMessage(text, state.errorMessage);
 
-    return ProfileScreenBackground(
+    return _RewardsBackdrop(
       child: SafeArea(
         child: state.isInitialLoading
-            ? const Center(child: CircularProgressIndicator.adaptive())
+            ? Center(
+                child: CircularProgressIndicator.adaptive(
+                  valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+                ),
+              )
             : RefreshIndicator.adaptive(
                 onRefresh: () => controller.load(refresh: true),
                 color: colors.accent,
+                backgroundColor: colors.surfaceStrong,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(14, 8, 14, bottomNavInset),
+                  padding: EdgeInsets.fromLTRB(15, 22, 15, bottomNavInset + 8),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    _RewardsHeader(
-                      lastUpdatedAt: state.wallet?.updatedAtUtc,
-                      onRefresh: () => controller.load(refresh: true),
+                    _RewardsHero(
+                      balance: state.wallet?.balance,
+                      onHistoryTap: () => controller.load(refresh: true),
                     ),
                     if (warningMessage != null) ...[
-                      const SizedBox(height: 12),
-                      ProfileMessageCard(
+                      const SizedBox(height: 14),
+                      _WarningBanner(
                         message: warningMessage,
                         tone: _warningTone,
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    _RewardsBalanceCard(balance: state.wallet?.balance),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     _PromoCodeCard(
                       isSubmitting: state.isRedeeming,
                       onSubmit: controller.applyRedeemCode,
                     ),
-                    const SizedBox(height: 10),
-                    _ReferralCard(
-                      rewards: rewardsSummary,
-                      isSubmitting: state.isApplyingReferral,
-                      onSubmit: controller.applyReferralCode,
-                    ),
+                    const SizedBox(height: 14),
+                    _ReferralCard(rewards: rewardsSummary),
+                    const SizedBox(height: 12),
+                    _ReferralInfoNote(rewards: rewardsSummary),
+                    if (rewardsSummary?.hasActivatedReferral != true) ...[
+                      const SizedBox(height: 22),
+                      _FriendCodeCard(
+                        rewards: rewardsSummary,
+                        isSubmitting: state.isApplyingReferral,
+                        onSubmit: controller.applyReferralCode,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -125,85 +134,138 @@ class _RewardsSummaryView {
 
 enum _FeedbackTone { success, warning, info }
 
-class _RewardsHeader extends StatelessWidget {
-  const _RewardsHeader({required this.onRefresh, this.lastUpdatedAt});
+class _RewardsBackdrop extends StatelessWidget {
+  const _RewardsBackdrop({required this.child});
 
-  final VoidCallback onRefresh;
-  final DateTime? lastUpdatedAt;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final localeTag = Localizations.localeOf(context).toLanguageTag();
-    final lastUpdatedText = _formatLastUpdatedText(
-      text,
-      lastUpdatedAt,
-      localeTag,
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                text.rewardsPageTitle,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                text.rewardsPageSubtitle,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 13,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF020811), Color(0xFF00040A)],
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: -70,
+            right: -90,
+            child: _GlowOrb(
+              size: 260,
+              color: const Color(0xFF0EA86D).withValues(alpha: 0.18),
+            ),
           ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              text.rewardsLastUpdatedLabel(lastUpdatedText),
-              style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
+          Positioned(
+            top: 82,
+            left: -92,
+            child: _GlowOrb(
+              size: 220,
+              color: const Color(0xFF1E8CFF).withValues(alpha: 0.08),
             ),
-            const SizedBox(height: 2),
-            IconButton(
-              tooltip: text.walletRefreshTooltip,
-              onPressed: onRefresh,
-              icon: Icon(
-                Icons.refresh_rounded,
-                size: 20,
-                color: colors.textSoft,
-              ),
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-            ),
-          ],
-        ),
-      ],
+          ),
+          const Positioned(
+            top: 44,
+            right: 108,
+            child: _DecorativePaw(size: 36, opacity: 0.12, turns: -0.12),
+          ),
+          const Positioned(
+            top: 74,
+            left: 154,
+            child: _DecorativePaw(size: 34, opacity: 0.1, turns: 0.1),
+          ),
+          const Positioned(
+            top: 112,
+            right: 20,
+            child: _DecorativeSpark(size: 18),
+          ),
+          const Positioned(
+            top: 154,
+            left: 196,
+            child: _DecorativeSpark(size: 14),
+          ),
+          child,
+        ],
+      ),
     );
   }
 }
 
-class _RewardsBalanceCard extends StatelessWidget {
-  const _RewardsBalanceCard({required this.balance});
+class _GlowOrb extends StatelessWidget {
+  const _GlowOrb({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+        ),
+      ),
+    );
+  }
+}
+
+class _DecorativePaw extends StatelessWidget {
+  const _DecorativePaw({
+    required this.size,
+    required this.opacity,
+    required this.turns,
+  });
+
+  final double size;
+  final double opacity;
+  final double turns;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Transform.rotate(
+        angle: turns,
+        child: Icon(
+          Icons.pets_rounded,
+          size: size,
+          color: const Color(0xFF38D77A).withValues(alpha: opacity),
+        ),
+      ),
+    );
+  }
+}
+
+class _DecorativeSpark extends StatelessWidget {
+  const _DecorativeSpark({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Icon(
+        Icons.auto_awesome_rounded,
+        size: size,
+        color: const Color(0xFFFFF0A6).withValues(alpha: 0.95),
+      ),
+    );
+  }
+}
+
+class _RewardsHero extends StatelessWidget {
+  const _RewardsHero({required this.balance, required this.onHistoryTap});
+
+  static const _balanceImage = 'assets/rewards/balance.png';
 
   final int? balance;
+  final VoidCallback onHistoryTap;
 
   @override
   Widget build(BuildContext context) {
@@ -211,54 +273,320 @@ class _RewardsBalanceCard extends StatelessWidget {
     final colors = context.petMagicColors;
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     final balanceValue = balance == null
-        ? text.profileWalletLoadingHint
-        : '${NumberFormat.decimalPattern(localeTag).format(balance)} ${text.walletBalanceUnit}';
+        ? '...'
+        : NumberFormat.decimalPattern(localeTag).format(balance);
 
-    return ProfileGlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
+    return SizedBox(
+      height: 205,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: colors.accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(
-              Icons.account_balance_wallet_rounded,
-              size: 18,
-              color: colors.accent,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
+          Positioned(
+            top: 0,
+            left: 4,
+            right: 0,
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  text.walletBalanceEyebrow,
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text.rewardsPageTitle,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 31,
+                          height: 1.05,
+                          fontWeight: FontWeight.w900,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 13),
+                      SizedBox(
+                        width: 180,
+                        child: Text(
+                          text.rewardsPageSubtitle,
+                          style: TextStyle(
+                            color: colors.textSoft,
+                            fontSize: 16,
+                            height: 1.42,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
+                _HistoryButton(onPressed: onHistoryTap),
+              ],
+            ),
+          ),
+          Positioned(
+            right: -26,
+            top: 28,
+            child: IgnorePointer(
+              child: Image.asset(
+                _balanceImage,
+                width: 212,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _BalancePanel(
+              balanceValue: balanceValue,
+              unit: text.walletBalanceUnit,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryButton extends StatelessWidget {
+  const _HistoryButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            color: const Color(0xFF07111C).withValues(alpha: 0.66),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFF243143)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.history_toggle_off_rounded,
+                size: 21,
+                color: Color(0xFF38E681),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                text.rewardsHistoryTitle,
+                style: const TextStyle(
+                  color: Color(0xFF48E581),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BalancePanel extends StatelessWidget {
+  const _BalancePanel({required this.balanceValue, required this.unit});
+
+  final String balanceValue;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return Container(
+      height: 96,
+      padding: const EdgeInsets.fromLTRB(18, 16, 160, 15),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(29),
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            const Color(0xFF042E25).withValues(alpha: 0.95),
+            const Color(0xFF0A5A36).withValues(alpha: 0.62),
+            const Color(0xFF0A1820).withValues(alpha: 0.88),
+          ],
+        ),
+        border: Border.all(
+          color: const Color(0xFF136746).withValues(alpha: 0.7),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0DD978).withValues(alpha: 0.18),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            text.walletBalanceEyebrow,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF44E681),
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
                   balanceValue,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.textStrong,
-                    fontSize: 15.5,
+                    fontSize: 34,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 7),
+              const _SparkTokenIcon(size: 34),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  unit,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SparkTokenIcon extends StatelessWidget {
+  const _SparkTokenIcon({this.size = 30});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7BF287), Color(0xFF19B963)],
+        ),
+        border: Border.all(
+          color: const Color(0xFFB6FF9F).withValues(alpha: 0.58),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2BE66C).withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Icon(
+          Icons.pets_rounded,
+          size: size * 0.58,
+          color: const Color(0xFF05351F),
+        ),
+      ),
+    );
+  }
+}
+
+class _RewardsGlassPanel extends StatelessWidget {
+  const _RewardsGlassPanel({
+    required this.child,
+    this.padding = const EdgeInsets.all(15),
+    this.gradient,
+    this.borderColor,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final Gradient? gradient;
+  final Color? borderColor;
+
+  static const _radius = 26.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(_radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(_radius),
+            gradient:
+                gradient ??
+                LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF121D2C).withValues(alpha: 0.9),
+                    const Color(0xFF07101A).withValues(alpha: 0.92),
+                  ],
+                ),
+            border: Border.all(
+              color: borderColor ?? const Color(0xFF1D2B3C),
+              width: 1.1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.36),
+                blurRadius: 28,
+                offset: const Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
   }
@@ -335,35 +663,83 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
-    return ProfileGlassCard(
-      padding: const EdgeInsets.all(14),
+    return _RewardsGlassPanel(
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
       child: Material(
         color: Colors.transparent,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _CardTitle(
+            _SectionHeader(
               icon: Icons.confirmation_number_rounded,
+              iconGradient: const LinearGradient(
+                colors: [Color(0xFFDDFB72), Color(0xFF49C667)],
+              ),
               title: text.rewardsPromoTitle,
               subtitle: text.rewardsPromoSubtitle,
             ),
             const SizedBox(height: 14),
-            TextField(
-              key: const Key('rewards_promo_input'),
-              controller: _controller,
-              textCapitalization: TextCapitalization.characters,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => unawaited(_submit()),
-              style: TextStyle(
-                color: colors.textStrong,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-              ),
-              decoration: InputDecoration(
-                labelText: text.walletRedeemInputLabel,
-                hintText: text.walletRedeemHint,
-                prefixIcon: const Icon(Icons.local_activity_rounded),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('rewards_promo_input'),
+                    controller: _controller,
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => unawaited(_submit()),
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                    decoration: _fieldDecoration(
+                      context,
+                      hintText: text.walletRedeemHint,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 112,
+                  height: 54,
+                  child: FilledButton(
+                    key: const Key('rewards_promo_submit'),
+                    onPressed: widget.isSubmitting ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF49DA87),
+                      foregroundColor: const Color(0xFF06140C),
+                      disabledBackgroundColor: const Color(0xFF314036),
+                      disabledForegroundColor: const Color(0xFF7F8EA0),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    child: widget.isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator.adaptive(
+                              strokeWidth: 2.2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF06140C),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            text.walletRedeemAction,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                  ),
+                ),
+              ],
             ),
             if (_message != null) ...[
               const SizedBox(height: 12),
@@ -372,31 +748,6 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                 tone: _feedbackToneColor(_messageTone, colors),
               ),
             ],
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                key: const Key('rewards_promo_submit'),
-                onPressed: widget.isSubmitting ? null : _submit,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(44),
-                ),
-                icon: widget.isSubmitting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator.adaptive(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.check_circle_rounded),
-                label: Text(
-                  widget.isSubmitting
-                      ? '${text.walletRedeemAction}...'
-                      : text.walletRedeemAction,
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -405,50 +756,23 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
 }
 
 class _ReferralCard extends StatefulWidget {
-  const _ReferralCard({
-    required this.rewards,
-    required this.isSubmitting,
-    required this.onSubmit,
-  });
+  const _ReferralCard({required this.rewards});
 
   final _RewardsSummaryView? rewards;
-  final bool isSubmitting;
-  final Future<String?> Function(String code) onSubmit;
 
   @override
   State<_ReferralCard> createState() => _ReferralCardState();
 }
 
 class _ReferralCardState extends State<_ReferralCard> {
-  late final TextEditingController _controller;
-  late final FocusNode _friendCodeFocusNode;
+  static const _inviteImage = 'assets/rewards/invite-friend.png';
+
   Timer? _copyHintTimer;
-  String? _message;
-  _FeedbackTone _messageTone = _FeedbackTone.info;
   bool _showCopyHint = false;
-  bool _showFriendCodeInput = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-    _friendCodeFocusNode = FocusNode();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ReferralCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (widget.rewards?.hasActivatedReferral == true) {
-      _showFriendCodeInput = false;
-    }
-  }
 
   @override
   void dispose() {
     _copyHintTimer?.cancel();
-    _controller.dispose();
-    _friendCodeFocusNode.dispose();
     super.dispose();
   }
 
@@ -487,6 +811,314 @@ class _ReferralCardState extends State<_ReferralCard> {
     );
 
     await SharePlus.instance.share(ShareParams(text: shareMessage));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final rewards = widget.rewards;
+    final hasRewards = rewards != null;
+    final bonus = rewards?.referralBonusSpark ?? 15;
+
+    return _RewardsGlassPanel(
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+      borderColor: const Color(0xFF0C6E4D).withValues(alpha: 0.78),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFF062D24).withValues(alpha: 0.96),
+          const Color(0xFF092B22).withValues(alpha: 0.88),
+          const Color(0xFF061018).withValues(alpha: 0.94),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              right: -36,
+              top: 14,
+              child: IgnorePointer(
+                child: Image.asset(
+                  _inviteImage,
+                  width: 210,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+            ),
+            const Positioned(
+              top: 26,
+              right: 42,
+              child: _DecorativeSpark(size: 15),
+            ),
+            const Positioned(
+              top: 44,
+              right: 10,
+              child: _DecorativeSpark(size: 10),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionHeader(
+                  icon: Icons.group_rounded,
+                  iconGradient: const LinearGradient(
+                    colors: [Color(0xFF46E58B), Color(0xFF11753D)],
+                  ),
+                  title: text.rewardsReferralTitle,
+                  subtitle: null,
+                ),
+                const SizedBox(height: 22),
+                SizedBox(width: 190, child: _ReferralInviteText(bonus: bonus)),
+                const SizedBox(height: 16),
+                _ReferralCodeBox(
+                  code: hasRewards && rewards.referralCode.isNotEmpty
+                      ? rewards.referralCode
+                      : '...',
+                  canCopy: hasRewards,
+                  onCopy: _copyCode,
+                ),
+                if (_showCopyHint) ...[
+                  const SizedBox(height: 7),
+                  Text(
+                    text.rewardsReferralCopiedMessage,
+                    style: const TextStyle(
+                      color: Color(0xFF44E681),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _GradientActionButton(
+                  key: const Key('rewards_referral_share'),
+                  height: 52,
+                  label: text.rewardsReferralShareCodeAction,
+                  icon: Icons.ios_share_rounded,
+                  onPressed: hasRewards ? _shareCode : null,
+                ),
+                const SizedBox(height: 14),
+                _ReferralStats(rewards: rewards),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReferralInviteText extends StatelessWidget {
+  const _ReferralInviteText({required this.bonus});
+
+  final int bonus;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '${text.rewardsReferralInvitePrefix} '),
+          TextSpan(
+            text: '+$bonus ${text.walletBalanceUnit}',
+            style: const TextStyle(
+              color: Color(0xFF48E581),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          TextSpan(text: ' ${text.rewardsReferralInviteSuffix}'),
+        ],
+      ),
+      style: TextStyle(
+        color: colors.textSoft,
+        fontSize: 13.5,
+        height: 1.42,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+class _ReferralCodeBox extends StatelessWidget {
+  const _ReferralCodeBox({
+    required this.code,
+    required this.canCopy,
+    required this.onCopy,
+  });
+
+  final String code;
+  final bool canCopy;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return Container(
+      width: 240,
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF031116).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: const Color(0xFF12382F).withValues(alpha: 0.9),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.32),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text.rewardsYourReferralCode,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  code,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 18,
+                    height: 1.1,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            key: const Key('rewards_referral_copy'),
+            onPressed: canCopy ? onCopy : null,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: Text(text.rewardsCopyReferralCodeAction),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReferralInfoNote extends StatelessWidget {
+  const _ReferralInfoNote({required this.rewards});
+
+  final _RewardsSummaryView? rewards;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final statusText = rewards == null
+        ? text.rewardsReferralStatusLoading
+        : rewards!.hasActivatedReferral
+        ? _referralStatusText(text, rewards!)
+        : text.rewardsReferralRulesNote;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 18, color: colors.textMuted),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 12.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text.rewardsReferralHowItWorksAction,
+                  style: const TextStyle(
+                    color: Color(0xFF44E681),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendCodeCard extends StatefulWidget {
+  const _FriendCodeCard({
+    required this.rewards,
+    required this.isSubmitting,
+    required this.onSubmit,
+  });
+
+  final _RewardsSummaryView? rewards;
+  final bool isSubmitting;
+  final Future<String?> Function(String code) onSubmit;
+
+  @override
+  State<_FriendCodeCard> createState() => _FriendCodeCardState();
+}
+
+class _FriendCodeCardState extends State<_FriendCodeCard> {
+  late final TextEditingController _controller;
+  late final FocusNode _friendCodeFocusNode;
+  String? _message;
+  _FeedbackTone _messageTone = _FeedbackTone.info;
+  bool _showFriendCodeInput = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _friendCodeFocusNode = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FriendCodeCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.rewards?.hasActivatedReferral == true) {
+      _showFriendCodeInput = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _friendCodeFocusNode.dispose();
+    super.dispose();
   }
 
   void _openFriendCodeInput() {
@@ -547,250 +1179,202 @@ class _ReferralCardState extends State<_ReferralCard> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final rewards = widget.rewards;
-    final hasRewards = rewards != null;
-    final hasActivatedReferral = rewards?.hasActivatedReferral == true;
-    final statusText = rewards == null
-        ? text.rewardsReferralStatusLoading
-        : _referralStatusText(text, rewards);
 
-    return ProfileGlassCard(
+    return _RewardsGlassPanel(
       padding: const EdgeInsets.all(14),
+      borderColor: const Color(0xFF3B3264).withValues(alpha: 0.86),
+      gradient: LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          const Color(0xFF15182B).withValues(alpha: 0.96),
+          const Color(0xFF101421).withValues(alpha: 0.96),
+        ],
+      ),
       child: Material(
         color: Colors.transparent,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _CardTitle(
-              icon: Icons.group_add_rounded,
-              title: text.rewardsReferralTitle,
-              subtitle: text.rewardsReferralSubtitle,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              text.rewardsReferralBonusPerFriend(
-                rewards?.referralBonusSpark ?? 0,
-              ),
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 12,
-                height: 1.3,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              text.rewardsReferralRulesNote,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 11.5,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.surface.withValues(alpha: 0.34),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: colors.border.withValues(alpha: 0.9)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            text.rewardsYourReferralCode,
-                            style: TextStyle(
-                              color: colors.textSoft,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            hasRewards && rewards.referralCode.isNotEmpty
-                                ? rewards.referralCode
-                                : '...',
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.9,
-                            ),
-                          ),
-                        ],
-                      ),
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF5B347C), Color(0xFF2B1F54)],
                     ),
-                    TextButton.icon(
-                      key: const Key('rewards_referral_copy'),
-                      onPressed: hasRewards ? _copyCode : null,
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 36),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA855F7).withValues(alpha: 0.2),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.group_add_rounded,
+                    color: Color(0xFFEBD6FF),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text.rewardsReferralFriendCodePrompt,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                      icon: const Icon(Icons.copy_rounded, size: 18),
-                      label: Text(text.rewardsCopyReferralCodeAction),
+                      const SizedBox(height: 4),
+                      Text(
+                        text.rewardsReferralFriendCodeHint,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12.5,
+                          height: 1.28,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_showFriendCodeInput) ...[
+                  const SizedBox(width: 10),
+                  _GradientActionButton(
+                    key: const Key('rewards_referral_show_input'),
+                    width: 126,
+                    height: 52,
+                    label: text.rewardsReferralUseFriendCodeAction,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
                     ),
-                  ],
-                ),
-              ),
+                    onPressed: _openFriendCodeInput,
+                  ),
+                ],
+              ],
             ),
-            if (_showCopyHint) ...[
-              const SizedBox(height: 6),
-              Text(
-                text.rewardsReferralCopiedMessage,
-                style: TextStyle(
-                  color: colors.accent,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                key: const Key('rewards_referral_share'),
-                onPressed: hasRewards ? _shareCode : null,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(44),
-                ),
-                icon: const Icon(Icons.ios_share_rounded, size: 20),
-                label: Text(text.rewardsReferralShareCodeAction),
-              ),
-            ),
-            const SizedBox(height: 10),
-            _ReferralStats(rewards: rewards),
-            const SizedBox(height: 10),
-            _InlineStatus(message: statusText, tone: colors.accent),
-            if (!hasActivatedReferral) ...[
-              const SizedBox(height: 12),
-              Text(
-                text.rewardsReferralFriendCodePrompt,
+            if (_showFriendCodeInput) ...[
+              const SizedBox(height: 14),
+              TextField(
+                key: const Key('rewards_referral_input'),
+                controller: _controller,
+                focusNode: _friendCodeFocusNode,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => unawaited(_submit()),
                 style: TextStyle(
                   color: colors.textStrong,
-                  fontSize: 13,
                   fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+                decoration: _fieldDecoration(
+                  context,
+                  hintText: text.rewardsReferralInputHint,
+                  labelText: text.rewardsReferralInputLabel,
+                  icon: Icons.group_rounded,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                text.rewardsReferralFriendCodeHint,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 11.5,
-                  height: 1.3,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(height: 12),
+              _GradientActionButton(
+                key: const Key('rewards_referral_submit'),
+                height: 48,
+                label: text.rewardsReferralActivateAction,
+                isLoading: widget.isSubmitting,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
                 ),
+                icon: Icons.check_circle_outline_rounded,
+                onPressed: widget.isSubmitting ? null : _submit,
               ),
-              const SizedBox(height: 10),
-              if (!_showFriendCodeInput)
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    key: const Key('rewards_referral_show_input'),
-                    onPressed: _openFriendCodeInput,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(42),
-                      side: BorderSide(
-                        color: colors.border.withValues(alpha: 0.95),
-                      ),
-                    ),
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
-                    label: Text(text.rewardsReferralUseFriendCodeAction),
-                  ),
-                )
-              else ...[
-                TextField(
-                  key: const Key('rewards_referral_input'),
-                  controller: _controller,
-                  focusNode: _friendCodeFocusNode,
-                  textCapitalization: TextCapitalization.characters,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => unawaited(_submit()),
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: text.rewardsReferralInputLabel,
-                    hintText: text.rewardsReferralInputHint,
-                    filled: true,
-                    fillColor: colors.surface.withValues(alpha: 0.35),
-                    hintStyle: TextStyle(
-                      color: colors.textSoft.withValues(alpha: 0.85),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: colors.border.withValues(alpha: 0.95),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: colors.accent.withValues(alpha: 0.95),
-                        width: 1.4,
-                      ),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.group_rounded,
-                      size: 20,
-                      color: colors.textSoft,
-                    ),
-                  ),
-                ),
-              ],
-              if (_message != null) ...[
-                const SizedBox(height: 12),
-                _InlineStatus(
-                  message: _message!,
-                  tone: _feedbackToneColor(_messageTone, colors),
-                ),
-              ],
-              if (_showFriendCodeInput) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.tonalIcon(
-                    key: const Key('rewards_referral_submit'),
-                    onPressed: widget.isSubmitting ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(42),
-                    ),
-                    icon: widget.isSubmitting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator.adaptive(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.check_circle_outline_rounded,
-                            size: 20,
-                          ),
-                    label: Text(text.rewardsReferralActivateAction),
-                  ),
-                ),
-              ],
+            ],
+            if (_message != null) ...[
+              const SizedBox(height: 12),
+              _InlineStatus(
+                message: _message!,
+                tone: _feedbackToneColor(_messageTone, colors),
+              ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.iconGradient,
+    required this.title,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final Gradient iconGradient;
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: iconGradient,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2BE66C).withValues(alpha: 0.18),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: const Color(0xFF042013), size: 24),
+        ),
+        const SizedBox(width: 13),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 18,
+                  height: 1.15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -804,81 +1388,110 @@ class _ReferralStats extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
 
-    return Row(
-      children: [
-        Expanded(
-          child: _MetricPill(
-            label: text.rewardsReferralEarnedLabel,
-            value: '${rewards?.totalReferralBonusEarned ?? 0}',
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF071915).withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF174439).withValues(alpha: 0.62),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _MetricPill(
-            label: text.rewardsReferralFriendsLabel,
-            value: '${rewards?.referredUsersCount ?? 0}',
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _MetricStat(
+              icon: Icons.pets_rounded,
+              iconColor: const Color(0xFF73E66E),
+              label: text.rewardsReferralEarnedLabel,
+              value: '${rewards?.totalReferralBonusEarned ?? 0}',
+              unit: text.walletBalanceUnit,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _MetricPill(
-            label: text.rewardsReferralBonusLabel,
-            value: '${rewards?.rewardedReferredUsersCount ?? 0}',
+          const _MetricDivider(),
+          Expanded(
+            child: _MetricStat(
+              icon: Icons.group_rounded,
+              iconColor: const Color(0xFF48E581),
+              label: text.rewardsReferralFriendsLabel,
+              value: '${rewards?.referredUsersCount ?? 0}',
+            ),
           ),
-        ),
-      ],
+          const _MetricDivider(),
+          Expanded(
+            child: _MetricStat(
+              icon: Icons.shopping_bag_rounded,
+              iconColor: const Color(0xFFFFD35B),
+              label: text.rewardsReferralBonusLabel,
+              value: '${rewards?.rewardedReferredUsersCount ?? 0}',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _CardTitle extends StatelessWidget {
-  const _CardTitle({
+class _MetricStat extends StatelessWidget {
+  const _MetricStat({
     required this.icon,
-    required this.title,
-    required this.subtitle,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    this.unit,
   });
 
   final IconData icon;
-  final String title;
-  final String subtitle;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final String? unit;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: colors.accent.withValues(alpha: 0.13),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: colors.accent, size: 20),
-        ),
-        const SizedBox(width: 10),
+        Icon(icon, color: iconColor, size: 24),
+        const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
+                  color: colors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
+              const SizedBox(height: 2),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: value),
+                    if (unit != null)
+                      TextSpan(
+                        text: ' $unit',
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 12,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
+                  color: colors.textStrong,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
@@ -889,49 +1502,119 @@ class _CardTitle extends StatelessWidget {
   }
 }
 
-class _MetricPill extends StatelessWidget {
-  const _MetricPill({required this.label, required this.value});
-
-  final String label;
-  final String value;
+class _MetricDivider extends StatelessWidget {
+  const _MetricDivider();
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
+    return Container(
+      width: 1,
+      height: 35,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      color: const Color(0xFF7FE6B6).withValues(alpha: 0.22),
+    );
+  }
+}
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.38),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.border.withValues(alpha: 0.65)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
+class _GradientActionButton extends StatelessWidget {
+  const _GradientActionButton({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.isLoading = false,
+    this.gradient = const LinearGradient(
+      colors: [Color(0xFF49DA87), Color(0xFF3ECE76)],
+    ),
+    this.width,
+    this.height = 50,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final bool isLoading;
+  final Gradient gradient;
+  final double? width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+
+    return SizedBox(
+      width: width ?? double.infinity,
+      height: height,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          borderRadius: BorderRadius.circular(15),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              gradient: enabled
+                  ? gradient
+                  : LinearGradient(
+                      colors: [
+                        const Color(0xFF314036).withValues(alpha: 0.8),
+                        const Color(0xFF243328).withValues(alpha: 0.8),
+                      ],
+                    ),
+              boxShadow: enabled
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF37DF78).withValues(alpha: 0.24),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2.2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF06140C),
+                          ),
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (icon != null) ...[
+                            Icon(
+                              icon,
+                              color: const Color(0xFF06140C),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Flexible(
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF06140C),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -970,38 +1653,90 @@ class _InlineStatus extends StatelessWidget {
   }
 }
 
+class _WarningBanner extends StatelessWidget {
+  const _WarningBanner({required this.message, required this.tone});
+
+  final String message;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tone.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Text(
+          message,
+          style: TextStyle(
+            color: colors.textStrong,
+            fontSize: 12.5,
+            height: 1.35,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _fieldDecoration(
+  BuildContext context, {
+  required String hintText,
+  String? labelText,
+  IconData? icon,
+}) {
+  final colors = context.petMagicColors;
+
+  return InputDecoration(
+    labelText: labelText,
+    hintText: hintText,
+    filled: true,
+    fillColor: const Color(0xFF0A1522).withValues(alpha: 0.82),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    prefixIcon: icon == null
+        ? null
+        : Icon(icon, size: 20, color: colors.textSoft),
+    hintStyle: TextStyle(
+      color: colors.textMuted.withValues(alpha: 0.72),
+      fontSize: 14.5,
+      fontWeight: FontWeight.w700,
+    ),
+    labelStyle: TextStyle(
+      color: colors.textSoft,
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(
+        color: const Color(0xFF253549).withValues(alpha: 0.95),
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Color(0xFF47DF82), width: 1.4),
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(
+        color: const Color(0xFF253549).withValues(alpha: 0.95),
+      ),
+    ),
+  );
+}
+
 Color _feedbackToneColor(_FeedbackTone tone, PetMagicColors colors) {
   return switch (tone) {
     _FeedbackTone.success => colors.accent,
     _FeedbackTone.warning => const Color(0xFFD7A44A),
     _FeedbackTone.info => colors.blue,
   };
-}
-
-String _formatLastUpdatedText(
-  AppLocalizations text,
-  DateTime? updatedAtUtc,
-  String localeTag,
-) {
-  if (updatedAtUtc == null) {
-    return text.rewardsLastUpdatedNow;
-  }
-
-  final now = DateTime.now();
-  final diff = now.difference(updatedAtUtc.toLocal());
-  if (diff.inMinutes < 1) {
-    return text.rewardsLastUpdatedNow;
-  }
-
-  if (diff.inHours < 1) {
-    return text.rewardsLastUpdatedMinutes(diff.inMinutes);
-  }
-
-  if (diff.inDays < 1) {
-    return text.rewardsLastUpdatedHours(diff.inHours);
-  }
-
-  return DateFormat.MMMd(localeTag).format(updatedAtUtc.toLocal());
 }
 
 String _referralStatusText(AppLocalizations text, _RewardsSummaryView rewards) {

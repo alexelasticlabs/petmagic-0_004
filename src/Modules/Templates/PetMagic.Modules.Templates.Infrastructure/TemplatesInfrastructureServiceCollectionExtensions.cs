@@ -22,6 +22,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         var section = configuration.GetSection(TemplatesOptions.SectionName);
         var r2Section = section.GetSection("R2");
         var falSection = section.GetSection("Fal");
+        var firebasePushSection = section.GetSection("FirebasePush");
         var configuredStorageProvider = ReadValue(section, "StorageProvider", "TEMPLATES_STORAGE_PROVIDER");
         var configuredAiProvider = ReadValue(section, "AiProvider", "TEMPLATES_AI_PROVIDER");
         var options = new TemplatesOptions
@@ -92,6 +93,13 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 StartTimeoutSeconds = ParseInt(falSection["StartTimeoutSeconds"], 120),
                 PollIntervalMilliseconds = ParseInt(falSection["PollIntervalMilliseconds"], 2_000),
                 MaxPollingAttempts = ParseInt(falSection["MaxPollingAttempts"], 180)
+            },
+            FirebasePush = new FirebasePushOptions
+            {
+                Enabled = ParseBool(firebasePushSection["Enabled"], false),
+                ProjectId = ReadValue(firebasePushSection, "ProjectId", "FIREBASE_PROJECT_ID") ?? string.Empty,
+                ServiceAccountJson = ReadValue(firebasePushSection, "ServiceAccountJson", "FIREBASE_SERVICE_ACCOUNT_JSON") ?? string.Empty,
+                ServiceAccountJsonPath = ReadValue(firebasePushSection, "ServiceAccountJsonPath", "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty
             }
         };
 
@@ -109,6 +117,16 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         AddGeneratedMediaImporter(services, options);
         AddGenerationBilling(services);
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
+        services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
+        services.AddScoped<NoopTemplateGenerationPushNotificationSender>();
+        services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>();
+        services.AddScoped<ITemplateGenerationPushNotificationSender>(serviceProvider =>
+        {
+            var pushOptions = serviceProvider.GetRequiredService<TemplatesOptions>().FirebasePush;
+            return pushOptions.IsConfigured
+                ? serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>()
+                : serviceProvider.GetRequiredService<NoopTemplateGenerationPushNotificationSender>();
+        });
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplatesService, TemplatesService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();

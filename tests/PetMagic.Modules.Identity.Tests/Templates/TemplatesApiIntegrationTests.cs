@@ -536,12 +536,14 @@ public sealed class TemplatesApiIntegrationTests
         Assert.Null(queued.StartedAtUtc);
         Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
 
-        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Succeeded");
         Assert.NotNull(generation);
 
         Assert.Equal(TestUserId, generation!.UserId);
         Assert.Equal(created.TemplateId, generation.TemplateId);
-        Assert.Equal("Completed", generation.Status);
+        Assert.Equal("Succeeded", generation.Status);
+        Assert.Equal("succeeded", generation.Stage);
+        Assert.Equal(100, generation.ProgressPercent);
         Assert.Equal(60, generation.TokenCost);
         Assert.False(generation.UserMediaExpired);
         Assert.NotNull(generation.SourceImageAsset);
@@ -557,7 +559,7 @@ public sealed class TemplatesApiIntegrationTests
             $"/api/templates/generations/{generation.GenerationId}");
 
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
-        Assert.Equal("Completed", fetched.Status);
+        Assert.Equal("Succeeded", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
     }
 
@@ -601,11 +603,11 @@ public sealed class TemplatesApiIntegrationTests
         Assert.Equal("Queued", queued.Status);
         Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
 
-        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Succeeded");
 
         Assert.Equal(TestUserId, generation.UserId);
         Assert.Equal(created.TemplateId, generation.TemplateId);
-        Assert.Equal("Completed", generation.Status);
+        Assert.Equal("Succeeded", generation.Status);
         Assert.Equal(20, generation.TokenCost);
         Assert.NotNull(generation.SourceImageAsset);
         Assert.Equal("pet.jpg", generation.SourceImageAsset!.FileName);
@@ -625,7 +627,7 @@ public sealed class TemplatesApiIntegrationTests
             $"/api/templates/generations/{generation.GenerationId}");
 
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
-        Assert.Equal("Completed", fetched.Status);
+        Assert.Equal("Succeeded", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
     }
 
