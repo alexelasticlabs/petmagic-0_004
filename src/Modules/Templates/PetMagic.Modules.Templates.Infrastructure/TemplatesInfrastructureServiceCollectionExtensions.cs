@@ -146,6 +146,12 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
 
         await dbContext.Database.MigrateAsync();
+        // Guard against environments where migration history drift left the column missing.
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE templates_items
+            ADD COLUMN IF NOT EXISTS "PetPhotoRequirements" character varying(1000);
+            """);
 
         if (!options.SeedSampleTemplates)
         {

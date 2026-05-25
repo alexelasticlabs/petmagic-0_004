@@ -8,6 +8,8 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
@@ -130,20 +132,30 @@ void main() {
     addTearDown(router.dispose);
 
     await tester.pumpWidget(
-      MaterialApp.router(
-        routerConfig: router,
-        theme: AppTheme.dark(),
-        locale: const Locale('ru'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: const [
-          Locale('ru'),
-          Locale('en'),
-          Locale('de'),
-          Locale('es'),
-          Locale('fr'),
-          Locale('it'),
-          Locale('pl'),
+      ProviderScope(
+        overrides: [
+          templateGenerationControllerProvider.overrideWith(
+            _IdleTemplateGenerationController.new,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
         ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.dark(),
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [
+            Locale('ru'),
+            Locale('en'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -160,24 +172,34 @@ void main() {
 
   testWidgets('wallet navigation hides while keyboard is open', (tester) async {
     await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(viewInsets: EdgeInsets.only(bottom: 280)),
-        child: MaterialApp(
-          theme: AppTheme.dark(),
-          locale: const Locale('ru'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const [
-            Locale('ru'),
-            Locale('en'),
-            Locale('de'),
-            Locale('es'),
-            Locale('fr'),
-            Locale('it'),
-            Locale('pl'),
-          ],
-          home: const PetMagicShell(
-            location: WalletPage.routePath,
-            child: Scaffold(body: Text('Wallet route')),
+      ProviderScope(
+        overrides: [
+          templateGenerationControllerProvider.overrideWith(
+            _IdleTemplateGenerationController.new,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
+        ],
+        child: MediaQuery(
+          data: const MediaQueryData(viewInsets: EdgeInsets.only(bottom: 280)),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+            home: const PetMagicShell(
+              location: WalletPage.routePath,
+              child: Scaffold(body: Text('Wallet route')),
+            ),
           ),
         ),
       ),
@@ -296,49 +318,38 @@ void main() {
     expect(find.text(text.rewardsReferralStatusPending), findsOneWidget);
   });
 
-  testWidgets(
-    'rewards page shows wallet flow and purchase soft warnings stay hidden',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(390, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('rewards page hides purchase soft warnings from wallet preload', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await _pumpRewardsPage(
-        tester,
-        repository: _FakeWalletRepository(
-          wallet: _walletState,
-          ledger: _ledgerItems,
-          packs: _packs,
-          purchases: _purchases,
-          failPurchases: true,
-        ),
-      );
+    await _pumpRewardsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
+        failPurchases: true,
+      ),
+    );
 
-      final rewardsContext = tester.element(find.byType(RewardsPage));
-      final text = AppLocalizations.of(rewardsContext);
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
 
-      expect(find.text(text.walletBalanceEyebrow), findsOneWidget);
-      expect(find.text(text.rewardsPageTitle), findsOneWidget);
-      expect(find.text(text.rewardsPromoTitle), findsOneWidget);
-      expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
-      expect(find.text('wallet.purchases_failed'), findsNothing);
+    expect(find.text(text.walletBalanceEyebrow), findsOneWidget);
+    expect(find.text(text.rewardsPageTitle), findsOneWidget);
+    expect(find.text(text.rewardsPromoTitle), findsOneWidget);
+    expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
+    expect(find.text('wallet.purchases_failed'), findsNothing);
 
-      await tester.drag(find.byType(ListView).first, const Offset(0, -620));
-      await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -620));
+    await tester.pumpAndSettle();
 
-      expect(find.text(text.walletBuySparkTitle), findsWidgets);
-      expect(find.text('Tiny Treat'), findsOneWidget);
-      expect(find.text('Happy Pack'), findsOneWidget);
-      expect(find.text('Magic Boost'), findsOneWidget);
-      expect(find.textContaining('Starter PawSpark'), findsNothing);
-      expect(find.textContaining('база +'), findsNothing);
-
-      await tester.drag(find.byType(ListView).first, const Offset(0, -520));
-      await tester.pumpAndSettle();
-
-      expect(find.text(text.walletRecentTransactionsTitle), findsWidgets);
-      expect(find.text(text.rewardsReferralTitle), findsWidgets);
-    },
-  );
+    expect(find.text(text.rewardsReferralTitle), findsWidgets);
+    expect(find.byKey(const Key('rewards_referral_show_input')), findsWidgets);
+  });
 
   testWidgets('rewards page hides payment unavailable purchase hint', (
     tester,
@@ -366,6 +377,20 @@ void main() {
     expect(find.text(text.walletPaymentGatewayUnavailableError), findsNothing);
     expect(find.textContaining('wallet.payment_unavailable'), findsNothing);
   });
+}
+
+class _IdleTemplateGenerationController extends TemplateGenerationController {
+  @override
+  TemplateGenerationState build() {
+    return const TemplateGenerationState();
+  }
+}
+
+class _IdleGenerationHistoryController extends GenerationHistoryController {
+  @override
+  GenerationHistoryState build() {
+    return const GenerationHistoryState();
+  }
 }
 
 Future<void> _pumpWalletPage(

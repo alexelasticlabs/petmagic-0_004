@@ -24,6 +24,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
     ILogger<FcmTemplateGenerationPushNotificationSender> logger) : ITemplateGenerationPushNotificationSender
 {
     private const string FirebaseMessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private GoogleCredential? credential;
 
     public async Task NotifyGenerationTerminalAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken)
@@ -74,14 +75,14 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
                     ["route"] = route,
                     ["status"] = generation.Status
                 },
-                new FcmAndroidConfig("high", new FcmAndroidNotification("petmagic_generations")),
+                new FcmAndroidConfig("high"),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default")))));
 
         using var httpRequest = new HttpRequestMessage(
             HttpMethod.Post,
             $"https://fcm.googleapis.com/v1/projects/{options.FirebasePush.ProjectId}/messages:send")
         {
-            Content = JsonContent.Create(request)
+            Content = JsonContent.Create(request, options: JsonOptions)
         };
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
@@ -157,9 +158,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
 
     private sealed record FcmNotification(string Title, string Body);
 
-    private sealed record FcmAndroidConfig(string Priority, FcmAndroidNotification Notification);
-
-    private sealed record FcmAndroidNotification(string ChannelId);
+    private sealed record FcmAndroidConfig(string Priority);
 
     private sealed record FcmApnsConfig(FcmApnsPayload Payload);
 

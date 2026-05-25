@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Channels;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Api.Endpoints;
@@ -953,9 +955,11 @@ public sealed class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
             builder.Services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
+            builder.Services.AddSingleton<ITemplateGenerationPushNotificationSender, NoopPushNotificationSender>();
             builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+            builder.Services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
             builder.Services.AddScoped<TemplateGenerationJobProcessor>();
             builder.Services.AddHostedService<TemplateGenerationWorker>();
             builder.Services.AddTemplatesApiModule();
@@ -972,6 +976,14 @@ public sealed class TemplatesApiIntegrationTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName);
 
             return new TestApplication(app, client, mediaStorage, billing);
+        }
+
+        private sealed class NoopPushNotificationSender : ITemplateGenerationPushNotificationSender
+        {
+            public Task NotifyGenerationTerminalAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken)
+            {
+                return Task.CompletedTask;
+            }
         }
 
         public async ValueTask DisposeAsync()

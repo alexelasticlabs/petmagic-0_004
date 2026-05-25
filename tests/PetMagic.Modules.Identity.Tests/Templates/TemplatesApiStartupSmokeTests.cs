@@ -71,6 +71,8 @@ public sealed class TemplatesApiStartupSmokeTests
                 throw new NotSupportedException("ITemplateMediaUploadPolicy should not be resolved during startup smoke test."));
             builder.Services.AddScoped<ITemplateGenerationService>(_ =>
                 throw new NotSupportedException("ITemplateGenerationService should not be resolved during startup smoke test."));
+            builder.Services.AddScoped<ITemplatePushTokenService>(_ =>
+                throw new NotSupportedException("ITemplatePushTokenService should not be resolved during startup smoke test."));
             builder.Services.AddScoped<ITemplateMediaLifecycleService>(_ =>
                 throw new NotSupportedException("ITemplateMediaLifecycleService should not be resolved during startup smoke test."));
             builder.Services.AddScoped<IMediaMetadataReader>(_ =>

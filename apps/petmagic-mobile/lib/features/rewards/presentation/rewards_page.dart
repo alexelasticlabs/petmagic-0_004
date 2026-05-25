@@ -38,11 +38,12 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
     final bottomNavInset = hasKeyboard
-        ? MediaQuery.viewPaddingOf(context).bottom + 12
+        ? safeBottom + 20
         : hasShell
-        ? petMagicBottomNavInset(context)
-        : MediaQuery.viewPaddingOf(context).bottom + 16;
+        ? petMagicBottomNavInset(context) + 28
+        : safeBottom + 24;
     final rewards = state.rewards;
     final rewardsSummary = rewards == null
         ? null
@@ -70,7 +71,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                 color: colors.accent,
                 backgroundColor: colors.surfaceStrong,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(15, 22, 15, bottomNavInset + 8),
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     _RewardsHero(
@@ -78,23 +79,23 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                       onHistoryTap: () => controller.load(refresh: true),
                     ),
                     if (warningMessage != null) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 20),
                       _WarningBanner(
                         message: warningMessage,
                         tone: _warningTone,
                       ),
                     ],
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 20),
                     _PromoCodeCard(
                       isSubmitting: state.isRedeeming,
                       onSubmit: controller.applyRedeemCode,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 20),
                     _ReferralCard(rewards: rewardsSummary),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     _ReferralInfoNote(rewards: rewardsSummary),
                     if (rewardsSummary?.hasActivatedReferral != true) ...[
-                      const SizedBox(height: 22),
+                      const SizedBox(height: 20),
                       _FriendCodeCard(
                         rewards: rewardsSummary,
                         isSubmitting: state.isApplyingReferral,
@@ -146,26 +147,26 @@ class _RewardsBackdrop extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF020811), Color(0xFF00040A)],
+          colors: [Color(0xFF030A14), Color(0xFF01060D)],
         ),
       ),
       child: Stack(
         fit: StackFit.expand,
         children: [
           Positioned(
-            top: -70,
-            right: -90,
+            top: -88,
+            right: -96,
             child: _GlowOrb(
-              size: 260,
-              color: const Color(0xFF0EA86D).withValues(alpha: 0.18),
+              size: 220,
+              color: const Color(0xFF0EA86D).withValues(alpha: 0.13),
             ),
           ),
           Positioned(
-            top: 82,
-            left: -92,
+            top: 120,
+            left: -104,
             child: _GlowOrb(
-              size: 220,
-              color: const Color(0xFF1E8CFF).withValues(alpha: 0.08),
+              size: 180,
+              color: const Color(0xFF1E8CFF).withValues(alpha: 0.05),
             ),
           ),
           const Positioned(
@@ -276,81 +277,101 @@ class _RewardsHero extends StatelessWidget {
         ? '...'
         : NumberFormat.decimalPattern(localeTag).format(balance);
 
-    return SizedBox(
-      height: 205,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: 0,
-            left: 4,
-            right: 0,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        text.rewardsPageTitle,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 31,
-                          height: 1.05,
-                          fontWeight: FontWeight.w900,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final heroWidth = constraints.maxWidth;
+        final imageWidth = (heroWidth * 0.44).clamp(136.0, 186.0);
+        final subtitleWidth = heroWidth * 0.5;
+        final balanceRightInset = (imageWidth * 0.72).clamp(112.0, 142.0);
+
+        return SizedBox(
+          height: 268,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            text.rewardsPageTitle,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 40,
+                              height: 1.0,
+                              fontWeight: FontWeight.w900,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.4),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: subtitleWidth,
+                            child: Text(
+                              text.rewardsPageSubtitle,
+                              style: TextStyle(
+                                color: colors.textSoft,
+                                fontSize: 16,
+                                height: 1.3,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _HistoryButton(onPressed: onHistoryTap),
+                  ],
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SizedBox(
+                  height: 118,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: _BalancePanel(
+                          balanceValue: balanceValue,
+                          unit: text.walletBalanceUnit,
+                          rightInset: balanceRightInset,
                         ),
                       ),
-                      const SizedBox(height: 13),
-                      SizedBox(
-                        width: 180,
-                        child: Text(
-                          text.rewardsPageSubtitle,
-                          style: TextStyle(
-                            color: colors.textSoft,
-                            fontSize: 16,
-                            height: 1.42,
-                            fontWeight: FontWeight.w700,
+                      Positioned(
+                        right: 0,
+                        bottom: -4,
+                        child: IgnorePointer(
+                          child: Image.asset(
+                            _balanceImage,
+                            width: imageWidth,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                _HistoryButton(onPressed: onHistoryTap),
-              ],
-            ),
-          ),
-          Positioned(
-            right: -26,
-            top: 28,
-            child: IgnorePointer(
-              child: Image.asset(
-                _balanceImage,
-                width: 212,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
               ),
-            ),
+            ],
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _BalancePanel(
-              balanceValue: balanceValue,
-              unit: text.walletBalanceUnit,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -368,19 +389,19 @@ class _HistoryButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: Ink(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 15),
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: const Color(0xFF07111C).withValues(alpha: 0.66),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFF243143)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -389,7 +410,7 @@ class _HistoryButton extends StatelessWidget {
             children: [
               const Icon(
                 Icons.history_toggle_off_rounded,
-                size: 21,
+                size: 19,
                 color: Color(0xFF38E681),
               ),
               const SizedBox(width: 8),
@@ -397,7 +418,7 @@ class _HistoryButton extends StatelessWidget {
                 text.rewardsHistoryTitle,
                 style: const TextStyle(
                   color: Color(0xFF48E581),
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -410,10 +431,15 @@ class _HistoryButton extends StatelessWidget {
 }
 
 class _BalancePanel extends StatelessWidget {
-  const _BalancePanel({required this.balanceValue, required this.unit});
+  const _BalancePanel({
+    required this.balanceValue,
+    required this.unit,
+    required this.rightInset,
+  });
 
   final String balanceValue;
   final String unit;
+  final double rightInset;
 
   @override
   Widget build(BuildContext context) {
@@ -421,17 +447,17 @@ class _BalancePanel extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return Container(
-      height: 96,
-      padding: const EdgeInsets.fromLTRB(18, 16, 160, 15),
+      height: 112,
+      padding: EdgeInsets.fromLTRB(20, 16, rightInset, 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(29),
+        borderRadius: BorderRadius.circular(30),
         gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
           colors: [
             const Color(0xFF042E25).withValues(alpha: 0.95),
-            const Color(0xFF0A5A36).withValues(alpha: 0.62),
-            const Color(0xFF0A1820).withValues(alpha: 0.88),
+            const Color(0xFF0C6A40).withValues(alpha: 0.68),
+            const Color(0xFF0A1A22).withValues(alpha: 0.88),
           ],
         ),
         border: Border.all(
@@ -452,46 +478,44 @@ class _BalancePanel extends StatelessWidget {
           Text(
             text.walletBalanceEyebrow,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Color(0xFF44E681),
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  balanceValue,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 34,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.4,
+          const SizedBox(height: 7),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Text(
+                    balanceValue,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 46,
+                      height: 1,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.8,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 7),
-              const _SparkTokenIcon(size: 34),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  unit,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                  const SizedBox(width: 8),
+                  const _SparkTokenIcon(size: 26),
+                  const SizedBox(width: 8),
+                  Text(
+                    unit,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -559,7 +583,7 @@ class _RewardsGlassPanel extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(_radius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(_radius),
@@ -579,9 +603,9 @@ class _RewardsGlassPanel extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.36),
-                blurRadius: 28,
-                offset: const Offset(0, 16),
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
@@ -664,91 +688,108 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
     final colors = context.petMagicColors;
 
     return _RewardsGlassPanel(
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       child: Material(
         color: Colors.transparent,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SectionHeader(
-              icon: Icons.confirmation_number_rounded,
-              iconGradient: const LinearGradient(
-                colors: [Color(0xFFDDFB72), Color(0xFF49C667)],
-              ),
-              title: text.rewardsPromoTitle,
-              subtitle: text.rewardsPromoSubtitle,
-            ),
-            const SizedBox(height: 14),
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final actionWidth = (constraints.maxWidth * 0.34).clamp(
+              124.0,
+              148.0,
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    key: const Key('rewards_promo_input'),
-                    controller: _controller,
-                    textCapitalization: TextCapitalization.characters,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => unawaited(_submit()),
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.3,
-                    ),
-                    decoration: _fieldDecoration(
-                      context,
-                      hintText: text.walletRedeemHint,
-                    ),
+                _SectionHeader(
+                  icon: Icons.confirmation_number_rounded,
+                  iconGradient: const LinearGradient(
+                    colors: [Color(0xFFDDFB72), Color(0xFF49C667)],
                   ),
+                  title: text.rewardsPromoTitle,
+                  subtitle: text.rewardsPromoSubtitle,
+                  iconBoxSize: 48,
+                  iconSize: 24,
+                  titleSize: 18,
+                  subtitleSize: 13,
                 ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 112,
-                  height: 54,
-                  child: FilledButton(
-                    key: const Key('rewards_promo_submit'),
-                    onPressed: widget.isSubmitting ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF49DA87),
-                      foregroundColor: const Color(0xFF06140C),
-                      disabledBackgroundColor: const Color(0xFF314036),
-                      disabledForegroundColor: const Color(0xFF7F8EA0),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    child: widget.isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator.adaptive(
-                              strokeWidth: 2.2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF06140C),
-                              ),
-                            ),
-                          )
-                        : Text(
-                            text.walletRedeemAction,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 54,
+                        child: TextField(
+                          key: const Key('rewards_promo_input'),
+                          controller: _controller,
+                          textCapitalization: TextCapitalization.characters,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => unawaited(_submit()),
+                          style: TextStyle(
+                            color: colors.textStrong,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
                           ),
-                  ),
+                          decoration: _fieldDecoration(
+                            context,
+                            hintText: text.walletRedeemHint,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: actionWidth,
+                      height: 54,
+                      child: FilledButton(
+                        key: const Key('rewards_promo_submit'),
+                        onPressed: widget.isSubmitting ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF49DA87),
+                          foregroundColor: const Color(0xFF06140C),
+                          disabledBackgroundColor: const Color(0xFF314036),
+                          disabledForegroundColor: const Color(0xFF7F8EA0),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        child: widget.isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator.adaptive(
+                                  strokeWidth: 2.2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF06140C),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                text.walletRedeemAction,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
+                if (_message != null) ...[
+                  const SizedBox(height: 12),
+                  _InlineStatus(
+                    message: _message!,
+                    tone: _feedbackToneColor(_messageTone, colors),
+                  ),
+                ],
               ],
-            ),
-            if (_message != null) ...[
-              const SizedBox(height: 12),
-              _InlineStatus(
-                message: _message!,
-                tone: _feedbackToneColor(_messageTone, colors),
-              ),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
@@ -821,7 +862,7 @@ class _ReferralCardState extends State<_ReferralCard> {
     final bonus = rewards?.referralBonusSpark ?? 15;
 
     return _RewardsGlassPanel(
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       borderColor: const Color(0xFF0C6E4D).withValues(alpha: 0.78),
       gradient: LinearGradient(
         begin: Alignment.topLeft,
@@ -834,76 +875,93 @@ class _ReferralCardState extends State<_ReferralCard> {
       ),
       child: Material(
         color: Colors.transparent,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              right: -36,
-              top: 14,
-              child: IgnorePointer(
-                child: Image.asset(
-                  _inviteImage,
-                  width: 210,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                ),
-              ),
-            ),
-            const Positioned(
-              top: 26,
-              right: 42,
-              child: _DecorativeSpark(size: 15),
-            ),
-            const Positioned(
-              top: 44,
-              right: 10,
-              child: _DecorativeSpark(size: 10),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final textWidth = constraints.maxWidth * 0.58;
+            final imageWidth = (constraints.maxWidth * 0.39).clamp(
+              126.0,
+              176.0,
+            );
+
+            return Stack(
+              clipBehavior: Clip.none,
               children: [
-                _SectionHeader(
-                  icon: Icons.group_rounded,
-                  iconGradient: const LinearGradient(
-                    colors: [Color(0xFF46E58B), Color(0xFF11753D)],
-                  ),
-                  title: text.rewardsReferralTitle,
-                  subtitle: null,
-                ),
-                const SizedBox(height: 22),
-                SizedBox(width: 190, child: _ReferralInviteText(bonus: bonus)),
-                const SizedBox(height: 16),
-                _ReferralCodeBox(
-                  code: hasRewards && rewards.referralCode.isNotEmpty
-                      ? rewards.referralCode
-                      : '...',
-                  canCopy: hasRewards,
-                  onCopy: _copyCode,
-                ),
-                if (_showCopyHint) ...[
-                  const SizedBox(height: 7),
-                  Text(
-                    text.rewardsReferralCopiedMessage,
-                    style: const TextStyle(
-                      color: Color(0xFF44E681),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                Positioned(
+                  right: -6,
+                  top: 14,
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: 0.74,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: imageWidth,
+                          maxHeight: 168,
+                        ),
+                        child: Image.asset(
+                          _inviteImage,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
                     ),
                   ),
-                ],
-                const SizedBox(height: 12),
-                _GradientActionButton(
-                  key: const Key('rewards_referral_share'),
-                  height: 52,
-                  label: text.rewardsReferralShareCodeAction,
-                  icon: Icons.ios_share_rounded,
-                  onPressed: hasRewards ? _shareCode : null,
                 ),
-                const SizedBox(height: 14),
-                _ReferralStats(rewards: rewards),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: textWidth,
+                      child: _SectionHeader(
+                        icon: Icons.group_rounded,
+                        iconGradient: const LinearGradient(
+                          colors: [Color(0xFF46E58B), Color(0xFF11753D)],
+                        ),
+                        title: text.rewardsReferralTitle,
+                        subtitle: null,
+                        iconBoxSize: 48,
+                        iconSize: 24,
+                        titleSize: 17.5,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: textWidth,
+                      child: _ReferralInviteText(bonus: bonus),
+                    ),
+                    const SizedBox(height: 12),
+                    _ReferralCodeBox(
+                      code: hasRewards && rewards.referralCode.isNotEmpty
+                          ? rewards.referralCode
+                          : '...',
+                      canCopy: hasRewards,
+                      onCopy: _copyCode,
+                    ),
+                    if (_showCopyHint) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        text.rewardsReferralCopiedMessage,
+                        style: const TextStyle(
+                          color: Color(0xFF44E681),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    _GradientActionButton(
+                      key: const Key('rewards_referral_share'),
+                      height: 58,
+                      label: text.rewardsReferralShareCodeAction,
+                      icon: Icons.ios_share_rounded,
+                      onPressed: hasRewards ? _shareCode : null,
+                    ),
+                    const SizedBox(height: 10),
+                    _ReferralStats(rewards: rewards),
+                  ],
+                ),
               ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -936,10 +994,12 @@ class _ReferralInviteText extends StatelessWidget {
       ),
       style: TextStyle(
         color: colors.textSoft,
-        fontSize: 13.5,
-        height: 1.42,
+        fontSize: 12.6,
+        height: 1.35,
         fontWeight: FontWeight.w700,
       ),
+      maxLines: 4,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
@@ -961,8 +1021,8 @@ class _ReferralCodeBox extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return Container(
-      width: 240,
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       decoration: BoxDecoration(
         color: const Color(0xFF031116).withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(13),
@@ -987,7 +1047,7 @@ class _ReferralCodeBox extends StatelessWidget {
                   text.rewardsYourReferralCode,
                   style: TextStyle(
                     color: colors.textSoft,
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -998,10 +1058,10 @@ class _ReferralCodeBox extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.textStrong,
-                    fontSize: 18,
+                    fontSize: 16,
                     height: 1.1,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 0.8,
+                    letterSpacing: 0.55,
                   ),
                 ),
               ],
@@ -1011,10 +1071,14 @@ class _ReferralCodeBox extends StatelessWidget {
             key: const Key('rewards_referral_copy'),
             onPressed: canCopy ? onCopy : null,
             style: TextButton.styleFrom(
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: const Size(0, 32),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              textStyle: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            icon: const Icon(Icons.copy_rounded, size: 18),
+            icon: const Icon(Icons.copy_rounded, size: 16),
             label: Text(text.rewardsCopyReferralCodeAction),
           ),
         ],
@@ -1181,7 +1245,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
     final colors = context.petMagicColors;
 
     return _RewardsGlassPanel(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       borderColor: const Color(0xFF3B3264).withValues(alpha: 0.86),
       gradient: LinearGradient(
         begin: Alignment.centerLeft,
@@ -1193,64 +1257,85 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
       ),
       child: Material(
         color: Colors.transparent,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 390;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF5B347C), Color(0xFF2B1F54)],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5B347C), Color(0xFF2B1F54)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFFA855F7,
+                            ).withValues(alpha: 0.17),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.group_add_rounded,
+                        color: Color(0xFFEBD6FF),
+                        size: 26,
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFA855F7).withValues(alpha: 0.2),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            text.rewardsReferralFriendCodePrompt,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            text.rewardsReferralFriendCodeHint,
+                            style: TextStyle(
+                              color: colors.textSoft,
+                              fontSize: 13,
+                              height: 1.32,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!_showFriendCodeInput && !compact) ...[
+                      const SizedBox(width: 12),
+                      _GradientActionButton(
+                        key: const Key('rewards_referral_show_input'),
+                        width: 186,
+                        height: 52,
+                        label: text.rewardsReferralUseFriendCodeAction,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
+                        ),
+                        onPressed: _openFriendCodeInput,
                       ),
                     ],
-                  ),
-                  child: const Icon(
-                    Icons.group_add_rounded,
-                    color: Color(0xFFEBD6FF),
-                    size: 24,
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        text.rewardsReferralFriendCodePrompt,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        text.rewardsReferralFriendCodeHint,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 12.5,
-                          height: 1.28,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!_showFriendCodeInput) ...[
-                  const SizedBox(width: 10),
+                if (!_showFriendCodeInput && compact) ...[
+                  const SizedBox(height: 14),
                   _GradientActionButton(
                     key: const Key('rewards_referral_show_input'),
-                    width: 126,
                     height: 52,
                     label: text.rewardsReferralUseFriendCodeAction,
                     gradient: const LinearGradient(
@@ -1259,50 +1344,50 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                     onPressed: _openFriendCodeInput,
                   ),
                 ],
+                if (_showFriendCodeInput) ...[
+                  const SizedBox(height: 14),
+                  TextField(
+                    key: const Key('rewards_referral_input'),
+                    controller: _controller,
+                    focusNode: _friendCodeFocusNode,
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => unawaited(_submit()),
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                    decoration: _fieldDecoration(
+                      context,
+                      hintText: text.rewardsReferralInputHint,
+                      labelText: text.rewardsReferralInputLabel,
+                      icon: Icons.group_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _GradientActionButton(
+                    key: const Key('rewards_referral_submit'),
+                    height: 52,
+                    label: text.rewardsReferralActivateAction,
+                    isLoading: widget.isSubmitting,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
+                    ),
+                    icon: Icons.check_circle_outline_rounded,
+                    onPressed: widget.isSubmitting ? null : _submit,
+                  ),
+                ],
+                if (_message != null) ...[
+                  const SizedBox(height: 12),
+                  _InlineStatus(
+                    message: _message!,
+                    tone: _feedbackToneColor(_messageTone, colors),
+                  ),
+                ],
               ],
-            ),
-            if (_showFriendCodeInput) ...[
-              const SizedBox(height: 14),
-              TextField(
-                key: const Key('rewards_referral_input'),
-                controller: _controller,
-                focusNode: _friendCodeFocusNode,
-                textCapitalization: TextCapitalization.characters,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => unawaited(_submit()),
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                ),
-                decoration: _fieldDecoration(
-                  context,
-                  hintText: text.rewardsReferralInputHint,
-                  labelText: text.rewardsReferralInputLabel,
-                  icon: Icons.group_rounded,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _GradientActionButton(
-                key: const Key('rewards_referral_submit'),
-                height: 48,
-                label: text.rewardsReferralActivateAction,
-                isLoading: widget.isSubmitting,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
-                ),
-                icon: Icons.check_circle_outline_rounded,
-                onPressed: widget.isSubmitting ? null : _submit,
-              ),
-            ],
-            if (_message != null) ...[
-              const SizedBox(height: 12),
-              _InlineStatus(
-                message: _message!,
-                tone: _feedbackToneColor(_messageTone, colors),
-              ),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
@@ -1315,12 +1400,20 @@ class _SectionHeader extends StatelessWidget {
     required this.iconGradient,
     required this.title,
     this.subtitle,
+    this.iconBoxSize = 50,
+    this.iconSize = 26,
+    this.titleSize = 19,
+    this.subtitleSize = 13.5,
   });
 
   final IconData icon;
   final Gradient iconGradient;
   final String title;
   final String? subtitle;
+  final double iconBoxSize;
+  final double iconSize;
+  final double titleSize;
+  final double subtitleSize;
 
   @override
   Widget build(BuildContext context) {
@@ -1330,11 +1423,11 @@ class _SectionHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 44,
-          height: 44,
+          width: iconBoxSize,
+          height: iconBoxSize,
           decoration: BoxDecoration(
             gradient: iconGradient,
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(15),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF2BE66C).withValues(alpha: 0.18),
@@ -1343,9 +1436,9 @@ class _SectionHeader extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(icon, color: const Color(0xFF042013), size: 24),
+          child: Icon(icon, color: const Color(0xFF042013), size: iconSize),
         ),
-        const SizedBox(width: 13),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1354,7 +1447,7 @@ class _SectionHeader extends StatelessWidget {
                 title,
                 style: TextStyle(
                   color: colors.textStrong,
-                  fontSize: 18,
+                  fontSize: titleSize,
                   height: 1.15,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1365,7 +1458,7 @@ class _SectionHeader extends StatelessWidget {
                   subtitle!,
                   style: TextStyle(
                     color: colors.textSoft,
-                    fontSize: 13,
+                    fontSize: subtitleSize,
                     height: 1.35,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1389,7 +1482,7 @@ class _ReferralStats extends StatelessWidget {
     final text = AppLocalizations.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
         color: const Color(0xFF071915).withValues(alpha: 0.48),
         borderRadius: BorderRadius.circular(16),
@@ -1451,50 +1544,61 @@ class _MetricStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: iconColor, size: 24),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+        Row(
+          children: [
+            Icon(icon, color: iconColor, size: 18),
+            const SizedBox(width: 4),
+            Expanded(
+              child: SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 2),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(text: value),
-                    if (unit != null)
-                      TextSpan(
-                        text: ' $unit',
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                        ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        SizedBox(
+          width: double.infinity,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: value),
+                  if (unit != null)
+                    TextSpan(
+                      text: ' $unit',
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
                       ),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
+                    ),
+                ],
               ),
-            ],
+              maxLines: 1,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
         ),
       ],
@@ -1509,8 +1613,8 @@ class _MetricDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: 35,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      height: 30,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
       color: const Color(0xFF7FE6B6).withValues(alpha: 0.22),
     );
   }
@@ -1698,6 +1802,7 @@ InputDecoration _fieldDecoration(
     hintText: hintText,
     filled: true,
     fillColor: const Color(0xFF0A1522).withValues(alpha: 0.82),
+    isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     prefixIcon: icon == null
         ? null

@@ -139,73 +139,93 @@ class _BalanceCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: colors.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: colors.accent.withValues(alpha: 0.18),
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: colors.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colors.accent.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: colors.accent,
+                        size: 18,
                       ),
                     ),
-                    child: Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: colors.accent,
-                      size: 18,
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        text.walletBalanceEyebrow,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    text.walletBalanceEyebrow,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              ProfileStatusPill(
-                label: isPremium
-                    ? text.walletPremiumStatus
-                    : text.walletFreeStatus,
-                leading: isPremium
-                    ? Icons.workspace_premium_rounded
-                    : Icons.person_outline_rounded,
-                backgroundColor: isPremium
-                    ? colors.gold.withValues(alpha: 0.16)
-                    : colors.accent.withValues(alpha: 0.11),
-                foregroundColor: statusTone,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: ProfileStatusPill(
+                      label: isPremium
+                          ? text.walletPremiumStatus
+                          : text.walletFreeStatus,
+                      leading: isPremium
+                          ? Icons.workspace_premium_rounded
+                          : Icons.person_outline_rounded,
+                      backgroundColor: isPremium
+                          ? colors.gold.withValues(alpha: 0.16)
+                          : colors.accent.withValues(alpha: 0.11),
+                      foregroundColor: statusTone,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                NumberFormat.decimalPattern().format(balance),
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  NumberFormat.decimalPattern().format(balance),
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                text.walletBalanceUnit,
-                style: TextStyle(
-                  color: statusTone,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
+                const SizedBox(width: 8),
+                Text(
+                  text.walletBalanceUnit,
+                  style: TextStyle(
+                    color: statusTone,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           Text(

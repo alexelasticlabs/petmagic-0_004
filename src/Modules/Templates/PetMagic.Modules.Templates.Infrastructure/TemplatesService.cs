@@ -1162,18 +1162,18 @@ internal sealed class TemplatesService(
         if (!string.IsNullOrWhiteSpace(normalizedCategory))
         {
             var normalizedCategoryUpper = normalizedCategory.ToUpperInvariant();
-            filteredQuery = filteredQuery.Where(template => template.Category.ToUpper() == normalizedCategoryUpper);
+            filteredQuery = filteredQuery.Where(template => (template.Category ?? string.Empty).ToUpper() == normalizedCategoryUpper);
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
             var normalizedSearchLower = normalizedSearch.ToLowerInvariant();
             filteredQuery = filteredQuery.Where(template =>
-                template.Title.ToLower().Contains(normalizedSearchLower)
-                || template.ShortDescription.ToLower().Contains(normalizedSearchLower)
-                || template.Category.ToLower().Contains(normalizedSearchLower)
-                || template.Tags.ToLower().Contains(normalizedSearchLower)
-                || (template.PetPhotoRequirements != null && template.PetPhotoRequirements.ToLower().Contains(normalizedSearchLower)));
+                (template.Title ?? string.Empty).ToLower().Contains(normalizedSearchLower)
+                || (template.ShortDescription ?? string.Empty).ToLower().Contains(normalizedSearchLower)
+                || (template.Category ?? string.Empty).ToLower().Contains(normalizedSearchLower)
+                || (template.Tags ?? string.Empty).ToLower().Contains(normalizedSearchLower)
+                || ((template.PetPhotoRequirements ?? string.Empty).ToLower().Contains(normalizedSearchLower)));
         }
 
         if (cursor is not null)
@@ -1427,8 +1427,8 @@ internal sealed class TemplatesService(
         }
 
         return template.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || template.ShortDescription.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || template.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (template.ShortDescription ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (template.Category ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase)
             || DeserializeRequirements(template.PetPhotoRequirements).Any(requirement => requirement.Contains(search, StringComparison.OrdinalIgnoreCase))
             || DeserializeTags(template.Tags).Any(tag => tag.Contains(search, StringComparison.OrdinalIgnoreCase));
     }
@@ -1447,8 +1447,13 @@ internal sealed class TemplatesService(
         return string.Join(',', NormalizeTags(tags));
     }
 
-    private static string[] DeserializeTags(string tags)
+    private static string[] DeserializeTags(string? tags)
     {
+        if (string.IsNullOrWhiteSpace(tags))
+        {
+            return [];
+        }
+
         return NormalizeTags(tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 

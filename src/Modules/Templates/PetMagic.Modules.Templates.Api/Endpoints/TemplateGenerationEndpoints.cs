@@ -206,7 +206,7 @@ public static class TemplateGenerationEndpoints
     private static async Task<Results<NoContent, ProblemHttpResult>> RegisterPushTokenAsync(
         HttpContext context,
         [FromBody] RegisterPushTokenRequest request,
-        ITemplatePushTokenService pushTokenService,
+        [FromServices] ITemplatePushTokenService pushTokenService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
@@ -236,7 +236,7 @@ public static class TemplateGenerationEndpoints
     private static async Task<Results<NoContent, ProblemHttpResult>> UnregisterPushTokenAsync(
         HttpContext context,
         [FromBody] UnregisterPushTokenRequest request,
-        ITemplatePushTokenService pushTokenService,
+        [FromServices] ITemplatePushTokenService pushTokenService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
