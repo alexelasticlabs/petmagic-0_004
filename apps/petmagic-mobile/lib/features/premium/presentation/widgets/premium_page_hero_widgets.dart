@@ -18,7 +18,7 @@ class _PremiumHeader extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_rounded),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -27,14 +27,15 @@ class _PremiumHeader extends StatelessWidget {
                 text.premiumPageTitle,
                 style: TextStyle(
                   color: colors.textStrong,
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         IconButton.filledTonal(
           onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded),
@@ -64,131 +65,216 @@ class _PremiumHero extends StatelessWidget {
         ? null
         : '${_planTitle(text, selectedPlan!)} · ${_tokensLabel(text, selectedPlan!)}';
 
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(28),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             colors.surfaceStrong,
-            colors.surfaceStrong.withValues(alpha: 0.96),
-            colors.gold.withValues(alpha: 0.08),
+            colors.surfaceStrong.withValues(alpha: 0.94),
+            colors.gold.withValues(alpha: 0.12),
+            colors.accent.withValues(alpha: 0.12),
           ],
         ),
-        border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.gold.withValues(alpha: 0.06),
+            blurRadius: 24,
+            spreadRadius: 2,
+          ),
+        ],
+        border: Border.all(
+          color: colors.gold.withValues(alpha: 0.4),
+          width: 1.5,
+        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ProfileStatusPill(
-                  label: isRecentlyActivated
-                      ? text.premiumRecentlyActivatedBadge
-                      : status?.isPremium == true
-                      ? text.premiumAlreadyActive
-                      : text.premiumHeroEyebrow,
-                  leading: Icons.workspace_premium_rounded,
-                  backgroundColor: isRecentlyActivated
-                      ? colors.accent.withValues(alpha: 0.16)
-                      : colors.gold.withValues(alpha: 0.16),
-                  foregroundColor: isRecentlyActivated
-                      ? colors.accent
-                      : colors.gold,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Elegant premium ambient decoration
+          Positioned(
+            right: -40,
+            top: -40,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colors.gold.withValues(alpha: 0.22),
+                    colors.gold.withValues(alpha: 0),
+                  ],
                 ),
-                const Spacer(),
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  color: isRecentlyActivated ? colors.accent : colors.gold,
-                  size: 20,
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 360;
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          Positioned(
+            left: -30,
+            bottom: -30,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colors.accent.withValues(alpha: 0.18),
+                    colors.accent.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            text.premiumHeroTitle,
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontSize: compact ? 25 : 28,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            text.premiumHeroSubtitle,
-                            style: TextStyle(
-                              color: colors.textSoft,
-                              fontSize: 13,
-                              height: 1.4,
-                              fontWeight: FontWeight.w700,
-                            ),
+                    Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.gold.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                            spreadRadius: 1,
                           ),
                         ],
                       ),
+                      child: ProfileStatusPill(
+                        label: isRecentlyActivated
+                            ? text.premiumRecentlyActivatedBadge
+                            : status?.isPremium == true
+                            ? text.premiumAlreadyActive
+                            : text.premiumHeroEyebrow,
+                        leading: Icons.workspace_premium_rounded,
+                        backgroundColor: isRecentlyActivated
+                            ? colors.accent.withValues(alpha: 0.2)
+                            : colors.gold.withValues(alpha: 0.22),
+                        foregroundColor: isRecentlyActivated
+                            ? colors.accent
+                            : colors.gold,
+                      ),
                     ),
-                    const SizedBox(width: 14),
-                    const _HeroPreviewStack(),
+                    const Spacer(),
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      color: isRecentlyActivated ? colors.accent : colors.gold,
+                      size: 22,
+                    ),
                   ],
-                );
-              },
-            ),
-            if (selectedPlanLabel != null) ...[
-              const SizedBox(height: 14),
-              Text(
-                selectedPlanLabel,
-                style: TextStyle(
-                  color: colors.textMuted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
                 ),
-              ),
-            ],
-            if (isRecentlyActivated) ...[
-              const SizedBox(height: 12),
-              ProfileProgressCard(
-                title: text.premiumRecentlyActivatedTitle,
-                message: text.premiumRecentlyActivatedMessage,
-                tone: colors.accent,
-                icon: Icons.check_circle_rounded,
-              ),
-            ],
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _HeroMetric(
-                  icon: Icons.stacked_line_chart_rounded,
-                  label: selectedPlan == null
-                      ? text.premiumComparisonPremiumTokensFallback
-                      : _tokensLabel(text, selectedPlan!),
+                const SizedBox(height: 16),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 360;
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                text.premiumHeroTitle,
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: compact ? 26 : 30,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                text.premiumHeroSubtitle,
+                                style: TextStyle(
+                                  color: colors.textSoft,
+                                  fontSize: 14,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const _HeroPreviewStack(),
+                      ],
+                    );
+                  },
                 ),
-                _HeroMetric(
-                  icon: Icons.flash_on_rounded,
-                  label: text.premiumComparisonFast,
-                ),
-                _HeroMetric(
-                  icon: Icons.hd_rounded,
-                  label: text.premiumComparisonHighQuality,
+                if (selectedPlanLabel != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceStrong.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: colors.border.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 14,
+                          color: colors.gold,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          selectedPlanLabel,
+                          style: TextStyle(
+                            color: colors.textStrong,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (isRecentlyActivated) ...[
+                  const SizedBox(height: 12),
+                  ProfileProgressCard(
+                    title: text.premiumRecentlyActivatedTitle,
+                    message: text.premiumRecentlyActivatedMessage,
+                    tone: colors.accent,
+                    icon: Icons.check_circle_rounded,
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _HeroMetric(
+                      icon: Icons.flash_on_rounded,
+                      label: text.premiumComparisonFast,
+                    ),
+                    _HeroMetric(
+                      icon: Icons.hd_rounded,
+                      label: text.premiumComparisonHighQuality,
+                    ),
+                    _HeroMetric(
+                      icon: Icons.workspace_premium_rounded,
+                      label: text.premiumComparisonPremiumTemplates,
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -202,41 +288,45 @@ class _HeroPreviewStack extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return SizedBox(
-      width: 148,
-      height: 210,
+      width: 140,
+      height: 200,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            left: 6,
-            top: 30,
+            left: 2,
+            top: 26,
             child: _PreviewCard(
-              angle: -0.14,
+              angle: -0.12,
               label: 'AI DANCE',
+              tag: 'MAGIC',
               accent: colors.gold,
-              gradient: const [Color(0xFF4C2F12), Color(0xFF191B31)],
+              gradient: const [Color(0xFF3B1E08), Color(0xFF141324)],
             ),
           ),
           Positioned(
-            right: -6,
-            top: 38,
+            right: -4,
+            top: 32,
             child: _PreviewCard(
               angle: 0.12,
               label: 'CINEMATIC',
+              tag: 'PRO',
               accent: colors.gold,
-              gradient: const [Color(0xFF5A3A12), Color(0xFF141C2D)],
+              gradient: const [Color(0xFF221133), Color(0xFF131A2D)],
             ),
           ),
           Positioned(
-            left: 22,
+            left: 18,
             child: _PreviewCard(
-              width: 104,
-              height: 170,
-              angle: 0.04,
+              width: 102,
+              height: 172,
+              angle: 0.02,
               label: 'VIRAL VIDEO',
+              tag: '4K HD',
               accent: colors.accent,
               showPlay: true,
-              gradient: const [Color(0xFF7B3A17), Color(0xFF1B2440)],
+              isCenter: true,
+              gradient: const [Color(0xFF501908), Color(0xFF111E39)],
             ),
           ),
         ],
@@ -251,18 +341,22 @@ class _PreviewCard extends StatelessWidget {
     required this.label,
     required this.accent,
     required this.gradient,
-    this.width = 92,
-    this.height = 148,
+    required this.tag,
+    this.width = 86,
+    this.height = 144,
     this.showPlay = false,
+    this.isCenter = false,
   });
 
   final double angle;
   final String label;
+  final String tag;
   final Color accent;
   final List<Color> gradient;
   final double width;
   final double height;
   final bool showPlay;
+  final bool isCenter;
 
   @override
   Widget build(BuildContext context) {
@@ -274,8 +368,13 @@ class _PreviewCard extends StatelessWidget {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: colors.border.withValues(alpha: 0.75)),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isCenter
+                ? colors.gold
+                : colors.border.withValues(alpha: 0.6),
+            width: isCenter ? 1.8 : 1.0,
+          ),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -283,46 +382,103 @@ class _PreviewCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 16,
-              offset: const Offset(0, 10),
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: isCenter ? 18 : 12,
+              offset: Offset(0, isCenter ? 8 : 6),
             ),
+            if (isCenter)
+              BoxShadow(
+                color: colors.gold.withValues(alpha: 0.15),
+                blurRadius: 12,
+                spreadRadius: 1,
+              ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(21),
+          child: Stack(
             children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: Icon(Icons.auto_awesome, size: 15, color: accent),
-              ),
-              const Spacer(),
-              if (showPlay)
-                Align(
-                  alignment: Alignment.center,
+              // Gloss reflection flare
+              Positioned(
+                top: -30,
+                left: -30,
+                child: Transform.rotate(
+                  angle: 0.5,
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: 120,
+                    height: 24,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.black,
-                      size: 28,
+                      color: Colors.white.withValues(alpha: 0.06),
                     ),
                   ),
                 ),
-              const Spacer(),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.gold.withValues(
+                              alpha: isCenter ? 0.35 : 0.18,
+                            ),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              color: colors.gold,
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.auto_awesome, size: 12, color: accent),
+                      ],
+                    ),
+                    const Spacer(),
+                    if (showPlay)
+                      Align(
+                        alignment: Alignment.center,
+                        child: Container(
+                          width: 40,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.95),
+                            boxShadow: [
+                              BoxShadow(
+                                color: colors.gold.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow_rounded,
+                            color: Colors.black,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    const Spacer(),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -343,24 +499,27 @@ class _HeroMetric extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.54),
+        color: colors.gold.withValues(alpha: 0.11),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.border.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: colors.gold.withValues(alpha: 0.45),
+          width: 1.1,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: colors.accent),
+            Icon(icon, size: 14, color: colors.gold),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 color: colors.textStrong,
-                fontSize: 11,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w800,
               ),
             ),

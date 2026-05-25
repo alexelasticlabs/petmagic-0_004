@@ -94,7 +94,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
         if (await dbContext.CurrencyPacks.AnyAsync())
         {
-            return;
+            dbContext.CurrencyPacks.RemoveRange(dbContext.CurrencyPacks);
+            await dbContext.SaveChangesAsync();
         }
 
         dbContext.CurrencyPacks.AddRange(
@@ -104,9 +105,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Code = "starter",
                 DisplayName = "Starter PawSpark",
                 CurrencyCode = "USD",
-                PriceAmount = 4.99m,
-                GrantedSpark = 350,
-                BonusSpark = 30,
+                PriceAmount = 6.99m,
+                GrantedSpark = 20,
+                BonusSpark = 0,
                 IsActive = true,
                 SortOrder = 1
             },
@@ -116,9 +117,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Code = "creator",
                 DisplayName = "Creator PawSpark",
                 CurrencyCode = "USD",
-                PriceAmount = 9.99m,
-                GrantedSpark = 800,
-                BonusSpark = 120,
+                PriceAmount = 14.99m,
+                GrantedSpark = 45,
+                BonusSpark = 0,
                 IsActive = true,
                 SortOrder = 2
             },
@@ -128,9 +129,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Code = "viral",
                 DisplayName = "Viral PawSpark",
                 CurrencyCode = "USD",
-                PriceAmount = 19.99m,
-                GrantedSpark = 1800,
-                BonusSpark = 420,
+                PriceAmount = 29.99m,
+                GrantedSpark = 90,
+                BonusSpark = 10,
                 IsActive = true,
                 SortOrder = 3
             },
@@ -140,9 +141,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Code = "starter",
                 DisplayName = "Starter PawSpark",
                 CurrencyCode = "EUR",
-                PriceAmount = 4.59m,
-                GrantedSpark = 350,
-                BonusSpark = 30,
+                PriceAmount = 6.29m,
+                GrantedSpark = 20,
+                BonusSpark = 0,
                 IsActive = true,
                 SortOrder = 1
             },
@@ -152,9 +153,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Code = "creator",
                 DisplayName = "Creator PawSpark",
                 CurrencyCode = "EUR",
-                PriceAmount = 9.19m,
-                GrantedSpark = 800,
-                BonusSpark = 120,
+                PriceAmount = 13.49m,
+                GrantedSpark = 45,
+                BonusSpark = 0,
                 IsActive = true,
                 SortOrder = 2
             },
@@ -164,9 +165,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Code = "viral",
                 DisplayName = "Viral PawSpark",
                 CurrencyCode = "EUR",
-                PriceAmount = 18.39m,
-                GrantedSpark = 1800,
-                BonusSpark = 420,
+                PriceAmount = 26.99m,
+                GrantedSpark = 90,
+                BonusSpark = 10,
                 IsActive = true,
                 SortOrder = 3
             });

@@ -29,34 +29,76 @@ class _BenefitsList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ProfileSectionLabel(label: text.premiumIncludesTitle),
-        const SizedBox(height: 2),
-        ProfileGlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Column(
-            children: [
-              for (var index = 0; index < benefits.length; index++) ...[
-                _BenefitLine(benefit: benefits[index]),
-                if (index < benefits.length - 1) const SizedBox(height: 10),
-              ],
-              if (selectedPlan != null) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    text.premiumTokenEstimate(
-                      _estimatedVideoCount(selectedPlan!.tokenAllowance),
-                      _estimatedPhotoCount(selectedPlan!.tokenAllowance),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            color: colors.surfaceGlass.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colors.gold.withValues(alpha: 0.25),
+              width: 1.2,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                for (var index = 0; index < benefits.length; index++) ...[
+                  _BenefitLine(benefit: benefits[index]),
+                  if (index < benefits.length - 1) ...[
+                    const SizedBox(height: 12),
+                    Divider(
+                      color: colors.border.withValues(alpha: 0.15),
+                      height: 1,
                     ),
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 11.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: 12),
+                  ],
+                ],
+                if (selectedPlan != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.gold.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: colors.gold.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 16,
+                          color: colors.gold,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            text.premiumTokenEstimate(
+                              _estimatedVideoCount(
+                                selectedPlan!.tokenAllowance,
+                              ),
+                              _estimatedPhotoCount(
+                                selectedPlan!.tokenAllowance,
+                              ),
+                            ),
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 12,
+                              height: 1.4,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],
@@ -75,21 +117,35 @@ class _BenefitLine extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(Icons.check_circle_rounded, color: colors.textStrong, size: 18),
-        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colors.gold.withValues(alpha: 0.18),
+          ),
+          child: Icon(Icons.check_rounded, color: colors.gold, size: 14),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
             benefit.label,
             style: TextStyle(
               color: colors.textStrong,
-              fontSize: 12.5,
-              height: 1.25,
+              fontSize: 13.5,
+              height: 1.3,
               fontWeight: FontWeight.w800,
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        Icon(benefit.icon, color: colors.textMuted, size: 18),
+        const SizedBox(width: 12),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: colors.surfaceStrong.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(benefit.icon, color: colors.gold, size: 16),
+        ),
       ],
     );
   }
@@ -138,161 +194,244 @@ class _PlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+
+    // Choose beautiful color branding based on plan.isPopular or gold accents
+    final activeColor = plan.isPopular ? colors.accent : colors.gold;
     final borderColor = selected
-        ? (plan.isPopular ? colors.accent : colors.gold)
-        : colors.border;
+        ? activeColor
+        : colors.border.withValues(alpha: 0.5);
+
     final approxMonthly = plan.billingInterval == 'yearly'
         ? plan.priceAmount / 12
         : null;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: onTap,
-      child: ProfileGlassCard(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              _planTitle(text, plan),
-                              style: TextStyle(
-                                color: colors.textStrong,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: selected
+            ? colors.surfaceStrong.withValues(alpha: 0.95)
+            : colors.surfaceGlass.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor, width: selected ? 2.0 : 1.2),
+        boxShadow: [
+          if (selected)
+            BoxShadow(
+              color: activeColor.withValues(alpha: 0.15),
+              blurRadius: 16,
+              spreadRadius: 2,
+              offset: const Offset(0, 4),
+            )
+          else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _planTitle(text, plan),
+                                style: TextStyle(
+                                  color: selected
+                                      ? colors.textStrong
+                                      : colors.textStrong.withValues(
+                                          alpha: 0.9,
+                                        ),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
                             ),
-                          ),
-                          if (plan.isPopular) ...[
-                            const SizedBox(width: 8),
-                            ProfileStatusPill(
-                              label: text.premiumPopularBadge,
-                              leading: Icons.local_fire_department_rounded,
-                              backgroundColor: colors.accent.withValues(
-                                alpha: 0.18,
+                            if (plan.isPopular) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: colors.accent.withValues(
+                                        alpha: 0.18,
+                                      ),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                                child: ProfileStatusPill(
+                                  label: text.premiumPopularBadge,
+                                  leading: Icons.local_fire_department_rounded,
+                                  backgroundColor: colors.accent.withValues(
+                                    alpha: 0.22,
+                                  ),
+                                  foregroundColor: colors.accent,
+                                ),
                               ),
-                              foregroundColor: colors.accent,
-                            ),
+                            ],
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (plan.compareAtPriceAmount != null) ...[
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            if (plan.compareAtPriceAmount != null) ...[
+                              Text(
+                                _formatPrice(plan, plan.compareAtPriceAmount!),
+                                style: TextStyle(
+                                  color: colors.textMuted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Flexible(
+                              child: Text(
+                                _formatPrice(plan, plan.priceAmount),
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
                             Text(
-                              _formatPrice(plan, plan.compareAtPriceAmount!),
-                              style: TextStyle(
-                                color: colors.textMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                decoration: TextDecoration.lineThrough,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Flexible(
-                            child: Text(
-                              _formatPrice(plan, plan.priceAmount),
-                              style: TextStyle(
-                                color: colors.textStrong,
-                                fontSize: 23,
-                                height: 1,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: Text(
                               _periodLabel(text, plan),
                               style: TextStyle(
                                 color: colors.textSoft,
-                                fontSize: 11.5,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _tokensLabel(text, plan),
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (approxMonthly != null) ...[
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _PlanChip(
-                              icon: Icons.calculate_rounded,
-                              label:
-                                  '${_formatPrice(plan, approxMonthly)} ${text.premiumMonthlyPeriod}',
-                            ),
-                            if (plan.discountPercent != null)
-                              _PlanChip(
-                                icon: Icons.savings_rounded,
-                                label: text.premiumDiscountLabel(
-                                  plan.discountPercent!,
-                                ),
-                              ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.bolt_rounded,
+                              size: 14,
+                              color: selected ? colors.gold : colors.textSoft,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _tokensLabel(text, plan),
+                              style: TextStyle(
+                                color: selected
+                                    ? colors.textStrong
+                                    : colors.textSoft,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (approxMonthly != null) ...[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _PlanChip(
+                                icon: Icons.calculate_rounded,
+                                label:
+                                    '${_formatPrice(plan, approxMonthly)} ${text.premiumMonthlyPeriod}',
+                              ),
+                              if (plan.discountPercent != null)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: colors.gold.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: _PlanChip(
+                                    icon: Icons.savings_rounded,
+                                    label: text.premiumDiscountLabel(
+                                      plan.discountPercent!,
+                                    ),
+                                    accentColor: colors.gold,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected
-                        ? (plan.isPopular ? colors.accent : colors.gold)
-                        : Colors.transparent,
-                    border: Border.all(color: borderColor, width: 1.4),
+                  const SizedBox(width: 12),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected ? activeColor : Colors.transparent,
+                      border: Border.all(
+                        color: selected
+                            ? activeColor
+                            : colors.border.withValues(alpha: 0.7),
+                        width: 2.0,
+                      ),
+                      boxShadow: [
+                        if (selected)
+                          BoxShadow(
+                            color: activeColor.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                          ),
+                      ],
+                    ),
+                    child: selected
+                        ? Icon(
+                            Icons.check_rounded,
+                            size: 16,
+                            color: colors.surface,
+                          )
+                        : null,
                   ),
-                  child: selected
-                      ? Icon(
-                          Icons.check_rounded,
-                          size: 16,
-                          color: colors.surface,
-                        )
-                      : null,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _PlanChip(
-                  icon: Icons.event_available_rounded,
-                  label: text.premiumCancelAnytime,
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 14),
+              Divider(color: colors.border.withValues(alpha: 0.3), height: 1),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _PlanChip(
+                    icon: Icons.event_available_rounded,
+                    label: text.premiumCancelAnytime,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

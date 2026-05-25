@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
@@ -161,8 +162,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               title: text.profileLegalShortcutTitle,
                               subtitle: legalStatus,
                               iconColor: colors.accent,
-                              onTap: () =>
-                                  context.push(ProfileSettingsPage.routePath),
+                              onTap: () => context.push(
+                                ProfileSettingsDetailPage.location(
+                                  ProfileSettingsDetailKind.terms,
+                                ),
+                              ),
                             ),
                             ProfileSettingsRow(
                               icon: Icons.support_agent_rounded,

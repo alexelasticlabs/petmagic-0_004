@@ -60,7 +60,14 @@ class _WalletPageState extends ConsumerState<WalletPage>
     final controller = ref.read(walletControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final bottomNavInset = petMagicBottomNavInset(context);
+    final hasShell =
+        context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
+    final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final bottomNavInset = hasKeyboard
+        ? MediaQuery.viewPaddingOf(context).bottom + 12
+        : hasShell
+        ? petMagicBottomNavInset(context)
+        : MediaQuery.viewPaddingOf(context).bottom + 16;
     final checkoutStatusMessage = _checkoutStatusMessage(text, state);
 
     ref.listen(walletControllerProvider, (previous, next) {
@@ -82,7 +89,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                 onRefresh: () => controller.load(refresh: true),
                 color: colors.accent,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, bottomNavInset),
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, bottomNavInset + 12),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     _WalletHeader(
@@ -92,7 +99,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                     ),
                     if (state.checkoutVerificationState ==
                         WalletCheckoutVerificationState.checking) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       ProfileProgressCard(
                         title: text.externalCheckoutCheckingTitle,
                         message: text.externalCheckoutCheckingMessage,
@@ -101,7 +108,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       ),
                     ],
                     if (checkoutStatusMessage != null) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       ProfileMessageCard(
                         message: checkoutStatusMessage,
                         tone:
@@ -112,7 +119,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       ),
                     ],
                     if (state.wallet == null) ...[
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 22),
                       _WalletUnavailableCard(
                         message: _friendlyError(
                           text,
@@ -123,20 +130,28 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       ),
                     ] else ...[
                       if (state.errorMessage != null) ...[
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
                         ProfileMessageCard(
                           message: _friendlyError(text, state.errorMessage!),
                           tone: _warningTone,
                         ),
                       ],
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       _BalanceCard(wallet: state.wallet),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 18),
+                      const _WhatYouCanCreateCard(),
+                      const SizedBox(height: 18),
                       _RewardsOverviewCard(
                         wallet: state.wallet,
                         isClaimingAd: state.isClaimingAd,
                         onClaimAd: controller.claimAdReward,
                       ),
+                      const SizedBox(height: 18),
+                      _PromoCodeForm(
+                        isSubmitting: state.isRedeeming,
+                        onSubmit: controller.applyRedeemCode,
+                      ),
+                      const SizedBox(height: 18),
                       _PacksSection(
                         packs: state.packs,
                         isBuying: state.isBuying,
@@ -147,9 +162,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
                           onBuy: () => controller.buyPack(pack),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 18),
                       _LedgerSection(items: state.ledger),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 18),
                       _PurchasesSection(
                         items: state.purchases,
                         highlightedOrderId: state.highlightedPurchaseOrderId,
@@ -189,6 +204,8 @@ Future<void> _showPackDetailSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
     backgroundColor: colors.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(26)),

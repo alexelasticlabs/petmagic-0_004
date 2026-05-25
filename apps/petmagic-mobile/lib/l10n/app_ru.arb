@@ -83,10 +83,10 @@
   "profileWalletEmptyHint": "Откройте баланс и историю",
   "walletDataUnavailableFallback": "Данные кошелька сейчас недоступны.",
   "walletRefreshTooltip": "Обновить кошелек",
-  "walletBalanceTitle": "Доступно для фото и видео",
+  "walletBalanceTitle": "Доступно для создания фото, видео и premium-шаблонов.",
   "walletBalanceEyebrow": "Текущий баланс",
   "walletBalanceUnit": "PawSpark",
-  "walletBalanceExplanation": "PawSpark тратится только внутри PetMagic: на генерации, бонусные действия и новые форматы.",
+  "walletBalanceExplanation": "PawSpark — внутренняя валюта PetMagic. Используйте её для создания фото, видео и доступа к премиум-шаблонам.",
   "walletPremiumStatus": "Premium-кошелек",
   "walletFreeStatus": "Базовый кошелек",
   "walletAdRewardsCount": "Наград за рекламу: {count}",
@@ -96,40 +96,102 @@
     }
   },
   "walletQuickActionsTitle": "Промокоды",
-  "walletRedeemAction": "Активировать промокод",
+  "walletRedeemAction": "Активировать",
   "walletRewardsTitle": "Бонус за рекламу",
   "walletAdRewardAction": "Награда за рекламу",
-  "walletAdRewardCompactTitle": "Быстрый бонус за рекламу",
-  "walletAdRewardCompactDescription": "Посмотрите короткую рекламу и получите PawSpark без оплаты.",
+  "walletAdRewardCompactTitle": "Получить PawSpark бесплатно",
+  "walletAdRewardCompactDescription": "Посмотрите короткую рекламу и получите +15 PawSpark.",
   "walletAdRewardRemaining": "Сегодня осталось: {count}",
   "@walletAdRewardRemaining": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletWatchAdAction": "Смотреть рекламу",
+  "walletWatchAdAction": "Получить +15 PawSpark",
+  "walletAdDailyLimitReached": "Реклама сейчас недоступна. Попробуйте у нас позже.",
   "walletPromoTitle": "Есть промокод?",
   "walletPromoSubtitle": "Введите код от команды PetMagic и сразу получите PawSpark на баланс.",
-  "rewardsPageTitle": "Бонусы",
-  "rewardsPageSubtitle": "Промокоды, реферальные бонусы и история наград в одном месте.",
+  "walletPromoInputPlaceholder": "Введите промокод",
+  "walletPromoSuccessMessage": "Промокод успешно активирован!",
+  "walletBestValueBadge": "Лучшая выгода",
+  "walletPremiumUpsellTitle": "Создаете часто?",
+  "walletPremiumUpsellMessage": "Premium дает ежемесячные PawSpark, premium-шаблоны и приоритетную очередь.",
+  "walletViewPremiumAction": "Посмотреть Premium",
+  "walletWhatYouCanCreateTitle": "Баланса хватит на:",
+  "walletSpendPhotoSubtitle": "Фото\nот 10 Spark",
+  "walletSpendVideoSubtitle": "Видео\nот 50 Spark",
+  "walletSpendPremiumSubtitle": "Premium\nот 80 Spark",
+  "walletContactSupportAction": "Связаться с поддержкой",
+  "walletRetryAction": "Повторить",
+  "rewardsPageTitle": "Бонусы и промокоды",
+  "rewardsPageSubtitle": "Активируйте промокоды, приглашайте друзей и получайте награды.",
+  "rewardsLastUpdatedLabel": "Обновлено: {value}",
+  "@rewardsLastUpdatedLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "rewardsLastUpdatedNow": "только что",
+  "rewardsLastUpdatedMinutes": "{count} мин назад",
+  "@rewardsLastUpdatedMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsLastUpdatedHours": "{count} ч назад",
+  "@rewardsLastUpdatedHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "rewardsPromoTitle": "Промокоды",
-  "rewardsPromoSubtitle": "Активируйте коды PetMagic и пополняйте баланс PawSpark.",
+  "rewardsPromoSubtitle": "Введите промокод, чтобы пополнить баланс PawSpark.",
+  "rewardsPromoEmptyError": "Введите промокод.",
+  "rewardsPromoCheckingStatus": "Проверяем код...",
   "rewardsReferralTitle": "Реферальные бонусы",
-  "rewardsReferralSubtitle": "Поделитесь кодом. Бонус начислится после первой покупки приглашенного друга.",
+  "rewardsReferralSubtitle": "Поделитесь кодом с другом. Бонус начисляется не за регистрацию, а после его первой успешной платной покупки.",
   "rewardsYourReferralCode": "Ваш код",
-  "rewardsCopyReferralCodeAction": "Скопировать реферальный код",
-  "rewardsReferralCopiedMessage": "Реферальный код скопирован.",
+  "rewardsCopyReferralCodeAction": "Скопировать",
+  "rewardsReferralCopiedMessage": "Код скопирован.",
+  "rewardsReferralShareCodeAction": "Поделиться кодом",
+  "rewardsReferralUseFriendCodeAction": "Ввести код друга",
+  "rewardsReferralFriendCodePrompt": "Есть код друга?",
+  "rewardsReferralFriendCodeHint": "Введите его до первой покупки.",
   "rewardsReferralInputLabel": "Код друга",
   "rewardsReferralInputHint": "PMABC12345",
-  "rewardsReferralActivateAction": "Активировать реферальный код",
-  "rewardsReferralActivatedMessage": "Реферальный код активирован. Бонус откроется после вашей первой покупки.",
+  "rewardsReferralActivateAction": "Активировать код",
+  "rewardsReferralEmptyError": "Введите код друга.",
+  "rewardsReferralCheckingStatus": "Проверяем реферальный код...",
+  "rewardsReferralActivatedMessage": "Реферальный код активирован. Начисление произойдет после вашей первой успешной платной покупки.",
   "rewardsReferralStatusLoading": "Загружаем статус рефералки...",
-  "rewardsReferralStatusNone": "Введите код друга до первой покупки, чтобы открыть реферальный бонус.",
-  "rewardsReferralStatusPending": "Рефералка подключена. Бонус начислится после вашей первой покупки.",
+  "rewardsReferralStatusNone": "Введите код друга перед первой покупкой. Бонус начисляется только после успешной оплаты.",
+  "rewardsReferralStatusPending": "Рефералка подключена. Бонус начислится после вашей первой успешной платной покупки.",
   "rewardsReferralStatusRewarded": "Реферальный бонус начислен. Спасибо, что развиваете PetMagic.",
-  "rewardsReferralEarnedLabel": "Получено",
-  "rewardsReferralFriendsLabel": "Друзья",
-  "rewardsReferralBonusLabel": "Бонус",
+  "rewardsReferralEarnedLabel": "PawSpark получено",
+  "rewardsReferralFriendsLabel": "Друзей приглашено",
+  "rewardsReferralBonusLabel": "Совершили покупку",
+  "rewardsReferralBonusPerFriend": "+{count} PawSpark за друга",
+  "@rewardsReferralBonusPerFriend": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsReferralRulesNote": "За регистрацию бонус не начисляется. Награда приходит только после первой успешной платной покупки.",
+  "rewardsReferralShareMessage": "Присоединяйся к PetMagic по моему коду {code}. Бонус начисляется после первой успешной платной покупки. После твоей первой покупки я получу +{bonus} PawSpark.",
+  "@rewardsReferralShareMessage": {
+    "placeholders": {
+      "code": {},
+      "bonus": {
+        "type": "int"
+      }
+    }
+  },
   "rewardsHistoryTitle": "История бонусов",
   "rewardsHistorySubtitle": "Последние промокоды, рефералки, реклама и еженедельные награды.",
   "rewardsHistoryEmpty": "Бонусов пока нет. Промокоды и реферальные награды появятся здесь.",
@@ -142,7 +204,7 @@
   "rewardsReferralCodeNotFoundError": "Реферальный код не найден.",
   "rewardsReferralSelfError": "Нельзя активировать собственный реферальный код.",
   "rewardsReferralAlreadyLinkedError": "Для этого аккаунта уже активирован реферальный код.",
-  "rewardsReferralPaidUserError": "Реферальный код нужно активировать до первой покупки.",
+  "rewardsReferralPaidUserError": "Реферальный код нужно активировать до первой успешной платной покупки.",
   "walletBuySparkTitle": "Пополнить PawSpark",
   "walletPackTotalSpark": "{count} PawSpark",
   "@walletPackTotalSpark": {
@@ -223,8 +285,11 @@
   "walletSourceAdminDebit": "Корректировка поддержки",
   "walletPurchaseCompleted": "Завершено",
   "walletPurchaseFailed": "Ошибка",
+  "walletQueryFilterAll": "Все",
+  "walletQueryFilterCredits": "Зачисления",
+  "walletQueryFilterDebits": "Списания",
   "walletPartialActivityUnavailable": "Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.",
-  "walletPaymentGatewayUnavailableError": "Оплата временно недоступна. Попробуйте Stripe Checkout чуть позже.",
+  "walletPaymentGatewayUnavailableError": "Платежи временно недоступны. Попробуйте позже или обновите приложение.",
   "walletPackUnavailableError": "Этот набор PawSpark больше недоступен.",
   "walletRedeemCodeNotFoundError": "Промокод не найден.",
   "walletRedeemCodeAlreadyUsedError": "Этот промокод уже использован.",
@@ -238,8 +303,8 @@
   "walletUnavailableError": "Данные кошелька временно недоступны. Попробуйте еще раз чуть позже.",
   "walletRedeemSheetTitle": "Промокод",
   "walletRedeemSheetSubtitle": "Код можно использовать один раз, если он активен и не истек.",
-  "walletRedeemInputLabel": "Код промокода",
-  "walletRedeemHint": "WELCOME-100",
+  "walletRedeemInputLabel": "Промокод",
+  "walletRedeemHint": "Введите промокод",
   "walletRedeemCancelAction": "Отмена",
   "walletApplyCode": "Применить код",
   "walletRedeemSuccessMessage": "Промокод успешно применён. Баланс уже обновлён.",
@@ -586,7 +651,6 @@
   "authAppleShortLabel": "Apple",
   "authContinueWithGoogle": "Продолжить с Google",
   "authContinueWithApple": "Продолжить с Apple",
-  "authGoogleBrowserFallbackAction": "Войти через Google в браузере",
   "authNoAccountPrompt": "Еще нет аккаунта?",
   "authHaveAccountPrompt": "Уже есть аккаунт?",
   "authSignUpAction": "Регистрация",

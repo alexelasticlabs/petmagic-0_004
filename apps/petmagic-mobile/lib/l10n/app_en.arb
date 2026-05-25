@@ -83,10 +83,10 @@
   "profileWalletEmptyHint": "Open balance and history",
   "walletDataUnavailableFallback": "Wallet data is not available right now.",
   "walletRefreshTooltip": "Refresh wallet",
-  "walletBalanceTitle": "Ready for photos and videos",
+  "walletBalanceTitle": "Available for photos, videos and premium templates.",
   "walletBalanceEyebrow": "Current balance",
   "walletBalanceUnit": "PawSpark",
-  "walletBalanceExplanation": "PawSpark is spent only inside PetMagic: generations, bonus actions, and new formats.",
+  "walletBalanceExplanation": "PawSpark — internal currency of PetMagic. Use it for creating photos, videos and accessing premium templates.",
   "walletPremiumStatus": "Premium wallet",
   "walletFreeStatus": "Free wallet",
   "walletAdRewardsCount": "{count} ad rewards",
@@ -96,40 +96,102 @@
     }
   },
   "walletQuickActionsTitle": "Promo codes",
-  "walletRedeemAction": "Redeem promo code",
+  "walletRedeemAction": "Activate",
   "walletRewardsTitle": "Ad bonus",
   "walletAdRewardAction": "Ad reward",
-  "walletAdRewardCompactTitle": "Quick ad bonus",
-  "walletAdRewardCompactDescription": "Watch a short ad and add PawSpark without paying.",
+  "walletAdRewardCompactTitle": "Get PawSpark for free",
+  "walletAdRewardCompactDescription": "Watch a short ad and get +15 PawSpark.",
   "walletAdRewardRemaining": "Left today: {count}",
   "@walletAdRewardRemaining": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletWatchAdAction": "Watch ad",
+  "walletWatchAdAction": "Get +15 PawSpark",
+  "walletAdDailyLimitReached": "Ads are temporarily unavailable. Please try again later.",
   "walletPromoTitle": "Have a promo code?",
   "walletPromoSubtitle": "Enter a code from PetMagic and add PawSpark to your balance.",
-  "rewardsPageTitle": "Rewards",
-  "rewardsPageSubtitle": "Promo codes, referral bonuses and reward history in one place.",
+  "walletPromoInputPlaceholder": "Enter promo code",
+  "walletPromoSuccessMessage": "Promo code activated successfully!",
+  "walletBestValueBadge": "Best value",
+  "walletPremiumUpsellTitle": "Create often?",
+  "walletPremiumUpsellMessage": "Premium membership gives you cheaper generations, monthly PawSparks and exclusive premium templates.",
+  "walletViewPremiumAction": "View Premium",
+  "walletWhatYouCanCreateTitle": "Your balance is enough for:",
+  "walletSpendPhotoSubtitle": "Photos\nfrom 10 Spark",
+  "walletSpendVideoSubtitle": "Videos\nfrom 50 Spark",
+  "walletSpendPremiumSubtitle": "Premium\nfrom 80 Spark",
+  "walletContactSupportAction": "Contact support",
+  "walletRetryAction": "Retry",
+  "rewardsPageTitle": "Rewards and promo codes",
+  "rewardsPageSubtitle": "Activate promo codes, invite friends, and earn rewards.",
+  "rewardsLastUpdatedLabel": "Updated: {value}",
+  "@rewardsLastUpdatedLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "rewardsLastUpdatedNow": "just now",
+  "rewardsLastUpdatedMinutes": "{count} min ago",
+  "@rewardsLastUpdatedMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsLastUpdatedHours": "{count} h ago",
+  "@rewardsLastUpdatedHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "rewardsPromoTitle": "Promo codes",
-  "rewardsPromoSubtitle": "Redeem PetMagic codes and add PawSpark to your balance.",
+  "rewardsPromoSubtitle": "Enter a promo code to top up your PawSpark balance.",
+  "rewardsPromoEmptyError": "Enter promo code.",
+  "rewardsPromoCheckingStatus": "Checking code...",
   "rewardsReferralTitle": "Referral bonuses",
-  "rewardsReferralSubtitle": "Share your code. The referral bonus is paid after your friend completes their first purchase.",
+  "rewardsReferralSubtitle": "Share your code with a friend. Referral bonus is not paid for signup and is credited only after their first successful paid purchase.",
   "rewardsYourReferralCode": "Your code",
-  "rewardsCopyReferralCodeAction": "Copy referral code",
-  "rewardsReferralCopiedMessage": "Referral code copied.",
+  "rewardsCopyReferralCodeAction": "Copy",
+  "rewardsReferralCopiedMessage": "Code copied.",
+  "rewardsReferralShareCodeAction": "Share code",
+  "rewardsReferralUseFriendCodeAction": "Enter friend code",
+  "rewardsReferralFriendCodePrompt": "Have a friend's code?",
+  "rewardsReferralFriendCodeHint": "Enter it before your first purchase.",
   "rewardsReferralInputLabel": "Friend code",
   "rewardsReferralInputHint": "PMABC12345",
-  "rewardsReferralActivateAction": "Activate referral code",
-  "rewardsReferralActivatedMessage": "Referral code activated. Bonus unlocks after your first purchase.",
+  "rewardsReferralActivateAction": "Activate code",
+  "rewardsReferralEmptyError": "Enter friend code.",
+  "rewardsReferralCheckingStatus": "Checking referral code...",
+  "rewardsReferralActivatedMessage": "Referral code activated. Bonus is credited after your first successful paid purchase.",
   "rewardsReferralStatusLoading": "Loading referral status...",
-  "rewardsReferralStatusNone": "Enter a friend's code before your first purchase to unlock the referral bonus.",
-  "rewardsReferralStatusPending": "Referral connected. Bonus will be paid after your first purchase.",
+  "rewardsReferralStatusNone": "Enter a friend's code before your first purchase. Bonus is credited only after a successful payment.",
+  "rewardsReferralStatusPending": "Referral connected. Bonus will be paid after your first successful paid purchase.",
   "rewardsReferralStatusRewarded": "Referral bonus paid. Thanks for growing PetMagic.",
-  "rewardsReferralEarnedLabel": "Earned",
-  "rewardsReferralFriendsLabel": "Friends",
-  "rewardsReferralBonusLabel": "Bonus",
+  "rewardsReferralEarnedLabel": "PawSpark earned",
+  "rewardsReferralFriendsLabel": "Friends invited",
+  "rewardsReferralBonusLabel": "Completed purchases",
+  "rewardsReferralBonusPerFriend": "+{count} PawSpark per invited friend",
+  "@rewardsReferralBonusPerFriend": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsReferralRulesNote": "No signup bonus. Referral reward is credited only after a successful first paid purchase.",
+  "rewardsReferralShareMessage": "Join me in PetMagic! Use my referral code {code}. Bonus is credited after your first successful paid purchase. After your first purchase I'll receive +{bonus} PawSpark.",
+  "@rewardsReferralShareMessage": {
+    "placeholders": {
+      "code": {},
+      "bonus": {
+        "type": "int"
+      }
+    }
+  },
   "rewardsHistoryTitle": "Bonus history",
   "rewardsHistorySubtitle": "Recent promo, referral, ad and weekly rewards.",
   "rewardsHistoryEmpty": "No bonuses yet. Promo and referral rewards will appear here.",
@@ -142,7 +204,7 @@
   "rewardsReferralCodeNotFoundError": "Referral code was not found.",
   "rewardsReferralSelfError": "You cannot activate your own referral code.",
   "rewardsReferralAlreadyLinkedError": "A referral code is already activated for this account.",
-  "rewardsReferralPaidUserError": "Referral code must be activated before your first purchase.",
+  "rewardsReferralPaidUserError": "Referral code must be activated before your first successful paid purchase.",
   "walletBuySparkTitle": "Top up PawSpark",
   "walletPackTotalSpark": "{count} PawSpark",
   "@walletPackTotalSpark": {
@@ -223,8 +285,11 @@
   "walletSourceAdminDebit": "Support adjustment",
   "walletPurchaseCompleted": "Completed",
   "walletPurchaseFailed": "Failed",
+  "walletQueryFilterAll": "All",
+  "walletQueryFilterCredits": "Credits",
+  "walletQueryFilterDebits": "Debits",
   "walletPartialActivityUnavailable": "Your balance is already available. History and some wallet actions will refresh a bit later.",
-  "walletPaymentGatewayUnavailableError": "Payment is temporarily unavailable. Please try Stripe Checkout again in a moment.",
+  "walletPaymentGatewayUnavailableError": "Payments are temporarily unavailable. Please try again later or update the app.",
   "walletPackUnavailableError": "This PawSpark pack is no longer available.",
   "walletRedeemCodeNotFoundError": "Redeem code was not found.",
   "walletRedeemCodeAlreadyUsedError": "This redeem code was already used.",
@@ -239,7 +304,7 @@
   "walletRedeemSheetTitle": "Redeem code",
   "walletRedeemSheetSubtitle": "A code can be used once while it is active and not expired.",
   "walletRedeemInputLabel": "Promo code",
-  "walletRedeemHint": "WELCOME-100",
+  "walletRedeemHint": "Enter promo code",
   "walletRedeemCancelAction": "Cancel",
   "walletApplyCode": "Apply code",
   "walletRedeemSuccessMessage": "Promo code applied successfully. Your balance is already updated.",
@@ -586,7 +651,6 @@
   "authAppleShortLabel": "Apple",
   "authContinueWithGoogle": "Continue with Google",
   "authContinueWithApple": "Continue with Apple",
-  "authGoogleBrowserFallbackAction": "Sign in with Google in browser",
   "authNoAccountPrompt": "Don't have an account?",
   "authHaveAccountPrompt": "Already have an account?",
   "authSignUpAction": "Sign Up",

@@ -255,7 +255,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletRefreshTooltip => 'Обновить кошелек';
 
   @override
-  String get walletBalanceTitle => 'Доступно для фото и видео';
+  String get walletBalanceTitle =>
+      'Доступно для создания фото, видео и premium-шаблонов.';
 
   @override
   String get walletBalanceEyebrow => 'Текущий баланс';
@@ -265,7 +266,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get walletBalanceExplanation =>
-      'PawSpark тратится только внутри PetMagic: на генерации, бонусные действия и новые форматы.';
+      'PawSpark — внутренняя валюта PetMagic. Используйте её для создания фото, видео и доступа к премиум-шаблонам.';
 
   @override
   String get walletPremiumStatus => 'Premium-кошелек';
@@ -282,7 +283,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletQuickActionsTitle => 'Промокоды';
 
   @override
-  String get walletRedeemAction => 'Активировать промокод';
+  String get walletRedeemAction => 'Активировать';
 
   @override
   String get walletRewardsTitle => 'Бонус за рекламу';
@@ -291,11 +292,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletAdRewardAction => 'Награда за рекламу';
 
   @override
-  String get walletAdRewardCompactTitle => 'Быстрый бонус за рекламу';
+  String get walletAdRewardCompactTitle => 'Получить PawSpark бесплатно';
 
   @override
   String get walletAdRewardCompactDescription =>
-      'Посмотрите короткую рекламу и получите PawSpark без оплаты.';
+      'Посмотрите короткую рекламу и получите +15 PawSpark.';
 
   @override
   String walletAdRewardRemaining(Object count) {
@@ -303,7 +304,11 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get walletWatchAdAction => 'Смотреть рекламу';
+  String get walletWatchAdAction => 'Получить +15 PawSpark';
+
+  @override
+  String get walletAdDailyLimitReached =>
+      'Реклама сейчас недоступна. Попробуйте у нас позже.';
 
   @override
   String get walletPromoTitle => 'Есть промокод?';
@@ -313,34 +318,107 @@ class AppLocalizationsRu extends AppLocalizations {
       'Введите код от команды PetMagic и сразу получите PawSpark на баланс.';
 
   @override
-  String get rewardsPageTitle => 'Бонусы';
+  String get walletPromoInputPlaceholder => 'Введите промокод';
+
+  @override
+  String get walletPromoSuccessMessage => 'Промокод успешно активирован!';
+
+  @override
+  String get walletBestValueBadge => 'Лучшая выгода';
+
+  @override
+  String get walletPremiumUpsellTitle => 'Создаете часто?';
+
+  @override
+  String get walletPremiumUpsellMessage =>
+      'Premium дает ежемесячные PawSpark, premium-шаблоны и приоритетную очередь.';
+
+  @override
+  String get walletViewPremiumAction => 'Посмотреть Premium';
+
+  @override
+  String get walletWhatYouCanCreateTitle => 'Баланса хватит на:';
+
+  @override
+  String get walletSpendPhotoSubtitle => 'Фото\nот 10 Spark';
+
+  @override
+  String get walletSpendVideoSubtitle => 'Видео\nот 50 Spark';
+
+  @override
+  String get walletSpendPremiumSubtitle => 'Premium\nот 80 Spark';
+
+  @override
+  String get walletContactSupportAction => 'Связаться с поддержкой';
+
+  @override
+  String get walletRetryAction => 'Повторить';
+
+  @override
+  String get rewardsPageTitle => 'Бонусы и промокоды';
 
   @override
   String get rewardsPageSubtitle =>
-      'Промокоды, реферальные бонусы и история наград в одном месте.';
+      'Активируйте промокоды, приглашайте друзей и получайте награды.';
+
+  @override
+  String rewardsLastUpdatedLabel(Object value) {
+    return 'Обновлено: $value';
+  }
+
+  @override
+  String get rewardsLastUpdatedNow => 'только что';
+
+  @override
+  String rewardsLastUpdatedMinutes(int count) {
+    return '$count мин назад';
+  }
+
+  @override
+  String rewardsLastUpdatedHours(int count) {
+    return '$count ч назад';
+  }
 
   @override
   String get rewardsPromoTitle => 'Промокоды';
 
   @override
   String get rewardsPromoSubtitle =>
-      'Активируйте коды PetMagic и пополняйте баланс PawSpark.';
+      'Введите промокод, чтобы пополнить баланс PawSpark.';
+
+  @override
+  String get rewardsPromoEmptyError => 'Введите промокод.';
+
+  @override
+  String get rewardsPromoCheckingStatus => 'Проверяем код...';
 
   @override
   String get rewardsReferralTitle => 'Реферальные бонусы';
 
   @override
   String get rewardsReferralSubtitle =>
-      'Поделитесь кодом. Бонус начислится после первой покупки приглашенного друга.';
+      'Поделитесь кодом с другом. Бонус начисляется не за регистрацию, а после его первой успешной платной покупки.';
 
   @override
   String get rewardsYourReferralCode => 'Ваш код';
 
   @override
-  String get rewardsCopyReferralCodeAction => 'Скопировать реферальный код';
+  String get rewardsCopyReferralCodeAction => 'Скопировать';
 
   @override
-  String get rewardsReferralCopiedMessage => 'Реферальный код скопирован.';
+  String get rewardsReferralCopiedMessage => 'Код скопирован.';
+
+  @override
+  String get rewardsReferralShareCodeAction => 'Поделиться кодом';
+
+  @override
+  String get rewardsReferralUseFriendCodeAction => 'Ввести код друга';
+
+  @override
+  String get rewardsReferralFriendCodePrompt => 'Есть код друга?';
+
+  @override
+  String get rewardsReferralFriendCodeHint => 'Введите его до первой покупки.';
 
   @override
   String get rewardsReferralInputLabel => 'Код друга';
@@ -349,35 +427,55 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsReferralInputHint => 'PMABC12345';
 
   @override
-  String get rewardsReferralActivateAction => 'Активировать реферальный код';
+  String get rewardsReferralActivateAction => 'Активировать код';
+
+  @override
+  String get rewardsReferralEmptyError => 'Введите код друга.';
+
+  @override
+  String get rewardsReferralCheckingStatus => 'Проверяем реферальный код...';
 
   @override
   String get rewardsReferralActivatedMessage =>
-      'Реферальный код активирован. Бонус откроется после вашей первой покупки.';
+      'Реферальный код активирован. Начисление произойдет после вашей первой успешной платной покупки.';
 
   @override
   String get rewardsReferralStatusLoading => 'Загружаем статус рефералки...';
 
   @override
   String get rewardsReferralStatusNone =>
-      'Введите код друга до первой покупки, чтобы открыть реферальный бонус.';
+      'Введите код друга перед первой покупкой. Бонус начисляется только после успешной оплаты.';
 
   @override
   String get rewardsReferralStatusPending =>
-      'Рефералка подключена. Бонус начислится после вашей первой покупки.';
+      'Рефералка подключена. Бонус начислится после вашей первой успешной платной покупки.';
 
   @override
   String get rewardsReferralStatusRewarded =>
       'Реферальный бонус начислен. Спасибо, что развиваете PetMagic.';
 
   @override
-  String get rewardsReferralEarnedLabel => 'Получено';
+  String get rewardsReferralEarnedLabel => 'PawSpark получено';
 
   @override
-  String get rewardsReferralFriendsLabel => 'Друзья';
+  String get rewardsReferralFriendsLabel => 'Друзей приглашено';
 
   @override
-  String get rewardsReferralBonusLabel => 'Бонус';
+  String get rewardsReferralBonusLabel => 'Совершили покупку';
+
+  @override
+  String rewardsReferralBonusPerFriend(int count) {
+    return '+$count PawSpark за друга';
+  }
+
+  @override
+  String get rewardsReferralRulesNote =>
+      'За регистрацию бонус не начисляется. Награда приходит только после первой успешной платной покупки.';
+
+  @override
+  String rewardsReferralShareMessage(Object code, int bonus) {
+    return 'Присоединяйся к PetMagic по моему коду $code. Бонус начисляется после первой успешной платной покупки. После твоей первой покупки я получу +$bonus PawSpark.';
+  }
 
   @override
   String get rewardsHistoryTitle => 'История бонусов';
@@ -421,7 +519,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get rewardsReferralPaidUserError =>
-      'Реферальный код нужно активировать до первой покупки.';
+      'Реферальный код нужно активировать до первой успешной платной покупки.';
 
   @override
   String get walletBuySparkTitle => 'Пополнить PawSpark';
@@ -537,12 +635,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletPurchaseFailed => 'Ошибка';
 
   @override
+  String get walletQueryFilterAll => 'Все';
+
+  @override
+  String get walletQueryFilterCredits => 'Зачисления';
+
+  @override
+  String get walletQueryFilterDebits => 'Списания';
+
+  @override
   String get walletPartialActivityUnavailable =>
       'Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.';
 
   @override
   String get walletPaymentGatewayUnavailableError =>
-      'Оплата временно недоступна. Попробуйте Stripe Checkout чуть позже.';
+      'Платежи временно недоступны. Попробуйте позже или обновите приложение.';
 
   @override
   String get walletPackUnavailableError =>
@@ -594,10 +701,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Код можно использовать один раз, если он активен и не истек.';
 
   @override
-  String get walletRedeemInputLabel => 'Код промокода';
+  String get walletRedeemInputLabel => 'Промокод';
 
   @override
-  String get walletRedeemHint => 'WELCOME-100';
+  String get walletRedeemHint => 'Введите промокод';
 
   @override
   String get walletRedeemCancelAction => 'Отмена';
@@ -1626,9 +1733,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authContinueWithApple => 'Продолжить с Apple';
-
-  @override
-  String get authGoogleBrowserFallbackAction => 'Войти через Google в браузере';
 
   @override
   String get authNoAccountPrompt => 'Еще нет аккаунта?';

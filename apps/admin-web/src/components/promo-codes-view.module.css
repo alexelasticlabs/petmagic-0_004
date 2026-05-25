@@ -3,7 +3,7 @@
   max-width: var(--admin-page-max-ultra);
   margin: 0 auto;
   display: grid;
-  gap: 1.1rem;
+  gap: 0.9rem;
 }
 
 .actionIcon,
@@ -38,13 +38,13 @@
 .kpiGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.82rem;
+  gap: 0.68rem;
 }
 
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.88rem;
+  gap: 0.72rem;
   align-items: start;
 }
 
@@ -54,71 +54,249 @@
   min-width: 0;
 }
 
-.toolbar {
-  justify-content: space-between;
+.pageHeader {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.pageTitle {
+  margin: 0;
+  color: #f5f7fa;
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(1.28rem, 1.02rem + 0.42vw, 1.56rem);
+  font-weight: 600;
+  line-height: 1.18;
+}
+
+.pageSubtitle {
+  margin: 0;
+  color: rgba(173, 189, 207, 0.78);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.tableCard {
+  border-color: #1f2d3f;
+  background:
+    radial-gradient(circle at top left, rgba(26, 115, 232, 0.12), transparent 34%),
+    rgba(6, 12, 20, 0.98);
+}
+
+.kpiGrid :global(article[class*="kpiCard"]) {
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(2px);
+}
+
+.kpiGrid :global(article[class*="kpiCard"])::before {
+  content: "";
+  position: absolute;
+  inset: -40% auto auto -18%;
+  width: 8rem;
+  height: 8rem;
+  background: radial-gradient(circle, rgba(138, 180, 248, 0.2), transparent 70%);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+
+.kpiGrid :global(article[class*="kpiCard"]:hover)::before {
+  opacity: 1;
+}
+
+.kpiGrid :global(article[class*="kpiCard"] span[class*="iconTile"]) {
+  transition:
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.kpiGrid :global(article[class*="kpiCard"]:hover span[class*="iconTile"]) {
+  transform: translateY(-1px) scale(1.04);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+.tableTopBar {
+  display: flex;
   align-items: center;
-  gap: 0.85rem;
-  margin-bottom: 0.8rem;
+  justify-content: space-between;
+  gap: 0.54rem;
+  margin-bottom: 0.62rem;
+}
+
+.tableTopBar :global(.ui-button.ui-button--md) {
+  min-height: 1.8rem;
+  padding: 0.34rem 0.62rem;
+  font-size: 0.78rem;
+}
+
+.statusTabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.26rem;
+}
+
+.statusTab {
+  appearance: none;
+  border: 1px solid rgba(46, 60, 79, 0.88);
+  border-radius: 0.5rem;
+  background: rgba(9, 16, 27, 0.9);
+  color: rgba(191, 206, 224, 0.9);
+  min-height: 1.72rem;
+  padding: 0.18rem 0.42rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.statusTab:hover {
+  border-color: rgba(83, 155, 245, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.statusTabActive {
+  border-color: rgba(83, 155, 245, 0.8);
+  background: rgba(26, 115, 232, 0.22);
+  color: #eef4ff;
+  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.28);
+}
+
+.statusTabCount {
+  border-radius: 999px;
+  min-width: 1.02rem;
+  min-height: 1.02rem;
+  padding: 0 0.22rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 34, 58, 0.94);
+  color: rgba(186, 230, 253, 0.96);
+  font-size: 0.6rem;
+  font-weight: 700;
 }
 
 .toolbarActions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.64rem;
+  gap: 0.34rem;
   align-items: center;
-}
-
-.toolbarCaption {
-  color: rgba(225, 233, 244, 0.7);
-  font-size: 0.84rem;
-  font-weight: 600;
 }
 
 .syncBadge {
   display: inline-flex;
   align-items: center;
-  min-height: 1.95rem;
-  padding: 0.22rem 0.68rem;
+  min-height: 1.62rem;
+  padding: 0.14rem 0.42rem;
   border: 1px solid rgba(56, 189, 248, 0.28);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   background: rgba(13, 30, 45, 0.72);
   color: #bae6fd;
-  font-size: 0.76rem;
+  font-size: 0.66rem;
   font-weight: 700;
+}
+
+.autoRefreshBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  min-height: 1.62rem;
+  padding: 0.14rem 0.42rem;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 0.5rem;
+  background: rgba(8, 23, 36, 0.82);
+  color: #c7f1ff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.autoRefreshDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45);
+  animation: pulseDot 1.6s ease-out infinite;
+}
+
+.autoRefreshBadgeLoading {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #e3f7ff;
+}
+
+.autoRefreshBadgeLoading .autoRefreshDot {
+  background: #38bdf8;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45);
 }
 
 .filterBar {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) repeat(2, minmax(11.5rem, 0.7fr));
-  gap: 0.78rem;
-  margin-bottom: 0.9rem;
+  grid-template-columns: minmax(0, 1.25fr) repeat(3, minmax(8.8rem, 0.7fr));
+  gap: 0.46rem;
+  margin-bottom: 0.56rem;
+  padding: 0.42rem;
+  border: 1px solid rgba(31, 45, 63, 0.92);
+  border-radius: 0.68rem;
+  background: rgba(4, 10, 18, 0.88);
+}
+
+.filterBar:focus-within {
+  border-color: rgba(83, 155, 245, 0.64);
+  box-shadow: 0 0 0 1px rgba(83, 155, 245, 0.2);
 }
 
 .searchField,
 .selectField,
 .formField {
   display: grid;
-  gap: 0.42rem;
+  gap: 0.24rem;
 }
 
 .fieldLabel {
   color: rgba(225, 233, 244, 0.72);
-  font-size: 0.76rem;
+  font-size: 0.64rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .searchInput,
 .input {
   width: 100%;
   border: 1px solid #1a2738;
-  background: rgba(10, 16, 28, 0.88);
+  background: rgba(9, 15, 25, 0.9);
   color: #eef4ff;
-  border-radius: 0.85rem;
-  padding: 0.82rem 0.92rem;
-  min-height: 2.8rem;
+  border-radius: 0.58rem;
+  padding: 0.52rem 0.68rem;
+  min-height: 2rem;
+  font-size: 0.82rem;
   font: inherit;
+}
+
+.selectField :global(button[class*="select-module"][class*="__trigger"]) {
+  min-height: 2rem;
+  border-radius: 0.58rem;
+  padding: 0.4rem 0.58rem;
+  gap: 0.42rem;
+}
+
+.selectField :global(span[class*="select-module"][class*="__value"]) {
+  font-size: 0.82rem;
+}
+
+.selectField :global(span[class*="select-module"][class*="__chevron"]) {
+  width: 0.5rem;
+  height: 0.5rem;
 }
 
 .selectInput {
@@ -152,47 +330,146 @@
 }
 
 .tableCard :global(table thead th) {
-  padding-bottom: 0.52rem;
+  padding: 0.54rem 0.52rem;
+  border-bottom: 1px solid rgba(31, 45, 63, 0.96);
+  background: rgba(8, 15, 25, 0.84);
+  color: rgba(173, 189, 207, 0.88);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  backdrop-filter: blur(4px);
 }
 
 .tableRow td {
-  padding-top: 0.7rem;
-  padding-bottom: 0.7rem;
+  padding: 0.62rem 0.52rem;
+  border-bottom: 1px solid rgba(28, 40, 56, 0.78);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.tableRow {
+  cursor: pointer;
+}
+
+.tableRow:nth-child(even) td {
+  background: rgba(8, 14, 24, 0.48);
+}
+
+.tableRow:hover td {
+  background: rgba(17, 33, 54, 0.58);
+}
+
+.tableRow:focus-visible td {
+  outline: 1px solid rgba(34, 197, 94, 0.42);
+  outline-offset: -1px;
 }
 
 .rowSelected td {
-  background: rgba(34, 197, 94, 0.08);
+  background: rgba(26, 115, 232, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(83, 155, 245, 0.28),
+    inset 0 -1px 0 rgba(83, 155, 245, 0.28);
 }
 
 .codeCell,
 .rewardCell,
 .usageCell {
   display: grid;
-  gap: 0.24rem;
+  gap: 0.22rem;
   align-content: start;
 }
 
 .codeValue {
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  color: #f4f8ff;
 }
 
 .codeMeta,
 .descriptionMeta,
 .usageCell span {
   color: rgba(173, 189, 207, 0.66);
-  font-size: 0.79rem;
-  line-height: 1.35;
+  font-size: 0.74rem;
+  line-height: 1.32;
+}
+
+.usageTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.usagePercent {
+  color: rgba(173, 189, 207, 0.9);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.usageToneGood {
+  color: #67e8a4;
+}
+
+.usageToneMedium {
+  color: #fcd34d;
+}
+
+.usageToneCritical {
+  color: #fca5a5;
+}
+
+.usageMeter {
+  width: 100%;
+  height: 0.26rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(35, 49, 67, 0.74);
+}
+
+.usageMeter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  background-size: 180% 100%;
+  transition: width 220ms ease;
+  animation: usageFlow 5.8s linear infinite;
+}
+
+.usageMeter.usageToneMedium > span {
+  background: linear-gradient(90deg, #f59e0b, #fcd34d);
+}
+
+.usageMeter.usageToneCritical > span {
+  background: linear-gradient(90deg, #ef4444, #f97316);
 }
 
 .windowCell {
   color: rgba(225, 233, 244, 0.8);
-  min-width: 11rem;
-  font-size: 0.8rem;
+  min-width: 10rem;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .inlineNumeric {
   color: rgba(225, 233, 244, 0.9);
+  font-weight: 600;
+}
+
+.createdCell {
+  display: grid;
+  gap: 0.16rem;
+  color: rgba(173, 189, 207, 0.72);
+  font-size: 0.73rem;
+}
+
+.createdCell strong {
+  color: #f0f5ff;
+  font-size: 0.78rem;
   font-weight: 600;
 }
 
@@ -224,6 +501,22 @@
   border-radius: 0.85rem;
   background: rgba(8, 13, 22, 0.98);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.42);
+}
+
+.actionsMenuPortal {
+  position: fixed;
+  z-index: 90;
+  pointer-events: auto;
+}
+
+.actionsMenuListPortal {
+  position: static;
+  top: auto;
+  right: auto;
+  min-width: 100%;
+  z-index: auto;
+  animation: menuFadeUp 140ms ease;
+  transform-origin: top right;
 }
 
 .actionsMenuItem {
@@ -260,19 +553,52 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.94rem;
+  gap: 0.62rem;
+  margin-top: 0.78rem;
+  border-top: 1px solid rgba(31, 45, 63, 0.82);
+  padding-top: 0.64rem;
 }
 
 .paginationInfo {
   color: rgba(225, 233, 244, 0.78);
-  font-size: 0.85rem;
+  font-size: 0.74rem;
   font-weight: 600;
 }
 
+.paginationCenter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+}
+
 .paginationActions {
-  display: flex;
-  gap: 0.56rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+}
+
+.paginationNumber {
+  min-width: 1.94rem;
+}
+
+.pageSizeControl {
+  display: inline-flex;
+  width: 8.3rem;
+}
+
+.pageSizeControl :global(div[class*="select-module"][class*="__root"]) {
+  width: 100%;
+}
+
+.pageSizeControl :global(button[class*="select-module"][class*="__trigger"]) {
+  min-height: 1.9rem;
+  border-radius: 0.62rem;
+  padding: 0.34rem 0.56rem;
+}
+
+.pageSizeControl :global(span[class*="select-module"][class*="__value"]) {
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 
 .form {
@@ -433,6 +759,42 @@
   font-size: 0.8rem;
 }
 
+@keyframes pulseDot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 0.42rem rgba(34, 197, 94, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+@keyframes usageFlow {
+  0% {
+    background-position: 0% 0;
+  }
+
+  100% {
+    background-position: 180% 0;
+  }
+}
+
+@keyframes menuFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .drawerBackdrop {
   position: fixed;
   inset: 0;
@@ -445,7 +807,7 @@
 }
 
 .editorDrawer {
-  width: min(42rem, 100%);
+  width: min(46rem, 100%);
   height: 100%;
   border: 1px solid #1a2738;
   border-radius: 1.05rem;
@@ -456,6 +818,12 @@
 
 .editorDrawer .formCard {
   height: 100%;
+}
+
+@media (max-width: 1200px) {
+  .windowCell {
+    min-width: 8.5rem;
+  }
 }
 
 @media (max-width: 1320px) {
@@ -472,20 +840,29 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .toolbar,
+  .tableTopBar,
   .toolbarActions,
   .pagination,
+  .paginationCenter,
   .formActions,
   .usageActions {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .statusTabs {
+    width: 100%;
+  }
+
+  .autoRefreshBadge {
+    justify-content: center;
+  }
+
   .actionsMenu {
     justify-content: flex-start;
   }
 
-  .actionsMenuList {
+  .actionsMenuList:not(.actionsMenuListPortal) {
     left: 0;
     right: auto;
     min-width: min(100%, 14rem);
@@ -507,5 +884,20 @@
   .usageWarning {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusTab,
+  .kpiGrid :global(article[class*="kpiCard"] span[class*="iconTile"]),
+  .actionsMenuListPortal,
+  .usageMeter > span,
+  .autoRefreshDot {
+    transition: none;
+    animation: none;
+  }
+
+  .statusTab:hover {
+    transform: none;
   }
 }

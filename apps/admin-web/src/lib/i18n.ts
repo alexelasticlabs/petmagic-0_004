@@ -198,6 +198,7 @@ export type Dictionary = {
   promoCodesViewActivationsAction: string;
   promoCodesPauseAction: string;
   promoCodesResumeAction: string;
+  promoCodesRestoreAction: string;
   promoCodesActionsMenuLabel: string;
   promoCodesUpdatedLabel: string;
   promoCodesLastUsedLabel: string;
@@ -225,6 +226,8 @@ export type Dictionary = {
   promoCodesPauseError: string;
   promoCodesResumeSuccess: string;
   promoCodesResumeError: string;
+  promoCodesRestoreSuccess: string;
+  promoCodesRestoreError: string;
   promoCodesArchiveSuccess: string;
   promoCodesArchiveError: string;
   promoCodesPreviousAction: string;
@@ -590,7 +593,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesStatusDraft: "Черновик",
     promoCodesStatusPaused: "Приостановлен",
     promoCodesStatusLimitReached: "Лимит достигнут",
-    promoCodesStatusArchived: "Архив",
+    promoCodesStatusArchived: "В архиве",
     promoCodesStatusExhausted: "Лимит достигнут",
     promoCodesStatusScheduled: "Запланирован",
     promoCodesStatusExpired: "Истек",
@@ -620,7 +623,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesFormCardDescription:
       "Настройте параметры промокода, проверьте ограничения и сохраните изменения.",
     promoCodesSectionMainTitle: "Основное",
-    promoCodesSectionCampaignTitle: "Условия",
+    promoCodesSectionCampaignTitle: "Дополнительно",
     promoCodesSectionRewardTitle: "Награда",
     promoCodesSectionLimitsTitle: "Лимиты",
     promoCodesNewDraftAction: "Создать промокод",
@@ -670,6 +673,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesViewActivationsAction: "Посмотреть активации",
     promoCodesPauseAction: "Приостановить",
     promoCodesResumeAction: "Возобновить",
+    promoCodesRestoreAction: "Восстановить",
     promoCodesActionsMenuLabel: "Меню действий",
     promoCodesUpdatedLabel: "Обновлен",
     promoCodesLastUsedLabel: "Последнее использование",
@@ -698,6 +702,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesPauseError: "Не удалось приостановить промокод.",
     promoCodesResumeSuccess: "Промокод снова активен.",
     promoCodesResumeError: "Не удалось возобновить промокод.",
+    promoCodesRestoreSuccess: "Промокод восстановлен.",
+    promoCodesRestoreError: "Не удалось восстановить промокод.",
     promoCodesArchiveSuccess: "Промокод архивирован.",
     promoCodesArchiveError: "Не удалось архивировать промокод.",
     promoCodesPreviousAction: "Назад",
@@ -1111,7 +1117,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesFormCardDescription:
       "Configure promo code rules, verify limits, and launch campaign-ready entries from one panel.",
     promoCodesSectionMainTitle: "Basics",
-    promoCodesSectionCampaignTitle: "Conditions",
+    promoCodesSectionCampaignTitle: "Additional",
     promoCodesSectionRewardTitle: "Reward",
     promoCodesSectionLimitsTitle: "Limits",
     promoCodesNewDraftAction: "Create promo code",
@@ -1160,6 +1166,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesViewActivationsAction: "View activations",
     promoCodesPauseAction: "Pause",
     promoCodesResumeAction: "Resume",
+    promoCodesRestoreAction: "Restore",
     promoCodesActionsMenuLabel: "Actions menu",
     promoCodesUpdatedLabel: "Updated",
     promoCodesLastUsedLabel: "Last used",
@@ -1188,6 +1195,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     promoCodesPauseError: "Failed to pause promo code.",
     promoCodesResumeSuccess: "Promo code resumed.",
     promoCodesResumeError: "Failed to resume promo code.",
+    promoCodesRestoreSuccess: "Promo code restored.",
+    promoCodesRestoreError: "Failed to restore promo code.",
     promoCodesArchiveSuccess: "Promo code archived.",
     promoCodesArchiveError: "Failed to archive promo code.",
     promoCodesPreviousAction: "Previous",

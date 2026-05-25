@@ -38,8 +38,6 @@ enum ExternalAuthProvider {
 abstract class ExternalAuthRepository {
   Future<AuthSession> authenticate(ExternalAuthProvider provider);
 
-  Future<AuthSession> authenticateInBrowser(ExternalAuthProvider provider);
-
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider);
 
   Future<void> clearSession(ExternalAuthProvider provider);
@@ -86,11 +84,6 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       return _authenticateWithNativeGoogle();
     }
 
-    return _authenticateWithBrowserFlow(provider);
-  }
-
-  @override
-  Future<AuthSession> authenticateInBrowser(ExternalAuthProvider provider) {
     return _authenticateWithBrowserFlow(provider);
   }
 

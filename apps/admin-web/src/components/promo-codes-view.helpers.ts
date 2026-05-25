@@ -28,7 +28,6 @@ export type PromoForm = {
   campaignName: string;
   campaignChannel: string;
   minimumSuccessfulPurchases: string;
-  createdBy: string;
   rewardKind: AdminRedeemRewardKind;
   rewardValue: string;
   maxRedemptions: string;
@@ -51,7 +50,6 @@ export function createDefaultPromoForm(): PromoForm {
     campaignName: "",
     campaignChannel: "",
     minimumSuccessfulPurchases: "0",
-    createdBy: "",
     rewardKind: "spark",
     rewardValue: "100",
     maxRedemptions: "100",
@@ -69,7 +67,6 @@ export function toPromoForm(code: AdminRedeemCode): PromoForm {
     campaignName: code.campaignName ?? "",
     campaignChannel: code.campaignChannel ?? "",
     minimumSuccessfulPurchases: code.minimumSuccessfulPurchases.toString(),
-    createdBy: code.createdBy ?? "",
     rewardKind: code.rewardKind,
     rewardValue: code.rewardValue.toString(),
     maxRedemptions: code.maxRedemptions.toString(),
@@ -89,7 +86,6 @@ export function toCreatePayload(form: PromoForm, text: PromoDictionary) {
     campaignName: form.campaignName.trim() || null,
     campaignChannel: form.campaignChannel.trim() || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases),
-    createdBy: form.createdBy.trim() || null,
     rewardKind: form.rewardKind,
     rewardValue: Number(form.rewardValue),
     maxRedemptions: Number(form.maxRedemptions),
@@ -108,7 +104,7 @@ export function toUpdatePayload(form: PromoForm, code: AdminRedeemCode, text: Pr
     campaignName: form.campaignName.trim() || null,
     campaignChannel: form.campaignChannel.trim() || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases),
-    createdBy: form.createdBy.trim() || null,
+    createdBy: code.createdBy?.trim() || null,
     rewardKind: form.rewardKind,
     rewardValue: Number(form.rewardValue),
     maxRedemptions: Number(form.maxRedemptions),
@@ -175,6 +171,10 @@ export function getPromoStatus(
   text: PromoDictionary,
   now: number
 ): PromoStatusModel {
+  if (!code.isActive && hasArchiveWindowMarker(code)) {
+    return { key: "archived", label: text.promoCodesStatusArchived, color: "#64748b" };
+  }
+
   const startsAt = code.startsAtUtc ? new Date(code.startsAtUtc).getTime() : null;
   const expiresAt = code.expiresAtUtc ? new Date(code.expiresAtUtc).getTime() : null;
 
@@ -197,10 +197,6 @@ export function getPromoStatus(
       return { key: "draft", label: text.promoCodesStatusDraft, color: "#94a3b8" };
     }
 
-    if (code.redeemedCount > 0) {
-      return { key: "archived", label: text.promoCodesStatusArchived, color: "#64748b" };
-    }
-
     return { key: "paused", label: text.promoCodesStatusPaused, color: "#f59e0b" };
   }
 
@@ -209,6 +205,21 @@ export function getPromoStatus(
   }
 
   return { key: "active", label: text.promoCodesStatusActiveOption, color: "#22c55e" };
+}
+
+function hasArchiveWindowMarker(code: AdminRedeemCode) {
+  if (!code.startsAtUtc || !code.expiresAtUtc) {
+    return false;
+  }
+
+  const startsAt = new Date(code.startsAtUtc).getTime();
+  const expiresAt = new Date(code.expiresAtUtc).getTime();
+
+  if (Number.isNaN(startsAt) || Number.isNaN(expiresAt)) {
+    return false;
+  }
+
+  return Math.abs(startsAt - expiresAt) <= 60_000;
 }
 
 export function comparePromoCodes(

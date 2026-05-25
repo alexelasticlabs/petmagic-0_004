@@ -154,41 +154,96 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                     ),
                     const SizedBox(height: 18),
                     if (state.isPremium) ...[
-                      FilledButton.icon(
-                        onPressed: state.isManaging
-                            ? null
-                            : controller.manageBilling,
-                        icon: state.isManaging
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator.adaptive(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.tune_rounded),
-                        label: Text(text.premiumManageAction),
-                      ),
-                      const SizedBox(height: 10),
-                    ] else ...[
-                      FilledButton.icon(
-                        onPressed: state.isBuying || !state.canStartCheckout
-                            ? null
-                            : () => _handleCheckoutTap(state, controller),
-                        icon: state.isBuying
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator.adaptive(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.arrow_forward_rounded),
-                        label: Text(
-                          _ctaLabel(text, state),
-                          maxLines: 2,
-                          textAlign: TextAlign.center,
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: FilledButton.icon(
+                          onPressed: state.isManaging
+                              ? null
+                              : controller.manageBilling,
+                          icon: state.isManaging
+                              ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator.adaptive(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.tune_rounded),
+                          label: Text(
+                            text.premiumManageAction,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
+                    ] else ...[
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: double.infinity,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            if (state.canStartCheckout && !state.isBuying)
+                              BoxShadow(
+                                color:
+                                    (state.selectedPlan?.isPopular == true
+                                            ? colors.accent
+                                            : colors.gold)
+                                        .withValues(alpha: 0.35),
+                                blurRadius: 20,
+                                spreadRadius: -2,
+                                offset: const Offset(0, 6),
+                              ),
+                          ],
+                        ),
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor:
+                                state.selectedPlan?.isPopular == true
+                                ? colors.accent
+                                : colors.gold,
+                            foregroundColor:
+                                state.selectedPlan?.isPopular == true
+                                ? Colors.white
+                                : colors.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: state.isBuying || !state.canStartCheckout
+                              ? null
+                              : () => _handleCheckoutTap(state, controller),
+                          icon: state.isBuying
+                              ? SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator.adaptive(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      state.selectedPlan?.isPopular == true
+                                          ? Colors.white
+                                          : colors.surface,
+                                    ),
+                                  ),
+                                )
+                              : const Icon(Icons.flash_on_rounded, size: 20),
+                          label: Text(
+                            _ctaLabel(text, state),
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
                     _TrustSummary(selectedPlan: state.selectedPlan),
                     const SizedBox(height: 18),

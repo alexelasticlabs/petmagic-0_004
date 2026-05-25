@@ -336,35 +336,6 @@ void main() {
     expect(find.text('Magic Studio'), findsOneWidget);
   });
 
-  testWidgets('continues with Google via browser fallback action', (
-    tester,
-  ) async {
-    final externalAuthRepository = _FakeExternalAuthRepository();
-
-    await _pumpApp(
-      tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
-      externalAuthRepository: externalAuthRepository,
-    );
-
-    await tester.tap(find.text('Sign in'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.widgetWithText(TextButton, 'Sign in with Google in browser'),
-    );
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    expect(
-      externalAuthRepository.browserAuthenticatedProviders,
-      contains(ExternalAuthProvider.google),
-    );
-    expect(find.text('Create Magic'), findsOneWidget);
-    expect(find.text('Magic Studio'), findsOneWidget);
-  });
-
   testWidgets('shows localized message when external sign-in is cancelled', (
     tester,
   ) async {
@@ -1228,8 +1199,6 @@ class _FakeProfileRepository extends ProfileRepository {
 }
 
 class _FakeExternalAuthRepository implements ExternalAuthRepository {
-  final List<ExternalAuthProvider> browserAuthenticatedProviders = [];
-
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     return AuthSession(
@@ -1254,12 +1223,6 @@ class _FakeExternalAuthRepository implements ExternalAuthRepository {
         avatar: null,
       ),
     );
-  }
-
-  @override
-  Future<AuthSession> authenticateInBrowser(ExternalAuthProvider provider) {
-    browserAuthenticatedProviders.add(provider);
-    return authenticate(provider);
   }
 
   @override
@@ -1291,13 +1254,6 @@ class _FailingExternalAuthRepository implements ExternalAuthRepository {
   }
 
   @override
-  Future<AuthSession> authenticateInBrowser(
-    ExternalAuthProvider provider,
-  ) async {
-    throw error;
-  }
-
-  @override
   Future<List<MobileLinkedAccount>> link(ExternalAuthProvider provider) async {
     throw error;
   }
@@ -1312,13 +1268,6 @@ class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     throw Exception('google sign-in failed unexpectedly');
-  }
-
-  @override
-  Future<AuthSession> authenticateInBrowser(
-    ExternalAuthProvider provider,
-  ) async {
-    throw Exception('google browser sign-in failed unexpectedly');
   }
 
   @override

@@ -357,12 +357,20 @@ public sealed class EconomyService(
             return Result.Failure<WalletCheckoutConfigResponse>(packsResult.Error);
         }
 
+        var region = EconomyPaymentProviderPolicy.NormalizeRegion(query.Country);
+        var isEuRegion = EconomyPaymentProviderPolicy.IsEuRegion(region);
+        var targetCurrency = isEuRegion ? "EUR" : "USD";
+
+        var filteredPacks = packsResult.Value
+            .Where(x => string.Equals(x.CurrencyCode, targetCurrency, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         var availablePaymentMethods = await BuildAvailablePaymentMethodsAsync(
             new GetPaywallConfigQuery(query.Platform, query.AppVersion, query.Country, query.Locale),
             cancellationToken);
 
         return Result.Success(new WalletCheckoutConfigResponse(
-            packsResult.Value,
+            filteredPacks,
             availablePaymentMethods,
             availablePaymentMethods.Any(x => x.RequiresExternalWarning)));
     }

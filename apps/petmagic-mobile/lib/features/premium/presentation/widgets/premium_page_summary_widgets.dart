@@ -238,59 +238,112 @@ class _TrustSummary extends StatelessWidget {
         ? null
         : '${_planTitle(text, selectedPlan!)} · ${_formatPrice(selectedPlan!, selectedPlan!.priceAmount)} ${_periodLabel(text, selectedPlan!)}';
 
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: colors.surfaceStrong.withValues(alpha: 0.58),
-        border: Border.all(color: colors.border.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(24),
+        color: colors.surfaceStrong.withValues(alpha: 0.65),
+        border: Border.all(
+          color: colors.gold.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.gold.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Icon(Icons.gavel_rounded, size: 16, color: colors.gold),
+                const SizedBox(width: 8),
+                Text(
+                  text.premiumSecurePaymentTitle,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Spacer(),
+                Icon(Icons.lock_outline_rounded, size: 16, color: colors.gold),
+              ],
+            ),
+            const SizedBox(height: 12),
             if (selectedPlanText != null) ...[
-              Text(
-                selectedPlanText,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colors.surfaceStrong.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colors.border.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.stars_rounded, size: 16, color: colors.gold),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        selectedPlanText,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
             ],
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Row(
               children: [
-                _PlanChip(
-                  icon: Icons.workspace_premium_rounded,
-                  label: text.premiumPopularBadge,
+                Row(
+                  children: List.generate(
+                    5,
+                    (index) =>
+                        Icon(Icons.star_rounded, color: colors.gold, size: 16),
+                  ),
                 ),
-                _PlanChip(
-                  icon: Icons.event_available_rounded,
-                  label: text.premiumCancelAnytime,
+                const SizedBox(width: 8),
+                Text(
+                  '4.9/5',
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               text.premiumSocialProof,
               style: TextStyle(
                 color: colors.textStrong,
-                fontSize: 12,
+                fontSize: 12.5,
+                height: 1.4,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               text.premiumSecurePaymentSubtitle,
               style: TextStyle(
                 color: colors.textSoft,
-                fontSize: 11.5,
-                height: 1.35,
-                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -301,34 +354,47 @@ class _TrustSummary extends StatelessWidget {
 }
 
 class _PlanChip extends StatelessWidget {
-  const _PlanChip({required this.icon, required this.label});
+  const _PlanChip({required this.icon, required this.label, this.accentColor});
 
   final IconData icon;
   final String label;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isAccent = accentColor != null;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.58),
+        color: isAccent
+            ? accentColor!.withValues(alpha: 0.12)
+            : colors.surfaceStrong.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+        border: Border.all(
+          color: isAccent
+              ? accentColor!.withValues(alpha: 0.5)
+              : colors.border.withValues(alpha: 0.6),
+          width: isAccent ? 1.2 : 1.0,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: colors.textMuted),
+            Icon(
+              icon,
+              size: 14,
+              color: isAccent ? accentColor : colors.textMuted,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: colors.textStrong,
+                color: isAccent ? colors.textStrong : colors.textStrong,
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: isAccent ? FontWeight.w900 : FontWeight.w800,
               ),
             ),
           ],

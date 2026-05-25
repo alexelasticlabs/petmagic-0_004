@@ -128,123 +128,198 @@ class _BalanceCard extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final balance = wallet?.balance ?? 0;
+    final isPremium = wallet?.isPremium == true;
+    final statusTone = isPremium ? colors.gold : colors.accent;
 
     return ProfileGlassCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: colors.accent.withValues(alpha: 0.13),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: colors.accent.withValues(alpha: 0.2),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colors.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colors.accent.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: colors.accent,
+                      size: 18,
+                    ),
                   ),
-                ),
-                child: Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: colors.accent,
-                  size: 21,
+                  const SizedBox(width: 10),
+                  Text(
+                    text.walletBalanceEyebrow,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              ProfileStatusPill(
+                label: isPremium
+                    ? text.walletPremiumStatus
+                    : text.walletFreeStatus,
+                leading: isPremium
+                    ? Icons.workspace_premium_rounded
+                    : Icons.person_outline_rounded,
+                backgroundColor: isPremium
+                    ? colors.gold.withValues(alpha: 0.16)
+                    : colors.accent.withValues(alpha: 0.11),
+                foregroundColor: statusTone,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                NumberFormat.decimalPattern().format(balance),
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 40,
+                  fontWeight: FontWeight.w950,
+                  letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      text.walletBalanceEyebrow,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.textSoft,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      text.walletBalanceTitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontSize: 15.5,
-                        height: 1.18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 8),
+              Text(
+                text.walletBalanceUnit,
+                style: TextStyle(
+                  color: statusTone,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          ProfileStatusPill(
-            label: wallet?.isPremium == true
-                ? text.walletPremiumStatus
-                : text.walletFreeStatus,
-            leading: wallet?.isPremium == true
-                ? Icons.workspace_premium_rounded
-                : Icons.person_outline_rounded,
-            backgroundColor: wallet?.isPremium == true
-                ? colors.gold.withValues(alpha: 0.18)
-                : colors.accent.withValues(alpha: 0.13),
-            foregroundColor: wallet?.isPremium == true
-                ? colors.gold
-                : colors.accent,
+          const SizedBox(height: 8),
+          Text(
+            text.walletBalanceTitle,
+            style: TextStyle(
+              color: colors.textStrong,
+              fontSize: 14.5,
+              height: 1.3,
+              fontWeight: FontWeight.w750,
+            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: colors.surfaceStrong.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.border.withValues(alpha: 0.86)),
-            ),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  NumberFormat.decimalPattern().format(balance),
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 28,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  text.walletBalanceUnit,
-                  style: TextStyle(
-                    color: colors.accent,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
+            height: 1,
+            color: colors.border.withValues(alpha: 0.5),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
             text.walletBalanceExplanation,
             style: TextStyle(
-              color: colors.textSoft,
-              fontSize: 12.5,
+              color: colors.textMuted,
+              fontSize: 12,
               height: 1.35,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _WhatYouCanCreateCard extends StatelessWidget {
+  const _WhatYouCanCreateCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return ProfileGlassCard(
+      padding: const EdgeInsets.all(15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, color: colors.accent, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text.walletWhatYouCanCreateTitle,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _createItem(
+                context,
+                Icons.image_rounded,
+                text.walletSpendPhotoSubtitle,
+              ),
+              _createItem(
+                context,
+                Icons.videocam_rounded,
+                text.walletSpendVideoSubtitle,
+              ),
+              _createItem(
+                context,
+                Icons.workspace_premium_rounded,
+                text.walletSpendPremiumSubtitle,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _createItem(BuildContext context, IconData icon, String label) {
+    final colors = context.petMagicColors;
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: colors.surfaceStrong.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: colors.accent, size: 20),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 10.5,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -266,6 +341,7 @@ class _RewardsOverviewCard extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final remaining = wallet?.adRewardsRemainingToday ?? 0;
+    final isLimitReached = remaining <= 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,11 +350,13 @@ class _RewardsOverviewCard extends StatelessWidget {
         _RewardStatusCard(
           icon: Icons.play_circle_outline_rounded,
           title: text.walletAdRewardCompactTitle,
-          subtitle: text.walletAdRewardCompactDescription,
+          subtitle: isLimitReached
+              ? text.walletAdDailyLimitReached
+              : text.walletAdRewardCompactDescription,
           badgeLabel: text.walletAdRewardRemaining(remaining),
           actionLabel: text.walletWatchAdAction,
           accent: colors.blue,
-          onTap: remaining <= 0 || isClaimingAd ? null : onClaimAd,
+          onTap: isLimitReached || isClaimingAd ? null : onClaimAd,
           isLoading: isClaimingAd,
         ),
       ],
@@ -311,66 +389,92 @@ class _RewardStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     return ProfileGlassCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: accent.withValues(alpha: 0.2)),
-                ),
-                child: Icon(icon, color: accent, size: 21),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: accent.withValues(alpha: 0.24)),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  accent.withValues(alpha: 0.16),
+                  colors.surfaceStrong.withValues(alpha: 0.42),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.textSoft,
-                        fontSize: 12.2,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: accent.withValues(alpha: 0.26)),
+                  ),
+                  child: Icon(icon, color: accent, size: 21),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12.2,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           ProfileStatusPill(
             label: badgeLabel,
             leading: Icons.bolt_rounded,
-            backgroundColor: accent.withValues(alpha: 0.14),
+            backgroundColor: accent.withValues(alpha: 0.16),
             foregroundColor: accent,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: FilledButton.tonalIcon(
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: accent.withValues(alpha: 0.2),
+                disabledBackgroundColor: colors.surfaceStrong,
+                foregroundColor: accent,
+                disabledForegroundColor: colors.textMuted,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
               onPressed: onTap,
               icon: Icon(
                 isLoading
@@ -380,6 +484,213 @@ class _RewardStatusCard extends StatelessWidget {
               label: Text(isLoading ? '...' : actionLabel),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PromoCodeForm extends StatefulWidget {
+  const _PromoCodeForm({required this.isSubmitting, required this.onSubmit});
+
+  final bool isSubmitting;
+  final Future<String?> Function(String code) onSubmit;
+
+  @override
+  State<_PromoCodeForm> createState() => _PromoCodeFormState();
+}
+
+class _PromoCodeFormState extends State<_PromoCodeForm> {
+  late final TextEditingController _controller;
+  String? _message;
+  bool _isSuccess = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final code = _controller.text.trim();
+    final text = AppLocalizations.of(context);
+    if (code.isEmpty) {
+      setState(() {
+        _isSuccess = false;
+        _message = text.walletPromoInputPlaceholder;
+      });
+      return;
+    }
+
+    if (widget.isSubmitting) {
+      return;
+    }
+
+    setState(() {
+      _message = null;
+    });
+
+    final error = await widget.onSubmit(code);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (error == null) {
+        _isSuccess = true;
+        _message = text.walletPromoSuccessMessage;
+        _controller.clear();
+      } else {
+        _isSuccess = false;
+        _message = _friendlyError(text, error);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return ProfileGlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.confirmation_number_rounded,
+                color: colors.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text.walletPromoTitle,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            text.walletPromoSubtitle,
+            style: TextStyle(
+              color: colors.textSoft,
+              fontSize: 12.2,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.surfaceStrong.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colors.border.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => unawaited(_submit()),
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: text.walletPromoInputPlaceholder,
+                      hintStyle: TextStyle(
+                        color: colors.textMuted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 44,
+                child: FilledButton(
+                  onPressed: widget.isSubmitting ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.accent,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: colors.surfaceStrong,
+                    disabledForegroundColor: colors.textMuted,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: widget.isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator.adaptive(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.arrow_forward_rounded, size: 20),
+                ),
+              ),
+            ],
+          ),
+          if (_message != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(
+                  _isSuccess
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.info_outline_rounded,
+                  color: _isSuccess ? colors.accent : colors.gold,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _message!,
+                    style: TextStyle(
+                      color: _isSuccess ? colors.textStrong : colors.gold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

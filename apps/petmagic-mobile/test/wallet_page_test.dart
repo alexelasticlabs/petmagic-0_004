@@ -210,6 +210,29 @@ void main() {
     expect(find.text(text.walletRedeemOfflineError), findsAtLeastNWidgets(1));
   });
 
+  testWidgets('rewards page validates empty promo code input', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpRewardsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
+      ),
+    );
+
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
+
+    await tester.tap(find.byKey(const Key('rewards_promo_submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text(text.rewardsPromoEmptyError), findsOneWidget);
+  });
+
   testWidgets('rewards page activates referral codes', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -227,14 +250,47 @@ void main() {
     final rewardsContext = tester.element(find.byType(RewardsPage));
     final text = AppLocalizations.of(rewardsContext);
 
+    await tester.ensureVisible(
+      find.byKey(const Key('rewards_referral_show_input')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('rewards_referral_show_input')));
+    await tester.pumpAndSettle();
+
     await tester.enterText(
       find.byKey(const Key('rewards_referral_input')),
       'PMFRIEND1',
     );
-    await tester.tap(find.byKey(const Key('rewards_referral_submit')));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     expect(find.text(text.rewardsReferralStatusPending), findsOneWidget);
+  });
+
+  testWidgets('rewards page hides bonus history and purchase soft warnings', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpRewardsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
+        failPurchases: true,
+      ),
+    );
+
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
+
+    expect(find.text(text.rewardsPromoTitle), findsOneWidget);
+    expect(find.text(text.rewardsHistoryTitle), findsNothing);
+    expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
+    expect(find.text('wallet.purchases_failed'), findsNothing);
   });
 }
 
@@ -295,6 +351,7 @@ class _FakeWalletRepository extends WalletRepository {
     required this.packs,
     required this.purchases,
     this.failLedger = false,
+    this.failPurchases = false,
     this.redeemError,
   }) : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
@@ -303,6 +360,7 @@ class _FakeWalletRepository extends WalletRepository {
   final List<CurrencyPackModel> packs;
   final List<PurchaseHistoryItem> purchases;
   final bool failLedger;
+  final bool failPurchases;
   final AppException? redeemError;
 
   @override
@@ -347,6 +405,10 @@ class _FakeWalletRepository extends WalletRepository {
     int skip = 0,
     int take = 20,
   }) async {
+    if (failPurchases) {
+      throw Exception('purchases failed');
+    }
+
     return OffsetPagedModel(
       items: purchases,
       skip: skip,

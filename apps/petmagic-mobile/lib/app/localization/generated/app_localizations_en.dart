@@ -254,7 +254,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletRefreshTooltip => 'Refresh wallet';
 
   @override
-  String get walletBalanceTitle => 'Ready for photos and videos';
+  String get walletBalanceTitle =>
+      'Available for photos, videos and premium templates.';
 
   @override
   String get walletBalanceEyebrow => 'Current balance';
@@ -264,7 +265,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get walletBalanceExplanation =>
-      'PawSpark is spent only inside PetMagic: generations, bonus actions, and new formats.';
+      'PawSpark — internal currency of PetMagic. Use it for creating photos, videos and accessing premium templates.';
 
   @override
   String get walletPremiumStatus => 'Premium wallet';
@@ -281,7 +282,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletQuickActionsTitle => 'Promo codes';
 
   @override
-  String get walletRedeemAction => 'Redeem promo code';
+  String get walletRedeemAction => 'Activate';
 
   @override
   String get walletRewardsTitle => 'Ad bonus';
@@ -290,11 +291,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletAdRewardAction => 'Ad reward';
 
   @override
-  String get walletAdRewardCompactTitle => 'Quick ad bonus';
+  String get walletAdRewardCompactTitle => 'Get PawSpark for free';
 
   @override
   String get walletAdRewardCompactDescription =>
-      'Watch a short ad and add PawSpark without paying.';
+      'Watch a short ad and get +15 PawSpark.';
 
   @override
   String walletAdRewardRemaining(Object count) {
@@ -302,7 +303,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get walletWatchAdAction => 'Watch ad';
+  String get walletWatchAdAction => 'Get +15 PawSpark';
+
+  @override
+  String get walletAdDailyLimitReached =>
+      'Ads are temporarily unavailable. Please try again later.';
 
   @override
   String get walletPromoTitle => 'Have a promo code?';
@@ -312,34 +317,108 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a code from PetMagic and add PawSpark to your balance.';
 
   @override
-  String get rewardsPageTitle => 'Rewards';
+  String get walletPromoInputPlaceholder => 'Enter promo code';
+
+  @override
+  String get walletPromoSuccessMessage => 'Promo code activated successfully!';
+
+  @override
+  String get walletBestValueBadge => 'Best value';
+
+  @override
+  String get walletPremiumUpsellTitle => 'Create often?';
+
+  @override
+  String get walletPremiumUpsellMessage =>
+      'Premium membership gives you cheaper generations, monthly PawSparks and exclusive premium templates.';
+
+  @override
+  String get walletViewPremiumAction => 'View Premium';
+
+  @override
+  String get walletWhatYouCanCreateTitle => 'Your balance is enough for:';
+
+  @override
+  String get walletSpendPhotoSubtitle => 'Photos\nfrom 10 Spark';
+
+  @override
+  String get walletSpendVideoSubtitle => 'Videos\nfrom 50 Spark';
+
+  @override
+  String get walletSpendPremiumSubtitle => 'Premium\nfrom 80 Spark';
+
+  @override
+  String get walletContactSupportAction => 'Contact support';
+
+  @override
+  String get walletRetryAction => 'Retry';
+
+  @override
+  String get rewardsPageTitle => 'Rewards and promo codes';
 
   @override
   String get rewardsPageSubtitle =>
-      'Promo codes, referral bonuses and reward history in one place.';
+      'Activate promo codes, invite friends, and earn rewards.';
+
+  @override
+  String rewardsLastUpdatedLabel(Object value) {
+    return 'Updated: $value';
+  }
+
+  @override
+  String get rewardsLastUpdatedNow => 'just now';
+
+  @override
+  String rewardsLastUpdatedMinutes(int count) {
+    return '$count min ago';
+  }
+
+  @override
+  String rewardsLastUpdatedHours(int count) {
+    return '$count h ago';
+  }
 
   @override
   String get rewardsPromoTitle => 'Promo codes';
 
   @override
   String get rewardsPromoSubtitle =>
-      'Redeem PetMagic codes and add PawSpark to your balance.';
+      'Enter a promo code to top up your PawSpark balance.';
+
+  @override
+  String get rewardsPromoEmptyError => 'Enter promo code.';
+
+  @override
+  String get rewardsPromoCheckingStatus => 'Checking code...';
 
   @override
   String get rewardsReferralTitle => 'Referral bonuses';
 
   @override
   String get rewardsReferralSubtitle =>
-      'Share your code. The referral bonus is paid after your friend completes their first purchase.';
+      'Share your code with a friend. Referral bonus is not paid for signup and is credited only after their first successful paid purchase.';
 
   @override
   String get rewardsYourReferralCode => 'Your code';
 
   @override
-  String get rewardsCopyReferralCodeAction => 'Copy referral code';
+  String get rewardsCopyReferralCodeAction => 'Copy';
 
   @override
-  String get rewardsReferralCopiedMessage => 'Referral code copied.';
+  String get rewardsReferralCopiedMessage => 'Code copied.';
+
+  @override
+  String get rewardsReferralShareCodeAction => 'Share code';
+
+  @override
+  String get rewardsReferralUseFriendCodeAction => 'Enter friend code';
+
+  @override
+  String get rewardsReferralFriendCodePrompt => 'Have a friend\'s code?';
+
+  @override
+  String get rewardsReferralFriendCodeHint =>
+      'Enter it before your first purchase.';
 
   @override
   String get rewardsReferralInputLabel => 'Friend code';
@@ -348,35 +427,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rewardsReferralInputHint => 'PMABC12345';
 
   @override
-  String get rewardsReferralActivateAction => 'Activate referral code';
+  String get rewardsReferralActivateAction => 'Activate code';
+
+  @override
+  String get rewardsReferralEmptyError => 'Enter friend code.';
+
+  @override
+  String get rewardsReferralCheckingStatus => 'Checking referral code...';
 
   @override
   String get rewardsReferralActivatedMessage =>
-      'Referral code activated. Bonus unlocks after your first purchase.';
+      'Referral code activated. Bonus is credited after your first successful paid purchase.';
 
   @override
   String get rewardsReferralStatusLoading => 'Loading referral status...';
 
   @override
   String get rewardsReferralStatusNone =>
-      'Enter a friend\'s code before your first purchase to unlock the referral bonus.';
+      'Enter a friend\'s code before your first purchase. Bonus is credited only after a successful payment.';
 
   @override
   String get rewardsReferralStatusPending =>
-      'Referral connected. Bonus will be paid after your first purchase.';
+      'Referral connected. Bonus will be paid after your first successful paid purchase.';
 
   @override
   String get rewardsReferralStatusRewarded =>
       'Referral bonus paid. Thanks for growing PetMagic.';
 
   @override
-  String get rewardsReferralEarnedLabel => 'Earned';
+  String get rewardsReferralEarnedLabel => 'PawSpark earned';
 
   @override
-  String get rewardsReferralFriendsLabel => 'Friends';
+  String get rewardsReferralFriendsLabel => 'Friends invited';
 
   @override
-  String get rewardsReferralBonusLabel => 'Bonus';
+  String get rewardsReferralBonusLabel => 'Completed purchases';
+
+  @override
+  String rewardsReferralBonusPerFriend(int count) {
+    return '+$count PawSpark per invited friend';
+  }
+
+  @override
+  String get rewardsReferralRulesNote =>
+      'No signup bonus. Referral reward is credited only after a successful first paid purchase.';
+
+  @override
+  String rewardsReferralShareMessage(Object code, int bonus) {
+    return 'Join me in PetMagic! Use my referral code $code. Bonus is credited after your first successful paid purchase. After your first purchase I\'ll receive +$bonus PawSpark.';
+  }
 
   @override
   String get rewardsHistoryTitle => 'Bonus history';
@@ -420,7 +519,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rewardsReferralPaidUserError =>
-      'Referral code must be activated before your first purchase.';
+      'Referral code must be activated before your first successful paid purchase.';
 
   @override
   String get walletBuySparkTitle => 'Top up PawSpark';
@@ -536,12 +635,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletPurchaseFailed => 'Failed';
 
   @override
+  String get walletQueryFilterAll => 'All';
+
+  @override
+  String get walletQueryFilterCredits => 'Credits';
+
+  @override
+  String get walletQueryFilterDebits => 'Debits';
+
+  @override
   String get walletPartialActivityUnavailable =>
       'Your balance is already available. History and some wallet actions will refresh a bit later.';
 
   @override
   String get walletPaymentGatewayUnavailableError =>
-      'Payment is temporarily unavailable. Please try Stripe Checkout again in a moment.';
+      'Payments are temporarily unavailable. Please try again later or update the app.';
 
   @override
   String get walletPackUnavailableError =>
@@ -596,7 +704,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletRedeemInputLabel => 'Promo code';
 
   @override
-  String get walletRedeemHint => 'WELCOME-100';
+  String get walletRedeemHint => 'Enter promo code';
 
   @override
   String get walletRedeemCancelAction => 'Cancel';
@@ -1625,10 +1733,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authContinueWithApple => 'Continue with Apple';
-
-  @override
-  String get authGoogleBrowserFallbackAction =>
-      'Sign in with Google in browser';
 
   @override
   String get authNoAccountPrompt => 'Don\'t have an account?';
@@ -2748,10 +2852,6 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get authContinueWithApple => 'Continue with Apple';
-
-  @override
-  String get authGoogleBrowserFallbackAction =>
-      'Sign in with Google in browser';
 
   @override
   String get authNoAccountPrompt => 'Don\'t have an account?';

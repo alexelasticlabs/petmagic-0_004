@@ -580,7 +580,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletBalanceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Ready for photos and videos'**
+  /// **'Available for photos, videos and premium templates.'**
   String get walletBalanceTitle;
 
   /// No description provided for @walletBalanceEyebrow.
@@ -598,7 +598,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletBalanceExplanation.
   ///
   /// In en, this message translates to:
-  /// **'PawSpark is spent only inside PetMagic: generations, bonus actions, and new formats.'**
+  /// **'PawSpark — internal currency of PetMagic. Use it for creating photos, videos and accessing premium templates.'**
   String get walletBalanceExplanation;
 
   /// No description provided for @walletPremiumStatus.
@@ -628,7 +628,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletRedeemAction.
   ///
   /// In en, this message translates to:
-  /// **'Redeem promo code'**
+  /// **'Activate'**
   String get walletRedeemAction;
 
   /// No description provided for @walletRewardsTitle.
@@ -646,13 +646,13 @@ abstract class AppLocalizations {
   /// No description provided for @walletAdRewardCompactTitle.
   ///
   /// In en, this message translates to:
-  /// **'Quick ad bonus'**
+  /// **'Get PawSpark for free'**
   String get walletAdRewardCompactTitle;
 
   /// No description provided for @walletAdRewardCompactDescription.
   ///
   /// In en, this message translates to:
-  /// **'Watch a short ad and add PawSpark without paying.'**
+  /// **'Watch a short ad and get +15 PawSpark.'**
   String get walletAdRewardCompactDescription;
 
   /// No description provided for @walletAdRewardRemaining.
@@ -664,8 +664,14 @@ abstract class AppLocalizations {
   /// No description provided for @walletWatchAdAction.
   ///
   /// In en, this message translates to:
-  /// **'Watch ad'**
+  /// **'Get +15 PawSpark'**
   String get walletWatchAdAction;
+
+  /// No description provided for @walletAdDailyLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Ads are temporarily unavailable. Please try again later.'**
+  String get walletAdDailyLimitReached;
 
   /// No description provided for @walletPromoTitle.
   ///
@@ -679,17 +685,113 @@ abstract class AppLocalizations {
   /// **'Enter a code from PetMagic and add PawSpark to your balance.'**
   String get walletPromoSubtitle;
 
+  /// No description provided for @walletPromoInputPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter promo code'**
+  String get walletPromoInputPlaceholder;
+
+  /// No description provided for @walletPromoSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo code activated successfully!'**
+  String get walletPromoSuccessMessage;
+
+  /// No description provided for @walletBestValueBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Best value'**
+  String get walletBestValueBadge;
+
+  /// No description provided for @walletPremiumUpsellTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create often?'**
+  String get walletPremiumUpsellTitle;
+
+  /// No description provided for @walletPremiumUpsellMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium membership gives you cheaper generations, monthly PawSparks and exclusive premium templates.'**
+  String get walletPremiumUpsellMessage;
+
+  /// No description provided for @walletViewPremiumAction.
+  ///
+  /// In en, this message translates to:
+  /// **'View Premium'**
+  String get walletViewPremiumAction;
+
+  /// No description provided for @walletWhatYouCanCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your balance is enough for:'**
+  String get walletWhatYouCanCreateTitle;
+
+  /// No description provided for @walletSpendPhotoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos\nfrom 10 Spark'**
+  String get walletSpendPhotoSubtitle;
+
+  /// No description provided for @walletSpendVideoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Videos\nfrom 50 Spark'**
+  String get walletSpendVideoSubtitle;
+
+  /// No description provided for @walletSpendPremiumSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium\nfrom 80 Spark'**
+  String get walletSpendPremiumSubtitle;
+
+  /// No description provided for @walletContactSupportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get walletContactSupportAction;
+
+  /// No description provided for @walletRetryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get walletRetryAction;
+
   /// No description provided for @rewardsPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Rewards'**
+  /// **'Rewards and promo codes'**
   String get rewardsPageTitle;
 
   /// No description provided for @rewardsPageSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Promo codes, referral bonuses and reward history in one place.'**
+  /// **'Activate promo codes, invite friends, and earn rewards.'**
   String get rewardsPageSubtitle;
+
+  /// No description provided for @rewardsLastUpdatedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated: {value}'**
+  String rewardsLastUpdatedLabel(Object value);
+
+  /// No description provided for @rewardsLastUpdatedNow.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get rewardsLastUpdatedNow;
+
+  /// No description provided for @rewardsLastUpdatedMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min ago'**
+  String rewardsLastUpdatedMinutes(int count);
+
+  /// No description provided for @rewardsLastUpdatedHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h ago'**
+  String rewardsLastUpdatedHours(int count);
 
   /// No description provided for @rewardsPromoTitle.
   ///
@@ -700,8 +802,20 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsPromoSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Redeem PetMagic codes and add PawSpark to your balance.'**
+  /// **'Enter a promo code to top up your PawSpark balance.'**
   String get rewardsPromoSubtitle;
+
+  /// No description provided for @rewardsPromoEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter promo code.'**
+  String get rewardsPromoEmptyError;
+
+  /// No description provided for @rewardsPromoCheckingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking code...'**
+  String get rewardsPromoCheckingStatus;
 
   /// No description provided for @rewardsReferralTitle.
   ///
@@ -712,7 +826,7 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Share your code. The referral bonus is paid after your friend completes their first purchase.'**
+  /// **'Share your code with a friend. Referral bonus is not paid for signup and is credited only after their first successful paid purchase.'**
   String get rewardsReferralSubtitle;
 
   /// No description provided for @rewardsYourReferralCode.
@@ -724,14 +838,38 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsCopyReferralCodeAction.
   ///
   /// In en, this message translates to:
-  /// **'Copy referral code'**
+  /// **'Copy'**
   String get rewardsCopyReferralCodeAction;
 
   /// No description provided for @rewardsReferralCopiedMessage.
   ///
   /// In en, this message translates to:
-  /// **'Referral code copied.'**
+  /// **'Code copied.'**
   String get rewardsReferralCopiedMessage;
+
+  /// No description provided for @rewardsReferralShareCodeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Share code'**
+  String get rewardsReferralShareCodeAction;
+
+  /// No description provided for @rewardsReferralUseFriendCodeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter friend code'**
+  String get rewardsReferralUseFriendCodeAction;
+
+  /// No description provided for @rewardsReferralFriendCodePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Have a friend\'s code?'**
+  String get rewardsReferralFriendCodePrompt;
+
+  /// No description provided for @rewardsReferralFriendCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter it before your first purchase.'**
+  String get rewardsReferralFriendCodeHint;
 
   /// No description provided for @rewardsReferralInputLabel.
   ///
@@ -748,13 +886,25 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralActivateAction.
   ///
   /// In en, this message translates to:
-  /// **'Activate referral code'**
+  /// **'Activate code'**
   String get rewardsReferralActivateAction;
+
+  /// No description provided for @rewardsReferralEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter friend code.'**
+  String get rewardsReferralEmptyError;
+
+  /// No description provided for @rewardsReferralCheckingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking referral code...'**
+  String get rewardsReferralCheckingStatus;
 
   /// No description provided for @rewardsReferralActivatedMessage.
   ///
   /// In en, this message translates to:
-  /// **'Referral code activated. Bonus unlocks after your first purchase.'**
+  /// **'Referral code activated. Bonus is credited after your first successful paid purchase.'**
   String get rewardsReferralActivatedMessage;
 
   /// No description provided for @rewardsReferralStatusLoading.
@@ -766,13 +916,13 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralStatusNone.
   ///
   /// In en, this message translates to:
-  /// **'Enter a friend\'s code before your first purchase to unlock the referral bonus.'**
+  /// **'Enter a friend\'s code before your first purchase. Bonus is credited only after a successful payment.'**
   String get rewardsReferralStatusNone;
 
   /// No description provided for @rewardsReferralStatusPending.
   ///
   /// In en, this message translates to:
-  /// **'Referral connected. Bonus will be paid after your first purchase.'**
+  /// **'Referral connected. Bonus will be paid after your first successful paid purchase.'**
   String get rewardsReferralStatusPending;
 
   /// No description provided for @rewardsReferralStatusRewarded.
@@ -784,20 +934,38 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralEarnedLabel.
   ///
   /// In en, this message translates to:
-  /// **'Earned'**
+  /// **'PawSpark earned'**
   String get rewardsReferralEarnedLabel;
 
   /// No description provided for @rewardsReferralFriendsLabel.
   ///
   /// In en, this message translates to:
-  /// **'Friends'**
+  /// **'Friends invited'**
   String get rewardsReferralFriendsLabel;
 
   /// No description provided for @rewardsReferralBonusLabel.
   ///
   /// In en, this message translates to:
-  /// **'Bonus'**
+  /// **'Completed purchases'**
   String get rewardsReferralBonusLabel;
+
+  /// No description provided for @rewardsReferralBonusPerFriend.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} PawSpark per invited friend'**
+  String rewardsReferralBonusPerFriend(int count);
+
+  /// No description provided for @rewardsReferralRulesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'No signup bonus. Referral reward is credited only after a successful first paid purchase.'**
+  String get rewardsReferralRulesNote;
+
+  /// No description provided for @rewardsReferralShareMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Join me in PetMagic! Use my referral code {code}. Bonus is credited after your first successful paid purchase. After your first purchase I\'ll receive +{bonus} PawSpark.'**
+  String rewardsReferralShareMessage(Object code, int bonus);
 
   /// No description provided for @rewardsHistoryTitle.
   ///
@@ -874,7 +1042,7 @@ abstract class AppLocalizations {
   /// No description provided for @rewardsReferralPaidUserError.
   ///
   /// In en, this message translates to:
-  /// **'Referral code must be activated before your first purchase.'**
+  /// **'Referral code must be activated before your first successful paid purchase.'**
   String get rewardsReferralPaidUserError;
 
   /// No description provided for @walletBuySparkTitle.
@@ -1063,6 +1231,24 @@ abstract class AppLocalizations {
   /// **'Failed'**
   String get walletPurchaseFailed;
 
+  /// No description provided for @walletQueryFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get walletQueryFilterAll;
+
+  /// No description provided for @walletQueryFilterCredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Credits'**
+  String get walletQueryFilterCredits;
+
+  /// No description provided for @walletQueryFilterDebits.
+  ///
+  /// In en, this message translates to:
+  /// **'Debits'**
+  String get walletQueryFilterDebits;
+
   /// No description provided for @walletPartialActivityUnavailable.
   ///
   /// In en, this message translates to:
@@ -1072,7 +1258,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletPaymentGatewayUnavailableError.
   ///
   /// In en, this message translates to:
-  /// **'Payment is temporarily unavailable. Please try Stripe Checkout again in a moment.'**
+  /// **'Payments are temporarily unavailable. Please try again later or update the app.'**
   String get walletPaymentGatewayUnavailableError;
 
   /// No description provided for @walletPackUnavailableError.
@@ -1162,7 +1348,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletRedeemHint.
   ///
   /// In en, this message translates to:
-  /// **'WELCOME-100'**
+  /// **'Enter promo code'**
   String get walletRedeemHint;
 
   /// No description provided for @walletRedeemCancelAction.
@@ -2982,12 +3168,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue with Apple'**
   String get authContinueWithApple;
-
-  /// No description provided for @authGoogleBrowserFallbackAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in with Google in browser'**
-  String get authGoogleBrowserFallbackAction;
 
   /// No description provided for @authNoAccountPrompt.
   ///

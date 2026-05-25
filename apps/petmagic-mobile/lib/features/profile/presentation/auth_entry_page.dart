@@ -389,19 +389,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.center,
-                            child: TextButton.icon(
-                              onPressed: state.isSaving
-                                  ? null
-                                  : () => _submitExternalInBrowser(
-                                      ExternalAuthProvider.google,
-                                    ),
-                              icon: const Icon(Icons.open_in_browser_rounded),
-                              label: Text(text.authGoogleBrowserFallbackAction),
-                            ),
-                          ),
                           const SizedBox(height: 14),
                           if (isDark)
                             DarkTrustPanel(
@@ -481,23 +468,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final controller = ref.read(profileControllerProvider.notifier);
     final router = GoRouter.of(context);
     await controller.authenticateWithProvider(provider);
-
-    if (!mounted) {
-      return;
-    }
-
-    final nextState = ref.read(profileControllerProvider);
-    if (!nextState.isAuthenticated || !context.mounted) {
-      return;
-    }
-
-    router.go(TemplatesPage.routePath);
-  }
-
-  Future<void> _submitExternalInBrowser(ExternalAuthProvider provider) async {
-    final controller = ref.read(profileControllerProvider.notifier);
-    final router = GoRouter.of(context);
-    await controller.authenticateWithProviderInBrowser(provider);
 
     if (!mounted) {
       return;

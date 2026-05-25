@@ -3,6 +3,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 
 import {
   CalendarIcon,
@@ -36,7 +37,6 @@ import {
   formatRewardValue,
   formatSevenDayDelta,
   formatWindow,
-  getLastUsedAt,
   getPromoStatus,
   getRewardKindLabel,
   getUserLabels,
@@ -67,12 +67,22 @@ import {
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
-const PAGE_SIZE = 8;
-const PROMO_CODES_AUTO_REFRESH_MS = 30_000;
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [6, 10, 20] as const;
+const PROMO_CODES_AUTO_REFRESH_MS = 15_000;
 const EMPTY_PROMO_CODES: AdminRedeemCode[] = [];
 const EMPTY_REDEMPTIONS: AdminRedeemCodeRedemption[] = [];
 const ACTIVATIONS_PREVIEW_LIMIT = 5;
 const ACTIVATIONS_EXPANDED_LIMIT = 20;
+const ACTIONS_MENU_WIDTH_PX = 220;
+const ACTIONS_MENU_HEIGHT_ESTIMATE_PX = 236;
+const ACTIONS_MENU_GAP_PX = 8;
+
+type ActionsMenuPosition = {
+  top: number;
+  left: number;
+  openUpward: boolean;
+};
 
 export function PromoCodesView({ locale }: { locale: Locale }) {
   const text = getDictionary(locale);
@@ -84,15 +94,19 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<PromoStatusFilter>("all");
+  const [rewardFilter, setRewardFilter] = useState<"all" | AdminRedeemRewardKind>("all");
   const [sortMode, setSortMode] = useState<PromoSortMode>("updated");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [panelMode, setPanelMode] = useState<PromoFormMode>("create");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [selectedCodeId, setSelectedCodeId] = useState<string | null>(null);
   const [form, setForm] = useState<PromoForm>(() => createDefaultPromoForm());
   const [feedback, setFeedback] = useState<PromoFeedback | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [busyCodeId, setBusyCodeId] = useState<string | null>(null);
   const [actionsMenuCodeId, setActionsMenuCodeId] = useState<string | null>(null);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState<ActionsMenuPosition | null>(null);
   const [showAllActivations, setShowAllActivations] = useState(false);
   const [activationsPage, setActivationsPage] = useState(1);
 
@@ -101,6 +115,16 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       ensureAdminSession(locale, router);
     }
   }, [locale, router, session]);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, []);
 
   useEffect(() => {
     if (!actionsMenuCodeId) {
@@ -114,11 +138,48 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       }
 
       setActionsMenuCodeId(null);
+      setActionsMenuPosition(null);
     }
 
     window.addEventListener("pointerdown", handlePointerDown);
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [actionsMenuCodeId]);
+
+  useEffect(() => {
+    if (!actionsMenuCodeId) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeActionsMenu();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [actionsMenuCodeId]);
+
+  useEffect(() => {
+    if (!actionsMenuCodeId) {
+      return;
+    }
+
+    function handleViewportChange() {
+      setActionsMenuCodeId(null);
+      setActionsMenuPosition(null);
+    }
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
     };
   }, [actionsMenuCodeId]);
 
@@ -145,6 +206,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     queryFn: fetchAdminRedeemCodes,
     refetchInterval: PROMO_CODES_AUTO_REFRESH_MS,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const promoCodes = promoCodesQuery.data ?? EMPTY_PROMO_CODES;
@@ -282,13 +344,17 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     }: {
       redeemCodeId: string;
       payload: ReturnType<typeof toUpdatePayload>;
+      mode?: "toggle" | "restore";
     }) => updateAdminRedeemCode(redeemCodeId, payload),
     onSuccess: async (code, variables) => {
       setFeedback({
         tone: "success",
-        message: variables.payload.isActive
-          ? text.promoCodesResumeSuccess
-          : text.promoCodesPauseSuccess,
+        message:
+          variables.mode === "restore"
+            ? text.promoCodesRestoreSuccess
+            : variables.payload.isActive
+              ? text.promoCodesResumeSuccess
+              : text.promoCodesPauseSuccess,
       });
       if (selectedCodeId === code.redeemCodeId) {
         setForm(toPromoForm(code));
@@ -296,9 +362,12 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodes });
     },
     onError: (error, variables) => {
-      const fallback = variables.payload.isActive
-        ? text.promoCodesResumeError
-        : text.promoCodesPauseError;
+      const fallback =
+        variables.mode === "restore"
+          ? text.promoCodesRestoreError
+          : variables.payload.isActive
+            ? text.promoCodesResumeError
+            : text.promoCodesPauseError;
       setFeedback({ tone: "danger", message: error instanceof Error ? error.message : fallback });
     },
     onSettled: () => {
@@ -401,15 +470,16 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           codeValue.toLowerCase().includes(normalizedSearch) ||
           code.codePrefix.toLowerCase().includes(normalizedSearch) ||
           description.toLowerCase().includes(normalizedSearch);
+        const matchesReward = rewardFilter === "all" || code.rewardKind === rewardFilter;
 
-        return matchesStatus && matchesSearch;
+        return matchesStatus && matchesSearch && matchesReward;
       })
       .sort((firstItem, secondItem) => comparePromoCodes(firstItem, secondItem, sortMode));
-  }, [deferredSearch, nowMs, promoCodes, sortMode, statusFilter, text]);
+  }, [deferredSearch, nowMs, promoCodes, rewardFilter, sortMode, statusFilter, text]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCodes.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredCodes.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pagedCodes = filteredCodes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pagedCodes = filteredCodes.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const hasCodes = promoCodes.length > 0;
   const hasFilteredCodes = filteredCodes.length > 0;
   const isMutating =
@@ -417,6 +487,59 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     updateMutation.isPending ||
     statusMutation.isPending ||
     archiveMutation.isPending;
+
+  const shownRangeStart = hasFilteredCodes ? (currentPage - 1) * pageSize + 1 : 0;
+  const shownRangeEnd = hasFilteredCodes
+    ? Math.min(filteredCodes.length, currentPage * pageSize)
+    : 0;
+
+  const secondsUntilAutoRefresh = useMemo(() => {
+    if (!promoCodesQuery.dataUpdatedAt) {
+      return Math.ceil(PROMO_CODES_AUTO_REFRESH_MS / 1000);
+    }
+
+    const elapsed = Math.max(0, nowTick - promoCodesQuery.dataUpdatedAt);
+    const remaining = PROMO_CODES_AUTO_REFRESH_MS - (elapsed % PROMO_CODES_AUTO_REFRESH_MS);
+    return Math.max(1, Math.ceil(remaining / 1000));
+  }, [nowTick, promoCodesQuery.dataUpdatedAt]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const half = Math.floor(maxVisible / 2);
+    let start = Math.max(1, currentPage - half);
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    start = Math.max(1, end - maxVisible + 1);
+
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [currentPage, totalPages]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<PromoStatusFilter, number> = {
+      all: promoCodes.length,
+      draft: 0,
+      scheduled: 0,
+      active: 0,
+      paused: 0,
+      exhausted: 0,
+      expired: 0,
+      archived: 0,
+    };
+
+    for (const code of promoCodes) {
+      const key = getPromoStatus(code, text, nowMs).key;
+      counts[key] += 1;
+    }
+
+    return counts;
+  }, [nowMs, promoCodes, text]);
 
   function handleResetPanel() {
     setFeedback(null);
@@ -445,11 +568,12 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     setActivationsPage(1);
     setForm(createDefaultPromoForm());
     setFeedback(null);
+    closeActionsMenu();
   }
 
   function handleCloseEditor() {
     setIsEditorOpen(false);
-    setActionsMenuCodeId(null);
+    closeActionsMenu();
   }
 
   function handleOpenEditPanel(code: AdminRedeemCode) {
@@ -460,27 +584,50 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     setActivationsPage(1);
     setForm(toPromoForm(code));
     setFeedback(null);
-  }
-
-  function handleOpenDuplicatePanel(code: AdminRedeemCode) {
-    setPanelMode("duplicate");
-    setIsEditorOpen(true);
-    setSelectedCodeId(code.redeemCodeId);
-    setShowAllActivations(false);
-    setActivationsPage(1);
-    setForm({
-      ...toPromoForm(code),
-      code: createGeneratedPromoCode(),
-    });
-    setFeedback(null);
-    setActionsMenuCodeId(null);
+    closeActionsMenu();
   }
 
   function handleFocusUsage(code: AdminRedeemCode) {
     setSelectedCodeId(code.redeemCodeId);
     setShowAllActivations(false);
     setActivationsPage(1);
+    closeActionsMenu();
+  }
+
+  function closeActionsMenu() {
     setActionsMenuCodeId(null);
+    setActionsMenuPosition(null);
+  }
+
+  function getCurrentLocalDateTimeValue() {
+    return new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16);
+  }
+
+  function getActionsMenuPosition(trigger: HTMLElement): ActionsMenuPosition {
+    const rect = trigger.getBoundingClientRect();
+    const openUpward = window.innerHeight - rect.bottom < ACTIONS_MENU_HEIGHT_ESTIMATE_PX;
+    const maxLeft = Math.max(
+      ACTIONS_MENU_GAP_PX,
+      window.innerWidth - ACTIONS_MENU_WIDTH_PX - ACTIONS_MENU_GAP_PX
+    );
+
+    return {
+      top: openUpward ? rect.top - ACTIONS_MENU_GAP_PX : rect.bottom + ACTIONS_MENU_GAP_PX,
+      left: Math.min(Math.max(ACTIONS_MENU_GAP_PX, rect.right - ACTIONS_MENU_WIDTH_PX), maxLeft),
+      openUpward,
+    };
+  }
+
+  function handleToggleActionsMenu(code: AdminRedeemCode, trigger: HTMLElement) {
+    if (actionsMenuCodeId === code.redeemCodeId) {
+      closeActionsMenu();
+      return;
+    }
+
+    setActionsMenuCodeId(code.redeemCodeId);
+    setActionsMenuPosition(getActionsMenuPosition(trigger));
   }
 
   async function handleCopyCode(code: string) {
@@ -490,7 +637,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     } catch {
       setFeedback({ tone: "danger", message: text.promoCodesUpdateError });
     }
-    setActionsMenuCodeId(null);
+    closeActionsMenu();
   }
 
   function handleGenerateCode() {
@@ -515,14 +662,22 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
 
   function handleToggleCodeState(code: AdminRedeemCode) {
     try {
+      const status = getPromoStatus(code, text, nowMs);
+      const nextIsActive = !code.isActive;
+      const nextForm = toPromoForm(code);
       const payload = toUpdatePayload(
-        { ...toPromoForm(code), isActive: !code.isActive },
+        {
+          ...nextForm,
+          isActive: nextIsActive,
+          startsAtUtc: nextIsActive && status.key === "archived" ? "" : nextForm.startsAtUtc,
+          expiresAtUtc: nextIsActive && status.key === "archived" ? "" : nextForm.expiresAtUtc,
+        },
         code,
         text
       );
       setBusyCodeId(code.redeemCodeId);
-      setActionsMenuCodeId(null);
-      statusMutation.mutate({ redeemCodeId: code.redeemCodeId, payload });
+      closeActionsMenu();
+      statusMutation.mutate({ redeemCodeId: code.redeemCodeId, payload, mode: "toggle" });
     } catch (error) {
       setFeedback({
         tone: "danger",
@@ -537,14 +692,49 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     }
 
     try {
-      const payload = toUpdatePayload({ ...toPromoForm(code), isActive: false }, code, text);
+      const archivedAt = getCurrentLocalDateTimeValue();
+      const payload = toUpdatePayload(
+        {
+          ...toPromoForm(code),
+          isActive: false,
+          startsAtUtc: archivedAt,
+          expiresAtUtc: archivedAt,
+        },
+        code,
+        text
+      );
       setBusyCodeId(code.redeemCodeId);
-      setActionsMenuCodeId(null);
+      closeActionsMenu();
       archiveMutation.mutate({ redeemCodeId: code.redeemCodeId, payload });
     } catch (error) {
       setFeedback({
         tone: "danger",
         message: error instanceof Error ? error.message : text.promoCodesArchiveError,
+      });
+    }
+  }
+
+  function handleRestore(code: AdminRedeemCode) {
+    try {
+      const status = getPromoStatus(code, text, nowMs);
+      const nextForm = toPromoForm(code);
+      const payload = toUpdatePayload(
+        {
+          ...nextForm,
+          isActive: true,
+          startsAtUtc: status.key === "archived" ? "" : nextForm.startsAtUtc,
+          expiresAtUtc: status.key === "archived" ? "" : nextForm.expiresAtUtc,
+        },
+        code,
+        text
+      );
+      setBusyCodeId(code.redeemCodeId);
+      closeActionsMenu();
+      statusMutation.mutate({ redeemCodeId: code.redeemCodeId, payload, mode: "restore" });
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        message: error instanceof Error ? error.message : text.promoCodesRestoreError,
       });
     }
   }
@@ -586,6 +776,21 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     { value: "archived", label: text.promoCodesStatusArchived, tone: "neutral" },
   ];
 
+  const statusTabs: Array<{ value: PromoStatusFilter; label: string }> = [
+    { value: "all", label: locale === "ru" ? "Все" : "All" },
+    { value: "active", label: locale === "ru" ? "Активные" : "Active" },
+    { value: "draft", label: locale === "ru" ? "Черновики" : "Drafts" },
+    { value: "paused", label: locale === "ru" ? "Приостановленные" : "Paused" },
+    { value: "expired", label: locale === "ru" ? "Истекшие" : "Expired" },
+    { value: "archived", label: locale === "ru" ? "Архивные" : "Archived" },
+  ];
+
+  const rewardOptions: SelectOption[] = [
+    { value: "all", label: locale === "ru" ? "Все награды" : "All rewards", tone: "neutral" },
+    { value: "spark", label: text.promoCodesRewardTypeSparkOption, tone: "recommended" },
+    { value: "premium_days", label: text.promoCodesRewardTypePremiumOption, tone: "premium" },
+  ];
+
   const formStatusOptions: SelectOption[] = [
     { value: "active", label: text.promoCodesStatusActiveOption, tone: "recommended" },
     { value: "paused", label: text.promoCodesStatusPausedOption, tone: "premium" },
@@ -598,6 +803,12 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     { value: "code", label: text.promoCodesSortCode, tone: "neutral" },
     { value: "expiry", label: text.promoCodesSortExpiry, tone: "neutral" },
   ];
+
+  const pageSizeOptions: SelectOption[] = PAGE_SIZE_OPTIONS.map((option) => ({
+    value: option.toString(),
+    label: locale === "ru" ? `${option} на странице` : `${option} per page`,
+    tone: "neutral",
+  }));
 
   if (promoCodesQuery.isLoading) {
     return (
@@ -629,6 +840,11 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   const selectedStatus = selectedCode ? getPromoStatus(selectedCode, text, nowMs) : null;
+  const actionsMenuCode =
+    promoCodes.find((code) => code.redeemCodeId === actionsMenuCodeId) ?? null;
+  const actionsMenuStatus = actionsMenuCode ? getPromoStatus(actionsMenuCode, text, nowMs) : null;
+  const isActionsMenuArchived = actionsMenuStatus?.key === "archived";
+  const isActionsMenuBusy = actionsMenuCode !== null && busyCodeId === actionsMenuCode.redeemCodeId;
 
   return (
     <AdminPage className={styles.page}>
@@ -639,6 +855,11 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           {feedback.message}
         </div>
       ) : null}
+
+      <header className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>{text.navPromoCodes}</h1>
+        <p className={styles.pageSubtitle}>{text.promoCodesHeroDescription}</p>
+      </header>
 
       <div className={styles.kpiGrid}>
         <AdminKpiCard
@@ -676,24 +897,67 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       </div>
 
       <div className={styles.workspace}>
-        <AdminCard
-          title={text.navPromoCodes}
-          description={text.promoCodesTableDescription}
-          className={styles.tableCard}
-        >
-          <AdminToolbar className={styles.toolbar}>
-            <span className={styles.toolbarCaption}>
-              {hasFilteredCodes
-                ? `${formatNumber(filteredCodes.length, locale)} / ${formatNumber(promoCodes.length, locale)}`
-                : formatNumber(promoCodes.length, locale)}
-            </span>
+        <AdminCard className={styles.tableCard}>
+          <AdminToolbar className={styles.tableTopBar}>
+            <div
+              className={styles.statusTabs}
+              role="tablist"
+              aria-label={text.promoCodesStatusFilterLabel}
+            >
+              {statusTabs.map((tab, index) => {
+                const isActiveTab = statusFilter === tab.value;
+
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActiveTab}
+                    className={`${styles.statusTab}${isActiveTab ? ` ${styles.statusTabActive}` : ""}`}
+                    onClick={() => {
+                      setStatusFilter(tab.value);
+                      setPage(1);
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key !== "ArrowLeft" &&
+                        event.key !== "ArrowRight" &&
+                        event.key !== "Home" &&
+                        event.key !== "End"
+                      ) {
+                        return;
+                      }
+
+                      event.preventDefault();
+
+                      let nextIndex = index;
+                      if (event.key === "ArrowRight") {
+                        nextIndex = (index + 1) % statusTabs.length;
+                      } else if (event.key === "ArrowLeft") {
+                        nextIndex = (index - 1 + statusTabs.length) % statusTabs.length;
+                      } else if (event.key === "Home") {
+                        nextIndex = 0;
+                      } else if (event.key === "End") {
+                        nextIndex = statusTabs.length - 1;
+                      }
+
+                      setStatusFilter(statusTabs[nextIndex].value);
+                      setPage(1);
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    <span className={styles.statusTabCount}>
+                      {formatNumber(statusCounts[tab.value], locale)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className={styles.toolbarActions}>
-              <Button variant="primary" onClick={handleOpenCreatePanel}>
-                {text.promoCodesCreateAction}
+              <Button variant="secondary" onClick={handleExport} disabled={!hasFilteredCodes}>
+                <DownloadIcon className={styles.actionIcon} /> {text.promoCodesExportAction}
               </Button>
-              {promoCodesQuery.isFetching ? (
-                <span className={styles.syncBadge}>{text.promoCodesUpdatingLabel}</span>
-              ) : null}
               <Button
                 variant="secondary"
                 onClick={() => void promoCodesQuery.refetch()}
@@ -701,9 +965,20 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
               >
                 <RefreshIcon className={styles.actionIcon} /> {text.promoCodesRefreshAction}
               </Button>
-              <Button variant="secondary" onClick={handleExport} disabled={!hasFilteredCodes}>
-                <DownloadIcon className={styles.actionIcon} /> {text.promoCodesExportAction}
+              <Button variant="primary" onClick={handleOpenCreatePanel}>
+                {text.promoCodesCreateAction}
               </Button>
+              <span
+                className={`${styles.autoRefreshBadge}${promoCodesQuery.isFetching ? ` ${styles.autoRefreshBadgeLoading}` : ""}`}
+                aria-live="polite"
+              >
+                <span className={styles.autoRefreshDot} />
+                {promoCodesQuery.isFetching
+                  ? text.promoCodesUpdatingLabel
+                  : locale === "ru"
+                    ? `Автообновление: ${secondsUntilAutoRefresh}с`
+                    : `Auto refresh: ${secondsUntilAutoRefresh}s`}
+              </span>
             </div>
           </AdminToolbar>
 
@@ -730,6 +1005,19 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                   setPage(1);
                 }}
                 ariaLabel={text.promoCodesStatusFilterLabel}
+                showSelectedDescription={false}
+              />
+            </div>
+            <div className={styles.selectField}>
+              <span className={styles.fieldLabel}>{text.promoCodesRewardTypeLabel}</span>
+              <Select
+                value={rewardFilter}
+                options={rewardOptions}
+                onChange={(value) => {
+                  setRewardFilter(value as "all" | AdminRedeemRewardKind);
+                  setPage(1);
+                }}
+                ariaLabel={text.promoCodesRewardTypeLabel}
                 showSelectedDescription={false}
               />
             </div>
@@ -766,6 +1054,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                   onClick={() => {
                     setSearch("");
                     setStatusFilter("all");
+                    setRewardFilter("all");
                     setPage(1);
                   }}
                 >
@@ -786,7 +1075,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                       <th>{text.promoCodesWindowLabel}</th>
                       <th>{text.statusLabel}</th>
                       <th>{text.createdAtLabel}</th>
-                      <th>{text.promoCodesCampaignCreatedByLabel}</th>
                       <th>{text.actionsLabel}</th>
                     </tr>
                   </thead>
@@ -796,14 +1084,31 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                       const isSelected = selectedCodeId === code.redeemCodeId;
                       const codeValue = code.code || `${code.codePrefix}...`;
                       const actionBusy = busyCodeId === code.redeemCodeId;
-                      const lastUsedAt = getLastUsedAt(code);
                       const campaignMeta = formatCampaignMeta(code);
+                      const usagePercent = Math.min(
+                        100,
+                        Math.round((code.redeemedCount / Math.max(1, code.maxRedemptions)) * 100)
+                      );
+                      const usageToneClass =
+                        usagePercent >= 80
+                          ? styles.usageToneCritical
+                          : usagePercent >= 45
+                            ? styles.usageToneMedium
+                            : styles.usageToneGood;
 
                       return (
                         <tr
                           key={code.redeemCodeId}
                           className={`${styles.tableRow}${isSelected ? ` ${styles.rowSelected}` : ""}`}
-                          onClick={() => handleOpenEditPanel(code)}
+                          onClick={() => handleFocusUsage(code)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              handleFocusUsage(code);
+                            }
+                          }}
+                          tabIndex={0}
+                          aria-selected={isSelected}
                         >
                           <td>
                             <div className={styles.codeCell}>
@@ -834,13 +1139,18 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                           </td>
                           <td>
                             <div className={styles.usageCell}>
-                              <strong>
-                                {formatNumber(code.redeemedCount, locale)} /{" "}
-                                {formatNumber(code.maxRedemptions, locale)}
-                              </strong>
-                              <span>
-                                {text.promoCodesLastUsedLabel}: {formatDateTime(lastUsedAt, locale)}
-                              </span>
+                              <div className={styles.usageTopRow}>
+                                <strong>
+                                  {formatNumber(code.redeemedCount, locale)} /{" "}
+                                  {formatNumber(code.maxRedemptions, locale)}
+                                </strong>
+                                <span className={`${styles.usagePercent} ${usageToneClass}`}>
+                                  {usagePercent}%
+                                </span>
+                              </div>
+                              <div className={`${styles.usageMeter} ${usageToneClass}`}>
+                                <span style={{ width: `${usagePercent}%` }} />
+                              </div>
                             </div>
                           </td>
                           <td>
@@ -852,8 +1162,12 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                           <td>
                             <AdminStatusBadge color={status.color}>{status.label}</AdminStatusBadge>
                           </td>
-                          <td>{formatDateTime(code.createdAtUtc, locale)}</td>
-                          <td>{code.createdBy?.trim() || "-"}</td>
+                          <td>
+                            <div className={styles.createdCell}>
+                              <strong>{formatDateTime(code.createdAtUtc, locale)}</strong>
+                              <span>{code.createdBy?.trim() || "-"}</span>
+                            </div>
+                          </td>
                           <td>
                             <div
                               className={styles.actionsMenu}
@@ -867,72 +1181,13 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                                 aria-label={text.promoCodesActionsMenuLabel}
                                 aria-haspopup="menu"
                                 aria-expanded={actionsMenuCodeId === code.redeemCodeId}
-                                onClick={() =>
-                                  setActionsMenuCodeId((current) =>
-                                    current === code.redeemCodeId ? null : code.redeemCodeId
-                                  )
+                                onClick={(event) =>
+                                  handleToggleActionsMenu(code, event.currentTarget)
                                 }
                                 disabled={actionBusy}
                               >
                                 <MoreHorizontalIcon className={styles.inlineIcon} />
                               </Button>
-
-                              {actionsMenuCodeId === code.redeemCodeId ? (
-                                <div
-                                  className={styles.actionsMenuList}
-                                  role="menu"
-                                  aria-label={text.promoCodesActionsMenuLabel}
-                                >
-                                  <button
-                                    type="button"
-                                    className={styles.actionsMenuItem}
-                                    onClick={() => void handleCopyCode(codeValue)}
-                                  >
-                                    {text.promoCodesCopyAction}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={styles.actionsMenuItem}
-                                    onClick={() => {
-                                      handleOpenEditPanel(code);
-                                      setActionsMenuCodeId(null);
-                                    }}
-                                  >
-                                    {text.editTemplate}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={styles.actionsMenuItem}
-                                    onClick={() => handleOpenDuplicatePanel(code)}
-                                  >
-                                    {text.promoCodesDuplicateAction}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={styles.actionsMenuItem}
-                                    onClick={() => handleFocusUsage(code)}
-                                  >
-                                    {text.promoCodesViewActivationsAction}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={styles.actionsMenuItem}
-                                    onClick={() => handleToggleCodeState(code)}
-                                  >
-                                    {code.isActive
-                                      ? text.promoCodesPauseAction
-                                      : text.promoCodesResumeAction}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`${styles.actionsMenuItem} ${styles.actionsMenuItemDanger}`}
-                                    onClick={() => handleArchive(code)}
-                                    disabled={!code.isActive || actionBusy}
-                                  >
-                                    {text.archive}
-                                  </button>
-                                </div>
-                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -944,25 +1199,57 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
 
               <div className={styles.pagination}>
                 <span className={styles.paginationInfo}>
-                  {formatNumber(currentPage, locale)} / {formatNumber(totalPages, locale)}
+                  {locale === "ru"
+                    ? `Показано ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} из ${formatNumber(filteredCodes.length, locale)}`
+                    : `Showing ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} of ${formatNumber(filteredCodes.length, locale)}`}
                 </span>
-                <div className={styles.paginationActions}>
+                <div className={styles.paginationCenter}>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
                     disabled={currentPage <= 1}
+                    aria-label={text.promoCodesPreviousAction}
                   >
-                    {text.promoCodesPreviousAction}
+                    {"<"}
                   </Button>
+
+                  <div className={styles.paginationActions}>
+                    {visiblePageNumbers.map((pageNumber) => (
+                      <Button
+                        key={pageNumber}
+                        variant={pageNumber === currentPage ? "primary" : "secondary"}
+                        size="sm"
+                        className={styles.paginationNumber}
+                        onClick={() => setPage(pageNumber)}
+                      >
+                        {formatNumber(pageNumber, locale)}
+                      </Button>
+                    ))}
+                  </div>
+
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                     disabled={currentPage >= totalPages}
+                    aria-label={text.promoCodesNextAction}
                   >
-                    {text.promoCodesNextAction}
+                    {">"}
                   </Button>
+                </div>
+
+                <div className={styles.pageSizeControl}>
+                  <Select
+                    value={pageSize.toString()}
+                    options={pageSizeOptions}
+                    onChange={(value) => {
+                      setPageSize(Number(value));
+                      setPage(1);
+                    }}
+                    ariaLabel={locale === "ru" ? "Размер страницы" : "Page size"}
+                    showSelectedDescription={false}
+                  />
                 </div>
               </div>
             </>
@@ -1101,6 +1388,92 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           )}
         </AdminCard>
       </div>
+
+      {actionsMenuCode && actionsMenuPosition && typeof window !== "undefined"
+        ? createPortal(
+            <div
+              className={styles.actionsMenuPortal}
+              style={{
+                top: actionsMenuPosition.top,
+                left: actionsMenuPosition.left,
+                minWidth: ACTIONS_MENU_WIDTH_PX,
+                transform: actionsMenuPosition.openUpward ? "translateY(-100%)" : undefined,
+              }}
+              role="menu"
+              aria-label={text.promoCodesActionsMenuLabel}
+              data-promo-actions-root
+            >
+              <div className={`${styles.actionsMenuList} ${styles.actionsMenuListPortal}`}>
+                {isActionsMenuArchived ? (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.actionsMenuItem}
+                      onClick={() => handleFocusUsage(actionsMenuCode)}
+                    >
+                      {text.promoCodesViewActivationsAction}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.actionsMenuItem}
+                      onClick={() => handleRestore(actionsMenuCode)}
+                      disabled={isActionsMenuBusy}
+                    >
+                      {text.promoCodesRestoreAction}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.actionsMenuItem}
+                      onClick={() =>
+                        void handleCopyCode(
+                          actionsMenuCode.code || `${actionsMenuCode.codePrefix}...`
+                        )
+                      }
+                    >
+                      {text.promoCodesCopyAction}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.actionsMenuItem}
+                      onClick={() => handleOpenEditPanel(actionsMenuCode)}
+                    >
+                      {text.editTemplate}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.actionsMenuItem}
+                      onClick={() => handleFocusUsage(actionsMenuCode)}
+                    >
+                      {text.promoCodesViewActivationsAction}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.actionsMenuItem}
+                      onClick={() => handleToggleCodeState(actionsMenuCode)}
+                      disabled={isActionsMenuBusy}
+                    >
+                      {actionsMenuCode.isActive
+                        ? text.promoCodesPauseAction
+                        : text.promoCodesResumeAction}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.actionsMenuItem} ${styles.actionsMenuItemDanger}`}
+                      onClick={() => handleArchive(actionsMenuCode)}
+                      disabled={!actionsMenuCode.isActive || isActionsMenuBusy}
+                    >
+                      {text.archive}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
       {isEditorOpen ? (
         <div className={styles.drawerBackdrop} onClick={handleCloseEditor}>
@@ -1377,18 +1750,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                             ...current,
                             campaignChannel: event.target.value,
                           }))
-                        }
-                      />
-                    </label>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>
-                        {text.promoCodesCampaignCreatedByLabel}
-                      </span>
-                      <input
-                        className={styles.input}
-                        value={form.createdBy}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, createdBy: event.target.value }))
                         }
                       />
                     </label>
