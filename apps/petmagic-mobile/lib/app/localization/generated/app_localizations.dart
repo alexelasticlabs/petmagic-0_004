@@ -1479,13 +1479,13 @@ abstract class AppLocalizations {
   /// No description provided for @premiumHeroTitle.
   ///
   /// In en, this message translates to:
-  /// **'Get Premium and create more content.'**
+  /// **'Unlock viral pet videos'**
   String get premiumHeroTitle;
 
   /// No description provided for @premiumHeroSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Unlock premium templates, faster generation and more room for photos and videos in one plan.'**
+  /// **'More generations, premium templates, faster processing and no watermark.'**
   String get premiumHeroSubtitle;
 
   /// No description provided for @premiumAlreadyActive.
@@ -1761,7 +1761,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumContinueAction.
   ///
   /// In en, this message translates to:
-  /// **'Start Premium'**
+  /// **'Continue'**
   String get premiumContinueAction;
 
   /// No description provided for @externalCheckoutStripeTitle.
@@ -2735,6 +2735,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unable to send the attachment right now. Please try again in a moment.'**
   String get supportChatAttachmentUnavailableError;
+
+  /// No description provided for @supportChatAttachmentTooLargeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment is too large. Maximum size is 10 MB.'**
+  String get supportChatAttachmentTooLargeError;
+
+  /// No description provided for @supportChatImageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Support image'**
+  String get supportChatImageLabel;
+
+  /// No description provided for @supportChatSaveImageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save image'**
+  String get supportChatSaveImageAction;
+
+  /// No description provided for @supportChatShareAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get supportChatShareAction;
+
+  /// No description provided for @supportChatOpenOriginalAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open original'**
+  String get supportChatOpenOriginalAction;
+
+  /// No description provided for @supportChatCloseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get supportChatCloseAction;
+
+  /// No description provided for @supportChatImageSavedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image saved'**
+  String get supportChatImageSavedMessage;
+
+  /// No description provided for @supportChatSaveImageFailedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save image'**
+  String get supportChatSaveImageFailedError;
+
+  /// No description provided for @supportChatShareImageFailedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to share image'**
+  String get supportChatShareImageFailedError;
+
+  /// No description provided for @supportChatAttachmentStatusUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading'**
+  String get supportChatAttachmentStatusUploading;
+
+  /// No description provided for @supportChatAttachmentStatusUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get supportChatAttachmentStatusUploaded;
+
+  /// No description provided for @supportChatAttachmentStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get supportChatAttachmentStatusFailed;
+
+  /// No description provided for @supportChatAttachmentStatusRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get supportChatAttachmentStatusRetry;
+
+  /// No description provided for @supportChatImageUploadFailedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Image upload failed'**
+  String get supportChatImageUploadFailedLabel;
+
+  /// No description provided for @supportChatFileFallbackLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get supportChatFileFallbackLabel;
 
   /// No description provided for @profileSettingsThemeSystem.
   ///

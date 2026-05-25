@@ -389,6 +389,39 @@ class ProfileController extends Notifier<ProfileState> {
     }
   }
 
+  Future<void> deleteAccount() async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      await _repository.deleteCurrentAccount();
+      try {
+        await ref
+            .read(externalAuthRepositoryProvider)
+            .clearSession(ExternalAuthProvider.google);
+      } catch (_) {
+        // Account deletion must still complete even if provider cleanup fails.
+      }
+
+      state = state.copyWith(
+        isSaving: false,
+        clearSession: true,
+        clearProfile: true,
+        password: '',
+        confirmPassword: '',
+        successMessage: 'profile.account_deleted',
+      );
+      ref.read(appLaunchControllerProvider.notifier).markSignedOut();
+    } on AppException catch (error) {
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
+    }
+  }
+
   Future<void> uploadAvatar() async {
     final file = await _imagePicker.pickImage(
       source: ImageSource.gallery,

@@ -209,6 +209,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
+    final profileController = ref.read(profileControllerProvider.notifier);
     final profile = state.profile;
     final bottomInset = petMagicBottomNavInset(
       context,
@@ -656,7 +657,14 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                     await showProfileDeleteAccountConfirmationSheet(
                       context: context,
                       onConfirm: () async {
+                        await profileController.deleteAccount();
+
                         if (!context.mounted) {
+                          return;
+                        }
+
+                        final nextState = ref.read(profileControllerProvider);
+                        if (nextState.errorMessage == null) {
                           return;
                         }
 
@@ -665,7 +673,12 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
                             SnackBar(
-                              content: Text(text.profileDetailsDeleteBody),
+                              content: Text(
+                                mapProfileFeedbackMessage(
+                                  nextState.errorMessage!,
+                                  text,
+                                ),
+                              ),
                             ),
                           );
                       },

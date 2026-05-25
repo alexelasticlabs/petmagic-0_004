@@ -79,14 +79,15 @@ class SupportChatMessage {
       body: body,
       isRead: isRead ?? this.isRead,
       createdAtUtc: createdAtUtc,
-        attachmentUrl: attachmentUrl ?? this.attachmentUrl,
-        attachmentFileName: attachmentFileName ?? this.attachmentFileName,
-        attachmentContentType: attachmentContentType ?? this.attachmentContentType,
-        attachmentFileSizeBytes:
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      attachmentFileName: attachmentFileName ?? this.attachmentFileName,
+      attachmentContentType:
+          attachmentContentType ?? this.attachmentContentType,
+      attachmentFileSizeBytes:
           attachmentFileSizeBytes ?? this.attachmentFileSizeBytes,
-        attachmentUploadStatus:
+      attachmentUploadStatus:
           attachmentUploadStatus ?? this.attachmentUploadStatus,
-        attachmentUploadErrorCode: clearAttachmentUploadErrorCode
+      attachmentUploadErrorCode: clearAttachmentUploadErrorCode
           ? null
           : (attachmentUploadErrorCode ?? this.attachmentUploadErrorCode),
       readAtUtc: clearReadAt ? null : (readAtUtc ?? this.readAtUtc),

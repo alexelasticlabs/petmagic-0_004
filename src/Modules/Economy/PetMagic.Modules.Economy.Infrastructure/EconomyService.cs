@@ -383,7 +383,7 @@ public sealed class EconomyService(
             .OrderBy(x => x.DisplayOrder)
             .ToListAsync(cancellationToken);
 
-        var stripeEnabled = !string.IsNullOrWhiteSpace(options.Value.StripeSecretKey);
+        var stripeEnabled = HasAnyStripeSecretKey();
         if (configuredPlans.Count > 0)
         {
             var plans = configuredPlans
@@ -547,7 +547,20 @@ public sealed class EconomyService(
             return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!await IsPaymentProviderAllowedAsync(provider, command.Platform, command.Country, command.AppVersion, cancellationToken))
+        var providerConfig = await ResolveEnabledPaymentProviderConfigAsync(
+            provider,
+            command.Platform,
+            command.Country,
+            command.AppVersion,
+            cancellationToken);
+
+        if (providerConfig is null)
+        {
+            return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+        }
+
+        var stripeApiKey = ResolveStripeApiKey(providerConfig.Mode);
+        if (string.IsNullOrWhiteSpace(stripeApiKey))
         {
             return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
@@ -558,7 +571,7 @@ public sealed class EconomyService(
             return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PremiumPlanNotFound);
         }
 
-        var customer = await GetOrCreatePaymentCustomerAsync(command.UserId, provider, cancellationToken);
+        var customer = await GetOrCreatePaymentCustomerAsync(command.UserId, provider, providerConfig.Mode, cancellationToken);
         if (customer.IsFailure)
         {
             return Result.Failure<PremiumCheckoutResponse>(customer.Error);
@@ -573,7 +586,8 @@ public sealed class EconomyService(
                 plan.ProductName,
                 plan.PriceAmount,
                 plan.CurrencyCode,
-                plan.BillingInterval),
+                plan.BillingInterval,
+                stripeApiKey),
             cancellationToken);
 
         if (checkout.IsFailure)
@@ -597,6 +611,12 @@ public sealed class EconomyService(
             return Result.Failure<BillingPortalSessionResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
+        var stripeApiKey = ResolveStripeApiKey();
+        if (string.IsNullOrWhiteSpace(stripeApiKey))
+        {
+            return Result.Failure<BillingPortalSessionResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
         var customer = await dbContext.PaymentCustomers
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.UserId == command.UserId && x.Provider == provider, cancellationToken);
@@ -607,7 +627,7 @@ public sealed class EconomyService(
         }
 
         var portal = await paymentGateway.CreateBillingPortalSessionAsync(
-            new BillingPortalCreateRequest(provider, command.UserId, customer.ExternalCustomerId),
+            new BillingPortalCreateRequest(provider, command.UserId, customer.ExternalCustomerId, stripeApiKey),
             cancellationToken);
 
         if (portal.IsFailure)
@@ -740,14 +760,20 @@ public sealed class EconomyService(
             return Result.Failure<PaymentMethodSetupResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        var customerResult = await GetOrCreatePaymentCustomerAsync(command.UserId, provider, cancellationToken);
+        var stripeApiKey = ResolveStripeApiKey();
+        if (string.IsNullOrWhiteSpace(stripeApiKey))
+        {
+            return Result.Failure<PaymentMethodSetupResponse>(EconomyErrors.PaymentProviderUnavailable);
+        }
+
+        var customerResult = await GetOrCreatePaymentCustomerAsync(command.UserId, provider, null, cancellationToken);
         if (customerResult.IsFailure)
         {
             return Result.Failure<PaymentMethodSetupResponse>(customerResult.Error);
         }
 
         var setupResult = await paymentGateway.CreatePaymentMethodSetupAsync(
-            new PaymentMethodSetupCreateRequest(provider, command.UserId, customerResult.Value.ExternalCustomerId),
+            new PaymentMethodSetupCreateRequest(provider, command.UserId, customerResult.Value.ExternalCustomerId, stripeApiKey),
             cancellationToken);
 
         if (setupResult.IsFailure)
@@ -827,7 +853,20 @@ public sealed class EconomyService(
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!await IsPaymentProviderAllowedAsync(provider, command.Platform, command.Country, command.AppVersion, cancellationToken))
+        var providerConfig = await ResolveEnabledPaymentProviderConfigAsync(
+            provider,
+            command.Platform,
+            command.Country,
+            command.AppVersion,
+            cancellationToken);
+
+        if (providerConfig is null)
+        {
+            return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+        }
+
+        var stripeApiKey = ResolveStripeApiKey(providerConfig.Mode);
+        if (string.IsNullOrWhiteSpace(stripeApiKey))
         {
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
@@ -890,7 +929,8 @@ public sealed class EconomyService(
                     order.SparkToGrant,
                     pack.DisplayName,
                     customer.ExternalCustomerId,
-                    savedMethod.ExternalPaymentMethodId),
+                    savedMethod.ExternalPaymentMethodId,
+                    stripeApiKey),
                 cancellationToken);
 
             if (savedPaymentResult.IsFailure)
@@ -919,7 +959,8 @@ public sealed class EconomyService(
                 order.PriceAmount,
                 order.CurrencyCode,
                 order.SparkToGrant,
-                pack.DisplayName),
+                pack.DisplayName,
+                stripeApiKey),
             cancellationToken);
 
         if (paymentResult.IsFailure)
@@ -1220,29 +1261,209 @@ public sealed class EconomyService(
             .OrderBy(x => x.Platform)
             .ThenBy(x => x.Provider)
             .ThenBy(x => x.Region)
-            .Select(x => new AdminPaymentProviderConfigurationResponse(
-                x.Id,
-                x.Provider,
-                x.Platform,
-                x.Region,
-                x.IsEnabled,
-                x.IsRecommended,
-                x.IsSelectedByDefault,
-                x.RequiresExternalWarning,
-                x.RequiresStoreDisclosure,
-                x.AllowedFromAppVersion,
-                x.ExternalCheckoutAllowed,
-                x.BonusTokensPercent,
-                x.DisplayLabel,
-                x.DisplaySubtitle,
-                x.WarningTitle,
-                x.WarningMessage,
-                x.Mode,
-                x.Notes,
-                x.UpdatedAtUtc))
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>(configs);
+        return Result.Success<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>(
+            configs.Select(ToAdminPaymentProviderConfigurationResponse).ToList());
+    }
+
+    public async Task<Result<AdminPaymentProviderConfigurationResponse>> CreatePaymentProviderConfigurationAsync(
+        CreatePaymentProviderConfigurationCommand command,
+        CancellationToken cancellationToken)
+    {
+        var provider = command.Provider.Trim().ToLowerInvariant();
+        var platform = EconomyPaymentProviderPolicy.NormalizePlatform(command.Platform);
+        var region = EconomyPaymentProviderPolicy.NormalizeConfigRegion(command.Region);
+
+        var exists = await dbContext.PaymentProviderConfigurations
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.Provider == provider
+                    && x.Platform == platform
+                    && x.Region == region,
+                cancellationToken);
+
+        if (exists)
+        {
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationAlreadyExists);
+        }
+
+        var now = DateTime.UtcNow;
+        var configuration = new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = provider,
+            Platform = platform,
+            Region = region,
+            IsEnabled = command.IsEnabled,
+            IsRecommended = command.IsRecommended,
+            IsSelectedByDefault = command.IsSelectedByDefault,
+            RequiresExternalWarning = command.RequiresExternalWarning,
+            RequiresStoreDisclosure = command.RequiresStoreDisclosure,
+            AllowedFromAppVersion = command.AllowedFromAppVersion.Trim(),
+            ExternalCheckoutAllowed = command.ExternalCheckoutAllowed,
+            BonusTokensPercent = command.BonusTokensPercent,
+            DisplayLabel = NullIfWhiteSpace(command.DisplayLabel),
+            DisplaySubtitle = NullIfWhiteSpace(command.DisplaySubtitle),
+            WarningTitle = NullIfWhiteSpace(command.WarningTitle),
+            WarningMessage = NullIfWhiteSpace(command.WarningMessage),
+            Mode = EconomyPaymentProviderPolicy.NormalizeMode(command.Mode),
+            Notes = NullIfWhiteSpace(command.Notes),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        dbContext.PaymentProviderConfigurations.Add(configuration);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(ToAdminPaymentProviderConfigurationResponse(configuration));
+    }
+
+    public async Task<Result<AdminPaymentProviderConfigurationResponse>> ClonePaymentProviderConfigurationAsync(
+        ClonePaymentProviderConfigurationCommand command,
+        CancellationToken cancellationToken)
+    {
+        var source = await dbContext.PaymentProviderConfigurations
+            .FirstOrDefaultAsync(x => x.Id == command.SourceConfigurationId, cancellationToken);
+
+        if (source is null)
+        {
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationNotFound);
+        }
+
+        var region = EconomyPaymentProviderPolicy.NormalizeConfigRegion(command.Region);
+        var exists = await dbContext.PaymentProviderConfigurations
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.Provider == source.Provider
+                    && x.Platform == source.Platform
+                    && x.Region == region,
+                cancellationToken);
+
+        if (exists)
+        {
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationAlreadyExists);
+        }
+
+        var now = DateTime.UtcNow;
+        var clone = new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = source.Provider,
+            Platform = source.Platform,
+            Region = region,
+            IsEnabled = source.IsEnabled,
+            IsRecommended = source.IsRecommended,
+            IsSelectedByDefault = source.IsSelectedByDefault,
+            RequiresExternalWarning = source.RequiresExternalWarning,
+            RequiresStoreDisclosure = source.RequiresStoreDisclosure,
+            AllowedFromAppVersion = source.AllowedFromAppVersion,
+            ExternalCheckoutAllowed = source.ExternalCheckoutAllowed,
+            BonusTokensPercent = source.BonusTokensPercent,
+            DisplayLabel = source.DisplayLabel,
+            DisplaySubtitle = source.DisplaySubtitle,
+            WarningTitle = source.WarningTitle,
+            WarningMessage = source.WarningMessage,
+            Mode = source.Mode,
+            Notes = source.Notes,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        dbContext.PaymentProviderConfigurations.Add(clone);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(ToAdminPaymentProviderConfigurationResponse(clone));
+    }
+
+    public async Task<Result> DeletePaymentProviderConfigurationAsync(
+        DeletePaymentProviderConfigurationCommand command,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await dbContext.PaymentProviderConfigurations
+            .FirstOrDefaultAsync(x => x.Id == command.ConfigurationId, cancellationToken);
+
+        if (configuration is null)
+        {
+            return Result.Failure(EconomyErrors.PaymentProviderConfigurationNotFound);
+        }
+
+        dbContext.PaymentProviderConfigurations.Remove(configuration);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result<AdminPaymentProviderConfigurationMatchResponse>> TestPaymentProviderConfigurationMatchAsync(
+        TestPaymentProviderConfigurationMatchQuery query,
+        CancellationToken cancellationToken)
+    {
+        var provider = query.Provider.Trim().ToLowerInvariant();
+        var platform = EconomyPaymentProviderPolicy.NormalizePlatform(query.Platform);
+        var normalizedRegion = EconomyPaymentProviderPolicy.NormalizeRegion(query.Country);
+        var isEuRegion = EconomyPaymentProviderPolicy.IsEuRegion(normalizedRegion);
+        var appVersion = query.AppVersion.Trim();
+
+        var configs = await dbContext.PaymentProviderConfigurations
+            .AsNoTracking()
+            .Where(x => x.IsEnabled)
+            .ToListAsync(cancellationToken);
+
+        var matchedConfiguration = EconomyPaymentProviderPolicy.SelectProviderConfig(
+            configs,
+            provider,
+            platform,
+            normalizedRegion,
+            isEuRegion,
+            appVersion);
+
+        if (matchedConfiguration is null)
+        {
+            return Result.Success(new AdminPaymentProviderConfigurationMatchResponse(
+                provider,
+                platform,
+                query.Country,
+                normalizedRegion,
+                isEuRegion,
+                appVersion,
+                false,
+                false,
+                string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase) ? IsStripeModeConfigured("test") || IsStripeModeConfigured("live") : true,
+                "config_not_found",
+                "No enabled route matched provider/platform/region/appVersion.",
+                null));
+        }
+
+        var allowedByPolicy = EconomyPaymentProviderPolicy.IsProviderAllowedForCheckout(provider, platform, matchedConfiguration);
+        var stripeModeConfigured = !string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
+            || IsStripeModeConfigured(matchedConfiguration.Mode);
+
+        var allowedForCheckout = allowedByPolicy && stripeModeConfigured;
+        var decisionCode = allowedForCheckout
+            ? "allowed"
+            : allowedByPolicy
+                ? "stripe_key_missing"
+                : "policy_blocked";
+
+        var decisionMessage = decisionCode switch
+        {
+            "allowed" => "Matched and allowed for checkout.",
+            "stripe_key_missing" => "Matched route requires Stripe mode key that is not configured.",
+            _ => "Matched route is blocked by checkout policy (for example mobile external checkout disabled)."
+        };
+
+        return Result.Success(new AdminPaymentProviderConfigurationMatchResponse(
+            provider,
+            platform,
+            query.Country,
+            normalizedRegion,
+            isEuRegion,
+            appVersion,
+            true,
+            allowedForCheckout,
+            stripeModeConfigured,
+            decisionCode,
+            decisionMessage,
+            ToAdminPaymentProviderConfigurationResponse(matchedConfiguration)));
     }
 
     public async Task<Result<AdminCurrencyPackResponse>> UpdateCurrencyPackAsync(
@@ -1341,26 +1562,7 @@ public sealed class EconomyService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new AdminPaymentProviderConfigurationResponse(
-            configuration.Id,
-            configuration.Provider,
-            configuration.Platform,
-            configuration.Region,
-            configuration.IsEnabled,
-            configuration.IsRecommended,
-            configuration.IsSelectedByDefault,
-            configuration.RequiresExternalWarning,
-            configuration.RequiresStoreDisclosure,
-            configuration.AllowedFromAppVersion,
-            configuration.ExternalCheckoutAllowed,
-            configuration.BonusTokensPercent,
-            configuration.DisplayLabel,
-            configuration.DisplaySubtitle,
-            configuration.WarningTitle,
-            configuration.WarningMessage,
-            configuration.Mode,
-            configuration.Notes,
-            configuration.UpdatedAtUtc));
+        return Result.Success(ToAdminPaymentProviderConfigurationResponse(configuration));
     }
 
     public async Task<Result<IReadOnlyList<AdminRedeemCodeResponse>>> ListAdminRedeemCodesAsync(CancellationToken cancellationToken)
@@ -1610,9 +1812,35 @@ public sealed class EconomyService(
     {
         string? eventId;
         string? eventType;
+        var stripeWebhookSecrets = ResolveStripeWebhookSecrets();
+        if (stripeWebhookSecrets.Count == 0)
+        {
+            return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidStripeSignature);
+        }
+
         try
         {
-            var stripeEvent = EventUtility.ConstructEvent(command.RawBody, command.StripeSignature, options.Value.StripeWebhookSecret);
+            Event? stripeEvent = null;
+            Exception? lastVerificationError = null;
+
+            foreach (var webhookSecret in stripeWebhookSecrets)
+            {
+                try
+                {
+                    stripeEvent = EventUtility.ConstructEvent(command.RawBody, command.StripeSignature, webhookSecret);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    lastVerificationError = ex;
+                }
+            }
+
+            if (stripeEvent is null)
+            {
+                throw lastVerificationError ?? new InvalidOperationException("Stripe webhook signature validation failed.");
+            }
+
             eventId = stripeEvent.Id;
             eventType = stripeEvent.Type;
         }
@@ -1622,7 +1850,10 @@ public sealed class EconomyService(
                 ex,
                 "Stripe SDK signature verification failed. Falling back to manual signature validation.");
 
-            if (!EconomyWebhookParser.VerifyStripeSignatureFallback(command.RawBody, command.StripeSignature, options.Value.StripeWebhookSecret))
+            var isSignatureValid = stripeWebhookSecrets.Any(
+                webhookSecret => EconomyWebhookParser.VerifyStripeSignatureFallback(command.RawBody, command.StripeSignature, webhookSecret));
+
+            if (!isSignatureValid)
             {
                 return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidStripeSignature);
             }
@@ -2051,6 +2282,7 @@ public sealed class EconomyService(
     private async Task<Result<PaymentCustomer>> GetOrCreatePaymentCustomerAsync(
         Guid userId,
         string provider,
+        string? stripeMode,
         CancellationToken cancellationToken)
     {
         var existing = await dbContext.PaymentCustomers
@@ -2061,8 +2293,18 @@ public sealed class EconomyService(
             return Result.Success(existing);
         }
 
+        var stripeApiKey = string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
+            ? ResolveStripeApiKey(stripeMode)
+            : null;
+
+        if (string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(stripeApiKey))
+        {
+            return Result.Failure<PaymentCustomer>(EconomyErrors.PaymentProviderUnavailable);
+        }
+
         var createResult = await paymentGateway.CreateCustomerAsync(
-            new PaymentCustomerCreateRequest(provider, userId),
+            new PaymentCustomerCreateRequest(provider, userId, stripeApiKey),
             cancellationToken);
 
         if (createResult.IsFailure)
@@ -2422,6 +2664,30 @@ public sealed class EconomyService(
             pack.SortOrder);
     }
 
+    private static AdminPaymentProviderConfigurationResponse ToAdminPaymentProviderConfigurationResponse(PaymentProviderConfiguration configuration)
+    {
+        return new AdminPaymentProviderConfigurationResponse(
+            configuration.Id,
+            configuration.Provider,
+            configuration.Platform,
+            configuration.Region,
+            configuration.IsEnabled,
+            configuration.IsRecommended,
+            configuration.IsSelectedByDefault,
+            configuration.RequiresExternalWarning,
+            configuration.RequiresStoreDisclosure,
+            configuration.AllowedFromAppVersion,
+            configuration.ExternalCheckoutAllowed,
+            configuration.BonusTokensPercent,
+            configuration.DisplayLabel,
+            configuration.DisplaySubtitle,
+            configuration.WarningTitle,
+            configuration.WarningMessage,
+            configuration.Mode,
+            configuration.Notes,
+            configuration.UpdatedAtUtc);
+    }
+
     private static AdminRedeemCodeResponse ToAdminRedeemCodeResponse(
         RedeemCode code,
         IReadOnlyList<AdminRedeemCodeRedemptionResponse> redemptions)
@@ -2530,7 +2796,7 @@ public sealed class EconomyService(
         if (string.Equals(platform, "web", StringComparison.Ordinal))
         {
             var stripeConfig = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, "stripe", platform, region, isEuRegion, query.AppVersion);
-            if (stripeConfig is not null)
+            if (stripeConfig is not null && IsStripeModeConfigured(stripeConfig.Mode))
             {
                 methods.Add(ToPaywallPaymentMethodResponse(stripeConfig, platform, region, "web"));
             }
@@ -2546,7 +2812,9 @@ public sealed class EconomyService(
         }
 
         var stripeMobileConfig = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, "stripe", platform, region, isEuRegion, query.AppVersion);
-        if (stripeMobileConfig is not null && stripeMobileConfig.ExternalCheckoutAllowed)
+        if (stripeMobileConfig is not null
+            && stripeMobileConfig.ExternalCheckoutAllowed
+            && IsStripeModeConfigured(stripeMobileConfig.Mode))
         {
             methods.Add(ToPaywallPaymentMethodResponse(
                 stripeMobileConfig,
@@ -2949,7 +3217,7 @@ public sealed class EconomyService(
             && subscription.MonthlyTokensGranted < subscription.MonthlyTokenLimit;
     }
 
-    private async Task<bool> IsPaymentProviderAllowedAsync(
+    private async Task<PaymentProviderConfiguration?> ResolveEnabledPaymentProviderConfigAsync(
         string provider,
         string platform,
         string country,
@@ -2964,13 +3232,92 @@ public sealed class EconomyService(
             .Where(x => x.IsEnabled)
             .ToListAsync(cancellationToken);
 
-        var config = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, provider, normalizedPlatform, normalizedRegion, isEuRegion, appVersion);
+        var config = EconomyPaymentProviderPolicy.SelectProviderConfig(
+            configs,
+            provider,
+            normalizedPlatform,
+            normalizedRegion,
+            isEuRegion,
+            appVersion);
+
         if (config is null)
         {
-            return false;
+            return null;
         }
 
-        return EconomyPaymentProviderPolicy.IsProviderAllowedForCheckout(provider, normalizedPlatform, config);
+        if (!EconomyPaymentProviderPolicy.IsProviderAllowedForCheckout(provider, normalizedPlatform, config))
+        {
+            return null;
+        }
+
+        if (string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
+            && !IsStripeModeConfigured(config.Mode))
+        {
+            return null;
+        }
+
+        return config;
+    }
+
+    private bool HasAnyStripeSecretKey()
+    {
+        return !string.IsNullOrWhiteSpace(ResolveStripeApiKey());
+    }
+
+    private bool IsStripeModeConfigured(string? mode)
+    {
+        return !string.IsNullOrWhiteSpace(ResolveStripeApiKey(mode));
+    }
+
+    private string? ResolveStripeApiKey(string? mode = null)
+    {
+        var normalizedMode = mode is null ? null : EconomyPaymentProviderPolicy.NormalizeMode(mode);
+        return normalizedMode switch
+        {
+            "live" => FirstNonEmpty(options.Value.StripeLiveSecretKey, options.Value.StripeSecretKey),
+            "test" => FirstNonEmpty(options.Value.StripeTestSecretKey, options.Value.StripeSecretKey),
+            _ => FirstNonEmpty(options.Value.StripeSecretKey, options.Value.StripeLiveSecretKey, options.Value.StripeTestSecretKey)
+        };
+    }
+
+    private IReadOnlyList<string> ResolveStripeWebhookSecrets()
+    {
+        var secrets = new List<string>();
+        AppendIfNotEmpty(secrets, options.Value.StripeWebhookSecret);
+        AppendIfNotEmpty(secrets, options.Value.StripeLiveWebhookSecret);
+        AppendIfNotEmpty(secrets, options.Value.StripeTestWebhookSecret);
+        return secrets;
+    }
+
+    private static void AppendIfNotEmpty(ICollection<string> values, string? candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return;
+        }
+
+        if (values.Contains(candidate))
+        {
+            return;
+        }
+
+        values.Add(candidate);
+    }
+
+    private static string? FirstNonEmpty(params string?[] candidates)
+    {
+        return candidates.FirstOrDefault(candidate => !string.IsNullOrWhiteSpace(candidate));
+    }
+
+    private async Task<bool> IsPaymentProviderAllowedAsync(
+        string provider,
+        string platform,
+        string country,
+        string appVersion,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await ResolveEnabledPaymentProviderConfigAsync(provider, platform, country, appVersion, cancellationToken);
+        return configuration is not null;
     }
 
     private static DateTime? ResolveNotificationPeriodStartUtc(string billingPeriod, DateTime? currentPeriodEndUtc, DateTime? fallbackPeriodStartUtc)

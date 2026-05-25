@@ -10,18 +10,32 @@ class _BenefitsList extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final tokenAllowance = selectedPlan?.tokenAllowance;
-    final benefits = [
-      _Benefit(
-        Icons.workspace_premium_rounded,
-        text.premiumComparisonPremiumTemplates,
+    final benefits = <_BenefitCardData>[
+      _BenefitCardData(
+        icon: Icons.workspace_premium_rounded,
+        title: text.premiumComparisonPremiumTemplates,
+        subtitle: text.premiumBenefitExclusive,
+        tone: const Color(0xFFA855F7),
       ),
-      _Benefit(Icons.visibility_off_rounded, text.premiumComparisonNoWatermark),
-      _Benefit(Icons.flash_on_rounded, text.premiumComparisonFast),
-      _Benefit(
-        Icons.auto_awesome_rounded,
-        tokenAllowance == null
+      _BenefitCardData(
+        icon: Icons.opacity_rounded,
+        title: text.premiumComparisonNoWatermark,
+        subtitle: text.premiumBenefitHighQuality,
+        tone: const Color(0xFF22D3EE),
+      ),
+      _BenefitCardData(
+        icon: Icons.bolt_rounded,
+        title: text.premiumComparisonFast,
+        subtitle: text.premiumBenefitFastGeneration,
+        tone: const Color(0xFF4ADE80),
+      ),
+      _BenefitCardData(
+        icon: Icons.hd_rounded,
+        title: text.premiumComparisonHighQuality,
+        subtitle: tokenAllowance == null
             ? text.premiumComparisonPremiumTokensFallback
             : text.premiumComparisonPremiumTokens(tokenAllowance),
+        tone: colors.gold,
       ),
     ];
 
@@ -30,123 +44,126 @@ class _BenefitsList extends StatelessWidget {
       children: [
         ProfileSectionLabel(label: text.premiumIncludesTitle),
         const SizedBox(height: 4),
-        Container(
-          decoration: BoxDecoration(
-            color: colors.surfaceGlass.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: colors.gold.withValues(alpha: 0.25),
-              width: 1.2,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth > 560
+                ? 4
+                : constraints.maxWidth > 420
+                ? 2
+                : 1;
+            final spacing = 10.0;
+            final width = columns == 1
+                ? constraints.maxWidth
+                : (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
               children: [
-                for (var index = 0; index < benefits.length; index++) ...[
-                  _BenefitLine(benefit: benefits[index]),
-                  if (index < benefits.length - 1) ...[
-                    const SizedBox(height: 12),
-                    Divider(
-                      color: colors.border.withValues(alpha: 0.15),
-                      height: 1,
+                for (final benefit in benefits)
+                  SizedBox(
+                    width: width,
+                    child: _BenefitCard(data: benefit),
+                  ),
+              ],
+            );
+          },
+        ),
+        if (selectedPlan != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colors.gold.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.gold.withValues(alpha: 0.28)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.tips_and_updates_rounded,
+                  size: 18,
+                  color: colors.gold,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text.premiumTokenEstimate(
+                      _estimatedVideoCount(selectedPlan!.tokenAllowance),
+                      _estimatedPhotoCount(selectedPlan!.tokenAllowance),
                     ),
-                    const SizedBox(height: 12),
-                  ],
-                ],
-                if (selectedPlan != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colors.gold.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: colors.gold.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          size: 16,
-                          color: colors.gold,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            text.premiumTokenEstimate(
-                              _estimatedVideoCount(
-                                selectedPlan!.tokenAllowance,
-                              ),
-                              _estimatedPhotoCount(
-                                selectedPlan!.tokenAllowance,
-                              ),
-                            ),
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontSize: 12,
-                              height: 1.4,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 12.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),
-        ),
+        ],
       ],
     );
   }
 }
 
-class _BenefitLine extends StatelessWidget {
-  const _BenefitLine({required this.benefit});
+class _BenefitCard extends StatelessWidget {
+  const _BenefitCard({required this.data});
 
-  final _Benefit benefit;
+  final _BenefitCardData data;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: colors.gold.withValues(alpha: 0.18),
-          ),
-          child: Icon(Icons.check_rounded, color: colors.gold, size: 14),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            benefit.label,
-            style: TextStyle(
-              color: colors.textStrong,
-              fontSize: 13.5,
-              height: 1.3,
-              fontWeight: FontWeight.w800,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: colors.surfaceStrong.withValues(alpha: 0.72),
+        border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: data.tone.withValues(alpha: 0.14),
+                border: Border.all(color: data.tone.withValues(alpha: 0.4)),
+              ),
+              child: Icon(data.icon, size: 18, color: data.tone),
             ),
-          ),
+            const SizedBox(height: 10),
+            Text(
+              data.title,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontSize: 13.5,
+                height: 1.22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              data.subtitle,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 12,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: colors.surfaceStrong.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(benefit.icon, color: colors.gold, size: 16),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -165,15 +182,35 @@ class _PlansSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ProfileSectionLabel(label: text.premiumChoosePlanTitle),
-        const SizedBox(height: 2),
-        for (final plan in state.plans) ...[
-          _PlanCard(
-            plan: plan,
-            selected: plan.planCode == state.selectedPlanCode,
-            onTap: () => controller.selectPlan(plan.planCode),
-          ),
-          const SizedBox(height: 10),
-        ],
+        const SizedBox(height: 4),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (state.plans.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            final compact = constraints.maxWidth < 420;
+            final cardWidth = compact
+                ? constraints.maxWidth
+                : (constraints.maxWidth - 12) / 2;
+
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final plan in state.plans)
+                  SizedBox(
+                    width: cardWidth,
+                    child: _PlanCard(
+                      plan: plan,
+                      selected: plan.planCode == state.selectedPlanCode,
+                      onTap: () => controller.selectPlan(plan.planCode),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ],
     );
   }
@@ -194,242 +231,181 @@ class _PlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-
-    // Choose beautiful color branding based on plan.isPopular or gold accents
-    final activeColor = plan.isPopular ? colors.accent : colors.gold;
-    final borderColor = selected
-        ? activeColor
-        : colors.border.withValues(alpha: 0.5);
-
-    final approxMonthly = plan.billingInterval == 'yearly'
+    final accent = plan.isPopular ? colors.gold : colors.accent;
+    final approxMonthly =
+        plan.billingInterval == 'year' || plan.billingInterval == 'yearly'
         ? plan.priceAmount / 12
         : null;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: selected
-            ? colors.surfaceStrong.withValues(alpha: 0.95)
-            : colors.surfaceGlass.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: selected ? 2.0 : 1.2),
+        border: Border.all(
+          color: selected ? accent : colors.border.withValues(alpha: 0.64),
+          width: selected ? 1.8 : 1.1,
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surfaceStrong.withValues(alpha: 0.94),
+            colors.surface.withValues(alpha: 0.6),
+          ],
+        ),
         boxShadow: [
           if (selected)
             BoxShadow(
-              color: activeColor.withValues(alpha: 0.15),
+              color: accent.withValues(alpha: 0.25),
               blurRadius: 16,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            )
-          else
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              spreadRadius: 1,
+              offset: const Offset(0, 6),
             ),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (plan.isPopular || plan.discountPercent != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    color: colors.gold.withValues(alpha: 0.2),
+                    border: Border.all(
+                      color: colors.gold.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 13,
+                        color: Color(0xFFFFC107),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        plan.discountPercent != null
+                            ? text.premiumDiscountLabel(plan.discountPercent!)
+                            : text.premiumPopularBadge,
+                        style: TextStyle(
+                          color: colors.gold,
+                          fontSize: 10.8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                _planTitle(text, plan),
-                                style: TextStyle(
-                                  color: selected
-                                      ? colors.textStrong
-                                      : colors.textStrong.withValues(
-                                          alpha: 0.9,
-                                        ),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                            ),
-                            if (plan.isPopular) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                decoration: BoxDecoration(
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: colors.accent.withValues(
-                                        alpha: 0.18,
-                                      ),
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                                ),
-                                child: ProfileStatusPill(
-                                  label: text.premiumPopularBadge,
-                                  leading: Icons.local_fire_department_rounded,
-                                  backgroundColor: colors.accent.withValues(
-                                    alpha: 0.22,
-                                  ),
-                                  foregroundColor: colors.accent,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            if (plan.compareAtPriceAmount != null) ...[
-                              Text(
-                                _formatPrice(plan, plan.compareAtPriceAmount!),
-                                style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.lineThrough,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            Flexible(
-                              child: Text(
-                                _formatPrice(plan, plan.priceAmount),
-                                style: TextStyle(
-                                  color: colors.textStrong,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _periodLabel(text, plan),
-                              style: TextStyle(
-                                color: colors.textSoft,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.bolt_rounded,
-                              size: 14,
-                              color: selected ? colors.gold : colors.textSoft,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _tokensLabel(text, plan),
-                              style: TextStyle(
-                                color: selected
-                                    ? colors.textStrong
-                                    : colors.textSoft,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (approxMonthly != null) ...[
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _PlanChip(
-                                icon: Icons.calculate_rounded,
-                                label:
-                                    '${_formatPrice(plan, approxMonthly)} ${text.premiumMonthlyPeriod}',
-                              ),
-                              if (plan.discountPercent != null)
-                                Container(
-                                  decoration: BoxDecoration(
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: colors.gold.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                  child: _PlanChip(
-                                    icon: Icons.savings_rounded,
-                                    label: text.premiumDiscountLabel(
-                                      plan.discountPercent!,
-                                    ),
-                                    accentColor: colors.gold,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ],
+                    child: Text(
+                      _planTitle(text, plan),
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
+                  Container(
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: selected ? activeColor : Colors.transparent,
                       border: Border.all(
                         color: selected
-                            ? activeColor
-                            : colors.border.withValues(alpha: 0.7),
-                        width: 2.0,
+                            ? accent
+                            : colors.border.withValues(alpha: 0.8),
+                        width: 2,
                       ),
-                      boxShadow: [
-                        if (selected)
-                          BoxShadow(
-                            color: activeColor.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                          ),
-                      ],
+                      color: selected
+                          ? accent.withValues(alpha: 0.22)
+                          : Colors.transparent,
                     ),
                     child: selected
-                        ? Icon(
-                            Icons.check_rounded,
-                            size: 16,
-                            color: colors.surface,
-                          )
+                        ? Icon(Icons.check_rounded, size: 16, color: accent)
                         : null,
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Divider(color: colors.border.withValues(alpha: 0.3), height: 1),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  _PlanChip(
-                    icon: Icons.event_available_rounded,
-                    label: text.premiumCancelAnytime,
+                  Text(
+                    _formatPrice(plan, plan.priceAmount),
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 44,
+                      height: 0.9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.25,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _periodLabel(text, plan),
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.bolt_rounded, color: colors.accent, size: 15),
+                  const SizedBox(width: 4),
+                  Text(
+                    _tokensLabel(text, plan),
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              if (approxMonthly != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: colors.accent.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    '${_formatPrice(plan, approxMonthly)} ${text.premiumMonthlyPeriod}',
+                    style: TextStyle(
+                      color: colors.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -438,153 +414,184 @@ class _PlanCard extends StatelessWidget {
   }
 }
 
-class _PaymentProviderSection extends StatelessWidget {
-  const _PaymentProviderSection({required this.state, required this.onSelect});
+class _CheckoutActionsSection extends StatelessWidget {
+  const _CheckoutActionsSection({
+    required this.state,
+    required this.storeProvider,
+    required this.stripeAvailable,
+    required this.onStoreCheckout,
+    required this.onStripeCheckout,
+  });
 
   final PremiumState state;
-  final ValueChanged<PremiumPaymentProvider> onSelect;
+  final PremiumPaymentProvider? storeProvider;
+  final bool stripeAvailable;
+  final VoidCallback? onStoreCheckout;
+  final VoidCallback? onStripeCheckout;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final hasStore = storeProvider != null;
+    final hasStripe = stripeAvailable;
+
+    if (!hasStore && !hasStripe) {
+      return ProfileMessageCard(
+        message: text.premiumStoreUnavailable,
+        tone: colors.gold,
+      );
+    }
+
+    final storeIsBusy =
+        hasStore && state.isBuying && state.selectedProvider == storeProvider;
+    final stripeIsBusy =
+        hasStripe &&
+        state.isBuying &&
+        state.selectedProvider == PremiumPaymentProvider.stripe;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ProfileSectionLabel(label: text.premiumPaymentTitle),
-        const SizedBox(height: 2),
-        ProfileGlassCard(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              for (final provider in state.availableProviders)
-                _ProviderRow(
-                  provider: provider,
-                  paymentMethod: state.paymentMethods
-                      .where((method) => method.provider == provider)
-                      .cast<PremiumPaymentMethodModel?>()
-                      .firstOrNull,
-                  enabled: state.isProviderAvailable(provider),
-                  selected: provider == state.selectedProvider,
-                  onTap: () => onSelect(provider),
-                ),
-            ],
+        if (state.availableProviders.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final provider in state.availableProviders)
+                  _PaymentProviderPill(
+                    provider: provider,
+                    selected: provider == state.selectedProvider,
+                  ),
+              ],
+            ),
           ),
-        ),
+        if (hasStore)
+          SizedBox(
+            width: double.infinity,
+            height: 58,
+            child: FilledButton.icon(
+              onPressed: state.isBuying ? null : onStoreCheckout,
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.gold,
+                foregroundColor: colors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                elevation: 0,
+              ),
+              icon: storeIsBusy
+                  ? SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator.adaptive(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colors.surface,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      storeProvider == PremiumPaymentProvider.appStore
+                          ? Icons.phone_iphone_rounded
+                          : Icons.play_arrow_rounded,
+                      size: 20,
+                    ),
+              label: Text(
+                '${text.premiumContinueAction} · ${_providerLabel(text, storeProvider!)}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+          ),
+        if (hasStore && hasStripe) const SizedBox(height: 10),
+        if (hasStripe)
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: state.isBuying ? null : onStripeCheckout,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: colors.accent.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: stripeIsBusy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                    )
+                  : Icon(
+                      Icons.credit_card_rounded,
+                      size: 18,
+                      color: colors.accent,
+                    ),
+              label: Text(
+                '${text.premiumContinueAction} · Stripe',
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _ProviderRow extends StatelessWidget {
-  const _ProviderRow({
-    required this.provider,
-    required this.paymentMethod,
-    required this.enabled,
-    required this.selected,
-    required this.onTap,
-  });
+class _PaymentProviderPill extends StatelessWidget {
+  const _PaymentProviderPill({required this.provider, required this.selected});
 
   final PremiumPaymentProvider provider;
-  final PremiumPaymentMethodModel? paymentMethod;
-  final bool enabled;
   final bool selected;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
-    final backendLabel = paymentMethod?.displayLabel?.trim();
-    final backendSubtitle = paymentMethod?.displaySubtitle?.trim();
-    final label = backendLabel == null || backendLabel.isEmpty
-        ? _providerLabel(text, provider)
-        : backendLabel;
-    final subtitle = backendSubtitle == null || backendSubtitle.isEmpty
-        ? paymentMethod?.notes
-        : backendSubtitle;
+    final colors = context.petMagicColors;
     final icon = switch (provider) {
       PremiumPaymentProvider.stripe => Icons.credit_card_rounded,
-      PremiumPaymentProvider.googlePlay => Icons.shop_rounded,
+      PremiumPaymentProvider.googlePlay => Icons.play_circle_outline_rounded,
       PremiumPaymentProvider.appStore => Icons.phone_iphone_rounded,
     };
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: enabled ? onTap : null,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: selected
+            ? colors.accent.withValues(alpha: 0.16)
+            : colors.surfaceStrong.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: selected
+              ? colors.accent.withValues(alpha: 0.5)
+              : colors.border.withValues(alpha: 0.7),
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              color: enabled
-                  ? (selected ? colors.accent : colors.textMuted)
-                  : colors.textMuted.withValues(alpha: 0.45),
+              size: 14,
+              color: selected ? colors.accent : colors.textMuted,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: enabled
-                          ? colors.textStrong
-                          : colors.textMuted.withValues(alpha: 0.75),
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (subtitle?.isNotEmpty == true)
-                    Text(
-                      subtitle!,
-                      style: TextStyle(
-                        color: colors.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  if (paymentMethod != null &&
-                      (paymentMethod!.isRecommended ||
-                          paymentMethod!.isSelectedByDefault ||
-                          paymentMethod!.bonusTokensPercent > 0)) ...[
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        if (paymentMethod!.isRecommended)
-                          _PaymentMethodBadge(
-                            label: text.premiumPaymentRecommendedBadge,
-                          ),
-                        if (paymentMethod!.isSelectedByDefault)
-                          _PaymentMethodBadge(
-                            label: text.premiumPaymentDefaultBadge,
-                          ),
-                        if (paymentMethod!.bonusTokensPercent > 0)
-                          _PaymentMethodBadge(
-                            label: text.paymentBonusPercentBadge(
-                              paymentMethod!.bonusTokensPercent,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ],
+            const SizedBox(width: 6),
+            Text(
+              _providerLabel(text, provider),
+              style: TextStyle(
+                color: selected ? colors.textStrong : colors.textSoft,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
               ),
-            ),
-            if (paymentMethod?.requiresExternalWarning == true) ...[
-              const SizedBox(width: 8),
-              Icon(Icons.open_in_new_rounded, size: 16, color: colors.gold),
-            ],
-            const SizedBox(width: 8),
-            Icon(
-              enabled && selected
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: enabled && selected ? colors.accent : colors.textMuted,
             ),
           ],
         ),
@@ -593,32 +600,16 @@ class _ProviderRow extends StatelessWidget {
   }
 }
 
-class _PaymentMethodBadge extends StatelessWidget {
-  const _PaymentMethodBadge({required this.label});
+class _BenefitCardData {
+  const _BenefitCardData({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.tone,
+  });
 
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.accent.withValues(alpha: 0.34)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: colors.accent,
-            fontSize: 10.5,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color tone;
 }

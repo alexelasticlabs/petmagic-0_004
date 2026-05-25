@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 class AllTransactionsPage extends ConsumerStatefulWidget {
   const AllTransactionsPage({super.key});
 
+  static const routeName = 'wallet-all-transactions';
   static const routePath = '/wallet/transactions';
 
   @override
@@ -20,10 +21,18 @@ class AllTransactionsPage extends ConsumerStatefulWidget {
 }
 
 class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
+  static const String _kAllTransactionsEmptyAsset =
+      'assets/rewards/wallet-pack-chest.png';
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(walletControllerProvider.notifier).load());
+    final snapshot = ref.read(walletControllerProvider);
+    if (snapshot.wallet == null && snapshot.ledger.isEmpty) {
+      Future.microtask(
+        () => ref.read(walletControllerProvider.notifier).load(),
+      );
+    }
   }
 
   @override
@@ -32,6 +41,9 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
     final colors = context.petMagicColors;
     final state = ref.watch(walletControllerProvider);
     final controller = ref.read(walletControllerProvider.notifier);
+    final errorToShow = state.errorMessage != null && state.ledger.isEmpty
+        ? _friendlyTransactionsError(text, state.errorMessage!)
+        : null;
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
     final bottomInset = hasShell
@@ -75,10 +87,10 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                         ),
                       ],
                     ),
-                    if (state.errorMessage != null) ...[
+                    if (errorToShow != null) ...[
                       const SizedBox(height: 12),
                       ProfileMessageCard(
-                        message: state.errorMessage!,
+                        message: errorToShow,
                         tone: colors.gold,
                       ),
                     ],
@@ -90,10 +102,22 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                       ),
                       child: state.ledger.isEmpty
                           ? Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Text(
-                                text.walletNoActivity,
-                                style: TextStyle(color: colors.textSoft),
+                              padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
+                              child: Column(
+                                children: [
+                                  Image.asset(
+                                    _kAllTransactionsEmptyAsset,
+                                    height: 84,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.medium,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    text.walletNoActivity,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: colors.textSoft),
+                                  ),
+                                ],
                               ),
                             )
                           : Column(
@@ -227,6 +251,28 @@ String _sourceLabel(AppLocalizations text, String source) {
     'admin_debit' => text.walletSourceAdminDebit,
     _ => source,
   };
+}
+
+String _friendlyTransactionsError(AppLocalizations text, String raw) {
+  final value = raw.toLowerCase();
+
+  if (value.contains('wallet.ledger_failed')) {
+    return text.walletPartialActivityUnavailable;
+  }
+
+  if (value.contains('wallet.network_unavailable')) {
+    return text.walletRedeemOfflineError;
+  }
+
+  if (value.contains('wallet.payment_unavailable')) {
+    return text.walletPaymentUnavailableError;
+  }
+
+  if (value.contains('wallet.packs_failed')) {
+    return text.walletPaymentUnavailableError;
+  }
+
+  return text.walletDataUnavailableFallback;
 }
 
 IconData _sourceIcon(String source) {

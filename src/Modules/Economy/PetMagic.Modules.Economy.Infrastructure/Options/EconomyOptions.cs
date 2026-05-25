@@ -16,7 +16,15 @@ public sealed class EconomyOptions
 
     public string StripeSecretKey { get; init; } = string.Empty;
 
+    public string StripeTestSecretKey { get; init; } = string.Empty;
+
+    public string StripeLiveSecretKey { get; init; } = string.Empty;
+
     public string StripeWebhookSecret { get; init; } = string.Empty;
+
+    public string StripeTestWebhookSecret { get; init; } = string.Empty;
+
+    public string StripeLiveWebhookSecret { get; init; } = string.Empty;
 
     public string StripeCheckoutSuccessUrl { get; init; } = "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}";
 

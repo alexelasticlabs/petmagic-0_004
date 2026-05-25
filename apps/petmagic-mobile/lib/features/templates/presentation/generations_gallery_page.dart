@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
-import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:share_plus/share_plus.dart';
 
 class GenerationsGalleryPage extends ConsumerStatefulWidget {
   const GenerationsGalleryPage({super.key});
@@ -87,7 +88,7 @@ class _GenerationsGalleryPageState
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Ваши магические создания',
+                              _subtitleForFilter(state.filter),
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: colors.textSoft,
@@ -137,10 +138,7 @@ class _GenerationsGalleryPageState
       ];
     }
 
-    final bottomInset = petMagicBottomNavInset(
-      context,
-      extraSpacing: kPetMagicBottomContentInsetRelaxed,
-    );
+    final bottomInset = petMagicBottomNavInset(context) + 22;
 
     if (state.filter == GenerationHistoryFilter.all) {
       final activeItems = state.items
@@ -184,6 +182,38 @@ class _GenerationsGalleryPageState
             ),
             itemBuilder: (context, index) =>
                 _ReadyGridCard(generation: state.items[index]),
+          ),
+        ),
+      ];
+    }
+
+    if (state.filter == GenerationHistoryFilter.active) {
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+          sliver: const SliverToBoxAdapter(child: _ActiveInfoCard()),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(18, 0, 18, bottomInset),
+          sliver: SliverList.separated(
+            itemCount: state.items.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) =>
+                _ActiveCard(generation: state.items[index]),
+          ),
+        ),
+      ];
+    }
+
+    if (state.filter == GenerationHistoryFilter.failed) {
+      return [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(18, 8, 18, bottomInset),
+          sliver: SliverList.separated(
+            itemCount: state.items.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) =>
+                _FailedCard(generation: state.items[index]),
           ),
         ),
       ];
@@ -469,6 +499,40 @@ class _ShowMoreButton extends StatelessWidget {
   }
 }
 
+class _ActiveInfoCard extends StatelessWidget {
+  const _ActiveInfoCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceGlass,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 16, color: colors.gold),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colors.textSoft,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ActiveCard extends ConsumerWidget {
   const _ActiveCard({required this.generation});
 
@@ -479,19 +543,21 @@ class _ActiveCard extends ConsumerWidget {
     final colors = context.petMagicColors;
     final previewUrl = _previewUrl(generation);
 
+    void openGeneration() {
+      if (generation.isUnread) {
+        ref
+            .read(generationHistoryControllerProvider.notifier)
+            .markRead(generation.generationId);
+      }
+      context.go(
+        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+      );
+    }
+
     return _CardEntrance(
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          if (generation.isUnread) {
-            ref
-                .read(generationHistoryControllerProvider.notifier)
-                .markRead(generation.generationId);
-          }
-          context.go(
-            '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-          );
-        },
+        onTap: openGeneration,
         child: Ink(
           decoration: BoxDecoration(
             color: colors.surfaceGlass,
@@ -539,15 +605,6 @@ class _ActiveCard extends ConsumerWidget {
                         top: 6,
                         child: _TypeBadge(generation: generation),
                       ),
-                      if (_isVideoGeneration(generation) &&
-                          generation.outputVideoDurationSeconds != null)
-                        Positioned(
-                          left: 6,
-                          bottom: 6,
-                          child: _DurationBadge(
-                            seconds: generation.outputVideoDurationSeconds!,
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -556,34 +613,6 @@ class _ActiveCard extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const PawSparkIcon(size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${generation.tokenCost}',
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: colors.textMuted,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${generation.effectiveProgressPercent}%',
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: colors.accent,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                          ),
-                          if (generation.isUnread) ...[
-                            const SizedBox(width: 8),
-                            const _UnreadDot(),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
                       Text(
                         generation.templateTitle ?? 'PetMagic result',
                         maxLines: 1,
@@ -592,59 +621,88 @@ class _ActiveCard extends ConsumerWidget {
                             ?.copyWith(
                               color: colors.textStrong,
                               fontWeight: FontWeight.w900,
-                              height: 1.1,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_typeLabel(generation)} · ${generation.tokenCost} токенов',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: colors.textMuted,
+                              fontWeight: FontWeight.w700,
                             ),
                       ),
                       const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          minHeight: 5,
-                          value: generation.effectiveProgressPercent / 100,
-                          color: colors.accent,
-                          backgroundColor: colors.border.withValues(
-                            alpha: 0.55,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
                       Text(
-                        _activeStatusLabel(generation),
+                        _stageStatusLabel(generation),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.textSoft,
-                          fontWeight: FontWeight.w700,
+                          color: _statusColor(colors, generation),
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      if ((generation.estimatedDurationLabel ?? '').isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            'Осталось примерно ${generation.estimatedDurationLabel}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelMedium
+                      const SizedBox(height: 7),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                minHeight: 5,
+                                value:
+                                    generation.effectiveProgressPercent / 100,
+                                color: colors.accent,
+                                backgroundColor: colors.border.withValues(
+                                  alpha: 0.55,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${generation.effectiveProgressPercent}%',
+                            style: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(
-                                  color: colors.textMuted,
-                                  fontWeight: FontWeight.w600,
+                                  color: colors.accent,
+                                  fontWeight: FontWeight.w900,
                                 ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        _estimatedTimeLabel(generation),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: colors.textSoft,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.tonal(
+                          onPressed: openGeneration,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colors.accent.withValues(
+                              alpha: 0.22,
+                            ),
+                            foregroundColor: colors.accent,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: const Text('Открыть'),
                         ),
+                      ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: colors.surfaceStrong,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    color: colors.textMuted,
                   ),
                 ),
               ],
@@ -681,118 +739,120 @@ class _ReadyGridCard extends ConsumerWidget {
     }
 
     return _CardEntrance(
-      child: ClipRRect(
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        child: Material(
-          color: colors.surfaceGlass,
-          child: InkWell(
-            onTap: openGeneration,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: previewUrl == null || previewUrl.isEmpty
-                      ? _ThumbnailPlaceholder(generation: generation)
-                      : CachedNetworkImage(
-                          imageUrl: previewUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (context, url, error) =>
-                              _ThumbnailPlaceholder(generation: generation),
+        onTap: openGeneration,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: colors.surfaceGlass,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+            boxShadow: [
+              BoxShadow(
+                color: colors.shadow.withValues(alpha: 0.14),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
                         ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.08),
-                          Colors.black.withValues(alpha: 0.72),
-                        ],
-                        stops: const [0.44, 1],
+                        child: previewUrl == null || previewUrl.isEmpty
+                            ? _ThumbnailPlaceholder(generation: generation)
+                            : CachedNetworkImage(
+                                imageUrl: previewUrl,
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) =>
+                                    _ThumbnailPlaceholder(
+                                      generation: generation,
+                                    ),
+                              ),
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  left: 8,
-                  top: 8,
-                  child: _TypeBadge(generation: generation),
-                ),
-                if (_isVideoGeneration(generation) &&
-                    generation.outputVideoDurationSeconds != null)
-                  Positioned(
-                    left: 8,
-                    top: 34,
-                    child: _DurationBadge(
-                      seconds: generation.outputVideoDurationSeconds!,
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: _TypeBadge(generation: generation),
                     ),
-                  ),
-                Positioned(
-                  left: 8,
-                  right: 8,
-                  bottom: 8,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        generation.templateTitle ?? 'PetMagic result',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          height: 1.1,
+                    if (_isVideoGeneration(generation) &&
+                        generation.outputVideoDurationSeconds != null)
+                      Positioned(
+                        left: 8,
+                        top: 34,
+                        child: _DurationBadge(
+                          seconds: generation.outputVideoDurationSeconds!,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Создано ${_formattedDate(generation.updatedAtUtc)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.78),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(9, 8, 6, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const PawSparkIcon(size: 12),
-                          const SizedBox(width: 4),
                           Text(
-                            '${generation.tokenCost}',
-                            style: Theme.of(context).textTheme.labelMedium
+                            generation.templateTitle ?? 'PetMagic result',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
-                                  color: Colors.white,
+                                  color: colors.textStrong,
                                   fontWeight: FontWeight.w900,
+                                  height: 1.15,
                                 ),
                           ),
-                          const Spacer(),
-                          SizedBox(
-                            width: 26,
-                            height: 26,
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              iconSize: 18,
-                              onPressed: () => _showReadyCardActions(
-                                context,
-                                ref,
-                                generation,
-                              ),
-                              icon: const Icon(
-                                Icons.more_vert_rounded,
-                                color: Colors.white,
-                              ),
-                            ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_typeLabel(generation)} · ${generation.tokenCost} 🐾',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: colors.textSoft,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _formattedDate(generation.updatedAtUtc),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: colors.textMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          _showReadyCardActions(context, ref, generation),
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        color: colors.textMuted,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -809,6 +869,7 @@ class _FailedCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.petMagicColors;
     final previewUrl = _previewUrl(generation);
+    final failureReason = _failureReasonMessage(generation);
 
     void openGeneration() {
       if (generation.isUnread) {
@@ -821,113 +882,173 @@ class _FailedCard extends ConsumerWidget {
       );
     }
 
+    void pickAnotherPhoto() {
+      context.go(TemplatesPage.routePath);
+    }
+
+    void openSupport() {
+      context.go(SupportChatPage.routePath);
+    }
+
     return _CardEntrance(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: openGeneration,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow.withValues(alpha: 0.14),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 88,
-                  height: 88,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: previewUrl == null || previewUrl.isEmpty
-                              ? _ThumbnailPlaceholder(generation: generation)
-                              : CachedNetworkImage(
-                                  imageUrl: previewUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      _ThumbnailPlaceholder(
-                                        generation: generation,
-                                      ),
-                                ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 6,
-                        top: 6,
-                        child: _TypeBadge(generation: generation),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const PawSparkIcon(size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${generation.tokenCost}',
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: colors.textMuted,
-                                  fontWeight: FontWeight.w800,
-                                ),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: colors.surfaceGlass,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow.withValues(alpha: 0.14),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 88,
+                    height: 88,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: previewUrl == null || previewUrl.isEmpty
+                                ? _ThumbnailPlaceholder(generation: generation)
+                                : CachedNetworkImage(
+                                    imageUrl: previewUrl,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (context, url, error) =>
+                                        _ThumbnailPlaceholder(
+                                          generation: generation,
+                                        ),
+                                  ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        generation.templateTitle ?? 'PetMagic result',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: colors.textStrong,
-                              fontWeight: FontWeight.w900,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Не удалось создать',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colors.danger,
-                          fontWeight: FontWeight.w800,
                         ),
-                      ),
-                      if (generation.refundedAtUtc != null ||
-                          generation.tokenCost > 0)
+                        Positioned(
+                          left: 6,
+                          top: 6,
+                          child: _TypeBadge(generation: generation),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          'Токены возвращены',
+                          generation.templateTitle ?? 'PetMagic result',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: colors.textStrong,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_typeLabel(generation)} · ${generation.tokenCost} токенов',
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(
                                 color: colors.textMuted,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                         ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Не удалось создать',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: colors.danger,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        if (generation.refundedAtUtc != null ||
+                            generation.tokenCost > 0)
+                          Text(
+                            'Токены возвращены',
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: colors.textMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () =>
+                        _showFailedCardActions(context, ref, generation),
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surfaceStrong.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colors.border.withValues(alpha: 0.7),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 16,
+                        color: colors.gold,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          failureReason,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: colors.textSoft, height: 1.25),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: openGeneration,
-                  icon: Icon(Icons.refresh_rounded, color: colors.accent),
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: pickAnotherPhoto,
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.accent,
+                  foregroundColor: colors.backgroundBottom,
                 ),
-              ],
-            ),
+                child: const Text('Выбрать другое фото'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: openSupport,
+                child: const Text('Сообщить в поддержку'),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: openGeneration,
+                  child: const Text('Открыть статус'),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -988,20 +1109,6 @@ class _UnreadPill extends StatelessWidget {
   }
 }
 
-class _UnreadDot extends StatelessWidget {
-  const _UnreadDot();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    return Container(
-      width: 9,
-      height: 9,
-      decoration: BoxDecoration(color: colors.accent, shape: BoxShape.circle),
-    );
-  }
-}
-
 class _ThumbnailPlaceholder extends StatelessWidget {
   const _ThumbnailPlaceholder({required this.generation});
 
@@ -1054,6 +1161,15 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+String _subtitleForFilter(GenerationHistoryFilter filter) {
+  return switch (filter) {
+    GenerationHistoryFilter.all => 'Ваши магические создания',
+    GenerationHistoryFilter.active => 'Активные генерации',
+    GenerationHistoryFilter.ready => 'Ваши готовые результаты',
+    GenerationHistoryFilter.failed => 'Проблемы с генерацией',
+  };
 }
 
 class _ErrorState extends ConsumerWidget {
@@ -1157,14 +1273,49 @@ class _DurationBadge extends StatelessWidget {
   }
 }
 
-String _activeStatusLabel(TemplateGenerationResult generation) {
+String _typeLabel(TemplateGenerationResult generation) {
+  return _isVideoGeneration(generation) ? 'Видео' : 'Изображение';
+}
+
+String _stageStatusLabel(TemplateGenerationResult generation) {
+  if (generation.effectiveProgressPercent >= 95) {
+    return 'Почти готово';
+  }
+
+  return switch (generation.stage) {
+    'queued' => 'В очереди',
+    'uploading' => 'Подготавливаем фото',
+    'preprocessing' => 'Подготавливаем фото',
+    'processing' => 'Создаем результат',
+    'generating' => 'Создаем результат',
+    'finalizing' => 'Сохраняем файл',
+    _ => 'Создаем результат',
+  };
+}
+
+String _estimatedTimeLabel(TemplateGenerationResult generation) {
   if (generation.stage == 'queued') {
-    return 'В очереди...';
+    return 'Начнем через несколько минут';
   }
-  if (generation.stage == 'finalizing') {
-    return 'Финализируем результат...';
+  if ((generation.estimatedDurationLabel ?? '').isNotEmpty) {
+    return 'Осталось примерно ${generation.estimatedDurationLabel}';
   }
-  return 'Создаем магию... ${generation.effectiveProgressPercent}%';
+  return 'Мы сообщим, когда результат будет готов.';
+}
+
+String _failureReasonMessage(TemplateGenerationResult generation) {
+  final code = (generation.failureCode ?? '').toLowerCase();
+  final message = (generation.failureMessage ?? '').toLowerCase();
+  final combined = '$code $message';
+
+  if (combined.contains('photo') ||
+      combined.contains('face') ||
+      combined.contains('pet') ||
+      combined.contains('quality')) {
+    return 'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
+  }
+
+  return 'Не удалось создать результат из-за технической ошибки. Мы вернули токены на ваш баланс.';
 }
 
 String _formattedDate(DateTime value) {
@@ -1183,8 +1334,19 @@ String _formattedDate(DateTime value) {
     'дек',
   ];
   final local = value.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final date = DateTime(local.year, local.month, local.day);
+  final dayDiff = today.difference(date).inDays;
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
+
+  if (dayDiff == 0) {
+    return 'Сегодня, $hour:$minute';
+  }
+  if (dayDiff == 1) {
+    return 'Вчера, $hour:$minute';
+  }
   return '${local.day} ${months[local.month - 1]}, $hour:$minute';
 }
 
@@ -1238,46 +1400,130 @@ Future<void> _showReadyCardActions(
 ) async {
   final colors = context.petMagicColors;
 
-  await showPetMagicModalBottomSheet<void>(
+  await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     backgroundColor: colors.surface,
-    builder: (sheetContext, bottomInset) {
-      return Padding(
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.open_in_new_rounded),
-                title: const Text('Открыть'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  if (generation.isUnread) {
-                    ref
-                        .read(generationHistoryControllerProvider.notifier)
-                        .markRead(generation.generationId);
-                  }
-                  context.go(
-                    '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.share_rounded),
-                title: const Text('Поделиться'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Скоро добавим sharing')),
-                  );
-                },
-              ),
-            ],
-          ),
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.open_in_new_rounded),
+              title: const Text('Открыть'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                if (generation.isUnread) {
+                  ref
+                      .read(generationHistoryControllerProvider.notifier)
+                      .markRead(generation.generationId);
+                }
+                context.go(
+                  '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download_rounded),
+              title: const Text('Сохранить'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _notifySoon(
+                  context,
+                  'Сохранение появится в следующем обновлении',
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_rounded),
+              title: const Text('Поделиться'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                final outputUrl = generation.outputUrl;
+                if (outputUrl == null || outputUrl.isEmpty) {
+                  _notifySoon(context, 'Результат еще недоступен для шаринга');
+                  return;
+                }
+                SharePlus.instance.share(ShareParams(text: outputUrl));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded),
+              title: const Text('Удалить'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _notifySoon(context, 'Удаление из галереи скоро добавим');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.flag_outlined),
+              title: const Text('Сообщить о проблеме'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                context.go(SupportChatPage.routePath);
+              },
+            ),
+          ],
         ),
       );
     },
   );
+}
+
+Future<void> _showFailedCardActions(
+  BuildContext context,
+  WidgetRef ref,
+  TemplateGenerationResult generation,
+) async {
+  final colors = context.petMagicColors;
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: colors.surface,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.open_in_new_rounded),
+              title: const Text('Открыть статус'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                if (generation.isUnread) {
+                  ref
+                      .read(generationHistoryControllerProvider.notifier)
+                      .markRead(generation.generationId);
+                }
+                context.go(
+                  '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.image_search_rounded),
+              title: const Text('Выбрать другое фото'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                context.go(TemplatesPage.routePath);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.support_agent_rounded),
+              title: const Text('Сообщить в поддержку'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                context.go(SupportChatPage.routePath);
+              },
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+void _notifySoon(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }

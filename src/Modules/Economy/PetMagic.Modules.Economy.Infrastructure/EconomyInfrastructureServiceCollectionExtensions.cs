@@ -16,14 +16,37 @@ public static class EconomyInfrastructureServiceCollectionExtensions
     public static IServiceCollection AddEconomyInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var section = configuration.GetSection(EconomyOptions.SectionName);
+        var legacyStripeSecretKey = ReadValue(section, "StripeSecretKey", "STRIPE_SECRET_KEY") ?? string.Empty;
+        var legacyStripeWebhookSecret = ReadValue(section, "StripeWebhookSecret", "STRIPE_WEBHOOK_SECRET") ?? string.Empty;
+
         var economyOptions = new EconomyOptions
         {
             WeeklyFreeSpark = ParseInt(section["WeeklyFreeSpark"], 100),
             WeeklyPremiumSpark = ParseInt(section["WeeklyPremiumSpark"], 250),
             AdRewardSpark = ParseInt(section["AdRewardSpark"], 15),
             AdRewardDailyLimit = ParseInt(section["AdRewardDailyLimit"], 5),
-            StripeSecretKey = ReadValue(section, "StripeSecretKey", "STRIPE_SECRET_KEY") ?? string.Empty,
-            StripeWebhookSecret = ReadValue(section, "StripeWebhookSecret", "STRIPE_WEBHOOK_SECRET") ?? string.Empty,
+            StripeSecretKey = legacyStripeSecretKey,
+            StripeTestSecretKey = ReadValue(
+                section,
+                "StripeTestSecretKey",
+                "STRIPE_TEST_SECRET_KEY",
+                "STRIPE_SECRET_KEY_TEST") ?? legacyStripeSecretKey,
+            StripeLiveSecretKey = ReadValue(
+                section,
+                "StripeLiveSecretKey",
+                "STRIPE_LIVE_SECRET_KEY",
+                "STRIPE_SECRET_KEY_LIVE") ?? legacyStripeSecretKey,
+            StripeWebhookSecret = legacyStripeWebhookSecret,
+            StripeTestWebhookSecret = ReadValue(
+                section,
+                "StripeTestWebhookSecret",
+                "STRIPE_TEST_WEBHOOK_SECRET",
+                "STRIPE_WEBHOOK_SECRET_TEST") ?? legacyStripeWebhookSecret,
+            StripeLiveWebhookSecret = ReadValue(
+                section,
+                "StripeLiveWebhookSecret",
+                "STRIPE_LIVE_WEBHOOK_SECRET",
+                "STRIPE_WEBHOOK_SECRET_LIVE") ?? legacyStripeWebhookSecret,
             StripeCheckoutSuccessUrl = section["StripeCheckoutSuccessUrl"] ?? "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}",
             StripeCheckoutCancelUrl = section["StripeCheckoutCancelUrl"] ?? "https://petmagic.app/payments/cancel",
             StripeBillingPortalReturnUrl = section["StripeBillingPortalReturnUrl"] ?? "https://petmagic.app/profile/premium",
@@ -61,7 +84,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         return int.TryParse(raw, out var value) ? value : fallback;
     }
 
-    private static string? ReadValue(IConfigurationSection section, string key, string environmentVariable)
+    private static string? ReadValue(IConfigurationSection section, string key, params string[] environmentVariables)
     {
         var value = section[key];
         if (!string.IsNullOrWhiteSpace(value))
@@ -69,8 +92,16 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             return value;
         }
 
-        value = Environment.GetEnvironmentVariable(environmentVariable);
-        return string.IsNullOrWhiteSpace(value) ? null : value;
+        foreach (var environmentVariable in environmentVariables)
+        {
+            value = Environment.GetEnvironmentVariable(environmentVariable);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 
     private static string NormalizePem(string? raw)
@@ -363,27 +394,12 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             var existing = await dbContext.PaymentProviderConfigurations.FirstOrDefaultAsync(
                 x => x.Provider == config.Provider && x.Platform == config.Platform && x.Region == config.Region);
 
-            if (existing is null)
+            if (existing is not null)
             {
-                dbContext.PaymentProviderConfigurations.Add(config);
                 continue;
             }
 
-            existing.IsEnabled = config.IsEnabled;
-            existing.IsRecommended = config.IsRecommended;
-            existing.IsSelectedByDefault = config.IsSelectedByDefault;
-            existing.RequiresExternalWarning = config.RequiresExternalWarning;
-            existing.RequiresStoreDisclosure = config.RequiresStoreDisclosure;
-            existing.AllowedFromAppVersion = config.AllowedFromAppVersion;
-            existing.ExternalCheckoutAllowed = config.ExternalCheckoutAllowed;
-            existing.BonusTokensPercent = config.BonusTokensPercent;
-            existing.DisplayLabel = config.DisplayLabel;
-            existing.DisplaySubtitle = config.DisplaySubtitle;
-            existing.WarningTitle = config.WarningTitle;
-            existing.WarningMessage = config.WarningMessage;
-            existing.Mode = config.Mode;
-            existing.Notes = config.Notes;
-            existing.UpdatedAtUtc = now;
+            dbContext.PaymentProviderConfigurations.Add(config);
         }
 
         await dbContext.SaveChangesAsync();

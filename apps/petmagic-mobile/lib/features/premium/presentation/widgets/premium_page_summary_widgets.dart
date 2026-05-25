@@ -8,61 +8,116 @@ class _ComparisonSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final premiumTokens = selectedPlan == null
+        ? text.premiumComparisonPremiumTokensFallback
+        : text.premiumComparisonPremiumTokens(selectedPlan!.tokenAllowance);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ProfileSectionLabel(label: text.premiumComparisonTitle),
         const SizedBox(height: 2),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _FeatureColumnCard(
-                title: text.premiumFreeColumn,
-                accent: false,
-                items: const [
-                  '20 токенов в месяц',
-                  'Водяной знак',
-                  'Базовые шаблоны',
-                  'Стандартное качество',
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _FeatureColumnCard(
-                title: text.premiumPremiumColumn,
-                accent: true,
-                items: [
-                  selectedPlan == null
-                      ? text.premiumComparisonPremiumTokensFallback
-                      : text.premiumComparisonPremiumTokens(
-                          selectedPlan!.tokenAllowance,
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colors.border.withValues(alpha: 0.8)),
+            color: colors.surfaceStrong.withValues(alpha: 0.62),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(19),
+                  ),
+                  color: colors.surfaceStrong.withValues(alpha: 0.7),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        text.premiumComparisonTitle,
+                        style: TextStyle(
+                          color: colors.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
                         ),
-                  text.premiumComparisonNoWatermark,
-                  text.premiumComparisonPremiumTemplates,
-                  text.premiumComparisonHighQuality,
-                ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        text.premiumFreeColumn,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        text.premiumPremiumColumn,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colors.accent,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              _ComparisonRow(
+                label: text.premiumComparisonTokens,
+                freeValue: text.premiumFreeSummaryTokens,
+                premiumValue: premiumTokens,
+              ),
+              _ComparisonRow(
+                label: text.premiumComparisonNoWatermark,
+                freeValue: text.premiumFreeSummaryWatermark,
+                premiumValue: text.premiumComparisonNoWatermark,
+              ),
+              _ComparisonRow(
+                label: text.premiumComparisonPremiumTemplates,
+                freeValue: text.premiumFreeSummaryTemplates,
+                premiumValue: text.premiumComparisonPremiumTemplates,
+              ),
+              _ComparisonRow(
+                label: text.premiumComparisonHighQuality,
+                freeValue: text.premiumFreeSummaryQuality,
+                premiumValue: text.premiumComparisonHighQuality,
+                isLast: true,
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
-class _FeatureColumnCard extends StatelessWidget {
-  const _FeatureColumnCard({
-    required this.title,
-    required this.accent,
-    required this.items,
+class _ComparisonRow extends StatelessWidget {
+  const _ComparisonRow({
+    required this.label,
+    required this.freeValue,
+    required this.premiumValue,
+    this.isLast = false,
   });
 
-  final String title;
-  final bool accent;
-  final List<String> items;
+  final String label;
+  final String freeValue;
+  final String premiumValue;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
@@ -70,67 +125,52 @@ class _FeatureColumnCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: accent
-              ? colors.accent.withValues(alpha: 0.8)
-              : colors.border.withValues(alpha: 0.7),
-        ),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: accent
-              ? [
-                  colors.accent.withValues(alpha: 0.18),
-                  colors.surfaceStrong.withValues(alpha: 0.9),
-                ]
-              : [
-                  colors.surfaceStrong.withValues(alpha: 0.78),
-                  colors.surfaceStrong.withValues(alpha: 0.55),
-                ],
+        border: Border(
+          top: BorderSide(color: colors.border.withValues(alpha: 0.4)),
+          bottom: isLast
+              ? BorderSide.none
+              : BorderSide(color: colors.border.withValues(alpha: 0.15)),
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                color: accent ? colors.accent : colors.textStrong,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
+            Expanded(
+              flex: 3,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            for (final item in items) ...[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    accent
-                        ? Icons.check_circle_rounded
-                        : Icons.remove_circle_outline_rounded,
-                    size: 16,
-                    color: accent ? colors.accent : colors.textMuted,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontSize: 12.5,
-                        height: 1.3,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+            Expanded(
+              flex: 2,
+              child: Text(
+                freeValue,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(height: 9),
-            ],
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                premiumValue,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colors.accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -240,112 +280,58 @@ class _TrustSummary extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: colors.surfaceStrong.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(18),
+        color: colors.surfaceStrong.withValues(alpha: 0.55),
         border: Border.all(
-          color: colors.gold.withValues(alpha: 0.35),
-          width: 1.2,
+          color: colors.border.withValues(alpha: 0.7),
+          width: 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.gold.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Icon(Icons.gavel_rounded, size: 16, color: colors.gold),
-                const SizedBox(width: 8),
-                Text(
-                  text.premiumSecurePaymentTitle,
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
+                _TrustPill(
+                  icon: Icons.lock_outline_rounded,
+                  label: text.premiumSecurePaymentTitle,
+                  tone: colors.gold,
                 ),
-                const Spacer(),
-                Icon(Icons.lock_outline_rounded, size: 16, color: colors.gold),
+                _TrustPill(
+                  icon: Icons.autorenew_rounded,
+                  label: text.premiumCancelAnytime,
+                  tone: colors.accent,
+                ),
+                _TrustPill(
+                  icon: Icons.verified_user_outlined,
+                  label: text.premiumPaymentTitle,
+                  tone: colors.blue,
+                ),
               ],
             ),
-            const SizedBox(height: 12),
             if (selectedPlanText != null) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: colors.surfaceStrong.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: colors.border.withValues(alpha: 0.25),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.stars_rounded, size: 16, color: colors.gold),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        selectedPlanText,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.star_rounded, size: 16, color: colors.gold),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      selectedPlanText,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
             ],
-            Row(
-              children: [
-                Row(
-                  children: List.generate(
-                    5,
-                    (index) =>
-                        Icon(Icons.star_rounded, color: colors.gold, size: 16),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '4.9/5',
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              text.premiumSocialProof,
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 12.5,
-                height: 1.4,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              text.premiumSecurePaymentSubtitle,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 12,
-                height: 1.4,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ],
         ),
       ),
@@ -353,48 +339,40 @@ class _TrustSummary extends StatelessWidget {
   }
 }
 
-class _PlanChip extends StatelessWidget {
-  const _PlanChip({required this.icon, required this.label, this.accentColor});
+class _TrustPill extends StatelessWidget {
+  const _TrustPill({
+    required this.icon,
+    required this.label,
+    required this.tone,
+  });
 
   final IconData icon;
   final String label;
-  final Color? accentColor;
+  final Color tone;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final isAccent = accentColor != null;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: isAccent
-            ? accentColor!.withValues(alpha: 0.12)
-            : colors.surfaceStrong.withValues(alpha: 0.58),
+        color: tone.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: isAccent
-              ? accentColor!.withValues(alpha: 0.5)
-              : colors.border.withValues(alpha: 0.6),
-          width: isAccent ? 1.2 : 1.0,
-        ),
+        border: Border.all(color: tone.withValues(alpha: 0.4)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isAccent ? accentColor : colors.textMuted,
-            ),
+            Icon(icon, size: 14, color: tone),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: isAccent ? colors.textStrong : colors.textStrong,
-                fontSize: 11,
-                fontWeight: isAccent ? FontWeight.w900 : FontWeight.w800,
+                color: colors.textStrong,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -402,11 +380,4 @@ class _PlanChip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Benefit {
-  const _Benefit(this.icon, this.label);
-
-  final IconData icon;
-  final String label;
 }

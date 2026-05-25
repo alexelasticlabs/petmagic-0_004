@@ -141,6 +141,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 const NoTransitionPage(child: WalletPage()),
           ),
           GoRoute(
+            name: AllTransactionsPage.routeName,
             path: AllTransactionsPage.routePath,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: AllTransactionsPage()),

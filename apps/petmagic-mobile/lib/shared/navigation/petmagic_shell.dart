@@ -12,49 +12,42 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 
-const kPetMagicBottomNavHeight = 42.0;
-const kPetMagicBottomNavOuterGap = 10.0;
-const kPetMagicBottomContentInsetCompact = 16.0;
-const kPetMagicBottomContentInsetRelaxed = 24.0;
-const kPetMagicBottomNavBackdropExtra = 28.0;
-const kPetMagicBottomSheetBottomGap = 14.0;
+const _bottomNavHeight = 42.0;
+const _bottomNavOuterGap = 10.0;
+const _bottomNavContentInsetExtra = 18.0;
+const _bottomNavBackdropExtra = 28.0;
+const _bottomSheetBottomGap = 14.0;
+
+const kPetMagicBottomContentInsetRelaxed = _bottomNavContentInsetExtra;
+const kPetMagicBottomContentInsetCompact = _bottomNavOuterGap;
 
 double petMagicBottomNavInset(
   BuildContext context, {
-  double extraSpacing = kPetMagicBottomContentInsetCompact,
+  double extraSpacing = kPetMagicBottomContentInsetRelaxed,
 }) {
   final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
-  return bottomPadding +
-      kPetMagicBottomNavHeight +
-      kPetMagicBottomNavOuterGap +
-      extraSpacing;
+  return bottomPadding + _bottomNavHeight + _bottomNavOuterGap + extraSpacing;
 }
 
 double petMagicScrollableBottomInset(
   BuildContext context, {
-  double extraSpacing = kPetMagicBottomContentInsetCompact,
-  double keyboardExtra = kPetMagicBottomContentInsetCompact,
+  double extraSpacing = kPetMagicBottomContentInsetRelaxed,
 }) {
-  final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
-  final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-  if (keyboardInset > 0) {
-    return safeBottom + keyboardExtra;
-  }
-
-  return safeBottom +
-      kPetMagicBottomNavHeight +
-      kPetMagicBottomNavOuterGap +
-      extraSpacing;
+  return petMagicBottomNavInset(context, extraSpacing: extraSpacing);
 }
 
 double petMagicBottomSheetOffset(BuildContext context) {
-  final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+  final viewMediaQuery = MediaQueryData.fromView(View.of(context));
+  final keyboardInset = viewMediaQuery.viewInsets.bottom;
   if (keyboardInset > 0) {
-    return keyboardInset + kPetMagicBottomSheetBottomGap;
+    return keyboardInset + _bottomSheetBottomGap;
   }
 
-  final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
-  return bottomPadding + kPetMagicBottomSheetBottomGap;
+  final bottomPadding = viewMediaQuery.viewPadding.bottom;
+  return bottomPadding +
+      _bottomNavHeight +
+      _bottomNavOuterGap +
+      _bottomSheetBottomGap;
 }
 
 class PetMagicShell extends ConsumerStatefulWidget {
@@ -125,9 +118,9 @@ class _BottomNavBackdrop extends StatelessWidget {
           child: Container(
             height:
                 bottomPadding +
-                kPetMagicBottomNavHeight +
-                kPetMagicBottomNavOuterGap +
-                kPetMagicBottomNavBackdropExtra,
+                _bottomNavHeight +
+                _bottomNavOuterGap +
+                _bottomNavBackdropExtra,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -185,7 +178,7 @@ class _FloatingBottomNav extends ConsumerWidget {
             16,
             0,
             16,
-            bottomPadding + kPetMagicBottomNavOuterGap,
+            bottomPadding + _bottomNavOuterGap,
           ),
           child: Stack(
             alignment: Alignment.center,
@@ -226,7 +219,7 @@ class _FloatingBottomNav extends ConsumerWidget {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(3, 1, 3, 1),
                       child: SizedBox(
-                        height: kPetMagicBottomNavHeight,
+                        height: _bottomNavHeight,
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -295,10 +288,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
           16,
           0,
           16,
-          bottomPadding +
-              kPetMagicBottomNavOuterGap +
-              kPetMagicBottomNavHeight +
-              10,
+          bottomPadding + _bottomNavOuterGap + _bottomNavHeight + 10,
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -356,30 +346,15 @@ class _ActiveGenerationBanner extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Создаем ваш результат...',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(
-                                    color: colors.textMuted,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            Text(
-                              generation.templateTitle ?? 'Новая генерация',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colors.textStrong,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                            ),
-                          ],
+                        child: Text(
+                          '✨ Создаем ${generation.templateTitle ?? 'результат'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: colors.textStrong,
+                                fontWeight: FontWeight.w900,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 8),

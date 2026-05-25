@@ -2,6 +2,69 @@ part of 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 
 const int _kPhotoCostSpark = 6;
 const int _kVideoCostSpark = 33;
+const String _kWalletBalanceCoinAsset =
+    'assets/rewards/wallet-balance-coin.png';
+const String _kWalletCompanionAsset = 'assets/rewards/invite-friend.png';
+
+class _WalletCompanionHero extends StatelessWidget {
+  const _WalletCompanionHero();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return ProfileGlassCard(
+      padding: EdgeInsets.zero,
+      child: Container(
+        height: 156,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF071A28),
+              const Color(0xFF0A2436),
+              const Color(0xFF0A1D2B),
+            ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: -28,
+              top: 18,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.accent.withValues(alpha: 0.28),
+                      blurRadius: 56,
+                      spreadRadius: 8,
+                    ),
+                  ],
+                ),
+                child: const SizedBox(width: 1, height: 1),
+              ),
+            ),
+            Positioned(
+              right: -8,
+              bottom: -16,
+              child: Image.asset(
+                _kWalletCompanionAsset,
+                height: 186,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _WalletHeader extends StatelessWidget {
   const _WalletHeader({
@@ -308,7 +371,9 @@ class _BalanceCoinGlow extends StatelessWidget {
         ),
       ),
       child: Center(
-        child: DecoratedBox(
+        child: Container(
+          width: 72,
+          height: 72,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
@@ -319,7 +384,13 @@ class _BalanceCoinGlow extends StatelessWidget {
               ),
             ],
           ),
-          child: const PawSparkIcon(size: 58),
+          child: ClipOval(
+            child: Image.asset(
+              _kWalletBalanceCoinAsset,
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.medium,
+            ),
+          ),
         ),
       ),
     );

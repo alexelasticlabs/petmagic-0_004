@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
 
 namespace PetMagic.Modules.SupportChat.Infrastructure.Data;

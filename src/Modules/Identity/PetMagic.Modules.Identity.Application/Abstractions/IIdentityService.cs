@@ -31,6 +31,8 @@ public interface IIdentityService
 
     Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken);
 
+    Task<Result> DeleteCurrentUserAsync(DeleteCurrentUserCommand command, CancellationToken cancellationToken);
+
     Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken);
 
     Task<Result<UserProfileResponse>> AcceptLegalDocumentsAsync(Guid userId, AcceptLegalDocumentsCommand command, CancellationToken cancellationToken);

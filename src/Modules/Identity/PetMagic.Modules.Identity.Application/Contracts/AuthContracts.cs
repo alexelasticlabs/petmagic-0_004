@@ -24,6 +24,8 @@ public sealed record RefreshTokenCommand(string RefreshToken);
 
 public sealed record LogoutCommand(Guid UserId, string RefreshToken);
 
+public sealed record DeleteCurrentUserCommand(Guid UserId);
+
 public sealed record ExternalLoginCallbackCommand(
     string Provider,
     string ProviderSubject,

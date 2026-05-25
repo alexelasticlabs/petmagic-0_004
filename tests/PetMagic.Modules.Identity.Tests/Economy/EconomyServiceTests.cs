@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -1101,6 +1103,143 @@ public sealed class EconomyServiceTests
         Assert.Equal(120, wallet.Balance);
     }
 
+    [Fact]
+    public async Task CreatePaymentProviderConfigurationAsync_ShouldCreateNormalizedRoute()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.CreatePaymentProviderConfigurationAsync(
+            new CreatePaymentProviderConfigurationCommand(
+                "Stripe",
+                "Android",
+                "us",
+                true,
+                false,
+                false,
+                true,
+                false,
+                "1.2.3",
+                false,
+                5,
+                "Stripe Alt Billing",
+                null,
+                null,
+                null,
+                "TEST",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("stripe", result.Value.Provider);
+        Assert.Equal("android", result.Value.Platform);
+        Assert.Equal("US", result.Value.Region);
+        Assert.Equal("test", result.Value.Mode);
+    }
+
+    [Fact]
+    public async Task CreatePaymentProviderConfigurationAsync_ShouldFailOnDuplicateRoute()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.CreatePaymentProviderConfigurationAsync(
+            new CreatePaymentProviderConfigurationCommand(
+                "stripe",
+                "web",
+                "*",
+                true,
+                true,
+                true,
+                false,
+                false,
+                "0.0.0",
+                true,
+                0,
+                null,
+                null,
+                null,
+                null,
+                "test",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentProviderConfigurationAlreadyExists.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ClonePaymentProviderConfigurationAsync_ShouldCopySourceWithNewRegion()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var source = await dbContext.PaymentProviderConfigurations.AsNoTracking().SingleAsync();
+
+        var result = await service.ClonePaymentProviderConfigurationAsync(
+            new ClonePaymentProviderConfigurationCommand(source.Id, "EU"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("EU", result.Value.Region);
+        Assert.Equal(source.Provider, result.Value.Provider);
+        Assert.Equal(source.Platform, result.Value.Platform);
+    }
+
+    [Fact]
+    public async Task DeletePaymentProviderConfigurationAsync_ShouldRemoveConfiguration()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var source = await dbContext.PaymentProviderConfigurations.AsNoTracking().SingleAsync();
+
+        var create = await service.CreatePaymentProviderConfigurationAsync(
+            new CreatePaymentProviderConfigurationCommand(
+                source.Provider,
+                source.Platform,
+                "US",
+                source.IsEnabled,
+                source.IsRecommended,
+                source.IsSelectedByDefault,
+                source.RequiresExternalWarning,
+                source.RequiresStoreDisclosure,
+                source.AllowedFromAppVersion,
+                source.ExternalCheckoutAllowed,
+                source.BonusTokensPercent,
+                source.DisplayLabel,
+                source.DisplaySubtitle,
+                source.WarningTitle,
+                source.WarningMessage,
+                source.Mode,
+                source.Notes),
+            CancellationToken.None);
+
+        Assert.True(create.IsSuccess);
+
+        var delete = await service.DeletePaymentProviderConfigurationAsync(
+            new DeletePaymentProviderConfigurationCommand(create.Value.ConfigurationId),
+            CancellationToken.None);
+
+        Assert.True(delete.IsSuccess);
+        Assert.False(await dbContext.PaymentProviderConfigurations.AnyAsync(x => x.Id == create.Value.ConfigurationId));
+    }
+
+    [Fact]
+    public async Task TestPaymentProviderConfigurationMatchAsync_ShouldReturnAllowedDecision()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.TestPaymentProviderConfigurationMatchAsync(
+            new TestPaymentProviderConfigurationMatchQuery("stripe", "web", "US", "1.0.0"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.MatchFound);
+        Assert.True(result.Value.AllowedForCheckout);
+        Assert.Equal("allowed", result.Value.DecisionCode);
+        Assert.NotNull(result.Value.MatchedConfiguration);
+    }
+
     private static EconomyService CreateService(
         EconomyDbContext dbContext,
         FakePaymentGateway? gateway = null,
@@ -1305,6 +1444,7 @@ public sealed class EconomyServiceTests
         public Task<Result<IReadOnlyList<LinkedAccountResponse>>> UnlinkExternalLoginAsync(Guid userId, string provider, CancellationToken cancellationToken) => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
         public Task<Result<TokenPairResponse>> RefreshAsync(RefreshTokenCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
         public Task<Result> LogoutAsync(LogoutCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> DeleteCurrentUserAsync(DeleteCurrentUserCommand command, CancellationToken cancellationToken) => NotSupported();
 
         public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
         {

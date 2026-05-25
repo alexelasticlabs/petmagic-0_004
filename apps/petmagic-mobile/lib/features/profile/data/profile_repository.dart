@@ -159,6 +159,25 @@ class ProfileRepository {
     }
   }
 
+  Future<void> deleteCurrentAccount() async {
+    try {
+      await _authorizedRequest<void>(
+        (session) => _dio.delete<void>(
+          '/api/auth/me',
+          options: Options(
+            headers: {
+              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+            },
+          ),
+        ),
+      );
+
+      await _sessionStorage.clear();
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: 'profile.action_failed');
+    }
+  }
+
   Future<MobileUserProfile> fetchProfile() async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(

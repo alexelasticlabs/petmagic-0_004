@@ -24,7 +24,7 @@ void main() {
     await tester.tap(find.text(text.profileSettingsLanguageEnglish));
     await tester.pumpAndSettle();
 
-    expect(find.text('English'), findsWidgets);
+    expect(find.text(text.profileSettingsLanguageEnglish), findsWidgets);
   });
 
   testWidgets('theme sheet applies selected theme mode', (tester) async {
@@ -45,7 +45,7 @@ void main() {
     expect(find.text(text.profileSettingsThemeDark), findsOneWidget);
   });
 
-  testWidgets('delete confirmation sheet shows protected flow message', (
+  testWidgets('delete confirmation sheet triggers account deletion action', (
     tester,
   ) async {
     await _pumpSettingsPage(tester);
@@ -54,24 +54,30 @@ void main() {
       tester.element(find.byType(ProfileSettingsPage)),
     );
 
-    await tester.tap(find.text(text.profileSettingsDeleteAccountTitle));
+    final deleteRow = find.text(text.profileSettingsDeleteAccountTitle);
+    await tester.scrollUntilVisible(
+      deleteRow,
+      320,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(deleteRow, warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(
-      find.widgetWithText(FilledButton, text.profileSettingsDeleteAccountTitle),
-      findsOneWidget,
+    final deleteButton = find.widgetWithText(
+      FilledButton,
+      text.profileSettingsDeleteAccountTitle,
     );
+    expect(deleteButton, findsOneWidget);
 
-    await tester.tap(
-      find.widgetWithText(FilledButton, text.profileSettingsDeleteAccountTitle),
-    );
+    await tester.tap(deleteButton);
     await tester.pumpAndSettle();
 
-    expect(find.text(text.profileDetailsDeleteBody), findsOneWidget);
+    expect(_FakeProfileController.deleteAccountCalls, 1);
   });
 }
 
 Future<void> _pumpSettingsPage(WidgetTester tester) async {
+  _FakeProfileController.deleteAccountCalls = 0;
   await tester.binding.setSurfaceSize(const Size(390, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -106,6 +112,8 @@ Future<void> _pumpSettingsPage(WidgetTester tester) async {
 }
 
 class _FakeProfileController extends ProfileController {
+  static int deleteAccountCalls = 0;
+
   @override
   ProfileState build() {
     const profile = MobileUserProfile(
@@ -148,6 +156,11 @@ class _FakeProfileController extends ProfileController {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<void> deleteAccount() async {
+    deleteAccountCalls += 1;
+  }
 }
 
 class _FakePreferencesController extends AppPreferencesController {

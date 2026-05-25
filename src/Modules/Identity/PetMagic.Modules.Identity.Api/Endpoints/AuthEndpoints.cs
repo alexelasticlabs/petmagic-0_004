@@ -71,6 +71,9 @@ public static class AuthEndpoints
         group.MapGet("/me", MeAsync)
             .RequireAuthorization();
 
+        group.MapDelete("/me", DeleteMeAsync)
+            .RequireAuthorization();
+
         group.MapPost("/me/legal-acceptance", AcceptCurrentLegalDocumentsAsync)
             .RequireAuthorization();
 
@@ -563,6 +566,37 @@ public static class AuthEndpoints
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteMeAsync(
+        HttpContext context,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(subject, out var userId))
+        {
+            return TypedResults.Problem(
+                title: InvalidSubjectCode,
+                detail: "Invalid access token subject.",
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.DeleteCurrentUserAsync(new DeleteCurrentUserCommand(userId), cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: statusCode);
+        }
+
+        DeleteRefreshTokenCookie(context);
+        return TypedResults.NoContent();
     }
 
     private static async Task<Results<Ok<UserProfileResponse>, ValidationProblem, ProblemHttpResult>> AcceptCurrentLegalDocumentsAsync(

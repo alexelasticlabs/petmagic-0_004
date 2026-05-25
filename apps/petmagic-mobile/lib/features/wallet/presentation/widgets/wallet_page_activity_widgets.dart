@@ -108,9 +108,14 @@ class _FeaturedPackTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  _packVisual(pack.code),
-                  style: const TextStyle(fontSize: 28),
+                SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: Image.asset(
+                    _packImageAsset(pack.code),
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -311,10 +316,13 @@ class _PackListTile extends StatelessWidget {
             else
               const SizedBox(height: 22),
             const SizedBox(height: 6),
-            Text(
-              _packVisual(pack.code),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 34),
+            SizedBox(
+              height: 48,
+              child: Image.asset(
+                _packImageAsset(pack.code),
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
@@ -399,12 +407,12 @@ class _PackListTile extends StatelessWidget {
   }
 }
 
-String _packVisual(String code) {
+String _packImageAsset(String code) {
   return switch (code) {
-    'starter' => '☕',
-    'creator' => '👜',
-    'viral' => '✨',
-    _ => '💎',
+    'starter' => 'assets/rewards/wallet-pack-coffee.png',
+    'creator' => 'assets/rewards/wallet-pack-suitcase.png',
+    'viral' => 'assets/rewards/wallet-pack-chest.png',
+    _ => 'assets/rewards/wallet-pack-chest.png',
   };
 }
 

@@ -4,10 +4,28 @@ namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
 internal static class EconomyPaymentProviderPolicy
 {
+    private static readonly StringComparer ModeComparer = StringComparer.OrdinalIgnoreCase;
+
     public static string NormalizeConfigRegion(string value)
     {
         var normalized = value.Trim();
         return string.Equals(normalized, "*", StringComparison.Ordinal) ? "*" : normalized.ToUpperInvariant();
+    }
+
+    public static string NormalizeMode(string mode)
+    {
+        return string.IsNullOrWhiteSpace(mode) ? "test" : mode.Trim().ToLowerInvariant();
+    }
+
+    public static bool IsSupportedMode(string mode)
+    {
+        var normalizedMode = NormalizeMode(mode);
+        return ModeComparer.Equals(normalizedMode, "test") || ModeComparer.Equals(normalizedMode, "live");
+    }
+
+    public static bool IsValidVersion(string rawVersion)
+    {
+        return TryParseVersion(rawVersion, out _);
     }
 
     public static string NormalizePlatform(string platform)
@@ -71,16 +89,58 @@ internal static class EconomyPaymentProviderPolicy
 
     private static bool IsAppVersionAllowed(string configuredVersion, string appVersion)
     {
-        if (!Version.TryParse(configuredVersion, out var minimumVersion))
+        if (!TryParseVersion(configuredVersion, out var minimumVersion))
         {
-            return true;
+            return false;
         }
 
-        if (!Version.TryParse(appVersion, out var currentVersion))
+        if (!TryParseVersion(appVersion, out var currentVersion))
         {
-            return true;
+            return false;
         }
 
         return currentVersion >= minimumVersion;
+    }
+
+    private static bool TryParseVersion(string rawVersion, out Version version)
+    {
+        version = new Version(0, 0);
+        if (string.IsNullOrWhiteSpace(rawVersion))
+        {
+            return false;
+        }
+
+        var normalized = rawVersion.Trim();
+        var metadataSeparator = normalized.IndexOfAny(['-', '+']);
+        if (metadataSeparator >= 0)
+        {
+            normalized = normalized[..metadataSeparator];
+        }
+
+        if (Version.TryParse(normalized, out var parsedVersion) && parsedVersion is not null)
+        {
+            version = parsedVersion;
+            return true;
+        }
+
+        var segments = normalized
+            .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(segment => int.TryParse(segment, out var value) ? value : -1)
+            .ToArray();
+
+        if (segments.Length == 0 || segments.Length > 4 || segments.Any(segment => segment < 0))
+        {
+            return false;
+        }
+
+        version = segments.Length switch
+        {
+            1 => new Version(segments[0], 0),
+            2 => new Version(segments[0], segments[1]),
+            3 => new Version(segments[0], segments[1], segments[2]),
+            _ => new Version(segments[0], segments[1], segments[2], segments[3])
+        };
+
+        return true;
     }
 }

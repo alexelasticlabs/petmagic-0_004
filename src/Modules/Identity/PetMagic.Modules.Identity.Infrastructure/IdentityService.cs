@@ -477,6 +477,55 @@ public sealed class IdentityService(
         return Result.Success();
     }
 
+    public async Task<Result> DeleteCurrentUserAsync(DeleteCurrentUserCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(command.UserId.ToString());
+        if (user is null)
+        {
+            return Result.Failure(IdentityErrors.UserNotFound);
+        }
+
+        var avatarUrl = user.AvatarUrl;
+        var deleteUserResult = await userManager.DeleteAsync(user);
+        if (!deleteUserResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.OperationFailed);
+        }
+
+        var refreshSessions = await dbContext.RefreshTokenSessions
+            .Where(x => x.UserId == command.UserId)
+            .ToListAsync(cancellationToken);
+
+        var emailCodes = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == command.UserId)
+            .ToListAsync(cancellationToken);
+
+        var emailJobs = await dbContext.EmailDispatchJobs
+            .Where(x => x.UserId == command.UserId)
+            .ToListAsync(cancellationToken);
+
+        if (refreshSessions.Count > 0)
+        {
+            dbContext.RefreshTokenSessions.RemoveRange(refreshSessions);
+        }
+
+        if (emailCodes.Count > 0)
+        {
+            dbContext.UserEmailCodes.RemoveRange(emailCodes);
+        }
+
+        if (emailJobs.Count > 0)
+        {
+            dbContext.EmailDispatchJobs.RemoveRange(emailJobs);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await avatarStorage.DeleteAsync(avatarUrl, CancellationToken.None);
+        await WriteAuditAsync(command.UserId, "user.deleted", "User account deleted by owner.", cancellationToken);
+
+        return Result.Success();
+    }
+
     public async Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());

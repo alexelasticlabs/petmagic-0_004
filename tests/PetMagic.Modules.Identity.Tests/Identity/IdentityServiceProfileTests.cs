@@ -8,8 +8,8 @@ using Microsoft.Extensions.Options;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
-using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure;
+using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
@@ -108,6 +108,98 @@ public sealed class IdentityServiceProfileTests
         var persisted = await identityDb.Users.SingleAsync();
         Assert.Null(persisted.AvatarUrl);
         Assert.Single(avatarStorage.DeletedUrls);
+    }
+
+    [Fact]
+    public async Task DeleteCurrentUserAsync_ShouldRemoveUserAndIdentityArtifacts()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var avatarStorage = new TrackingAvatarStorage();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, avatarStorage);
+
+        var userId = Guid.NewGuid();
+        identityDb.Users.Add(new AppUser
+        {
+            Id = userId,
+            Email = "delete@petmagic.app",
+            UserName = "delete@petmagic.app",
+            EmailConfirmed = true,
+            IsActive = true,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            AvatarUrl = "http://localhost:5000/user-avatars/delete.png",
+            AvatarFileName = "delete.png",
+            AvatarContentType = "image/png",
+            AvatarFileSizeBytes = 128,
+            AvatarUpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        identityDb.RefreshTokenSessions.Add(new RefreshTokenSession
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TokenHash = "hash",
+            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7)
+        });
+
+        identityDb.UserEmailCodes.Add(new UserEmailCode
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Email = "delete@petmagic.app",
+            Purpose = EmailCodePurpose.EmailConfirmation,
+            CodeHash = "code-hash",
+            RequestedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(15)
+        });
+
+        identityDb.EmailDispatchJobs.Add(new EmailDispatchJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            RecipientEmail = "delete@petmagic.app",
+            Kind = EmailDispatchKind.EmailConfirmation,
+            Status = EmailDispatchStatus.Queued,
+            Subject = "Confirm",
+            HtmlBody = "<p>Confirm</p>",
+            TextBody = "Confirm",
+            AttemptCount = 0,
+            QueuedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        await identityDb.SaveChangesAsync();
+
+        var result = await service.DeleteCurrentUserAsync(
+            new DeleteCurrentUserCommand(userId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(await identityDb.Users.AnyAsync(x => x.Id == userId));
+        Assert.False(await identityDb.RefreshTokenSessions.AnyAsync(x => x.UserId == userId));
+        Assert.False(await identityDb.UserEmailCodes.AnyAsync(x => x.UserId == userId));
+        Assert.False(await identityDb.EmailDispatchJobs.AnyAsync(x => x.UserId == userId));
+        Assert.Contains("delete.png", avatarStorage.DeletedUrls.Single());
+        Assert.True(await identityDb.AuditEvents.AnyAsync(x => x.SubjectUserId == userId && x.Action == "user.deleted"));
+    }
+
+    [Fact]
+    public async Task DeleteCurrentUserAsync_ShouldReturnNotFound_WhenUserMissing()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+
+        var result = await service.DeleteCurrentUserAsync(
+            new DeleteCurrentUserCommand(Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(IdentityErrors.UserNotFound.Code, result.Error.Code);
     }
 
     [Fact]

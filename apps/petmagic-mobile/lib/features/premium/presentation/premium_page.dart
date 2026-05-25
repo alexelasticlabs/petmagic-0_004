@@ -62,7 +62,14 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     final controller = ref.read(premiumControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final bottomNavInset = petMagicScrollableBottomInset(context);
+    final storeProvider = _preferredStoreProvider(
+      state,
+      Theme.of(context).platform,
+    );
+    final stripeAvailable =
+        state.availableProviders.contains(PremiumPaymentProvider.stripe) &&
+        state.isProviderAvailable(PremiumPaymentProvider.stripe);
+    final bottomNavInset = petMagicBottomNavInset(context);
     final checkoutStatusMessage = _checkoutStatusMessage(text, state);
 
     ref.listen(premiumControllerProvider, (previous, next) {
@@ -98,6 +105,8 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                   children: [
                     _PremiumHeader(
                       onRefresh: () => controller.load(refresh: true),
+                      onRestore: controller.restorePurchases,
+                      isRestoring: state.isRestoring,
                     ),
                     const SizedBox(height: 14),
                     if (state.checkoutVerificationState ==
@@ -148,16 +157,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                     ),
                     const SizedBox(height: 16),
                     _PlansSection(state: state, controller: controller),
-                    const SizedBox(height: 14),
-                    _PaymentProviderSection(
-                      state: state,
-                      onSelect: controller.selectProvider,
-                    ),
                     const SizedBox(height: 18),
                     if (state.isPremium) ...[
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: 58,
                         child: FilledButton.icon(
                           onPressed: state.isManaging
                               ? null
@@ -169,7 +173,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Icon(Icons.tune_rounded),
+                              : const Icon(Icons.tune_rounded, size: 20),
                           label: Text(
                             text.premiumManageAction,
                             style: const TextStyle(
@@ -181,68 +185,22 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                       ),
                       const SizedBox(height: 12),
                     ] else ...[
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: double.infinity,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            if (state.canStartCheckout && !state.isBuying)
-                              BoxShadow(
-                                color:
-                                    (state.selectedPlan?.isPopular == true
-                                            ? colors.accent
-                                            : colors.gold)
-                                        .withValues(alpha: 0.35),
-                                blurRadius: 20,
-                                spreadRadius: -2,
-                                offset: const Offset(0, 6),
+                      _CheckoutActionsSection(
+                        state: state,
+                        storeProvider: storeProvider,
+                        stripeAvailable: stripeAvailable,
+                        onStoreCheckout: storeProvider == null
+                            ? null
+                            : () => _startCheckoutForProvider(
+                                storeProvider,
+                                controller,
                               ),
-                          ],
-                        ),
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                state.selectedPlan?.isPopular == true
-                                ? colors.accent
-                                : colors.gold,
-                            foregroundColor:
-                                state.selectedPlan?.isPopular == true
-                                ? Colors.white
-                                : colors.surface,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: state.isBuying || !state.canStartCheckout
-                              ? null
-                              : () => _handleCheckoutTap(state, controller),
-                          icon: state.isBuying
-                              ? SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator.adaptive(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      state.selectedPlan?.isPopular == true
-                                          ? Colors.white
-                                          : colors.surface,
-                                    ),
-                                  ),
-                                )
-                              : const Icon(Icons.flash_on_rounded, size: 20),
-                          label: Text(
-                            _ctaLabel(text, state),
-                            maxLines: 2,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 16.5,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ),
+                        onStripeCheckout: stripeAvailable
+                            ? () => _startCheckoutForProvider(
+                                PremiumPaymentProvider.stripe,
+                                controller,
+                              )
+                            : null,
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -256,7 +214,14 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                       onPressed: state.isRestoring
                           ? null
                           : controller.restorePurchases,
-                      icon: const Icon(Icons.restore_rounded),
+                      icon: state.isRestoring
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator.adaptive(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.restore_rounded),
                       label: Text(text.premiumRestoreAction),
                     ),
                     const SizedBox(height: 8),
@@ -314,6 +279,48 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
     await controller.startCheckout();
   }
+
+  Future<void> _startCheckoutForProvider(
+    PremiumPaymentProvider provider,
+    PremiumController controller,
+  ) async {
+    controller.selectProvider(provider);
+    final selectedState = ref.read(premiumControllerProvider);
+    if (selectedState.isBuying || !selectedState.canStartCheckout) {
+      return;
+    }
+
+    await _handleCheckoutTap(selectedState, controller);
+  }
+}
+
+PremiumPaymentProvider? _preferredStoreProvider(
+  PremiumState state,
+  TargetPlatform platform,
+) {
+  final preferredOrder = switch (platform) {
+    TargetPlatform.iOS => const [
+      PremiumPaymentProvider.appStore,
+      PremiumPaymentProvider.googlePlay,
+    ],
+    TargetPlatform.android => const [
+      PremiumPaymentProvider.googlePlay,
+      PremiumPaymentProvider.appStore,
+    ],
+    _ => const [
+      PremiumPaymentProvider.googlePlay,
+      PremiumPaymentProvider.appStore,
+    ],
+  };
+
+  for (final provider in preferredOrder) {
+    if (state.availableProviders.contains(provider) &&
+        state.isProviderAvailable(provider)) {
+      return provider;
+    }
+  }
+
+  return null;
 }
 
 String _formatPrice(PremiumPlanModel plan, double amount) {
@@ -350,16 +357,6 @@ String _providerLabel(AppLocalizations text, PremiumPaymentProvider provider) {
     PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
     PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
     PremiumPaymentProvider.appStore => text.premiumPaymentApple,
-  };
-}
-
-String _ctaLabel(AppLocalizations text, PremiumState state) {
-  return switch (state.selectedProvider) {
-    PremiumPaymentProvider.stripe => '${text.premiumContinueAction} · Stripe',
-    PremiumPaymentProvider.googlePlay =>
-      '${text.premiumContinueAction} · Google Play',
-    PremiumPaymentProvider.appStore =>
-      '${text.premiumContinueAction} · App Store',
   };
 }
 

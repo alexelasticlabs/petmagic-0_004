@@ -253,6 +253,21 @@ export type AdminPaymentProviderConfiguration = {
   updatedAtUtc: string;
 };
 
+export type AdminPaymentProviderConfigurationMatch = {
+  provider: string;
+  platform: string;
+  country: string;
+  normalizedRegion: string;
+  isEuRegion: boolean;
+  appVersion: string;
+  matchFound: boolean;
+  allowedForCheckout: boolean;
+  stripeModeConfigured: boolean;
+  decisionCode: string;
+  decisionMessage: string;
+  matchedConfiguration?: AdminPaymentProviderConfiguration | null;
+};
+
 export type AdminSubscriptionEvent = {
   eventId: string;
   userId?: string | null;
@@ -1332,6 +1347,71 @@ export async function updateAdminPaymentProviderConfig(
     `/api/admin/economy/payment-provider-configs/${configurationId}`,
     {
       method: "PUT",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function createAdminPaymentProviderConfig(
+  payload: Pick<
+    AdminPaymentProviderConfiguration,
+    | "provider"
+    | "platform"
+    | "region"
+    | "isEnabled"
+    | "isRecommended"
+    | "isSelectedByDefault"
+    | "requiresExternalWarning"
+    | "requiresStoreDisclosure"
+    | "allowedFromAppVersion"
+    | "externalCheckoutAllowed"
+    | "bonusTokensPercent"
+    | "displayLabel"
+    | "displaySubtitle"
+    | "warningTitle"
+    | "warningMessage"
+    | "mode"
+    | "notes"
+  >
+): Promise<AdminPaymentProviderConfiguration> {
+  return apiRequest<AdminPaymentProviderConfiguration>(
+    "/api/admin/economy/payment-provider-configs",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function cloneAdminPaymentProviderConfig(
+  configurationId: string,
+  payload: { region: string }
+): Promise<AdminPaymentProviderConfiguration> {
+  return apiRequest<AdminPaymentProviderConfiguration>(
+    `/api/admin/economy/payment-provider-configs/${configurationId}/clone`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function deleteAdminPaymentProviderConfig(configurationId: string): Promise<void> {
+  await apiRequest<void>(`/api/admin/economy/payment-provider-configs/${configurationId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function testAdminPaymentProviderConfigMatch(payload: {
+  provider: string;
+  platform: string;
+  country: string;
+  appVersion: string;
+}): Promise<AdminPaymentProviderConfigurationMatch> {
+  return apiRequest<AdminPaymentProviderConfigurationMatch>(
+    "/api/admin/economy/payment-provider-configs/test-match",
+    {
+      method: "POST",
       body: JSON.stringify(payload),
     }
   );

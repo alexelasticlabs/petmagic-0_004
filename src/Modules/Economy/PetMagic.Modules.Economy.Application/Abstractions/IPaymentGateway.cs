@@ -32,7 +32,8 @@ public sealed record PaymentCreateRequest(
     decimal PriceAmount,
     string CurrencyCode,
     int SparkToGrant,
-    string ProductName);
+    string ProductName,
+    string? ApiSecretKey = null);
 
 public sealed record PaymentCreateResponse(string ExternalPaymentId, string CheckoutUrl);
 
@@ -44,19 +45,20 @@ public sealed record SubscriptionCheckoutCreateRequest(
     string ProductName,
     decimal PriceAmount,
     string CurrencyCode,
-    string BillingInterval);
+    string BillingInterval,
+    string? ApiSecretKey = null);
 
 public sealed record SubscriptionCheckoutCreateResponse(string ExternalCheckoutId, string CheckoutUrl);
 
-public sealed record PaymentCustomerCreateRequest(string Provider, Guid UserId);
+public sealed record PaymentCustomerCreateRequest(string Provider, Guid UserId, string? ApiSecretKey = null);
 
 public sealed record PaymentCustomerCreateResponse(string ExternalCustomerId);
 
-public sealed record BillingPortalCreateRequest(string Provider, Guid UserId, string ExternalCustomerId);
+public sealed record BillingPortalCreateRequest(string Provider, Guid UserId, string ExternalCustomerId, string? ApiSecretKey = null);
 
 public sealed record BillingPortalCreateResponse(string PortalUrl);
 
-public sealed record PaymentMethodSetupCreateRequest(string Provider, Guid UserId, string ExternalCustomerId);
+public sealed record PaymentMethodSetupCreateRequest(string Provider, Guid UserId, string ExternalCustomerId, string? ApiSecretKey = null);
 
 public sealed record PaymentMethodSetupCreateResponse(string ExternalSetupId, string CheckoutUrl);
 
@@ -75,4 +77,5 @@ public sealed record PaymentSavedMethodCreateRequest(
     int SparkToGrant,
     string ProductName,
     string ExternalCustomerId,
-    string ExternalPaymentMethodId);
+    string ExternalPaymentMethodId,
+    string? ApiSecretKey = null);

@@ -141,6 +141,8 @@ class _WalletPageState extends ConsumerState<WalletPage>
                           tone: _warningTone,
                         ),
                       ],
+                      const SizedBox(height: 14),
+                      const _WalletCompanionHero(),
                       const SizedBox(height: 20),
                       _BalanceCard(wallet: state.wallet),
                       const SizedBox(height: 18),
@@ -164,7 +166,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       _LedgerSection(
                         items: state.ledger,
                         onViewAll: () =>
-                            context.push(AllTransactionsPage.routePath),
+                            context.pushNamed(AllTransactionsPage.routeName),
                       ),
                       const SizedBox(height: 18),
                       _PurchasesSection(

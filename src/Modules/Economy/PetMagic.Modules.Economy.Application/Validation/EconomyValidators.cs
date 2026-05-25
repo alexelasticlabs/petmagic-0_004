@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 
@@ -181,15 +182,176 @@ public sealed class UpdatePaymentProviderConfigurationCommandValidator : Abstrac
     public UpdatePaymentProviderConfigurationCommandValidator()
     {
         RuleFor(x => x.ConfigurationId).NotEmpty();
-        RuleFor(x => x.Region).NotEmpty().MaximumLength(16);
-        RuleFor(x => x.AllowedFromAppVersion).NotEmpty().MaximumLength(32);
+        RuleFor(x => x.Region)
+            .NotEmpty()
+            .MaximumLength(16)
+            .Must(PaymentProviderConfigurationValidationRules.IsValidRegion)
+            .WithMessage("Region must be '*' or a valid region code (EU or ISO-3166 alpha-2).");
+        RuleFor(x => x.AllowedFromAppVersion)
+            .NotEmpty()
+            .MaximumLength(32)
+            .Must(PaymentProviderConfigurationValidationRules.IsValidVersion)
+            .WithMessage("AllowedFromAppVersion must be a valid semantic version.");
         RuleFor(x => x.BonusTokensPercent).InclusiveBetween(0, 100);
         RuleFor(x => x.DisplayLabel).MaximumLength(80);
         RuleFor(x => x.DisplaySubtitle).MaximumLength(160);
         RuleFor(x => x.WarningTitle).MaximumLength(120);
         RuleFor(x => x.WarningMessage).MaximumLength(800);
-        RuleFor(x => x.Mode).NotEmpty().MaximumLength(24);
+        RuleFor(x => x.Mode)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PaymentProviderConfigurationValidationRules.IsSupportedMode)
+            .WithMessage("Mode must be either 'test' or 'live'.");
         RuleFor(x => x.Notes).MaximumLength(240);
+    }
+}
+
+public sealed class CreatePaymentProviderConfigurationCommandValidator : AbstractValidator<CreatePaymentProviderConfigurationCommand>
+{
+    public CreatePaymentProviderConfigurationCommandValidator()
+    {
+        RuleFor(x => x.Provider)
+            .NotEmpty()
+            .MaximumLength(32)
+            .Must(PaymentProviderConfigurationValidationRules.IsSupportedProvider)
+            .WithMessage("Provider must be one of: stripe, app_store, google_play.");
+
+        RuleFor(x => x.Platform)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PaymentProviderConfigurationValidationRules.IsSupportedPlatform)
+            .WithMessage("Platform must be one of: ios, android, web.");
+
+        RuleFor(x => x.Region)
+            .NotEmpty()
+            .MaximumLength(16)
+            .Must(PaymentProviderConfigurationValidationRules.IsValidRegion)
+            .WithMessage("Region must be '*' or a valid region code (EU or ISO-3166 alpha-2).");
+
+        RuleFor(x => x.AllowedFromAppVersion)
+            .NotEmpty()
+            .MaximumLength(32)
+            .Must(PaymentProviderConfigurationValidationRules.IsValidVersion)
+            .WithMessage("AllowedFromAppVersion must be a valid semantic version.");
+
+        RuleFor(x => x.BonusTokensPercent).InclusiveBetween(0, 100);
+        RuleFor(x => x.DisplayLabel).MaximumLength(80);
+        RuleFor(x => x.DisplaySubtitle).MaximumLength(160);
+        RuleFor(x => x.WarningTitle).MaximumLength(120);
+        RuleFor(x => x.WarningMessage).MaximumLength(800);
+
+        RuleFor(x => x.Mode)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PaymentProviderConfigurationValidationRules.IsSupportedMode)
+            .WithMessage("Mode must be either 'test' or 'live'.");
+
+        RuleFor(x => x.Notes).MaximumLength(240);
+    }
+}
+
+public sealed class ClonePaymentProviderConfigurationCommandValidator : AbstractValidator<ClonePaymentProviderConfigurationCommand>
+{
+    public ClonePaymentProviderConfigurationCommandValidator()
+    {
+        RuleFor(x => x.SourceConfigurationId).NotEmpty();
+        RuleFor(x => x.Region)
+            .NotEmpty()
+            .MaximumLength(16)
+            .Must(PaymentProviderConfigurationValidationRules.IsValidRegion)
+            .WithMessage("Region must be '*' or a valid region code (EU or ISO-3166 alpha-2).");
+    }
+}
+
+public sealed class DeletePaymentProviderConfigurationCommandValidator : AbstractValidator<DeletePaymentProviderConfigurationCommand>
+{
+    public DeletePaymentProviderConfigurationCommandValidator()
+    {
+        RuleFor(x => x.ConfigurationId).NotEmpty();
+    }
+}
+
+public sealed class TestPaymentProviderConfigurationMatchQueryValidator : AbstractValidator<TestPaymentProviderConfigurationMatchQuery>
+{
+    public TestPaymentProviderConfigurationMatchQueryValidator()
+    {
+        RuleFor(x => x.Provider)
+            .NotEmpty()
+            .MaximumLength(32)
+            .Must(PaymentProviderConfigurationValidationRules.IsSupportedProvider)
+            .WithMessage("Provider must be one of: stripe, app_store, google_play.");
+
+        RuleFor(x => x.Platform)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PaymentProviderConfigurationValidationRules.IsSupportedPlatform)
+            .WithMessage("Platform must be one of: ios, android, web.");
+
+        RuleFor(x => x.Country)
+            .NotEmpty()
+            .MaximumLength(16)
+            .Must(PaymentProviderConfigurationValidationRules.IsValidRegion)
+            .WithMessage("Country must be a valid region code (EU or ISO-3166 alpha-2). Use '*' only for wildcard diagnostics.");
+
+        RuleFor(x => x.AppVersion)
+            .NotEmpty()
+            .MaximumLength(32)
+            .Must(PaymentProviderConfigurationValidationRules.IsValidVersion)
+            .WithMessage("AppVersion must be a valid semantic version.");
+    }
+}
+
+internal static class PaymentProviderConfigurationValidationRules
+{
+    public static bool IsValidRegion(string value)
+    {
+        var region = value.Trim();
+        if (region == "*")
+        {
+            return true;
+        }
+
+        if (string.Equals(region, "EU", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return region.Length == 2 && region.All(char.IsLetter);
+    }
+
+    public static bool IsSupportedMode(string value)
+    {
+        return string.Equals(value.Trim(), "test", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value.Trim(), "live", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsSupportedProvider(string value)
+    {
+        var provider = value.Trim().ToLowerInvariant();
+        return provider is "stripe" or "app_store" or "google_play";
+    }
+
+    public static bool IsSupportedPlatform(string value)
+    {
+        var platform = value.Trim().ToLowerInvariant();
+        return platform is "ios" or "android" or "web" or "iphone" or "ipad";
+    }
+
+    public static bool IsValidVersion(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim();
+        var metadataSeparator = normalized.IndexOfAny(['-', '+']);
+        if (metadataSeparator >= 0)
+        {
+            normalized = normalized[..metadataSeparator];
+        }
+
+        return Version.TryParse(normalized, out _);
     }
 }
 

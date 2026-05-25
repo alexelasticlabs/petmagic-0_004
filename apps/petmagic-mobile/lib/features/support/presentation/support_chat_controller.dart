@@ -188,11 +188,13 @@ class SupportChatController extends Notifier<SupportChatState> {
         body: body,
       );
 
+      final attachmentFailure = _messageFromAttachmentFailure(message);
+
       state = state.copyWith(
         isSending: false,
         conversation: _appendOutgoingMessage(conversation, message),
-        errorMessage: _messageFromAttachmentFailure(message),
-        clearError: _messageFromAttachmentFailure(message) == null,
+        errorMessage: attachmentFailure,
+        clearError: attachmentFailure == null,
       );
       _resumePendingRealtimeRefreshIfNeeded();
       return message.isAttachmentUploaded;
@@ -304,7 +306,8 @@ class SupportChatController extends Notifier<SupportChatState> {
       return null;
     }
 
-    return message.attachmentUploadErrorCode ?? 'support.attachment_unavailable';
+    return message.attachmentUploadErrorCode ??
+        'support.attachment_unavailable';
   }
 
   Future<void> _refreshConversation() async {

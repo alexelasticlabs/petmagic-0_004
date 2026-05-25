@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:share_plus/share_plus.dart';
@@ -80,8 +82,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
               padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset),
               children: [
                 _Header(
-                  title: 'Статус генерации',
-                  onBack: () => context.go('/templates'),
+                  title: generation?.templateTitle ?? 'Статус генерации',
+                  subtitle: generation == null
+                      ? null
+                      : '${_typeLabel(generation)} • ${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
+                  onBack: () => context.go('/creations'),
+                  onMenu: generation == null
+                      ? null
+                      : () => _openActionsSheet(generation),
                 ),
                 const SizedBox(height: 18),
                 if (_isLoading && generation == null)
@@ -91,39 +99,78 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                 else if (generation != null) ...[
                   _StatusHero(generation: generation),
                   const SizedBox(height: 14),
-                  _StageCard(generation: generation),
-                  const SizedBox(height: 14),
                   if (generation.isCompleted) ...[
                     _ResultCard(generation: generation),
+                    const SizedBox(height: 14),
+                    _ReadyActionsRow(
+                      onSave: _saveSoon,
+                      onShare: () => _shareResult(generation),
+                      onDelete: _deleteSoon,
+                    ),
+                    const SizedBox(height: 14),
+                    _DetailsCard(
+                      rows: [
+                        ('Шаблон', generation.templateTitle ?? 'Без названия'),
+                        (
+                          'Создано',
+                          _formatDateTime(
+                            generation.completedAtUtc ?? generation.updatedAtUtc,
+                          ),
+                        ),
+                        ('Тип', _typeLabel(generation)),
+                        (
+                          'Стоимость',
+                          '${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     _FeedbackCard(
                       isSubmitting: _isSubmittingFeedback,
                       onRatingSelected: _handleRatingSelected,
                     ),
-                  ] else if (generation.isFailed)
-                    _FailureCard(generation: generation)
-                  else
+                  ] else if (generation.isFailed) ...[
+                    _FailureCard(generation: generation),
+                    const SizedBox(height: 14),
+                    _FailedActions(
+                      onPickAnotherPhoto: () => context.go(TemplatesPage.routePath),
+                      onRetry: _retrySoon,
+                      onSupport: () => context.go(SupportChatPage.routePath),
+                    ),
+                    const SizedBox(height: 14),
+                    _DetailsCard(
+                      rows: [
+                        ('Шаблон', generation.templateTitle ?? 'Без названия'),
+                        ('Тип', _typeLabel(generation)),
+                        ('Попытка', '${generation.attemptCount}'),
+                        (
+                          'Стоимость',
+                          '${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    _StageCard(generation: generation),
+                    const SizedBox(height: 14),
                     _BackgroundHintCard(generation: generation),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => context.go('/templates'),
-                          icon: const Icon(Icons.auto_awesome_motion_rounded),
-                          label: const Text('Продолжить'),
+                    const SizedBox(height: 14),
+                    _ActiveActions(
+                      onContinue: () => context.go('/templates'),
+                      onCancel: _cancelSoon,
+                    ),
+                    const SizedBox(height: 14),
+                    _DetailsCard(
+                      rows: [
+                        ('Шаблон', generation.templateTitle ?? 'Без названия'),
+                        ('Начато', _formatDateTime(generation.createdAtUtc)),
+                        ('Тип', _typeLabel(generation)),
+                        (
+                          'Стоимость',
+                          '${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => context.go('/creations'),
-                          icon: const Icon(Icons.photo_library_outlined),
-                          label: const Text('Галерея'),
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -131,6 +178,131 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _openActionsSheet(TemplateGenerationResult generation) async {
+    final colors = context.petMagicColors;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: colors.surface,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (generation.isCompleted) ...[
+                ListTile(
+                  leading: const Icon(Icons.download_rounded),
+                  title: const Text('Сохранить'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _saveSoon();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.share_rounded),
+                  title: const Text('Поделиться'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _shareResult(generation);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: const Text('Удалить'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _deleteSoon();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: const Text('Сообщить о проблеме'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.go(SupportChatPage.routePath);
+                  },
+                ),
+              ] else if (generation.isFailed) ...[
+                ListTile(
+                  leading: const Icon(Icons.image_search_rounded),
+                  title: const Text('Выбрать другое фото'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.go(TemplatesPage.routePath);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.refresh_rounded),
+                  title: const Text('Попробовать снова'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _retrySoon();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.support_agent_rounded),
+                  title: const Text('Сообщить в поддержку'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.go(SupportChatPage.routePath);
+                  },
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Открыть галерею'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.go('/creations');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.close_rounded),
+                  title: const Text('Отменить генерацию'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _cancelSoon();
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _saveSoon() {
+    _showInfo('Сохранение появится в ближайшем обновлении.');
+  }
+
+  void _deleteSoon() {
+    _showInfo('Удаление из истории скоро добавим.');
+  }
+
+  void _cancelSoon() {
+    _showInfo('Отмена генерации появится в ближайшем обновлении.');
+  }
+
+  void _retrySoon() {
+    _showInfo('Попробуйте выбрать фото и запустить генерацию снова.');
+    context.go(TemplatesPage.routePath);
+  }
+
+  void _shareResult(TemplateGenerationResult generation) {
+    final outputUrl = generation.outputUrl;
+    if (outputUrl == null || outputUrl.isEmpty) {
+      _showInfo('Результат пока недоступен для шаринга.');
+      return;
+    }
+
+    SharePlus.instance.share(ShareParams(text: outputUrl));
+  }
+
+  void _showInfo(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -155,13 +327,16 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
         _errorMessage = null;
       });
 
-      if (generation.isCompleted) {
-        _pollTimer?.cancel();
+      if (generation.isUnread) {
         unawaited(
           ref
               .read(generationHistoryControllerProvider.notifier)
               .markRead(generation.generationId),
         );
+      }
+
+      if (generation.isTerminal) {
+        _pollTimer?.cancel();
       }
     } catch (error) {
       if (!mounted) {
@@ -236,15 +411,23 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.title, required this.onBack});
+  const _Header({
+    required this.title,
+    required this.onBack,
+    this.subtitle,
+    this.onMenu,
+  });
 
   final String title;
+  final String? subtitle;
   final VoidCallback onBack;
+  final VoidCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         IconButton(
           onPressed: onBack,
@@ -252,14 +435,39 @@ class _Header extends StatelessWidget {
           color: colors.textStrong,
         ),
         Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: colors.textStrong,
-              fontWeight: FontWeight.w800,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
+        if (onMenu != null)
+          IconButton(
+            onPressed: onMenu,
+            icon: const Icon(Icons.more_vert_rounded),
+            color: colors.textStrong,
+          ),
       ],
     );
   }
@@ -307,15 +515,56 @@ class _StatusHero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              minHeight: 9,
-              value: progress / 100,
-              color: _statusColor(colors, generation),
-              backgroundColor: colors.border.withValues(alpha: 0.6),
+          if (!generation.isTerminal)
+            Row(
+              children: [
+                SizedBox(
+                  width: 84,
+                  height: 84,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CircularProgressIndicator(
+                        value: progress / 100,
+                        strokeWidth: 7,
+                        color: _statusColor(colors, generation),
+                        backgroundColor: colors.border.withValues(alpha: 0.6),
+                      ),
+                      Center(
+                        child: Text(
+                          '$progress%',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: colors.textStrong,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _etaLabel(generation),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textSoft,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: 9,
+                value: progress / 100,
+                color: _statusColor(colors, generation),
+                backgroundColor: colors.border.withValues(alpha: 0.6),
+              ),
             ),
-          ),
           const SizedBox(height: 8),
           Text(
             generation.isTerminal
@@ -456,20 +705,38 @@ class _FailureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     return _Panel(
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline_rounded, color: colors.danger),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              generation.refundedAtUtc != null
-                  ? 'Не удалось создать результат. Мы вернули токены на ваш баланс.'
-                  : 'Не удалось создать результат. Попробуйте другое фото или повторите позже.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colors.textSoft,
-                height: 1.4,
+          Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: colors.danger),
+              const SizedBox(width: 8),
+              Text(
+                'Не удалось создать',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: colors.danger,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _failureReasonMessage(generation),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.textSoft,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            generation.refundedAtUtc != null
+                ? 'Токены возвращены на ваш баланс.'
+                : 'Если ошибка повторится, напишите в поддержку.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colors.textMuted,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -501,6 +768,201 @@ class _BackgroundHintCard extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadyActionsRow extends StatelessWidget {
+  const _ReadyActionsRow({
+    required this.onSave,
+    required this.onShare,
+    required this.onDelete,
+  });
+
+  final VoidCallback onSave;
+  final VoidCallback onShare;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _ActionTile(
+          icon: Icons.download_rounded,
+          label: 'Скачать',
+          onTap: onSave,
+        ),
+        const SizedBox(width: 8),
+        _ActionTile(
+          icon: Icons.share_rounded,
+          label: 'Поделиться',
+          onTap: onShare,
+        ),
+        const SizedBox(width: 8),
+        _ActionTile(
+          icon: Icons.delete_outline_rounded,
+          label: 'Удалить',
+          onTap: onDelete,
+        ),
+      ],
+    );
+  }
+}
+
+class _FailedActions extends StatelessWidget {
+  const _FailedActions({
+    required this.onPickAnotherPhoto,
+    required this.onRetry,
+    required this.onSupport,
+  });
+
+  final VoidCallback onPickAnotherPhoto;
+  final VoidCallback onRetry;
+  final VoidCallback onSupport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton(
+          onPressed: onPickAnotherPhoto,
+          child: const Text('Выбрать другое фото'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(onPressed: onRetry, child: const Text('Попробовать снова')),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: onSupport,
+          child: const Text('Сообщить в поддержку'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActiveActions extends StatelessWidget {
+  const _ActiveActions({required this.onContinue, required this.onCancel});
+
+  final VoidCallback onContinue;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton(
+          onPressed: onContinue,
+          child: const Text('Продолжить в приложении'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: onCancel,
+          child: const Text('Отменить генерацию'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceGlass,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: colors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            child: Column(
+              children: [
+                Icon(icon, size: 18, color: colors.textStrong),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: colors.textStrong,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailsCard extends StatelessWidget {
+  const _DetailsCard({required this.rows});
+
+  final List<(String, String)> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return _Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Детали',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: colors.textStrong,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      row.$1,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      row.$2,
+                      textAlign: TextAlign.right,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textStrong,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -796,6 +1258,73 @@ class _Panel extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
+}
+
+String _typeLabel(TemplateGenerationResult generation) {
+  return _isVideo(generation) ? 'Видео' : 'Изображение';
+}
+
+String _tokensLabel(int value) {
+  final last = value % 10;
+  final lastTwo = value % 100;
+  if (last == 1 && lastTwo != 11) {
+    return 'токен';
+  }
+  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+    return 'токена';
+  }
+  return 'токенов';
+}
+
+String _formatDateTime(DateTime value) {
+  const months = <String>[
+    'янв',
+    'фев',
+    'мар',
+    'апр',
+    'мая',
+    'июн',
+    'июл',
+    'авг',
+    'сен',
+    'окт',
+    'ноя',
+    'дек',
+  ];
+  final local = value.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${local.day} ${months[local.month - 1]}, $hour:$minute';
+}
+
+String _etaLabel(TemplateGenerationResult generation) {
+  final estimated = generation.estimatedDurationLabel;
+  if (estimated != null && estimated.isNotEmpty) {
+    return 'Примерно $estimated осталось';
+  }
+
+  if (generation.stage == 'queued') {
+    return 'Ожидание в очереди';
+  }
+  if (generation.stage == 'finalizing') {
+    return 'Почти готово';
+  }
+  return 'Примерно 1-2 мин осталось';
+}
+
+String _failureReasonMessage(TemplateGenerationResult generation) {
+  final code = (generation.failureCode ?? '').toLowerCase();
+  final message = (generation.failureMessage ?? '').toLowerCase();
+  final combined = '$code $message';
+
+  if (combined.contains('photo') ||
+      combined.contains('face') ||
+      combined.contains('pet') ||
+      combined.contains('quality')) {
+    return 'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
+  }
+
+  return 'Произошла техническая ошибка при генерации.';
 }
 
 String _statusTitle(TemplateGenerationResult generation) {

@@ -779,12 +779,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumHeroEyebrow => 'Premium магия';
 
   @override
-  String get premiumHeroTitle =>
-      'Получите Premium и создавайте больше контента.';
+  String get premiumHeroTitle => 'Откройте вирусные видео с питомцами';
 
   @override
   String get premiumHeroSubtitle =>
-      'Откройте premium-шаблоны, более быструю генерацию и больше возможностей для фото и видео в одном тарифе.';
+      'Больше генераций, premium-шаблоны, более быстрая обработка и без водяного знака.';
 
   @override
   String get premiumAlreadyActive => 'Premium активен';
@@ -936,7 +935,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.';
 
   @override
-  String get premiumContinueAction => 'Получить Premium';
+  String get premiumContinueAction => 'Продолжить';
 
   @override
   String get externalCheckoutStripeTitle => 'Оплата через Stripe';
@@ -1503,6 +1502,55 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get supportChatAttachmentUnavailableError =>
       'Сейчас не удается отправить вложение. Попробуйте снова через минуту.';
+
+  @override
+  String get supportChatAttachmentTooLargeError =>
+      'Файл слишком большой. Максимальный размер — 10 МБ.';
+
+  @override
+  String get supportChatImageLabel => 'Изображение';
+
+  @override
+  String get supportChatSaveImageAction => 'Сохранить изображение';
+
+  @override
+  String get supportChatShareAction => 'Поделиться';
+
+  @override
+  String get supportChatOpenOriginalAction => 'Открыть оригинал';
+
+  @override
+  String get supportChatCloseAction => 'Закрыть';
+
+  @override
+  String get supportChatImageSavedMessage => 'Изображение сохранено';
+
+  @override
+  String get supportChatSaveImageFailedError =>
+      'Не удалось сохранить изображение';
+
+  @override
+  String get supportChatShareImageFailedError =>
+      'Не удалось поделиться изображением';
+
+  @override
+  String get supportChatAttachmentStatusUploading => 'Загрузка';
+
+  @override
+  String get supportChatAttachmentStatusUploaded => 'Загружено';
+
+  @override
+  String get supportChatAttachmentStatusFailed => 'Ошибка';
+
+  @override
+  String get supportChatAttachmentStatusRetry => 'Повтор';
+
+  @override
+  String get supportChatImageUploadFailedLabel =>
+      'Не удалось загрузить изображение';
+
+  @override
+  String get supportChatFileFallbackLabel => 'Файл';
 
   @override
   String get profileSettingsThemeSystem => 'Системная';

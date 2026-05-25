@@ -148,6 +148,37 @@ public sealed record UpdatePaymentProviderConfigurationCommand(
     string Mode,
     string? Notes);
 
+public sealed record CreatePaymentProviderConfigurationCommand(
+    string Provider,
+    string Platform,
+    string Region,
+    bool IsEnabled,
+    bool IsRecommended,
+    bool IsSelectedByDefault,
+    bool RequiresExternalWarning,
+    bool RequiresStoreDisclosure,
+    string AllowedFromAppVersion,
+    bool ExternalCheckoutAllowed,
+    int BonusTokensPercent,
+    string? DisplayLabel,
+    string? DisplaySubtitle,
+    string? WarningTitle,
+    string? WarningMessage,
+    string Mode,
+    string? Notes);
+
+public sealed record ClonePaymentProviderConfigurationCommand(
+    Guid SourceConfigurationId,
+    string Region);
+
+public sealed record DeletePaymentProviderConfigurationCommand(Guid ConfigurationId);
+
+public sealed record TestPaymentProviderConfigurationMatchQuery(
+    string Provider,
+    string Platform,
+    string Country,
+    string AppVersion);
+
 public sealed record OffsetPagedResponse<T>(
     IReadOnlyList<T> Items,
     int Skip,
@@ -358,6 +389,20 @@ public sealed record AdminPaymentProviderConfigurationResponse(
     string Mode,
     string? Notes,
     DateTime UpdatedAtUtc);
+
+public sealed record AdminPaymentProviderConfigurationMatchResponse(
+    string Provider,
+    string Platform,
+    string Country,
+    string NormalizedRegion,
+    bool IsEuRegion,
+    string AppVersion,
+    bool MatchFound,
+    bool AllowedForCheckout,
+    bool StripeModeConfigured,
+    string DecisionCode,
+    string DecisionMessage,
+    AdminPaymentProviderConfigurationResponse? MatchedConfiguration);
 
 public sealed record AdminUserSubscriptionResponse(
     Guid SubscriptionId,

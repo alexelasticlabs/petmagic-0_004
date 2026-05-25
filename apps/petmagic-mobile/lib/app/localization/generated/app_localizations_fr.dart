@@ -1506,6 +1506,54 @@ class AppLocalizationsFr extends AppLocalizations {
       'Impossible d\'envoyer la pièce jointe pour le moment. Réessayez dans un instant.';
 
   @override
+  String get supportChatAttachmentTooLargeError =>
+      'La pièce jointe est trop volumineuse. La taille maximale est de 10 Mo.';
+
+  @override
+  String get supportChatImageLabel => 'Image de support';
+
+  @override
+  String get supportChatSaveImageAction => 'Enregistrer l\'image';
+
+  @override
+  String get supportChatShareAction => 'Partager';
+
+  @override
+  String get supportChatOpenOriginalAction => 'Ouvrir l\'original';
+
+  @override
+  String get supportChatCloseAction => 'Fermer';
+
+  @override
+  String get supportChatImageSavedMessage => 'Image enregistrée';
+
+  @override
+  String get supportChatSaveImageFailedError =>
+      'Échec de l\'enregistrement de l\'image';
+
+  @override
+  String get supportChatShareImageFailedError => 'Échec du partage de l\'image';
+
+  @override
+  String get supportChatAttachmentStatusUploading => 'Téléversement';
+
+  @override
+  String get supportChatAttachmentStatusUploaded => 'Téléversée';
+
+  @override
+  String get supportChatAttachmentStatusFailed => 'Échec';
+
+  @override
+  String get supportChatAttachmentStatusRetry => 'Réessayer';
+
+  @override
+  String get supportChatImageUploadFailedLabel =>
+      'Échec du téléversement de l\'image';
+
+  @override
+  String get supportChatFileFallbackLabel => 'Fichier';
+
+  @override
   String get profileSettingsThemeSystem => 'Système';
 
   @override

@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart'
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
@@ -29,6 +30,7 @@ class ProfileSettingsPage extends ConsumerWidget {
     final preferencesController = ref.read(
       appPreferencesControllerProvider.notifier,
     );
+    final profileController = ref.read(profileControllerProvider.notifier);
 
     return ProfileScreenBackground(
       child: SafeArea(
@@ -276,7 +278,14 @@ class ProfileSettingsPage extends ConsumerWidget {
                     await showProfileDeleteAccountConfirmationSheet(
                       context: context,
                       onConfirm: () async {
+                        await profileController.deleteAccount();
+
                         if (!context.mounted) {
+                          return;
+                        }
+
+                        final nextState = ref.read(profileControllerProvider);
+                        if (nextState.errorMessage == null) {
                           return;
                         }
 
@@ -285,7 +294,12 @@ class ProfileSettingsPage extends ConsumerWidget {
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
                             SnackBar(
-                              content: Text(text.profileDetailsDeleteBody),
+                              content: Text(
+                                mapProfileFeedbackMessage(
+                                  nextState.errorMessage!,
+                                  text,
+                                ),
+                              ),
                             ),
                           );
                       },

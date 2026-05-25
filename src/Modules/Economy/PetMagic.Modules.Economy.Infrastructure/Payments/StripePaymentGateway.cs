@@ -1,6 +1,7 @@
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Options;
+
 using Stripe;
 using Stripe.Checkout;
 
@@ -17,12 +18,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure<PaymentCreateResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure<PaymentCreateResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         var amountInMinorUnits = (long)decimal.Round(request.PriceAmount * 100m, 0, MidpointRounding.AwayFromZero);
         var checkoutOptions = new SessionCreateOptions
@@ -95,12 +97,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         var amountInMinorUnits = (long)decimal.Round(request.PriceAmount * 100m, 0, MidpointRounding.AwayFromZero);
         var metadata = new Dictionary<string, string>
@@ -173,12 +176,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure<PaymentCustomerCreateResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure<PaymentCustomerCreateResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         try
         {
@@ -212,12 +216,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure<BillingPortalCreateResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure<BillingPortalCreateResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         try
         {
@@ -254,12 +259,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure<PaymentMethodSetupCreateResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure<PaymentMethodSetupCreateResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         try
         {
@@ -307,12 +313,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure<PaymentMethodDetailsResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey();
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure<PaymentMethodDetailsResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         try
         {
@@ -344,12 +351,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey();
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         try
         {
@@ -371,12 +379,13 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             return Result.Failure<PaymentCreateResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        if (!EnsureConfigured())
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey))
         {
             return Result.Failure<PaymentCreateResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        ConfigureStripe();
+        ConfigureStripe(apiKey);
 
         var amountInMinorUnits = (long)decimal.Round(request.PriceAmount * 100m, 0, MidpointRounding.AwayFromZero);
 
@@ -415,13 +424,33 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
         return string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
     }
 
-    private bool EnsureConfigured()
+    private bool EnsureConfigured(string? apiKey)
     {
-        return !string.IsNullOrWhiteSpace(options.StripeSecretKey);
+        return !string.IsNullOrWhiteSpace(apiKey);
     }
 
-    private void ConfigureStripe()
+    private void ConfigureStripe(string? apiKey)
     {
-        StripeConfiguration.ApiKey = options.StripeSecretKey;
+        StripeConfiguration.ApiKey = apiKey;
+    }
+
+    private string ResolveApiKey(string? apiKey = null)
+    {
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            return apiKey;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.StripeSecretKey))
+        {
+            return options.StripeSecretKey;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.StripeLiveSecretKey))
+        {
+            return options.StripeLiveSecretKey;
+        }
+
+        return options.StripeTestSecretKey;
     }
 }

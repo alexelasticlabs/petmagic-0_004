@@ -1508,6 +1508,53 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se puede enviar el archivo adjunto en este momento. Inténtalo de nuevo en un momento.';
 
   @override
+  String get supportChatAttachmentTooLargeError =>
+      'El archivo adjunto es demasiado grande. El tamaño máximo es de 10 MB.';
+
+  @override
+  String get supportChatImageLabel => 'Imagen de soporte';
+
+  @override
+  String get supportChatSaveImageAction => 'Guardar imagen';
+
+  @override
+  String get supportChatShareAction => 'Compartir';
+
+  @override
+  String get supportChatOpenOriginalAction => 'Abrir original';
+
+  @override
+  String get supportChatCloseAction => 'Cerrar';
+
+  @override
+  String get supportChatImageSavedMessage => 'Imagen guardada';
+
+  @override
+  String get supportChatSaveImageFailedError => 'No se pudo guardar la imagen';
+
+  @override
+  String get supportChatShareImageFailedError =>
+      'No se pudo compartir la imagen';
+
+  @override
+  String get supportChatAttachmentStatusUploading => 'Subiendo';
+
+  @override
+  String get supportChatAttachmentStatusUploaded => 'Subida';
+
+  @override
+  String get supportChatAttachmentStatusFailed => 'Fallida';
+
+  @override
+  String get supportChatAttachmentStatusRetry => 'Reintentar';
+
+  @override
+  String get supportChatImageUploadFailedLabel => 'Error al subir la imagen';
+
+  @override
+  String get supportChatFileFallbackLabel => 'Archivo';
+
+  @override
   String get profileSettingsThemeSystem => 'Sistema';
 
   @override

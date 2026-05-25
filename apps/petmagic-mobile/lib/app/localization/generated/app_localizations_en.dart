@@ -779,11 +779,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumHeroEyebrow => 'Premium magic';
 
   @override
-  String get premiumHeroTitle => 'Get Premium and create more content.';
+  String get premiumHeroTitle => 'Unlock viral pet videos';
 
   @override
   String get premiumHeroSubtitle =>
-      'Unlock premium templates, faster generation and more room for photos and videos in one plan.';
+      'More generations, premium templates, faster processing and no watermark.';
 
   @override
   String get premiumAlreadyActive => 'Premium active';
@@ -935,7 +935,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manage or cancel your subscription from billing settings at any time.';
 
   @override
-  String get premiumContinueAction => 'Start Premium';
+  String get premiumContinueAction => 'Continue';
 
   @override
   String get externalCheckoutStripeTitle => 'Payment via Stripe';
@@ -1503,6 +1503,52 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get supportChatAttachmentUnavailableError =>
       'Unable to send the attachment right now. Please try again in a moment.';
+
+  @override
+  String get supportChatAttachmentTooLargeError =>
+      'Attachment is too large. Maximum size is 10 MB.';
+
+  @override
+  String get supportChatImageLabel => 'Support image';
+
+  @override
+  String get supportChatSaveImageAction => 'Save image';
+
+  @override
+  String get supportChatShareAction => 'Share';
+
+  @override
+  String get supportChatOpenOriginalAction => 'Open original';
+
+  @override
+  String get supportChatCloseAction => 'Close';
+
+  @override
+  String get supportChatImageSavedMessage => 'Image saved';
+
+  @override
+  String get supportChatSaveImageFailedError => 'Failed to save image';
+
+  @override
+  String get supportChatShareImageFailedError => 'Failed to share image';
+
+  @override
+  String get supportChatAttachmentStatusUploading => 'Uploading';
+
+  @override
+  String get supportChatAttachmentStatusUploaded => 'Uploaded';
+
+  @override
+  String get supportChatAttachmentStatusFailed => 'Failed';
+
+  @override
+  String get supportChatAttachmentStatusRetry => 'Retry';
+
+  @override
+  String get supportChatImageUploadFailedLabel => 'Image upload failed';
+
+  @override
+  String get supportChatFileFallbackLabel => 'File';
 
   @override
   String get profileSettingsThemeSystem => 'System';

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { AdminCard, AdminKpiCard, AdminMetricStrip, AdminPage, AdminPageGrid, AdminPageHero, AdminSelectField, AdminStateCard, AdminStatusBadge, adminTableStyles } from "@/components/admin/admin-primitives";
 import styles from "@/components/economy-page.module.css";
@@ -9,11 +9,16 @@ import { Button } from "@/components/ui/button";
 import { useEconomyPageController } from "@/components/use-economy-page-controller";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    updateAdminPaymentProviderConfig,
+    cloneAdminPaymentProviderConfig,
+    createAdminPaymentProviderConfig,
+    deleteAdminPaymentProviderConfig,
+    testAdminPaymentProviderConfigMatch,
     updateAdminCurrencyPack,
+    updateAdminPaymentProviderConfig,
     updateAdminSubscriptionPlan,
     type AdminCurrencyPack,
     type AdminPaymentProviderConfiguration,
+    type AdminPaymentProviderConfigurationMatch,
     type AdminSubscriptionPlan,
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
@@ -61,6 +66,18 @@ type ProviderConfigDraft = {
     warningMessage: string;
     mode: string;
     notes: string;
+};
+
+type ProviderConfigCreateDraft = ProviderConfigDraft & {
+    provider: string;
+    platform: string;
+};
+
+type ProviderConfigMatchDraft = {
+    provider: string;
+    platform: string;
+    country: string;
+    appVersion: string;
 };
 
 type TableOrEmptyProps = {
@@ -201,6 +218,15 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     const [drafts, setDrafts] = useState<Record<string, PackDraft>>({});
     const [planDrafts, setPlanDrafts] = useState<Record<string, SubscriptionPlanDraft>>({});
     const [providerConfigDrafts, setProviderConfigDrafts] = useState<Record<string, ProviderConfigDraft>>({});
+    const [cloneRegionDrafts, setCloneRegionDrafts] = useState<Record<string, string>>({});
+    const [createProviderDraft, setCreateProviderDraft] = useState<ProviderConfigCreateDraft>(() => createDefaultProviderConfigDraft());
+    const [matchDraft, setMatchDraft] = useState<ProviderConfigMatchDraft>({
+        provider: "stripe",
+        platform: "web",
+        country: "US",
+        appVersion: "1.0.0",
+    });
+    const [matchResult, setMatchResult] = useState<AdminPaymentProviderConfigurationMatch | null>(null);
     const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
 
     const savePackMutation = useMutation({
@@ -267,6 +293,59 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         },
         onError: (error) => {
             setFeedback({ tone: "danger", message: error instanceof Error ? error.message : text.providerConfigSaveError });
+        },
+    });
+
+    const createProviderConfigMutation = useMutation({
+        mutationFn: async () => createAdminPaymentProviderConfig(toProviderConfigCreatePayload(createProviderDraft, text)),
+        onSuccess: async () => {
+            setFeedback({ tone: "success", message: text.providerConfigCreated });
+            setCreateProviderDraft(createDefaultProviderConfigDraft());
+            await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPaymentProviderConfigs });
+        },
+        onError: (error) => {
+            setFeedback({ tone: "danger", message: error instanceof Error ? error.message : text.providerConfigCreateError });
+        },
+    });
+
+    const cloneProviderConfigMutation = useMutation({
+        mutationFn: async (payload: { configurationId: string; region: string }) => {
+            return cloneAdminPaymentProviderConfig(payload.configurationId, { region: payload.region });
+        },
+        onSuccess: async (_, variables) => {
+            setFeedback({ tone: "success", message: text.providerConfigCloned });
+            setCloneRegionDrafts((current) => ({ ...current, [variables.configurationId]: "" }));
+            await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPaymentProviderConfigs });
+        },
+        onError: (error) => {
+            setFeedback({ tone: "danger", message: error instanceof Error ? error.message : text.providerConfigCloneError });
+        },
+    });
+
+    const deleteProviderConfigMutation = useMutation({
+        mutationFn: async (configurationId: string) => {
+            await deleteAdminPaymentProviderConfig(configurationId);
+        },
+        onSuccess: async () => {
+            setFeedback({ tone: "success", message: text.providerConfigDeleted });
+            await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPaymentProviderConfigs });
+        },
+        onError: (error) => {
+            setFeedback({ tone: "danger", message: error instanceof Error ? error.message : text.providerConfigDeleteError });
+        },
+    });
+
+    const testProviderConfigMutation = useMutation({
+        mutationFn: async () => {
+            const payload = toProviderConfigMatchPayload(matchDraft, text);
+            return testAdminPaymentProviderConfigMatch(payload);
+        },
+        onSuccess: (result) => {
+            setMatchResult(result);
+        },
+        onError: (error) => {
+            setMatchResult(null);
+            setFeedback({ tone: "danger", message: error instanceof Error ? error.message : text.providerConfigTestError });
         },
     });
 
@@ -655,6 +734,167 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 </AdminCard>
 
                 <AdminCard title={text.providerConfigsTitle} description={text.providerConfigsDescription}>
+                    <div className={styles.redeemGrid}>
+                        <div className={styles.redeemForm}>
+                            <strong>{text.providerConfigCreateTitle}</strong>
+                            <div className={styles.formRow}>
+                                <label className={styles.field}>
+                                    <span>{text.providerColumn}</span>
+                                    <input
+                                        value={createProviderDraft.provider}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, provider: event.target.value.toLowerCase() }))}
+                                        className={styles.input}
+                                        placeholder="stripe"
+                                    />
+                                </label>
+                                <label className={styles.field}>
+                                    <span>{text.platformColumn}</span>
+                                    <input
+                                        value={createProviderDraft.platform}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, platform: event.target.value.toLowerCase() }))}
+                                        className={styles.input}
+                                        placeholder="web"
+                                    />
+                                </label>
+                                <label className={styles.field}>
+                                    <span>{text.regionColumn}</span>
+                                    <input
+                                        value={createProviderDraft.region}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, region: event.target.value.toUpperCase() }))}
+                                        className={styles.input}
+                                        placeholder="US"
+                                    />
+                                </label>
+                                <label className={styles.field}>
+                                    <span>{text.modeColumn}</span>
+                                    <input
+                                        value={createProviderDraft.mode}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, mode: event.target.value.toLowerCase() }))}
+                                        className={styles.input}
+                                        placeholder="test"
+                                    />
+                                </label>
+                            </div>
+
+                            <div className={styles.formRow}>
+                                <label className={styles.field}>
+                                    <span>{text.minVersionLabel}</span>
+                                    <input
+                                        value={createProviderDraft.allowedFromAppVersion}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, allowedFromAppVersion: event.target.value }))}
+                                        className={styles.input}
+                                    />
+                                </label>
+                                <label className={styles.field}>
+                                    <span>{text.bonusPercentLabel}</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={createProviderDraft.bonusTokensPercent}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, bonusTokensPercent: event.target.value }))}
+                                        className={styles.input}
+                                    />
+                                </label>
+                            </div>
+
+                            <div className={styles.flagList}>
+                                <label className={styles.checkboxField}>
+                                    <input
+                                        type="checkbox"
+                                        checked={createProviderDraft.isEnabled}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, isEnabled: event.target.checked }))}
+                                    />
+                                    <span>{text.activeState}</span>
+                                </label>
+                                <label className={styles.checkboxField}>
+                                    <input
+                                        type="checkbox"
+                                        checked={createProviderDraft.externalCheckoutAllowed}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, externalCheckoutAllowed: event.target.checked }))}
+                                    />
+                                    <span>{text.externalCheckoutFlag}</span>
+                                </label>
+                                <label className={styles.checkboxField}>
+                                    <input
+                                        type="checkbox"
+                                        checked={createProviderDraft.isRecommended}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, isRecommended: event.target.checked }))}
+                                    />
+                                    <span>{text.recommendedFlag}</span>
+                                </label>
+                                <label className={styles.checkboxField}>
+                                    <input
+                                        type="checkbox"
+                                        checked={createProviderDraft.isSelectedByDefault}
+                                        onChange={(event) => setCreateProviderDraft((current) => ({ ...current, isSelectedByDefault: event.target.checked }))}
+                                    />
+                                    <span>{text.defaultFlag}</span>
+                                </label>
+                            </div>
+
+                            <Button onClick={() => createProviderConfigMutation.mutate()} disabled={createProviderConfigMutation.isPending}>
+                                {createProviderConfigMutation.isPending ? text.savingAction : text.providerConfigCreateAction}
+                            </Button>
+                        </div>
+
+                        <div className={styles.redeemForm}>
+                            <strong>{text.providerConfigTestTitle}</strong>
+                            <div className={styles.formRow}>
+                                <label className={styles.field}>
+                                    <span>{text.providerColumn}</span>
+                                    <input
+                                        value={matchDraft.provider}
+                                        onChange={(event) => setMatchDraft((current) => ({ ...current, provider: event.target.value.toLowerCase() }))}
+                                        className={styles.input}
+                                        placeholder="stripe"
+                                    />
+                                </label>
+                                <label className={styles.field}>
+                                    <span>{text.platformColumn}</span>
+                                    <input
+                                        value={matchDraft.platform}
+                                        onChange={(event) => setMatchDraft((current) => ({ ...current, platform: event.target.value.toLowerCase() }))}
+                                        className={styles.input}
+                                        placeholder="ios"
+                                    />
+                                </label>
+                                <label className={styles.field}>
+                                    <span>{text.regionColumn}</span>
+                                    <input
+                                        value={matchDraft.country}
+                                        onChange={(event) => setMatchDraft((current) => ({ ...current, country: event.target.value.toUpperCase() }))}
+                                        className={styles.input}
+                                        placeholder="DE"
+                                    />
+                                </label>
+                                <label className={styles.field}>
+                                    <span>{text.minVersionLabel}</span>
+                                    <input
+                                        value={matchDraft.appVersion}
+                                        onChange={(event) => setMatchDraft((current) => ({ ...current, appVersion: event.target.value }))}
+                                        className={styles.input}
+                                        placeholder="1.0.0"
+                                    />
+                                </label>
+                            </div>
+
+                            <Button onClick={() => testProviderConfigMutation.mutate()} disabled={testProviderConfigMutation.isPending}>
+                                {testProviderConfigMutation.isPending ? text.savingAction : text.providerConfigTestAction}
+                            </Button>
+
+                            {matchResult ? (
+                                <AdminStateCard
+                                    tone={matchResult.allowedForCheckout ? "success" : "warning"}
+                                    title={`${matchResult.decisionCode}: ${matchResult.decisionMessage}`}
+                                    description={matchResult.matchedConfiguration
+                                        ? `${text.providerConfigMatchLabel}: ${matchResult.matchedConfiguration.provider}/${matchResult.matchedConfiguration.platform}/${matchResult.matchedConfiguration.region} (${matchResult.matchedConfiguration.mode})`
+                                        : text.providerConfigNoMatchLabel}
+                                />
+                            ) : null}
+                        </div>
+                    </div>
+
                     <TableOrEmpty hasItems={providerConfigs.length > 0} emptyTitle={text.noProviderConfigs}>
                         <div className={adminTableStyles.tableWrap}>
                             <table className={adminTableStyles.table}>
@@ -816,9 +1056,56 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <Button onClick={() => saveProviderConfigMutation.mutate(config.configurationId)} disabled={isSavingConfig}>
-                                                        {isSavingConfig ? text.savingAction : text.saveAction}
-                                                    </Button>
+                                                    <div className={styles.tableActions}>
+                                                        <Button onClick={() => saveProviderConfigMutation.mutate(config.configurationId)} disabled={isSavingConfig}>
+                                                            {isSavingConfig ? text.savingAction : text.saveAction}
+                                                        </Button>
+
+                                                        <input
+                                                            value={cloneRegionDrafts[config.configurationId] ?? ""}
+                                                            onChange={(event) =>
+                                                                setCloneRegionDrafts((current) => ({
+                                                                    ...current,
+                                                                    [config.configurationId]: event.target.value.toUpperCase(),
+                                                                }))
+                                                            }
+                                                            className={styles.input}
+                                                            placeholder={text.cloneRegionPlaceholder}
+                                                        />
+
+                                                        <Button
+                                                            onClick={() =>
+                                                                cloneProviderConfigMutation.mutate({
+                                                                    configurationId: config.configurationId,
+                                                                    region: (cloneRegionDrafts[config.configurationId] ?? "").trim(),
+                                                                })
+                                                            }
+                                                            disabled={
+                                                                cloneProviderConfigMutation.isPending
+                                                                || !(cloneRegionDrafts[config.configurationId] ?? "").trim()
+                                                            }
+                                                        >
+                                                            {cloneProviderConfigMutation.isPending && cloneProviderConfigMutation.variables?.configurationId === config.configurationId
+                                                                ? text.savingAction
+                                                                : text.cloneAction}
+                                                        </Button>
+
+                                                        <Button
+                                                            onClick={() => {
+                                                                if (!window.confirm(text.providerConfigDeleteConfirm)) {
+                                                                    return;
+                                                                }
+
+                                                                deleteProviderConfigMutation.mutate(config.configurationId);
+                                                            }}
+                                                            disabled={deleteProviderConfigMutation.isPending}
+                                                            variant="danger"
+                                                        >
+                                                            {deleteProviderConfigMutation.isPending && deleteProviderConfigMutation.variables === config.configurationId
+                                                                ? text.savingAction
+                                                                : text.deleteAction}
+                                                        </Button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -986,6 +1273,12 @@ function getText(locale: Locale) {
             subscriptionPlansDescription: "Текущая конфигурация месячных и годовых планов, которую видят мобильный клиент и checkout flow.",
             providerConfigsTitle: "Маршрутизация платежей",
             providerConfigsDescription: "Backend-controlled правила выбора App Store, Google Play и Stripe по платформе и региону.",
+            providerConfigCreateTitle: "Создать маршрут",
+            providerConfigCreateAction: "Добавить маршрут",
+            providerConfigTestTitle: "Test Match",
+            providerConfigTestAction: "Проверить матч",
+            providerConfigMatchLabel: "Сработавший маршрут",
+            providerConfigNoMatchLabel: "Совпадений нет для указанных входных условий.",
             subscriptionsTitle: "Активные и недавние подписки",
             subscriptionsDescription: "Снимок последних premium подписок по пользователям с провайдером, токенами и датой продления.",
             subscriptionEventsTitle: "Лог событий подписок",
@@ -997,10 +1290,19 @@ function getText(locale: Locale) {
             planSaveError: "Не удалось сохранить Premium план.",
             providerConfigSaved: "Маршрут оплаты обновлен.",
             providerConfigSaveError: "Не удалось сохранить маршрут оплаты.",
+            providerConfigCreated: "Маршрут оплаты создан.",
+            providerConfigCreateError: "Не удалось создать маршрут оплаты.",
+            providerConfigCloned: "Маршрут оплаты клонирован.",
+            providerConfigCloneError: "Не удалось клонировать маршрут оплаты.",
+            providerConfigDeleted: "Маршрут оплаты удален.",
+            providerConfigDeleteError: "Не удалось удалить маршрут оплаты.",
+            providerConfigTestError: "Не удалось выполнить тест маршрутизации.",
             planMissingDraft: "План не найден в текущем списке.",
             providerConfigMissingDraft: "Маршрут оплаты не найден в текущем списке.",
             invalidPlanNumbers: "Укажите корректные цену, валюту и лимит токенов для плана.",
             invalidProviderConfig: "Заполните регион, минимальную версию приложения, режим маршрута и бонус от 0 до 100%.",
+            invalidProviderConfigCreate: "Укажите provider и platform для нового маршрута.",
+            invalidProviderConfigMatch: "Укажите provider/platform/region/appVersion для теста маршрутизации.",
             packColumn: "Пакет",
             planColumn: "План",
             priceColumn: "Цена",
@@ -1063,6 +1365,10 @@ function getText(locale: Locale) {
             displaySubtitleLabel: "Подзаголовок",
             warningTitleLabel: "Заголовок warning",
             warningMessageLabel: "Текст warning",
+            cloneRegionPlaceholder: "Регион для копии",
+            cloneAction: "Клонировать",
+            deleteAction: "Удалить",
+            providerConfigDeleteConfirm: "Удалить этот маршрут оплаты?",
             notProcessedLabel: "Еще не обработано",
         };
     }
@@ -1094,6 +1400,12 @@ function getText(locale: Locale) {
         subscriptionPlansDescription: "Current monthly and yearly plan configuration used by mobile clients and checkout flows.",
         providerConfigsTitle: "Payment routing",
         providerConfigsDescription: "Backend-controlled rules that choose App Store, Google Play, and Stripe by platform and region.",
+        providerConfigCreateTitle: "Create route",
+        providerConfigCreateAction: "Add route",
+        providerConfigTestTitle: "Test match",
+        providerConfigTestAction: "Run match",
+        providerConfigMatchLabel: "Matched route",
+        providerConfigNoMatchLabel: "No route matched the provided input conditions.",
         subscriptionsTitle: "Active and recent subscriptions",
         subscriptionsDescription: "Snapshot of recent premium subscriptions with provider, token usage, and renewal date.",
         subscriptionEventsTitle: "Subscription event log",
@@ -1105,10 +1417,19 @@ function getText(locale: Locale) {
         planSaveError: "Failed to save premium plan.",
         providerConfigSaved: "Payment route updated.",
         providerConfigSaveError: "Failed to save payment route.",
+        providerConfigCreated: "Payment route created.",
+        providerConfigCreateError: "Failed to create payment route.",
+        providerConfigCloned: "Payment route cloned.",
+        providerConfigCloneError: "Failed to clone payment route.",
+        providerConfigDeleted: "Payment route deleted.",
+        providerConfigDeleteError: "Failed to delete payment route.",
+        providerConfigTestError: "Failed to run routing test.",
         planMissingDraft: "Premium plan was not found in the current list.",
         providerConfigMissingDraft: "Payment route was not found in the current list.",
         invalidPlanNumbers: "Enter a valid price, currency, and token limit for the plan.",
         invalidProviderConfig: "Enter a valid region, minimum app version, routing mode, and 0-100% bonus.",
+        invalidProviderConfigCreate: "Enter provider and platform for the new route.",
+        invalidProviderConfigMatch: "Enter provider/platform/region/appVersion for routing test.",
         packColumn: "Pack",
         planColumn: "Plan",
         priceColumn: "Price",
@@ -1171,6 +1492,10 @@ function getText(locale: Locale) {
         displaySubtitleLabel: "Subtitle",
         warningTitleLabel: "Warning title",
         warningMessageLabel: "Warning message",
+        cloneRegionPlaceholder: "Clone region",
+        cloneAction: "Clone",
+        deleteAction: "Delete",
+        providerConfigDeleteConfirm: "Delete this payment route?",
         notProcessedLabel: "Not processed yet",
     };
 }
@@ -1271,6 +1596,28 @@ function toSubscriptionPlanPayload(draft: SubscriptionPlanDraft, text: ReturnTyp
     };
 }
 
+function createDefaultProviderConfigDraft(): ProviderConfigCreateDraft {
+    return {
+        provider: "stripe",
+        platform: "web",
+        region: "*",
+        isEnabled: true,
+        isRecommended: false,
+        isSelectedByDefault: false,
+        requiresExternalWarning: false,
+        requiresStoreDisclosure: false,
+        allowedFromAppVersion: "0.0.0",
+        externalCheckoutAllowed: true,
+        bonusTokensPercent: "0",
+        displayLabel: "",
+        displaySubtitle: "",
+        warningTitle: "",
+        warningMessage: "",
+        mode: "test",
+        notes: "",
+    };
+}
+
 function toProviderConfigDraft(config: AdminPaymentProviderConfiguration): ProviderConfigDraft {
     return {
         region: config.region,
@@ -1288,6 +1635,39 @@ function toProviderConfigDraft(config: AdminPaymentProviderConfiguration): Provi
         warningMessage: config.warningMessage ?? "",
         mode: config.mode,
         notes: config.notes ?? "",
+    };
+}
+
+function toProviderConfigCreatePayload(draft: ProviderConfigCreateDraft, text: ReturnType<typeof getText>) {
+    const provider = draft.provider.trim().toLowerCase();
+    const platform = draft.platform.trim().toLowerCase();
+
+    if (!provider || !platform) {
+        throw new Error(text.invalidProviderConfigCreate);
+    }
+
+    return {
+        provider,
+        platform,
+        ...toProviderConfigPayload(draft, text),
+    };
+}
+
+function toProviderConfigMatchPayload(draft: ProviderConfigMatchDraft, text: ReturnType<typeof getText>) {
+    const provider = draft.provider.trim().toLowerCase();
+    const platform = draft.platform.trim().toLowerCase();
+    const country = draft.country.trim().toUpperCase();
+    const appVersion = draft.appVersion.trim();
+
+    if (!provider || !platform || !country || !appVersion) {
+        throw new Error(text.invalidProviderConfigMatch);
+    }
+
+    return {
+        provider,
+        platform,
+        country,
+        appVersion,
     };
 }
 

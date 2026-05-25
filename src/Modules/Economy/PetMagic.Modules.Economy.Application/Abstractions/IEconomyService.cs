@@ -67,6 +67,14 @@ public interface IEconomyService
 
     Task<Result<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>> ListAdminPaymentProviderConfigurationsAsync(CancellationToken cancellationToken);
 
+    Task<Result<AdminPaymentProviderConfigurationResponse>> CreatePaymentProviderConfigurationAsync(CreatePaymentProviderConfigurationCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminPaymentProviderConfigurationResponse>> ClonePaymentProviderConfigurationAsync(ClonePaymentProviderConfigurationCommand command, CancellationToken cancellationToken);
+
+    Task<Result> DeletePaymentProviderConfigurationAsync(DeletePaymentProviderConfigurationCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminPaymentProviderConfigurationMatchResponse>> TestPaymentProviderConfigurationMatchAsync(TestPaymentProviderConfigurationMatchQuery query, CancellationToken cancellationToken);
+
     Task<Result<AdminCurrencyPackResponse>> UpdateCurrencyPackAsync(UpdateCurrencyPackCommand command, CancellationToken cancellationToken);
 
     Task<Result<AdminSubscriptionPlanResponse>> UpdateSubscriptionPlanAsync(UpdateSubscriptionPlanCommand command, CancellationToken cancellationToken);

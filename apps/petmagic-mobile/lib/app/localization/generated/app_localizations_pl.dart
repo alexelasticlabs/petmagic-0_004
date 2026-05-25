@@ -1507,6 +1507,54 @@ class AppLocalizationsPl extends AppLocalizations {
       'Nie można teraz wysłać załącznika. Spróbuj ponownie za chwilę.';
 
   @override
+  String get supportChatAttachmentTooLargeError =>
+      'Załącznik jest za duży. Maksymalny rozmiar to 10 MB.';
+
+  @override
+  String get supportChatImageLabel => 'Obraz pomocy';
+
+  @override
+  String get supportChatSaveImageAction => 'Zapisz obraz';
+
+  @override
+  String get supportChatShareAction => 'Udostępnij';
+
+  @override
+  String get supportChatOpenOriginalAction => 'Otwórz oryginał';
+
+  @override
+  String get supportChatCloseAction => 'Zamknij';
+
+  @override
+  String get supportChatImageSavedMessage => 'Obraz zapisany';
+
+  @override
+  String get supportChatSaveImageFailedError => 'Nie udało się zapisać obrazu';
+
+  @override
+  String get supportChatShareImageFailedError =>
+      'Nie udało się udostępnić obrazu';
+
+  @override
+  String get supportChatAttachmentStatusUploading => 'Przesyłanie';
+
+  @override
+  String get supportChatAttachmentStatusUploaded => 'Przesłano';
+
+  @override
+  String get supportChatAttachmentStatusFailed => 'Błąd';
+
+  @override
+  String get supportChatAttachmentStatusRetry => 'Ponów';
+
+  @override
+  String get supportChatImageUploadFailedLabel =>
+      'Przesyłanie obrazu nie powiodło się';
+
+  @override
+  String get supportChatFileFallbackLabel => 'Plik';
+
+  @override
   String get profileSettingsThemeSystem => 'System';
 
   @override
