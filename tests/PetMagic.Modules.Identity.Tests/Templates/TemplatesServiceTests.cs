@@ -1,5 +1,7 @@
 using System.Threading.Channels;
+
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -281,6 +283,48 @@ public sealed class TemplatesServiceTests
         Assert.True(publicList.IsSuccess);
         Assert.Single(publicList.Value);
         Assert.Equal(imageTemplate.Value.TemplateId, publicList.Value[0].TemplateId);
+    }
+
+    [Fact]
+    public async Task TemplateResponses_ShouldIncludePetPhotoRequirements()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        string[] expectedRequirements = ["Clear pet face", "Good lighting"];
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Clean Portrait",
+                "Bright portrait",
+                "Portrait",
+                ["clean"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/clean-portrait.jpg", "clean-portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString(),
+                ["Clear pet face", "Good lighting", "Clear pet face"]),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        Assert.Equal(expectedRequirements, created.Value.PetPhotoRequirements);
+
+        var adminDetail = await service.GetAdminAsync(created.Value.TemplateId, CancellationToken.None);
+        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, CancellationToken.None);
+        var publicFeed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, null, [], null, "good lighting", 10, null),
+            CancellationToken.None);
+
+        Assert.True(adminDetail.IsSuccess);
+        Assert.True(publicDetail.IsSuccess);
+        Assert.True(publicFeed.IsSuccess);
+        Assert.Equal(expectedRequirements, adminDetail.Value.PetPhotoRequirements);
+        Assert.Equal(expectedRequirements, publicDetail.Value.PetPhotoRequirements);
+        var feedItem = Assert.Single(publicFeed.Value.Items);
+        Assert.Equal(created.Value.TemplateId, feedItem.TemplateId);
+        Assert.Equal(expectedRequirements, feedItem.PetPhotoRequirements);
     }
 
     [Fact]

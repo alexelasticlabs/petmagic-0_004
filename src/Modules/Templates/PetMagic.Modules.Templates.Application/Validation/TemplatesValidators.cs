@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 
@@ -29,6 +30,8 @@ public sealed class CreateImageTemplateCommandValidator : AbstractValidator<Crea
         RuleFor(x => x.ImagePrompt).MaximumLength(1000);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= 6).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(160).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(32);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
     }
@@ -48,6 +51,8 @@ public sealed class UpdateImageTemplateCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.ImagePrompt).MaximumLength(1000);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= 6).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(160).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(32);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
     }
@@ -69,6 +74,8 @@ public sealed class CreateVideoTemplateCommandValidator : AbstractValidator<Crea
         RuleFor(x => x.KlingPrompt).MaximumLength(1000);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= 6).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(160).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(32);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
         RuleFor(x => x.ReferenceMotionAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ReferenceMotionAsset is not null);
@@ -92,6 +99,8 @@ public sealed class UpdateVideoTemplateCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.KlingPrompt).MaximumLength(1000);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("Template status is invalid.");
+        RuleFor(x => x.PetPhotoRequirements).Must(items => items is null || items.Count <= 6).WithMessage("Pet photo requirements can contain up to 6 items.");
+        RuleForEach(x => x.PetPhotoRequirements).NotEmpty().MaximumLength(160).When(x => x.PetPhotoRequirements is not null);
         RuleForEach(x => x.Tags).NotEmpty().MaximumLength(32);
         RuleFor(x => x.PreviewAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.PreviewAsset is not null);
         RuleFor(x => x.ReferenceMotionAsset!).SetValidator(new TemplateAssetCommandValidator()).When(x => x.ReferenceMotionAsset is not null);

@@ -191,7 +191,7 @@ class WalletRepository {
       request: request,
       mapError: _mapDioException,
       requestFailedMessage: 'wallet.request_failed',
-      sessionExpiredMessage: 'Session expired.',
+      sessionExpiredMessage: 'auth.session_expired',
     );
   }
 

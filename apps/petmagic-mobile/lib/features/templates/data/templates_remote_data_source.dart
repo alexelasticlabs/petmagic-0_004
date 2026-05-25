@@ -38,7 +38,7 @@ class TemplatesRemoteDataSource {
 
     final data = response.data;
     if (data == null) {
-      throw const AppException('Templates feed response was empty.');
+      throw const AppException('templates.feed_response_empty');
     }
 
     return TemplatesFeedDto.fromJson(data);
@@ -107,12 +107,12 @@ class TemplatesRemoteDataSource {
 
     if (lastConnectionError != null) {
       throw AppException(
-        'Connection timeout. Checked: ${AppConfig.apiBaseUrls.join(', ')}. If you are on a physical Android device over USB, run `adb reverse tcp:5000 tcp:5000` and use API_BASE_URL=http://127.0.0.1:5000.',
+        'templates.connection_timeout',
         cause: lastConnectionError,
       );
     }
 
-    throw const AppException('Templates feed request failed.');
+    throw const AppException('templates.request_failed');
   }
 
   void cancelPendingFeedRequest() {
@@ -128,11 +128,11 @@ class TemplatesRemoteDataSource {
   String _mapMessage(DioException error) {
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.connectionError) {
-      return 'Connection timeout. Check API availability and API_BASE_URL.';
+      return 'templates.connection_timeout';
     }
 
     if (error.type == DioExceptionType.receiveTimeout) {
-      return 'Server response timeout. Try again.';
+      return 'templates.server_timeout';
     }
 
     try {
@@ -145,6 +145,6 @@ class TemplatesRemoteDataSource {
       // Keep a safe fallback below.
     }
 
-    return error.message ?? 'Templates feed request failed.';
+    return error.message ?? 'templates.request_failed';
   }
 }

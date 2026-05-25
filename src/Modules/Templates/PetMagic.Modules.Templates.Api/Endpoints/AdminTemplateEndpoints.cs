@@ -286,7 +286,7 @@ public static class AdminTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var command = new UpdateImageTemplateCommand(templateId, request.Title, request.ShortDescription, request.Category, request.Tags, request.IsPremium, request.TokenCost, request.PromoBadgeMode, request.PreviewAsset, request.ImageModel, request.ImagePrompt, request.Status);
+        var command = new UpdateImageTemplateCommand(templateId, request.Title, request.ShortDescription, request.Category, request.Tags, request.IsPremium, request.TokenCost, request.PromoBadgeMode, request.PreviewAsset, request.ImageModel, request.ImagePrompt, request.Status, request.PetPhotoRequirements);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -347,7 +347,8 @@ public static class AdminTemplateEndpoints
             request.KlingModel,
             request.KlingPrompt,
             request.KeepOriginalSound,
-            request.Status);
+            request.Status,
+            request.PetPhotoRequirements);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -631,7 +632,8 @@ public static class AdminTemplateEndpoints
         TemplateAssetCommand? PreviewAsset,
         string ImageModel,
         string ImagePrompt,
-        string? Status = null);
+        string? Status = null,
+        IReadOnlyList<string>? PetPhotoRequirements = null);
 
     public sealed record UpdateVideoTemplateRequest(
         string Title,
@@ -649,7 +651,8 @@ public static class AdminTemplateEndpoints
         string KlingModel,
         string KlingPrompt,
         bool KeepOriginalSound,
-        string? Status = null);
+        string? Status = null,
+        IReadOnlyList<string>? PetPhotoRequirements = null);
 
     public sealed record ChangeTemplateStatusRequest(string Status);
 }

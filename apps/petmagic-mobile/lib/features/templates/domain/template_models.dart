@@ -32,6 +32,7 @@ class TemplateItem {
     required this.templateType,
     required this.title,
     required this.shortDescription,
+    required this.petPhotoRequirements,
     required this.category,
     required this.tags,
     required this.isPremium,
@@ -46,6 +47,7 @@ class TemplateItem {
   final TemplateType templateType;
   final String title;
   final String shortDescription;
+  final List<String> petPhotoRequirements;
   final String category;
   final List<String> tags;
   final bool isPremium;
@@ -56,6 +58,24 @@ class TemplateItem {
   final double? referenceVideoDurationSeconds;
 
   bool get isVideo => templateType == TemplateType.video;
+
+  List<String> get effectivePetPhotoRequirements {
+    final normalized = petPhotoRequirements
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    if (normalized.isNotEmpty) {
+      return normalized;
+    }
+
+    return isVideo
+        ? const [
+            'Full body visible',
+            'Pet facing camera',
+            'No cropped head or legs',
+          ]
+        : const ['One pet in the photo', 'Clear face', 'Good lighting'];
+  }
 }
 
 class TemplatesFeedPage {

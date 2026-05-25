@@ -10,7 +10,11 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 const _supportedAppLocales = <Locale>[
   Locale('ru'),
   Locale('en'),
-  Locale('en', 'US'),
+  Locale('de'),
+  Locale('es'),
+  Locale('fr'),
+  Locale('it'),
+  Locale('pl'),
 ];
 
 class PetMagicApp extends ConsumerWidget {
@@ -50,13 +54,14 @@ class PetMagicApp extends ConsumerWidget {
         }
 
         for (final locale in locales) {
-          if (locale.languageCode == 'ru') {
-            return const Locale('ru');
+          for (final supportedLocale in _supportedAppLocales) {
+            if (supportedLocale.languageCode == locale.languageCode) {
+              return supportedLocale;
+            }
           }
+
           if (locale.languageCode == 'en') {
-            return locale.countryCode == 'US'
-                ? const Locale('en', 'US')
-                : const Locale('en');
+            return const Locale('en');
           }
         }
 

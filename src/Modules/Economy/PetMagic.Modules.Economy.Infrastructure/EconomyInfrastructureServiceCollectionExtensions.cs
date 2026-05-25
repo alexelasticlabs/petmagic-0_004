@@ -103,7 +103,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             {
                 Id = Guid.NewGuid(),
                 Code = "starter",
-                DisplayName = "Starter PawSpark",
+                DisplayName = "Tiny Treat",
                 CurrencyCode = "USD",
                 PriceAmount = 6.99m,
                 GrantedSpark = 20,
@@ -115,7 +115,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             {
                 Id = Guid.NewGuid(),
                 Code = "creator",
-                DisplayName = "Creator PawSpark",
+                DisplayName = "Happy Pack",
                 CurrencyCode = "USD",
                 PriceAmount = 14.99m,
                 GrantedSpark = 45,
@@ -127,11 +127,11 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             {
                 Id = Guid.NewGuid(),
                 Code = "viral",
-                DisplayName = "Viral PawSpark",
+                DisplayName = "Magic Boost",
                 CurrencyCode = "USD",
                 PriceAmount = 29.99m,
-                GrantedSpark = 90,
-                BonusSpark = 10,
+                GrantedSpark = 100,
+                BonusSpark = 0,
                 IsActive = true,
                 SortOrder = 3
             },
@@ -139,7 +139,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             {
                 Id = Guid.NewGuid(),
                 Code = "starter",
-                DisplayName = "Starter PawSpark",
+                DisplayName = "Tiny Treat",
                 CurrencyCode = "EUR",
                 PriceAmount = 6.29m,
                 GrantedSpark = 20,
@@ -151,7 +151,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             {
                 Id = Guid.NewGuid(),
                 Code = "creator",
-                DisplayName = "Creator PawSpark",
+                DisplayName = "Happy Pack",
                 CurrencyCode = "EUR",
                 PriceAmount = 13.49m,
                 GrantedSpark = 45,
@@ -163,11 +163,11 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             {
                 Id = Guid.NewGuid(),
                 Code = "viral",
-                DisplayName = "Viral PawSpark",
+                DisplayName = "Magic Boost",
                 CurrencyCode = "EUR",
                 PriceAmount = 26.99m,
-                GrantedSpark = 90,
-                BonusSpark = 10,
+                GrantedSpark = 100,
+                BonusSpark = 0,
                 IsActive = true,
                 SortOrder = 3
             });

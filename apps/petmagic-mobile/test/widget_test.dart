@@ -663,10 +663,7 @@ void main() {
       final state = container.read(supportChatControllerProvider);
       expect(state.isLoading, isFalse);
       expect(state.conversation, isNull);
-      expect(
-        state.errorMessage,
-        'Unable to reach support right now. Please try again in a moment.',
-      );
+      expect(state.errorMessage, 'support.unavailable');
     },
   );
 
@@ -814,7 +811,7 @@ void main() {
     );
 
     await firstController.updateThemeMode(ThemeMode.dark);
-    await firstController.updateLocale(const Locale('en', 'US'));
+    await firstController.updateLocale(const Locale('en'));
 
     final secondContainer = ProviderContainer();
     addTearDown(secondContainer.dispose);
@@ -825,7 +822,23 @@ void main() {
 
     final loadedState = secondContainer.read(appPreferencesControllerProvider);
     expect(loadedState.themeMode, ThemeMode.dark);
-    expect(loadedState.locale, const Locale('en', 'US'));
+    expect(loadedState.locale, const Locale('en'));
+  });
+
+  test('app preferences controller migrates legacy en_US locale', () async {
+    SharedPreferences.setMockInitialValues(const {
+      'petmagic_mobile_locale': 'en_US',
+    });
+
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(appPreferencesControllerProvider);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(appPreferencesControllerProvider);
+    expect(state.locale, const Locale('en'));
   });
 }
 
@@ -981,6 +994,7 @@ const _sampleTemplate = TemplateItem(
   templateType: TemplateType.image,
   title: 'Magic Studio',
   shortDescription: 'Turn your pet into a star.',
+  petPhotoRequirements: ['One pet in the photo', 'Clear face'],
   category: 'Magic',
   tags: ['funny', 'sparkle'],
   isPremium: false,

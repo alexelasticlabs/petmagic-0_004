@@ -33,8 +33,7 @@ class SupportChatPage extends ConsumerStatefulWidget {
 
 class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   static const _loadingFallbackDelay = Duration(seconds: 8);
-  static const _loadingFallbackMessage =
-      'Unable to reach support right now. Please try again in a moment.';
+  static const _loadingFallbackMessageCode = 'support.unavailable';
 
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -465,11 +464,17 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                                     child: _SupportEmptyState(
                                       icon: Icons.support_agent_rounded,
                                       title: text.supportChatEmptyTitle,
-                                      description:
-                                          state.errorMessage ??
-                                          (_showLoadingFallback
-                                              ? _loadingFallbackMessage
-                                              : text.supportChatEmptyMessage),
+                                      description: state.errorMessage != null
+                                          ? _mapSupportError(
+                                              text,
+                                              state.errorMessage!,
+                                            )
+                                          : (_showLoadingFallback
+                                                ? _mapSupportError(
+                                                    text,
+                                                    _loadingFallbackMessageCode,
+                                                  )
+                                                : text.supportChatEmptyMessage),
                                       actionLabel: text.retryAction,
                                       onAction: () {
                                         _clearLoadingFallback(notify: true);
@@ -530,7 +535,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 16),
                                   child: ProfileMessageCard(
-                                    message: state.errorMessage!,
+                                    message: _mapSupportError(
+                                      text,
+                                      state.errorMessage!,
+                                    ),
                                     tone: colors.danger,
                                   ),
                                 );
@@ -751,6 +759,29 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
         localLeft.month == localRight.month &&
         localLeft.day == localRight.day;
   }
+}
+
+String _mapSupportError(AppLocalizations text, String raw) {
+  final value = raw.toLowerCase();
+
+  if (value.contains('support.attachment_unavailable')) {
+    return text.supportChatAttachmentUnavailableError;
+  }
+
+  if (value.contains('support.unavailable') ||
+      value.contains('support.request_failed')) {
+    return text.supportChatUnavailableError;
+  }
+
+  if (value.contains('auth.sign_in_required')) {
+    return text.authSignInRequired;
+  }
+
+  if (value.contains('auth.session_expired')) {
+    return text.authSessionExpired;
+  }
+
+  return raw;
 }
 
 enum _SupportAttachmentAction { gallery, file }

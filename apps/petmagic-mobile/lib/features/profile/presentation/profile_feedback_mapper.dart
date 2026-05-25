@@ -26,6 +26,20 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
     case 'auth.external_token_invalid':
     case 'auth.external_invalid':
       return text.authExternalFailed;
+    case 'auth.sign_in_required':
+      return text.authSignInRequired;
+    case 'auth.session_expired':
+      return text.authSessionExpired;
+    case 'auth.login_failed':
+      return text.authLoginFailed;
+    case 'auth.registration_failed':
+      return text.authRegistrationFailed;
+    case 'auth.password_reset_request_failed':
+      return text.authPasswordResetRequestFailed;
+    case 'auth.password_reset_failed':
+      return text.authPasswordResetFailed;
+    case 'auth.request_failed':
+      return text.authRequestFailed;
     case 'profile.action_failed':
       return text.profileActionFailed;
     default:

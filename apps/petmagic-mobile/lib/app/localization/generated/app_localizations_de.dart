@@ -1234,6 +1234,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieser Anbieter kann erst entfernt werden, wenn eine andere Anmeldemethode verfügbar bleibt.';
 
   @override
+  String get profileLinkedAccountsSignInRequired =>
+      'Melden Sie sich erneut an, um verknüpfte Konten zu verwalten.';
+
+  @override
+  String get profileLinkedAccountsUnavailable =>
+      'Verknüpfte Konten sind vorübergehend nicht verfügbar.';
+
+  @override
   String get profileDetailsNotificationsBody =>
       'Dieser Abschnitt spiegelt Ihre aktuellen Kommunikationspräferenzen in der App wider.';
 
@@ -1461,6 +1469,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportChatMessageRead => 'Gelesen';
 
   @override
+  String get supportChatUnavailableError =>
+      'Support ist derzeit nicht erreichbar. Bitte versuchen Sie es in einem Moment erneut.';
+
+  @override
+  String get supportChatAttachmentUnavailableError =>
+      'Der Anhang kann derzeit nicht gesendet werden. Bitte versuchen Sie es in einem Moment erneut.';
+
+  @override
   String get profileSettingsThemeSystem => 'System';
 
   @override
@@ -1476,7 +1492,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileSettingsLanguageEnglish => 'Englisch';
 
   @override
-  String get profileSettingsLanguageEnglishUs => 'Englisch (USA)';
+  String get profileSettingsLanguageGerman => 'Deutsch';
+
+  @override
+  String get profileSettingsLanguageSpanish => 'Spanisch';
+
+  @override
+  String get profileSettingsLanguageFrench => 'Französisch';
+
+  @override
+  String get profileSettingsLanguageItalian => 'Italienisch';
+
+  @override
+  String get profileSettingsLanguagePolish => 'Polnisch';
 
   @override
   String profileSettingsVersionLabel(Object version) {
@@ -1517,6 +1545,22 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get emptyTemplatesMessage =>
       'Versuche einen anderen Filter oder aktualisiere den Katalog.';
+
+  @override
+  String get templatesFeedEmptyError =>
+      'Vorlagen sind vorübergehend nicht verfügbar.';
+
+  @override
+  String get templatesConnectionTimeoutError =>
+      'Keine Verbindung. Prüfe dein Netzwerk und versuche es erneut.';
+
+  @override
+  String get templatesServerTimeoutError =>
+      'Der Server hat zu lange zum Antworten gebraucht. Bitte versuche es erneut.';
+
+  @override
+  String get templatesRequestFailedError =>
+      'Vorlagen konnten derzeit nicht geladen werden. Bitte versuche es erneut.';
 
   @override
   String get startupOnboardingActionContinueGuest => 'Als Gast fortfahren';
@@ -1782,6 +1826,32 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get authExternalSessionExpired =>
       'Diese Anmeldesitzung ist abgelaufen. Bitte versuchen Sie es erneut.';
+
+  @override
+  String get authSignInRequired => 'Anmeldung erforderlich.';
+
+  @override
+  String get authSessionExpired => 'Sitzung abgelaufen.';
+
+  @override
+  String get authLoginFailed =>
+      'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
+
+  @override
+  String get authRegistrationFailed =>
+      'Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.';
+
+  @override
+  String get authPasswordResetRequestFailed =>
+      'Anfrage zum Zurücksetzen des Passworts fehlgeschlagen. Bitte versuchen Sie es erneut.';
+
+  @override
+  String get authPasswordResetFailed =>
+      'Zurücksetzen des Passworts fehlgeschlagen. Bitte versuchen Sie es erneut.';
+
+  @override
+  String get authRequestFailed =>
+      'Anfrage fehlgeschlagen. Bitte versuchen Sie es erneut.';
 
   @override
   String get profileActionFailed =>

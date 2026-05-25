@@ -25,20 +25,18 @@ class _PacksSection extends StatelessWidget {
       children: [
         _SectionTitle(title: text.walletBuySparkTitle),
         const SizedBox(height: 2),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: packs.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final pack = packs[index];
-            return _PackListTile(
-              pack: pack,
-              isFeatured: featuredPack?.packId == pack.packId,
-              isBuying: isBuying,
-              onTap: () => onSelect(pack),
-            );
-          },
+        Column(
+          children: [
+            for (var index = 0; index < packs.length; index++) ...[
+              _PackListTile(
+                pack: packs[index],
+                isFeatured: featuredPack?.packId == packs[index].packId,
+                isBuying: isBuying,
+                onTap: () => onSelect(packs[index]),
+              ),
+              if (index != packs.length - 1) const SizedBox(height: 12),
+            ],
+          ],
         ),
       ],
     );
@@ -62,26 +60,8 @@ class _PackListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-
-    // Custom badges content
-    String? badgeLabel;
-    IconData? badgeIcon;
-    Color? badgeColor;
-
-    if (pack.totalSpark == 45) {
-      badgeLabel = text.walletPopularBadge;
-      badgeIcon = Icons.local_fire_department_rounded;
-      badgeColor = colors.gold;
-    } else if (pack.totalSpark == 100) {
-      badgeLabel = text.walletBestValueBadge;
-      badgeIcon = Icons.star_rounded;
-      badgeColor = colors.accent;
-    }
-
-    final accent = badgeColor ?? colors.accent;
+    final accent = isFeatured ? colors.gold : colors.accent;
     final price = _formatPrice(pack);
-
-    final showBadge = badgeLabel != null;
 
     return Material(
       color: Colors.transparent,
@@ -92,16 +72,17 @@ class _PackListTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: showBadge
-                  ? accent.withValues(alpha: 0.34)
+              color: isFeatured
+                  ? colors.gold.withValues(alpha: 0.34)
                   : colors.border.withValues(alpha: 0.94),
             ),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: showBadge
+              colors: isFeatured
                   ? [
-                      accent.withValues(alpha: 0.16),
+                      colors.gold.withValues(alpha: 0.22),
+                      colors.accent.withValues(alpha: 0.11),
                       colors.surfaceStrong.withValues(alpha: 0.62),
                     ]
                   : [
@@ -111,129 +92,160 @@ class _PackListTile extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: (showBadge ? accent : colors.shadow).withValues(
-                  alpha: showBadge ? 0.18 : 0.12,
+                color: (isFeatured ? colors.gold : colors.shadow).withValues(
+                  alpha: isFeatured ? 0.22 : 0.16,
                 ),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 44,
+            padding: const EdgeInsets.all(15),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 350;
+                final leading = Container(
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: accent.withValues(alpha: 0.18)),
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: accent.withValues(alpha: 0.2)),
                   ),
                   child: Icon(
-                    pack.totalSpark >= 100
+                    isFeatured
                         ? Icons.workspace_premium_rounded
                         : Icons.bolt_rounded,
                     color: accent,
-                    size: 20,
+                    size: 21,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              pack.displayName,
-                              style: TextStyle(
-                                color: colors.textStrong,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          if (showBadge) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: accent.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (badgeIcon != null) ...[
-                                    Icon(badgeIcon, color: accent, size: 10),
-                                    const SizedBox(width: 3),
-                                  ],
-                                  Text(
-                                    badgeLabel!,
-                                    style: TextStyle(
-                                      color: accent,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        text.walletPackBreakdown(
-                          pack.grantedSpark,
-                          pack.bonusSpark,
-                        ),
-                        style: TextStyle(
-                          color: colors.textMuted,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w750,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  height: 38,
-                  child: FilledButton(
-                    onPressed: isBuying ? null : onTap,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: accent,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: colors.surfaceStrong,
-                      disabledForegroundColor: colors.textMuted,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      text.walletBuyForPrice(price),
-                      style: const TextStyle(
-                        fontSize: 12.5,
+                );
+                final details = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      pack.displayName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 15,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                  ),
-                ),
-              ],
+                    if (isFeatured) ...[
+                      const SizedBox(height: 7),
+                      ProfileStatusPill(
+                        label: text.walletPopularBadge,
+                        leading: Icons.local_fire_department_rounded,
+                        backgroundColor: colors.gold.withValues(alpha: 0.16),
+                        foregroundColor: colors.gold,
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Text(
+                      text.walletPackBreakdown(
+                        pack.grantedSpark,
+                        pack.bonusSpark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 12.2,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                );
+                final value = Column(
+                  crossAxisAlignment: compact
+                      ? CrossAxisAlignment.start
+                      : CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      price,
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.62),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: colors.border.withValues(alpha: 0.84),
+                        ),
+                      ),
+                      child: Text(
+                        text.walletPackTotalSpark(pack.totalSpark),
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 11.8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          text.walletPackDetailsAction,
+                          style: TextStyle(
+                            color: colors.textSoft,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: colors.textSoft,
+                          size: 15,
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          leading,
+                          const SizedBox(width: 12),
+                          Expanded(child: details),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      value,
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    leading,
+                    const SizedBox(width: 12),
+                    Expanded(child: details),
+                    const SizedBox(width: 12),
+                    value,
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -291,118 +303,43 @@ class _PackDetailRow extends StatelessWidget {
   }
 }
 
-class _LedgerSection extends StatefulWidget {
+class _LedgerSection extends StatelessWidget {
   const _LedgerSection({required this.items});
 
   final List<WalletLedgerItem> items;
-
-  @override
-  State<_LedgerSection> createState() => _LedgerSectionState();
-}
-
-class _LedgerSectionState extends State<_LedgerSection> {
-  int _selectedFilterIndex = 0; // 0: All, 1: Credits, 2: Debits
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
-    // Filter items
-    final filteredItems = widget.items.where((item) {
-      if (_selectedFilterIndex == 1) {
-        return item.delta >= 0;
-      } else if (_selectedFilterIndex == 2) {
-        return item.delta < 0;
-      }
-      return true;
-    }).toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionTitle(title: text.walletRecentTransactionsTitle),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _filterChip(0, text.walletQueryFilterAll),
-            const SizedBox(width: 8),
-            _filterChip(1, text.walletQueryFilterCredits),
-            const SizedBox(width: 8),
-            _filterChip(2, text.walletQueryFilterDebits),
-          ],
-        ),
-        const SizedBox(height: 12),
         ProfileGlassCard(
           padding: const EdgeInsets.all(12),
-          child: filteredItems.isEmpty
+          child: items.isEmpty
               ? Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 20,
-                    horizontal: 8,
-                  ),
-                  child: Center(
-                    child: Text(
-                      text.walletNoActivity,
-                      style: TextStyle(
-                        color: colors.textSoft,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    text.walletNoActivity,
+                    style: TextStyle(color: colors.textSoft),
                   ),
                 )
               : Column(
                   children: [
-                    for (var index = 0; index < filteredItems.length; index++)
+                    for (var index = 0; index < items.length; index++)
                       Padding(
                         padding: EdgeInsets.only(
-                          bottom: index == filteredItems.length - 1 ? 0 : 10,
+                          bottom: index == items.length - 1 ? 0 : 10,
                         ),
-                        child: _LedgerRow(item: filteredItems[index]),
+                        child: _LedgerRow(item: items[index]),
                       ),
                   ],
                 ),
         ),
       ],
-    );
-  }
-
-  Widget _filterChip(int index, String label) {
-    final colors = context.petMagicColors;
-    final isSelected = _selectedFilterIndex == index;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _selectedFilterIndex = index;
-          });
-        },
-        child: Container(
-          height: 34,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? colors.accent.withValues(alpha: 0.16)
-                : colors.surfaceStrong.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? colors.accent.withValues(alpha: 0.3)
-                  : colors.border.withValues(alpha: 0.5),
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? colors.accent : colors.textSoft,
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

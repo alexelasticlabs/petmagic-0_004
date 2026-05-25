@@ -110,8 +110,7 @@ class SupportChatController extends Notifier<SupportChatState> {
     } on Object {
       state = state.copyWith(
         isLoading: false,
-        errorMessage:
-            'Unable to reach support right now. Please try again in a moment.',
+        errorMessage: 'support.unavailable',
       );
     }
   }
@@ -202,8 +201,7 @@ class SupportChatController extends Notifier<SupportChatState> {
     } on Object {
       state = state.copyWith(
         isSending: false,
-        errorMessage:
-            'Unable to send the attachment right now. Please try again in a moment.',
+        errorMessage: 'support.attachment_unavailable',
       );
       return false;
     }

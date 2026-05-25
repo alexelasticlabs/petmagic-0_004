@@ -101,7 +101,6 @@ abstract class AppLocalizations {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('de'),
     Locale('en'),
-    Locale('en', 'US'),
     Locale('es'),
     Locale('fr'),
     Locale('it'),
@@ -2281,6 +2280,18 @@ abstract class AppLocalizations {
   /// **'This provider cannot be removed until another sign-in method remains available.'**
   String get profileLinkedAccountsProtectedHint;
 
+  /// No description provided for @profileLinkedAccountsSignInRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in again to manage linked accounts.'**
+  String get profileLinkedAccountsSignInRequired;
+
+  /// No description provided for @profileLinkedAccountsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked accounts are temporarily unavailable.'**
+  String get profileLinkedAccountsUnavailable;
+
   /// No description provided for @profileDetailsNotificationsBody.
   ///
   /// In en, this message translates to:
@@ -2665,6 +2676,18 @@ abstract class AppLocalizations {
   /// **'Read'**
   String get supportChatMessageRead;
 
+  /// No description provided for @supportChatUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to reach support right now. Please try again in a moment.'**
+  String get supportChatUnavailableError;
+
+  /// No description provided for @supportChatAttachmentUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to send the attachment right now. Please try again in a moment.'**
+  String get supportChatAttachmentUnavailableError;
+
   /// No description provided for @profileSettingsThemeSystem.
   ///
   /// In en, this message translates to:
@@ -2695,11 +2718,35 @@ abstract class AppLocalizations {
   /// **'English'**
   String get profileSettingsLanguageEnglish;
 
-  /// No description provided for @profileSettingsLanguageEnglishUs.
+  /// No description provided for @profileSettingsLanguageGerman.
   ///
   /// In en, this message translates to:
-  /// **'English (US)'**
-  String get profileSettingsLanguageEnglishUs;
+  /// **'German'**
+  String get profileSettingsLanguageGerman;
+
+  /// No description provided for @profileSettingsLanguageSpanish.
+  ///
+  /// In en, this message translates to:
+  /// **'Spanish'**
+  String get profileSettingsLanguageSpanish;
+
+  /// No description provided for @profileSettingsLanguageFrench.
+  ///
+  /// In en, this message translates to:
+  /// **'French'**
+  String get profileSettingsLanguageFrench;
+
+  /// No description provided for @profileSettingsLanguageItalian.
+  ///
+  /// In en, this message translates to:
+  /// **'Italian'**
+  String get profileSettingsLanguageItalian;
+
+  /// No description provided for @profileSettingsLanguagePolish.
+  ///
+  /// In en, this message translates to:
+  /// **'Polish'**
+  String get profileSettingsLanguagePolish;
 
   /// No description provided for @profileSettingsVersionLabel.
   ///
@@ -2772,6 +2819,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try another filter or refresh the catalog.'**
   String get emptyTemplatesMessage;
+
+  /// No description provided for @templatesFeedEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates are temporarily unavailable.'**
+  String get templatesFeedEmptyError;
+
+  /// No description provided for @templatesConnectionTimeoutError.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Check your network and try again.'**
+  String get templatesConnectionTimeoutError;
+
+  /// No description provided for @templatesServerTimeoutError.
+  ///
+  /// In en, this message translates to:
+  /// **'The server took too long to respond. Please try again.'**
+  String get templatesServerTimeoutError;
+
+  /// No description provided for @templatesRequestFailedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load templates right now. Please try again.'**
+  String get templatesRequestFailedError;
 
   /// No description provided for @startupOnboardingActionContinueGuest.
   ///
@@ -3235,6 +3306,48 @@ abstract class AppLocalizations {
   /// **'This sign-in session expired. Please try again.'**
   String get authExternalSessionExpired;
 
+  /// No description provided for @authSignInRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in is required.'**
+  String get authSignInRequired;
+
+  /// No description provided for @authSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Session expired.'**
+  String get authSessionExpired;
+
+  /// No description provided for @authLoginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Login failed. Please try again.'**
+  String get authLoginFailed;
+
+  /// No description provided for @authRegistrationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration failed. Please try again.'**
+  String get authRegistrationFailed;
+
+  /// No description provided for @authPasswordResetRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset request failed. Please try again.'**
+  String get authPasswordResetRequestFailed;
+
+  /// No description provided for @authPasswordResetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset failed. Please try again.'**
+  String get authPasswordResetFailed;
+
+  /// No description provided for @authRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Request failed. Please try again.'**
+  String get authRequestFailed;
+
   /// No description provided for @profileActionFailed.
   ///
   /// In en, this message translates to:
@@ -3363,18 +3476,6 @@ class _AppLocalizationsDelegate
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-  // Lookup logic when language+country codes are specified.
-  switch (locale.languageCode) {
-    case 'en':
-      {
-        switch (locale.countryCode) {
-          case 'US':
-            return AppLocalizationsEnUs();
-        }
-        break;
-      }
-  }
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'de':

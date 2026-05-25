@@ -1034,6 +1034,14 @@ String? _rewardsWarningMessage(AppLocalizations text, String? raw) {
 String _friendlyRewardsError(AppLocalizations text, String raw) {
   final value = raw.toLowerCase();
 
+  if (value.contains('auth.sign_in_required')) {
+    return text.authRequiredMessage;
+  }
+
+  if (value.contains('auth.session_expired')) {
+    return text.authExternalSessionExpired;
+  }
+
   if (value.contains('referral_code_not_found')) {
     return text.rewardsReferralCodeNotFoundError;
   }

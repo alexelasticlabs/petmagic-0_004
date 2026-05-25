@@ -411,6 +411,7 @@ export type AdminTemplateListItem = {
   templateType: TemplateType;
   title: string;
   shortDescription: string;
+  petPhotoRequirements?: string[];
   category: string;
   status: TemplateStatus;
   promoBadgeMode: TemplatePromoBadgeMode;
@@ -448,6 +449,7 @@ export type AdminTemplate = {
   templateType: TemplateType;
   title: string;
   shortDescription: string;
+  petPhotoRequirements?: string[];
   category: string;
   status: TemplateStatus;
   promoBadgeMode: TemplatePromoBadgeMode;
@@ -700,6 +702,7 @@ export type AdminTemplateTestRun = {
 export type ImageTemplatePayload = {
   title: string;
   shortDescription: string;
+  petPhotoRequirements: string[];
   category: string;
   status: TemplateStatus;
   promoBadgeMode: TemplatePromoBadgeMode;
@@ -714,6 +717,7 @@ export type ImageTemplatePayload = {
 export type VideoTemplatePayload = {
   title: string;
   shortDescription: string;
+  petPhotoRequirements: string[];
   category: string;
   status: TemplateStatus;
   promoBadgeMode: TemplatePromoBadgeMode;

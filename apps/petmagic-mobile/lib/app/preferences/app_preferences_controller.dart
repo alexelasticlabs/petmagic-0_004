@@ -42,6 +42,9 @@ class AppPreferencesState {
 class AppPreferencesController extends Notifier<AppPreferencesState> {
   late final AppPreferencesStorage _storage;
 
+  static const _legacyEnglishUsLocale = Locale('en', 'US');
+  static const _englishLocale = Locale('en');
+
   @override
   AppPreferencesState build() {
     _storage = ref.watch(appPreferencesStorageProvider);
@@ -52,13 +55,18 @@ class AppPreferencesController extends Notifier<AppPreferencesState> {
   Future<void> _load() async {
     final savedThemeMode = await _storage.readThemeMode();
     final savedLocale = await _storage.readLocale();
+    final normalizedLocale = _normalizeLocale(savedLocale);
 
     state = state.copyWith(
       themeMode: savedThemeMode ?? state.themeMode,
-      locale: savedLocale,
+      locale: normalizedLocale,
       localeWasSet: true,
       hasLoaded: true,
     );
+
+    if (savedLocale != normalizedLocale) {
+      await _storage.saveLocale(normalizedLocale);
+    }
   }
 
   Future<void> updateThemeMode(ThemeMode mode) async {
@@ -67,7 +75,25 @@ class AppPreferencesController extends Notifier<AppPreferencesState> {
   }
 
   Future<void> updateLocale(Locale? locale) async {
-    state = state.copyWith(locale: locale, localeWasSet: true, hasLoaded: true);
-    await _storage.saveLocale(locale);
+    final normalizedLocale = _normalizeLocale(locale);
+    state = state.copyWith(
+      locale: normalizedLocale,
+      localeWasSet: true,
+      hasLoaded: true,
+    );
+    await _storage.saveLocale(normalizedLocale);
+  }
+
+  Locale? _normalizeLocale(Locale? locale) {
+    if (locale == null) {
+      return null;
+    }
+
+    if (locale.languageCode == _legacyEnglishUsLocale.languageCode &&
+        locale.countryCode == _legacyEnglishUsLocale.countryCode) {
+      return _englishLocale;
+    }
+
+    return locale;
   }
 }

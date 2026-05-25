@@ -48,6 +48,7 @@ class TemplateItemDto {
     required this.templateType,
     required this.title,
     required this.shortDescription,
+    required this.petPhotoRequirements,
     required this.category,
     required this.effectivePromoBadge,
     required this.tags,
@@ -62,6 +63,7 @@ class TemplateItemDto {
   final String templateType;
   final String title;
   final String shortDescription;
+  final List<String> petPhotoRequirements;
   final String category;
   final String? effectivePromoBadge;
   final List<String> tags;
@@ -79,6 +81,12 @@ class TemplateItemDto {
       templateType: json['templateType'] as String? ?? 'Image',
       title: json['title'] as String? ?? '',
       shortDescription: json['shortDescription'] as String? ?? '',
+      petPhotoRequirements:
+          (json['petPhotoRequirements'] as List<dynamic>? ?? const [])
+              .whereType<String>()
+              .map((item) => item.trim())
+              .where((item) => item.isNotEmpty)
+              .toList(growable: false),
       category: json['category'] as String? ?? '',
       effectivePromoBadge: json['effectivePromoBadge'] as String?,
       tags: (json['tags'] as List<dynamic>? ?? const [])
@@ -100,6 +108,7 @@ class TemplateItemDto {
     'templateType': templateType,
     'title': title,
     'shortDescription': shortDescription,
+    'petPhotoRequirements': petPhotoRequirements,
     'category': category,
     'effectivePromoBadge': effectivePromoBadge,
     'tags': tags,
@@ -115,6 +124,7 @@ class TemplateItemDto {
     templateType: templateTypeFromApi(templateType),
     title: title,
     shortDescription: shortDescription,
+    petPhotoRequirements: petPhotoRequirements,
     category: category,
     effectivePromoBadge: effectivePromoBadge,
     tags: tags,

@@ -14,9 +14,18 @@ type TemplateBasicFieldsProps = {
 
 const TITLE_LIMIT = 60;
 const SHORT_DESCRIPTION_LIMIT = 120;
+const PET_PHOTO_REQUIREMENTS_LIMIT = 1000;
 
-export function TemplateBasicFields({ text, form, setForm, categorySuggestions = [], showMusicDescription = false }: TemplateBasicFieldsProps) {
-  const categoryValues = Array.from(new Set([...categorySuggestions, form.category].map((value) => value.trim()).filter(Boolean)));
+export function TemplateBasicFields({
+  text,
+  form,
+  setForm,
+  categorySuggestions = [],
+  showMusicDescription = false,
+}: TemplateBasicFieldsProps) {
+  const categoryValues = Array.from(
+    new Set([...categorySuggestions, form.category].map((value) => value.trim()).filter(Boolean))
+  );
   const categoryOptions: SelectOption[] = [
     {
       value: "",
@@ -32,11 +41,41 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
     })),
   ];
   const promoBadgeOptions: SelectOption[] = [
-    { value: "Auto", label: text.promoBadgeAutoLabel, description: text.promoBadgeAutoHint, badge: "Auto", tone: "neutral" },
-    { value: "New", label: "NEW", description: text.promoBadgeNewHint, badge: "Fresh", tone: "recommended" },
-    { value: "Trending", label: "TRENDING", description: text.promoBadgeTrendingHint, badge: "Hot", tone: "premium" },
-    { value: "Popular", label: "POPULAR", description: text.promoBadgePopularHint, badge: "Core", tone: "fast" },
-    { value: "Funny", label: "FUNNY", description: text.promoBadgeFunnyHint, badge: "Mood", tone: "recommended" }
+    {
+      value: "Auto",
+      label: text.promoBadgeAutoLabel,
+      description: text.promoBadgeAutoHint,
+      badge: "Auto",
+      tone: "neutral",
+    },
+    {
+      value: "New",
+      label: "NEW",
+      description: text.promoBadgeNewHint,
+      badge: "Fresh",
+      tone: "recommended",
+    },
+    {
+      value: "Trending",
+      label: "TRENDING",
+      description: text.promoBadgeTrendingHint,
+      badge: "Hot",
+      tone: "premium",
+    },
+    {
+      value: "Popular",
+      label: "POPULAR",
+      description: text.promoBadgePopularHint,
+      badge: "Core",
+      tone: "fast",
+    },
+    {
+      value: "Funny",
+      label: "FUNNY",
+      description: text.promoBadgeFunnyHint,
+      badge: "Mood",
+      tone: "recommended",
+    },
   ];
 
   return (
@@ -44,7 +83,9 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
       <label className={styles.fieldBlock}>
         <span className={styles.fieldHeader}>
           <span>{text.titleLabel}</span>
-          <span className={styles.fieldCounter}>{form.title.length}/{TITLE_LIMIT}</span>
+          <span className={styles.fieldCounter}>
+            {form.title.length}/{TITLE_LIMIT}
+          </span>
         </span>
         <input
           value={form.title}
@@ -57,14 +98,36 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
       <label className={styles.fieldBlock}>
         <span className={styles.fieldHeader}>
           <span>{text.shortDescriptionLabel}</span>
-          <span className={styles.fieldCounter}>{form.shortDescription.length}/{SHORT_DESCRIPTION_LIMIT}</span>
+          <span className={styles.fieldCounter}>
+            {form.shortDescription.length}/{SHORT_DESCRIPTION_LIMIT}
+          </span>
         </span>
         <textarea
           value={form.shortDescription}
           maxLength={SHORT_DESCRIPTION_LIMIT}
-          onChange={(event) => setForm((current) => ({ ...current, shortDescription: event.target.value }))}
+          onChange={(event) =>
+            setForm((current) => ({ ...current, shortDescription: event.target.value }))
+          }
           rows={3}
           required
+        />
+      </label>
+
+      <label className={styles.fieldBlock}>
+        <span className={styles.fieldHeader}>
+          <span>{text.petPhotoRequirementsLabel}</span>
+          <span className={styles.fieldCounter}>
+            {form.petPhotoRequirements.length}/{PET_PHOTO_REQUIREMENTS_LIMIT}
+          </span>
+        </span>
+        <textarea
+          value={form.petPhotoRequirements}
+          maxLength={PET_PHOTO_REQUIREMENTS_LIMIT}
+          onChange={(event) =>
+            setForm((current) => ({ ...current, petPhotoRequirements: event.target.value }))
+          }
+          rows={4}
+          placeholder={text.petPhotoRequirementsHint}
         />
       </label>
 
@@ -85,7 +148,10 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
           <span className={styles.fieldHeader}>
             <span>{text.tagsLabel}</span>
           </span>
-          <input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} />
+          <input
+            value={form.tags}
+            onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
+          />
         </label>
       </div>
 
@@ -110,7 +176,7 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
               styles.accessOption,
               styles.accessOptionFree,
               !form.isPremium ? styles.accessOptionActive : null,
-              !form.isPremium ? styles.accessOptionActiveFree : null,
+              !form.isPremium ? styles.accessOptionActiveFree : null
             )}
             onClick={() => setForm((current) => ({ ...current, isPremium: false }))}
           >
@@ -124,7 +190,7 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
               styles.accessOption,
               styles.accessOptionPremium,
               form.isPremium ? styles.accessOptionActive : null,
-              form.isPremium ? styles.accessOptionActivePremium : null,
+              form.isPremium ? styles.accessOptionActivePremium : null
             )}
             onClick={() => setForm((current) => ({ ...current, isPremium: true }))}
           >
@@ -141,8 +207,18 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
           </span>
           <input
             value={form.tokenCost}
-            onChange={(event) => setForm((current) => ({ ...current, tokenCost: event.target.value.replace(/\D+/g, "") }))}
-            onBlur={(event) => setForm((current) => ({ ...current, tokenCost: event.target.value.replace(/\D+/g, "") }))}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                tokenCost: event.target.value.replace(/\D+/g, ""),
+              }))
+            }
+            onBlur={(event) =>
+              setForm((current) => ({
+                ...current,
+                tokenCost: event.target.value.replace(/\D+/g, ""),
+              }))
+            }
             inputMode="numeric"
             pattern="[0-9]*"
             min="1"
@@ -156,7 +232,12 @@ export function TemplateBasicFields({ text, form, setForm, categorySuggestions =
             <span className={styles.fieldHeader}>
               <span>{text.musicDescriptionLabel}</span>
             </span>
-            <input value={form.musicDescription} onChange={(event) => setForm((current) => ({ ...current, musicDescription: event.target.value }))} />
+            <input
+              value={form.musicDescription}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, musicDescription: event.target.value }))
+              }
+            />
           </label>
         ) : null}
       </div>

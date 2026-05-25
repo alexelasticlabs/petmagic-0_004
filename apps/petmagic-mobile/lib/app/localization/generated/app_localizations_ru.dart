@@ -1230,6 +1230,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Этот способ входа нельзя отключить, пока не останется другой доступный вариант входа.';
 
   @override
+  String get profileLinkedAccountsSignInRequired =>
+      'Войдите снова, чтобы управлять связанными аккаунтами.';
+
+  @override
+  String get profileLinkedAccountsUnavailable =>
+      'Связанные аккаунты временно недоступны.';
+
+  @override
   String get profileDetailsNotificationsBody =>
       'В этом разделе отражаются текущие коммуникационные предпочтения аккаунта.';
 
@@ -1459,6 +1467,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatMessageRead => 'Прочитано';
 
   @override
+  String get supportChatUnavailableError =>
+      'Сейчас не удается связаться с поддержкой. Попробуйте снова через минуту.';
+
+  @override
+  String get supportChatAttachmentUnavailableError =>
+      'Сейчас не удается отправить вложение. Попробуйте снова через минуту.';
+
+  @override
   String get profileSettingsThemeSystem => 'Системная';
 
   @override
@@ -1474,7 +1490,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileSettingsLanguageEnglish => 'Английский';
 
   @override
-  String get profileSettingsLanguageEnglishUs => 'Английский (США)';
+  String get profileSettingsLanguageGerman => 'Немецкий';
+
+  @override
+  String get profileSettingsLanguageSpanish => 'Испанский';
+
+  @override
+  String get profileSettingsLanguageFrench => 'Французский';
+
+  @override
+  String get profileSettingsLanguageItalian => 'Итальянский';
+
+  @override
+  String get profileSettingsLanguagePolish => 'Польский';
 
   @override
   String profileSettingsVersionLabel(Object version) {
@@ -1514,6 +1542,21 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get emptyTemplatesMessage =>
       'Попробуйте другой фильтр или обновите каталог.';
+
+  @override
+  String get templatesFeedEmptyError => 'Шаблоны временно недоступны.';
+
+  @override
+  String get templatesConnectionTimeoutError =>
+      'Нет подключения. Проверьте сеть и попробуйте снова.';
+
+  @override
+  String get templatesServerTimeoutError =>
+      'Сервер отвечает слишком долго. Попробуйте снова.';
+
+  @override
+  String get templatesRequestFailedError =>
+      'Сейчас не удалось загрузить шаблоны. Попробуйте снова.';
 
   @override
   String get startupOnboardingActionContinueGuest => 'Продолжить как гость';
@@ -1770,6 +1813,30 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get authExternalSessionExpired =>
       'Сессия внешнего входа истекла. Попробуйте еще раз.';
+
+  @override
+  String get authSignInRequired => 'Требуется вход в аккаунт.';
+
+  @override
+  String get authSessionExpired => 'Сессия истекла.';
+
+  @override
+  String get authLoginFailed => 'Не удалось войти. Попробуйте снова.';
+
+  @override
+  String get authRegistrationFailed =>
+      'Не удалось зарегистрироваться. Попробуйте снова.';
+
+  @override
+  String get authPasswordResetRequestFailed =>
+      'Не удалось отправить запрос на сброс пароля. Попробуйте снова.';
+
+  @override
+  String get authPasswordResetFailed =>
+      'Не удалось сбросить пароль. Попробуйте снова.';
+
+  @override
+  String get authRequestFailed => 'Запрос не выполнен. Попробуйте снова.';
 
   @override
   String get profileActionFailed =>

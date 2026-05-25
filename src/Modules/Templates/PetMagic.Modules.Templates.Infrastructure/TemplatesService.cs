@@ -1,5 +1,7 @@
 using System.Globalization;
+
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -762,6 +764,7 @@ internal sealed class TemplatesService(
             TemplateType = TemplateType.Image,
             Title = command.Title.Trim(),
             ShortDescription = command.ShortDescription.Trim(),
+            PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements),
             Category = categoryResult.Value.Name,
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
@@ -826,6 +829,7 @@ internal sealed class TemplatesService(
 
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
+        template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
         template.Category = categoryResult.Value.Name;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
@@ -861,6 +865,7 @@ internal sealed class TemplatesService(
             await dbContext.Entry(template).ReloadAsync(cancellationToken);
             template.Title = command.Title.Trim();
             template.ShortDescription = command.ShortDescription.Trim();
+            template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
             template.Category = categoryResult.Value.Name;
             template.Tags = SerializeTags(command.Tags);
             template.IsPremium = command.IsPremium;
@@ -908,6 +913,7 @@ internal sealed class TemplatesService(
             TemplateType = TemplateType.Video,
             Title = command.Title.Trim(),
             ShortDescription = command.ShortDescription.Trim(),
+            PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements),
             Category = categoryResult.Value.Name,
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
@@ -982,6 +988,7 @@ internal sealed class TemplatesService(
 
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
+        template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
         template.Category = categoryResult.Value.Name;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
@@ -1025,6 +1032,7 @@ internal sealed class TemplatesService(
             await dbContext.Entry(template).ReloadAsync(cancellationToken);
             template.Title = command.Title.Trim();
             template.ShortDescription = command.ShortDescription.Trim();
+            template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
             template.Category = categoryResult.Value.Name;
             template.Tags = SerializeTags(command.Tags);
             template.IsPremium = command.IsPremium;
@@ -1164,7 +1172,8 @@ internal sealed class TemplatesService(
                 template.Title.ToLower().Contains(normalizedSearchLower)
                 || template.ShortDescription.ToLower().Contains(normalizedSearchLower)
                 || template.Category.ToLower().Contains(normalizedSearchLower)
-                || template.Tags.ToLower().Contains(normalizedSearchLower));
+                || template.Tags.ToLower().Contains(normalizedSearchLower)
+                || (template.PetPhotoRequirements != null && template.PetPhotoRequirements.ToLower().Contains(normalizedSearchLower)));
         }
 
         if (cursor is not null)
@@ -1420,6 +1429,7 @@ internal sealed class TemplatesService(
         return template.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
             || template.ShortDescription.Contains(search, StringComparison.OrdinalIgnoreCase)
             || template.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || DeserializeRequirements(template.PetPhotoRequirements).Any(requirement => requirement.Contains(search, StringComparison.OrdinalIgnoreCase))
             || DeserializeTags(template.Tags).Any(tag => tag.Contains(search, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -1440,6 +1450,32 @@ internal sealed class TemplatesService(
     private static string[] DeserializeTags(string tags)
     {
         return NormalizeTags(tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    private static string? SerializeRequirements(IEnumerable<string>? requirements)
+    {
+        var normalized = NormalizeRequirements(requirements ?? []);
+        return normalized.Length == 0 ? null : string.Join('\n', normalized);
+    }
+
+    private static string[] DeserializeRequirements(string? requirements)
+    {
+        if (string.IsNullOrWhiteSpace(requirements))
+        {
+            return [];
+        }
+
+        return NormalizeRequirements(requirements.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    private static string[] NormalizeRequirements(IEnumerable<string> requirements)
+    {
+        return requirements
+            .Select(requirement => requirement.Trim())
+            .Where(requirement => !string.IsNullOrWhiteSpace(requirement))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .ToArray();
     }
 
     private static string NormalizeCategoryName(string rawCategoryName)
@@ -1828,7 +1864,8 @@ internal sealed class TemplatesService(
             template.CharacterOrientation?.ToString(),
             template.CreatedAtUtc,
             template.UpdatedAtUtc,
-            estimatedCostUsd);
+            estimatedCostUsd,
+            DeserializeRequirements(template.PetPhotoRequirements));
     }
 
     private static AdminTemplateCategoryListItemResponse MapAdminCategory(TemplateCategory category, IReadOnlyCollection<TemplateItem> templates)
@@ -1890,7 +1927,8 @@ internal sealed class TemplatesService(
                     template.KlingModel,
                     template.ReferenceVideoDurationSeconds),
             template.CreatedAtUtc,
-            template.UpdatedAtUtc);
+            template.UpdatedAtUtc,
+            DeserializeRequirements(template.PetPhotoRequirements));
     }
 
     private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template)
@@ -1907,7 +1945,8 @@ internal sealed class TemplatesService(
             template.TokenCost,
             GetAsset(template, TemplateAssetKind.Preview),
             template.MusicDescription,
-            template.ReferenceVideoDurationSeconds);
+            template.ReferenceVideoDurationSeconds,
+            DeserializeRequirements(template.PetPhotoRequirements));
     }
 
     private static PublicTemplateResponse MapPublicResponse(TemplateItem template)
@@ -1924,7 +1963,8 @@ internal sealed class TemplatesService(
             template.TokenCost,
             GetAsset(template, TemplateAssetKind.Preview),
             template.MusicDescription,
-            template.ReferenceVideoDurationSeconds);
+            template.ReferenceVideoDurationSeconds,
+            DeserializeRequirements(template.PetPhotoRequirements));
     }
 
     private static TemplatePromoBadgeMode ParsePromoBadgeMode(string raw)

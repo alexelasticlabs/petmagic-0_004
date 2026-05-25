@@ -75,7 +75,10 @@ class ProfileRepository {
 
       return login(email: email, password: password);
     } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'Registration failed.');
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.registration_failed',
+      );
     }
   }
 
@@ -93,7 +96,7 @@ class ProfileRepository {
       await _sessionStorage.save(session);
       return session;
     } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'Login failed.');
+      throw _mapDioException(error, fallbackMessage: 'auth.login_failed');
     }
   }
 
@@ -106,7 +109,7 @@ class ProfileRepository {
     } on DioException catch (error) {
       throw _mapDioException(
         error,
-        fallbackMessage: 'Password reset request failed.',
+        fallbackMessage: 'auth.password_reset_request_failed',
       );
     }
   }
@@ -126,7 +129,10 @@ class ProfileRepository {
         },
       );
     } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: 'Password reset failed.');
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.password_reset_failed',
+      );
     }
   }
 
@@ -297,8 +303,8 @@ class ProfileRepository {
     return _authSessionCoordinator.authorizedRequest(
       request: request,
       mapError: _mapDioException,
-      requestFailedMessage: 'Request failed.',
-      sessionExpiredMessage: 'Session expired.',
+      requestFailedMessage: 'auth.request_failed',
+      sessionExpiredMessage: 'auth.session_expired',
     );
   }
 

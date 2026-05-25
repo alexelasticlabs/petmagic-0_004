@@ -213,12 +213,19 @@ class TemplatesController extends Notifier<TemplatesState> {
     } on RequestCancelledException {
       if (requestVersion != _requestVersion) return;
       state = state.copyWith(isLoading: false, isRefreshing: false);
+    } on AppException catch (error) {
+      if (requestVersion != _requestVersion) return;
+      state = state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        errorMessage: error.message,
+      );
     } catch (error) {
       if (requestVersion != _requestVersion) return;
       state = state.copyWith(
         isLoading: false,
         isRefreshing: false,
-        errorMessage: error.toString(),
+        errorMessage: 'templates.request_failed',
       );
     } finally {
       _resumePendingRealtimeRefreshIfNeeded();
@@ -261,6 +268,12 @@ class TemplatesController extends Notifier<TemplatesState> {
       }
 
       state = state.copyWith(isLoadingMore: false);
+    } on AppException catch (error) {
+      if (requestVersion != _requestVersion) {
+        return;
+      }
+
+      state = state.copyWith(isLoadingMore: false, errorMessage: error.message);
     } catch (error) {
       if (requestVersion != _requestVersion) {
         return;
@@ -268,7 +281,7 @@ class TemplatesController extends Notifier<TemplatesState> {
 
       state = state.copyWith(
         isLoadingMore: false,
-        errorMessage: error.toString(),
+        errorMessage: 'templates.request_failed',
       );
     } finally {
       _resumePendingRealtimeRefreshIfNeeded();

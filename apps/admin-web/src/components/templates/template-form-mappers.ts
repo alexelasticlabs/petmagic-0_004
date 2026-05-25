@@ -1,21 +1,24 @@
 import { type TemplateFormState } from "@/components/templates/types";
 import {
-    createImageTemplate,
-    createVideoTemplate,
-    updateImageTemplate,
-    updateVideoTemplate,
-    type AdminTemplate,
-    type ImageTemplatePayload,
-    type TemplateAssetInput,
-    type TemplatePromoBadgeMode,
-    type TemplateStatus,
-    type TemplateType,
-    type VideoTemplatePayload,
+  createImageTemplate,
+  createVideoTemplate,
+  updateImageTemplate,
+  updateVideoTemplate,
+  type AdminTemplate,
+  type ImageTemplatePayload,
+  type TemplateAssetInput,
+  type TemplatePromoBadgeMode,
+  type TemplateStatus,
+  type TemplateType,
+  type VideoTemplatePayload,
 } from "@/lib/api-client";
 
-export const DEFAULT_IMAGE_PROMPT = "Keep the same pet, same face, same fur, same colors, same eyes, same breed, and the same overall identity. Apply the template style and scene to the uploaded pet photo without replacing the pet with a different animal.";
-export const DEFAULT_PREPROCESSING_PROMPT = "Keep the same pet, same face, same fur, same colors, same background, same lighting and camera angle. Adjust the pet into an upright pose standing on its two hind legs like a human, with the front paws naturally positioned like arms. Make the full body clearly visible and suitable for motion transfer. Do not change the pet’s identity, breed, facial features, background, or image style.";
-export const DEFAULT_KLING_PROMPT = "A cute pet performing a funny viral dance, smooth animation, high quality.";
+export const DEFAULT_IMAGE_PROMPT =
+  "Keep the same pet, same face, same fur, same colors, same eyes, same breed, and the same overall identity. Apply the template style and scene to the uploaded pet photo without replacing the pet with a different animal.";
+export const DEFAULT_PREPROCESSING_PROMPT =
+  "Keep the same pet, same face, same fur, same colors, same background, same lighting and camera angle. Adjust the pet into an upright pose standing on its two hind legs like a human, with the front paws naturally positioned like arms. Make the full body clearly visible and suitable for motion transfer. Do not change the pet’s identity, breed, facial features, background, or image style.";
+export const DEFAULT_KLING_PROMPT =
+  "A cute pet performing a funny viral dance, smooth animation, high quality.";
 
 export const IMAGE_MODELS = [
   "openai/gpt-image-2/edit",
@@ -23,7 +26,7 @@ export const IMAGE_MODELS = [
   "fal-ai/flux-2-pro/edit",
   "fal-ai/gpt-image-1.5/edit",
   "fal-ai/bytedance/seedream/v5/lite/edit",
-  "fal-ai/nano-banana-2/edit"
+  "fal-ai/nano-banana-2/edit",
 ] as const;
 
 export const PREPROCESSING_MODELS = [
@@ -32,18 +35,22 @@ export const PREPROCESSING_MODELS = [
   "fal-ai/flux-2-pro/edit",
   "fal-ai/gpt-image-1.5/edit",
   "fal-ai/bytedance/seedream/v5/lite/edit",
-  "fal-ai/nano-banana-2/edit"
+  "fal-ai/nano-banana-2/edit",
 ] as const;
 
 export const KLING_MODELS = [
   "fal-ai/kling-video/v3/pro/motion-control",
-  "fal-ai/kling-video/v3/standard/motion-control"
+  "fal-ai/kling-video/v3/standard/motion-control",
 ] as const;
 
 export function createInitialTemplateForm(templateType: TemplateType): TemplateFormState {
   return {
     title: "",
     shortDescription: "",
+    petPhotoRequirements:
+      templateType === "Video"
+        ? "Full body visible\nPet facing camera\nNo cropped head or legs"
+        : "One pet in the photo\nClear face\nGood lighting",
     category: "",
     promoBadgeMode: "Auto",
     tags: "",
@@ -73,6 +80,7 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
   return {
     title: template.title,
     shortDescription: template.shortDescription,
+    petPhotoRequirements: template.petPhotoRequirements?.join("\n") ?? "",
     category: template.category,
     promoBadgeMode: template.promoBadgeMode,
     tags: template.tags.join(", "),
@@ -80,7 +88,9 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     tokenCost: template.tokenCost.toString(),
     previewUrl: template.previewAsset?.url ?? "",
     previewFileName: template.previewAsset?.fileName ?? "",
-    previewContentType: template.previewAsset?.contentType ?? (template.templateType === "Video" ? "video/mp4" : "image/jpeg"),
+    previewContentType:
+      template.previewAsset?.contentType ??
+      (template.templateType === "Video" ? "video/mp4" : "image/jpeg"),
     previewFileSizeBytes: template.previewAsset?.fileSizeBytes?.toString() ?? "",
     musicDescription: template.musicDescription ?? "",
     referenceUrl: template.referenceMotionAsset?.url ?? "",
@@ -98,17 +108,27 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
   };
 }
 
-export async function saveImageTemplateFromForm(templateId: string | undefined, form: TemplateFormState, status: TemplateStatus): Promise<AdminTemplate> {
+export async function saveImageTemplateFromForm(
+  templateId: string | undefined,
+  form: TemplateFormState,
+  status: TemplateStatus
+): Promise<AdminTemplate> {
   const payload: ImageTemplatePayload = {
     title: form.title,
     shortDescription: form.shortDescription,
+    petPhotoRequirements: normalizeRequirements(form.petPhotoRequirements),
     category: form.category,
     status,
     promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
     tags: normalizeTags(form.tags),
     isPremium: form.isPremium,
     tokenCost: parseNumber(form.tokenCost),
-    previewAsset: buildAsset(form.previewUrl, form.previewFileName, form.previewContentType, form.previewFileSizeBytes),
+    previewAsset: buildAsset(
+      form.previewUrl,
+      form.previewFileName,
+      form.previewContentType,
+      form.previewFileSizeBytes
+    ),
     imageModel: form.imageModel,
     imagePrompt: form.imagePrompt,
   };
@@ -116,10 +136,15 @@ export async function saveImageTemplateFromForm(templateId: string | undefined, 
   return templateId ? updateImageTemplate(templateId, payload) : createImageTemplate(payload);
 }
 
-export async function saveVideoTemplateFromForm(templateId: string | undefined, form: TemplateFormState, status: TemplateStatus): Promise<AdminTemplate> {
+export async function saveVideoTemplateFromForm(
+  templateId: string | undefined,
+  form: TemplateFormState,
+  status: TemplateStatus
+): Promise<AdminTemplate> {
   const payload: VideoTemplatePayload = {
     title: form.title,
     shortDescription: form.shortDescription,
+    petPhotoRequirements: normalizeRequirements(form.petPhotoRequirements),
     category: form.category,
     status,
     promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
@@ -127,13 +152,18 @@ export async function saveVideoTemplateFromForm(templateId: string | undefined, 
     isPremium: form.isPremium,
     tokenCost: parseNumber(form.tokenCost),
     musicDescription: form.musicDescription,
-    previewAsset: buildAsset(form.previewUrl, form.previewFileName, form.previewContentType, form.previewFileSizeBytes),
+    previewAsset: buildAsset(
+      form.previewUrl,
+      form.previewFileName,
+      form.previewContentType,
+      form.previewFileSizeBytes
+    ),
     referenceMotionAsset: buildAsset(
       form.referenceUrl,
       form.referenceFileName,
       form.referenceContentType,
       form.referenceFileSizeBytes,
-      form.referenceDurationSeconds,
+      form.referenceDurationSeconds
     ),
     preprocessingModel: form.preprocessingModel,
     preprocessingPrompt: form.preprocessingPrompt,
@@ -164,7 +194,7 @@ function buildAsset(
   fileName: string,
   contentType: string,
   fileSizeBytes: string,
-  durationSeconds?: string,
+  durationSeconds?: string
 ): TemplateAssetInput | undefined {
   if (!url.trim()) {
     return undefined;
@@ -187,6 +217,14 @@ function normalizeTags(raw: string): string[] {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function normalizeRequirements(raw: string): string[] {
+  return raw
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 6);
 }
 
 function parseOptionalNumber(raw: string): number | undefined {

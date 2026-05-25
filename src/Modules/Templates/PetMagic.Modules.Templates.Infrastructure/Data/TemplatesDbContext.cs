@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
@@ -36,6 +37,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Title).HasMaxLength(120).IsRequired();
             entity.Property(x => x.ShortDescription).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.PetPhotoRequirements).HasMaxLength(1000);
             entity.Property(x => x.Category).HasMaxLength(64).IsRequired();
             entity.Property(x => x.Tags).HasMaxLength(1000).IsRequired();
             entity.Property(x => x.PromoBadgeMode).HasConversion<int>();

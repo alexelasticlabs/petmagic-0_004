@@ -7,24 +7,24 @@ import { useEffect, useState } from "react";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { buildTemplateEditorModel } from "@/components/templates/template-editor-model";
 import {
-    createFormFromTemplate,
-    createInitialTemplateForm,
-    parseOptionalDecimal,
-    saveImageTemplateFromForm,
-    saveVideoTemplateFromForm,
+  createFormFromTemplate,
+  createInitialTemplateForm,
+  parseOptionalDecimal,
+  saveImageTemplateFromForm,
+  saveVideoTemplateFromForm,
 } from "@/components/templates/template-form-mappers";
 import { type TemplateFormState } from "@/components/templates/types";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
 import { useAdminTemplateOptions } from "@/components/templates/use-admin-template-options";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    fetchAdminTemplate,
-    uploadTemplateMedia,
-    useAuthSession,
-    type AdminTemplate,
-    type TemplateAssetKind,
-    type TemplateStatus,
-    type TemplateType,
+  fetchAdminTemplate,
+  uploadTemplateMedia,
+  useAuthSession,
+  type AdminTemplate,
+  type TemplateAssetKind,
+  type TemplateStatus,
+  type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 
@@ -41,12 +41,19 @@ type ToastState = {
 
 type EditorVisibilityStatus = Extract<TemplateStatus, "Draft" | "Active">;
 
-export function useTemplateEditorController({ initialTemplateId, locale, templateType }: TemplateEditorControllerOptions) {
+export function useTemplateEditorController({
+  initialTemplateId,
+  locale,
+  templateType,
+}: TemplateEditorControllerOptions) {
   const text = getDictionary(locale);
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();
-  const { categories } = useAdminTemplateCategories({ enabled: Boolean(session), includeArchived: false });
+  const { categories } = useAdminTemplateCategories({
+    enabled: Boolean(session),
+    includeArchived: false,
+  });
   const {
     hasError: hasTemplateOptionsError,
     isLoading: isTemplateOptionsLoading,
@@ -54,7 +61,9 @@ export function useTemplateEditorController({ initialTemplateId, locale, templat
     templates,
   } = useAdminTemplateOptions({ enabled: Boolean(session), templateType });
   const [selectedTemplate, setSelectedTemplate] = useState<AdminTemplate | null>(null);
-  const [form, setForm] = useState<TemplateFormState>(() => createInitialTemplateForm(templateType));
+  const [form, setForm] = useState<TemplateFormState>(() =>
+    createInitialTemplateForm(templateType)
+  );
   const [isInitializing, setIsInitializing] = useState(true);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -64,11 +73,10 @@ export function useTemplateEditorController({ initialTemplateId, locale, templat
   const isVideo = templateType === "Video";
 
   const saveTemplateMutation = useMutation<AdminTemplate, unknown, EditorVisibilityStatus>({
-    mutationFn: (targetStatus) => (
+    mutationFn: (targetStatus) =>
       templateType === "Video"
         ? saveVideoTemplateFromForm(selectedTemplate?.templateId, form, targetStatus)
-        : saveImageTemplateFromForm(selectedTemplate?.templateId, form, targetStatus)
-    ),
+        : saveImageTemplateFromForm(selectedTemplate?.templateId, form, targetStatus),
     onSuccess: async (savedTemplate) => {
       setSelectedTemplate(savedTemplate);
       setForm(createFormFromTemplate(savedTemplate));
@@ -84,24 +92,27 @@ export function useTemplateEditorController({ initialTemplateId, locale, templat
   });
 
   const uploadTemplateMediaMutation = useMutation({
-    mutationFn: ({ assetKind, file }: { assetKind: TemplateAssetKind; file: File }) => uploadTemplateMedia(file, assetKind),
+    mutationFn: ({ assetKind, file }: { assetKind: TemplateAssetKind; file: File }) =>
+      uploadTemplateMedia(file, assetKind),
     onSuccess: (asset, { assetKind }) => {
-      setForm((current) => assetKind === "Preview"
-        ? {
-          ...current,
-          previewUrl: asset.url,
-          previewFileName: asset.fileName,
-          previewContentType: asset.contentType,
-          previewFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
-        }
-        : {
-          ...current,
-          referenceUrl: asset.url,
-          referenceFileName: asset.fileName,
-          referenceContentType: asset.contentType,
-          referenceFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
-          referenceDurationSeconds: asset.durationSeconds?.toString() ?? "",
-        });
+      setForm((current) =>
+        assetKind === "Preview"
+          ? {
+              ...current,
+              previewUrl: asset.url,
+              previewFileName: asset.fileName,
+              previewContentType: asset.contentType,
+              previewFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
+            }
+          : {
+              ...current,
+              referenceUrl: asset.url,
+              referenceFileName: asset.fileName,
+              referenceContentType: asset.contentType,
+              referenceFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
+              referenceDurationSeconds: asset.durationSeconds?.toString() ?? "",
+            }
+      );
 
       if (assetKind === "Preview") {
         setPreviewFile(null);
@@ -182,7 +193,12 @@ export function useTemplateEditorController({ initialTemplateId, locale, templat
     const catalogPath = getTemplateCatalogPath(locale, templateType);
 
     try {
-      const activationReadinessError = getActivationReadinessError(templateType, form, text, targetStatus);
+      const activationReadinessError = getActivationReadinessError(
+        templateType,
+        form,
+        text,
+        targetStatus
+      );
       if (activationReadinessError) {
         setToast({ type: "error", message: activationReadinessError });
         return;
@@ -220,16 +236,28 @@ export function useTemplateEditorController({ initialTemplateId, locale, templat
     }
   }
 
-  const mergedCategorySuggestions = getUniqueValues([...categories.map((category) => category.name), ...templates.map((template) => template.category)]);
+  const mergedCategorySuggestions = getUniqueValues([
+    ...categories.map((category) => category.name),
+    ...templates.map((template) => template.category),
+  ]);
   const isEditMode = selectedTemplate !== null;
   const catalogPath = getTemplateCatalogPath(locale, templateType);
   const editorModel = buildTemplateEditorModel(text, form, selectedTemplate, templateType);
   const catalogLabel = isVideo ? text.navVideoTemplates : text.navImageTemplates;
-  const fallbackPreviewTitle = isVideo ? text.videoTemplateCreatePageTitle : text.imageTemplatesTitle;
-  const previewTags = form.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+  const fallbackPreviewTitle = isVideo
+    ? text.videoTemplateCreatePageTitle
+    : text.imageTemplatesTitle;
+  const previewTags = form.tags
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
   const isLoading = isInitializing || isTemplateOptionsLoading;
   const isSaving = saveTemplateMutation.isPending;
-  const activeToast = toast ?? (hasTemplateOptionsError ? { type: "error" as const, message: text.errorLoadingTemplates } : null);
+  const activeToast =
+    toast ??
+    (hasTemplateOptionsError
+      ? { type: "error" as const, message: text.errorLoadingTemplates }
+      : null);
 
   return {
     activeToast,
@@ -268,14 +296,20 @@ function getTemplateCatalogPath(locale: Locale, templateType: TemplateType) {
 }
 
 function getUniqueValues(values: string[]): string[] {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((left, right) => left.localeCompare(right));
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort(
+    (left, right) => left.localeCompare(right)
+  );
 }
 
 function resolveEditorVisibilityStatus(status?: TemplateStatus): EditorVisibilityStatus {
   return status === "Active" ? "Active" : "Draft";
 }
 
-function getTemplateSaveErrorMessage(error: unknown, text: Dictionary, targetStatus: EditorVisibilityStatus): string {
+function getTemplateSaveErrorMessage(
+  error: unknown,
+  text: Dictionary,
+  targetStatus: EditorVisibilityStatus
+): string {
   if (error && typeof error === "object" && "validationErrors" in error) {
     const validationErrors = (error as { validationErrors?: string[] }).validationErrors ?? [];
     if (validationErrors.length > 0) {
@@ -283,7 +317,11 @@ function getTemplateSaveErrorMessage(error: unknown, text: Dictionary, targetSta
     }
   }
 
-  if (error instanceof Error && error.message && !/^API request failed with status \d+$/i.test(error.message)) {
+  if (
+    error instanceof Error &&
+    error.message &&
+    !/^API request failed with status \d+$/i.test(error.message)
+  ) {
     return error.message;
   }
 
@@ -294,7 +332,7 @@ function getActivationReadinessError(
   templateType: TemplateType,
   form: TemplateFormState,
   text: Dictionary,
-  targetStatus: EditorVisibilityStatus,
+  targetStatus: EditorVisibilityStatus
 ): string | null {
   if (targetStatus !== "Active") {
     return null;
@@ -304,6 +342,10 @@ function getActivationReadinessError(
 
   if (!form.previewUrl.trim()) {
     missingLabels.push(text.previewAssetTitle);
+  }
+
+  if (!form.petPhotoRequirements.trim()) {
+    missingLabels.push(text.petPhotoRequirementsLabel);
   }
 
   if (templateType === "Video") {

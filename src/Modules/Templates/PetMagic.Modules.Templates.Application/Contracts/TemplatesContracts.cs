@@ -25,7 +25,8 @@ public sealed record CreateImageTemplateCommand(
     TemplateAssetCommand? PreviewAsset,
     string ImageModel,
     string ImagePrompt,
-    string? Status = null);
+    string? Status = null,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record UpdateImageTemplateCommand(
     Guid TemplateId,
@@ -39,7 +40,8 @@ public sealed record UpdateImageTemplateCommand(
     TemplateAssetCommand? PreviewAsset,
     string ImageModel,
     string ImagePrompt,
-    string? Status = null);
+    string? Status = null,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record CreateVideoTemplateCommand(
     string Title,
@@ -57,7 +59,8 @@ public sealed record CreateVideoTemplateCommand(
     string KlingModel,
     string KlingPrompt,
     bool KeepOriginalSound,
-    string? Status = null);
+    string? Status = null,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record UpdateVideoTemplateCommand(
     Guid TemplateId,
@@ -76,7 +79,8 @@ public sealed record UpdateVideoTemplateCommand(
     string KlingModel,
     string KlingPrompt,
     bool KeepOriginalSound,
-    string? Status = null);
+    string? Status = null,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record ChangeTemplateStatusCommand(Guid TemplateId, string Status);
 
@@ -129,7 +133,8 @@ public sealed record AdminTemplateListItemResponse(
     string? CharacterOrientation,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    decimal? EstimatedCostUsd = null);
+    decimal? EstimatedCostUsd = null,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record AdminTemplateCategoryListItemResponse(
     Guid CategoryId,
@@ -172,7 +177,8 @@ public sealed record AdminTemplateResponse(
     bool? KeepOriginalSound,
     decimal? EstimatedProviderCostUsd,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record AdminTemplateStatisticsResponse(
     Guid TemplateId,
@@ -424,7 +430,8 @@ public sealed record PublicTemplateListItemResponse(
     int TokenCost,
     TemplateAssetResponse? PreviewAsset,
     string? MusicDescription,
-    double? ReferenceVideoDurationSeconds);
+    double? ReferenceVideoDurationSeconds,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record PublicTemplateCategoryResponse(
     string Name);
@@ -456,7 +463,8 @@ public sealed record PublicTemplateResponse(
     int TokenCost,
     TemplateAssetResponse? PreviewAsset,
     string? MusicDescription,
-    double? ReferenceVideoDurationSeconds);
+    double? ReferenceVideoDurationSeconds,
+    IReadOnlyList<string>? PetPhotoRequirements = null);
 
 public sealed record TemplateGenerationResponse(
     Guid GenerationId,

@@ -36,8 +36,8 @@ class AuthSessionCoordinator {
     required Future<Response<T>> Function(AuthSession session) request,
     required DioExceptionToAppException mapError,
     required String requestFailedMessage,
-    String unauthorizedMessage = 'Sign in is required.',
-    String sessionExpiredMessage = 'Session expired.',
+    String unauthorizedMessage = 'auth.sign_in_required',
+    String sessionExpiredMessage = 'auth.session_expired',
   }) async {
     var session = await _sessionStorage.read();
     if (session == null) {
@@ -67,8 +67,8 @@ class AuthSessionCoordinator {
 
   Future<AuthSession> requireValidSession({
     required DioExceptionToAppException mapError,
-    String unauthorizedMessage = 'Sign in is required.',
-    String sessionExpiredMessage = 'Session expired.',
+    String unauthorizedMessage = 'auth.sign_in_required',
+    String sessionExpiredMessage = 'auth.session_expired',
   }) async {
     final session = await _sessionStorage.read();
     if (session == null) {

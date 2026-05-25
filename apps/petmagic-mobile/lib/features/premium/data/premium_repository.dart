@@ -250,7 +250,7 @@ class PremiumRepository {
       request: request,
       mapError: _mapDioException,
       requestFailedMessage: 'premium.request_failed',
-      sessionExpiredMessage: 'Session expired.',
+      sessionExpiredMessage: 'auth.session_expired',
     );
   }
 

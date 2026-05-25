@@ -74,7 +74,11 @@ void main() {
           supportedLocales: const [
             Locale('ru'),
             Locale('en'),
-            Locale('en', 'US'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
           ],
         ),
       ),

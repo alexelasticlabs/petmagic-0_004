@@ -2,12 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
@@ -24,6 +31,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
+  final _imagePicker = ImagePicker();
   Timer? _searchDebounce;
   DateTime? _lastRefreshAt;
 
@@ -128,7 +136,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                 child: _StateMessage(
                   icon: Icons.cloud_off_rounded,
                   title: text.templatesErrorTitle,
-                  message: state.errorMessage!,
+                  message: _mapTemplatesError(text, state.errorMessage!),
                   actionLabel: text.retryAction,
                   onAction: () => controller.loadInitial(forceRefresh: true),
                 ),
@@ -156,7 +164,11 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     childAspectRatio: 0.72,
                   ),
                   itemBuilder: (context, index) {
-                    return TemplateCard(template: state.items[index]);
+                    final template = state.items[index];
+                    return TemplateCard(
+                      template: template,
+                      onPressed: () => _handleTemplateSelected(template),
+                    );
                   },
                 ),
               ),
@@ -218,6 +230,118 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         .read(templatesControllerProvider.notifier)
         .loadInitial(forceRefresh: true);
   }
+
+  Future<void> _handleTemplateSelected(TemplateItem template) async {
+    final action = await showTemplateDetailSheet(context, template);
+    if (!mounted || action != TemplateDetailAction.upload) {
+      return;
+    }
+
+    await _startTemplateUploadFlow(template);
+  }
+
+  Future<void> _startTemplateUploadFlow(TemplateItem template) async {
+    final photo = await _pickPetPhoto();
+    if (!mounted || photo == null) {
+      return;
+    }
+
+    final generationController = ref.read(
+      templateGenerationControllerProvider.notifier,
+    );
+    generationController.selectPhoto(photo);
+
+    final gate = await generationController.checkGate(template);
+    if (!mounted) {
+      return;
+    }
+
+    if (!gate.isAllowed) {
+      final blockerAction = await showTemplateBlockedSheet(
+        context: context,
+        template: template,
+        gate: gate,
+      );
+      if (!mounted || blockerAction == null) {
+        return;
+      }
+
+      switch (blockerAction) {
+        case TemplateBlockedAction.wallet:
+          context.go(WalletPage.routePath);
+        case TemplateBlockedAction.premium:
+          context.go(PremiumPage.routePath);
+        case TemplateBlockedAction.chooseAnother:
+          break;
+      }
+      return;
+    }
+
+    final confirmed = await showTemplateGenerationConfirmSheet(
+      context: context,
+      template: template,
+      photo: photo,
+      gate: gate,
+    );
+    if (!mounted) {
+      return;
+    }
+
+    if (confirmed == false) {
+      await _startTemplateUploadFlow(template);
+      return;
+    }
+
+    if (confirmed != true) {
+      return;
+    }
+
+    unawaited(generationController.startGeneration(template));
+    await showTemplateGenerationProgressSheet(
+      context: context,
+      template: template,
+    );
+  }
+
+  Future<XFile?> _pickPetPhoto() async {
+    final sourceAction = await showPetPhotoSourceSheet(context);
+    if (!mounted || sourceAction == null) {
+      return null;
+    }
+
+    final source = switch (sourceAction) {
+      PetPhotoSourceAction.camera => ImageSource.camera,
+      PetPhotoSourceAction.gallery => ImageSource.gallery,
+    };
+
+    return _imagePicker.pickImage(
+      source: source,
+      imageQuality: 92,
+      maxWidth: 1800,
+    );
+  }
+}
+
+String _mapTemplatesError(AppLocalizations text, String raw) {
+  final value = raw.toLowerCase();
+
+  if (value.contains('templates.feed_response_empty')) {
+    return text.templatesFeedEmptyError;
+  }
+
+  if (value.contains('templates.connection_timeout')) {
+    return text.templatesConnectionTimeoutError;
+  }
+
+  if (value.contains('templates.server_timeout')) {
+    return text.templatesServerTimeoutError;
+  }
+
+  if (value.contains('templates.request_failed')) {
+    return text.templatesRequestFailedError;
+  }
+
+  return raw;
 }
 
 class _TemplatesLifecycleObserver with WidgetsBindingObserver {

@@ -1232,6 +1232,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ce fournisseur ne peut pas être supprimé tant qu\'une autre méthode de connexion n\'est pas disponible.';
 
   @override
+  String get profileLinkedAccountsSignInRequired =>
+      'Reconnectez-vous pour gérer les comptes liés.';
+
+  @override
+  String get profileLinkedAccountsUnavailable =>
+      'Les comptes liés sont temporairement indisponibles.';
+
+  @override
   String get profileDetailsNotificationsBody =>
       'Cette section reflète vos préférences de communication actuelles dans l\'application.';
 
@@ -1460,6 +1468,14 @@ class AppLocalizationsFr extends AppLocalizations {
   String get supportChatMessageRead => 'Lu';
 
   @override
+  String get supportChatUnavailableError =>
+      'Impossible de joindre le support pour le moment. Réessayez dans un instant.';
+
+  @override
+  String get supportChatAttachmentUnavailableError =>
+      'Impossible d\'envoyer la pièce jointe pour le moment. Réessayez dans un instant.';
+
+  @override
   String get profileSettingsThemeSystem => 'Système';
 
   @override
@@ -1475,7 +1491,19 @@ class AppLocalizationsFr extends AppLocalizations {
   String get profileSettingsLanguageEnglish => 'Anglais';
 
   @override
-  String get profileSettingsLanguageEnglishUs => 'Anglais (États-Unis)';
+  String get profileSettingsLanguageGerman => 'Allemand';
+
+  @override
+  String get profileSettingsLanguageSpanish => 'Espagnol';
+
+  @override
+  String get profileSettingsLanguageFrench => 'Français';
+
+  @override
+  String get profileSettingsLanguageItalian => 'Italien';
+
+  @override
+  String get profileSettingsLanguagePolish => 'Polonais';
 
   @override
   String profileSettingsVersionLabel(Object version) {
@@ -1517,6 +1545,22 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get emptyTemplatesMessage =>
       'Essayez un autre filtre ou actualisez le catalogue.';
+
+  @override
+  String get templatesFeedEmptyError =>
+      'Les modèles sont temporairement indisponibles.';
+
+  @override
+  String get templatesConnectionTimeoutError =>
+      'Aucune connexion. Vérifiez votre réseau et réessayez.';
+
+  @override
+  String get templatesServerTimeoutError =>
+      'Le serveur a mis trop de temps à répondre. Veuillez réessayer.';
+
+  @override
+  String get templatesRequestFailedError =>
+      'Impossible de charger les modèles pour le moment. Veuillez réessayer.';
 
   @override
   String get startupOnboardingActionContinueGuest =>
@@ -1781,6 +1825,30 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get authExternalSessionExpired =>
       'Cette session de connexion a expiré. Veuillez réessayer.';
+
+  @override
+  String get authSignInRequired => 'La connexion est requise.';
+
+  @override
+  String get authSessionExpired => 'Session expirée.';
+
+  @override
+  String get authLoginFailed => 'Échec de la connexion. Veuillez réessayer.';
+
+  @override
+  String get authRegistrationFailed =>
+      'Échec de l\'inscription. Veuillez réessayer.';
+
+  @override
+  String get authPasswordResetRequestFailed =>
+      'Échec de la demande de réinitialisation du mot de passe. Veuillez réessayer.';
+
+  @override
+  String get authPasswordResetFailed =>
+      'Échec de la réinitialisation du mot de passe. Veuillez réessayer.';
+
+  @override
+  String get authRequestFailed => 'La requête a échoué. Veuillez réessayer.';
 
   @override
   String get profileActionFailed =>

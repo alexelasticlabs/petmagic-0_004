@@ -351,7 +351,7 @@ String _providerLabel(AppLocalizations text, PremiumPaymentProvider provider) {
 
 String _ctaLabel(AppLocalizations text, PremiumState state) {
   return switch (state.selectedProvider) {
-    PremiumPaymentProvider.stripe => 'Stripe Checkout',
+    PremiumPaymentProvider.stripe => '${text.premiumContinueAction} · Stripe',
     PremiumPaymentProvider.googlePlay =>
       '${text.premiumContinueAction} · Google Play',
     PremiumPaymentProvider.appStore =>

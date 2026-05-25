@@ -144,44 +144,22 @@ class ProfileSettingsPage extends ConsumerWidget {
                     icon: Icons.language_rounded,
                     title: text.profileSettingsLanguageTitle,
                     subtitle: text.profileSettingsLanguageSubtitle,
-                    children: [
-                      _SettingsChoiceButton(
-                        icon: Icons.translate_rounded,
-                        label: 'RU',
-                        caption: text.profileSettingsLanguageRussian,
-                        isSelected: _matchesLocale(
-                          preferences.locale,
-                          const Locale('ru'),
-                        ),
-                        onTap: () => preferencesController.updateLocale(
-                          const Locale('ru'),
-                        ),
-                      ),
-                      _SettingsChoiceButton(
-                        icon: Icons.language_rounded,
-                        label: 'EN',
-                        caption: text.profileSettingsLanguageEnglish,
-                        isSelected: _matchesLocale(
-                          preferences.locale,
-                          const Locale('en'),
-                        ),
-                        onTap: () => preferencesController.updateLocale(
-                          const Locale('en'),
-                        ),
-                      ),
-                      _SettingsChoiceButton(
-                        icon: Icons.public_rounded,
-                        label: 'US',
-                        caption: text.profileSettingsLanguageEnglishUs,
-                        isSelected: _matchesLocale(
-                          preferences.locale,
-                          const Locale('en', 'US'),
-                        ),
-                        onTap: () => preferencesController.updateLocale(
-                          const Locale('en', 'US'),
-                        ),
-                      ),
-                    ],
+                    children: _languageChoices(text)
+                        .map(
+                          (choice) => _SettingsChoiceButton(
+                            icon: choice.icon,
+                            label: choice.codeLabel,
+                            caption: choice.title,
+                            isSelected: _matchesLocale(
+                              preferences.locale,
+                              choice.locale,
+                            ),
+                            onTap: () => preferencesController.updateLocale(
+                              choice.locale,
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -324,6 +302,67 @@ class ProfileSettingsPage extends ConsumerWidget {
     return effectiveLocale.languageCode == candidate.languageCode &&
         (effectiveLocale.countryCode ?? '') == (candidate.countryCode ?? '');
   }
+
+  static List<_LanguageChoice> _languageChoices(AppLocalizations text) {
+    return [
+      _LanguageChoice(
+        locale: const Locale('ru'),
+        codeLabel: 'RU',
+        title: text.profileSettingsLanguageRussian,
+        icon: Icons.translate_rounded,
+      ),
+      _LanguageChoice(
+        locale: const Locale('en'),
+        codeLabel: 'EN',
+        title: text.profileSettingsLanguageEnglish,
+        icon: Icons.language_rounded,
+      ),
+      _LanguageChoice(
+        locale: const Locale('de'),
+        codeLabel: 'DE',
+        title: text.profileSettingsLanguageGerman,
+        icon: Icons.language_rounded,
+      ),
+      _LanguageChoice(
+        locale: const Locale('es'),
+        codeLabel: 'ES',
+        title: text.profileSettingsLanguageSpanish,
+        icon: Icons.language_rounded,
+      ),
+      _LanguageChoice(
+        locale: const Locale('fr'),
+        codeLabel: 'FR',
+        title: text.profileSettingsLanguageFrench,
+        icon: Icons.language_rounded,
+      ),
+      _LanguageChoice(
+        locale: const Locale('it'),
+        codeLabel: 'IT',
+        title: text.profileSettingsLanguageItalian,
+        icon: Icons.language_rounded,
+      ),
+      _LanguageChoice(
+        locale: const Locale('pl'),
+        codeLabel: 'PL',
+        title: text.profileSettingsLanguagePolish,
+        icon: Icons.language_rounded,
+      ),
+    ];
+  }
+}
+
+class _LanguageChoice {
+  const _LanguageChoice({
+    required this.locale,
+    required this.codeLabel,
+    required this.title,
+    required this.icon,
+  });
+
+  final Locale locale;
+  final String codeLabel;
+  final String title;
+  final IconData icon;
 }
 
 class _SettingsChoiceGroup extends StatelessWidget {

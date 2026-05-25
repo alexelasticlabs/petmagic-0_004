@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 export type TemplateFormState = {
   title: string;
   shortDescription: string;
+  petPhotoRequirements: string;
   category: string;
   promoBadgeMode: string;
   tags: string;

@@ -918,12 +918,15 @@ String _linkedAccountsErrorText(
     loading: () => text.profileLinkedAccountsLoading,
     error: (error, _) {
       final raw = error.toString();
-      if (raw.contains('401') || raw.contains('Sign in is required')) {
-        return 'Sign in again to manage linked accounts.';
+      if (raw.contains('401') ||
+          raw.contains('auth.sign_in_required') ||
+          raw.contains('Sign in is required')) {
+        return text.profileLinkedAccountsSignInRequired;
       }
 
-      return raw.contains('Request failed')
-          ? 'Linked accounts are temporarily unavailable.'
+      return raw.contains('auth.request_failed') ||
+              raw.contains('Request failed')
+          ? text.profileLinkedAccountsUnavailable
           : text.profileLegalUnavailable;
     },
   );

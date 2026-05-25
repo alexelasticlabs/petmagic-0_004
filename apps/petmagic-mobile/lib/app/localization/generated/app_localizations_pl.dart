@@ -1235,6 +1235,14 @@ class AppLocalizationsPl extends AppLocalizations {
       'Tego dostawcy nie można odłączyć, dopóki nie pozostanie dostępna inna metoda logowania.';
 
   @override
+  String get profileLinkedAccountsSignInRequired =>
+      'Zaloguj się ponownie, aby zarządzać połączonymi kontami.';
+
+  @override
+  String get profileLinkedAccountsUnavailable =>
+      'Połączone konta są tymczasowo niedostępne.';
+
+  @override
   String get profileDetailsNotificationsBody =>
       'Ta sekcja odzwierciedla Twoje obecne preferencje dotyczące komunikacji w aplikacji.';
 
@@ -1461,6 +1469,14 @@ class AppLocalizationsPl extends AppLocalizations {
   String get supportChatMessageRead => 'Przeczytano';
 
   @override
+  String get supportChatUnavailableError =>
+      'Nie można teraz połączyć się ze wsparciem. Spróbuj ponownie za chwilę.';
+
+  @override
+  String get supportChatAttachmentUnavailableError =>
+      'Nie można teraz wysłać załącznika. Spróbuj ponownie za chwilę.';
+
+  @override
   String get profileSettingsThemeSystem => 'System';
 
   @override
@@ -1476,7 +1492,19 @@ class AppLocalizationsPl extends AppLocalizations {
   String get profileSettingsLanguageEnglish => 'angielski';
 
   @override
-  String get profileSettingsLanguageEnglishUs => 'angielski (amerykański)';
+  String get profileSettingsLanguageGerman => 'niemiecki';
+
+  @override
+  String get profileSettingsLanguageSpanish => 'hiszpański';
+
+  @override
+  String get profileSettingsLanguageFrench => 'francuski';
+
+  @override
+  String get profileSettingsLanguageItalian => 'włoski';
+
+  @override
+  String get profileSettingsLanguagePolish => 'polski';
 
   @override
   String profileSettingsVersionLabel(Object version) {
@@ -1516,6 +1544,21 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get emptyTemplatesMessage =>
       'Sprobuj innego filtra albo odswiez katalog.';
+
+  @override
+  String get templatesFeedEmptyError => 'Szablony są tymczasowo niedostępne.';
+
+  @override
+  String get templatesConnectionTimeoutError =>
+      'Brak połączenia. Sprawdź sieć i spróbuj ponownie.';
+
+  @override
+  String get templatesServerTimeoutError =>
+      'Serwer odpowiadał zbyt długo. Spróbuj ponownie.';
+
+  @override
+  String get templatesRequestFailedError =>
+      'Nie udało się teraz załadować szablonów. Spróbuj ponownie.';
 
   @override
   String get startupOnboardingActionContinueGuest => 'Kontynuuj jako gość';
@@ -1773,6 +1816,30 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get authExternalSessionExpired =>
       'Ta sesja logowania wygasła. Spróbuj ponownie.';
+
+  @override
+  String get authSignInRequired => 'Wymagane jest zalogowanie.';
+
+  @override
+  String get authSessionExpired => 'Sesja wygasła.';
+
+  @override
+  String get authLoginFailed => 'Logowanie nie powiodło się. Spróbuj ponownie.';
+
+  @override
+  String get authRegistrationFailed =>
+      'Rejestracja nie powiodła się. Spróbuj ponownie.';
+
+  @override
+  String get authPasswordResetRequestFailed =>
+      'Nie udało się wysłać żądania resetu hasła. Spróbuj ponownie.';
+
+  @override
+  String get authPasswordResetFailed =>
+      'Nie udało się zresetować hasła. Spróbuj ponownie.';
+
+  @override
+  String get authRequestFailed => 'Żądanie nie powiodło się. Spróbuj ponownie.';
 
   @override
   String get profileActionFailed =>

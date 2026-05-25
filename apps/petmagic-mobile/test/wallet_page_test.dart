@@ -29,7 +29,7 @@ void main() {
           purchases: _purchases,
         ),
       );
-
+      tester.testTextInput.hide();
       final walletContext = tester.element(find.byType(WalletPage));
       final text = AppLocalizations.of(walletContext);
 
@@ -138,7 +138,11 @@ void main() {
         supportedLocales: const [
           Locale('ru'),
           Locale('en'),
-          Locale('en', 'US'),
+          Locale('de'),
+          Locale('es'),
+          Locale('fr'),
+          Locale('it'),
+          Locale('pl'),
         ],
       ),
     );
@@ -165,7 +169,11 @@ void main() {
           supportedLocales: const [
             Locale('ru'),
             Locale('en'),
-            Locale('en', 'US'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
           ],
           home: const PetMagicShell(
             location: WalletPage.routePath,
@@ -200,14 +208,26 @@ void main() {
     final rewardsContext = tester.element(find.byType(RewardsPage));
     final text = AppLocalizations.of(rewardsContext);
 
+    await tester.drag(find.byType(ListView).first, const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('rewards_promo_input')));
+    await tester.pumpAndSettle();
+
     await tester.enterText(
       find.byKey(const Key('rewards_promo_input')),
       'WELCOME-100',
     );
-    await tester.tap(find.byKey(const Key('rewards_promo_submit')));
+    final submitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('rewards_promo_submit')),
+    );
+    submitButton.onPressed!();
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
 
-    expect(find.text(text.walletRedeemOfflineError), findsAtLeastNWidgets(1));
+    expect(
+      find.text(text.walletRedeemOfflineError, skipOffstage: false),
+      findsAtLeastNWidgets(1),
+    );
   });
 
   testWidgets('rewards page validates empty promo code input', (tester) async {
@@ -227,7 +247,13 @@ void main() {
     final rewardsContext = tester.element(find.byType(RewardsPage));
     final text = AppLocalizations.of(rewardsContext);
 
-    await tester.tap(find.byKey(const Key('rewards_promo_submit')));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -360));
+    await tester.pumpAndSettle();
+
+    final submitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('rewards_promo_submit')),
+    );
+    submitButton.onPressed!();
     await tester.pumpAndSettle();
 
     expect(find.text(text.rewardsPromoEmptyError), findsOneWidget);
@@ -250,6 +276,9 @@ void main() {
     final rewardsContext = tester.element(find.byType(RewardsPage));
     final text = AppLocalizations.of(rewardsContext);
 
+    await tester.drag(find.byType(ListView).first, const Offset(0, -1080));
+    await tester.pumpAndSettle();
+
     await tester.ensureVisible(
       find.byKey(const Key('rewards_referral_show_input')),
     );
@@ -267,7 +296,51 @@ void main() {
     expect(find.text(text.rewardsReferralStatusPending), findsOneWidget);
   });
 
-  testWidgets('rewards page hides bonus history and purchase soft warnings', (
+  testWidgets(
+    'rewards page shows wallet flow and purchase soft warnings stay hidden',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await _pumpRewardsPage(
+        tester,
+        repository: _FakeWalletRepository(
+          wallet: _walletState,
+          ledger: _ledgerItems,
+          packs: _packs,
+          purchases: _purchases,
+          failPurchases: true,
+        ),
+      );
+
+      final rewardsContext = tester.element(find.byType(RewardsPage));
+      final text = AppLocalizations.of(rewardsContext);
+
+      expect(find.text(text.rewardsBalanceTitle), findsOneWidget);
+      expect(find.text(text.rewardsFreeTokensTitle), findsOneWidget);
+      expect(find.text(text.rewardsPromoTitle), findsOneWidget);
+      expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
+      expect(find.text('wallet.purchases_failed'), findsNothing);
+
+      await tester.drag(find.byType(ListView).first, const Offset(0, -620));
+      await tester.pumpAndSettle();
+
+      expect(find.text(text.walletBuySparkTitle), findsWidgets);
+      expect(find.text('Tiny Treat'), findsOneWidget);
+      expect(find.text('Happy Pack'), findsOneWidget);
+      expect(find.text('Magic Boost'), findsOneWidget);
+      expect(find.textContaining('Starter PawSpark'), findsNothing);
+      expect(find.textContaining('база +'), findsNothing);
+
+      await tester.drag(find.byType(ListView).first, const Offset(0, -520));
+      await tester.pumpAndSettle();
+
+      expect(find.text(text.walletRecentTransactionsTitle), findsWidgets);
+      expect(find.text(text.rewardsReferralTitle), findsWidgets);
+    },
+  );
+
+  testWidgets('rewards page shows payment unavailable hint without raw key', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -280,17 +353,18 @@ void main() {
         ledger: _ledgerItems,
         packs: _packs,
         purchases: _purchases,
-        failPurchases: true,
+        paymentMethods: const [],
       ),
     );
 
     final rewardsContext = tester.element(find.byType(RewardsPage));
     final text = AppLocalizations.of(rewardsContext);
 
-    expect(find.text(text.rewardsPromoTitle), findsOneWidget);
-    expect(find.text(text.rewardsHistoryTitle), findsNothing);
-    expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
-    expect(find.text('wallet.purchases_failed'), findsNothing);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -620));
+    await tester.pumpAndSettle();
+
+    expect(find.text(text.rewardsPaymentUnavailableHint), findsOneWidget);
+    expect(find.textContaining('wallet.payment_unavailable'), findsNothing);
   });
 }
 
@@ -308,15 +382,20 @@ Future<void> _pumpWalletPage(
         supportedLocales: const [
           Locale('ru'),
           Locale('en'),
-          Locale('en', 'US'),
+          Locale('de'),
+          Locale('es'),
+          Locale('fr'),
+          Locale('it'),
+          Locale('pl'),
         ],
-        home: const WalletPage(),
+        home: const Material(child: WalletPage()),
       ),
     ),
   );
 
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 200));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpRewardsPage(
@@ -333,15 +412,20 @@ Future<void> _pumpRewardsPage(
         supportedLocales: const [
           Locale('ru'),
           Locale('en'),
-          Locale('en', 'US'),
+          Locale('de'),
+          Locale('es'),
+          Locale('fr'),
+          Locale('it'),
+          Locale('pl'),
         ],
-        home: const RewardsPage(),
+        home: const Material(child: RewardsPage()),
       ),
     ),
   );
 
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 200));
+  await tester.pumpAndSettle();
 }
 
 class _FakeWalletRepository extends WalletRepository {
@@ -353,6 +437,7 @@ class _FakeWalletRepository extends WalletRepository {
     this.failLedger = false,
     this.failPurchases = false,
     this.redeemError,
+    this.paymentMethods = _paymentMethods,
   }) : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   final WalletStateModel wallet;
@@ -362,6 +447,7 @@ class _FakeWalletRepository extends WalletRepository {
   final bool failLedger;
   final bool failPurchases;
   final AppException? redeemError;
+  final List<WalletPaymentMethodModel> paymentMethods;
 
   @override
   Future<WalletStateModel> fetchWallet() async => wallet;
@@ -392,7 +478,7 @@ class _FakeWalletRepository extends WalletRepository {
   }) async {
     return WalletCheckoutConfigModel(
       packs: packs,
-      paymentMethods: _paymentMethods,
+      paymentMethods: paymentMethods,
       externalPaymentWarningRequired: false,
     );
   }
@@ -453,7 +539,7 @@ const _rewardsSummary = RewardsSummaryModel(
 
 const _walletState = WalletStateModel(
   userId: 'user-1',
-  balance: 130,
+  balance: 172,
   adRewardsRemainingToday: 3,
   isPremium: false,
   updatedAtUtc: null,
@@ -464,19 +550,28 @@ const _ledgerItems = [
   WalletLedgerItem(
     entryId: 'entry-1',
     userId: 'user-1',
-    delta: 100,
-    balanceAfter: 130,
-    source: 'weekly_grant',
-    reason: 'Weekly reward',
+    delta: 15,
+    balanceAfter: 172,
+    source: 'ad_reward',
+    reason: 'Ad reward',
     createdAtUtc: null,
   ),
   WalletLedgerItem(
     entryId: 'entry-2',
     userId: 'user-1',
-    delta: -20,
-    balanceAfter: 30,
-    source: 'generation_spend',
-    reason: 'Generated video',
+    delta: 12,
+    balanceAfter: 157,
+    source: 'redeem_code',
+    reason: 'Promo code',
+    createdAtUtc: null,
+  ),
+  WalletLedgerItem(
+    entryId: 'entry-3',
+    userId: 'user-1',
+    delta: 100,
+    balanceAfter: 145,
+    source: 'weekly_grant',
+    reason: 'Weekly reward',
     createdAtUtc: null,
   ),
 ];
@@ -485,22 +580,32 @@ const _packs = [
   CurrencyPackModel(
     packId: 'starter',
     code: 'starter',
-    displayName: 'Starter PawSpark',
+    displayName: 'Tiny Treat',
     currencyCode: 'EUR',
-    priceAmount: 2.79,
-    grantedSpark: 100,
-    bonusSpark: 10,
-    totalSpark: 110,
+    priceAmount: 6.29,
+    grantedSpark: 20,
+    bonusSpark: 0,
+    totalSpark: 20,
   ),
   CurrencyPackModel(
     packId: 'creator',
     code: 'creator',
-    displayName: 'Creator PawSpark',
+    displayName: 'Happy Pack',
     currencyCode: 'EUR',
-    priceAmount: 9.99,
-    grantedSpark: 350,
-    bonusSpark: 30,
-    totalSpark: 380,
+    priceAmount: 13.49,
+    grantedSpark: 45,
+    bonusSpark: 0,
+    totalSpark: 45,
+  ),
+  CurrencyPackModel(
+    packId: 'viral',
+    code: 'viral',
+    displayName: 'Magic Boost',
+    currencyCode: 'EUR',
+    priceAmount: 26.99,
+    grantedSpark: 100,
+    bonusSpark: 0,
+    totalSpark: 100,
   ),
 ];
 
@@ -522,12 +627,12 @@ const _paymentMethods = [
 const _purchases = [
   PurchaseHistoryItem(
     orderId: 'order-1',
-    packDisplayName: 'Creator PawSpark',
+    packDisplayName: 'Happy Pack',
     paymentProvider: 'stripe',
     status: 'succeeded',
-    priceAmount: 9.99,
+    priceAmount: 13.49,
     currencyCode: 'EUR',
-    sparkToGrant: 380,
+    sparkToGrant: 45,
     createdAtUtc: null,
     confirmedAtUtc: null,
   ),

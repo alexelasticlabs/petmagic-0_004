@@ -130,8 +130,8 @@ class SupportChatRepository {
     return _authSessionCoordinator.authorizedRequest(
       request: request,
       mapError: _mapDioException,
-      requestFailedMessage: 'Support request failed.',
-      sessionExpiredMessage: 'Session expired.',
+      requestFailedMessage: 'support.request_failed',
+      sessionExpiredMessage: 'auth.session_expired',
     );
   }
 
@@ -157,10 +157,7 @@ class SupportChatRepository {
     }
 
     if (NetworkErrorMapper.isConnectionUnavailable(error)) {
-      return const AppException(
-        'Unable to reach support right now. Please check your connection and try again.',
-        statusCode: 503,
-      );
+      return const AppException('support.unavailable', statusCode: 503);
     }
 
     return NetworkErrorMapper.fallback(

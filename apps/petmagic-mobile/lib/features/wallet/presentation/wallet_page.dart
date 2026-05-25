@@ -139,17 +139,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       const SizedBox(height: 20),
                       _BalanceCard(wallet: state.wallet),
                       const SizedBox(height: 18),
-                      const _WhatYouCanCreateCard(),
-                      const SizedBox(height: 18),
                       _RewardsOverviewCard(
                         wallet: state.wallet,
                         isClaimingAd: state.isClaimingAd,
                         onClaimAd: controller.claimAdReward,
-                      ),
-                      const SizedBox(height: 18),
-                      _PromoCodeForm(
-                        isSubmitting: state.isRedeeming,
-                        onSubmit: controller.applyRedeemCode,
                       ),
                       const SizedBox(height: 18),
                       _PacksSection(
@@ -443,6 +436,14 @@ String? _checkoutStatusMessage(AppLocalizations text, WalletState state) {
 }
 
 String _friendlyError(AppLocalizations text, String value) {
+  if (value.contains('auth.sign_in_required')) {
+    return text.authRequiredMessage;
+  }
+
+  if (value.contains('auth.session_expired')) {
+    return text.authExternalSessionExpired;
+  }
+
   if (value.contains('wallet.ledger_failed') ||
       value.contains('wallet.packs_failed') ||
       value.contains('wallet.purchases_failed')) {

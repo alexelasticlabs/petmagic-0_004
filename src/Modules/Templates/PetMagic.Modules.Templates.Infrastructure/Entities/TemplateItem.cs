@@ -12,6 +12,8 @@ public sealed class TemplateItem
 
     public string ShortDescription { get; set; } = string.Empty;
 
+    public string? PetPhotoRequirements { get; set; }
+
     public string Category { get; set; } = string.Empty;
 
     public string Tags { get; set; } = string.Empty;

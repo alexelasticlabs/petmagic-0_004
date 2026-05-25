@@ -267,6 +267,8 @@ export type Dictionary = {
   actionsLabel: string;
   titleLabel: string;
   shortDescriptionLabel: string;
+  petPhotoRequirementsLabel: string;
+  petPhotoRequirementsHint: string;
   categoryLabel: string;
   promoBadgeLabel: string;
   promoBadgeAutoLabel: string;
@@ -744,6 +746,9 @@ const dictionaries: Record<Locale, Dictionary> = {
     actionsLabel: "Действия",
     titleLabel: "Название",
     shortDescriptionLabel: "Краткое описание",
+    petPhotoRequirementsLabel: "Требования к фото питомца",
+    petPhotoRequirementsHint:
+      "Один пункт на строку: один питомец в кадре, морда хорошо видна, хороший свет",
     categoryLabel: "Категория",
     promoBadgeLabel: "Промо-бейдж",
     promoBadgeAutoLabel: "Автоматически",
@@ -1236,6 +1241,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     actionsLabel: "Actions",
     titleLabel: "Title",
     shortDescriptionLabel: "Short description",
+    petPhotoRequirementsLabel: "Pet photo requirements",
+    petPhotoRequirementsHint: "One item per line: one pet in frame, clear face, good lighting",
     categoryLabel: "Category",
     promoBadgeLabel: "Promo badge",
     promoBadgeAutoLabel: "Automatic",

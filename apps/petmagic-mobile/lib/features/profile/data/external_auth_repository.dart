@@ -320,7 +320,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   Future<AuthSession> _readAuthorizedSession() async {
     return _authSessionCoordinator.requireValidSession(
       mapError: _mapDioException,
-      sessionExpiredMessage: 'Session expired.',
+      sessionExpiredMessage: 'auth.session_expired',
     );
   }
 

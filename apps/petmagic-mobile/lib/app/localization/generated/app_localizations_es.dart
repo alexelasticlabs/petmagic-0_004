@@ -1235,6 +1235,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Este proveedor no se puede quitar hasta que haya otro método de acceso disponible.';
 
   @override
+  String get profileLinkedAccountsSignInRequired =>
+      'Vuelve a iniciar sesión para administrar cuentas vinculadas.';
+
+  @override
+  String get profileLinkedAccountsUnavailable =>
+      'Las cuentas vinculadas no están disponibles temporalmente.';
+
+  @override
   String get profileDetailsNotificationsBody =>
       'Esta sección refleja sus preferencias de comunicación actuales en la aplicación.';
 
@@ -1462,6 +1470,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get supportChatMessageRead => 'Leido';
 
   @override
+  String get supportChatUnavailableError =>
+      'No se puede contactar con soporte en este momento. Inténtalo de nuevo en un momento.';
+
+  @override
+  String get supportChatAttachmentUnavailableError =>
+      'No se puede enviar el archivo adjunto en este momento. Inténtalo de nuevo en un momento.';
+
+  @override
   String get profileSettingsThemeSystem => 'Sistema';
 
   @override
@@ -1477,7 +1493,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get profileSettingsLanguageEnglish => 'Inglés';
 
   @override
-  String get profileSettingsLanguageEnglishUs => 'Inglés (Estados Unidos)';
+  String get profileSettingsLanguageGerman => 'Alemán';
+
+  @override
+  String get profileSettingsLanguageSpanish => 'Español';
+
+  @override
+  String get profileSettingsLanguageFrench => 'Francés';
+
+  @override
+  String get profileSettingsLanguageItalian => 'Italiano';
+
+  @override
+  String get profileSettingsLanguagePolish => 'Polaco';
 
   @override
   String profileSettingsVersionLabel(Object version) {
@@ -1517,6 +1545,22 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get emptyTemplatesMessage =>
       'Pruebe con otro filtro o actualice el catálogo.';
+
+  @override
+  String get templatesFeedEmptyError =>
+      'Las plantillas no están disponibles temporalmente.';
+
+  @override
+  String get templatesConnectionTimeoutError =>
+      'Sin conexión. Revisa tu red e inténtalo de nuevo.';
+
+  @override
+  String get templatesServerTimeoutError =>
+      'El servidor tardó demasiado en responder. Inténtalo de nuevo.';
+
+  @override
+  String get templatesRequestFailedError =>
+      'No se pudieron cargar las plantillas en este momento. Inténtalo de nuevo.';
 
   @override
   String get startupOnboardingActionContinueGuest => 'Continuar como invitado';
@@ -1781,6 +1825,31 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get authExternalSessionExpired =>
       'Esta sesión de inicio de sesión expiró. Por favor inténtalo de nuevo.';
+
+  @override
+  String get authSignInRequired => 'Se requiere iniciar sesión.';
+
+  @override
+  String get authSessionExpired => 'La sesión ha expirado.';
+
+  @override
+  String get authLoginFailed =>
+      'No se pudo iniciar sesión. Inténtalo de nuevo.';
+
+  @override
+  String get authRegistrationFailed =>
+      'No se pudo completar el registro. Inténtalo de nuevo.';
+
+  @override
+  String get authPasswordResetRequestFailed =>
+      'No se pudo enviar la solicitud de restablecimiento de contraseña. Inténtalo de nuevo.';
+
+  @override
+  String get authPasswordResetFailed =>
+      'No se pudo restablecer la contraseña. Inténtalo de nuevo.';
+
+  @override
+  String get authRequestFailed => 'La solicitud falló. Inténtalo de nuevo.';
 
   @override
   String get profileActionFailed =>
