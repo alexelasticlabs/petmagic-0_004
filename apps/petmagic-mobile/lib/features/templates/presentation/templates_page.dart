@@ -17,6 +17,7 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
+import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
   const TemplatesPage({super.key});
@@ -494,7 +495,7 @@ class _TokenBalance extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.pets_rounded, color: colors.accent, size: 18),
+                const PawSparkIcon(size: 18),
                 const SizedBox(width: 6),
                 Text(
                   '$balance',

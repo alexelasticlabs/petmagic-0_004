@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:share_plus/share_plus.dart';
 
 class RewardsPage extends ConsumerStatefulWidget {
@@ -23,6 +24,96 @@ class RewardsPage extends ConsumerStatefulWidget {
 
 class _RewardsPageState extends ConsumerState<RewardsPage> {
   static const _warningTone = Color(0xFFD7A44A);
+
+  Future<void> _showReferralHowItWorksSheet(int bonusSpark) async {
+    final text = AppLocalizations.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        final colors = context.petMagicColors;
+
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFF1D2B3C), width: 1.1),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF121D2C).withValues(alpha: 0.96),
+                    const Color(0xFF07101A).withValues(alpha: 0.98),
+                  ],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        color: colors.textSoft,
+                      ),
+                    ),
+                    Text(
+                      text.rewardsReferralHowItWorksAction,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      text.rewardsReferralSubtitle,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 13,
+                        height: 1.4,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      text.rewardsReferralBonusPerFriend(bonusSpark),
+                      style: TextStyle(
+                        color: colors.accent,
+                        fontSize: 13,
+                        height: 1.35,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      text.rewardsReferralRulesNote,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 13,
+                        height: 1.4,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _showHistorySheet(List<WalletLedgerItem> items) async {
     final text = AppLocalizations.of(context);
@@ -282,7 +373,12 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                     const SizedBox(height: 16),
                     _ReferralCard(rewards: rewardsSummary),
                     const SizedBox(height: 14),
-                    _ReferralInfoNote(rewards: rewardsSummary),
+                    _ReferralInfoNote(
+                      rewards: rewardsSummary,
+                      onHowItWorksTap: () => _showReferralHowItWorksSheet(
+                        rewardsSummary?.referralBonusSpark ?? 15,
+                      ),
+                    ),
                     if (rewardsSummary?.hasActivatedReferral != true) ...[
                       const SizedBox(height: 16),
                       _FriendCodeCard(
@@ -692,7 +788,7 @@ class _BalancePanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const _SparkTokenIcon(size: 22),
+                  const PawSparkIcon(size: 22),
                   const SizedBox(width: 6),
                   Text(
                     unit,
@@ -707,46 +803,6 @@ class _BalancePanel extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SparkTokenIcon extends StatelessWidget {
-  const _SparkTokenIcon({this.size = 30});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF7BF287), Color(0xFF19B963)],
-        ),
-        border: Border.all(
-          color: const Color(0xFFB6FF9F).withValues(alpha: 0.58),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF2BE66C).withValues(alpha: 0.35),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Icon(
-          Icons.pets_rounded,
-          size: size * 0.58,
-          color: const Color(0xFF05351F),
-        ),
       ),
     );
   }
@@ -1273,9 +1329,13 @@ class _ReferralCodeBox extends StatelessWidget {
 }
 
 class _ReferralInfoNote extends StatelessWidget {
-  const _ReferralInfoNote({required this.rewards});
+  const _ReferralInfoNote({
+    required this.rewards,
+    required this.onHowItWorksTap,
+  });
 
   final _RewardsSummaryView? rewards;
+  final VoidCallback onHowItWorksTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1308,12 +1368,21 @@ class _ReferralInfoNote extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  text.rewardsReferralHowItWorksAction,
-                  style: const TextStyle(
-                    color: Color(0xFF44E681),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
+                TextButton(
+                  onPressed: onHowItWorksTap,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    alignment: Alignment.centerLeft,
+                  ),
+                  child: Text(
+                    text.rewardsReferralHowItWorksAction,
+                    style: const TextStyle(
+                      color: Color(0xFF44E681),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ],
@@ -1679,8 +1748,7 @@ class _ReferralStats extends StatelessWidget {
         children: [
           Expanded(
             child: _MetricStat(
-              icon: Icons.pets_rounded,
-              iconColor: const Color(0xFF73E66E),
+              leading: const PawSparkIcon(size: 18),
               label: text.rewardsReferralEarnedLabel,
               value: '${rewards?.totalReferralBonusEarned ?? 0}',
               unit: text.walletBalanceUnit,
@@ -1712,15 +1780,17 @@ class _ReferralStats extends StatelessWidget {
 
 class _MetricStat extends StatelessWidget {
   const _MetricStat({
-    required this.icon,
-    required this.iconColor,
+    this.icon,
+    this.iconColor,
+    this.leading,
     required this.label,
     required this.value,
     this.unit,
   });
 
-  final IconData icon;
-  final Color iconColor;
+  final IconData? icon;
+  final Color? iconColor;
+  final Widget? leading;
   final String label;
   final String value;
   final String? unit;
@@ -1734,7 +1804,10 @@ class _MetricStat extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, color: iconColor, size: 18),
+            if (leading != null)
+              leading!
+            else
+              Icon(icon ?? Icons.circle, color: iconColor, size: 18),
             const SizedBox(width: 4),
             Expanded(
               child: SizedBox(

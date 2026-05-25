@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
@@ -414,7 +415,7 @@ class _TemplateDetailContent extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     _Pill(
-                      icon: Icons.pets_rounded,
+                      leading: const PawSparkIcon(size: 15),
                       label: '${template.tokenCost} PawSpark',
                       color: colors.gold,
                     ),
@@ -977,9 +978,15 @@ class _ProgressStep extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.label, required this.color});
+  const _Pill({
+    this.icon,
+    this.leading,
+    required this.label,
+    required this.color,
+  });
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String label;
   final Color color;
 
@@ -997,7 +1004,10 @@ class _Pill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 15),
+            if (leading != null)
+              leading!
+            else if (icon != null)
+              Icon(icon, color: color, size: 15),
             const SizedBox(width: 6),
             Flexible(
               child: Text(

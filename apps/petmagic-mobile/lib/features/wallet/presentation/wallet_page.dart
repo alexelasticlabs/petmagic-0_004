@@ -10,10 +10,11 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_pack_selection.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-part 'widgets/wallet_page_overview_widgets.dart';
 part 'widgets/wallet_page_activity_widgets.dart';
+part 'widgets/wallet_page_overview_widgets.dart';
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});

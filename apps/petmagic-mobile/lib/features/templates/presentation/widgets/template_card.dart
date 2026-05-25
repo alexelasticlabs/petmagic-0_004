@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -653,7 +654,7 @@ class _TokenChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.pets_rounded, color: Color(0xFFF1CB73), size: 15),
+            const PawSparkIcon(size: 15),
             const SizedBox(width: 5),
             Text(
               '$cost',

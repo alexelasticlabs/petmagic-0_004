@@ -216,6 +216,8 @@ class _BalanceCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
+                const PawSparkIcon(size: 20),
+                const SizedBox(width: 6),
                 Text(
                   text.walletBalanceUnit,
                   style: TextStyle(
