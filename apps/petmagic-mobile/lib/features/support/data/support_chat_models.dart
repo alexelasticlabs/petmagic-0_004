@@ -12,6 +12,8 @@ class SupportChatMessage {
     this.attachmentFileName,
     this.attachmentContentType,
     this.attachmentFileSizeBytes,
+    this.attachmentUploadStatus,
+    this.attachmentUploadErrorCode,
     this.readAtUtc,
   });
 
@@ -27,6 +29,8 @@ class SupportChatMessage {
   final String? attachmentFileName;
   final String? attachmentContentType;
   final int? attachmentFileSizeBytes;
+  final String? attachmentUploadStatus;
+  final String? attachmentUploadErrorCode;
   final DateTime? readAtUtc;
 
   bool get hasAttachment => attachmentUrl?.isNotEmpty == true;
@@ -34,9 +38,36 @@ class SupportChatMessage {
   bool get hasImageAttachment =>
       hasAttachment && (attachmentContentType?.startsWith('image/') ?? false);
 
+  String? get normalizedAttachmentUploadStatus {
+    final value = attachmentUploadStatus?.trim();
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+
+    return value;
+  }
+
+  bool get isAttachmentUploading =>
+      normalizedAttachmentUploadStatus?.toLowerCase() == 'uploading';
+
+  bool get isAttachmentUploaded =>
+      normalizedAttachmentUploadStatus?.toLowerCase() == 'uploaded';
+
+  bool get isAttachmentFailed =>
+      normalizedAttachmentUploadStatus?.toLowerCase() == 'failed';
+
+  bool get canRetryAttachment => isAttachmentFailed;
+
   SupportChatMessage copyWith({
     bool? isRead,
     DateTime? readAtUtc,
+    String? attachmentUrl,
+    String? attachmentFileName,
+    String? attachmentContentType,
+    int? attachmentFileSizeBytes,
+    String? attachmentUploadStatus,
+    String? attachmentUploadErrorCode,
+    bool clearAttachmentUploadErrorCode = false,
     bool clearReadAt = false,
   }) {
     return SupportChatMessage(
@@ -48,10 +79,16 @@ class SupportChatMessage {
       body: body,
       isRead: isRead ?? this.isRead,
       createdAtUtc: createdAtUtc,
-      attachmentUrl: attachmentUrl,
-      attachmentFileName: attachmentFileName,
-      attachmentContentType: attachmentContentType,
-      attachmentFileSizeBytes: attachmentFileSizeBytes,
+        attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+        attachmentFileName: attachmentFileName ?? this.attachmentFileName,
+        attachmentContentType: attachmentContentType ?? this.attachmentContentType,
+        attachmentFileSizeBytes:
+          attachmentFileSizeBytes ?? this.attachmentFileSizeBytes,
+        attachmentUploadStatus:
+          attachmentUploadStatus ?? this.attachmentUploadStatus,
+        attachmentUploadErrorCode: clearAttachmentUploadErrorCode
+          ? null
+          : (attachmentUploadErrorCode ?? this.attachmentUploadErrorCode),
       readAtUtc: clearReadAt ? null : (readAtUtc ?? this.readAtUtc),
     );
   }
@@ -69,6 +106,8 @@ class SupportChatMessage {
       attachmentFileName: json['attachmentFileName'] as String?,
       attachmentContentType: json['attachmentContentType'] as String?,
       attachmentFileSizeBytes: json['attachmentFileSizeBytes'] as int?,
+      attachmentUploadStatus: json['attachmentUploadStatus'] as String?,
+      attachmentUploadErrorCode: json['attachmentUploadErrorCode'] as String?,
       createdAtUtc:
           DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),

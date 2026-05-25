@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/presentation/password_reset_pag
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
@@ -21,8 +22,10 @@ class ProfileSettingsPage extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
-    final bottomNavInset = petMagicBottomNavInset(context);
+    final bottomNavInset = petMagicScrollableBottomInset(context);
     final preferences = ref.watch(appPreferencesControllerProvider);
+    final resolvedLocale =
+        preferences.locale ?? Localizations.localeOf(context);
     final preferencesController = ref.read(
       appPreferencesControllerProvider.notifier,
     );
@@ -123,12 +126,9 @@ class ProfileSettingsPage extends ConsumerWidget {
                         ProfileSettingsDetailKind.notifications,
                       ),
                     ),
-                    trailing: IgnorePointer(
-                      child: Switch.adaptive(
-                        value: state.profile?.marketingEmailsEnabled ?? false,
-                        onChanged: (_) {},
-                      ),
-                    ),
+                    trailingText: state.profile?.marketingEmailsEnabled == true
+                        ? text.profilePreferenceEnabled
+                        : text.profilePreferenceOff,
                     showDivider: false,
                   ),
                 ],
@@ -137,67 +137,34 @@ class ProfileSettingsPage extends ConsumerWidget {
             const SizedBox(height: 18),
             ProfileSectionLabel(label: text.profileSettingsPreferencesSection),
             ProfileGlassCard(
+              padding: EdgeInsets.zero,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SettingsChoiceGroup(
+                  ProfileSettingsRow(
                     icon: Icons.language_rounded,
                     title: text.profileSettingsLanguageTitle,
-                    subtitle: text.profileSettingsLanguageSubtitle,
-                    children: _languageChoices(text)
-                        .map(
-                          (choice) => _SettingsChoiceButton(
-                            icon: choice.icon,
-                            label: choice.codeLabel,
-                            caption: choice.title,
-                            isSelected: _matchesLocale(
-                              preferences.locale,
-                              choice.locale,
-                            ),
-                            onTap: () => preferencesController.updateLocale(
-                              choice.locale,
-                            ),
-                          ),
-                        )
-                        .toList(growable: false),
+                    subtitle: _languageLabel(text, resolvedLocale),
+                    onTap: () async {
+                      await showProfileLanguageSheet(
+                        context: context,
+                        selectedLocale: resolvedLocale,
+                        options: _languageOptions(text),
+                        onSelect: preferencesController.updateLocale,
+                      );
+                    },
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Divider(
-                      height: 1,
-                      color: colors.border.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  _SettingsChoiceGroup(
+                  ProfileSettingsRow(
                     icon: Icons.dark_mode_outlined,
                     title: text.profileSettingsThemeTitle,
-                    subtitle: text.profileSettingsThemeSubtitle,
-                    children: [
-                      _SettingsChoiceButton(
-                        icon: Icons.brightness_auto_rounded,
-                        label: text.profileSettingsThemeSystem,
-                        isSelected: preferences.themeMode == ThemeMode.system,
-                        onTap: () => preferencesController.updateThemeMode(
-                          ThemeMode.system,
-                        ),
-                      ),
-                      _SettingsChoiceButton(
-                        icon: Icons.light_mode_rounded,
-                        label: text.profileSettingsThemeLight,
-                        isSelected: preferences.themeMode == ThemeMode.light,
-                        onTap: () => preferencesController.updateThemeMode(
-                          ThemeMode.light,
-                        ),
-                      ),
-                      _SettingsChoiceButton(
-                        icon: Icons.dark_mode_rounded,
-                        label: text.profileSettingsThemeDark,
-                        isSelected: preferences.themeMode == ThemeMode.dark,
-                        onTap: () => preferencesController.updateThemeMode(
-                          ThemeMode.dark,
-                        ),
-                      ),
-                    ],
+                    subtitle: _themeModeLabel(text, preferences.themeMode),
+                    showDivider: false,
+                    onTap: () async {
+                      await showProfileThemeSheet(
+                        context: context,
+                        selectedThemeMode: preferences.themeMode,
+                        onSelect: preferencesController.updateThemeMode,
+                      );
+                    },
                   ),
                 ],
               ),
@@ -274,19 +241,56 @@ class ProfileSettingsPage extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
             ProfileSectionLabel(label: text.profileSettingsDangerSection),
-            ProfileGlassCard(
-              padding: EdgeInsets.zero,
-              child: ProfileSettingsRow(
-                icon: Icons.delete_outline_rounded,
-                title: text.profileSettingsDeleteAccountTitle,
-                subtitle: text.profileSettingsDeleteAccountSubtitle,
-                iconColor: colors.danger,
-                isDestructive: true,
-                showDivider: false,
-                onTap: () => context.push(
-                  ProfileSettingsDetailPage.location(
-                    ProfileSettingsDetailKind.deleteAccount,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colors.danger.withValues(alpha: 0.2),
+                      colors.surfaceGlass,
+                    ],
                   ),
+                  border: Border.all(
+                    color: colors.danger.withValues(alpha: 0.45),
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.danger.withValues(alpha: 0.18),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ProfileSettingsRow(
+                  icon: Icons.delete_outline_rounded,
+                  title: text.profileSettingsDeleteAccountTitle,
+                  subtitle: text.profileSettingsDeleteAccountSubtitle,
+                  iconColor: colors.danger,
+                  isDestructive: true,
+                  showDivider: false,
+                  onTap: () async {
+                    await showProfileDeleteAccountConfirmationSheet(
+                      context: context,
+                      onConfirm: () async {
+                        if (!context.mounted) {
+                          return;
+                        }
+
+                        final messenger = ScaffoldMessenger.of(context);
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(text.profileDetailsDeleteBody),
+                            ),
+                          );
+                      },
+                    );
+                  },
                 ),
               ),
             ),
@@ -296,246 +300,59 @@ class ProfileSettingsPage extends ConsumerWidget {
     );
   }
 
-  static bool _matchesLocale(Locale? currentLocale, Locale candidate) {
-    final effectiveLocale = currentLocale ?? candidate;
-
-    return effectiveLocale.languageCode == candidate.languageCode &&
-        (effectiveLocale.countryCode ?? '') == (candidate.countryCode ?? '');
-  }
-
-  static List<_LanguageChoice> _languageChoices(AppLocalizations text) {
+  static List<ProfileLanguageSheetOption> _languageOptions(
+    AppLocalizations text,
+  ) {
     return [
-      _LanguageChoice(
+      ProfileLanguageSheetOption(
         locale: const Locale('ru'),
-        codeLabel: 'RU',
-        title: text.profileSettingsLanguageRussian,
-        icon: Icons.translate_rounded,
+        label: text.profileSettingsLanguageRussian,
       ),
-      _LanguageChoice(
+      ProfileLanguageSheetOption(
         locale: const Locale('en'),
-        codeLabel: 'EN',
-        title: text.profileSettingsLanguageEnglish,
-        icon: Icons.language_rounded,
+        label: text.profileSettingsLanguageEnglish,
       ),
-      _LanguageChoice(
+      ProfileLanguageSheetOption(
         locale: const Locale('de'),
-        codeLabel: 'DE',
-        title: text.profileSettingsLanguageGerman,
-        icon: Icons.language_rounded,
+        label: text.profileSettingsLanguageGerman,
       ),
-      _LanguageChoice(
+      ProfileLanguageSheetOption(
         locale: const Locale('es'),
-        codeLabel: 'ES',
-        title: text.profileSettingsLanguageSpanish,
-        icon: Icons.language_rounded,
+        label: text.profileSettingsLanguageSpanish,
       ),
-      _LanguageChoice(
+      ProfileLanguageSheetOption(
         locale: const Locale('fr'),
-        codeLabel: 'FR',
-        title: text.profileSettingsLanguageFrench,
-        icon: Icons.language_rounded,
+        label: text.profileSettingsLanguageFrench,
       ),
-      _LanguageChoice(
+      ProfileLanguageSheetOption(
         locale: const Locale('it'),
-        codeLabel: 'IT',
-        title: text.profileSettingsLanguageItalian,
-        icon: Icons.language_rounded,
+        label: text.profileSettingsLanguageItalian,
       ),
-      _LanguageChoice(
+      ProfileLanguageSheetOption(
         locale: const Locale('pl'),
-        codeLabel: 'PL',
-        title: text.profileSettingsLanguagePolish,
-        icon: Icons.language_rounded,
+        label: text.profileSettingsLanguagePolish,
       ),
     ];
   }
-}
 
-class _LanguageChoice {
-  const _LanguageChoice({
-    required this.locale,
-    required this.codeLabel,
-    required this.title,
-    required this.icon,
-  });
-
-  final Locale locale;
-  final String codeLabel;
-  final String title;
-  final IconData icon;
-}
-
-class _SettingsChoiceGroup extends StatelessWidget {
-  const _SettingsChoiceGroup({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.children,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: colors.accent.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: colors.accent, size: 19),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 12.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Wrap(spacing: 10, runSpacing: 10, children: children),
-      ],
-    );
+  static String _languageLabel(AppLocalizations text, Locale locale) {
+    return switch (locale.languageCode) {
+      'ru' => text.profileSettingsLanguageRussian,
+      'en' => text.profileSettingsLanguageEnglish,
+      'de' => text.profileSettingsLanguageGerman,
+      'es' => text.profileSettingsLanguageSpanish,
+      'fr' => text.profileSettingsLanguageFrench,
+      'it' => text.profileSettingsLanguageItalian,
+      'pl' => text.profileSettingsLanguagePolish,
+      _ => text.profileSettingsLanguageEnglish,
+    };
   }
-}
 
-class _SettingsChoiceButton extends StatelessWidget {
-  const _SettingsChoiceButton({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-    this.caption,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? caption;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          width: 148,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? colors.accent.withValues(alpha: 0.14)
-                : colors.surfaceStrong.withValues(alpha: 0.82),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isSelected
-                  ? colors.accent.withValues(alpha: 0.55)
-                  : colors.border.withValues(alpha: 0.75),
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: colors.accent.withValues(alpha: 0.14),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: isSelected
-                          ? colors.accent.withValues(alpha: 0.16)
-                          : colors.surfaceGlass,
-                    ),
-                    child: Icon(
-                      icon,
-                      color: isSelected ? colors.accent : colors.textMuted,
-                      size: 18,
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    isSelected
-                        ? Icons.check_circle_rounded
-                        : Icons.radio_button_unchecked_rounded,
-                    color: isSelected ? colors.accent : colors.textMuted,
-                    size: 18,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              if (caption != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  caption!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 11.5,
-                    height: 1.25,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
+  static String _themeModeLabel(AppLocalizations text, ThemeMode mode) {
+    return switch (mode) {
+      ThemeMode.system => text.profileSettingsThemeSystem,
+      ThemeMode.light => text.profileSettingsThemeLight,
+      ThemeMode.dark => text.profileSettingsThemeDark,
+    };
   }
 }

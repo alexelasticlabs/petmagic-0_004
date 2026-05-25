@@ -84,7 +84,7 @@
   "walletDataUnavailableFallback": "Данные кошелька сейчас недоступны.",
   "walletRefreshTooltip": "Обновить кошелек",
   "walletBalanceTitle": "Доступно для создания фото, видео и premium-шаблонов.",
-  "walletBalanceEyebrow": "Текущий баланс",
+  "walletBalanceEyebrow": "Ваш баланс",
   "walletBalanceUnit": "PawSpark",
   "walletBalanceExplanation": "PawSpark — внутренняя валюта PetMagic. Используйте её для создания фото, видео и доступа к премиум-шаблонам.",
   "walletPremiumStatus": "Premium-кошелек",
@@ -107,7 +107,7 @@
       "count": {}
     }
   },
-  "walletWatchAdAction": "Получить +15 PawSpark",
+  "walletWatchAdAction": "Смотреть рекламу +15",
   "walletAdDailyLimitReached": "Реклама сейчас недоступна. Попробуйте у нас позже.",
   "walletPromoTitle": "Есть промокод?",
   "walletPromoSubtitle": "Введите код от команды PetMagic и сразу получите PawSpark на баланс.",
@@ -117,7 +117,23 @@
   "walletPremiumUpsellTitle": "Создаете часто?",
   "walletPremiumUpsellMessage": "Premium дает ежемесячные PawSpark, premium-шаблоны и приоритетную очередь.",
   "walletViewPremiumAction": "Посмотреть Premium",
-  "walletWhatYouCanCreateTitle": "Баланса хватит на:",
+  "walletWhatYouCanCreateTitle": "Хватит примерно на:",
+  "walletApproxPhotos": "{count} фото",
+  "@walletApproxPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "walletApproxVideos": "{count} видео",
+  "@walletApproxVideos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "walletSpendPhotoSubtitle": "Фото\nот 10 Spark",
   "walletSpendVideoSubtitle": "Видео\nот 50 Spark",
   "walletSpendPremiumSubtitle": "Premium\nот 80 Spark",
@@ -260,6 +276,7 @@
     }
   },
   "walletRecentTransactionsTitle": "Последние операции",
+  "walletViewAllTransactions": "Все операции",
   "walletNoActivity": "Операций в кошельке пока нет.",
   "walletBalanceAfter": "Баланс: {count}",
   "@walletBalanceAfter": {
@@ -280,10 +297,11 @@
   "walletTryAgainAction": "Попробовать снова",
   "walletPending": "Ожидается",
   "walletSourcePackPurchase": "Пополнение",
-  "walletSourceGenerationSpend": "Генерация шаблона",
+  "walletSourceGenerationSpend": "Генерация",
   "walletSourceGenerationRefund": "Возврат за генерацию",
-  "walletSourceWeeklyGrant": "Недельная награда",
-  "walletSourceAdReward": "Награда за рекламу",
+  "walletSourceWeeklyGrant": "Недельный бонус",
+  "walletSourceAdReward": "Бонус за рекламу",
+  "walletSourcePromoCode": "Промокод",
   "walletSourceAdminGrant": "Начисление поддержки",
   "walletSourceAdminDebit": "Корректировка поддержки",
   "walletPurchaseCompleted": "Завершено",
@@ -293,6 +311,7 @@
   "walletQueryFilterDebits": "Списания",
   "walletPartialActivityUnavailable": "Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.",
   "walletPaymentGatewayUnavailableError": "Платежи временно недоступны. Попробуйте позже или обновите приложение.",
+  "walletPaymentUnavailableError": "Пополнение временно недоступно. Попробуйте позже.",
   "walletPackUnavailableError": "Этот набор PawSpark больше недоступен.",
   "walletRedeemCodeNotFoundError": "Промокод не найден.",
   "walletRedeemCodeAlreadyUsedError": "Этот промокод уже использован.",

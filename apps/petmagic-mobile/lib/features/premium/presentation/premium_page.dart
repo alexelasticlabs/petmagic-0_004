@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -61,7 +62,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     final controller = ref.read(premiumControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final bottomNavInset = petMagicBottomNavInset(context);
+    final bottomNavInset = petMagicScrollableBottomInset(context);
     final checkoutStatusMessage = _checkoutStatusMessage(text, state);
 
     ref.listen(premiumControllerProvider, (previous, next) {
@@ -296,11 +297,14 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     PremiumController controller,
   ) async {
     if (state.selectedProvider == PremiumPaymentProvider.stripe && mounted) {
-      final confirmed = await showModalBottomSheet<bool>(
+      final confirmed = await showPetMagicModalBottomSheet<bool>(
         context: context,
         backgroundColor: Colors.transparent,
         isScrollControlled: true,
-        builder: (context) => _ExternalCheckoutWarningSheet(state: state),
+        builder: (context, bottomInset) => Padding(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: _ExternalCheckoutWarningSheet(state: state),
+        ),
       );
 
       if (confirmed != true) {

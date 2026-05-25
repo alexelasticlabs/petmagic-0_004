@@ -1,21 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
-import 'package:go_router/go_router.dart';
-import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -138,6 +139,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: WalletPage.routePath,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: WalletPage()),
+          ),
+          GoRoute(
+            path: AllTransactionsPage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: AllTransactionsPage()),
           ),
           GoRoute(
             path: RewardsPage.routePath,

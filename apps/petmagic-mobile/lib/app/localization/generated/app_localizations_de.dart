@@ -259,7 +259,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Available for photos, videos and premium templates.';
 
   @override
-  String get walletBalanceEyebrow => 'Current balance';
+  String get walletBalanceEyebrow => 'Your balance';
 
   @override
   String get walletBalanceUnit => 'PawSpark';
@@ -304,7 +304,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get walletWatchAdAction => 'Get +15 PawSpark';
+  String get walletWatchAdAction => 'Watch ad +15';
 
   @override
   String get walletAdDailyLimitReached =>
@@ -337,7 +337,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get walletViewPremiumAction => 'View Premium';
 
   @override
-  String get walletWhatYouCanCreateTitle => 'Your balance is enough for:';
+  String get walletWhatYouCanCreateTitle => 'Enough for approximately:';
+
+  @override
+  String walletApproxPhotos(int count) {
+    return '$count photos';
+  }
+
+  @override
+  String walletApproxVideos(int count) {
+    return '$count videos';
+  }
 
   @override
   String get walletSpendPhotoSubtitle => 'Photos\nfrom 10 Spark';
@@ -591,6 +601,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get walletRecentTransactionsTitle => 'Recent transactions';
 
   @override
+  String get walletViewAllTransactions => 'All transactions';
+
+  @override
   String get walletNoActivity => 'No wallet activity yet.';
 
   @override
@@ -622,16 +635,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get walletSourcePackPurchase => 'Added funds';
 
   @override
-  String get walletSourceGenerationSpend => 'Template generation';
+  String get walletSourceGenerationSpend => 'Generation';
 
   @override
   String get walletSourceGenerationRefund => 'Generation refund';
 
   @override
-  String get walletSourceWeeklyGrant => 'Weekly reward';
+  String get walletSourceWeeklyGrant => 'Weekly bonus';
 
   @override
-  String get walletSourceAdReward => 'Ad reward';
+  String get walletSourceAdReward => 'Ad bonus';
+
+  @override
+  String get walletSourcePromoCode => 'Promo code';
 
   @override
   String get walletSourceAdminGrant => 'Support credit';
@@ -661,6 +677,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get walletPaymentGatewayUnavailableError =>
       'Payments are temporarily unavailable. Please try again later or update the app.';
+
+  @override
+  String get walletPaymentUnavailableError =>
+      'Top-up is temporarily unavailable. Please try again later.';
 
   @override
   String get walletPackUnavailableError =>

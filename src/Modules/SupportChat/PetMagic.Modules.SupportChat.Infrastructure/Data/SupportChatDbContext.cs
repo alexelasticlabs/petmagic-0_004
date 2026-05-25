@@ -33,6 +33,8 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.AttachmentUrl).HasMaxLength(2048);
             entity.Property(x => x.AttachmentFileName).HasMaxLength(256);
             entity.Property(x => x.AttachmentContentType).HasMaxLength(128);
+            entity.Property(x => x.AttachmentUploadStatus);
+            entity.Property(x => x.AttachmentUploadErrorCode).HasMaxLength(128);
             entity.HasIndex(x => new { x.ConversationId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.ConversationId, x.IsFromAdmin, x.ReadAtUtc });
             entity.HasOne(x => x.Conversation)

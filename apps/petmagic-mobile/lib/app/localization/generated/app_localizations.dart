@@ -585,7 +585,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletBalanceEyebrow.
   ///
   /// In en, this message translates to:
-  /// **'Current balance'**
+  /// **'Your balance'**
   String get walletBalanceEyebrow;
 
   /// No description provided for @walletBalanceUnit.
@@ -663,7 +663,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletWatchAdAction.
   ///
   /// In en, this message translates to:
-  /// **'Get +15 PawSpark'**
+  /// **'Watch ad +15'**
   String get walletWatchAdAction;
 
   /// No description provided for @walletAdDailyLimitReached.
@@ -723,8 +723,20 @@ abstract class AppLocalizations {
   /// No description provided for @walletWhatYouCanCreateTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your balance is enough for:'**
+  /// **'Enough for approximately:'**
   String get walletWhatYouCanCreateTitle;
+
+  /// No description provided for @walletApproxPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} photos'**
+  String walletApproxPhotos(int count);
+
+  /// No description provided for @walletApproxVideos.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} videos'**
+  String walletApproxVideos(int count);
 
   /// No description provided for @walletSpendPhotoSubtitle.
   ///
@@ -1146,6 +1158,12 @@ abstract class AppLocalizations {
   /// **'Recent transactions'**
   String get walletRecentTransactionsTitle;
 
+  /// No description provided for @walletViewAllTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'All transactions'**
+  String get walletViewAllTransactions;
+
   /// No description provided for @walletNoActivity.
   ///
   /// In en, this message translates to:
@@ -1203,7 +1221,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletSourceGenerationSpend.
   ///
   /// In en, this message translates to:
-  /// **'Template generation'**
+  /// **'Generation'**
   String get walletSourceGenerationSpend;
 
   /// No description provided for @walletSourceGenerationRefund.
@@ -1215,14 +1233,20 @@ abstract class AppLocalizations {
   /// No description provided for @walletSourceWeeklyGrant.
   ///
   /// In en, this message translates to:
-  /// **'Weekly reward'**
+  /// **'Weekly bonus'**
   String get walletSourceWeeklyGrant;
 
   /// No description provided for @walletSourceAdReward.
   ///
   /// In en, this message translates to:
-  /// **'Ad reward'**
+  /// **'Ad bonus'**
   String get walletSourceAdReward;
+
+  /// No description provided for @walletSourcePromoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo code'**
+  String get walletSourcePromoCode;
 
   /// No description provided for @walletSourceAdminGrant.
   ///
@@ -1277,6 +1301,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Payments are temporarily unavailable. Please try again later or update the app.'**
   String get walletPaymentGatewayUnavailableError;
+
+  /// No description provided for @walletPaymentUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-up is temporarily unavailable. Please try again later.'**
+  String get walletPaymentUnavailableError;
 
   /// No description provided for @walletPackUnavailableError.
   ///

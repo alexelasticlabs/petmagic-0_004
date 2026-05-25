@@ -52,7 +52,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final subscriptionSummary = ref.watch(premiumSubscriptionSummaryProvider);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final bottomNavInset = petMagicBottomNavInset(context);
+    final bottomNavInset = petMagicScrollableBottomInset(context);
 
     if (!state.isLoading && !state.isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

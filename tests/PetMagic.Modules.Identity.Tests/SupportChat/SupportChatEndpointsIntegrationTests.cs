@@ -240,7 +240,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             new OpenConversationRequest("Need help with screenshot", SupportConversationPriority.Normal));
 
         using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47]);
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         form.Add(fileContent, "file", "issue.png");
         form.Add(new StringContent("Screenshot of the payment error"), "body");
@@ -257,6 +257,8 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("issue.png", message.AttachmentFileName);
         Assert.Equal("image/png", message.AttachmentContentType);
         Assert.NotNull(message.AttachmentUrl);
+        Assert.Equal("Uploaded", message.AttachmentUploadStatus);
+        Assert.Null(message.AttachmentUploadErrorCode);
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
@@ -264,6 +266,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
         Assert.Equal("issue.png", attachmentMessage.AttachmentFileName);
+        Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
     }
 
     [Fact]
@@ -298,20 +301,20 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task AdminAttachmentEndpoint_ShouldUploadFileAndExposeAttachmentMetadata()
+    public async Task AdminAttachmentEndpoint_ShouldUploadImageAndExposeAttachmentMetadata()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
 
         var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(UserId, "User"),
             "/api/support/conversation/open",
-            new OpenConversationRequest("Need invoice copy", SupportConversationPriority.Normal));
+            new OpenConversationRequest("Need screenshot review", SupportConversationPriority.Normal));
 
         using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x25, 0x50, 0x44, 0x46]);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-        form.Add(fileContent, "file", "invoice.pdf");
-        form.Add(new StringContent("Invoice copy attached"), "body");
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", "admin-screenshot.png");
+        form.Add(new StringContent("Screenshot attached"), "body");
 
         using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
             $"/api/admin/support/conversations/{created.ConversationId}/attachments",
@@ -321,18 +324,64 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
         Assert.True(message.IsFromAdmin);
-        Assert.Equal("Invoice copy attached", message.Body);
-        Assert.Equal("invoice.pdf", message.AttachmentFileName);
-        Assert.Equal("application/pdf", message.AttachmentContentType);
+        Assert.Equal("Screenshot attached", message.Body);
+        Assert.Equal("admin-screenshot.png", message.AttachmentFileName);
+        Assert.Equal("image/png", message.AttachmentContentType);
         Assert.NotNull(message.AttachmentUrl);
+        Assert.Equal("Uploaded", message.AttachmentUploadStatus);
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(UserId, "User"),
             "/api/support/conversation");
 
         var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
-        Assert.Equal("invoice.pdf", attachmentMessage.AttachmentFileName);
-        Assert.Equal("application/pdf", attachmentMessage.AttachmentContentType);
+        Assert.Equal("admin-screenshot.png", attachmentMessage.AttachmentFileName);
+        Assert.Equal("image/png", attachmentMessage.AttachmentContentType);
+        Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
+    }
+
+    [Fact]
+    public async Task UserAttachmentRetryEndpoint_ShouldRetryFailedAttachmentAndUploadImage()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need retry flow", SupportConversationPriority.Normal));
+
+        using var failedForm = new MultipartFormDataContent();
+        var failedContent = new ByteArrayContent([0x25, 0x50, 0x44, 0x46]);
+        failedContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        failedForm.Add(failedContent, "file", "invoice.pdf");
+        failedForm.Add(new StringContent("First upload should fail"), "body");
+
+        using var failedResponse = await userClient.PostAsync(
+            $"/api/support/conversation/{created.ConversationId}/attachments",
+            failedForm);
+
+        await AssertSuccessAsync(failedResponse);
+        var failedMessage = (await failedResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+        Assert.Equal("Failed", failedMessage.AttachmentUploadStatus);
+        Assert.Equal("support.attachment_content_type_not_allowed", failedMessage.AttachmentUploadErrorCode);
+        Assert.Null(failedMessage.AttachmentUrl);
+
+        using var retryForm = new MultipartFormDataContent();
+        var retryContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        retryContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        retryForm.Add(retryContent, "file", "fixed.png");
+
+        using var retryResponse = await userClient.PostAsync(
+            $"/api/support/conversation/{created.ConversationId}/messages/{failedMessage.MessageId}/attachment/retry",
+            retryForm);
+
+        await AssertSuccessAsync(retryResponse);
+        var retriedMessage = (await retryResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+        Assert.Equal(failedMessage.MessageId, retriedMessage.MessageId);
+        Assert.Equal("Uploaded", retriedMessage.AttachmentUploadStatus);
+        Assert.Null(retriedMessage.AttachmentUploadErrorCode);
+        Assert.NotNull(retriedMessage.AttachmentUrl);
     }
 
     [Fact]
@@ -748,6 +797,14 @@ public sealed class SupportChatEndpointsIntegrationTests
 
     private sealed class FakeSupportAttachmentStorage : ISupportAttachmentStorage
     {
+        private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp"
+        };
+
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success());
@@ -757,14 +814,73 @@ public sealed class SupportChatEndpointsIntegrationTests
             SupportAttachmentUploadCommand attachment,
             CancellationToken cancellationToken)
         {
+            var normalizedContentType = NormalizeContentType(attachment.ContentType);
+            if (!AllowedImageContentTypes.Contains(normalizedContentType))
+            {
+                return Task.FromResult(Result.Failure<StoredSupportAttachmentResponse>(
+                    new Error("support.attachment_content_type_not_allowed", "Content type is not allowed.")));
+            }
+
+            if (!MatchesImageSignature(normalizedContentType, attachment.Content))
+            {
+                return Task.FromResult(Result.Failure<StoredSupportAttachmentResponse>(
+                    new Error("support.attachment_mime_mismatch", "MIME type does not match file signature.")));
+            }
+
+            if (string.Equals(normalizedContentType, "image/jpg", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedContentType = "image/jpeg";
+            }
+
             var url = $"http://localhost:5000/support-attachments/test/{Guid.NewGuid():N}-{attachment.FileName}";
             return Task.FromResult(Result.Success(new StoredSupportAttachmentResponse(
                 url,
                 url,
                 attachment.FileName,
-                attachment.ContentType,
+                normalizedContentType,
                 attachment.Content.LongLength,
                 null)));
+        }
+
+        private static string NormalizeContentType(string contentType)
+        {
+            if (string.IsNullOrWhiteSpace(contentType))
+            {
+                return string.Empty;
+            }
+
+            var separatorIndex = contentType.IndexOf(';');
+            return (separatorIndex >= 0 ? contentType[..separatorIndex] : contentType).Trim();
+        }
+
+        private static bool MatchesImageSignature(string normalizedContentType, byte[] payload)
+        {
+            return normalizedContentType switch
+            {
+                "image/jpeg" or "image/jpg" => payload.Length >= 3
+                    && payload[0] == 0xFF
+                    && payload[1] == 0xD8
+                    && payload[2] == 0xFF,
+                "image/png" => payload.Length >= 8
+                    && payload[0] == 0x89
+                    && payload[1] == 0x50
+                    && payload[2] == 0x4E
+                    && payload[3] == 0x47
+                    && payload[4] == 0x0D
+                    && payload[5] == 0x0A
+                    && payload[6] == 0x1A
+                    && payload[7] == 0x0A,
+                "image/webp" => payload.Length >= 12
+                    && payload[0] == 0x52
+                    && payload[1] == 0x49
+                    && payload[2] == 0x46
+                    && payload[3] == 0x46
+                    && payload[8] == 0x57
+                    && payload[9] == 0x45
+                    && payload[10] == 0x42
+                    && payload[11] == 0x50,
+                _ => false,
+            };
         }
     }
 

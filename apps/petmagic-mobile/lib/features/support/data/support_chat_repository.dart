@@ -107,6 +107,32 @@ class SupportChatRepository {
     return SupportChatMessage.fromJson(response.data ?? const {});
   }
 
+  Future<SupportChatMessage> retryAttachment({
+    required String conversationId,
+    required String messageId,
+    required String filePath,
+    required String fileName,
+    required String contentType,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/support/conversation/$conversationId/messages/$messageId/attachment/retry',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromFileSync(
+            filePath,
+            filename: fileName,
+            contentType: MediaType.parse(contentType),
+          ),
+        }),
+        options: _authorizedOptions(
+          session,
+        ).copyWith(contentType: 'multipart/form-data'),
+      ),
+    );
+
+    return SupportChatMessage.fromJson(response.data ?? const {});
+  }
+
   Future<void> markConversationRead(String conversationId) async {
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(

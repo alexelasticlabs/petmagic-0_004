@@ -331,6 +331,8 @@ export type AdminSupportMessage = {
   attachmentFileName?: string | null;
   attachmentContentType?: string | null;
   attachmentFileSizeBytes?: number | null;
+  attachmentUploadStatus?: string | null;
+  attachmentUploadErrorCode?: string | null;
   isRead: boolean;
   readAtUtc?: string | null;
   createdAtUtc: string;

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +14,9 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _supportSecondaryGreen = Color(0xFF69D8A7);
@@ -45,6 +49,11 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   bool _showSecurityBanner = true;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
+  _PendingSupportAttachment? _pendingAttachment;
+
+  bool get _hasPendingAttachment => _pendingAttachment != null;
+
+  bool get _composerCanSend => _composerHasText || _hasPendingAttachment;
 
   bool _isWaitingForInitialConversation(SupportChatState state) {
     return state.isLoading && state.conversation == null;
@@ -177,7 +186,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     _messageFocusNode.requestFocus();
   }
 
-  Future<void> _pickImageAttachment(String localeTag) async {
+  Future<void> _pickImageAttachment() async {
     final picked = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 92,
@@ -187,57 +196,41 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
       return;
     }
 
-    final wasSent = await _controller.sendImageAttachment(
-      picked,
-      body: _messageController.text,
-      localeTag: localeTag,
-    );
-    if (!mounted || !wasSent) {
+    final contentType = _controller.resolveContentTypeForUpload(picked.path);
+    final normalizedType = contentType.toLowerCase();
+    if (normalizedType != 'image/jpeg' &&
+        normalizedType != 'image/png' &&
+        normalizedType != 'image/webp') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_mapSupportError(AppLocalizations.of(context), 'support.attachment_content_type_not_allowed'))),
+      );
       return;
     }
 
-    _messageController.clear();
+    setState(() {
+      _pendingAttachment = _PendingSupportAttachment(
+        filePath: picked.path,
+        fileName: picked.name,
+        contentType: contentType,
+      );
+    });
   }
 
-  Future<void> _pickFileAttachment(String localeTag) async {
-    final picked = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      type: FileType.any,
-    );
-    final file = picked?.files.single;
-    if (file == null || file.path == null || !mounted) {
-      return;
-    }
-
-    final wasSent = await _controller.sendAttachment(
-      filePath: file.path!,
-      fileName: file.name,
-      contentType: _controller.resolveContentTypeForUpload(file.path!),
-      localeTag: localeTag,
-      body: _messageController.text,
-    );
-    if (!mounted || !wasSent) {
-      return;
-    }
-
-    _messageController.clear();
-  }
-
-  Future<void> _showAttachmentOptions(String localeTag) async {
+  Future<void> _showAttachmentOptions() async {
     if (ref.read(supportChatControllerProvider).isSending) {
       return;
     }
 
-    final action = await showModalBottomSheet<_SupportAttachmentAction>(
+    final action = await showPetMagicModalBottomSheet<_SupportAttachmentAction>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
+      builder: (sheetContext, bottomInset) {
         final colors = sheetContext.petMagicColors;
         final text = AppLocalizations.of(sheetContext);
         return SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: colors.surfaceStrong,
@@ -271,19 +264,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                       sheetContext,
                     ).pop(_SupportAttachmentAction.gallery),
                   ),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.attach_file_rounded,
-                      color: _supportComposerIconColor,
-                    ),
-                    title: Text(
-                      text.profileLegalDocumentSection,
-                      style: TextStyle(color: colors.textStrong),
-                    ),
-                    onTap: () => Navigator.of(
-                      sheetContext,
-                    ).pop(_SupportAttachmentAction.file),
-                  ),
                   const SizedBox(height: 6),
                 ],
               ),
@@ -299,13 +279,16 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
 
     switch (action) {
       case _SupportAttachmentAction.gallery:
-        await _pickImageAttachment(localeTag);
-      case _SupportAttachmentAction.file:
-        await _pickFileAttachment(localeTag);
+        await _pickImageAttachment();
     }
   }
 
   Future<void> _sendCurrentMessage(String localeTag) async {
+    if (_hasPendingAttachment) {
+      await _sendPendingAttachment(localeTag);
+      return;
+    }
+
     final body = _messageController.text;
     await _controller.sendMessage(body, localeTag: localeTag);
     if (!mounted) {
@@ -315,6 +298,183 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     if (body.trim().isNotEmpty) {
       _messageController.clear();
     }
+  }
+
+  Future<void> _sendPendingAttachment(String localeTag) async {
+    final pendingAttachment = _pendingAttachment;
+    if (pendingAttachment == null) {
+      return;
+    }
+
+    final wasSent = await _controller.sendAttachment(
+      filePath: pendingAttachment.filePath,
+      fileName: pendingAttachment.fileName,
+      contentType: pendingAttachment.contentType,
+      localeTag: localeTag,
+      body: _messageController.text,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final errorValue = ref.read(supportChatControllerProvider).errorMessage;
+    final isTransportFailure =
+        errorValue?.contains('support.unavailable') == true ||
+        errorValue?.contains('support.request_failed') == true;
+
+    if (wasSent || !isTransportFailure) {
+      _messageController.clear();
+      setState(() {
+        _pendingAttachment = null;
+      });
+    }
+  }
+
+  void _removePendingAttachment() {
+    setState(() {
+      _pendingAttachment = null;
+    });
+  }
+
+  Future<void> _retryAttachmentForMessage(SupportChatMessage message) async {
+    if (message.messageId.isEmpty || !message.canRetryAttachment) {
+      return;
+    }
+
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 92,
+      maxWidth: 1800,
+    );
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    await _controller.retryAttachment(
+      messageId: message.messageId,
+      filePath: picked.path,
+      fileName: picked.name,
+      contentType: _controller.resolveContentTypeForUpload(picked.path),
+    );
+  }
+
+  Future<void> _openImageFullscreen({
+    required String imageUrl,
+    String? fileName,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return _SupportImagePreviewDialog(
+          imageUrl: imageUrl,
+          fileName: fileName,
+          onSaveImage: () => _saveImageToDevice(
+            imageUrl: imageUrl,
+            fileName: fileName,
+          ),
+          onShareImage: () => _shareImage(
+            imageUrl: imageUrl,
+            fileName: fileName,
+          ),
+          onOpenOriginal: () => _openAttachmentExternally(imageUrl),
+        );
+      },
+    );
+  }
+
+  Future<void> _openAttachmentExternally(String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null) {
+      return;
+    }
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _saveImageToDevice({
+    required String imageUrl,
+    String? fileName,
+  }) async {
+    try {
+      final bytes = await _downloadImageBytes(imageUrl);
+      final safeFileName = _safeImageFileName(fileName);
+      final targetPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save image',
+        fileName: safeFileName,
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+      );
+
+      if (targetPath == null || targetPath.trim().isEmpty) {
+        return;
+      }
+
+      await File(targetPath).writeAsBytes(bytes, flush: true);
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Image saved')));
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save image')),
+      );
+    }
+  }
+
+  Future<void> _shareImage({
+    required String imageUrl,
+    String? fileName,
+  }) async {
+    try {
+      final bytes = await _downloadImageBytes(imageUrl);
+      final tempFileName = _safeImageFileName(fileName);
+      final tempFile = File(
+        '${Directory.systemTemp.path}${Platform.pathSeparator}petmagic_$tempFileName',
+      );
+      await tempFile.writeAsBytes(bytes, flush: true);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(tempFile.path)],
+          title: fileName ?? 'Support image',
+          text: fileName ?? 'Support image',
+        ),
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to share image')),
+      );
+    }
+  }
+
+  Future<List<int>> _downloadImageBytes(String imageUrl) async {
+    final response = await Dio().get<List<int>>(
+      imageUrl,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data ?? const <int>[];
+  }
+
+  String _safeImageFileName(String? value) {
+    final fallback = 'support-image-${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final candidate = value?.trim();
+    if (candidate == null || candidate.isEmpty) {
+      return fallback;
+    }
+
+    return candidate.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
   }
 
   @override
@@ -361,7 +521,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     final conversation = state.conversation;
     final messages = conversation?.messages ?? const <SupportChatMessage>[];
     final localeTag = Localizations.localeOf(context).toLanguageTag();
-    final bottomNavInset = petMagicBottomNavInset(context);
+    final bottomNavInset = petMagicScrollableBottomInset(context);
     final isWaitingForInitialConversation = _isWaitingForInitialConversation(
       state,
     );
@@ -576,7 +736,12 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                                           ),
                                         ),
                                       ),
-                                    _MessageBubble(message: message),
+                                    _MessageBubble(
+                                      message: message,
+                                      onOpenImage: _openImageFullscreen,
+                                      onRetryAttachment: () =>
+                                          _retryAttachmentForMessage(message),
+                                    ),
                                   ],
                                 ),
                               );
@@ -602,132 +767,149 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                           ),
                         ),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            splashRadius: 18,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 36,
-                              height: 36,
-                            ),
-                            onPressed: state.isSending
-                                ? null
-                                : () => _showAttachmentOptions(localeTag),
-                            icon: const Icon(
-                              Icons.attach_file_rounded,
-                              size: 23,
-                              color: _supportComposerIconColor,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Expanded(
-                            child: TextField(
-                              controller: _messageController,
-                              focusNode: _messageFocusNode,
-                              minLines: 1,
-                              maxLines: 5,
-                              textInputAction: TextInputAction.newline,
-                              style: TextStyle(
-                                color: colors.textStrong,
-                                fontSize: 15.5,
-                                height: 1.28,
-                                fontWeight: FontWeight.w400,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: text.supportChatInputHint,
-                                hintStyle: TextStyle(
-                                  color: _supportComposerHintColor,
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                disabledBorder: InputBorder.none,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.fromLTRB(
-                                  4,
-                                  12,
-                                  4,
-                                  12,
-                                ),
-                                filled: false,
+                          if (_pendingAttachment != null) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
+                              child: _PendingAttachmentPreview(
+                                attachment: _pendingAttachment!,
+                                onRemove: state.isSending
+                                    ? null
+                                    : _removePendingAttachment,
                               ),
                             ),
-                          ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            splashRadius: 18,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 36,
-                              height: 36,
-                            ),
-                            onPressed: state.isSending ? null : _insertEmoji,
-                            icon: const Icon(
-                              Icons.sentiment_satisfied_alt_rounded,
-                              size: 23,
-                              color: _supportComposerIconColor,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          AnimatedScale(
-                            scale: _composerHasText ? 1 : 0.9,
-                            duration: const Duration(milliseconds: 150),
-                            curve: Curves.easeOut,
-                            child: IgnorePointer(
-                              ignoring: !_composerHasText || state.isSending,
-                              child: AnimatedOpacity(
+                          ],
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                splashRadius: 18,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 36,
+                                  height: 36,
+                                ),
+                                onPressed: state.isSending
+                                    ? null
+                                  : _showAttachmentOptions,
+                                icon: const Icon(
+                                  Icons.attach_file_rounded,
+                                  size: 23,
+                                  color: _supportComposerIconColor,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Expanded(
+                                child: TextField(
+                                  controller: _messageController,
+                                  focusNode: _messageFocusNode,
+                                  minLines: 1,
+                                  maxLines: 5,
+                                  textInputAction: TextInputAction.newline,
+                                  style: TextStyle(
+                                    color: colors.textStrong,
+                                    fontSize: 15.5,
+                                    height: 1.28,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: text.supportChatInputHint,
+                                    hintStyle: TextStyle(
+                                      color: _supportComposerHintColor,
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.fromLTRB(
+                                      4,
+                                      12,
+                                      4,
+                                      12,
+                                    ),
+                                    filled: false,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                splashRadius: 18,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 36,
+                                  height: 36,
+                                ),
+                                onPressed: state.isSending ? null : _insertEmoji,
+                                icon: const Icon(
+                                  Icons.sentiment_satisfied_alt_rounded,
+                                  size: 23,
+                                  color: _supportComposerIconColor,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              AnimatedScale(
+                                scale: _composerCanSend ? 1 : 0.9,
                                 duration: const Duration(milliseconds: 150),
-                                opacity: _composerHasText || state.isSending
-                                    ? 1
-                                    : 0.72,
-                                child: Material(
-                                  color: state.isSending
-                                      ? _supportComposerSendGreen.withValues(
-                                          alpha: 0.92,
-                                        )
-                                      : _composerHasText
-                                      ? _supportComposerSendGreen
-                                      : _supportComposerSendGreen.withValues(
-                                          alpha: 0.38,
+                                curve: Curves.easeOut,
+                                child: IgnorePointer(
+                                  ignoring: !_composerCanSend || state.isSending,
+                                  child: AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 150),
+                                    opacity: _composerCanSend || state.isSending
+                                        ? 1
+                                        : 0.72,
+                                    child: Material(
+                                      color: state.isSending
+                                          ? _supportComposerSendGreen.withValues(
+                                              alpha: 0.92,
+                                            )
+                                          : _composerCanSend
+                                          ? _supportComposerSendGreen
+                                          : _supportComposerSendGreen.withValues(
+                                              alpha: 0.38,
+                                            ),
+                                      shape: const CircleBorder(),
+                                      child: InkWell(
+                                        customBorder: const CircleBorder(),
+                                        onTap:
+                                            state.isSending || !_composerCanSend
+                                            ? null
+                                            : () => _sendCurrentMessage(localeTag),
+                                        child: SizedBox(
+                                          width: 50,
+                                          height: 50,
+                                          child: Center(
+                                            child: state.isSending
+                                                ? const SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(Colors.white),
+                                                    ),
+                                                  )
+                                                : const Icon(
+                                                    Icons.send_rounded,
+                                                    size: 21,
+                                                    color: Colors.white,
+                                                  ),
+                                          ),
                                         ),
-                                  shape: const CircleBorder(),
-                                  child: InkWell(
-                                    customBorder: const CircleBorder(),
-                                    onTap: state.isSending || !_composerHasText
-                                        ? null
-                                        : () => _sendCurrentMessage(localeTag),
-                                    child: SizedBox(
-                                      width: 50,
-                                      height: 50,
-                                      child: Center(
-                                        child: state.isSending
-                                            ? const SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<
-                                                        Color
-                                                      >(Colors.white),
-                                                ),
-                                              )
-                                            : const Icon(
-                                                Icons.send_rounded,
-                                                size: 21,
-                                                color: Colors.white,
-                                              ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -768,6 +950,15 @@ String _mapSupportError(AppLocalizations text, String raw) {
     return text.supportChatAttachmentUnavailableError;
   }
 
+  if (value.contains('support.attachment_content_type_not_allowed') ||
+      value.contains('support.attachment_mime_mismatch')) {
+    return text.supportChatAttachmentUnavailableError;
+  }
+
+  if (value.contains('support.attachment_retry_not_allowed')) {
+    return text.supportChatAttachmentUnavailableError;
+  }
+
   if (value.contains('support.unavailable') ||
       value.contains('support.request_failed')) {
     return text.supportChatUnavailableError;
@@ -784,7 +975,7 @@ String _mapSupportError(AppLocalizations text, String raw) {
   return raw;
 }
 
-enum _SupportAttachmentAction { gallery, file }
+enum _SupportAttachmentAction { gallery }
 
 class _SupportHeader extends StatelessWidget {
   const _SupportHeader({
@@ -1346,9 +1537,16 @@ class _SupportFaqItemData {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    this.onOpenImage,
+    this.onRetryAttachment,
+  });
 
   final SupportChatMessage message;
+  final Future<void> Function({required String imageUrl, String? fileName})?
+  onOpenImage;
+  final VoidCallback? onRetryAttachment;
 
   @override
   Widget build(BuildContext context) {
@@ -1380,8 +1578,10 @@ class _MessageBubble extends StatelessWidget {
     final deliveryLabel = message.isRead
         ? text.supportChatMessageRead
         : text.supportChatMessageDelivered;
+    final attachmentUploadStatus = message.normalizedAttachmentUploadStatus;
     final hasImageAttachment = message.hasImageAttachment;
     final hasFileAttachment = message.hasAttachment && !hasImageAttachment;
+    final hasFailedAttachment = message.isAttachmentFailed && !message.hasAttachment;
     final attachmentFileName = message.attachmentFileName?.trim();
     final shouldShowBody =
         message.body.trim().isNotEmpty &&
@@ -1437,43 +1637,56 @@ class _MessageBubble extends StatelessWidget {
                       const SizedBox(height: 4),
                     ],
                     if (hasImageAttachment) ...[
-                      ClipRRect(
+                      InkWell(
                         borderRadius: BorderRadius.circular(14),
-                        child: AspectRatio(
-                          aspectRatio: 1.05,
-                          child: Image.network(
-                            message.attachmentUrl!,
-                            fit: BoxFit.cover,
-                            cacheWidth: attachmentCacheWidth,
-                            cacheHeight: attachmentCacheHeight,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: colors.surface,
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  color: colors.textMuted,
-                                  size: 24,
-                                ),
-                              );
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) {
-                                return child;
-                              }
-
-                              return Container(
-                                color: colors.surface,
-                                alignment: Alignment.center,
-                                child: const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                        onTap: onOpenImage == null
+                            ? null
+                            : () => onOpenImage!(
+                                imageUrl: message.attachmentUrl!,
+                                fileName: attachmentFileName,
+                              ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: AspectRatio(
+                            aspectRatio: 1.05,
+                            child: Image.network(
+                              message.attachmentUrl!,
+                              fit: BoxFit.cover,
+                              cacheWidth: attachmentCacheWidth,
+                              cacheHeight: attachmentCacheHeight,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: colors.surface,
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    Icons.broken_image_outlined,
+                                    color: colors.textMuted,
+                                    size: 24,
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                              loadingBuilder: (
+                                context,
+                                child,
+                                loadingProgress,
+                              ) {
+                                if (loadingProgress == null) {
+                                  return child;
+                                }
+
+                                return Container(
+                                  color: colors.surface,
+                                  alignment: Alignment.center,
+                                  child: const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
@@ -1503,6 +1716,47 @@ class _MessageBubble extends StatelessWidget {
                           ],
                         ),
                       ],
+                      if (shouldShowBody) const SizedBox(height: 8),
+                    ],
+                    if (hasFailedAttachment) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.danger.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: colors.danger.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline_rounded,
+                              size: 16,
+                              color: colors.danger,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                attachmentFileName?.isNotEmpty == true
+                                    ? attachmentFileName!
+                                    : 'Image upload failed',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       if (shouldShowBody) const SizedBox(height: 8),
                     ],
                     if (hasFileAttachment) ...[
@@ -1575,6 +1829,17 @@ class _MessageBubble extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                    if (attachmentUploadStatus != null) ...[
+                      const SizedBox(height: 8),
+                      _AttachmentStatusRow(
+                        status: attachmentUploadStatus,
+                        errorCode: message.attachmentUploadErrorCode,
+                        isFromAdmin: message.isFromAdmin,
+                        isRetryEnabled:
+                            message.canRetryAttachment && onRetryAttachment != null,
+                        onRetryAttachment: onRetryAttachment,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -1643,6 +1908,336 @@ class _MessageBubble extends StatelessWidget {
 
     return '${(kilobytes / 1024).toStringAsFixed(1)} MB';
   }
+}
+
+class _AttachmentStatusRow extends StatelessWidget {
+  const _AttachmentStatusRow({
+    required this.status,
+    required this.errorCode,
+    required this.isFromAdmin,
+    required this.isRetryEnabled,
+    required this.onRetryAttachment,
+  });
+
+  final String status;
+  final String? errorCode;
+  final bool isFromAdmin;
+  final bool isRetryEnabled;
+  final VoidCallback? onRetryAttachment;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final normalized = status.toLowerCase();
+    const warningColor = Color(0xFFE7A126);
+    const successColor = Color(0xFF37B16A);
+
+    final ({Color color, IconData icon, String label}) descriptor =
+        switch (normalized) {
+          'uploading' => (
+            color: warningColor,
+            icon: Icons.cloud_upload_rounded,
+            label: 'Uploading',
+          ),
+          'uploaded' => (
+            color: successColor,
+            icon: Icons.check_circle_rounded,
+            label: 'Uploaded',
+          ),
+          'failed' => (
+            color: colors.danger,
+            icon: Icons.error_rounded,
+            label: 'Failed',
+          ),
+          'retry' => (
+            color: warningColor,
+            icon: Icons.refresh_rounded,
+            label: 'Retry',
+          ),
+          _ => (
+            color: colors.textMuted,
+            icon: Icons.info_outline_rounded,
+            label: status,
+          ),
+        };
+
+    final textColor = isFromAdmin
+        ? descriptor.color
+        : Colors.white.withValues(alpha: 0.92);
+
+    return Row(
+      children: [
+        Icon(descriptor.icon, size: 13, color: textColor),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            errorCode?.isNotEmpty == true
+                ? '${descriptor.label} (${errorCode!})'
+                : descriptor.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        if (isRetryEnabled && !isFromAdmin)
+          TextButton.icon(
+            onPressed: onRetryAttachment,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              minimumSize: const Size(0, 0),
+              foregroundColor: textColor,
+            ),
+            icon: const Icon(Icons.refresh_rounded, size: 12),
+            label: const Text(
+              'Retry',
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _PendingAttachmentPreview extends StatelessWidget {
+  const _PendingAttachmentPreview({
+    required this.attachment,
+    required this.onRemove,
+  });
+
+  final _PendingSupportAttachment attachment;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: AspectRatio(
+            aspectRatio: 1.55,
+            child: Image.file(
+              File(attachment.filePath),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return ColoredBox(
+                  color: colors.surface,
+                  child: Center(
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.56),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onRemove,
+              child: const SizedBox(
+                width: 28,
+                height: 28,
+                child: Icon(Icons.close_rounded, color: Colors.white, size: 18),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 10,
+          right: 10,
+          bottom: 10,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Text(
+                attachment.fileName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SupportImagePreviewDialog extends StatelessWidget {
+  const _SupportImagePreviewDialog({
+    required this.imageUrl,
+    required this.fileName,
+    required this.onSaveImage,
+    required this.onShareImage,
+    required this.onOpenOriginal,
+  });
+
+  final String imageUrl;
+  final String? fileName;
+  final Future<void> Function() onSaveImage;
+  final Future<void> Function() onShareImage;
+  final Future<void> Function() onOpenOriginal;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      fileName?.trim().isNotEmpty == true
+                          ? fileName!
+                          : 'Support image',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4,
+                child: Center(
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: Colors.white70,
+                          size: 48,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+              decoration: BoxDecoration(
+                color: colors.surfaceStrong.withValues(alpha: 0.16),
+                border: Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                ),
+              ),
+              child: Wrap(
+                alignment: WrapAlignment.spaceEvenly,
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _DialogActionChip(
+                    icon: Icons.download_rounded,
+                    label: 'Save image',
+                    onPressed: () => unawaited(onSaveImage()),
+                  ),
+                  _DialogActionChip(
+                    icon: Icons.share_rounded,
+                    label: 'Share',
+                    onPressed: () => unawaited(onShareImage()),
+                  ),
+                  _DialogActionChip(
+                    icon: Icons.open_in_new_rounded,
+                    label: 'Open original',
+                    onPressed: () => unawaited(onOpenOriginal()),
+                  ),
+                  _DialogActionChip(
+                    icon: Icons.close_rounded,
+                    label: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogActionChip extends StatelessWidget {
+  const _DialogActionChip({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+    );
+  }
+}
+
+class _PendingSupportAttachment {
+  const _PendingSupportAttachment({
+    required this.filePath,
+    required this.fileName,
+    required this.contentType,
+  });
+
+  final String filePath;
+  final String fileName;
+  final String contentType;
 }
 
 class _SupportAvatar extends StatelessWidget {

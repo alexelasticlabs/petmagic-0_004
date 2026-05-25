@@ -39,6 +39,13 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     b.Property<long?>("AttachmentFileSizeBytes")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("AttachmentUploadErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int?>("AttachmentUploadStatus")
+                        .HasColumnType("integer");
+
                     b.Property<string>("AttachmentUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");

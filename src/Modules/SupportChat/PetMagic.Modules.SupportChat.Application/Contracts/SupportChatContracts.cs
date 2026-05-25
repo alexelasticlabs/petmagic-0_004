@@ -23,6 +23,27 @@ public sealed record SendSupportMessageCommand(
     long? AttachmentFileSizeBytes = null,
     string? Locale = null);
 
+public sealed record CreateSupportAttachmentMessageCommand(
+    Guid ConversationId,
+    Guid SenderUserId,
+    string Body,
+    bool IsAdmin,
+    string AttachmentFileName,
+    string AttachmentContentType,
+    string? Locale = null);
+
+public sealed record UpdateSupportAttachmentMessageCommand(
+    Guid ConversationId,
+    Guid MessageId,
+    Guid SenderUserId,
+    bool IsAdmin,
+    SupportAttachmentUploadStatus AttachmentUploadStatus,
+    string? AttachmentUrl = null,
+    string? AttachmentFileName = null,
+    string? AttachmentContentType = null,
+    long? AttachmentFileSizeBytes = null,
+    string? AttachmentUploadErrorCode = null);
+
 public sealed record MarkSupportConversationReadCommand(
     Guid ConversationId,
     Guid UserId,
@@ -77,6 +98,8 @@ public sealed record SupportMessageResponse(
     string? AttachmentFileName,
     string? AttachmentContentType,
     long? AttachmentFileSizeBytes,
+    string? AttachmentUploadStatus,
+    string? AttachmentUploadErrorCode,
     bool IsRead,
     DateTime? ReadAtUtc,
     DateTime CreatedAtUtc);

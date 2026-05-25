@@ -84,7 +84,7 @@
   "walletDataUnavailableFallback": "Wallet data is not available right now.",
   "walletRefreshTooltip": "Refresh wallet",
   "walletBalanceTitle": "Available for photos, videos and premium templates.",
-  "walletBalanceEyebrow": "Current balance",
+  "walletBalanceEyebrow": "Your balance",
   "walletBalanceUnit": "PawSpark",
   "walletBalanceExplanation": "PawSpark — internal currency of PetMagic. Use it for creating photos, videos and accessing premium templates.",
   "walletPremiumStatus": "Premium wallet",
@@ -107,7 +107,7 @@
       "count": {}
     }
   },
-  "walletWatchAdAction": "Get +15 PawSpark",
+  "walletWatchAdAction": "Watch ad +15",
   "walletAdDailyLimitReached": "Ads are temporarily unavailable. Please try again later.",
   "walletPromoTitle": "Have a promo code?",
   "walletPromoSubtitle": "Enter a code from PetMagic and add PawSpark to your balance.",
@@ -117,7 +117,23 @@
   "walletPremiumUpsellTitle": "Create often?",
   "walletPremiumUpsellMessage": "Premium membership gives you cheaper generations, monthly PawSparks and exclusive premium templates.",
   "walletViewPremiumAction": "View Premium",
-  "walletWhatYouCanCreateTitle": "Your balance is enough for:",
+  "walletWhatYouCanCreateTitle": "Enough for approximately:",
+  "walletApproxPhotos": "{count} photos",
+  "@walletApproxPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "walletApproxVideos": "{count} videos",
+  "@walletApproxVideos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "walletSpendPhotoSubtitle": "Photos\nfrom 10 Spark",
   "walletSpendVideoSubtitle": "Videos\nfrom 50 Spark",
   "walletSpendPremiumSubtitle": "Premium\nfrom 80 Spark",
@@ -260,6 +276,7 @@
     }
   },
   "walletRecentTransactionsTitle": "Recent transactions",
+  "walletViewAllTransactions": "All transactions",
   "walletNoActivity": "No wallet activity yet.",
   "walletBalanceAfter": "Bal. {count}",
   "@walletBalanceAfter": {
@@ -280,10 +297,11 @@
   "walletTryAgainAction": "Try again",
   "walletPending": "Pending",
   "walletSourcePackPurchase": "Added funds",
-  "walletSourceGenerationSpend": "Template generation",
+  "walletSourceGenerationSpend": "Generation",
   "walletSourceGenerationRefund": "Generation refund",
-  "walletSourceWeeklyGrant": "Weekly reward",
-  "walletSourceAdReward": "Ad reward",
+  "walletSourceWeeklyGrant": "Weekly bonus",
+  "walletSourceAdReward": "Ad bonus",
+  "walletSourcePromoCode": "Promo code",
   "walletSourceAdminGrant": "Support credit",
   "walletSourceAdminDebit": "Support adjustment",
   "walletPurchaseCompleted": "Completed",
@@ -293,6 +311,7 @@
   "walletQueryFilterDebits": "Debits",
   "walletPartialActivityUnavailable": "Your balance is already available. History and some wallet actions will refresh a bit later.",
   "walletPaymentGatewayUnavailableError": "Payments are temporarily unavailable. Please try again later or update the app.",
+  "walletPaymentUnavailableError": "Top-up is temporarily unavailable. Please try again later.",
   "walletPackUnavailableError": "This PawSpark pack is no longer available.",
   "walletRedeemCodeNotFoundError": "Redeem code was not found.",
   "walletRedeemCodeAlreadyUsedError": "This redeem code was already used.",

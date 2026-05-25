@@ -85,7 +85,7 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         {
             PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "support-attachments"),
-            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], 8 * 1024 * 1024)
+            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], 10 * 1024 * 1024)
         };
     }
 

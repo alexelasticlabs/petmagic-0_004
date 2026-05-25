@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 
 import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import {
@@ -49,6 +50,8 @@ type SupportConversationPageProps = {
 };
 
 export function SupportConversationPage({ locale, conversationId }: SupportConversationPageProps) {
+    const [fullscreenImage, setFullscreenImage] = useState<{ url: string; fileName?: string | null } | null>(null);
+
     const {
         activeSidePanelTab,
         accountCreatedAt,
@@ -112,6 +115,74 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
         userQuery,
         visibleTemplates,
     } = useSupportConversationController({ locale, conversationId });
+
+    const closeFullscreenImage = () => {
+        setFullscreenImage(null);
+    };
+
+    const saveFullscreenImage = async () => {
+        if (!fullscreenImage) {
+            return;
+        }
+
+        try {
+            const response = await fetch(fullscreenImage.url, { credentials: "include" });
+            if (!response.ok) {
+                return;
+            }
+
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = fullscreenImage.fileName?.trim() || "support-image";
+            document.body.append(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch {
+            // Keep the dialog actionable even if browser download API is blocked.
+        }
+    };
+
+    const shareFullscreenImage = async () => {
+        if (!fullscreenImage) {
+            return;
+        }
+
+        try {
+            if (typeof window === "undefined") {
+                return;
+            }
+
+            const browserNavigator = window.navigator as Navigator & {
+                share?: (data: ShareData) => Promise<void>;
+                clipboard?: Clipboard;
+            };
+
+            if (browserNavigator.share) {
+                await browserNavigator.share({
+                    title: fullscreenImage.fileName ?? "Support attachment",
+                    url: fullscreenImage.url,
+                });
+                return;
+            }
+
+            if (browserNavigator.clipboard) {
+                await browserNavigator.clipboard.writeText(fullscreenImage.url);
+            }
+        } catch {
+            // Ignore action errors to avoid breaking message rendering.
+        }
+    };
+
+    const openFullscreenImageInNewTab = () => {
+        if (!fullscreenImage) {
+            return;
+        }
+
+        window.open(fullscreenImage.url, "_blank", "noopener,noreferrer");
+    };
 
     return (
         <AdminPage className={styles.page}>
@@ -271,7 +342,14 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                         <span>{formatClockTime(message.createdAtUtc, locale)}</span>
                                                     </div>
                                                     {hasImageAttachment(message) ? (
-                                                        <a href={message.attachmentUrl!} target="_blank" rel="noopener noreferrer" className={styles.messageImageLink}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFullscreenImage({
+                                                                url: message.attachmentUrl!,
+                                                                fileName: message.attachmentFileName,
+                                                            })}
+                                                            className={styles.messageImageButton}
+                                                        >
                                                             <Image
                                                                 src={message.attachmentUrl!}
                                                                 alt={message.attachmentFileName ?? message.body}
@@ -282,7 +360,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                                 loading="lazy"
                                                                 unoptimized
                                                             />
-                                                        </a>
+                                                        </button>
                                                     ) : hasAttachment(message) ? (
                                                         <a
                                                             href={message.attachmentUrl!}
@@ -299,6 +377,20 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                         </a>
                                                     ) : null}
                                                     {shouldRenderMessageBody(message) ? <div className={styles.messageBody}>{message.body}</div> : null}
+                                                    {message.attachmentUploadStatus ? (
+                                                        <div className={styles.messageAttachmentStatusRow}>
+                                                            <span
+                                                                className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${message.attachmentUploadStatus.toLowerCase()}`] ?? ""}`}
+                                                            >
+                                                                {message.attachmentUploadStatus}
+                                                            </span>
+                                                            {message.attachmentUploadErrorCode ? (
+                                                                <span className={styles.messageAttachmentStatusErrorCode}>
+                                                                    {message.attachmentUploadErrorCode}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : null}
                                                 </article>
                                             ))}
                                         </div>
@@ -333,7 +425,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                         ref={attachmentInputRef}
                                         type="file"
                                         className={styles.hiddenFileInput}
-                                        accept="image/*,.pdf,.txt,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                                        accept="image/jpeg,image/png,image/webp"
                                         onChange={(event) => {
                                             const nextFile = event.target.files?.[0] ?? null;
                                             setSelectedAttachment(nextFile);
@@ -353,7 +445,14 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                     {selectedAttachment ? (
                                         <div className={styles.attachmentPreviewCard}>
                                             {attachmentPreviewUrl ? (
-                                                <a href={attachmentPreviewUrl} target="_blank" rel="noopener noreferrer" className={styles.attachmentPreviewImageLink}>
+                                                <button
+                                                    type="button"
+                                                    className={styles.attachmentPreviewImageButton}
+                                                    onClick={() => setFullscreenImage({
+                                                        url: attachmentPreviewUrl,
+                                                        fileName: selectedAttachment.name,
+                                                    })}
+                                                >
                                                     <Image
                                                         src={attachmentPreviewUrl}
                                                         alt={selectedAttachment.name}
@@ -363,7 +462,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                                         className={styles.attachmentPreviewImage}
                                                         unoptimized
                                                     />
-                                                </a>
+                                                </button>
                                             ) : (
                                                 <div className={styles.attachmentPreviewFileIcon}>FILE</div>
                                             )}
@@ -374,9 +473,16 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                             </div>
                                             <div className={styles.attachmentPreviewActions}>
                                                 {attachmentPreviewUrl ? (
-                                                    <a href={attachmentPreviewUrl} target="_blank" rel="noopener noreferrer" className={styles.attachmentActionLink}>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.attachmentActionButton}
+                                                        onClick={() => setFullscreenImage({
+                                                            url: attachmentPreviewUrl,
+                                                            fileName: selectedAttachment.name,
+                                                        })}
+                                                    >
                                                         {text.supportAttachmentOpenAction}
-                                                    </a>
+                                                    </button>
                                                 ) : null}
                                                 <Button variant="ghost" size="sm" onClick={resetSelectedAttachment}>
                                                     {text.supportAttachmentRemoveAction}
@@ -854,6 +960,43 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             </AdminCard>
                         </div> : null}
                     </div>
+                    {fullscreenImage ? (
+                        <div className={styles.imageViewerOverlay} role="dialog" aria-modal="true">
+                            <div className={styles.imageViewerPanel}>
+                                <div className={styles.imageViewerHeader}>
+                                    <strong>{fullscreenImage.fileName?.trim() || "Image"}</strong>
+                                    <Button variant="ghost" size="sm" onClick={closeFullscreenImage}>
+                                        Close
+                                    </Button>
+                                </div>
+                                <div className={styles.imageViewerBody}>
+                                    <Image
+                                        src={fullscreenImage.url}
+                                        alt={fullscreenImage.fileName ?? "Support image"}
+                                        width={1720}
+                                        height={980}
+                                        sizes="100vw"
+                                        className={styles.imageViewerImage}
+                                        unoptimized
+                                    />
+                                </div>
+                                <div className={styles.imageViewerActions}>
+                                    <Button variant="secondary" size="sm" onClick={saveFullscreenImage}>
+                                        Save image
+                                    </Button>
+                                    <Button variant="secondary" size="sm" onClick={shareFullscreenImage}>
+                                        Share
+                                    </Button>
+                                    <Button variant="secondary" size="sm" onClick={openFullscreenImageInNewTab}>
+                                        Open original
+                                    </Button>
+                                    <Button variant="primary" size="sm" onClick={closeFullscreenImage}>
+                                        Close
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
                 </>
             )}
         </AdminPage>

@@ -628,11 +628,32 @@
     background: rgba(16, 24, 37, 0.96);
 }
 
-.messageImageLink,
+.messageImageButton,
 .messageAttachmentCard,
-.attachmentActionLink,
-.attachmentPreviewImageLink {
+.attachmentActionButton,
+.attachmentPreviewImageButton {
     text-decoration: none;
+}
+
+.messageImageButton,
+.attachmentPreviewImageButton,
+.attachmentActionButton {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.messageImageButton {
+    border-radius: 0.95rem;
+    overflow: hidden;
+    transition: transform 140ms ease;
+}
+
+.messageImageButton:hover {
+    transform: translateY(-1px);
 }
 
 .messageImage {
@@ -689,15 +710,65 @@
 }
 
 .messageAttachmentMeta span,
-.attachmentActionLink {
+.attachmentActionButton {
     color: #9fb2c7;
     font-size: 0.78rem;
 }
 
+.attachmentActionButton {
+    padding: 0.28rem 0.2rem;
+}
+
 .messageAttachmentCard:hover,
-.attachmentActionLink:hover {
+.attachmentActionButton:hover {
     color: #edf6ff;
     border-color: rgba(34, 197, 94, 0.36);
+}
+
+.messageAttachmentStatusRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.messageAttachmentStatusPill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.52rem;
+    border-radius: 999px;
+    border: 1px solid rgba(127, 145, 168, 0.42);
+    background: rgba(127, 145, 168, 0.14);
+    color: #d2deec;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.messageAttachmentStatus_uploading,
+.messageAttachmentStatus_retry {
+    border-color: rgba(245, 158, 11, 0.42);
+    background: rgba(245, 158, 11, 0.16);
+    color: #ffedca;
+}
+
+.messageAttachmentStatus_uploaded {
+    border-color: rgba(34, 197, 94, 0.48);
+    background: rgba(34, 197, 94, 0.17);
+    color: #dff8e9;
+}
+
+.messageAttachmentStatus_failed {
+    border-color: rgba(248, 113, 113, 0.5);
+    background: rgba(248, 113, 113, 0.17);
+    color: #ffd9d9;
+}
+
+.messageAttachmentStatusErrorCode {
+    color: #9fb2c7;
+    font-size: 0.72rem;
 }
 
 .messageAdmin .messageBody,
@@ -1326,4 +1397,60 @@
     .chatShell {
         min-height: clamp(44rem, 74vh, 60rem);
     }
+}
+
+.imageViewerOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    padding: 1.2rem;
+    background: rgba(2, 6, 13, 0.86);
+    backdrop-filter: blur(4px);
+}
+
+.imageViewerPanel {
+    width: min(100%, 72rem);
+    max-height: calc(100vh - 2.4rem);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 0.9rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(34, 197, 94, 0.26);
+    background: rgba(7, 12, 20, 0.96);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.46);
+}
+
+.imageViewerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #f7fbff;
+}
+
+.imageViewerBody {
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    overflow: auto;
+}
+
+.imageViewerImage {
+    width: auto;
+    max-width: 100%;
+    max-height: calc(100vh - 14rem);
+    height: auto;
+    object-fit: contain;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.imageViewerActions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
 }

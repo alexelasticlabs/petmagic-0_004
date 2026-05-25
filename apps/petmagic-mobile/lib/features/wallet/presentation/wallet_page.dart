@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_pack_selection.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -63,12 +66,13 @@ class _WalletPageState extends ConsumerState<WalletPage>
     final colors = context.petMagicColors;
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
-    final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final bottomNavInset = hasKeyboard
-        ? MediaQuery.viewPaddingOf(context).bottom + 12
-        : hasShell
-        ? petMagicBottomNavInset(context)
-        : MediaQuery.viewPaddingOf(context).bottom + 16;
+    final bottomNavInset = hasShell
+        ? petMagicScrollableBottomInset(
+            context,
+            extraSpacing: kPetMagicBottomContentInsetRelaxed,
+          )
+        : MediaQuery.viewPaddingOf(context).bottom +
+              kPetMagicBottomContentInsetCompact;
     final checkoutStatusMessage = _checkoutStatusMessage(text, state);
 
     ref.listen(walletControllerProvider, (previous, next) {
@@ -90,7 +94,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                 onRefresh: () => controller.load(refresh: true),
                 color: colors.accent,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 14, 16, bottomNavInset + 12),
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     _WalletHeader(
@@ -157,7 +161,11 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         ),
                       ),
                       const SizedBox(height: 18),
-                      _LedgerSection(items: state.ledger),
+                      _LedgerSection(
+                        items: state.ledger,
+                        onViewAll: () =>
+                            context.push(AllTransactionsPage.routePath),
+                      ),
                       const SizedBox(height: 18),
                       _PurchasesSection(
                         items: state.purchases,
@@ -195,7 +203,7 @@ Future<void> _showPackDetailSheet(
   final colors = context.petMagicColors;
   final price = _formatPrice(pack);
 
-  await showModalBottomSheet<void>(
+  await showPetMagicModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -204,9 +212,9 @@ Future<void> _showPackDetailSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
     ),
-    builder: (sheetContext) {
+    builder: (sheetContext, bottomInset) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,6 +383,7 @@ String _sourceLabel(AppLocalizations text, String source) {
     'generation_refund' => text.walletSourceGenerationRefund,
     'weekly_grant' => text.walletSourceWeeklyGrant,
     'ad_reward' => text.walletSourceAdReward,
+    'promo_redeem' || 'redeem_code' => text.walletSourcePromoCode,
     'admin_grant' => text.walletSourceAdminGrant,
     'admin_debit' => text.walletSourceAdminDebit,
     _ => source,
@@ -388,6 +397,7 @@ IconData _sourceIcon(String source) {
     'generation_refund' => Icons.undo_rounded,
     'weekly_grant' => Icons.card_giftcard_rounded,
     'ad_reward' => Icons.play_circle_fill_rounded,
+    'promo_redeem' || 'redeem_code' => Icons.confirmation_number_rounded,
     'admin_grant' => Icons.support_agent_rounded,
     'admin_debit' => Icons.remove_circle_outline_rounded,
     _ => Icons.receipt_long_rounded,
@@ -453,6 +463,10 @@ String _friendlyError(AppLocalizations text, String value) {
 
   if (value.contains('payment_gateway_failed')) {
     return text.walletPaymentGatewayUnavailableError;
+  }
+
+  if (value.contains('wallet.payment_unavailable')) {
+    return text.walletPaymentUnavailableError;
   }
 
   if (value.contains('economy.pack_not_found')) {

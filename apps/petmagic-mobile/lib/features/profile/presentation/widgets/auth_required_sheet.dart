@@ -5,24 +5,20 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 
 Future<void> showAuthRequiredSheet(BuildContext context) {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   final router = GoRouter.of(context);
 
-  return showModalBottomSheet<void>(
+  return showPetMagicModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (sheetContext) {
+    builder: (sheetContext, bottomInset) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          MediaQuery.of(sheetContext).viewInsets.bottom + 16,
-        ),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(32),
           child: BackdropFilter(

@@ -20,6 +20,10 @@ public sealed class ConversationMessage
 
     public long? AttachmentFileSizeBytes { get; set; }
 
+    public int? AttachmentUploadStatus { get; set; }
+
+    public string? AttachmentUploadErrorCode { get; set; }
+
     public DateTime? ReadAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

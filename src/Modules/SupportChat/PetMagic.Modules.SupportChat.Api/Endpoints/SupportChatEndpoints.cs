@@ -27,6 +27,9 @@ public static class SupportChatEndpoints
         userGroup.MapPost("/conversation/{conversationId:guid}/attachments", SendUserAttachmentAsync)
             .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
+        userGroup.MapPost("/conversation/{conversationId:guid}/messages/{messageId:guid}/attachment/retry", RetryUserAttachmentAsync)
+            .DisableAntiforgery()
+            .RequireRateLimiting("support-chat");
         userGroup.MapPost("/conversation/{conversationId:guid}/read", MarkUserReadAsync);
 
         var adminGroup = endpoints.MapGroup("/api/admin/support")
@@ -38,6 +41,9 @@ public static class SupportChatEndpoints
         adminGroup.MapPost("/conversations/{conversationId:guid}/messages", SendAdminMessageAsync)
             .RequireRateLimiting("support-chat");
         adminGroup.MapPost("/conversations/{conversationId:guid}/attachments", SendAdminAttachmentAsync)
+            .DisableAntiforgery()
+            .RequireRateLimiting("support-chat");
+        adminGroup.MapPost("/conversations/{conversationId:guid}/messages/{messageId:guid}/attachment/retry", RetryAdminAttachmentAsync)
             .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
         adminGroup.MapPost("/conversations/{conversationId:guid}/read", MarkAdminReadAsync);
@@ -159,6 +165,43 @@ public static class SupportChatEndpoints
             });
         }
 
+        var requestedContentType = file.ContentType ?? "application/octet-stream";
+        var normalizedBody = string.IsNullOrWhiteSpace(body)
+            ? Path.GetFileName(file.FileName)
+            : body.Trim();
+
+        var createMessageResult = await service.CreateAttachmentMessageAsync(
+            new CreateSupportAttachmentMessageCommand(
+                conversationId,
+                userId,
+                normalizedBody,
+                IsAdmin: false,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType,
+                Locale: ResolvePreferredLocale(locale, httpContext)),
+            cancellationToken);
+
+        if (createMessageResult.IsFailure)
+        {
+            return ToProblem(createMessageResult.Error);
+        }
+
+        var uploadingStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                createMessageResult.Value.MessageId,
+                userId,
+                IsAdmin: false,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploading,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType),
+            cancellationToken);
+
+        if (uploadingStatusResult.IsFailure)
+        {
+            return ToProblem(uploadingStatusResult.Error);
+        }
+
         await using var stream = file.OpenReadStream();
         using var memoryStream = new MemoryStream();
         await stream.CopyToAsync(memoryStream, cancellationToken);
@@ -172,39 +215,60 @@ public static class SupportChatEndpoints
 
         if (storeResult.IsFailure)
         {
-            return ToProblem(storeResult.Error);
+            var failedStatusResult = await service.UpdateAttachmentMessageAsync(
+                new UpdateSupportAttachmentMessageCommand(
+                    conversationId,
+                    createMessageResult.Value.MessageId,
+                    userId,
+                    IsAdmin: false,
+                    AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                    AttachmentUploadErrorCode: storeResult.Error.Code),
+                cancellationToken);
+
+            if (failedStatusResult.IsFailure)
+            {
+                return ToProblem(failedStatusResult.Error);
+            }
+
+            return TypedResults.Ok(failedStatusResult.Value);
         }
 
-        var normalizedBody = string.IsNullOrWhiteSpace(body)
-            ? Path.GetFileName(file.FileName)
-            : body.Trim();
+        var completeStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                createMessageResult.Value.MessageId,
+                userId,
+                IsAdmin: false,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
+                AttachmentUrl: storeResult.Value.Url,
+                AttachmentFileName: storeResult.Value.FileName,
+                AttachmentContentType: storeResult.Value.ContentType,
+                AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
+            cancellationToken);
 
-        var command = new SendSupportMessageCommand(
-            conversationId,
-            userId,
-            normalizedBody,
-            IsAdmin: false,
-            AttachmentUrl: storeResult.Value.Url,
-            AttachmentFileName: storeResult.Value.FileName,
-            AttachmentContentType: storeResult.Value.ContentType,
-            AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes,
-            Locale: ResolvePreferredLocale(locale, httpContext));
-
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
+        if (completeStatusResult.IsFailure)
         {
             await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+
+            var failedStatusResult = await service.UpdateAttachmentMessageAsync(
+                new UpdateSupportAttachmentMessageCommand(
+                    conversationId,
+                    createMessageResult.Value.MessageId,
+                    userId,
+                    IsAdmin: false,
+                    AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                    AttachmentUploadErrorCode: completeStatusResult.Error.Code),
+                cancellationToken);
+
+            if (failedStatusResult.IsFailure)
+            {
+                return ToProblem(completeStatusResult.Error);
+            }
+
+            return TypedResults.Ok(failedStatusResult.Value);
         }
 
-        var result = await service.SendMessageAsync(command, cancellationToken);
-        if (result.IsFailure)
-        {
-            await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
-            return ToProblem(result.Error);
-        }
-
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(completeStatusResult.Value);
     }
 
     private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendAdminAttachmentAsync(
@@ -230,6 +294,42 @@ public static class SupportChatEndpoints
             });
         }
 
+        var requestedContentType = file.ContentType ?? "application/octet-stream";
+        var normalizedBody = string.IsNullOrWhiteSpace(body)
+            ? Path.GetFileName(file.FileName)
+            : body.Trim();
+
+        var createMessageResult = await service.CreateAttachmentMessageAsync(
+            new CreateSupportAttachmentMessageCommand(
+                conversationId,
+                userId,
+                normalizedBody,
+                IsAdmin: true,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType),
+            cancellationToken);
+
+        if (createMessageResult.IsFailure)
+        {
+            return ToProblem(createMessageResult.Error);
+        }
+
+        var uploadingStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                createMessageResult.Value.MessageId,
+                userId,
+                IsAdmin: true,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploading,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType),
+            cancellationToken);
+
+        if (uploadingStatusResult.IsFailure)
+        {
+            return ToProblem(uploadingStatusResult.Error);
+        }
+
         await using var stream = file.OpenReadStream();
         using var memoryStream = new MemoryStream();
         await stream.CopyToAsync(memoryStream, cancellationToken);
@@ -243,38 +343,278 @@ public static class SupportChatEndpoints
 
         if (storeResult.IsFailure)
         {
-            return ToProblem(storeResult.Error);
+            var failedStatusResult = await service.UpdateAttachmentMessageAsync(
+                new UpdateSupportAttachmentMessageCommand(
+                    conversationId,
+                    createMessageResult.Value.MessageId,
+                    userId,
+                    IsAdmin: true,
+                    AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                    AttachmentUploadErrorCode: storeResult.Error.Code),
+                cancellationToken);
+
+            if (failedStatusResult.IsFailure)
+            {
+                return ToProblem(failedStatusResult.Error);
+            }
+
+            return TypedResults.Ok(failedStatusResult.Value);
         }
 
-        var normalizedBody = string.IsNullOrWhiteSpace(body)
-            ? Path.GetFileName(file.FileName)
-            : body.Trim();
+        var completeStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                createMessageResult.Value.MessageId,
+                userId,
+                IsAdmin: true,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
+                AttachmentUrl: storeResult.Value.Url,
+                AttachmentFileName: storeResult.Value.FileName,
+                AttachmentContentType: storeResult.Value.ContentType,
+                AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
+            cancellationToken);
 
-        var command = new SendSupportMessageCommand(
-            conversationId,
-            userId,
-            normalizedBody,
-            IsAdmin: true,
-            AttachmentUrl: storeResult.Value.Url,
-            AttachmentFileName: storeResult.Value.FileName,
-            AttachmentContentType: storeResult.Value.ContentType,
-            AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes);
-
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
+        if (completeStatusResult.IsFailure)
         {
             await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
-            return TypedResults.ValidationProblem(validation.ToDictionary());
+
+            var failedStatusResult = await service.UpdateAttachmentMessageAsync(
+                new UpdateSupportAttachmentMessageCommand(
+                    conversationId,
+                    createMessageResult.Value.MessageId,
+                    userId,
+                    IsAdmin: true,
+                    AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                    AttachmentUploadErrorCode: completeStatusResult.Error.Code),
+                cancellationToken);
+
+            if (failedStatusResult.IsFailure)
+            {
+                return ToProblem(completeStatusResult.Error);
+            }
+
+            return TypedResults.Ok(failedStatusResult.Value);
         }
 
-        var result = await service.SendMessageAsync(command, cancellationToken);
-        if (result.IsFailure)
+        return TypedResults.Ok(completeStatusResult.Value);
+    }
+
+    private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> RetryUserAttachmentAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromRoute] Guid messageId,
+        [FromForm] IFormFile? file,
+        [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(file)] = ["Support attachment file is required."]
+            });
+        }
+
+        var requestedContentType = file.ContentType ?? "application/octet-stream";
+
+        var retryStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                messageId,
+                userId,
+                IsAdmin: false,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Retry,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType),
+            cancellationToken);
+
+        if (retryStatusResult.IsFailure)
+        {
+            return ToProblem(retryStatusResult.Error);
+        }
+
+        var uploadingStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                messageId,
+                userId,
+                IsAdmin: false,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploading,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType),
+            cancellationToken);
+
+        if (uploadingStatusResult.IsFailure)
+        {
+            return ToProblem(uploadingStatusResult.Error);
+        }
+
+        await using var stream = file.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, cancellationToken);
+
+        var storeResult = await attachmentStorage.StoreAsync(
+            new SupportAttachmentUploadCommand(
+                Path.GetFileName(file.FileName),
+                requestedContentType,
+                memoryStream.ToArray()),
+            cancellationToken);
+
+        if (storeResult.IsFailure)
+        {
+            var failedStatusResult = await service.UpdateAttachmentMessageAsync(
+                new UpdateSupportAttachmentMessageCommand(
+                    conversationId,
+                    messageId,
+                    userId,
+                    IsAdmin: false,
+                    AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                    AttachmentUploadErrorCode: storeResult.Error.Code),
+                cancellationToken);
+
+            if (failedStatusResult.IsFailure)
+            {
+                return ToProblem(failedStatusResult.Error);
+            }
+
+            return TypedResults.Ok(failedStatusResult.Value);
+        }
+
+        var completeStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                messageId,
+                userId,
+                IsAdmin: false,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
+                AttachmentUrl: storeResult.Value.Url,
+                AttachmentFileName: storeResult.Value.FileName,
+                AttachmentContentType: storeResult.Value.ContentType,
+                AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
+            cancellationToken);
+
+        if (completeStatusResult.IsFailure)
         {
             await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
-            return ToProblem(result.Error);
+            return ToProblem(completeStatusResult.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(completeStatusResult.Value);
+    }
+
+    private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> RetryAdminAttachmentAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromRoute] Guid messageId,
+        [FromForm] IFormFile? file,
+        [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        if (file is null || file.Length == 0)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(file)] = ["Support attachment file is required."]
+            });
+        }
+
+        var requestedContentType = file.ContentType ?? "application/octet-stream";
+
+        var retryStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                messageId,
+                userId,
+                IsAdmin: true,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Retry,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType),
+            cancellationToken);
+
+        if (retryStatusResult.IsFailure)
+        {
+            return ToProblem(retryStatusResult.Error);
+        }
+
+        var uploadingStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                messageId,
+                userId,
+                IsAdmin: true,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploading,
+                AttachmentFileName: Path.GetFileName(file.FileName),
+                AttachmentContentType: requestedContentType),
+            cancellationToken);
+
+        if (uploadingStatusResult.IsFailure)
+        {
+            return ToProblem(uploadingStatusResult.Error);
+        }
+
+        await using var stream = file.OpenReadStream();
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream, cancellationToken);
+
+        var storeResult = await attachmentStorage.StoreAsync(
+            new SupportAttachmentUploadCommand(
+                Path.GetFileName(file.FileName),
+                requestedContentType,
+                memoryStream.ToArray()),
+            cancellationToken);
+
+        if (storeResult.IsFailure)
+        {
+            var failedStatusResult = await service.UpdateAttachmentMessageAsync(
+                new UpdateSupportAttachmentMessageCommand(
+                    conversationId,
+                    messageId,
+                    userId,
+                    IsAdmin: true,
+                    AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                    AttachmentUploadErrorCode: storeResult.Error.Code),
+                cancellationToken);
+
+            if (failedStatusResult.IsFailure)
+            {
+                return ToProblem(failedStatusResult.Error);
+            }
+
+            return TypedResults.Ok(failedStatusResult.Value);
+        }
+
+        var completeStatusResult = await service.UpdateAttachmentMessageAsync(
+            new UpdateSupportAttachmentMessageCommand(
+                conversationId,
+                messageId,
+                userId,
+                IsAdmin: true,
+                AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
+                AttachmentUrl: storeResult.Value.Url,
+                AttachmentFileName: storeResult.Value.FileName,
+                AttachmentContentType: storeResult.Value.ContentType,
+                AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
+            cancellationToken);
+
+        if (completeStatusResult.IsFailure)
+        {
+            await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+            return ToProblem(completeStatusResult.Error);
+        }
+
+        return TypedResults.Ok(completeStatusResult.Value);
     }
 
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> MarkUserReadAsync(
@@ -582,13 +922,16 @@ public static class SupportChatEndpoints
         var statusCode = error.Code switch
         {
             "support.conversation_not_found" => StatusCodes.Status404NotFound,
+            "support.message_not_found" => StatusCodes.Status404NotFound,
             "support.template_not_found" => StatusCodes.Status404NotFound,
             "support.forbidden" => StatusCodes.Status403Forbidden,
             "support.invalid_subject" => StatusCodes.Status401Unauthorized,
             "support.attachment_invalid_upload" => StatusCodes.Status400BadRequest,
             "support.attachment_content_type_not_allowed" => StatusCodes.Status400BadRequest,
+            "support.attachment_mime_mismatch" => StatusCodes.Status400BadRequest,
             "support.attachment_file_too_large" => StatusCodes.Status400BadRequest,
             "support.attachment_storage_failed" => StatusCodes.Status400BadRequest,
+            "support.attachment_retry_not_allowed" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };
 

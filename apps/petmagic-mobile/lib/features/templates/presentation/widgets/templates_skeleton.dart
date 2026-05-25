@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 class TemplatesSkeleton extends StatelessWidget {
   const TemplatesSkeleton({super.key});
@@ -7,9 +8,13 @@ class TemplatesSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final bottomInset = petMagicBottomNavInset(
+      context,
+      extraSpacing: kPetMagicBottomContentInsetRelaxed,
+    );
 
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset),
       sliver: SliverGrid.builder(
         itemCount: 6,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

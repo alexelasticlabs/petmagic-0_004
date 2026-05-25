@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:share_plus/share_plus.dart';
@@ -28,17 +29,17 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
   Future<void> _showReferralHowItWorksSheet(int bonusSpark) async {
     final text = AppLocalizations.of(context);
 
-    await showModalBottomSheet<void>(
+    await showPetMagicModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (context, bottomInset) {
         final colors = context.petMagicColors;
 
         return SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),
@@ -118,11 +119,11 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
   Future<void> _showHistorySheet(List<WalletLedgerItem> items) async {
     final text = AppLocalizations.of(context);
 
-    await showModalBottomSheet<void>(
+    await showPetMagicModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (context, bottomInset) {
         final colors = context.petMagicColors;
         final localeTag = Localizations.localeOf(context).toLanguageTag();
         final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.72;
@@ -130,7 +131,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
         return SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
             child: ConstrainedBox(
               constraints: BoxConstraints(maxHeight: maxSheetHeight),
               child: DecoratedBox(
@@ -317,13 +318,10 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
     final colors = context.petMagicColors;
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
-    final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
-    final bottomNavInset = hasKeyboard
-        ? safeBottom + 20
-        : hasShell
-        ? petMagicBottomNavInset(context) + 28
-        : safeBottom + 24;
+    final bottomNavInset = hasShell
+        ? petMagicScrollableBottomInset(context)
+        : MediaQuery.viewPaddingOf(context).bottom +
+              kPetMagicBottomContentInsetCompact;
     final rewards = state.rewards;
     final rewardsSummary = rewards == null
         ? null

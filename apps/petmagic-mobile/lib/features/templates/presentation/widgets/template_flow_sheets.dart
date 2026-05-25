@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
@@ -24,42 +25,47 @@ Future<TemplateDetailAction?> showTemplateDetailSheet(
   TemplateItem template,
 ) {
   final colors = context.petMagicColors;
-  return showModalBottomSheet<TemplateDetailAction>(
+  return showPetMagicModalBottomSheet<TemplateDetailAction>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => DraggableScrollableSheet(
-      initialChildSize: 0.96,
-      minChildSize: 0.72,
-      maxChildSize: 0.98,
-      expand: false,
-      builder: (context, scrollController) {
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.backgroundBottom,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(color: colors.border.withValues(alpha: 0.72)),
-          ),
-          child: _TemplateDetailContent(
-            template: template,
-            scrollController: scrollController,
-          ),
-        );
-      },
+    builder: (sheetContext, bottomInset) => Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.96,
+        minChildSize: 0.72,
+        maxChildSize: 0.98,
+        expand: false,
+        builder: (context, scrollController) {
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.backgroundBottom,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+            ),
+            child: _TemplateDetailContent(
+              template: template,
+              scrollController: scrollController,
+            ),
+          );
+        },
+      ),
     ),
   );
 }
 
 Future<PetPhotoSourceAction?> showPetPhotoSourceSheet(BuildContext context) {
   final colors = context.petMagicColors;
-  return showModalBottomSheet<PetPhotoSourceAction>(
+  return showPetMagicModalBottomSheet<PetPhotoSourceAction>(
     context: context,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => SafeArea(
+    builder: (sheetContext, bottomInset) => SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: colors.surfaceStrong,
@@ -113,118 +119,119 @@ Future<bool?> showTemplateGenerationConfirmSheet({
   required TemplateGenerationGate gate,
 }) {
   final colors = context.petMagicColors;
-  return showModalBottomSheet<bool>(
+  return showPetMagicModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.backgroundBottom,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(child: _SheetHandle(color: colors.border)),
-            const SizedBox(height: 18),
-            Text(
-              'Готово к созданию!',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: colors.textStrong,
-                fontWeight: FontWeight.w800,
+    builder: (sheetContext, bottomInset) => Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.backgroundBottom,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(child: _SheetHandle(color: colors.border)),
+              const SizedBox(height: 18),
+              Text(
+                'Готово к созданию!',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              'Проверьте детали перед созданием',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.textMuted,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 5),
+              Text(
+                'Проверьте детали перед созданием',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.file(
-                    File(photo.path),
-                    width: 88,
-                    height: 112,
-                    fit: BoxFit.cover,
+              const SizedBox(height: 22),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.file(
+                      File(photo.path),
+                      width: 88,
+                      height: 112,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ConfirmMeta(label: 'Шаблон', value: template.title),
+                        _ConfirmMeta(
+                          label: 'Стоимость',
+                          value: '${template.tokenCost} PawSpark',
+                        ),
+                        _ConfirmMeta(
+                          label: 'Ваш баланс',
+                          value: '${gate.balance} PawSpark',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surfaceStrong.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: colors.border.withValues(alpha: 0.55),
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
                     children: [
-                      _ConfirmMeta(label: 'Шаблон', value: template.title),
-                      _ConfirmMeta(
-                        label: 'Стоимость',
-                        value: '${template.tokenCost} PawSpark',
+                      Icon(
+                        Icons.info_outline_rounded,
+                        color: colors.gold,
+                        size: 20,
                       ),
-                      _ConfirmMeta(
-                        label: 'Ваш баланс',
-                        value: '${gate.balance} PawSpark',
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Создание может занять от 10 секунд до 1 минуты.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.textSoft, height: 1.35),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.surfaceStrong.withValues(alpha: 0.82),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: colors.border.withValues(alpha: 0.55),
-                ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      color: colors.gold,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Создание может занять от 10 секунд до 1 минуты.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.textSoft,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Создать магию'),
               ),
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(sheetContext).pop(true),
-              icon: const Icon(Icons.auto_awesome_rounded),
-              label: const Text('Создать магию'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: () => Navigator.of(sheetContext).pop(false),
-              child: const Text('Изменить фото'),
-            ),
-          ],
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: () => Navigator.of(sheetContext).pop(false),
+                child: const Text('Изменить фото'),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -250,13 +257,13 @@ Future<TemplateBlockedAction?> showTemplateBlockedSheet({
       ? TemplateBlockedAction.premium
       : TemplateBlockedAction.wallet;
 
-  return showModalBottomSheet<TemplateBlockedAction>(
+  return showPetMagicModalBottomSheet<TemplateBlockedAction>(
     context: context,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => SafeArea(
+    builder: (sheetContext, bottomInset) => SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: colors.surfaceStrong,
@@ -323,21 +330,24 @@ Future<void> showTemplateGenerationProgressSheet({
   required TemplateItem template,
 }) {
   final colors = context.petMagicColors;
-  return showModalBottomSheet<void>(
+  return showPetMagicModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     enableDrag: false,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext) => DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.backgroundBottom,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-      ),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(sheetContext).height * 0.92,
-        child: _TemplateGenerationProgressContent(template: template),
+    builder: (sheetContext, bottomInset) => Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.backgroundBottom,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+        ),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.92,
+          child: _TemplateGenerationProgressContent(template: template),
+        ),
       ),
     ),
   );

@@ -10,6 +10,8 @@ import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 enum ProfileSettingsDetailKind {
   linkedAccounts,
@@ -48,11 +50,15 @@ class ProfileAccountInfoPage extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final profile = ref.watch(profileControllerProvider).profile;
+    final bottomInset = petMagicBottomNavInset(
+      context,
+      extraSpacing: kPetMagicBottomContentInsetRelaxed,
+    );
 
     return ProfileScreenBackground(
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+          padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
           children: [
             _DetailHeader(
               title: text.profileSettingsAccountInfoTitle,
@@ -204,6 +210,10 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
     final profile = state.profile;
+    final bottomInset = petMagicBottomNavInset(
+      context,
+      extraSpacing: kPetMagicBottomContentInsetRelaxed,
+    );
 
     final title = switch (kind) {
       ProfileSettingsDetailKind.linkedAccounts =>
@@ -242,7 +252,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       return ProfileScreenBackground(
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+            padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
             children: [
               _DetailHeader(title: title, subtitle: subtitle),
               const SizedBox(height: 22),
@@ -450,7 +460,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       return ProfileScreenBackground(
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+            padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
             children: [
               _DetailHeader(title: title, subtitle: subtitle),
               const SizedBox(height: 22),
@@ -603,7 +613,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
     return ProfileScreenBackground(
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+          padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
           children: [
             _DetailHeader(title: title, subtitle: subtitle),
             const SizedBox(height: 22),
@@ -632,6 +642,39 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                 ),
               ),
             ),
+            if (kind == ProfileSettingsDetailKind.deleteAccount) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.danger,
+                    foregroundColor: colors.backgroundBottom,
+                    shadowColor: colors.danger.withValues(alpha: 0.35),
+                  ),
+                  onPressed: () async {
+                    await showProfileDeleteAccountConfirmationSheet(
+                      context: context,
+                      onConfirm: () async {
+                        if (!context.mounted) {
+                          return;
+                        }
+
+                        final messenger = ScaffoldMessenger.of(context);
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(text.profileDetailsDeleteBody),
+                            ),
+                          );
+                      },
+                    );
+                  },
+                  child: Text(text.profileSettingsDeleteAccountTitle),
+                ),
+              ),
+            ],
           ],
         ),
       ),

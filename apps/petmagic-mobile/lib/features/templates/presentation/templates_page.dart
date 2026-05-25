@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
@@ -15,8 +16,10 @@ import 'package:petmagic_mobile/features/templates/presentation/templates_contro
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
@@ -42,7 +45,12 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     super.initState();
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
-    Future.microtask(() => _refreshFeed(forceRefresh: true));
+    Future.microtask(() {
+      _refreshFeed(forceRefresh: true);
+      if (ref.read(walletControllerProvider).wallet == null) {
+        unawaited(ref.read(walletControllerProvider.notifier).load());
+      }
+    });
   }
 
   @override
@@ -60,11 +68,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(templatesControllerProvider);
+    final wallet = ref.watch(walletControllerProvider).wallet;
     final controller = ref.read(templatesControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final titleStyle = Theme.of(context).textTheme.titleLarge;
     final subtitleStyle = Theme.of(context).textTheme.bodySmall;
+    final bottomInset = petMagicScrollableBottomInset(context);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -92,7 +102,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _TopBar(tokenBalance: 125),
+                      _TopBar(
+                        tokenBalance: wallet?.balance ?? 0,
+                        onRewardsPressed: () =>
+                            context.go(RewardsPage.routePath),
+                        onTopUpPressed: () => context.go(WalletPage.routePath),
+                        onWalletPressed: () => context.go(WalletPage.routePath),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         text.createMagicTitle,
@@ -176,7 +192,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 90),
+                  padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     child: state.isLoadingMore
@@ -366,6 +382,10 @@ String _mapTemplatesError(AppLocalizations text, String raw) {
 }
 
 String _generationStartErrorText(String raw) {
+  if (raw.contains('templates.premium_required')) {
+    return 'Этот шаблон доступен только с Premium.';
+  }
+
   if (raw.contains('templates.insufficient_balance')) {
     return 'Недостаточно PawSpark для запуска генерации.';
   }
@@ -395,9 +415,17 @@ class _TemplatesLifecycleObserver with WidgetsBindingObserver {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.tokenBalance});
+  const _TopBar({
+    required this.tokenBalance,
+    required this.onRewardsPressed,
+    required this.onTopUpPressed,
+    required this.onWalletPressed,
+  });
 
   final int tokenBalance;
+  final VoidCallback onRewardsPressed;
+  final VoidCallback onTopUpPressed;
+  final VoidCallback onWalletPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -421,18 +449,24 @@ class _TopBar extends StatelessWidget {
             ),
           ),
         ),
-        _GiftButton(tooltip: text.giftTooltip),
+        _GiftButton(tooltip: text.giftTooltip, onPressed: onRewardsPressed),
         const SizedBox(width: 8),
-        _TokenBalance(balance: tokenBalance, addTooltip: text.addTokensTooltip),
+        _TokenBalance(
+          balance: tokenBalance,
+          addTooltip: text.addTokensTooltip,
+          onAddPressed: onTopUpPressed,
+          onPressed: onWalletPressed,
+        ),
       ],
     );
   }
 }
 
 class _GiftButton extends StatelessWidget {
-  const _GiftButton({required this.tooltip});
+  const _GiftButton({required this.tooltip, required this.onPressed});
 
   final String tooltip;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -443,7 +477,11 @@ class _GiftButton extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          _HeaderButton(icon: Icons.card_giftcard_rounded, color: colors.gold),
+          _HeaderButton(
+            icon: Icons.card_giftcard_rounded,
+            color: colors.gold,
+            onPressed: onPressed,
+          ),
           Positioned(
             top: -4,
             right: -2,
@@ -472,10 +510,17 @@ class _GiftButton extends StatelessWidget {
 }
 
 class _TokenBalance extends StatelessWidget {
-  const _TokenBalance({required this.balance, required this.addTooltip});
+  const _TokenBalance({
+    required this.balance,
+    required this.addTooltip,
+    required this.onAddPressed,
+    required this.onPressed,
+  });
 
   final int balance;
   final String addTooltip;
+  final VoidCallback onAddPressed;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -487,67 +532,93 @@ class _TokenBalance extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: colors.border),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const PawSparkIcon(size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  '$balance',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colors.textStrong,
-                    fontSize: 12.8,
-                    fontWeight: FontWeight.w700,
-                  ),
+      child: Material(
+        color: Colors.transparent,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(22),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const PawSparkIcon(size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$balance',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: colors.textStrong,
+                        fontSize: 12.8,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Container(width: 1, height: 32, color: colors.border),
-          Tooltip(
-            message: addTooltip,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Icon(
-                Icons.add_rounded,
-                color: colors.textStrong,
-                size: 19,
               ),
             ),
-          ),
-        ],
+            Container(width: 1, height: 32, color: colors.border),
+            Tooltip(
+              message: addTooltip,
+              child: InkWell(
+                onTap: onAddPressed,
+                borderRadius: BorderRadius.circular(22),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: colors.textStrong,
+                    size: 19,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _HeaderButton extends StatelessWidget {
-  const _HeaderButton({required this.icon, required this.color});
+  const _HeaderButton({
+    required this.icon,
+    required this.color,
+    this.onPressed,
+  });
 
   final IconData icon;
   final Color color;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surfaceGlass,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colors.border),
-        boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 18),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Icon(icon, color: color, size: 20),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceGlass,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.border),
+            boxShadow: [
+              BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 18),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(icon, color: color, size: 20),
+          ),
+        ),
       ),
     );
   }
@@ -610,9 +681,13 @@ class _StateMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final bottomInset = petMagicBottomNavInset(
+      context,
+      extraSpacing: kPetMagicBottomContentInsetRelaxed,
+    );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 36, 28, 120),
+      padding: EdgeInsets.fromLTRB(28, 36, 28, bottomInset),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

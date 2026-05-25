@@ -8,6 +8,8 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:share_plus/share_plus.dart';
 
 class GenerationStatusPage extends ConsumerStatefulWidget {
@@ -52,6 +54,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final generation = _generation;
+    final bottomInset = petMagicBottomNavInset(
+      context,
+      extraSpacing: kPetMagicBottomContentInsetRelaxed,
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -71,7 +77,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 112),
+              padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset),
               children: [
                 _Header(
                   title: 'Статус генерации',
@@ -179,12 +185,15 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
       return;
     }
 
-    final result = await showModalBottomSheet<_FeedbackResult>(
+    final result = await showPetMagicModalBottomSheet<_FeedbackResult>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _NegativeFeedbackSheet(),
+      builder: (context, bottomInset) => Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: const _NegativeFeedbackSheet(),
+      ),
     );
 
     if (result == null) {

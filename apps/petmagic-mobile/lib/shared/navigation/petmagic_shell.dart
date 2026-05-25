@@ -1,73 +1,107 @@
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 
-const _bottomNavHeight = 42.0;
-const _bottomNavOuterGap = 10.0;
-const _bottomNavContentInsetExtra = 18.0;
-const _bottomNavBackdropExtra = 28.0;
-const _bottomSheetBottomGap = 14.0;
+const kPetMagicBottomNavHeight = 42.0;
+const kPetMagicBottomNavOuterGap = 10.0;
+const kPetMagicBottomContentInsetCompact = 16.0;
+const kPetMagicBottomContentInsetRelaxed = 24.0;
+const kPetMagicBottomNavBackdropExtra = 28.0;
+const kPetMagicBottomSheetBottomGap = 14.0;
 
-double petMagicBottomNavInset(BuildContext context) {
+double petMagicBottomNavInset(
+  BuildContext context, {
+  double extraSpacing = kPetMagicBottomContentInsetCompact,
+}) {
   final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
   return bottomPadding +
-      _bottomNavHeight +
-      _bottomNavOuterGap +
-      _bottomNavContentInsetExtra;
+      kPetMagicBottomNavHeight +
+      kPetMagicBottomNavOuterGap +
+      extraSpacing;
+}
+
+double petMagicScrollableBottomInset(
+  BuildContext context, {
+  double extraSpacing = kPetMagicBottomContentInsetCompact,
+  double keyboardExtra = kPetMagicBottomContentInsetCompact,
+}) {
+  final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
+  final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+  if (keyboardInset > 0) {
+    return safeBottom + keyboardExtra;
+  }
+
+  return safeBottom +
+      kPetMagicBottomNavHeight +
+      kPetMagicBottomNavOuterGap +
+      extraSpacing;
 }
 
 double petMagicBottomSheetOffset(BuildContext context) {
-  final viewMediaQuery = MediaQueryData.fromView(View.of(context));
-  final keyboardInset = viewMediaQuery.viewInsets.bottom;
+  final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
   if (keyboardInset > 0) {
-    return keyboardInset + _bottomSheetBottomGap;
+    return keyboardInset + kPetMagicBottomSheetBottomGap;
   }
 
-  final bottomPadding = viewMediaQuery.viewPadding.bottom;
-  return bottomPadding +
-      _bottomNavHeight +
-      _bottomNavOuterGap +
-      _bottomSheetBottomGap;
+  final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+  return bottomPadding + kPetMagicBottomSheetBottomGap;
 }
 
-class PetMagicShell extends ConsumerWidget {
+class PetMagicShell extends ConsumerStatefulWidget {
   const PetMagicShell({required this.location, required this.child, super.key});
 
   final String location;
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PetMagicShell> createState() => _PetMagicShellState();
+}
+
+class _PetMagicShellState extends ConsumerState<PetMagicShell> {
+  String? _dismissedGenerationId;
+
+  @override
+  Widget build(BuildContext context) {
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
     final showBottomNav = !hasKeyboard && isCurrentRoute;
+    final location = widget.location;
     final activeGeneration = ref.watch(
-      templateGenerationControllerProvider.select((state) => state.generation),
+      generationHistoryControllerProvider.select(
+        (state) => state.activeGeneration,
+      ),
     );
     final showActiveBanner =
         showBottomNav &&
         activeGeneration != null &&
         !activeGeneration.isTerminal &&
+        _dismissedGenerationId != activeGeneration.generationId &&
         !location.startsWith(GenerationStatusPage.routePrefix);
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          child,
+          widget.child,
           if (showBottomNav) const _BottomNavBackdrop(),
           if (showActiveBanner)
             _ActiveGenerationBanner(
-              generationId: activeGeneration.generationId,
+              generation: activeGeneration,
+              onDismiss: () {
+                setState(() {
+                  _dismissedGenerationId = activeGeneration.generationId;
+                });
+              },
             ),
           if (showBottomNav) _FloatingBottomNav(location: location),
         ],
@@ -91,9 +125,9 @@ class _BottomNavBackdrop extends StatelessWidget {
           child: Container(
             height:
                 bottomPadding +
-                _bottomNavHeight +
-                _bottomNavOuterGap +
-                _bottomNavBackdropExtra,
+                kPetMagicBottomNavHeight +
+                kPetMagicBottomNavOuterGap +
+                kPetMagicBottomNavBackdropExtra,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -151,7 +185,7 @@ class _FloatingBottomNav extends ConsumerWidget {
             16,
             0,
             16,
-            bottomPadding + _bottomNavOuterGap,
+            bottomPadding + kPetMagicBottomNavOuterGap,
           ),
           child: Stack(
             alignment: Alignment.center,
@@ -192,7 +226,7 @@ class _FloatingBottomNav extends ConsumerWidget {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(3, 1, 3, 1),
                       child: SizedBox(
-                        height: _bottomNavHeight,
+                        height: kPetMagicBottomNavHeight,
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -239,14 +273,20 @@ class _FloatingBottomNav extends ConsumerWidget {
 }
 
 class _ActiveGenerationBanner extends StatelessWidget {
-  const _ActiveGenerationBanner({required this.generationId});
+  const _ActiveGenerationBanner({
+    required this.generation,
+    required this.onDismiss,
+  });
 
-  final String generationId;
+  final TemplateGenerationResult generation;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+    final previewUrl = generation.sourceImageAsset?.url;
+    final progress = generation.effectiveProgressPercent;
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -255,12 +295,16 @@ class _ActiveGenerationBanner extends StatelessWidget {
           16,
           0,
           16,
-          bottomPadding + _bottomNavOuterGap + _bottomNavHeight + 10,
+          bottomPadding +
+              kPetMagicBottomNavOuterGap +
+              kPetMagicBottomNavHeight +
+              10,
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: () =>
-              context.go('${GenerationStatusPage.routePrefix}/$generationId'),
+          onTap: () => context.go(
+            '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+          ),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: colors.surfaceGlass.withValues(alpha: 0.92),
@@ -275,30 +319,97 @@ class _ActiveGenerationBanner extends StatelessWidget {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox.square(
-                    dimension: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.3,
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: SizedBox(
+                          width: 34,
+                          height: 34,
+                          child: previewUrl == null || previewUrl.isEmpty
+                              ? ColoredBox(
+                                  color: colors.surfaceStrong,
+                                  child: Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 18,
+                                    color: colors.accent,
+                                  ),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: previewUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) =>
+                                      ColoredBox(
+                                        color: colors.surfaceStrong,
+                                        child: Icon(
+                                          Icons.auto_awesome_rounded,
+                                          size: 18,
+                                          color: colors.accent,
+                                        ),
+                                      ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Создаем ваш результат...',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: colors.textMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            Text(
+                              generation.templateTitle ?? 'Новая генерация',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colors.textStrong,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$progress%',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: colors.accent,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: onDismiss,
+                        icon: Icon(
+                          Icons.keyboard_arrow_up_rounded,
+                          color: colors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: 4,
+                      value: progress / 100,
                       color: colors.accent,
                       backgroundColor: colors.border.withValues(alpha: 0.55),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Генерация продолжается',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.textStrong,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.chevron_right_rounded, color: colors.textMuted),
                 ],
               ),
             ),

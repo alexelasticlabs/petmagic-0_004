@@ -19,6 +19,8 @@ public static class TemplateGenerationEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
     private const string InvalidSubjectMessage = "Invalid access token subject.";
+    private const string PremiumRequiredCode = "templates.premium_required";
+    private const string PremiumRequiredMessage = "Premium subscription is required for this template.";
 
     public static IEndpointRouteBuilder MapTemplateGenerationEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -60,6 +62,7 @@ public static class TemplateGenerationEndpoints
         [FromForm] IFormFile? sourceImage,
         [FromServices] IMediaStorage mediaStorage,
         [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
+        [FromServices] ITemplatesService templatesService,
         [FromServices] IValidator<StartTemplateGenerationCommand> validator,
         [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
@@ -68,6 +71,25 @@ public static class TemplateGenerationEndpoints
         if (subjectError is not null)
         {
             return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var templateLookup = await templatesService.GetAdminAsync(templateId, cancellationToken);
+        if (templateLookup.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: templateLookup.Error.Code,
+                detail: templateLookup.Error.Message,
+                statusCode: string.Equals(templateLookup.Error.Code, "templates.not_found", StringComparison.Ordinal)
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest);
+        }
+
+        if (templateLookup.Value.IsPremium && TryGetPremiumClaim(context.User, out var isPremium) && !isPremium)
+        {
+            return TypedResults.Problem(
+                title: PremiumRequiredCode,
+                detail: PremiumRequiredMessage,
+                statusCode: StatusCodes.Status403Forbidden);
         }
 
         var uploadValidation = ValidateSourceImage(sourceImage, uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview));
@@ -321,9 +343,23 @@ public static class TemplateGenerationEndpoints
             "templates.invalid_image_model" => StatusCodes.Status400BadRequest,
             "templates.reference_motion_required" => StatusCodes.Status409Conflict,
             "templates.character_orientation_required" => StatusCodes.Status409Conflict,
+            "templates.premium_required" => StatusCodes.Status403Forbidden,
             "economy.insufficient_balance" => StatusCodes.Status402PaymentRequired,
             _ => StatusCodes.Status400BadRequest
         };
+    }
+
+    private static bool TryGetPremiumClaim(ClaimsPrincipal principal, out bool isPremium)
+    {
+        var premiumRaw = principal.FindFirstValue("premium");
+        if (string.IsNullOrWhiteSpace(premiumRaw))
+        {
+            isPremium = false;
+            return false;
+        }
+
+        isPremium = string.Equals(premiumRaw, "true", StringComparison.OrdinalIgnoreCase);
+        return true;
     }
 
     private static (Guid? UserId, Error? Error) TryGetSubject(HttpContext context)

@@ -259,7 +259,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Доступно для создания фото, видео и premium-шаблонов.';
 
   @override
-  String get walletBalanceEyebrow => 'Текущий баланс';
+  String get walletBalanceEyebrow => 'Ваш баланс';
 
   @override
   String get walletBalanceUnit => 'PawSpark';
@@ -304,7 +304,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get walletWatchAdAction => 'Получить +15 PawSpark';
+  String get walletWatchAdAction => 'Смотреть рекламу +15';
 
   @override
   String get walletAdDailyLimitReached =>
@@ -337,7 +337,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletViewPremiumAction => 'Посмотреть Premium';
 
   @override
-  String get walletWhatYouCanCreateTitle => 'Баланса хватит на:';
+  String get walletWhatYouCanCreateTitle => 'Хватит примерно на:';
+
+  @override
+  String walletApproxPhotos(int count) {
+    return '$count фото';
+  }
+
+  @override
+  String walletApproxVideos(int count) {
+    return '$count видео';
+  }
 
   @override
   String get walletSpendPhotoSubtitle => 'Фото\nот 10 Spark';
@@ -590,6 +600,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletRecentTransactionsTitle => 'Последние операции';
 
   @override
+  String get walletViewAllTransactions => 'Все операции';
+
+  @override
   String get walletNoActivity => 'Операций в кошельке пока нет.';
 
   @override
@@ -621,16 +634,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletSourcePackPurchase => 'Пополнение';
 
   @override
-  String get walletSourceGenerationSpend => 'Генерация шаблона';
+  String get walletSourceGenerationSpend => 'Генерация';
 
   @override
   String get walletSourceGenerationRefund => 'Возврат за генерацию';
 
   @override
-  String get walletSourceWeeklyGrant => 'Недельная награда';
+  String get walletSourceWeeklyGrant => 'Недельный бонус';
 
   @override
-  String get walletSourceAdReward => 'Награда за рекламу';
+  String get walletSourceAdReward => 'Бонус за рекламу';
+
+  @override
+  String get walletSourcePromoCode => 'Промокод';
 
   @override
   String get walletSourceAdminGrant => 'Начисление поддержки';
@@ -660,6 +676,10 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get walletPaymentGatewayUnavailableError =>
       'Платежи временно недоступны. Попробуйте позже или обновите приложение.';
+
+  @override
+  String get walletPaymentUnavailableError =>
+      'Пополнение временно недоступно. Попробуйте позже.';
 
   @override
   String get walletPackUnavailableError =>

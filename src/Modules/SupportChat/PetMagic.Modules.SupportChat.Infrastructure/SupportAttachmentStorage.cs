@@ -11,38 +11,19 @@ public sealed class SupportAttachmentStorageOptions
 
     public string LocalMediaRootPath { get; init; } = Path.Combine("wwwroot", "support-attachments");
 
-    public long MaxFileSizeBytes { get; init; } = 8 * 1024 * 1024;
+    public long MaxFileSizeBytes { get; init; } = 10 * 1024 * 1024;
 }
 
 internal sealed class LocalSupportAttachmentStorage(
     SupportAttachmentStorageOptions options,
     IHostEnvironment hostEnvironment) : ISupportAttachmentStorage
 {
-    private static readonly Dictionary<string, string> ImageSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> AllowedImageContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["jpeg"] = ".jpg",
-        ["jpg"] = ".jpg",
-        ["png"] = ".png",
-        ["webp"] = ".webp",
-        ["gif"] = ".gif",
-        ["heic"] = ".heic",
-        ["heif"] = ".heif"
-    };
-
-    private static readonly Dictionary<string, string> ExactContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["application/pdf"] = ".pdf",
-        ["application/json"] = ".json",
-        ["application/zip"] = ".zip",
-        ["application/x-zip-compressed"] = ".zip",
-        ["text/plain"] = ".txt",
-        ["text/csv"] = ".csv",
-        ["application/msword"] = ".doc",
-        ["application/vnd.ms-excel"] = ".xls",
-        ["application/vnd.ms-powerpoint"] = ".ppt",
-        ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] = ".docx",
-        ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] = ".xlsx",
-        ["application/vnd.openxmlformats-officedocument.presentationml.presentation"] = ".pptx"
+        ["image/jpeg"] = ".jpg",
+        ["image/jpg"] = ".jpg",
+        ["image/png"] = ".png",
+        ["image/webp"] = ".webp"
     };
 
     private static readonly Dictionary<string, string> ExtensionContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -50,21 +31,7 @@ internal sealed class LocalSupportAttachmentStorage(
         [".jpg"] = "image/jpeg",
         [".jpeg"] = "image/jpeg",
         [".png"] = "image/png",
-        [".webp"] = "image/webp",
-        [".gif"] = "image/gif",
-        [".heic"] = "image/heic",
-        [".heif"] = "image/heif",
-        [".pdf"] = "application/pdf",
-        [".json"] = "application/json",
-        [".zip"] = "application/zip",
-        [".txt"] = "text/plain",
-        [".csv"] = "text/csv",
-        [".doc"] = "application/msword",
-        [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        [".xls"] = "application/vnd.ms-excel",
-        [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        [".ppt"] = "application/vnd.ms-powerpoint",
-        [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        [".webp"] = "image/webp"
     };
 
     public async Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
@@ -76,8 +43,13 @@ internal sealed class LocalSupportAttachmentStorage(
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
         }
 
-        if (!TryResolveStoredFileFormat(attachment.ContentType, attachment.FileName, out var extension, out var normalizedContentType))
+        if (!TryResolveStoredFileFormat(attachment.ContentType, attachment.FileName, attachment.Content, out var extension, out var normalizedContentType, out var signatureMismatch))
         {
+            if (signatureMismatch)
+            {
+                return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentMimeMismatch);
+            }
+
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentContentTypeNotAllowed);
         }
 
@@ -198,55 +170,89 @@ internal sealed class LocalSupportAttachmentStorage(
     private static bool TryResolveStoredFileFormat(
         string contentType,
         string fileName,
+        byte[] attachmentContent,
         out string extension,
-        out string normalizedContentType)
+        out string normalizedContentType,
+        out bool signatureMismatch)
     {
         extension = string.Empty;
+        signatureMismatch = false;
         normalizedContentType = NormalizeContentType(contentType);
         if (string.IsNullOrWhiteSpace(normalizedContentType))
         {
             return false;
         }
 
-        if (normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
         {
-            var subtype = normalizedContentType["image/".Length..];
-            if (!ImageSubtypeExtensions.TryGetValue(subtype, out string? mappedImageExtension)
-                || string.IsNullOrWhiteSpace(mappedImageExtension))
+            var fileExtension = Path.GetExtension(fileName).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(fileExtension)
+                || !ExtensionContentTypes.TryGetValue(fileExtension, out string? extensionContentType)
+                || string.IsNullOrWhiteSpace(extensionContentType))
             {
                 return false;
             }
 
-            extension = mappedImageExtension;
-            normalizedContentType = string.Equals(subtype, "jpg", StringComparison.OrdinalIgnoreCase)
-                ? "image/jpeg"
-                : $"image/{subtype}";
-            return true;
+            extension = fileExtension;
+            normalizedContentType = extensionContentType;
+        }
+        else
+        {
+            if (!AllowedImageContentTypeExtensions.TryGetValue(normalizedContentType, out var mappedExtension)
+                || string.IsNullOrWhiteSpace(mappedExtension))
+            {
+                return false;
+            }
+
+            extension = mappedExtension;
+            if (string.Equals(normalizedContentType, "image/jpg", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedContentType = "image/jpeg";
+            }
         }
 
-        if (ExactContentTypeExtensions.TryGetValue(normalizedContentType, out string? mappedExactExtension)
-            && !string.IsNullOrWhiteSpace(mappedExactExtension))
+        if (!MatchesImageSignature(normalizedContentType, attachmentContent))
         {
-            extension = mappedExactExtension;
-            return true;
-        }
-
-        if (!string.Equals(normalizedContentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
-        {
+            signatureMismatch = true;
             return false;
         }
 
-        var fileExtension = Path.GetExtension(fileName).Trim().ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(fileExtension)
-            || !ExtensionContentTypes.TryGetValue(fileExtension, out string? extensionContentType)
-            || string.IsNullOrWhiteSpace(extensionContentType))
-        {
-            return false;
-        }
-
-        extension = fileExtension;
-        normalizedContentType = extensionContentType;
         return true;
+    }
+
+    private static bool MatchesImageSignature(string normalizedContentType, byte[]? attachmentContent)
+    {
+        if (attachmentContent is null || attachmentContent.Length < 12)
+        {
+            return false;
+        }
+
+        return normalizedContentType switch
+        {
+            "image/jpeg" => attachmentContent.Length >= 3
+                && attachmentContent[0] == 0xFF
+                && attachmentContent[1] == 0xD8
+                && attachmentContent[2] == 0xFF,
+            "image/png" => attachmentContent.Length >= 8
+                && attachmentContent[0] == 0x89
+                && attachmentContent[1] == 0x50
+                && attachmentContent[2] == 0x4E
+                && attachmentContent[3] == 0x47
+                && attachmentContent[4] == 0x0D
+                && attachmentContent[5] == 0x0A
+                && attachmentContent[6] == 0x1A
+                && attachmentContent[7] == 0x0A,
+            "image/webp" => attachmentContent.Length >= 12
+                && attachmentContent[0] == 0x52
+                && attachmentContent[1] == 0x49
+                && attachmentContent[2] == 0x46
+                && attachmentContent[3] == 0x46
+                && attachmentContent[8] == 0x57
+                && attachmentContent[9] == 0x45
+                && attachmentContent[10] == 0x42
+                && attachmentContent[11] == 0x50,
+            _ => false,
+        };
     }
 
     private static string NormalizeContentType(string contentType)

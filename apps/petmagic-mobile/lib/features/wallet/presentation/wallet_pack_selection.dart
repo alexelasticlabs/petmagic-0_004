@@ -1,6 +1,6 @@
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 
-CurrencyPackModel? selectPopularPack(List<CurrencyPackModel> packs) {
+CurrencyPackModel? selectBestValuePack(List<CurrencyPackModel> packs) {
   if (packs.isEmpty) {
     return null;
   }
@@ -27,4 +27,27 @@ CurrencyPackModel? selectPopularPack(List<CurrencyPackModel> packs) {
 
     return best;
   });
+}
+
+// Backward-compatible alias for existing tests and legacy callers.
+CurrencyPackModel? selectPopularPack(List<CurrencyPackModel> packs) {
+  return selectBestValuePack(packs);
+}
+
+CurrencyPackModel? selectMiddlePack(List<CurrencyPackModel> packs) {
+  if (packs.isEmpty) {
+    return null;
+  }
+
+  final sorted = packs.toList(growable: false)
+    ..sort((left, right) {
+      final byPrice = left.priceAmount.compareTo(right.priceAmount);
+      if (byPrice != 0) {
+        return byPrice;
+      }
+      return left.totalSpark.compareTo(right.totalSpark);
+    });
+
+  final middleIndex = (sorted.length - 1) ~/ 2;
+  return sorted[middleIndex];
 }

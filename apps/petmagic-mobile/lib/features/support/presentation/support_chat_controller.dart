@@ -191,10 +191,54 @@ class SupportChatController extends Notifier<SupportChatState> {
       state = state.copyWith(
         isSending: false,
         conversation: _appendOutgoingMessage(conversation, message),
-        clearError: true,
+        errorMessage: _messageFromAttachmentFailure(message),
+        clearError: _messageFromAttachmentFailure(message) == null,
       );
       _resumePendingRealtimeRefreshIfNeeded();
-      return true;
+      return message.isAttachmentUploaded;
+    } on AppException catch (error) {
+      state = state.copyWith(isSending: false, errorMessage: error.message);
+      return false;
+    } on Object {
+      state = state.copyWith(
+        isSending: false,
+        errorMessage: 'support.attachment_unavailable',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> retryAttachment({
+    required String messageId,
+    required String filePath,
+    required String fileName,
+    required String contentType,
+  }) async {
+    final conversation = state.conversation;
+    if (conversation == null || state.isSending) {
+      return false;
+    }
+
+    state = state.copyWith(isSending: true, clearError: true);
+
+    try {
+      final message = await _repository.retryAttachment(
+        conversationId: conversation.conversationId,
+        messageId: messageId,
+        filePath: filePath,
+        fileName: fileName,
+        contentType: contentType,
+      );
+
+      final attachmentFailure = _messageFromAttachmentFailure(message);
+      state = state.copyWith(
+        isSending: false,
+        conversation: _upsertMessage(conversation, message),
+        errorMessage: attachmentFailure,
+        clearError: attachmentFailure == null,
+      );
+      _resumePendingRealtimeRefreshIfNeeded();
+      return message.isAttachmentUploaded;
     } on AppException catch (error) {
       state = state.copyWith(isSending: false, errorMessage: error.message);
       return false;
@@ -233,6 +277,34 @@ class SupportChatController extends Notifier<SupportChatState> {
       lastMessageAtUtc: message.createdAtUtc,
       messages: [...conversation.messages, message],
     );
+  }
+
+  SupportChatConversation _upsertMessage(
+    SupportChatConversation conversation,
+    SupportChatMessage message,
+  ) {
+    final index = conversation.messages.indexWhere(
+      (existing) => existing.messageId == message.messageId,
+    );
+    if (index < 0) {
+      return _appendOutgoingMessage(conversation, message);
+    }
+
+    final updatedMessages = [...conversation.messages];
+    updatedMessages[index] = message;
+    return conversation.copyWith(
+      updatedAtUtc: message.createdAtUtc,
+      lastMessageAtUtc: message.createdAtUtc,
+      messages: updatedMessages,
+    );
+  }
+
+  String? _messageFromAttachmentFailure(SupportChatMessage message) {
+    if (!message.isAttachmentFailed) {
+      return null;
+    }
+
+    return message.attachmentUploadErrorCode ?? 'support.attachment_unavailable';
   }
 
   Future<void> _refreshConversation() async {
@@ -320,64 +392,16 @@ class SupportChatController extends Notifier<SupportChatState> {
 
   String _resolveContentType(String path) {
     final lowerPath = path.toLowerCase();
+    if (lowerPath.endsWith('.jpeg') || lowerPath.endsWith('.jpg')) {
+      return 'image/jpeg';
+    }
+
     if (lowerPath.endsWith('.png')) {
       return 'image/png';
     }
 
     if (lowerPath.endsWith('.webp')) {
       return 'image/webp';
-    }
-
-    if (lowerPath.endsWith('.heic') || lowerPath.endsWith('.heif')) {
-      return 'image/heic';
-    }
-
-    if (lowerPath.endsWith('.gif')) {
-      return 'image/gif';
-    }
-
-    if (lowerPath.endsWith('.pdf')) {
-      return 'application/pdf';
-    }
-
-    if (lowerPath.endsWith('.txt')) {
-      return 'text/plain';
-    }
-
-    if (lowerPath.endsWith('.csv')) {
-      return 'text/csv';
-    }
-
-    if (lowerPath.endsWith('.json')) {
-      return 'application/json';
-    }
-
-    if (lowerPath.endsWith('.doc')) {
-      return 'application/msword';
-    }
-
-    if (lowerPath.endsWith('.docx')) {
-      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    }
-
-    if (lowerPath.endsWith('.xls')) {
-      return 'application/vnd.ms-excel';
-    }
-
-    if (lowerPath.endsWith('.xlsx')) {
-      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    }
-
-    if (lowerPath.endsWith('.ppt')) {
-      return 'application/vnd.ms-powerpoint';
-    }
-
-    if (lowerPath.endsWith('.pptx')) {
-      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-    }
-
-    if (lowerPath.endsWith('.zip')) {
-      return 'application/zip';
     }
 
     return 'application/octet-stream';
