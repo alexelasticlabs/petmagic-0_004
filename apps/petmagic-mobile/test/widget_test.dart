@@ -24,9 +24,12 @@ import 'package:petmagic_mobile/features/support/data/support_chat_realtime_clie
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -581,8 +584,32 @@ void main() {
   testWidgets('delete account detail screen stays informational', (
     tester,
   ) async {
+    final profileRepository = _FakeProfileRepository()
+      ..storedSession = AuthSession.fromJson(
+        jsonDecode(_buildSessionJson()) as Map<String, dynamic>,
+      );
+
+    final container = ProviderContainer(
+      overrides: [
+        profileRepositoryProvider.overrideWith((ref) => profileRepository),
+        authSessionStorageProvider.overrideWith(
+          (ref) => _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
+        ),
+        templateGenerationControllerProvider.overrideWith(
+          _IdleTemplateGenerationController.new,
+        ),
+        generationHistoryControllerProvider.overrideWith(
+          _IdleGenerationHistoryController.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(profileControllerProvider.notifier).initialize();
+
     await tester.pumpWidget(
-      ProviderScope(
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: [Locale('en')],
@@ -609,6 +636,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         supportChatRepositoryProvider.overrideWith((ref) => supportRepository),
+        supportChatRealtimeClientProvider.overrideWith(
+          (ref) => const _FakeSupportChatRealtimeClient(),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -627,6 +657,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         supportChatRepositoryProvider.overrideWith((ref) => supportRepository),
+        supportChatRealtimeClientProvider.overrideWith(
+          (ref) => const _FakeSupportChatRealtimeClient(),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -653,6 +686,9 @@ void main() {
         overrides: [
           supportChatRepositoryProvider.overrideWith(
             (ref) => supportRepository,
+          ),
+          supportChatRealtimeClientProvider.overrideWith(
+            (ref) => const _FakeSupportChatRealtimeClient(),
           ),
         ],
       );
@@ -866,6 +902,13 @@ Future<void> _pumpApp(
         templatesRepositoryProvider.overrideWith(
           (ref) => repository ?? _FakeTemplatesRepository(),
         ),
+        templateGenerationControllerProvider.overrideWith(
+          _IdleTemplateGenerationController.new,
+        ),
+        generationHistoryControllerProvider.overrideWith(
+          _IdleGenerationHistoryController.new,
+        ),
+        walletControllerProvider.overrideWith(_IdleWalletController.new),
         profileRepositoryProvider.overrideWith(
           (ref) => profileRepository ?? _FakeProfileRepository(),
         ),
@@ -886,6 +929,30 @@ Future<void> _pumpApp(
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
+}
+
+class _IdleTemplateGenerationController extends TemplateGenerationController {
+  @override
+  TemplateGenerationState build() {
+    return const TemplateGenerationState();
+  }
+}
+
+class _IdleGenerationHistoryController extends GenerationHistoryController {
+  @override
+  GenerationHistoryState build() {
+    return const GenerationHistoryState();
+  }
+}
+
+class _IdleWalletController extends WalletController {
+  @override
+  WalletState build() {
+    return const WalletState();
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {}
 }
 
 String _buildSessionJson() {

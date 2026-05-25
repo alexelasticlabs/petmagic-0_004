@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:share_plus/share_plus.dart';
@@ -22,6 +23,194 @@ class RewardsPage extends ConsumerStatefulWidget {
 
 class _RewardsPageState extends ConsumerState<RewardsPage> {
   static const _warningTone = Color(0xFFD7A44A);
+
+  Future<void> _showHistorySheet(List<WalletLedgerItem> items) async {
+    final text = AppLocalizations.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        final colors = context.petMagicColors;
+        final localeTag = Localizations.localeOf(context).toLanguageTag();
+        final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.72;
+
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxSheetHeight),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: const Color(0xFF1D2B3C),
+                    width: 1.1,
+                  ),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF121D2C).withValues(alpha: 0.96),
+                      const Color(0xFF07101A).withValues(alpha: 0.98),
+                    ],
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF31465D),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              text.rewardsHistoryTitle,
+                              style: TextStyle(
+                                color: colors.textStrong,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                            color: colors.textSoft,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Flexible(
+                      child: items.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                              child: Text(
+                                text.rewardsHistoryEmpty,
+                                style: TextStyle(
+                                  color: colors.textSoft,
+                                  fontSize: 13,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.fromLTRB(14, 2, 14, 18),
+                              itemCount: items.length,
+                              separatorBuilder: (_, separatorIndex) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final item = items[index];
+                                final positive = item.delta >= 0;
+                                final tone = positive
+                                    ? const Color(0xFF49DA87)
+                                    : const Color(0xFF7EA4D1);
+                                final date = item.createdAtUtc?.toLocal();
+
+                                return DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: tone.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: tone.withValues(alpha: 0.24),
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      12,
+                                      10,
+                                      12,
+                                      10,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: BoxDecoration(
+                                            color: tone.withValues(alpha: 0.18),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            positive
+                                                ? Icons.arrow_downward_rounded
+                                                : Icons.arrow_upward_rounded,
+                                            size: 18,
+                                            color: tone,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item.reason.isEmpty
+                                                    ? item.source
+                                                    : item.reason,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: colors.textStrong,
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                              if (date != null)
+                                                Text(
+                                                  DateFormat.MMMd(
+                                                    localeTag,
+                                                  ).add_Hm().format(date),
+                                                  style: TextStyle(
+                                                    color: colors.textMuted,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          '${positive ? '+' : ''}${item.delta}',
+                                          style: TextStyle(
+                                            color: tone,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -71,31 +260,31 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                 color: colors.accent,
                 backgroundColor: colors.surfaceStrong,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(20, 20, 20, bottomNavInset),
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     _RewardsHero(
                       balance: state.wallet?.balance,
-                      onHistoryTap: () => controller.load(refresh: true),
+                      onHistoryTap: () => _showHistorySheet(state.ledger),
                     ),
                     if (warningMessage != null) ...[
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       _WarningBanner(
                         message: warningMessage,
                         tone: _warningTone,
                       ),
                     ],
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     _PromoCodeCard(
                       isSubmitting: state.isRedeeming,
                       onSubmit: controller.applyRedeemCode,
                     ),
-                    const SizedBox(height: 20),
-                    _ReferralCard(rewards: rewardsSummary),
                     const SizedBox(height: 16),
+                    _ReferralCard(rewards: rewardsSummary),
+                    const SizedBox(height: 14),
                     _ReferralInfoNote(rewards: rewardsSummary),
                     if (rewardsSummary?.hasActivatedReferral != true) ...[
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       _FriendCodeCard(
                         rewards: rewardsSummary,
                         isSubmitting: state.isApplyingReferral,
@@ -280,12 +469,12 @@ class _RewardsHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final heroWidth = constraints.maxWidth;
-        final imageWidth = (heroWidth * 0.44).clamp(136.0, 186.0);
-        final subtitleWidth = heroWidth * 0.5;
-        final balanceRightInset = (imageWidth * 0.72).clamp(112.0, 142.0);
+        final imageWidth = (heroWidth * 0.42).clamp(132.0, 176.0);
+        final subtitleWidth = heroWidth * 0.52;
+        final balanceRightInset = (imageWidth * 0.74).clamp(104.0, 130.0);
 
         return SizedBox(
-          height: 268,
+          height: 238,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -304,7 +493,7 @@ class _RewardsHero extends StatelessWidget {
                             text.rewardsPageTitle,
                             style: TextStyle(
                               color: colors.textStrong,
-                              fontSize: 40,
+                              fontSize: 33,
                               height: 1.0,
                               fontWeight: FontWeight.w900,
                               shadows: [
@@ -323,7 +512,7 @@ class _RewardsHero extends StatelessWidget {
                               text.rewardsPageSubtitle,
                               style: TextStyle(
                                 color: colors.textSoft,
-                                fontSize: 16,
+                                fontSize: 14,
                                 height: 1.3,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -341,7 +530,7 @@ class _RewardsHero extends StatelessWidget {
                 right: 0,
                 bottom: 0,
                 child: SizedBox(
-                  height: 118,
+                  height: 104,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -354,7 +543,7 @@ class _RewardsHero extends StatelessWidget {
                       ),
                       Positioned(
                         right: 0,
-                        bottom: -4,
+                        bottom: -2,
                         child: IgnorePointer(
                           child: Image.asset(
                             _balanceImage,
@@ -392,10 +581,10 @@ class _HistoryButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF07111C).withValues(alpha: 0.66),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFF243143)),
             boxShadow: [
               BoxShadow(
@@ -410,7 +599,7 @@ class _HistoryButton extends StatelessWidget {
             children: [
               const Icon(
                 Icons.history_toggle_off_rounded,
-                size: 19,
+                size: 17,
                 color: Color(0xFF38E681),
               ),
               const SizedBox(width: 8),
@@ -418,7 +607,7 @@ class _HistoryButton extends StatelessWidget {
                 text.rewardsHistoryTitle,
                 style: const TextStyle(
                   color: Color(0xFF48E581),
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -447,10 +636,10 @@ class _BalancePanel extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return Container(
-      height: 112,
-      padding: EdgeInsets.fromLTRB(20, 16, rightInset, 16),
+      height: 98,
+      padding: EdgeInsets.fromLTRB(16, 12, rightInset, 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
@@ -480,11 +669,11 @@ class _BalancePanel extends StatelessWidget {
             maxLines: 1,
             style: const TextStyle(
               color: Color(0xFF44E681),
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 5),
           Align(
             alignment: Alignment.centerLeft,
             child: FittedBox(
@@ -496,20 +685,20 @@ class _BalancePanel extends StatelessWidget {
                     balanceValue,
                     style: TextStyle(
                       color: colors.textStrong,
-                      fontSize: 46,
+                      fontSize: 39,
                       height: 1,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.8,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const _SparkTokenIcon(size: 26),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  const _SparkTokenIcon(size: 22),
+                  const SizedBox(width: 6),
                   Text(
                     unit,
                     style: TextStyle(
                       color: colors.textStrong,
-                      fontSize: 17,
+                      fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -688,14 +877,14 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
     final colors = context.petMagicColors;
 
     return _RewardsGlassPanel(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Material(
         color: Colors.transparent,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final actionWidth = (constraints.maxWidth * 0.34).clamp(
-              124.0,
-              148.0,
+              118.0,
+              140.0,
             );
 
             return Column(
@@ -708,18 +897,18 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                   ),
                   title: text.rewardsPromoTitle,
                   subtitle: text.rewardsPromoSubtitle,
-                  iconBoxSize: 48,
-                  iconSize: 24,
-                  titleSize: 18,
-                  subtitleSize: 13,
+                  iconBoxSize: 42,
+                  iconSize: 22,
+                  titleSize: 17,
+                  subtitleSize: 12.5,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: SizedBox(
-                        height: 54,
+                        height: 50,
                         child: TextField(
                           key: const Key('rewards_promo_input'),
                           controller: _controller,
@@ -728,7 +917,7 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                           onSubmitted: (_) => unawaited(_submit()),
                           style: TextStyle(
                             color: colors.textStrong,
-                            fontSize: 14.5,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.3,
                           ),
@@ -742,7 +931,7 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                     const SizedBox(width: 12),
                     SizedBox(
                       width: actionWidth,
-                      height: 54,
+                      height: 50,
                       child: FilledButton(
                         key: const Key('rewards_promo_submit'),
                         onPressed: widget.isSubmitting ? null : _submit,
@@ -753,10 +942,10 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                           disabledForegroundColor: const Color(0xFF7F8EA0),
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+                            borderRadius: BorderRadius.circular(13),
                           ),
                           textStyle: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -861,52 +1050,31 @@ class _ReferralCardState extends State<_ReferralCard> {
     final hasRewards = rewards != null;
     final bonus = rewards?.referralBonusSpark ?? 15;
 
-    return _RewardsGlassPanel(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      borderColor: const Color(0xFF0C6E4D).withValues(alpha: 0.78),
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          const Color(0xFF062D24).withValues(alpha: 0.96),
-          const Color(0xFF092B22).withValues(alpha: 0.88),
-          const Color(0xFF061018).withValues(alpha: 0.94),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final textWidth = constraints.maxWidth * 0.58;
-            final imageWidth = (constraints.maxWidth * 0.39).clamp(
-              126.0,
-              176.0,
-            );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 36 = 18px left + 18px right padding inside the glass panel
+        final innerWidth = constraints.maxWidth - 36;
+        final textWidth = innerWidth * 0.58;
+        final imageWidth = (innerWidth * 0.44).clamp(132.0, 188.0);
 
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  right: -6,
-                  top: 14,
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.74,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: imageWidth,
-                          maxHeight: 168,
-                        ),
-                        child: Image.asset(
-                          _inviteImage,
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Column(
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _RewardsGlassPanel(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              borderColor: const Color(0xFF0C6E4D).withValues(alpha: 0.78),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF062D24).withValues(alpha: 0.96),
+                  const Color(0xFF092B22).withValues(alpha: 0.88),
+                  const Color(0xFF061018).withValues(alpha: 0.94),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(
@@ -947,23 +1115,40 @@ class _ReferralCardState extends State<_ReferralCard> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     _GradientActionButton(
                       key: const Key('rewards_referral_share'),
-                      height: 58,
+                      height: 52,
                       label: text.rewardsReferralShareCodeAction,
                       icon: Icons.ios_share_rounded,
                       onPressed: hasRewards ? _shareCode : null,
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     _ReferralStats(rewards: rewards),
                   ],
                 ),
-              ],
-            );
-          },
-        ),
-      ),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: -14,
+              child: IgnorePointer(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: imageWidth,
+                    maxHeight: 202,
+                  ),
+                  child: Image.asset(
+                    _inviteImage,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1245,7 +1430,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
     final colors = context.petMagicColors;
 
     return _RewardsGlassPanel(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       borderColor: const Color(0xFF3B3264).withValues(alpha: 0.86),
       gradient: LinearGradient(
         begin: Alignment.centerLeft,
@@ -1268,8 +1453,8 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 52,
-                      height: 52,
+                      width: 46,
+                      height: 46,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
                         gradient: const LinearGradient(
@@ -1288,7 +1473,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                       child: const Icon(
                         Icons.group_add_rounded,
                         color: Color(0xFFEBD6FF),
-                        size: 26,
+                        size: 22,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1300,7 +1485,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                             text.rewardsReferralFriendCodePrompt,
                             style: TextStyle(
                               color: colors.textStrong,
-                              fontSize: 17,
+                              fontSize: 16,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -1309,7 +1494,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                             text.rewardsReferralFriendCodeHint,
                             style: TextStyle(
                               color: colors.textSoft,
-                              fontSize: 13,
+                              fontSize: 12,
                               height: 1.32,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1321,8 +1506,8 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                       const SizedBox(width: 12),
                       _GradientActionButton(
                         key: const Key('rewards_referral_show_input'),
-                        width: 186,
-                        height: 52,
+                        width: 168,
+                        height: 48,
                         label: text.rewardsReferralUseFriendCodeAction,
                         gradient: const LinearGradient(
                           colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
@@ -1336,7 +1521,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                   const SizedBox(height: 14),
                   _GradientActionButton(
                     key: const Key('rewards_referral_show_input'),
-                    height: 52,
+                    height: 48,
                     label: text.rewardsReferralUseFriendCodeAction,
                     gradient: const LinearGradient(
                       colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
@@ -1368,7 +1553,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                   const SizedBox(height: 12),
                   _GradientActionButton(
                     key: const Key('rewards_referral_submit'),
-                    height: 52,
+                    height: 48,
                     label: text.rewardsReferralActivateAction,
                     isLoading: widget.isSubmitting,
                     gradient: const LinearGradient(
@@ -1803,13 +1988,13 @@ InputDecoration _fieldDecoration(
     filled: true,
     fillColor: const Color(0xFF0A1522).withValues(alpha: 0.82),
     isDense: true,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
     prefixIcon: icon == null
         ? null
         : Icon(icon, size: 20, color: colors.textSoft),
     hintStyle: TextStyle(
       color: colors.textMuted.withValues(alpha: 0.72),
-      fontSize: 14.5,
+      fontSize: 13.5,
       fontWeight: FontWeight.w700,
     ),
     labelStyle: TextStyle(
@@ -1818,17 +2003,17 @@ InputDecoration _fieldDecoration(
       fontWeight: FontWeight.w700,
     ),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(13),
       borderSide: BorderSide(
         color: const Color(0xFF253549).withValues(alpha: 0.95),
       ),
     ),
     focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(13),
       borderSide: const BorderSide(color: Color(0xFF47DF82), width: 1.4),
     ),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(13),
       borderSide: BorderSide(
         color: const Color(0xFF253549).withValues(alpha: 0.95),
       ),
