@@ -12,8 +12,8 @@ using PetMagic.Modules.Identity.Infrastructure.Data;
 namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260516191828_AddIdentityEmailFlows")]
-    partial class AddIdentityEmailFlows
+    [Migration("20260526173403_BaselineIdentity")]
+    partial class BaselineIdentity
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -164,6 +164,24 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<string>("AvatarContentType")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("AvatarFileName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long?>("AvatarFileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("AvatarUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -194,6 +212,14 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("MarketingEmailsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("MarketingEmailsUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -211,8 +237,32 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("PrivacyPolicyAccepted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("PrivacyPolicyAcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PrivacyPolicyAcceptedVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
+
+                    b.Property<bool>("TermsOfUseAccepted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("TermsOfUseAcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TermsOfUseAcceptedVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");

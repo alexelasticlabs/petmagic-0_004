@@ -1,8 +1,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 WORKDIR /src
 COPY ["src/", "src/"]
-RUN dotnet restore "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj"
-RUN dotnet publish "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" -c Release --no-restore -o /app/publish -p:PublishReadyToRun=true
+RUN dotnet restore "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" -r linux-x64 -p:PublishReadyToRun=true
+RUN dotnet publish "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" -c Release --no-restore -r linux-x64 --self-contained false -o /app/publish -p:PublishReadyToRun=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 RUN apt-get update \

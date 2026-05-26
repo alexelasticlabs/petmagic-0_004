@@ -12,8 +12,8 @@ using PetMagic.Modules.SupportChat.Infrastructure.Data;
 namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(SupportChatDbContext))]
-    [Migration("20260520133332_RemoveSupportInternalNotes")]
-    partial class RemoveSupportInternalNotes
+    [Migration("20260526173424_BaselineSupportChat")]
+    partial class BaselineSupportChat
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -41,6 +41,13 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.Property<long?>("AttachmentFileSizeBytes")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("AttachmentUploadErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int?>("AttachmentUploadStatus")
+                        .HasColumnType("integer");
 
                     b.Property<string>("AttachmentUrl")
                         .HasMaxLength(2048)

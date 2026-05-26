@@ -12,8 +12,8 @@ using PetMagic.Modules.Templates.Infrastructure.Data;
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TemplatesDbContext))]
-    [Migration("20260516235747_AddTemplateAnalyticsEvents")]
-    partial class AddTemplateAnalyticsEvents
+    [Migration("20260526173450_BaselineTemplates")]
+    partial class BaselineTemplates
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -49,6 +49,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("FeedbackMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<Guid?>("GenerationId")
                         .HasColumnType("uuid");
 
@@ -66,6 +70,8 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TemplateId", "CountryCode");
+
+                    b.HasIndex("TemplateId", "CreatedAtUtc");
 
                     b.HasIndex("TemplateId", "DeviceClass");
 
@@ -115,6 +121,96 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("templates_assets", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique();
+
+                    b.HasIndex("IsArchived", "Name");
+
+                    b.ToTable("templates_categories", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("GenerationDurationSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("InputPhotoQualityScore")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ModelUsed")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ProviderRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SelectedReasons")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GenerationId", "UserId");
+
+                    b.HasIndex("TemplateId", "CreatedAtUtc");
+
+                    b.HasIndex("TemplateId", "Rating", "CreatedAtUtc");
+
+                    b.ToTable("templates_generation_feedback", (string)null);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", b =>
@@ -207,6 +303,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("RefundedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("ResultViewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("SourceImageContentType")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -274,6 +373,8 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("TemplateId", "Status", "CreatedAtUtc");
 
+                    b.HasIndex("UserId", "Status", "ResultViewedAtUtc");
+
                     b.ToTable("templates_generation_jobs", (string)null);
                 });
 
@@ -294,6 +395,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ImageModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ImagePrompt")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<bool>("IsPremium")
                         .HasColumnType("boolean");
 
@@ -311,6 +420,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<string>("MusicDescription")
                         .HasMaxLength(240)
                         .HasColumnType("character varying(240)");
+
+                    b.Property<string>("PetPhotoRequirements")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("PreprocessingModel")
                         .HasMaxLength(128)
@@ -435,6 +548,59 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.ToTable("templates_media_records", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplatePushDeviceToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("DisabledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Locale")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "DisabledAtUtc", "LastSeenAtUtc");
+
+                    b.ToTable("templates_push_device_tokens", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateAnalyticsEvent", b =>
                 {
                     b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", "Template")
@@ -453,6 +619,25 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasForeignKey("TemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationFeedback", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "Generation")
+                        .WithMany()
+                        .HasForeignKey("GenerationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Generation");
 
                     b.Navigation("Template");
                 });

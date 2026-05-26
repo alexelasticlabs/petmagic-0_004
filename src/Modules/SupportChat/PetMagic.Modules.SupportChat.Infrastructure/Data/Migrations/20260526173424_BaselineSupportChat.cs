@@ -1,3 +1,4 @@
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialSupportChat : Migration
+    public partial class BaselineSupportChat : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -30,6 +31,23 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "support_reply_templates",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Title = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    Body = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: false),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_support_reply_templates", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "support_messages",
                 columns: table => new
                 {
@@ -38,6 +56,12 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     SenderUserId = table.Column<Guid>(type: "uuid", nullable: false),
                     IsFromAdmin = table.Column<bool>(type: "boolean", nullable: false),
                     Body = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: false),
+                    AttachmentUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    AttachmentFileName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    AttachmentContentType = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    AttachmentFileSizeBytes = table.Column<long>(type: "bigint", nullable: true),
+                    AttachmentUploadStatus = table.Column<int>(type: "integer", nullable: true),
+                    AttachmentUploadErrorCode = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     ReadAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
@@ -71,17 +95,22 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_support_conversations_Status_UpdatedAtUtc",
                 table: "support_conversations",
-                columns: ["Status", "UpdatedAtUtc"]);
+                columns: new[] { "Status", "UpdatedAtUtc" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_support_messages_ConversationId_CreatedAtUtc",
                 table: "support_messages",
-                columns: ["ConversationId", "CreatedAtUtc"]);
+                columns: new[] { "ConversationId", "CreatedAtUtc" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_support_messages_ConversationId_IsFromAdmin_ReadAtUtc",
                 table: "support_messages",
-                columns: ["ConversationId", "IsFromAdmin", "ReadAtUtc"]);
+                columns: new[] { "ConversationId", "IsFromAdmin", "ReadAtUtc" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_support_reply_templates_SortOrder_IsEnabled",
+                table: "support_reply_templates",
+                columns: new[] { "SortOrder", "IsEnabled" });
         }
 
         /// <inheritdoc />
@@ -89,6 +118,9 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
         {
             migrationBuilder.DropTable(
                 name: "support_messages");
+
+            migrationBuilder.DropTable(
+                name: "support_reply_templates");
 
             migrationBuilder.DropTable(
                 name: "support_conversations");
