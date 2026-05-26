@@ -15,19 +15,19 @@ class _BenefitsList extends StatelessWidget {
         icon: Icons.workspace_premium_rounded,
         title: text.premiumComparisonPremiumTemplates,
         subtitle: text.premiumBenefitExclusive,
-        tone: const Color(0xFFA855F7),
+        tone: colors.purple,
       ),
       _BenefitCardData(
         icon: Icons.opacity_rounded,
         title: text.premiumComparisonNoWatermark,
         subtitle: text.premiumBenefitHighQuality,
-        tone: const Color(0xFF22D3EE),
+        tone: colors.blue,
       ),
       _BenefitCardData(
         icon: Icons.bolt_rounded,
         title: text.premiumComparisonFast,
         subtitle: text.premiumBenefitFastGeneration,
-        tone: const Color(0xFF4ADE80),
+        tone: colors.accent,
       ),
       _BenefitCardData(
         icon: Icons.hd_rounded,
@@ -287,11 +287,7 @@ class _PlanCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 13,
-                        color: Color(0xFFFFC107),
-                      ),
+                      Icon(Icons.star_rounded, size: 13, color: colors.gold),
                       const SizedBox(width: 4),
                       Text(
                         plan.discountPercent != null
@@ -433,6 +429,7 @@ class _CheckoutActionsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final storeForeground = colors.textStrong;
     final hasStore = storeProvider != null;
     final hasStripe = stripeAvailable;
 
@@ -476,7 +473,7 @@ class _CheckoutActionsSection extends StatelessWidget {
               onPressed: state.isBuying ? null : onStoreCheckout,
               style: FilledButton.styleFrom(
                 backgroundColor: colors.gold,
-                foregroundColor: colors.surface,
+                foregroundColor: storeForeground,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
                 ),
@@ -488,7 +485,7 @@ class _CheckoutActionsSection extends StatelessWidget {
                       child: CircularProgressIndicator.adaptive(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          colors.surface,
+                          storeForeground,
                         ),
                       ),
                     )

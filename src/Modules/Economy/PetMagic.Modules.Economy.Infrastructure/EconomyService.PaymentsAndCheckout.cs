@@ -1,6 +1,7 @@
 using System.Data;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -651,6 +652,23 @@ public sealed partial class EconomyService
         if (paymentResult.IsFailure)
         {
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        if (string.IsNullOrWhiteSpace(paymentResult.Value.CheckoutUrl))
+        {
+            EmptyCheckoutUrlCounter.Add(
+                1,
+                new KeyValuePair<string, object?>("provider", provider),
+                new KeyValuePair<string, object?>("platform", command.Platform),
+                new KeyValuePair<string, object?>("currency", order.CurrencyCode));
+
+            logger?.LogWarning(
+                "Payment gateway returned empty checkout URL for wallet top-up. OrderId={OrderId} UserId={UserId} PackId={PackId} Provider={Provider} ExternalPaymentId={ExternalPaymentId}",
+                order.Id,
+                order.UserId,
+                order.PackId,
+                provider,
+                paymentResult.Value.ExternalPaymentId);
         }
 
         order.ExternalPaymentId = paymentResult.Value.ExternalPaymentId;

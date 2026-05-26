@@ -16,10 +16,10 @@ class _WalletCompanionHero extends StatelessWidget {
     return ProfileGlassCard(
       padding: EdgeInsets.zero,
       child: Container(
-        height: 156,
+        height: 92,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border.withValues(alpha: 0.78)),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -33,16 +33,16 @@ class _WalletCompanionHero extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              left: -28,
-              top: 18,
+              left: -24,
+              top: 8,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: colors.accent.withValues(alpha: 0.28),
-                      blurRadius: 56,
-                      spreadRadius: 8,
+                      color: colors.accent.withValues(alpha: 0.2),
+                      blurRadius: 34,
+                      spreadRadius: 4,
                     ),
                   ],
                 ),
@@ -50,11 +50,11 @@ class _WalletCompanionHero extends StatelessWidget {
               ),
             ),
             Positioned(
-              right: -8,
-              bottom: -16,
+              right: -10,
+              bottom: -22,
               child: Image.asset(
                 _kWalletCompanionAsset,
-                height: 186,
+                height: 124,
                 fit: BoxFit.contain,
                 filterQuality: FilterQuality.medium,
               ),
@@ -67,19 +67,13 @@ class _WalletCompanionHero extends StatelessWidget {
 }
 
 class _WalletHeader extends StatelessWidget {
-  const _WalletHeader({
-    required this.title,
-    required this.subtitle,
-    required this.onRefresh,
-  });
+  const _WalletHeader({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
-  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final canPop = Navigator.of(context).canPop();
 
@@ -103,20 +97,14 @@ class _WalletHeader extends StatelessWidget {
                     )
                   else
                     const SizedBox(width: 48, height: 48),
-                  const Spacer(),
-                  IconButton.filledTonal(
-                    onPressed: onRefresh,
-                    icon: const Icon(Icons.refresh_rounded),
-                    tooltip: text.walletRefreshTooltip,
-                  ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
                 title,
                 style: TextStyle(
                   color: colors.textStrong,
-                  fontSize: 25,
+                  fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -154,7 +142,7 @@ class _WalletHeader extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: colors.textStrong,
-                      fontSize: 25,
+                      fontSize: 24,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -171,12 +159,6 @@ class _WalletHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            IconButton.filledTonal(
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh_rounded),
-              tooltip: text.walletRefreshTooltip,
-            ),
           ],
         );
       },
@@ -185,9 +167,10 @@ class _WalletHeader extends StatelessWidget {
 }
 
 class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.wallet});
+  const _BalanceCard({required this.wallet, required this.onRefresh});
 
   final WalletStateModel? wallet;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -221,13 +204,33 @@ class _BalanceCard extends StatelessWidget {
               final overview = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    text.walletBalanceEyebrow,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          text.walletBalanceEyebrow,
+                          style: TextStyle(
+                            color: colors.textSoft,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        onPressed: onRefresh,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        tooltip: text.walletRefreshTooltip,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 34,
+                          height: 34,
+                        ),
+                        style: IconButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   FittedBox(
@@ -259,30 +262,42 @@ class _BalanceCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    text.walletWhatYouCanCreateTitle,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+                  if (balance > 0) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      text.walletWhatYouCanCreateTitle,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _BalanceUsageChip(
-                        icon: Icons.photo_camera_outlined,
-                        label: text.walletApproxPhotos(photosApprox),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _BalanceUsageChip(
+                          icon: Icons.photo_camera_outlined,
+                          label: text.walletApproxPhotos(photosApprox),
+                        ),
+                        _BalanceUsageChip(
+                          icon: Icons.play_arrow_rounded,
+                          label: text.walletApproxVideos(videosApprox),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      text.walletInsufficientBalanceError,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
                       ),
-                      _BalanceUsageChip(
-                        icon: Icons.play_arrow_rounded,
-                        label: text.walletApproxVideos(videosApprox),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
               );
               final coin = const _BalanceCoinGlow();
@@ -453,10 +468,10 @@ class _RewardStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    const accent = Color(0xFF7E5CFF);
+    final accent = colors.accent;
 
     return ProfileGlassCard(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 360;
@@ -465,21 +480,24 @@ class _RewardStatusCard extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: accent.withValues(alpha: 0.34)),
-                  gradient: const LinearGradient(
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(color: accent.withValues(alpha: 0.26)),
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF2F2D84), Color(0xFF5F4CFF)],
+                    colors: [
+                      colors.surfaceStrong,
+                      colors.surfaceStrong.withValues(alpha: 0.92),
+                    ],
                   ),
                 ),
-                child: Icon(icon, color: Colors.white, size: 24),
+                child: Icon(icon, color: accent, size: 22),
               ),
               Positioned(
-                right: -8,
+                right: -10,
                 bottom: -4,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -488,12 +506,13 @@ class _RewardStatusCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    color: const Color(0xFF7F63FF),
+                    color: colors.surfaceStrong,
+                    border: Border.all(color: accent.withValues(alpha: 0.24)),
                   ),
                   child: Text(
                     '+$rewardAmount',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: accent,
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
                     ),
@@ -503,14 +522,15 @@ class _RewardStatusCard extends StatelessWidget {
             ],
           );
 
-          final actionButton = FilledButton.icon(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 36),
-              backgroundColor: colors.accent,
+          final actionButton = OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 34),
+              backgroundColor: colors.surfaceStrong.withValues(alpha: 0.35),
               disabledBackgroundColor: colors.surfaceStrong,
-              foregroundColor: Colors.white,
+              foregroundColor: colors.textStrong,
               disabledForegroundColor: colors.textMuted,
               padding: const EdgeInsets.symmetric(horizontal: 12),
+              side: BorderSide(color: colors.border.withValues(alpha: 0.84)),
               textStyle: const TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800,
@@ -545,7 +565,7 @@ class _RewardStatusCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: colors.textStrong,
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -556,7 +576,7 @@ class _RewardStatusCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: colors.textSoft,
-                          fontSize: 12,
+                          fontSize: 11.5,
                           height: 1.3,
                           fontWeight: FontWeight.w600,
                         ),
@@ -594,7 +614,7 @@ class _RewardStatusCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colors.textStrong,
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -605,7 +625,7 @@ class _RewardStatusCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colors.textSoft,
-                        fontSize: 12,
+                        fontSize: 11.5,
                         height: 1.3,
                         fontWeight: FontWeight.w600,
                       ),
@@ -623,7 +643,7 @@ class _RewardStatusCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              SizedBox(width: 156, child: actionButton),
+              SizedBox(width: 146, child: actionButton),
             ],
           );
         },

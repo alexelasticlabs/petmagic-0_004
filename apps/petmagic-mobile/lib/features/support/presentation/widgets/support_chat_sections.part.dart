@@ -56,9 +56,19 @@ class _SupportConversationViewport extends StatelessWidget {
         prompt: text.supportChatQuickActionRefund,
       ),
       _SupportQuickActionData(
+        icon: Icons.workspace_premium_rounded,
+        label: text.supportChatQuickActionSubscription,
+        prompt: text.supportChatQuickActionSubscription,
+      ),
+      _SupportQuickActionData(
+        icon: Icons.videocam_rounded,
+        label: text.supportChatQuickActionVideo,
+        prompt: text.supportChatQuickActionVideo,
+      ),
+      _SupportQuickActionData(
         icon: Icons.support_agent_rounded,
-        label: text.supportChatQuickActionHuman,
-        prompt: text.supportChatQuickActionHuman,
+        label: text.supportChatQuickActionTokens,
+        prompt: text.supportChatQuickActionTokens,
       ),
     ];
 
@@ -174,11 +184,16 @@ class _SupportConversationViewport extends StatelessWidget {
                       label: formatDayLabel(message.createdAtUtc),
                     ),
                   ),
-                _MessageBubble(
-                  message: message,
-                  onOpenImage: onOpenImage,
-                  onRetryAttachment: () => onRetryAttachment(message),
-                ),
+                if (_isSupportSystemMessage(message))
+                  _SupportSystemMessageCard(
+                    message: text.supportChatSystemNoticeBody,
+                  )
+                else
+                  _MessageBubble(
+                    message: message,
+                    onOpenImage: onOpenImage,
+                    onRetryAttachment: () => onRetryAttachment(message),
+                  ),
               ],
             ),
           );
@@ -196,9 +211,9 @@ class _SupportComposerPanel extends StatelessWidget {
     required this.pendingAttachment,
     required this.composerHasFocus,
     required this.composerCanSend,
+    required this.keyboardInset,
     required this.onRemovePendingAttachment,
     required this.onShowAttachmentOptions,
-    required this.onInsertEmoji,
     required this.onSendMessage,
   });
 
@@ -208,9 +223,9 @@ class _SupportComposerPanel extends StatelessWidget {
   final _PendingSupportAttachment? pendingAttachment;
   final bool composerHasFocus;
   final bool composerCanSend;
+  final double keyboardInset;
   final VoidCallback onRemovePendingAttachment;
   final VoidCallback onShowAttachmentOptions;
-  final VoidCallback onInsertEmoji;
   final Future<void> Function() onSendMessage;
 
   @override
@@ -218,13 +233,15 @@ class _SupportComposerPanel extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
+    final isKeyboardVisible = keyboardInset > 0;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, isKeyboardVisible ? 12 : 8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         constraints: const BoxConstraints(minHeight: 62),
-        padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
         decoration: BoxDecoration(
           color: colors.surfaceStrong.withValues(alpha: 0.94),
           borderRadius: BorderRadius.circular(30),
@@ -283,6 +300,7 @@ class _SupportComposerPanel extends StatelessWidget {
                       hintStyle: const TextStyle(
                         color: _supportComposerHintColor,
                         fontSize: 15.5,
+                        height: 1.3,
                         fontWeight: FontWeight.w400,
                       ),
                       border: InputBorder.none,
@@ -290,27 +308,13 @@ class _SupportComposerPanel extends StatelessWidget {
                       focusedBorder: InputBorder.none,
                       disabledBorder: InputBorder.none,
                       isDense: true,
-                      contentPadding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
+                      contentPadding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
                       filled: false,
                     ),
+                    textAlignVertical: TextAlignVertical.center,
                   ),
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  splashRadius: 18,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 36,
-                    height: 36,
-                  ),
-                  onPressed: state.isSending ? null : onInsertEmoji,
-                  icon: const Icon(
-                    Icons.sentiment_satisfied_alt_rounded,
-                    size: 23,
-                    color: _supportComposerIconColor,
-                  ),
-                ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 6),
                 AnimatedScale(
                   scale: composerCanSend ? 1 : 0.9,
                   duration: const Duration(milliseconds: 150),
@@ -322,10 +326,10 @@ class _SupportComposerPanel extends StatelessWidget {
                       opacity: composerCanSend || state.isSending ? 1 : 0.72,
                       child: Material(
                         color: state.isSending
-                            ? _supportComposerSendGreen.withValues(alpha: 0.92)
+                            ? _supportComposerSendGreen.withValues(alpha: 0.85)
                             : composerCanSend
                             ? _supportComposerSendGreen
-                            : _supportComposerSendGreen.withValues(alpha: 0.38),
+                            : _supportComposerSendGreen.withValues(alpha: 0.3),
                         shape: const CircleBorder(),
                         child: InkWell(
                           customBorder: const CircleBorder(),
@@ -333,8 +337,8 @@ class _SupportComposerPanel extends StatelessWidget {
                               ? null
                               : onSendMessage,
                           child: SizedBox(
-                            width: 50,
-                            height: 50,
+                            width: 42,
+                            height: 42,
                             child: Center(
                               child: state.isSending
                                   ? const SizedBox(
@@ -350,7 +354,7 @@ class _SupportComposerPanel extends StatelessWidget {
                                     )
                                   : const Icon(
                                       Icons.send_rounded,
-                                      size: 21,
+                                      size: 19,
                                       color: Colors.white,
                                     ),
                             ),
@@ -361,6 +365,62 @@ class _SupportComposerPanel extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 0, 8, 0),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _SupportComposerInfoChip(
+                    icon: Icons.photo_library_outlined,
+                    label: text.supportChatComposerAttachmentChip,
+                  ),
+                  _SupportComposerInfoChip(
+                    icon: Icons.schedule_rounded,
+                    label: text.supportChatComposerResponseChip,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportComposerInfoChip extends StatelessWidget {
+  const _SupportComposerInfoChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: colors.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: colors.textMuted,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),

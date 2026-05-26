@@ -2073,7 +2073,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileSettingsLinkedAccountsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Google, Apple and other providers will appear here.'**
+  /// **'Add sign-in methods so you do not lose access to your account.'**
   String get profileSettingsLinkedAccountsSubtitle;
 
   /// No description provided for @profileSettingsPasswordTitle.
@@ -2277,19 +2277,19 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsLinkedAccountsBody.
   ///
   /// In en, this message translates to:
-  /// **'Connected providers will appear here as soon as linking is enabled for your account.'**
+  /// **'Connect Google or Apple to keep access to your generations, purchases, and PawSpark on any device.'**
   String get profileDetailsLinkedAccountsBody;
 
   /// No description provided for @profileDetailsLinkedAccountsStatus.
   ///
   /// In en, this message translates to:
-  /// **'No external providers are linked yet. Email and password remain the active sign-in method for this profile.'**
+  /// **'Choose and connect convenient sign-in methods for your account.'**
   String get profileDetailsLinkedAccountsStatus;
 
   /// No description provided for @profileDetailsLinkedAccountsNext.
   ///
   /// In en, this message translates to:
-  /// **'Google, Apple and additional providers will be shown here after the backend linking flow is opened in the app.'**
+  /// **'Linked accounts help you:\n✓ recover access\n✓ sign in on a new device\n✓ keep purchases and PawSpark\n✓ protect your account'**
   String get profileDetailsLinkedAccountsNext;
 
   /// No description provided for @profileLinkedAccountsLoading.
@@ -2301,13 +2301,13 @@ abstract class AppLocalizations {
   /// No description provided for @profileLinkedAccountsConnectedStatus.
   ///
   /// In en, this message translates to:
-  /// **'Connected and ready for sign in.'**
+  /// **'Connected and ready to sign in.'**
   String get profileLinkedAccountsConnectedStatus;
 
   /// No description provided for @profileLinkedAccountsNotConnectedStatus.
   ///
   /// In en, this message translates to:
-  /// **'Not connected yet.'**
+  /// **'Not connected.'**
   String get profileLinkedAccountsNotConnectedStatus;
 
   /// No description provided for @profileLinkedAccountsConnectAction.
@@ -2325,7 +2325,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileLinkedAccountsProtectedHint.
   ///
   /// In en, this message translates to:
-  /// **'This provider cannot be removed until another sign-in method remains available.'**
+  /// **'This sign-in method cannot be removed until another method is connected.'**
   String get profileLinkedAccountsProtectedHint;
 
   /// No description provided for @profileLinkedAccountsSignInRequired.
@@ -2343,26 +2343,152 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsNotificationsBody.
   ///
   /// In en, this message translates to:
-  /// **'This section reflects your current communication preferences in the app.'**
+  /// **'Choose which notifications you want to receive in PetMagic.'**
   String get profileDetailsNotificationsBody;
 
   /// No description provided for @profileDetailsNotificationsStatusEnabled.
   ///
   /// In en, this message translates to:
-  /// **'Product updates and offers are enabled for this profile. Additional push controls will appear here later.'**
+  /// **'Notifications are enabled for this profile.'**
   String get profileDetailsNotificationsStatusEnabled;
 
   /// No description provided for @profileDetailsNotificationsStatusDisabled.
   ///
   /// In en, this message translates to:
-  /// **'Marketing emails are currently disabled for this profile. Additional push controls will appear here later.'**
+  /// **'Notifications are disabled for this profile.'**
   String get profileDetailsNotificationsStatusDisabled;
 
   /// No description provided for @profileDetailsNotificationsNext.
   ///
   /// In en, this message translates to:
-  /// **'You can already review the current email preference here. Dedicated push toggles will be added in a later product slice.'**
+  /// **'You can change push and email preferences at any time.'**
   String get profileDetailsNotificationsNext;
+
+  /// No description provided for @profileNotificationsLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading notification settings...'**
+  String get profileNotificationsLoading;
+
+  /// No description provided for @profileNotificationsPushSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications'**
+  String get profileNotificationsPushSection;
+
+  /// No description provided for @profileNotificationsPushPhotoReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo is ready'**
+  String get profileNotificationsPushPhotoReady;
+
+  /// No description provided for @profileNotificationsPushVideoReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Video is ready'**
+  String get profileNotificationsPushVideoReady;
+
+  /// No description provided for @profileNotificationsPushGenerationErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation errors'**
+  String get profileNotificationsPushGenerationErrors;
+
+  /// No description provided for @profileNotificationsPushReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders'**
+  String get profileNotificationsPushReminders;
+
+  /// No description provided for @profileNotificationsPushNewTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'New templates'**
+  String get profileNotificationsPushNewTemplates;
+
+  /// No description provided for @profileNotificationsPushPurchasesAndSubscriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases and subscriptions'**
+  String get profileNotificationsPushPurchasesAndSubscriptions;
+
+  /// No description provided for @profileNotificationsEmailSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get profileNotificationsEmailSection;
+
+  /// No description provided for @profileNotificationsEmailOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers and discounts'**
+  String get profileNotificationsEmailOffers;
+
+  /// No description provided for @profileNotificationsEmailNews.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic news'**
+  String get profileNotificationsEmailNews;
+
+  /// No description provided for @profileNotificationsEmailAccountAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Important account alerts'**
+  String get profileNotificationsEmailAccountAlerts;
+
+  /// No description provided for @profileNotificationsDeviceSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Device status'**
+  String get profileNotificationsDeviceSection;
+
+  /// No description provided for @profileNotificationsPushPermissionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Push permissions'**
+  String get profileNotificationsPushPermissionLabel;
+
+  /// No description provided for @profileNotificationsPushPermissionAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed'**
+  String get profileNotificationsPushPermissionAllowed;
+
+  /// No description provided for @profileNotificationsPushPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled in device settings'**
+  String get profileNotificationsPushPermissionDenied;
+
+  /// No description provided for @profileNotificationsPushPermissionNotDetermined.
+  ///
+  /// In en, this message translates to:
+  /// **'Not requested yet'**
+  String get profileNotificationsPushPermissionNotDetermined;
+
+  /// No description provided for @profileNotificationsPushPermissionProvisional.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed quietly'**
+  String get profileNotificationsPushPermissionProvisional;
+
+  /// No description provided for @profileNotificationsPushPermissionUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get profileNotificationsPushPermissionUnknown;
+
+  /// No description provided for @profileNotificationsRefreshStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh status'**
+  String get profileNotificationsRefreshStatus;
+
+  /// No description provided for @profileNotificationsRequestPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow push notifications'**
+  String get profileNotificationsRequestPermission;
 
   /// No description provided for @profileDetailsHelpBody.
   ///
@@ -2508,6 +2634,18 @@ abstract class AppLocalizations {
   /// **'Document'**
   String get profileLegalDocumentSection;
 
+  /// No description provided for @profileLegalDocumentInfoSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Document info'**
+  String get profileLegalDocumentInfoSection;
+
+  /// No description provided for @profileLegalOpenFullAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open full policy'**
+  String get profileLegalOpenFullAction;
+
   /// No description provided for @profileLegalCompactHint.
   ///
   /// In en, this message translates to:
@@ -2525,6 +2663,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap to expand'**
   String get profileLegalCompactSectionLabel;
+
+  /// No description provided for @profilePrivacyQuickDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What we collect'**
+  String get profilePrivacyQuickDataTitle;
+
+  /// No description provided for @profilePrivacyQuickDataBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Email\n• Profile name\n• Generation history\n• Uploaded pet photos\n• Purchase history\n• Support requests'**
+  String get profilePrivacyQuickDataBody;
+
+  /// No description provided for @profilePrivacyQuickUsageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why we use it'**
+  String get profilePrivacyQuickUsageTitle;
+
+  /// No description provided for @profilePrivacyQuickUsageBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Run app features\n• Generate content\n• Respond in support\n• Protect account and payments'**
+  String get profilePrivacyQuickUsageBody;
+
+  /// No description provided for @profilePrivacyQuickSharingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Do we share data?'**
+  String get profilePrivacyQuickSharingTitle;
+
+  /// No description provided for @profilePrivacyQuickSharingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We do not sell personal data. Data may be shared only with processors needed to operate the service (for example payments, cloud hosting, and analytics).'**
+  String get profilePrivacyQuickSharingBody;
+
+  /// No description provided for @profilePrivacyQuickRightsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rights'**
+  String get profilePrivacyQuickRightsTitle;
+
+  /// No description provided for @profilePrivacyQuickRightsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Request a copy of your data\n• Request account and data deletion\n• Withdraw consent where applicable'**
+  String get profilePrivacyQuickRightsBody;
 
   /// No description provided for @profileDetailsDeleteBody.
   ///
@@ -2645,6 +2831,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Talk to an operator'**
   String get supportChatQuickActionHuman;
+
+  /// No description provided for @supportChatQuickActionSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription issue'**
+  String get supportChatQuickActionSubscription;
+
+  /// No description provided for @supportChatQuickActionVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video generation issue'**
+  String get supportChatQuickActionVideo;
+
+  /// No description provided for @supportChatQuickActionTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens were not credited'**
+  String get supportChatQuickActionTokens;
 
   /// No description provided for @supportChatFaqTitle.
   ///
@@ -2825,6 +3029,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'File'**
   String get supportChatFileFallbackLabel;
+
+  /// No description provided for @supportChatSystemNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request sent'**
+  String get supportChatSystemNoticeTitle;
+
+  /// No description provided for @supportChatSystemNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We received your request and will reply soon. Average response time: up to 24 hours.'**
+  String get supportChatSystemNoticeBody;
+
+  /// No description provided for @supportChatComposerAttachmentChip.
+  ///
+  /// In en, this message translates to:
+  /// **'1 photo: JPG/PNG/WebP, up to 10 MB'**
+  String get supportChatComposerAttachmentChip;
+
+  /// No description provided for @supportChatComposerResponseChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Typical reply in a few hours'**
+  String get supportChatComposerResponseChip;
 
   /// No description provided for @profileSettingsThemeSystem.
   ///

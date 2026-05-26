@@ -7,12 +7,18 @@ class _RewardsBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final topGlowColor = colors.accent.withValues(alpha: 0.12);
+    final sideGlowColor = colors.blue.withValues(alpha: 0.07);
+    final pawColor = colors.accent.withValues(alpha: 0.12);
+    final sparkColor = colors.gold.withValues(alpha: 0.9);
+
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF030A14), Color(0xFF01060D)],
+          colors: [colors.backgroundTop, colors.backgroundBottom],
         ),
       ),
       child: Stack(
@@ -21,38 +27,32 @@ class _RewardsBackdrop extends StatelessWidget {
           Positioned(
             top: -88,
             right: -96,
-            child: _GlowOrb(
-              size: 220,
-              color: const Color(0xFF0EA86D).withValues(alpha: 0.13),
-            ),
+            child: _GlowOrb(size: 220, color: topGlowColor),
           ),
           Positioned(
             top: 120,
             left: -104,
-            child: _GlowOrb(
-              size: 180,
-              color: const Color(0xFF1E8CFF).withValues(alpha: 0.05),
-            ),
+            child: _GlowOrb(size: 180, color: sideGlowColor),
           ),
-          const Positioned(
+          Positioned(
             top: 44,
             right: 108,
-            child: _DecorativePaw(size: 36, opacity: 0.12, turns: -0.12),
+            child: _DecorativePaw(size: 36, color: pawColor, turns: -0.12),
           ),
-          const Positioned(
+          Positioned(
             top: 74,
             left: 154,
-            child: _DecorativePaw(size: 34, opacity: 0.1, turns: 0.1),
+            child: _DecorativePaw(size: 34, color: pawColor, turns: 0.1),
           ),
-          const Positioned(
+          Positioned(
             top: 112,
             right: 20,
-            child: _DecorativeSpark(size: 18),
+            child: _DecorativeSpark(size: 18, color: sparkColor),
           ),
-          const Positioned(
+          Positioned(
             top: 154,
             left: 196,
-            child: _DecorativeSpark(size: 14),
+            child: _DecorativeSpark(size: 14, color: sparkColor),
           ),
           child,
         ],
@@ -85,12 +85,12 @@ class _GlowOrb extends StatelessWidget {
 class _DecorativePaw extends StatelessWidget {
   const _DecorativePaw({
     required this.size,
-    required this.opacity,
+    required this.color,
     required this.turns,
   });
 
   final double size;
-  final double opacity;
+  final Color color;
   final double turns;
 
   @override
@@ -98,29 +98,22 @@ class _DecorativePaw extends StatelessWidget {
     return IgnorePointer(
       child: Transform.rotate(
         angle: turns,
-        child: Icon(
-          Icons.pets_rounded,
-          size: size,
-          color: const Color(0xFF38D77A).withValues(alpha: opacity),
-        ),
+        child: Icon(Icons.pets_rounded, size: size, color: color),
       ),
     );
   }
 }
 
 class _DecorativeSpark extends StatelessWidget {
-  const _DecorativeSpark({required this.size});
+  const _DecorativeSpark({required this.size, required this.color});
 
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: Icon(
-        Icons.auto_awesome_rounded,
-        size: size,
-        color: const Color(0xFFFFF0A6).withValues(alpha: 0.95),
-      ),
+      child: Icon(Icons.auto_awesome_rounded, size: size, color: color),
     );
   }
 }
@@ -174,7 +167,7 @@ class _RewardsHero extends StatelessWidget {
                               fontWeight: FontWeight.w900,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withValues(alpha: 0.4),
+                                  color: colors.shadow.withValues(alpha: 0.4),
                                   blurRadius: 12,
                                   offset: const Offset(0, 3),
                                 ),
@@ -249,6 +242,10 @@ class _HistoryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final buttonBackground = colors.surfaceGlass;
+    final buttonBorder = colors.border;
+    final accentColor = colors.accent;
 
     return Material(
       color: Colors.transparent,
@@ -259,12 +256,12 @@ class _HistoryButton extends StatelessWidget {
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF07111C).withValues(alpha: 0.66),
+            color: buttonBackground,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF243143)),
+            border: Border.all(color: buttonBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.16),
+                color: colors.shadow.withValues(alpha: 0.16),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
@@ -273,16 +270,16 @@ class _HistoryButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.history_toggle_off_rounded,
                 size: 17,
-                color: Color(0xFF38E681),
+                color: accentColor,
               ),
               const SizedBox(width: 8),
               Text(
                 text.rewardsHistoryTitle,
-                style: const TextStyle(
-                  color: Color(0xFF48E581),
+                style: TextStyle(
+                  color: accentColor,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
@@ -310,6 +307,14 @@ class _BalancePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final panelGradient = [
+      colors.accentSoft.withValues(alpha: 0.95),
+      colors.surfaceStrong.withValues(alpha: 0.98),
+      colors.surface.withValues(alpha: 0.98),
+    ];
+    final panelBorder = colors.accent.withValues(alpha: 0.26);
+    final panelGlow = colors.accent.withValues(alpha: 0.12);
+    final eyebrowColor = colors.accent;
 
     return Container(
       height: 98,
@@ -319,18 +324,12 @@ class _BalancePanel extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [
-            const Color(0xFF042E25).withValues(alpha: 0.95),
-            const Color(0xFF0C6A40).withValues(alpha: 0.68),
-            const Color(0xFF0A1A22).withValues(alpha: 0.88),
-          ],
+          colors: panelGradient,
         ),
-        border: Border.all(
-          color: const Color(0xFF136746).withValues(alpha: 0.7),
-        ),
+        border: Border.all(color: panelBorder),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0DD978).withValues(alpha: 0.18),
+            color: panelGlow,
             blurRadius: 34,
             offset: const Offset(0, 18),
           ),
@@ -343,8 +342,8 @@ class _BalancePanel extends StatelessWidget {
           Text(
             text.walletBalanceEyebrow,
             maxLines: 1,
-            style: const TextStyle(
-              color: Color(0xFF44E681),
+            style: TextStyle(
+              color: eyebrowColor,
               fontSize: 14,
               fontWeight: FontWeight.w900,
             ),
@@ -405,6 +404,8 @@ class _RewardsGlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(_radius),
       child: BackdropFilter(
@@ -418,17 +419,14 @@ class _RewardsGlassPanel extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF121D2C).withValues(alpha: 0.9),
-                    const Color(0xFF07101A).withValues(alpha: 0.92),
+                    colors.surfaceGlass,
+                    colors.surfaceStrong.withValues(alpha: 0.94),
                   ],
                 ),
-            border: Border.all(
-              color: borderColor ?? const Color(0xFF1D2B3C),
-              width: 1.1,
-            ),
+            border: Border.all(color: borderColor ?? colors.border, width: 1.1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: colors.shadow.withValues(alpha: 0.26),
                 blurRadius: 20,
                 offset: const Offset(0, 12),
               ),

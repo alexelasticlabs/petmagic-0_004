@@ -405,7 +405,7 @@ public sealed class SupportChatServiceTests
         Assert.Equal(2, detail.Value.Messages.Count);
         Assert.Equal("Necesito ayuda", detail.Value.Messages[0].Body);
         Assert.Equal(
-            "Mensaje entregado. Respondere en espanol porque la interfaz de la aplicacion usa ese idioma. El equipo de PetMagic ya recibio tu solicitud.",
+            "Mensaje recibido. Nuestro equipo de soporte ya recibio tu solicitud y respondera pronto.",
             detail.Value.Messages[1].Body);
         Assert.True(detail.Value.Messages[1].IsFromAdmin);
         Assert.True(detail.Value.Messages[1].IsRead);

@@ -377,8 +377,20 @@ class _TemplateDetailContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context);
     final colors = context.petMagicColors;
     final duration = template.referenceVideoDurationSeconds;
+    final title = _templateDisplayTitle(locale, template.title);
+    final description = _templateDisplayDescription(
+      locale,
+      template.shortDescription,
+      isVideo: template.isVideo,
+    );
+    final category = _templateDisplayCategory(locale, template.category);
+    final requirements = template.effectivePetPhotoRequirements
+        .map((item) => _templateDisplayRequirement(locale, item))
+        .take(4)
+        .toList(growable: false);
 
     return CustomScrollView(
       controller: scrollController,
@@ -416,7 +428,16 @@ class _TemplateDetailContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  template.title,
+                  _templateHeroTitle(locale, isVideo: template.isVideo),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colors.accent,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: colors.textStrong,
                     fontSize: 22,
@@ -426,7 +447,7 @@ class _TemplateDetailContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  template.shortDescription,
+                  description,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: colors.textSoft,
                     height: 1.45,
@@ -453,7 +474,7 @@ class _TemplateDetailContent extends StatelessWidget {
                     ),
                     _Pill(
                       icon: Icons.category_rounded,
-                      label: template.category,
+                      label: category,
                       color: colors.blue,
                     ),
                     if (template.isVideo && duration != null)
@@ -464,27 +485,95 @@ class _TemplateDetailContent extends StatelessWidget {
                       ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                Text(
+                  _templateCostContext(locale, template.tokenCost),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.textMuted,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.surfaceStrong.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: colors.border.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 11,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.timer_rounded, color: colors.blue, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _templateEtaText(locale, isVideo: template.isVideo),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: colors.textSoft,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 22),
                 Text(
-                  text.templateFlowBestPhotoTitle,
+                  _templateBestResultTitle(locale),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: colors.textStrong,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 10),
-                for (final requirement
-                    in template.effectivePetPhotoRequirements.take(4))
+                for (final requirement in requirements)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: _RequirementRow(label: requirement),
                   ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: colors.gold,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _templateQualityWarning(locale),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.textMuted,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () =>
                       Navigator.of(context).pop(TemplateDetailAction.upload),
                   icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: Text(text.templateFlowUploadPetPhotoAction),
+                  label: Text(
+                    _templateUploadActionLabel(
+                      locale,
+                      isVideo: template.isVideo,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -793,7 +882,14 @@ class _TemplateNetworkMedia extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final asset = template.previewAsset;
     if (asset == null || asset.url.isEmpty) {
-      return _EmptyMediaBox(label: text.templateFlowPreviewFallback);
+      return _TemplatePreviewPlaceholder(
+        isVideo: template.isVideo,
+        title: _templatePreviewMissingTitle(Localizations.localeOf(context)),
+        subtitle: _templatePreviewMissingSubtitle(
+          Localizations.localeOf(context),
+          isVideo: template.isVideo,
+        ),
+      );
     }
 
     if (template.isVideo && isVideoPreview(asset)) {
@@ -805,8 +901,14 @@ class _TemplateNetworkMedia extends StatelessWidget {
       fit: BoxFit.cover,
       placeholder: (context, url) =>
           _EmptyMediaBox(label: text.templateFlowLoadingPreview),
-      errorWidget: (context, url, error) =>
-          _EmptyMediaBox(label: text.templateFlowPreviewUnavailable),
+      errorWidget: (context, url, error) => _TemplatePreviewPlaceholder(
+        isVideo: template.isVideo,
+        title: _templatePreviewMissingTitle(Localizations.localeOf(context)),
+        subtitle: _templatePreviewMissingSubtitle(
+          Localizations.localeOf(context),
+          isVideo: template.isVideo,
+        ),
+      ),
     );
   }
 }
@@ -822,6 +924,7 @@ class _NetworkVideoPreview extends StatefulWidget {
 
 class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
   VideoPlayerController? _controller;
+  bool _failedToLoad = false;
 
   @override
   void initState() {
@@ -846,6 +949,7 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
   }
 
   Future<void> _initialize() async {
+    setState(() => _failedToLoad = false);
     final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _controller = controller;
     controller.setVolume(0);
@@ -861,17 +965,30 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
     } catch (_) {
       await controller.dispose();
       if (mounted) {
-        setState(() => _controller = null);
+        setState(() {
+          _controller = null;
+          _failedToLoad = true;
+        });
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
     final controller = _controller;
+    final locale = Localizations.localeOf(context);
+    if (_failedToLoad) {
+      return _TemplatePreviewPlaceholder(
+        isVideo: true,
+        title: _templatePreviewMissingTitle(locale),
+        subtitle: _templatePreviewMissingSubtitle(locale, isVideo: true),
+      );
+    }
+
     if (controller == null || !controller.value.isInitialized) {
-      return _EmptyMediaBox(label: text.templateFlowLoadingVideo);
+      return _EmptyMediaBox(
+        label: _isRussian(locale) ? 'Загружаем видео...' : 'Loading video...',
+      );
     }
 
     return Stack(
@@ -1102,6 +1219,69 @@ class _EmptyMediaBox extends StatelessWidget {
   }
 }
 
+class _TemplatePreviewPlaceholder extends StatelessWidget {
+  const _TemplatePreviewPlaceholder({
+    required this.isVideo,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final bool isVideo;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surfaceStrong.withValues(alpha: 0.96),
+            colors.surfaceGlass.withValues(alpha: 0.9),
+          ],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isVideo ? Icons.movie_creation_outlined : Icons.pets_rounded,
+                size: 38,
+                color: colors.accent,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.textMuted,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
   if (isFailed) {
     return 1;
@@ -1145,4 +1325,151 @@ String _generationErrorText(AppLocalizations text, String raw) {
   }
 
   return raw;
+}
+
+bool _isRussian(Locale locale) => locale.languageCode.toLowerCase() == 'ru';
+
+String _templateHeroTitle(Locale locale, {required bool isVideo}) {
+  if (_isRussian(locale)) {
+    return isVideo
+        ? '🐾 Оживите любимца в памятном ролике'
+        : '✨ Превратите питомца в милый портрет';
+  }
+
+  return isVideo
+      ? '🐾 Turn your pet into a memorable video'
+      : '✨ Turn your pet into an adorable portrait';
+}
+
+String _templateDisplayTitle(Locale locale, String rawTitle) {
+  final normalized = rawTitle.trim();
+  if (normalized.isEmpty || _isTechnicalTemplateText(normalized)) {
+    return _isRussian(locale) ? 'Портрет питомца' : 'Pet portrait';
+  }
+
+  return normalized;
+}
+
+String _templateDisplayDescription(
+  Locale locale,
+  String rawDescription, {
+  required bool isVideo,
+}) {
+  final normalized = rawDescription.trim();
+  if (normalized.isEmpty || _isTechnicalTemplateText(normalized)) {
+    if (_isRussian(locale)) {
+      return isVideo
+          ? 'Создайте короткое эмоциональное видео с вашим питомцем и поделитесь им с близкими.'
+          : 'Создайте тёплое памятное фото вашего любимца в стиле PetMagic.';
+    }
+
+    return isVideo
+        ? 'Create a short emotional video with your pet and share it with your loved ones.'
+        : 'Create a warm memorable portrait of your pet in PetMagic style.';
+  }
+
+  return normalized;
+}
+
+String _templateDisplayCategory(Locale locale, String rawCategory) {
+  final normalized = rawCategory.trim();
+  if (normalized.isEmpty) {
+    return _isRussian(locale) ? 'Шаблон' : 'Template';
+  }
+
+  if (_isRussian(locale)) {
+    final lower = normalized.toLowerCase();
+    if (lower == 'portrait') return 'Портрет';
+    if (lower == 'video') return 'Видео';
+  }
+
+  return normalized;
+}
+
+String _templateDisplayRequirement(Locale locale, String raw) {
+  final normalized = raw.trim();
+  if (!_isRussian(locale)) {
+    return normalized;
+  }
+
+  final lower = normalized.toLowerCase();
+  if (lower == 'one pet in the photo') return 'Один питомец в кадре';
+  if (lower == 'clear face') return 'Хорошо видно морду';
+  if (lower == 'good lighting') return 'Хорошее освещение';
+  if (lower == 'full body visible') return 'Питомец полностью в кадре';
+  if (lower == 'pet facing camera') return 'Питомец смотрит в камеру';
+  if (lower == 'no cropped head or legs') {
+    return 'Голова и лапы не обрезаны';
+  }
+
+  return normalized;
+}
+
+String _templateBestResultTitle(Locale locale) {
+  return _isRussian(locale)
+      ? 'Для лучшего результата:'
+      : 'For the best result:';
+}
+
+String _templateQualityWarning(Locale locale) {
+  return _isRussian(locale)
+      ? 'Результат зависит от качества фотографии.'
+      : 'Result quality depends on your photo quality.';
+}
+
+String _templateCostContext(Locale locale, int tokenCost) {
+  if (_isRussian(locale)) {
+    return 'Стоимость: $tokenCost PawSpark. Перед запуском проверим баланс и предложим пополнение, если токенов не хватит.';
+  }
+
+  return 'Cost: $tokenCost PawSpark. We will check your balance before start and suggest a top-up if needed.';
+}
+
+String _templateEtaText(Locale locale, {required bool isVideo}) {
+  if (_isRussian(locale)) {
+    return isVideo
+        ? 'Обычно готово за: 2–5 минут'
+        : 'Обычно готово за: 30–60 секунд';
+  }
+
+  return isVideo
+      ? 'Usually ready in: 2-5 minutes'
+      : 'Usually ready in: 30-60 seconds';
+}
+
+String _templateUploadActionLabel(Locale locale, {required bool isVideo}) {
+  if (_isRussian(locale)) {
+    return isVideo
+        ? 'Загрузить фото питомца для видео'
+        : 'Загрузить фото питомца';
+  }
+
+  return isVideo ? 'Upload pet photo for video' : 'Upload a pet photo';
+}
+
+String _templatePreviewMissingTitle(Locale locale) {
+  return _isRussian(locale)
+      ? '📷 Превью скоро появится'
+      : '🐾 Preview coming soon';
+}
+
+String _templatePreviewMissingSubtitle(Locale locale, {required bool isVideo}) {
+  if (_isRussian(locale)) {
+    return isVideo
+        ? 'Этот шаблон уже доступен для генерации. Загрузите фото питомца и попробуйте.'
+        : 'Шаблон уже доступен для генерации. Загрузите фото питомца и попробуйте.';
+  }
+
+  return isVideo
+      ? 'This template is already available. Upload your pet photo and try it now.'
+      : 'This template is already available for generation. Upload your pet photo and try it.';
+}
+
+bool _isTechnicalTemplateText(String text) {
+  final lower = text.toLowerCase();
+  return lower.contains('placeholder') ||
+      lower.contains('admin') ||
+      lower.contains('public catalog') ||
+      lower.contains('catalog flows') ||
+      lower.contains('template card');
 }

@@ -70,6 +70,13 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final promoForeground = Theme.of(context).colorScheme.onPrimary;
+    final promoHeaderGradient = LinearGradient(
+      colors: [
+        colors.gold.withValues(alpha: 0.7),
+        colors.accent.withValues(alpha: 0.9),
+      ],
+    );
 
     return _RewardsGlassPanel(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -87,9 +94,7 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
               children: [
                 _SectionHeader(
                   icon: Icons.confirmation_number_rounded,
-                  iconGradient: const LinearGradient(
-                    colors: [Color(0xFFDDFB72), Color(0xFF49C667)],
-                  ),
+                  iconGradient: promoHeaderGradient,
                   title: text.rewardsPromoTitle,
                   subtitle: text.rewardsPromoSubtitle,
                   iconBoxSize: 42,
@@ -131,10 +136,10 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                         key: const Key('rewards_promo_submit'),
                         onPressed: widget.isSubmitting ? null : _submit,
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF49DA87),
-                          foregroundColor: const Color(0xFF06140C),
-                          disabledBackgroundColor: const Color(0xFF314036),
-                          disabledForegroundColor: const Color(0xFF7F8EA0),
+                          backgroundColor: colors.accent,
+                          foregroundColor: promoForeground,
+                          disabledBackgroundColor: colors.border,
+                          disabledForegroundColor: colors.textMuted,
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(13),
@@ -145,13 +150,13 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                           ),
                         ),
                         child: widget.isSubmitting
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator.adaptive(
                                   strokeWidth: 2.2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF06140C),
+                                    promoForeground,
                                   ),
                                 ),
                               )
@@ -244,6 +249,17 @@ class _ReferralCardState extends State<_ReferralCard> {
     final rewards = widget.rewards;
     final hasRewards = rewards != null;
     final bonus = rewards?.referralBonusSpark ?? 15;
+    final colors = context.petMagicColors;
+    final cardBorder = colors.accent.withValues(alpha: 0.32);
+    final cardGradient = [
+      colors.accentSoft.withValues(alpha: 0.92),
+      colors.surfaceStrong.withValues(alpha: 0.98),
+      colors.surface.withValues(alpha: 0.98),
+    ];
+    final shareIconGradient = [
+      colors.accent.withValues(alpha: 0.26),
+      colors.accent.withValues(alpha: 0.14),
+    ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -257,15 +273,11 @@ class _ReferralCardState extends State<_ReferralCard> {
           children: [
             _RewardsGlassPanel(
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-              borderColor: const Color(0xFF0C6E4D).withValues(alpha: 0.78),
+              borderColor: cardBorder,
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF062D24).withValues(alpha: 0.96),
-                  const Color(0xFF092B22).withValues(alpha: 0.88),
-                  const Color(0xFF061018).withValues(alpha: 0.94),
-                ],
+                colors: cardGradient,
               ),
               child: Material(
                 color: Colors.transparent,
@@ -276,9 +288,7 @@ class _ReferralCardState extends State<_ReferralCard> {
                       width: textWidth,
                       child: _SectionHeader(
                         icon: Icons.group_rounded,
-                        iconGradient: const LinearGradient(
-                          colors: [Color(0xFF46E58B), Color(0xFF11753D)],
-                        ),
+                        iconGradient: LinearGradient(colors: shareIconGradient),
                         title: text.rewardsReferralTitle,
                         subtitle: null,
                         iconBoxSize: 48,
@@ -303,8 +313,8 @@ class _ReferralCardState extends State<_ReferralCard> {
                       const SizedBox(height: 6),
                       Text(
                         text.rewardsReferralCopiedMessage,
-                        style: const TextStyle(
-                          color: Color(0xFF44E681),
+                        style: TextStyle(
+                          color: colors.accent,
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,
                         ),
@@ -364,10 +374,7 @@ class _ReferralInviteText extends StatelessWidget {
           TextSpan(text: '${text.rewardsReferralInvitePrefix} '),
           TextSpan(
             text: '+$bonus ${text.walletBalanceUnit}',
-            style: const TextStyle(
-              color: Color(0xFF48E581),
-              fontWeight: FontWeight.w900,
-            ),
+            style: TextStyle(color: colors.accent, fontWeight: FontWeight.w900),
           ),
           TextSpan(text: ' ${text.rewardsReferralInviteSuffix}'),
         ],
@@ -404,14 +411,12 @@ class _ReferralCodeBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF031116).withValues(alpha: 0.92),
+        color: colors.surface.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: const Color(0xFF12382F).withValues(alpha: 0.9),
-        ),
+        border: Border.all(color: colors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.32),
+            color: colors.shadow.withValues(alpha: 0.28),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -517,8 +522,8 @@ class _ReferralInfoNote extends StatelessWidget {
                   ),
                   child: Text(
                     text.rewardsReferralHowItWorksAction,
-                    style: const TextStyle(
-                      color: Color(0xFF44E681),
+                    style: TextStyle(
+                      color: colors.accent,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w900,
                     ),
@@ -636,17 +641,28 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final cardBorder = colors.purple.withValues(alpha: 0.26);
+    final cardGradient = [
+      colors.surface,
+      colors.surfaceStrong.withValues(alpha: 0.96),
+    ];
+    final iconGradient = [
+      colors.purple.withValues(alpha: 0.24),
+      colors.purple.withValues(alpha: 0.12),
+    ];
+    final iconColor = colors.purple;
+    final actionGradient = [
+      colors.purple.withValues(alpha: 0.8),
+      colors.purple.withValues(alpha: 0.62),
+    ];
 
     return _RewardsGlassPanel(
       padding: const EdgeInsets.all(16),
-      borderColor: const Color(0xFF3B3264).withValues(alpha: 0.86),
+      borderColor: cardBorder,
       gradient: LinearGradient(
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
-        colors: [
-          const Color(0xFF15182B).withValues(alpha: 0.96),
-          const Color(0xFF101421).withValues(alpha: 0.96),
-        ],
+        colors: cardGradient,
       ),
       child: Material(
         color: Colors.transparent,
@@ -665,22 +681,18 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                       height: 46,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF5B347C), Color(0xFF2B1F54)],
-                        ),
+                        gradient: LinearGradient(colors: iconGradient),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(
-                              0xFFA855F7,
-                            ).withValues(alpha: 0.17),
+                            color: colors.purple.withValues(alpha: 0.17),
                             blurRadius: 14,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.group_add_rounded,
-                        color: Color(0xFFEBD6FF),
+                        color: iconColor,
                         size: 22,
                       ),
                     ),
@@ -717,9 +729,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                         width: 168,
                         height: 48,
                         label: text.rewardsReferralUseFriendCodeAction,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
-                        ),
+                        gradient: LinearGradient(colors: actionGradient),
                         onPressed: _openFriendCodeInput,
                       ),
                     ],
@@ -731,9 +741,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                     key: const Key('rewards_referral_show_input'),
                     height: 48,
                     label: text.rewardsReferralUseFriendCodeAction,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
-                    ),
+                    gradient: LinearGradient(colors: actionGradient),
                     onPressed: _openFriendCodeInput,
                   ),
                 ],
@@ -764,9 +772,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                     height: 48,
                     label: text.rewardsReferralActivateAction,
                     isLoading: widget.isSubmitting,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFA867F2), Color(0xFF7440B9)],
-                    ),
+                    gradient: LinearGradient(colors: actionGradient),
                     icon: Icons.check_circle_outline_rounded,
                     onPressed: widget.isSubmitting ? null : _submit,
                   ),

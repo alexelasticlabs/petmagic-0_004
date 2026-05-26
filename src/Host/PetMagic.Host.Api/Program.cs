@@ -158,6 +158,7 @@ builder.Services
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddRuntimeInstrumentation()
+        .AddMeter("PetMagic.Modules.Economy")
         .AddOtlpExporter());
 
 var app = builder.Build();

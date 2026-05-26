@@ -36,13 +36,13 @@ class _SectionHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(15),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF2BE66C).withValues(alpha: 0.18),
+                color: colors.accent.withValues(alpha: 0.18),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: Icon(icon, color: const Color(0xFF042013), size: iconSize),
+          child: Icon(icon, color: colors.textStrong, size: iconSize),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -86,15 +86,14 @@ class _ReferralStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: const Color(0xFF071915).withValues(alpha: 0.48),
+        color: colors.surfaceStrong.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF174439).withValues(alpha: 0.62),
-        ),
+        border: Border.all(color: colors.border),
       ),
       child: Row(
         children: [
@@ -110,7 +109,7 @@ class _ReferralStats extends StatelessWidget {
           Expanded(
             child: _MetricStat(
               icon: Icons.group_rounded,
-              iconColor: const Color(0xFF48E581),
+              iconColor: colors.accent,
               label: text.rewardsReferralFriendsLabel,
               value: '${rewards?.referredUsersCount ?? 0}',
             ),
@@ -119,7 +118,7 @@ class _ReferralStats extends StatelessWidget {
           Expanded(
             child: _MetricStat(
               icon: Icons.shopping_bag_rounded,
-              iconColor: const Color(0xFFFFD35B),
+              iconColor: colors.gold,
               label: text.rewardsReferralBonusLabel,
               value: '${rewards?.rewardedReferredUsersCount ?? 0}',
             ),
@@ -221,11 +220,13 @@ class _MetricDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
     return Container(
       width: 1,
       height: 30,
       margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: const Color(0xFF7FE6B6).withValues(alpha: 0.22),
+      color: colors.border,
     );
   }
 }
@@ -236,9 +237,7 @@ class _GradientActionButton extends StatelessWidget {
     required this.onPressed,
     this.icon,
     this.isLoading = false,
-    this.gradient = const LinearGradient(
-      colors: [Color(0xFF49DA87), Color(0xFF3ECE76)],
-    ),
+    this.gradient,
     this.width,
     this.height = 50,
     super.key,
@@ -248,12 +247,22 @@ class _GradientActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool isLoading;
-  final Gradient gradient;
+  final Gradient? gradient;
   final double? width;
   final double height;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final foreground = Theme.of(context).colorScheme.onPrimary;
+    final enabledGradient =
+        gradient ??
+        LinearGradient(
+          colors: [
+            colors.accent.withValues(alpha: 0.95),
+            colors.accent.withValues(alpha: 0.78),
+          ],
+        );
     final enabled = onPressed != null;
 
     return SizedBox(
@@ -268,17 +277,17 @@ class _GradientActionButton extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
               gradient: enabled
-                  ? gradient
+                  ? enabledGradient
                   : LinearGradient(
                       colors: [
-                        const Color(0xFF314036).withValues(alpha: 0.8),
-                        const Color(0xFF243328).withValues(alpha: 0.8),
+                        colors.surfaceStrong.withValues(alpha: 0.9),
+                        colors.surface.withValues(alpha: 0.9),
                       ],
                     ),
               boxShadow: enabled
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF37DF78).withValues(alpha: 0.24),
+                        color: colors.accent.withValues(alpha: 0.24),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -289,14 +298,12 @@ class _GradientActionButton extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: isLoading
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator.adaptive(
                           strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Color(0xFF06140C),
-                          ),
+                          valueColor: AlwaysStoppedAnimation<Color>(foreground),
                         ),
                       )
                     : Row(
@@ -304,11 +311,7 @@ class _GradientActionButton extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (icon != null) ...[
-                            Icon(
-                              icon,
-                              color: const Color(0xFF06140C),
-                              size: 20,
-                            ),
+                            Icon(icon, color: foreground, size: 20),
                             const SizedBox(width: 8),
                           ],
                           Flexible(
@@ -317,8 +320,8 @@ class _GradientActionButton extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Color(0xFF06140C),
+                              style: TextStyle(
+                                color: foreground,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -411,7 +414,7 @@ InputDecoration _fieldDecoration(
     labelText: labelText,
     hintText: hintText,
     filled: true,
-    fillColor: const Color(0xFF0A1522).withValues(alpha: 0.82),
+    fillColor: colors.surfaceGlass,
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
     prefixIcon: icon == null
@@ -429,19 +432,15 @@ InputDecoration _fieldDecoration(
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(13),
-      borderSide: BorderSide(
-        color: const Color(0xFF253549).withValues(alpha: 0.95),
-      ),
+      borderSide: BorderSide(color: colors.border),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(13),
-      borderSide: const BorderSide(color: Color(0xFF47DF82), width: 1.4),
+      borderSide: BorderSide(color: colors.accent, width: 1.4),
     ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(13),
-      borderSide: BorderSide(
-        color: const Color(0xFF253549).withValues(alpha: 0.95),
-      ),
+      borderSide: BorderSide(color: colors.border),
     ),
   );
 }
@@ -449,7 +448,7 @@ InputDecoration _fieldDecoration(
 Color _feedbackToneColor(_FeedbackTone tone, PetMagicColors colors) {
   return switch (tone) {
     _FeedbackTone.success => colors.accent,
-    _FeedbackTone.warning => const Color(0xFFD7A44A),
+    _FeedbackTone.warning => colors.gold,
     _FeedbackTone.info => colors.blue,
   };
 }

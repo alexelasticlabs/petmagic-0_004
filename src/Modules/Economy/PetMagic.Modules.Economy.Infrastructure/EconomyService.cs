@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics.Metrics;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,13 @@ public sealed partial class EconomyService(
     IIdentityService? identityService = null,
     ILogger<EconomyService>? logger = null) : IEconomyService
 {
+    private static readonly Meter EconomyMeter = new("PetMagic.Modules.Economy");
+
+    private static readonly Counter<long> EmptyCheckoutUrlCounter = EconomyMeter.CreateCounter<long>(
+        "petmagic.economy.checkout.empty_url.total",
+        unit: "{event}",
+        description: "Number of wallet top-up checkout creation responses with empty checkout URL.");
+
     private readonly EconomyAdminConfigurationService _adminConfigurationService =
         new(dbContext, options);
 

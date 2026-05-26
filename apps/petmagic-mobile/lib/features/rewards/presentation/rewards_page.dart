@@ -29,8 +29,6 @@ class RewardsPage extends ConsumerStatefulWidget {
 }
 
 class _RewardsPageState extends ConsumerState<RewardsPage> {
-  static const _warningTone = Color(0xFFD7A44A);
-
   Future<void> _showReferralHowItWorksSheet(int bonusSpark) async {
     final text = AppLocalizations.of(context);
 
@@ -48,13 +46,13 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: const Color(0xFF1D2B3C), width: 1.1),
+                border: Border.all(color: colors.border, width: 1.1),
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF121D2C).withValues(alpha: 0.96),
-                    const Color(0xFF07101A).withValues(alpha: 0.98),
+                    colors.surface,
+                    colors.surfaceStrong.withValues(alpha: 0.97),
                   ],
                 ),
               ),
@@ -142,16 +140,13 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: const Color(0xFF1D2B3C),
-                    width: 1.1,
-                  ),
+                  border: Border.all(color: colors.border, width: 1.1),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFF121D2C).withValues(alpha: 0.96),
-                      const Color(0xFF07101A).withValues(alpha: 0.98),
+                      colors.surface,
+                      colors.surfaceStrong.withValues(alpha: 0.97),
                     ],
                   ),
                 ),
@@ -163,7 +158,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                       width: 38,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF31465D),
+                        color: colors.textMuted.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -213,8 +208,8 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                                 final item = items[index];
                                 final positive = item.delta >= 0;
                                 final tone = positive
-                                    ? const Color(0xFF49DA87)
-                                    : const Color(0xFF7EA4D1);
+                                    ? colors.accent
+                                    : colors.blue;
                                 final date = item.createdAtUtc?.toLocal();
 
                                 return DecoratedBox(
@@ -365,7 +360,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                       const SizedBox(height: 16),
                       _WarningBanner(
                         message: warningMessage,
-                        tone: _warningTone,
+                        tone: colors.gold,
                       ),
                     ],
                     const SizedBox(height: 16),

@@ -294,7 +294,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal(2, conversation.Messages.Count);
         Assert.Equal("Bonjour", conversation.Messages[0].Body);
         Assert.Equal(
-            "Message livre. Je repondrai en francais, car l'interface de l'application utilise cette langue. L'equipe PetMagic a deja recu votre demande.",
+            "Message recu. Notre equipe de support a bien recu votre demande et vous repondra bientot.",
             conversation.Messages[1].Body);
         Assert.True(conversation.Messages[1].IsFromAdmin);
         Assert.True(conversation.Messages[1].IsRead);

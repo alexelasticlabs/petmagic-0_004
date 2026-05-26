@@ -10,7 +10,6 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_pack_selection.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
@@ -32,8 +31,6 @@ class WalletPage extends ConsumerStatefulWidget {
 class _WalletPageState extends ConsumerState<WalletPage>
     with WidgetsBindingObserver {
   bool _shouldReloadOnResume = false;
-
-  static const _warningTone = Color(0xFFD7A44A);
 
   @override
   void initState() {
@@ -75,17 +72,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
               kPetMagicBottomContentInsetCompact;
     final checkoutStatusMessage = _checkoutStatusMessage(text, state);
 
-    ref.listen(walletControllerProvider, (previous, next) {
-      final checkoutUrl = next.checkoutUrl;
-      if (checkoutUrl == null || checkoutUrl.isEmpty) {
-        return;
-      }
-
-      controller.resetCheckoutVerification();
-      controller.consumeCheckoutUrl();
-      _openCheckout(checkoutUrl);
-    });
-
     return ProfileScreenBackground(
       child: SafeArea(
         child: state.isInitialLoading
@@ -100,7 +86,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
                     _WalletHeader(
                       title: text.walletPageTitle,
                       subtitle: text.walletPageSubtitle,
-                      onRefresh: () => controller.load(refresh: true),
                     ),
                     if (state.checkoutVerificationState ==
                         WalletCheckoutVerificationState.checking) ...[
@@ -119,7 +104,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         tone:
                             state.checkoutVerificationState ==
                                 WalletCheckoutVerificationState.error
-                            ? _warningTone
+                            ? colors.gold
                             : colors.accent,
                       ),
                     ],
@@ -135,23 +120,18 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       ),
                     ] else ...[
                       if (state.errorMessage != null) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         ProfileMessageCard(
                           message: _friendlyError(text, state.errorMessage!),
-                          tone: _warningTone,
+                          tone: colors.gold,
                         ),
                       ],
-                      const SizedBox(height: 14),
-                      const _WalletCompanionHero(),
-                      const SizedBox(height: 20),
-                      _BalanceCard(wallet: state.wallet),
-                      const SizedBox(height: 18),
-                      _RewardsOverviewCard(
+                      const SizedBox(height: 12),
+                      _BalanceCard(
                         wallet: state.wallet,
-                        isClaimingAd: state.isClaimingAd,
-                        onClaimAd: controller.claimAdReward,
+                        onRefresh: () => controller.load(refresh: true),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
                       _PacksSection(
                         packs: state.packs,
                         isBuying: state.isBuying,
@@ -160,19 +140,33 @@ class _WalletPageState extends ConsumerState<WalletPage>
                           pack,
                           isBuying: state.isBuying,
                           onBuy: () => controller.buyPack(pack),
+                          onCheckoutReady: (checkoutUrl) async {
+                            controller.resetCheckoutVerification();
+                            controller.consumeCheckoutUrl();
+                            await _openCheckout(checkoutUrl);
+                          },
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
+                      _RewardsOverviewCard(
+                        wallet: state.wallet,
+                        isClaimingAd: state.isClaimingAd,
+                        onClaimAd: controller.claimAdReward,
+                      ),
+                      const SizedBox(height: 12),
                       _LedgerSection(
                         items: state.ledger,
                         onViewAll: () =>
                             context.pushNamed(AllTransactionsPage.routeName),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
                       _PurchasesSection(
                         items: state.purchases,
                         highlightedOrderId: state.highlightedPurchaseOrderId,
                       ),
+                      if (state.purchases.isNotEmpty)
+                        const SizedBox(height: 12),
+                      const _WalletCompanionHero(),
                     ],
                   ],
                 ),
@@ -182,17 +176,74 @@ class _WalletPageState extends ConsumerState<WalletPage>
   }
 
   Future<void> _openCheckout(String checkoutUrl) async {
-    final uri = Uri.tryParse(checkoutUrl);
+    final text = AppLocalizations.of(context);
+    final uri = _checkoutUri(checkoutUrl);
     if (uri == null) {
+      debugPrint('PETMAGIC_WALLET_CHECKOUT invalid_url="$checkoutUrl"');
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
+      );
       return;
     }
 
+    debugPrint('PETMAGIC_WALLET_CHECKOUT opening uri="$uri"');
     _shouldReloadOnResume = true;
-    final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    var launched = false;
+    try {
+      launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      debugPrint(
+        'PETMAGIC_WALLET_CHECKOUT in_app_browser_view launched=$launched',
+      );
+    } catch (_) {
+      debugPrint('PETMAGIC_WALLET_CHECKOUT in_app_browser_view threw');
+      launched = false;
+    }
+
     if (!launched) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        debugPrint(
+          'PETMAGIC_WALLET_CHECKOUT external_application launched=$launched',
+        );
+      } catch (_) {
+        debugPrint('PETMAGIC_WALLET_CHECKOUT external_application threw');
+        launched = false;
+      }
+    }
+
+    if (!launched && mounted) {
+      debugPrint('PETMAGIC_WALLET_CHECKOUT failed_to_launch');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
+      );
     }
   }
+}
+
+Uri? _checkoutUri(String rawUrl) {
+  final value = rawUrl.trim();
+  if (value.isEmpty) {
+    return null;
+  }
+
+  final parsed = Uri.tryParse(value);
+  if (parsed == null) {
+    return null;
+  }
+
+  if (parsed.hasScheme) {
+    return parsed;
+  }
+
+  if (parsed.hasAuthority) {
+    return parsed.replace(scheme: 'https');
+  }
+
+  return null;
 }
 
 Future<void> _showPackDetailSheet(
@@ -200,6 +251,7 @@ Future<void> _showPackDetailSheet(
   CurrencyPackModel pack, {
   required bool isBuying,
   required Future<String?> Function() onBuy,
+  required Future<void> Function(String checkoutUrl) onCheckoutReady,
 }) async {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
@@ -334,8 +386,17 @@ Future<void> _showPackDetailSheet(
                 onPressed: isBuying
                     ? null
                     : () async {
+                        final checkoutUrl = await onBuy();
+                        if (!sheetContext.mounted) {
+                          return;
+                        }
+
+                        if (checkoutUrl == null || checkoutUrl.isEmpty) {
+                          return;
+                        }
+
                         Navigator.of(sheetContext).pop();
-                        await onBuy();
+                        await onCheckoutReady(checkoutUrl);
                       },
                 icon: Icon(
                   isBuying
@@ -366,6 +427,16 @@ String _formatPrice(CurrencyPackModel pack) {
   return NumberFormat.simpleCurrency(
     name: pack.currencyCode,
   ).format(pack.priceAmount);
+}
+
+String _valuePerCurrencyLabel(CurrencyPackModel pack) {
+  if (pack.priceAmount <= 0) {
+    return '-';
+  }
+
+  final sparkPerUnit = pack.totalSpark / pack.priceAmount;
+  final formatted = NumberFormat('0.0').format(sparkPerUnit);
+  return '$formatted PawSpark / ${pack.currencyCode}1';
 }
 
 String _formatDate(BuildContext context, DateTime? value) {

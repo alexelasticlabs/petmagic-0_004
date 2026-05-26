@@ -51,6 +51,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   bool _composerHasText = false;
   bool _composerHasFocus = false;
   _PendingSupportAttachment? _pendingAttachment;
+  double _keyboardInset = 0;
 
   bool get _hasPendingAttachment => _pendingAttachment != null;
 
@@ -172,29 +173,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     setState(action);
   }
 
-  void _insertEmoji() {
-    const emoji = '😊';
-    final currentValue = _messageController.value;
-    final selection = currentValue.selection;
-    final start = selection.isValid
-        ? selection.start
-        : currentValue.text.length;
-    final end = selection.isValid ? selection.end : currentValue.text.length;
-    final safeStart = start < 0 ? currentValue.text.length : start;
-    final safeEnd = end < 0 ? currentValue.text.length : end;
-    final updatedText = currentValue.text.replaceRange(
-      safeStart,
-      safeEnd,
-      emoji,
-    );
-
-    _messageController.value = TextEditingValue(
-      text: updatedText,
-      selection: TextSelection.collapsed(offset: safeStart + emoji.length),
-    );
-    _messageFocusNode.requestFocus();
-  }
-
   Future<void> _showAttachmentOptions() {
     return _SupportChatPageActions(this)._showAttachmentOptionsImpl();
   }
@@ -266,6 +244,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     final messages = conversation?.messages ?? const <SupportChatMessage>[];
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     final bottomNavInset = petMagicScrollableBottomInset(context);
+    _keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final isWaitingForInitialConversation = _isWaitingForInitialConversation(
       state,
     );
@@ -337,9 +316,9 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     pendingAttachment: _pendingAttachment,
                     composerHasFocus: _composerHasFocus,
                     composerCanSend: _composerCanSend,
+                    keyboardInset: _keyboardInset,
                     onRemovePendingAttachment: _removePendingAttachment,
                     onShowAttachmentOptions: _showAttachmentOptions,
-                    onInsertEmoji: _insertEmoji,
                     onSendMessage: () => _sendCurrentMessage(localeTag),
                   ),
                 ],

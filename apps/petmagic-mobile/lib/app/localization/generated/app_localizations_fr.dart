@@ -1286,6 +1286,74 @@ class AppLocalizationsFr extends AppLocalizations {
       'Vous pouvez déjà consulter les préférences de courrier électronique actuelles ici. Des boutons poussoirs dédiés seront ajoutés dans une tranche de produit ultérieure.';
 
   @override
+  String get profileNotificationsLoading => 'Loading notification settings...';
+
+  @override
+  String get profileNotificationsPushSection => 'Push notifications';
+
+  @override
+  String get profileNotificationsPushPhotoReady => 'Photo is ready';
+
+  @override
+  String get profileNotificationsPushVideoReady => 'Video is ready';
+
+  @override
+  String get profileNotificationsPushGenerationErrors => 'Generation errors';
+
+  @override
+  String get profileNotificationsPushReminders => 'Reminders';
+
+  @override
+  String get profileNotificationsPushNewTemplates => 'New templates';
+
+  @override
+  String get profileNotificationsPushPurchasesAndSubscriptions =>
+      'Purchases and subscriptions';
+
+  @override
+  String get profileNotificationsEmailSection => 'Email';
+
+  @override
+  String get profileNotificationsEmailOffers => 'Offers and discounts';
+
+  @override
+  String get profileNotificationsEmailNews => 'PetMagic news';
+
+  @override
+  String get profileNotificationsEmailAccountAlerts =>
+      'Important account alerts';
+
+  @override
+  String get profileNotificationsDeviceSection => 'Device status';
+
+  @override
+  String get profileNotificationsPushPermissionLabel => 'Push permissions';
+
+  @override
+  String get profileNotificationsPushPermissionAllowed => 'Allowed';
+
+  @override
+  String get profileNotificationsPushPermissionDenied =>
+      'Disabled in device settings';
+
+  @override
+  String get profileNotificationsPushPermissionNotDetermined =>
+      'Not requested yet';
+
+  @override
+  String get profileNotificationsPushPermissionProvisional => 'Allowed quietly';
+
+  @override
+  String get profileNotificationsPushPermissionUnknown => 'Unknown';
+
+  @override
+  String get profileNotificationsRefreshStatus => 'Refresh status';
+
+  @override
+  String get profileNotificationsRequestPermission =>
+      'Allow push notifications';
+
+  @override
   String get profileDetailsHelpBody =>
       'Le centre d\'aide rassemblera des réponses rapides, des conseils de configuration et des conseils sur le compte en un seul endroit.';
 
@@ -1377,6 +1445,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get profileLegalDocumentSection => 'Document';
 
   @override
+  String get profileLegalDocumentInfoSection => 'Document info';
+
+  @override
+  String get profileLegalOpenFullAction => 'Open full policy';
+
+  @override
   String get profileLegalCompactHint =>
       'Le résumé reste visible et les détails ne s\'ouvrent qu\'en cas de besoin.';
 
@@ -1386,6 +1460,34 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileLegalCompactSectionLabel => 'Appuyer pour développer';
+
+  @override
+  String get profilePrivacyQuickDataTitle => 'What we collect';
+
+  @override
+  String get profilePrivacyQuickDataBody =>
+      '• Email\n• Profile name\n• Generation history\n• Uploaded pet photos\n• Purchase history\n• Support requests';
+
+  @override
+  String get profilePrivacyQuickUsageTitle => 'Why we use it';
+
+  @override
+  String get profilePrivacyQuickUsageBody =>
+      '• Run app features\n• Generate content\n• Respond in support\n• Protect account and payments';
+
+  @override
+  String get profilePrivacyQuickSharingTitle => 'Do we share data?';
+
+  @override
+  String get profilePrivacyQuickSharingBody =>
+      'We do not sell personal data. Data may be shared only with processors needed to operate the service (for example payments, cloud hosting, and analytics).';
+
+  @override
+  String get profilePrivacyQuickRightsTitle => 'Your rights';
+
+  @override
+  String get profilePrivacyQuickRightsBody =>
+      '• Request a copy of your data\n• Request account and data deletion\n• Withdraw consent where applicable';
 
   @override
   String get profileDetailsDeleteBody =>
@@ -1454,6 +1556,17 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get supportChatQuickActionHuman => 'Talk to an operator';
+
+  @override
+  String get supportChatQuickActionSubscription =>
+      'Problème avec l\'abonnement';
+
+  @override
+  String get supportChatQuickActionVideo => 'La vidéo ne se génère pas';
+
+  @override
+  String get supportChatQuickActionTokens =>
+      'Les jetons n\'ont pas été crédités';
 
   @override
   String get supportChatFaqTitle => 'FAQ';
@@ -1552,6 +1665,21 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get supportChatFileFallbackLabel => 'Fichier';
+
+  @override
+  String get supportChatSystemNoticeTitle => 'Demande envoyée';
+
+  @override
+  String get supportChatSystemNoticeBody =>
+      'Nous avons bien reçu votre message et nous vous répondrons bientôt. Le délai moyen de réponse est de 24 heures maximum.';
+
+  @override
+  String get supportChatComposerAttachmentChip =>
+      '1 photo : JPG/PNG/WebP, jusqu\'à 10 Mo';
+
+  @override
+  String get supportChatComposerResponseChip =>
+      'Nous répondons généralement en quelques heures';
 
   @override
   String get profileSettingsThemeSystem => 'Système';

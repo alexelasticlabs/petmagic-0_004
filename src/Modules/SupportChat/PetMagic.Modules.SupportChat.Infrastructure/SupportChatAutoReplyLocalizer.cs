@@ -6,13 +6,13 @@ internal static class SupportChatAutoReplyLocalizer
     {
         return NormalizeLanguage(locale) switch
         {
-            "ru" => "Сообщение доставлено. Я отвечу на русском, потому что у вас русский интерфейс. Команда PetMagic уже получила ваш запрос.",
-            "de" => "Nachricht zugestellt. Ich antworte auf Deutsch, weil Ihre App-Oberflache auf Deutsch eingestellt ist. Das PetMagic-Team hat Ihre Anfrage bereits erhalten.",
-            "pl" => "Wiadomosc dostarczona. Odpowiem po polsku, bo interfejs aplikacji jest ustawiony na ten jezyk. Zespol PetMagic juz otrzymal Twoje zgloszenie.",
-            "it" => "Messaggio consegnato. Rispondero in italiano, perche l'interfaccia dell'app e impostata in questa lingua. Il team PetMagic ha gia ricevuto la tua richiesta.",
-            "fr" => "Message livre. Je repondrai en francais, car l'interface de l'application utilise cette langue. L'equipe PetMagic a deja recu votre demande.",
-            "es" => "Mensaje entregado. Respondere en espanol porque la interfaz de la aplicacion usa ese idioma. El equipo de PetMagic ya recibio tu solicitud.",
-            _ => "Message delivered. I will reply in English because your app interface is using English. The PetMagic team has already received your request.",
+            "ru" => "Сообщение получено. Команда поддержки уже получила ваш запрос и ответит в ближайшее время.",
+            "de" => "Nachricht erhalten. Unser Support-Team hat Ihre Anfrage bereits erhalten und wird bald antworten.",
+            "pl" => "Wiadomosc otrzymana. Nasz zespol wsparcia otrzymal Twoje zgloszenie i odpowie w najblizszym czasie.",
+            "it" => "Messaggio ricevuto. Il nostro team di supporto ha gia ricevuto la tua richiesta e rispondera al piu presto.",
+            "fr" => "Message recu. Notre equipe de support a bien recu votre demande et vous repondra bientot.",
+            "es" => "Mensaje recibido. Nuestro equipo de soporte ya recibio tu solicitud y respondera pronto.",
+            _ => "Message received. Our support team has your request and will reply soon.",
         };
     }
 

@@ -187,7 +187,7 @@ class WalletPaymentMethodModel {
   final String? warningMessage;
   final String? notes;
 
-  bool get isStripe => provider == 'stripe';
+  bool get isStripe => provider.toLowerCase() == 'stripe';
 
   factory WalletPaymentMethodModel.fromJson(Map<String, dynamic> json) {
     return WalletPaymentMethodModel(

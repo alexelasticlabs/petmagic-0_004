@@ -4,12 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_notifications_settings_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
@@ -249,6 +250,9 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       final legalDocumentsAsync = ref.watch(
         currentLegalDocumentsProvider(localeTag),
       );
+      final currentDocument = _documentFromAsync(kind, legalDocumentsAsync);
+      final requiresAcceptance =
+          profile?.legalAcceptance.requiresAcceptance == true;
 
       return ProfileScreenBackground(
         child: SafeArea(
@@ -331,12 +335,24 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              if (_documentFromAsync(kind, legalDocumentsAsync)
-                  case final document?)
+              if (currentDocument case final document?)
                 ProfileGlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.tonalIcon(
+                          onPressed: () => _showFullLegalDocumentSheet(
+                            context,
+                            title,
+                            document,
+                          ),
+                          icon: const Icon(Icons.menu_book_rounded),
+                          label: Text(text.profileLegalOpenFullAction),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       Text(
                         document.summary,
                         style: TextStyle(
@@ -400,10 +416,46 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                   ),
                 ],
                 AsyncData(:final value) => [
+                  ProfileSectionLabel(
+                    label: text.profileLegalDocumentInfoSection,
+                  ),
+                  const SizedBox(height: 8),
                   ProfileGlassCard(
-                    child:
-                        profile != null &&
-                            profile.legalAcceptance.requiresAcceptance
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _changesTitle(locale),
+                          style: TextStyle(
+                            color: colors.textStrong,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        ..._buildChangesHints(
+                          _documentFromValue(kind, value),
+                          locale,
+                        ).map(
+                          (hint) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              hint,
+                              style: TextStyle(
+                                color: colors.textSoft,
+                                fontSize: 13,
+                                height: 1.4,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ProfileGlassCard(
+                    child: profile != null && requiresAcceptance
                         ? SizedBox(
                             width: double.infinity,
                             child: FilledButton(
@@ -435,15 +487,51 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 14),
                   ProfileSectionLabel(label: text.profileLegalDocumentSection),
-                  ..._documentFromValue(kind, value).sections.map(
-                    (section) => Padding(
+                  ..._documentFromValue(kind, value).sections
+                      .take(4)
+                      .map(
+                        (section) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ProfileGlassCard(
+                            child: _LegalSectionTile(
+                              section: section,
+                              compactLabel:
+                                  text.profileLegalCompactSectionLabel,
+                              colors: colors,
+                            ),
+                          ),
+                        ),
+                      ),
+                  if (_documentFromValue(kind, value).sections.length > 4)
+                    Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: ProfileGlassCard(
-                        child: _LegalSectionTile(
-                          section: section,
-                          compactLabel: text.profileLegalCompactSectionLabel,
-                          colors: colors,
+                        child: Text(
+                          text.profileLegalCompactHint,
+                          style: TextStyle(
+                            color: colors.textSoft,
+                            fontSize: 13,
+                            height: 1.45,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
+                      ),
+                    ),
+                  const SizedBox(height: 6),
+                  ProfileSectionLabel(
+                    label: text.profileDetailsNextStepSection,
+                  ),
+                  const SizedBox(height: 8),
+                  ProfileGlassCard(
+                    child: Text(
+                      requiresAcceptance
+                          ? text.profileDetailsTermsNext
+                          : text.profileLegalCurrentAcceptedHint,
+                      style: TextStyle(
+                        color: colors.textSoft,
+                        fontSize: 15,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -455,132 +543,22 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       );
     }
 
-    if (kind == ProfileSettingsDetailKind.linkedAccounts) {
-      final linkedAccountsAsync = ref.watch(linkedAccountsProvider);
+    if (kind == ProfileSettingsDetailKind.notifications) {
+      return ProfileNotificationsSettingsSection(
+        title: title,
+        subtitle: subtitle,
+        errorMessage: state.errorMessage,
+        scope: profile?.userId ?? 'guest',
+        fallbackMarketingEmails: profile?.marketingEmailsEnabled ?? false,
+        bottomInset: bottomInset,
+      );
+    }
 
-      return ProfileScreenBackground(
-        child: SafeArea(
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
-            children: [
-              _DetailHeader(title: title, subtitle: subtitle),
-              const SizedBox(height: 22),
-              if (state.errorMessage != null) ...[
-                ProfileGlassCard(
-                  child: Text(
-                    mapProfileFeedbackMessage(state.errorMessage!, text),
-                    style: TextStyle(
-                      color: colors.danger,
-                      fontSize: 15,
-                      height: 1.45,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-              ],
-              ProfileSectionLabel(
-                label: text.profileDetailsCurrentStatusSection,
-              ),
-              const SizedBox(height: 8),
-              ...switch (linkedAccountsAsync) {
-                AsyncLoading() => [
-                  ProfileGlassCard(
-                    child: Text(
-                      text.profileLinkedAccountsLoading,
-                      style: TextStyle(
-                        color: colors.textSoft,
-                        fontSize: 15,
-                        height: 1.45,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-                AsyncError() => [
-                  ProfileGlassCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _linkedAccountsErrorText(text, linkedAccountsAsync),
-                          style: TextStyle(
-                            color: colors.danger,
-                            fontSize: 15,
-                            height: 1.45,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () =>
-                              ref.invalidate(linkedAccountsProvider),
-                          child: Text(text.retryAction),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                AsyncData(:final value) => [
-                  ProfileGlassCard(
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        _LinkedAccountRow(
-                          provider: ExternalAuthProvider.google,
-                          account: _findLinkedAccount(
-                            value,
-                            ExternalAuthProvider.google,
-                          ),
-                          isBusy: state.isSaving,
-                          onConnect: () => ref
-                              .read(profileControllerProvider.notifier)
-                              .linkExternalAccount(ExternalAuthProvider.google),
-                          onDisconnect: () => ref
-                              .read(profileControllerProvider.notifier)
-                              .unlinkExternalAccount(
-                                ExternalAuthProvider.google,
-                              ),
-                        ),
-                        _LinkedAccountRow(
-                          provider: ExternalAuthProvider.apple,
-                          account: _findLinkedAccount(
-                            value,
-                            ExternalAuthProvider.apple,
-                          ),
-                          isBusy: state.isSaving,
-                          showDivider: false,
-                          onConnect: () => ref
-                              .read(profileControllerProvider.notifier)
-                              .linkExternalAccount(ExternalAuthProvider.apple),
-                          onDisconnect: () => ref
-                              .read(profileControllerProvider.notifier)
-                              .unlinkExternalAccount(
-                                ExternalAuthProvider.apple,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              },
-              const SizedBox(height: 18),
-              ProfileSectionLabel(label: text.profileDetailsNextStepSection),
-              const SizedBox(height: 8),
-              ProfileGlassCard(
-                child: Text(
-                  text.profileDetailsLinkedAccountsNext,
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 15,
-                    height: 1.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    if (kind == ProfileSettingsDetailKind.linkedAccounts) {
+      return ProfileLinkedAccountsSettingsSection(
+        title: title,
+        subtitle: subtitle,
+        bottomInset: bottomInset,
       );
     }
 
@@ -722,6 +700,114 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       locale.toLanguageTag(),
     ).add_Hm().format(value.toLocal());
   }
+
+  String _changesTitle(Locale locale) {
+    return locale.languageCode.toLowerCase().startsWith('ru')
+        ? 'Что изменилось'
+        : 'What changed';
+  }
+
+  List<String> _buildChangesHints(MobileLegalDocument document, Locale locale) {
+    final headings = document.sections
+        .map((section) => section.heading.trim())
+        .where((heading) => heading.isNotEmpty)
+        .take(3)
+        .toList(growable: false);
+
+    if (headings.isEmpty) {
+      return [
+        locale.languageCode.toLowerCase().startsWith('ru')
+            ? '• Обновлено содержание документа.'
+            : '• Document content has been updated.',
+      ];
+    }
+
+    return headings.map((heading) => '• $heading').toList(growable: false);
+  }
+
+  Future<void> _showFullLegalDocumentSheet(
+    BuildContext context,
+    String title,
+    MobileLegalDocument document,
+  ) {
+    final colors = context.petMagicColors;
+
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surface,
+      builder: (context) {
+        return SafeArea(
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.9,
+            minChildSize: 0.6,
+            maxChildSize: 0.95,
+            builder: (context, controller) {
+              return ListView(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    document.summary,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 14,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ...document.sections.map(
+                    (section) => Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            section.heading,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...section.paragraphs.map(
+                            (paragraph) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                paragraph,
+                                style: TextStyle(
+                                  color: colors.textSoft,
+                                  fontSize: 14,
+                                  height: 1.55,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _LegalSectionTile extends StatelessWidget {
@@ -833,159 +919,6 @@ class _DetailHeader extends StatelessWidget {
       ],
     );
   }
-}
-
-MobileLinkedAccount? _findLinkedAccount(
-  List<MobileLinkedAccount> accounts,
-  ExternalAuthProvider provider,
-) {
-  for (final account in accounts) {
-    if (account.provider.toLowerCase() == provider.apiValue.toLowerCase()) {
-      return account;
-    }
-  }
-
-  return null;
-}
-
-class _LinkedAccountRow extends StatelessWidget {
-  const _LinkedAccountRow({
-    required this.provider,
-    required this.account,
-    required this.isBusy,
-    required this.onConnect,
-    required this.onDisconnect,
-    this.showDivider = true,
-  });
-
-  final ExternalAuthProvider provider;
-  final MobileLinkedAccount? account;
-  final bool isBusy;
-  final VoidCallback onConnect;
-  final VoidCallback onDisconnect;
-  final bool showDivider;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final isConnected = account != null;
-    final canDisconnect = account?.canDisconnect ?? false;
-    final providerLabel = account?.displayName.trim().isNotEmpty == true
-        ? account!.displayName
-        : provider.apiValue;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: showDivider
-            ? Border(
-                bottom: BorderSide(
-                  color: colors.border.withValues(alpha: 0.75),
-                ),
-              )
-            : null,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: colors.accent.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                provider == ExternalAuthProvider.apple
-                    ? Icons.apple_rounded
-                    : Icons.g_mobiledata_rounded,
-                color: colors.accent,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    providerLabel,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isConnected
-                        ? text.profileLinkedAccountsConnectedStatus
-                        : text.profileLinkedAccountsNotConnectedStatus,
-                    style: TextStyle(
-                      color: isConnected ? colors.textStrong : colors.textSoft,
-                      fontSize: 13,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (isConnected && !canDisconnect) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      text.profileLinkedAccountsProtectedHint,
-                      style: TextStyle(
-                        color: colors.textMuted,
-                        fontSize: 12,
-                        height: 1.35,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            FilledButton.tonal(
-              onPressed: isBusy
-                  ? null
-                  : isConnected
-                  ? (canDisconnect ? onDisconnect : null)
-                  : onConnect,
-              child: Text(
-                isConnected
-                    ? text.profileLinkedAccountsDisconnectAction
-                    : text.profileLinkedAccountsConnectAction,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _linkedAccountsErrorText(
-  AppLocalizations text,
-  AsyncValue<List<MobileLinkedAccount>> value,
-) {
-  return value.when(
-    data: (_) => text.profileLegalUnavailable,
-    loading: () => text.profileLinkedAccountsLoading,
-    error: (error, _) {
-      final raw = error.toString();
-      if (raw.contains('401') ||
-          raw.contains('auth.sign_in_required') ||
-          raw.contains('Sign in is required')) {
-        return text.profileLinkedAccountsSignInRequired;
-      }
-
-      return raw.contains('auth.request_failed') ||
-              raw.contains('Request failed')
-          ? text.profileLinkedAccountsUnavailable
-          : text.profileLegalUnavailable;
-    },
-  );
 }
 
 class _InfoRow extends StatelessWidget {

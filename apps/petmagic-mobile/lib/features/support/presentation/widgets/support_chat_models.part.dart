@@ -3,10 +3,22 @@ part of 'package:petmagic_mobile/features/support/presentation/support_chat_page
 const _supportSecondaryGreen = Color(0xFF69D8A7);
 const _supportMessageGreen = Color(0xFF129369);
 const _supportMessageGreenBorder = Color(0xFF0D7752);
-const _supportComposerSendGreen = Color(0xFF00D97E);
+const _supportComposerSendGreen = Color(0xFF34B77A);
 const _supportComposerIconColor = Color(0xFFA0AEC0);
 const _supportComposerHintColor = Color(0xFF7B8794);
 const _supportAttachmentMaxFileSizeBytes = 10 * 1024 * 1024;
+
+bool _isSupportSystemMessage(SupportChatMessage message) {
+  if (!message.isFromAdmin) {
+    return false;
+  }
+
+  final body = message.body.toLowerCase();
+  return body.startsWith('сообщение получено') ||
+      body.startsWith('message received') ||
+      body.startsWith('сообщение доставлено') ||
+      body.startsWith('message delivered');
+}
 
 String _mapSupportError(AppLocalizations text, String raw) {
   final value = raw.toLowerCase();

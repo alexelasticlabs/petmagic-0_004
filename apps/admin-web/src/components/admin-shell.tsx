@@ -35,14 +35,12 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [theme, setTheme] = useState<AdminTheme>(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
+  const [theme, setTheme] = useState<AdminTheme>("dark");
 
+  useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    return resolveAdminTheme(readStoredAdminTheme(), media.matches);
-  });
+    setTheme(resolveAdminTheme(readStoredAdminTheme(), media.matches));
+  }, []);
 
   useEffect(() => {
     applyAdminTheme(theme);

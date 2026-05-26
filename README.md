@@ -27,6 +27,10 @@ docker-compose up --build
 - Backend API: Ready at http://localhost:5000 (health check: /health)
 - Admin Web: Ready at http://localhost:3000
 
+### Backups
+
+Use `scripts/backup-postgres.ps1` to export the current PostgreSQL database to `backups/`. Avoid `docker-compose down -v` unless you intentionally want to delete the data volume.
+
 #### Default Credentials:
 - Email: dmin@petmagic.app
 - Password: DemoPassword123!

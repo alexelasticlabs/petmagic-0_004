@@ -1117,7 +1117,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileSettingsLinkedAccountsSubtitle =>
-      'Google, Apple and other providers will appear here.';
+      'Add sign-in methods so you do not lose access to your account.';
 
   @override
   String get profileSettingsPasswordTitle => 'Change password';
@@ -1230,15 +1230,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsLinkedAccountsBody =>
-      'Connected providers will appear here as soon as linking is enabled for your account.';
+      'Connect Google or Apple to keep access to your generations, purchases, and PawSpark on any device.';
 
   @override
   String get profileDetailsLinkedAccountsStatus =>
-      'No external providers are linked yet. Email and password remain the active sign-in method for this profile.';
+      'Choose and connect convenient sign-in methods for your account.';
 
   @override
   String get profileDetailsLinkedAccountsNext =>
-      'Google, Apple and additional providers will be shown here after the backend linking flow is opened in the app.';
+      'Linked accounts help you:\n✓ recover access\n✓ sign in on a new device\n✓ keep purchases and PawSpark\n✓ protect your account';
 
   @override
   String get profileLinkedAccountsLoading =>
@@ -1246,10 +1246,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileLinkedAccountsConnectedStatus =>
-      'Connected and ready for sign in.';
+      'Connected and ready to sign in.';
 
   @override
-  String get profileLinkedAccountsNotConnectedStatus => 'Not connected yet.';
+  String get profileLinkedAccountsNotConnectedStatus => 'Not connected.';
 
   @override
   String get profileLinkedAccountsConnectAction => 'Connect';
@@ -1259,7 +1259,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileLinkedAccountsProtectedHint =>
-      'This provider cannot be removed until another sign-in method remains available.';
+      'This sign-in method cannot be removed until another method is connected.';
 
   @override
   String get profileLinkedAccountsSignInRequired =>
@@ -1271,19 +1271,87 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsNotificationsBody =>
-      'This section reflects your current communication preferences in the app.';
+      'Choose which notifications you want to receive in PetMagic.';
 
   @override
   String get profileDetailsNotificationsStatusEnabled =>
-      'Product updates and offers are enabled for this profile. Additional push controls will appear here later.';
+      'Notifications are enabled for this profile.';
 
   @override
   String get profileDetailsNotificationsStatusDisabled =>
-      'Marketing emails are currently disabled for this profile. Additional push controls will appear here later.';
+      'Notifications are disabled for this profile.';
 
   @override
   String get profileDetailsNotificationsNext =>
-      'You can already review the current email preference here. Dedicated push toggles will be added in a later product slice.';
+      'You can change push and email preferences at any time.';
+
+  @override
+  String get profileNotificationsLoading => 'Loading notification settings...';
+
+  @override
+  String get profileNotificationsPushSection => 'Push notifications';
+
+  @override
+  String get profileNotificationsPushPhotoReady => 'Photo is ready';
+
+  @override
+  String get profileNotificationsPushVideoReady => 'Video is ready';
+
+  @override
+  String get profileNotificationsPushGenerationErrors => 'Generation errors';
+
+  @override
+  String get profileNotificationsPushReminders => 'Reminders';
+
+  @override
+  String get profileNotificationsPushNewTemplates => 'New templates';
+
+  @override
+  String get profileNotificationsPushPurchasesAndSubscriptions =>
+      'Purchases and subscriptions';
+
+  @override
+  String get profileNotificationsEmailSection => 'Email';
+
+  @override
+  String get profileNotificationsEmailOffers => 'Offers and discounts';
+
+  @override
+  String get profileNotificationsEmailNews => 'PetMagic news';
+
+  @override
+  String get profileNotificationsEmailAccountAlerts =>
+      'Important account alerts';
+
+  @override
+  String get profileNotificationsDeviceSection => 'Device status';
+
+  @override
+  String get profileNotificationsPushPermissionLabel => 'Push permissions';
+
+  @override
+  String get profileNotificationsPushPermissionAllowed => 'Allowed';
+
+  @override
+  String get profileNotificationsPushPermissionDenied =>
+      'Disabled in device settings';
+
+  @override
+  String get profileNotificationsPushPermissionNotDetermined =>
+      'Not requested yet';
+
+  @override
+  String get profileNotificationsPushPermissionProvisional => 'Allowed quietly';
+
+  @override
+  String get profileNotificationsPushPermissionUnknown => 'Unknown';
+
+  @override
+  String get profileNotificationsRefreshStatus => 'Refresh status';
+
+  @override
+  String get profileNotificationsRequestPermission =>
+      'Allow push notifications';
 
   @override
   String get profileDetailsHelpBody =>
@@ -1376,6 +1444,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileLegalDocumentSection => 'Document';
 
   @override
+  String get profileLegalDocumentInfoSection => 'Document info';
+
+  @override
+  String get profileLegalOpenFullAction => 'Open full policy';
+
+  @override
   String get profileLegalCompactHint =>
       'The summary stays visible, and each section expands only when you need more detail.';
 
@@ -1385,6 +1459,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileLegalCompactSectionLabel => 'Tap to expand';
+
+  @override
+  String get profilePrivacyQuickDataTitle => 'What we collect';
+
+  @override
+  String get profilePrivacyQuickDataBody =>
+      '• Email\n• Profile name\n• Generation history\n• Uploaded pet photos\n• Purchase history\n• Support requests';
+
+  @override
+  String get profilePrivacyQuickUsageTitle => 'Why we use it';
+
+  @override
+  String get profilePrivacyQuickUsageBody =>
+      '• Run app features\n• Generate content\n• Respond in support\n• Protect account and payments';
+
+  @override
+  String get profilePrivacyQuickSharingTitle => 'Do we share data?';
+
+  @override
+  String get profilePrivacyQuickSharingBody =>
+      'We do not sell personal data. Data may be shared only with processors needed to operate the service (for example payments, cloud hosting, and analytics).';
+
+  @override
+  String get profilePrivacyQuickRightsTitle => 'Your rights';
+
+  @override
+  String get profilePrivacyQuickRightsBody =>
+      '• Request a copy of your data\n• Request account and data deletion\n• Withdraw consent where applicable';
 
   @override
   String get profileDetailsDeleteBody =>
@@ -1453,6 +1555,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatQuickActionHuman => 'Talk to an operator';
+
+  @override
+  String get supportChatQuickActionSubscription => 'Subscription issue';
+
+  @override
+  String get supportChatQuickActionVideo => 'Video generation issue';
+
+  @override
+  String get supportChatQuickActionTokens => 'Tokens were not credited';
 
   @override
   String get supportChatFaqTitle => 'FAQ';
@@ -1549,6 +1660,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatFileFallbackLabel => 'File';
+
+  @override
+  String get supportChatSystemNoticeTitle => 'Request sent';
+
+  @override
+  String get supportChatSystemNoticeBody =>
+      'We received your request and will reply soon. Average response time: up to 24 hours.';
+
+  @override
+  String get supportChatComposerAttachmentChip =>
+      '1 photo: JPG/PNG/WebP, up to 10 MB';
+
+  @override
+  String get supportChatComposerResponseChip => 'Typical reply in a few hours';
 
   @override
   String get profileSettingsThemeSystem => 'System';

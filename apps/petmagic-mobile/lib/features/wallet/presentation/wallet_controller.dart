@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -264,13 +265,42 @@ class WalletController extends Notifier<WalletState> {
         paymentMethod,
         WidgetsBinding.instance.platformDispatcher.locale,
       );
+
+      final checkoutUrl = checkout.checkoutUrl.trim();
+      if (checkoutUrl.isEmpty) {
+        final payload = <String, Object>{
+          'pack_id': pack.packId,
+          'pack_code': pack.code,
+          'provider': paymentMethod.provider,
+          'order_id': checkout.orderId,
+          'status': checkout.status,
+        };
+        developer.Timeline.instantSync(
+          'petmagic.wallet.checkout_empty_url',
+          arguments: payload,
+        );
+        developer.log(
+          'Empty checkout URL from purchase create API '
+          '(pack=${pack.code}, provider=${paymentMethod.provider}, order=${checkout.orderId}, status=${checkout.status})',
+          name: 'PetMagic.Wallet.Checkout',
+          error: 'wallet.checkout_empty_url',
+        );
+
+        state = state.copyWith(
+          isBuying: false,
+          clearCheckoutUrl: true,
+          clearPendingCheckout: true,
+          errorMessage: 'payment_gateway_failed',
+        );
+        return null;
+      }
+
       state = state.copyWith(
         isBuying: false,
-        checkoutUrl: checkout.checkoutUrl,
+        checkoutUrl: checkoutUrl,
         pendingCheckoutOrderId: checkout.orderId,
       );
-      unawaited(load(refresh: true));
-      return checkout.checkoutUrl;
+      return checkoutUrl;
     } catch (error) {
       state = state.copyWith(isBuying: false, errorMessage: error.toString());
       return null;

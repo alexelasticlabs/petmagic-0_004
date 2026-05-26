@@ -86,6 +86,12 @@ class _PremiumHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final heroGradient = [
+      colors.surface,
+      colors.surfaceStrong.withValues(alpha: 0.96),
+      colors.accentSoft.withValues(alpha: 0.48),
+    ];
+    final heroSubtitleColor = colors.gold;
     final selectedPlanLabel = selectedPlan == null
         ? null
         : '${_planTitle(text, selectedPlan!)} • ${_formatPrice(selectedPlan!, selectedPlan!.priceAmount)} ${_periodLabel(text, selectedPlan!)}';
@@ -96,11 +102,7 @@ class _PremiumHero extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF020A1B),
-            const Color(0xFF04112A),
-            const Color(0xFF050D1D),
-          ],
+          colors: heroGradient,
         ),
         boxShadow: [
           BoxShadow(
@@ -200,7 +202,7 @@ class _PremiumHero extends StatelessWidget {
                               TextSpan(
                                 text: text.premiumHeroSubtitle,
                                 style: TextStyle(
-                                  color: colors.gold,
+                                  color: heroSubtitleColor,
                                   fontSize: compact ? 15.5 : 17,
                                   height: 1.32,
                                   fontWeight: FontWeight.w800,

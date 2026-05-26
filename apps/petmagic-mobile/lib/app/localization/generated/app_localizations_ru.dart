@@ -1114,7 +1114,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileSettingsLinkedAccountsSubtitle =>
-      'Здесь появятся Google, Apple и другие провайдеры.';
+      'Добавьте способы входа, чтобы не потерять доступ к аккаунту.';
 
   @override
   String get profileSettingsPasswordTitle => 'Сменить пароль';
@@ -1227,15 +1227,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsLinkedAccountsBody =>
-      'Подключенные провайдеры появятся здесь, как только для аккаунта будет включено связывание.';
+      'Подключите Google или Apple, чтобы сохранить доступ к генерациям, покупкам и PawSpark на любом устройстве.';
 
   @override
   String get profileDetailsLinkedAccountsStatus =>
-      'Внешние провайдеры пока не привязаны. Для этого профиля активным способом входа остаются email и пароль.';
+      'Выберите и подключите удобные способы входа для вашего аккаунта.';
 
   @override
   String get profileDetailsLinkedAccountsNext =>
-      'Google, Apple и другие провайдеры появятся здесь после открытия backend-flow привязки в приложении.';
+      'Подключенные аккаунты помогают:\n✓ восстановить доступ\n✓ войти на новом устройстве\n✓ сохранить покупки и PawSpark\n✓ защитить аккаунт';
 
   @override
   String get profileLinkedAccountsLoading =>
@@ -1243,10 +1243,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileLinkedAccountsConnectedStatus =>
-      'Подключено и готово для входа.';
+      'Подключен и готов для входа.';
 
   @override
-  String get profileLinkedAccountsNotConnectedStatus => 'Пока не подключено.';
+  String get profileLinkedAccountsNotConnectedStatus => 'Не подключен.';
 
   @override
   String get profileLinkedAccountsConnectAction => 'Подключить';
@@ -1256,7 +1256,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileLinkedAccountsProtectedHint =>
-      'Этот способ входа нельзя отключить, пока не останется другой доступный вариант входа.';
+      'Этот способ входа нельзя отключить, пока не подключен другой способ входа.';
 
   @override
   String get profileLinkedAccountsSignInRequired =>
@@ -1268,19 +1268,90 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsNotificationsBody =>
-      'В этом разделе отражаются текущие коммуникационные предпочтения аккаунта.';
+      'Выберите, какие уведомления хотите получать в PetMagic.';
 
   @override
   String get profileDetailsNotificationsStatusEnabled =>
-      'Обновления продукта и предложения для этого профиля включены. Дополнительные push-настройки появятся позже.';
+      'Уведомления включены для этого профиля.';
 
   @override
   String get profileDetailsNotificationsStatusDisabled =>
-      'Маркетинговые письма для этого профиля сейчас отключены. Дополнительные push-настройки появятся позже.';
+      'Уведомления отключены для этого профиля.';
 
   @override
   String get profileDetailsNotificationsNext =>
-      'Уже сейчас здесь видно текущее email-предпочтение. Отдельные push-переключатели добавим в следующем продуктовом срезе.';
+      'Вы можете менять push и email-настройки в любой момент.';
+
+  @override
+  String get profileNotificationsLoading =>
+      'Загружаем настройки уведомлений...';
+
+  @override
+  String get profileNotificationsPushSection => 'Push-уведомления';
+
+  @override
+  String get profileNotificationsPushPhotoReady => 'Фото готово';
+
+  @override
+  String get profileNotificationsPushVideoReady => 'Видео готово';
+
+  @override
+  String get profileNotificationsPushGenerationErrors => 'Ошибки генерации';
+
+  @override
+  String get profileNotificationsPushReminders => 'Напоминания';
+
+  @override
+  String get profileNotificationsPushNewTemplates => 'Новые шаблоны';
+
+  @override
+  String get profileNotificationsPushPurchasesAndSubscriptions =>
+      'Покупки и подписки';
+
+  @override
+  String get profileNotificationsEmailSection => 'Email';
+
+  @override
+  String get profileNotificationsEmailOffers => 'Акции и скидки';
+
+  @override
+  String get profileNotificationsEmailNews => 'Новости PetMagic';
+
+  @override
+  String get profileNotificationsEmailAccountAlerts =>
+      'Важные уведомления аккаунта';
+
+  @override
+  String get profileNotificationsDeviceSection => 'Состояние устройства';
+
+  @override
+  String get profileNotificationsPushPermissionLabel => 'Push-разрешения';
+
+  @override
+  String get profileNotificationsPushPermissionAllowed => 'Разрешены';
+
+  @override
+  String get profileNotificationsPushPermissionDenied =>
+      'Отключены в настройках устройства';
+
+  @override
+  String get profileNotificationsPushPermissionNotDetermined =>
+      'Разрешение еще не запрашивалось';
+
+  @override
+  String get profileNotificationsPushPermissionProvisional =>
+      'Разрешены в тихом режиме';
+
+  @override
+  String get profileNotificationsPushPermissionUnknown =>
+      'Не удалось определить';
+
+  @override
+  String get profileNotificationsRefreshStatus => 'Обновить статус';
+
+  @override
+  String get profileNotificationsRequestPermission =>
+      'Разрешить push-уведомления';
 
   @override
   String get profileDetailsHelpBody =>
@@ -1374,6 +1445,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileLegalDocumentSection => 'Документ';
 
   @override
+  String get profileLegalDocumentInfoSection => 'Информация о документе';
+
+  @override
+  String get profileLegalOpenFullAction => 'Открыть полную политику';
+
+  @override
   String get profileLegalCompactHint =>
       'Сверху остается краткое резюме, а детали раскрываются только по нажатию.';
 
@@ -1383,6 +1460,34 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileLegalCompactSectionLabel => 'Нажмите, чтобы раскрыть';
+
+  @override
+  String get profilePrivacyQuickDataTitle => 'Что мы собираем';
+
+  @override
+  String get profilePrivacyQuickDataBody =>
+      '• Email\n• Имя профиля\n• Историю генераций\n• Загруженные фото питомцев\n• Историю покупок\n• Обращения в поддержку';
+
+  @override
+  String get profilePrivacyQuickUsageTitle => 'Для чего используем';
+
+  @override
+  String get profilePrivacyQuickUsageBody =>
+      '• Работа приложения\n• Генерация контента\n• Поддержка\n• Безопасность аккаунта и платежей';
+
+  @override
+  String get profilePrivacyQuickSharingTitle => 'Передаём ли данные?';
+
+  @override
+  String get profilePrivacyQuickSharingBody =>
+      'Мы не продаём персональные данные. Передача возможна только сервисам-обработчикам, которые нужны для работы приложения (например, платежи, облачная инфраструктура, аналитика).';
+
+  @override
+  String get profilePrivacyQuickRightsTitle => 'Ваши права';
+
+  @override
+  String get profilePrivacyQuickRightsBody =>
+      '• Запросить копию данных\n• Запросить удаление аккаунта и данных\n• Отозвать согласие, где это применимо';
 
   @override
   String get profileDetailsDeleteBody =>
@@ -1452,6 +1557,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatQuickActionHuman => 'Связаться с оператором';
+
+  @override
+  String get supportChatQuickActionSubscription => 'Проблема с подпиской';
+
+  @override
+  String get supportChatQuickActionVideo => 'Видео не создается';
+
+  @override
+  String get supportChatQuickActionTokens => 'Не пришли токены';
 
   @override
   String get supportChatFaqTitle => 'FAQ';
@@ -1551,6 +1665,21 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatFileFallbackLabel => 'Файл';
+
+  @override
+  String get supportChatSystemNoticeTitle => 'Запрос отправлен';
+
+  @override
+  String get supportChatSystemNoticeBody =>
+      'Мы получили ваше сообщение и ответим в ближайшее время. Среднее время ответа: до 24 часов.';
+
+  @override
+  String get supportChatComposerAttachmentChip =>
+      '1 фото: JPG/PNG/WebP, до 10 МБ';
+
+  @override
+  String get supportChatComposerResponseChip =>
+      'Обычно отвечаем в течение нескольких часов';
 
   @override
   String get profileSettingsThemeSystem => 'Системная';

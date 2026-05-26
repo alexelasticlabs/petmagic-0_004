@@ -472,6 +472,56 @@ class _AttachmentStatusRow extends StatelessWidget {
   }
 }
 
+class _SupportSystemMessageCard extends StatelessWidget {
+  const _SupportSystemMessageCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    final title = text.supportChatSystemNoticeTitle;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceStrong.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                message,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 12,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SupportAvatar extends StatelessWidget {
   const _SupportAvatar({required this.label});
 
