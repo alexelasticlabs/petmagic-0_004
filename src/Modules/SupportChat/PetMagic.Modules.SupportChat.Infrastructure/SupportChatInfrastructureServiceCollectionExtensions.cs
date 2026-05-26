@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.SupportChat.Application.Abstractions;
-using PetMagic.Modules.SupportChat.Domain.Enums;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
 

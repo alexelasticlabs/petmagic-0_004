@@ -49,7 +49,7 @@ internal static class Mp4DurationReader
             }
 
             var size = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan()[..4]);
-            var type = GetBoxType(header[4..8]);
+            var type = GetBoxType(header.AsSpan()[4..8]);
             long headerLength = 8;
             long boxSize = size;
 

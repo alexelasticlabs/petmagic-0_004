@@ -424,12 +424,12 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
         return string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
     }
 
-    private bool EnsureConfigured(string? apiKey)
+    private static bool EnsureConfigured(string? apiKey)
     {
         return !string.IsNullOrWhiteSpace(apiKey);
     }
 
-    private void ConfigureStripe(string? apiKey)
+    private static void ConfigureStripe(string? apiKey)
     {
         StripeConfiguration.ApiKey = apiKey;
     }

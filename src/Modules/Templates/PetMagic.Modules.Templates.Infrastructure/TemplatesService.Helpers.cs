@@ -179,11 +179,10 @@ internal sealed partial class TemplatesService
 
     private static string[] NormalizeTags(IEnumerable<string> tags)
     {
-        return tags
+        return [.. tags
             .Select(tag => tag.Trim())
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     private static string SerializeTags(IEnumerable<string> tags)
@@ -219,12 +218,11 @@ internal sealed partial class TemplatesService
 
     private static string[] NormalizeRequirements(IEnumerable<string> requirements)
     {
-        return requirements
+        return [.. requirements
             .Select(requirement => requirement.Trim())
             .Where(requirement => !string.IsNullOrWhiteSpace(requirement))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(6)
-            .ToArray();
+            .Take(6)];
     }
 
     private static string NormalizeCategoryName(string rawCategoryName)
@@ -279,11 +277,10 @@ internal sealed partial class TemplatesService
 
     private static string[] CollectObsoleteAssetUrls(IEnumerable<string?> assetUrls)
     {
-        return assetUrls
+        return [.. assetUrls
             .Where(assetUrl => !string.IsNullOrWhiteSpace(assetUrl))
             .Cast<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     private ValueTask PublishFeedInvalidatedAsync(CancellationToken cancellationToken)

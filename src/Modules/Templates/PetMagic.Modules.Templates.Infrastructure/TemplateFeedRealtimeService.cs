@@ -9,6 +9,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class TemplateFeedRealtimeService : ITemplateFeedRealtimeService
 {
+    private static readonly JsonSerializerOptions RealtimeJsonOptions = new(JsonSerializerDefaults.Web);
+
     private readonly ConcurrentDictionary<Guid, Channel<TemplateFeedRealtimeEvent>> subscribers = new();
 
     public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
@@ -32,7 +34,7 @@ internal sealed class TemplateFeedRealtimeService : ITemplateFeedRealtimeService
 
     public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
     {
-        var data = JsonSerializer.Serialize(generation, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var data = JsonSerializer.Serialize(generation, RealtimeJsonOptions);
         return PublishAsync(new TemplateFeedRealtimeEvent(TemplateFeedRealtimeTopics.GenerationStatusChanged, data), cancellationToken);
     }
 

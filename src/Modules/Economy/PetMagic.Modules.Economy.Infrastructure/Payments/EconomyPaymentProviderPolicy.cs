@@ -75,9 +75,7 @@ internal static class EconomyPaymentProviderPolicy
         string normalizedPlatform,
         PaymentProviderConfiguration config)
     {
-        return string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
-            ? string.Equals(normalizedPlatform, "web", StringComparison.Ordinal) || config.ExternalCheckoutAllowed
-            : true;
+        return !string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase) || string.Equals(normalizedPlatform, "web", StringComparison.Ordinal) || config.ExternalCheckoutAllowed;
     }
 
     private static bool MatchesRegion(string configuredRegion, string region, bool isEuRegion)

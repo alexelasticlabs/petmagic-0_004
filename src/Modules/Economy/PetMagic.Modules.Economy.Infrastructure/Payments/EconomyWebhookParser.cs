@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
-internal static class EconomyWebhookParser
+internal static partial class EconomyWebhookParser
 {
     public static bool IsStoreSubscriptionPremium(string status, DateTime? currentPeriodEndUtc)
     {
@@ -309,7 +309,7 @@ internal static class EconomyWebhookParser
         }
         catch
         {
-            var orderIdMatch = Regex.Match(rawBody, "\"order_id\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.CultureInvariant);
+            var orderIdMatch = OrderIdRegex().Match(rawBody);
             Guid? orderId = null;
             if (orderIdMatch.Success)
             {
@@ -321,10 +321,7 @@ internal static class EconomyWebhookParser
             }
 
             string? objectId = null;
-            var objectIdMatch = Regex.Match(
-                rawBody,
-                "\"data\"\\s*:\\s*\\{\\s*\"object\"\\s*:\\s*\\{.*?\"id\"\\s*:\\s*\"(?<value>[^\"]+)\"",
-                RegexOptions.CultureInvariant | RegexOptions.Singleline);
+            var objectIdMatch = ObjectIdRegex().Match(rawBody);
 
             if (objectIdMatch.Success)
             {
@@ -366,8 +363,8 @@ internal static class EconomyWebhookParser
         }
         catch
         {
-            var idMatch = Regex.Match(rawBody, "\"id\"\\s*:\\s*\"(?<value>evt_[^\"]+)\"", RegexOptions.CultureInvariant);
-            var typeMatch = Regex.Match(rawBody, "\"type\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.CultureInvariant);
+            var idMatch = StripeEventIdRegex().Match(rawBody);
+            var typeMatch = StripeEventTypeRegex().Match(rawBody);
 
             if (!idMatch.Success || !typeMatch.Success)
             {
@@ -458,4 +455,16 @@ internal static class EconomyWebhookParser
 
         return null;
     }
+
+    [GeneratedRegex("\"order_id\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.CultureInvariant)]
+    private static partial Regex OrderIdRegex();
+
+    [GeneratedRegex("\"data\"\\s*:\\s*\\{\\s*\"object\"\\s*:\\s*\\{.*?\"id\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.CultureInvariant | RegexOptions.Singleline)]
+    private static partial Regex ObjectIdRegex();
+
+    [GeneratedRegex("\"id\"\\s*:\\s*\"(?<value>evt_[^\"]+)\"", RegexOptions.CultureInvariant)]
+    private static partial Regex StripeEventIdRegex();
+
+    [GeneratedRegex("\"type\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.CultureInvariant)]
+    private static partial Regex StripeEventTypeRegex();
 }

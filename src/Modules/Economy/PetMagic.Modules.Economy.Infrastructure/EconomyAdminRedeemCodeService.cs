@@ -10,7 +10,7 @@ using PetMagic.Modules.Economy.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
-internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
+internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
 {
     private const int AdminRedeemCodeRedemptionsPreviewLimit = 5;
 
@@ -85,9 +85,7 @@ internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
             .GroupBy(x => x.RedeemCodeId)
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyList<AdminRedeemCodeRedemptionResponse>)group
-                    .Select(x => x.Response)
-                    .ToList());
+                group => (IReadOnlyList<AdminRedeemCodeRedemptionResponse>)[.. group.Select(x => x.Response)]);
 
         var result = codes
             .Select(code =>
@@ -369,7 +367,7 @@ internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
 
     private static string NormalizeRedeemCode(string rawCode)
     {
-        return Regex.Replace(rawCode.Trim().ToUpperInvariant(), "\\s+", string.Empty, RegexOptions.CultureInvariant);
+        return WhitespaceRegex().Replace(rawCode.Trim().ToUpperInvariant(), string.Empty);
     }
 
     private static string NormalizeRewardKind(string rawRewardKind)
@@ -392,4 +390,7 @@ internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
+
+    [GeneratedRegex("\\s+", RegexOptions.CultureInvariant)]
+    private static partial Regex WhitespaceRegex();
 }

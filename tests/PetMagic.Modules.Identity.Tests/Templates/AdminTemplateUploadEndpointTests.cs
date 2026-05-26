@@ -41,12 +41,12 @@ public sealed class AdminTemplateUploadEndpointTests
             metadataReader,
             CancellationToken.None);
 
-        var response = await ExecuteAsync(result);
+        var (statusCode, body) = await ExecuteAsync(result);
         var record = await dbContext.TemplateMediaRecords.SingleAsync();
 
-        Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
-        Assert.Contains("preview.jpg", response.Body);
-        Assert.Contains("image/jpeg", response.Body);
+        Assert.Equal(StatusCodes.Status200OK, statusCode);
+        Assert.Contains("preview.jpg", body);
+        Assert.Contains("image/jpeg", body);
         Assert.False(metadataReader.StoredMediaCalls > 0);
         Assert.Equal(TemplateMediaLifecycleState.Temporary, record.LifecycleState);
         Assert.Equal(TemplateMediaRole.PreviewAsset, record.Role);
@@ -78,10 +78,10 @@ public sealed class AdminTemplateUploadEndpointTests
             metadataReader,
             CancellationToken.None);
 
-        var response = await ExecuteAsync(result);
+        var (statusCode, body) = await ExecuteAsync(result);
 
-        Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
-        Assert.Contains("7.25", response.Body);
+        Assert.Equal(StatusCodes.Status200OK, statusCode);
+        Assert.Contains("7.25", body);
         Assert.Equal(1, metadataReader.StoredMediaCalls);
     }
 
@@ -109,10 +109,10 @@ public sealed class AdminTemplateUploadEndpointTests
             metadataReader,
             CancellationToken.None);
 
-        var response = await ExecuteAsync(result);
+        var (statusCode, body) = await ExecuteAsync(result);
 
-        Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
-        Assert.Contains("reference.mp4", response.Body);
+        Assert.Equal(StatusCodes.Status200OK, statusCode);
+        Assert.Contains("reference.mp4", body);
         Assert.Equal(1, metadataReader.StoredMediaCalls);
     }
 
@@ -131,10 +131,10 @@ public sealed class AdminTemplateUploadEndpointTests
             new RecordingMediaMetadataReader(),
             CancellationToken.None);
 
-        var response = await ExecuteAsync(result);
+        var (statusCode, body) = await ExecuteAsync(result);
 
-        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
-        Assert.Contains("File content type is not allowed", response.Body);
+        Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
+        Assert.Contains("File content type is not allowed", body);
     }
 
     [Fact]
@@ -152,10 +152,10 @@ public sealed class AdminTemplateUploadEndpointTests
             new RecordingMediaMetadataReader(),
             CancellationToken.None);
 
-        var response = await ExecuteAsync(result);
+        var (statusCode, body) = await ExecuteAsync(result);
 
-        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
-        Assert.Contains("File content type is not allowed", response.Body);
+        Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
+        Assert.Contains("File content type is not allowed", body);
     }
 
     [Fact]
@@ -173,10 +173,10 @@ public sealed class AdminTemplateUploadEndpointTests
             new RecordingMediaMetadataReader(),
             CancellationToken.None);
 
-        var response = await ExecuteAsync(result);
+        var (statusCode, body) = await ExecuteAsync(result);
 
-        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
-        Assert.Contains("File content type is not allowed", response.Body);
+        Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
+        Assert.Contains("File content type is not allowed", body);
     }
 
     [Fact]
@@ -194,10 +194,10 @@ public sealed class AdminTemplateUploadEndpointTests
             new RecordingMediaMetadataReader(),
             CancellationToken.None);
 
-        var response = await ExecuteAsync(result);
+        var (statusCode, body) = await ExecuteAsync(result);
 
-        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
-        Assert.Contains("maximum allowed size of 10 bytes", response.Body);
+        Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
+        Assert.Contains("maximum allowed size of 10 bytes", body);
     }
 
     private static FormFile CreateFormFile(string fileName, string contentType, byte[] content)

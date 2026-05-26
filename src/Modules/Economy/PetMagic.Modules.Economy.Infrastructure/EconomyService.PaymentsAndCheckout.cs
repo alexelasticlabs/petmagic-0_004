@@ -376,7 +376,7 @@ public sealed partial class EconomyService
             return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.PremiumBillingUnavailable);
         }
 
-        string? externalSubscriptionId = verification.Value.ExternalSubscriptionId;
+        var externalSubscriptionId = verification.Value.ExternalSubscriptionId;
         if (string.Equals(provider, "google_play", StringComparison.Ordinal))
         {
             var existingGoogleSubscription = await dbContext.UserSubscriptions

@@ -16,7 +16,7 @@ internal sealed record PremiumPlanDefinition(
 
 internal static class PremiumPlanCatalog
 {
-    private static readonly IReadOnlyList<PremiumPlanDefinition> Plans =
+    public static IReadOnlyList<PremiumPlanDefinition> All { get; } =
     [
         new(
             "monthly",
@@ -46,11 +46,9 @@ internal static class PremiumPlanCatalog
             "com.petmagic.app.premium.yearly")
     ];
 
-    public static IReadOnlyList<PremiumPlanDefinition> All => Plans;
-
     public static PremiumPlanDefinition? Find(string planCode)
     {
-        return Plans.FirstOrDefault(x =>
+        return All.FirstOrDefault(x =>
             string.Equals(x.PlanCode, planCode.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 }

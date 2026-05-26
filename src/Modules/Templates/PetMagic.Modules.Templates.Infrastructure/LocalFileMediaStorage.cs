@@ -185,7 +185,7 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         if (normalizedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
         {
             var subtype = normalizedContentType["video/".Length..];
-            if (!VideoSubtypeExtensions.TryGetValue(subtype, out string? mappedVideoExtension)
+            if (!VideoSubtypeExtensions.TryGetValue(subtype, out var mappedVideoExtension)
                 || string.IsNullOrWhiteSpace(mappedVideoExtension))
             {
                 return false;
@@ -196,7 +196,7 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
             return true;
         }
 
-        if (ExactContentTypeExtensions.TryGetValue(normalizedContentType, out string? mappedExactExtension)
+        if (ExactContentTypeExtensions.TryGetValue(normalizedContentType, out var mappedExactExtension)
             && !string.IsNullOrWhiteSpace(mappedExactExtension))
         {
             extension = mappedExactExtension;

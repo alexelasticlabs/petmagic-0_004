@@ -20,7 +20,7 @@ public sealed class SupportReplyTemplateCatalogService(SupportChatDbContext supp
             .ThenBy(x => x.Title)
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<SupportReplyTemplateResponse>>(templates.Select(ToResponse).ToList());
+        return Result.Success<IReadOnlyList<SupportReplyTemplateResponse>>([.. templates.Select(ToResponse)]);
     }
 
     public async Task<Result<SupportReplyTemplateResponse>> UpsertAdminTemplateAsync(UpsertSupportReplyTemplateCommand command, CancellationToken cancellationToken)

@@ -160,7 +160,7 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
         }
 
         var subtype = normalizedContentType["image/".Length..];
-        if (!ImageSubtypeExtensions.TryGetValue(subtype, out string? mappedExtension)
+        if (!ImageSubtypeExtensions.TryGetValue(subtype, out var mappedExtension)
             || string.IsNullOrWhiteSpace(mappedExtension))
         {
             return false;

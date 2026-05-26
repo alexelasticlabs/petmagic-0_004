@@ -4,16 +4,11 @@ using PetMagic.Modules.Identity.Application.Contracts;
 
 namespace PetMagic.Modules.Identity.Api.Authentication;
 
-public sealed class ExternalLoginCompletionStore
+public sealed class ExternalLoginCompletionStore(IMemoryCache cache)
 {
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(2);
 
-    private readonly IMemoryCache _cache;
-
-    public ExternalLoginCompletionStore(IMemoryCache cache)
-    {
-        _cache = cache;
-    }
+    private readonly IMemoryCache _cache = cache;
 
     public string Create(TokenPairResponse session)
     {

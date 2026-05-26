@@ -2,16 +2,11 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace PetMagic.Modules.Identity.Api.Authentication;
 
-public sealed class ExternalAccountLinkStore
+public sealed class ExternalAccountLinkStore(IMemoryCache cache)
 {
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(5);
 
-    private readonly IMemoryCache _cache;
-
-    public ExternalAccountLinkStore(IMemoryCache cache)
-    {
-        _cache = cache;
-    }
+    private readonly IMemoryCache _cache = cache;
 
     public string Create(Guid userId)
     {

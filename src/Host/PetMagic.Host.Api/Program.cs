@@ -195,7 +195,7 @@ app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = static staticFileContext =>
     {
-        staticFileContext.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        staticFileContext.Context.Response.Headers.XContentTypeOptions = "nosniff";
 
         var requestPath = staticFileContext.Context.Request.Path.Value ?? string.Empty;
         var contentType = staticFileContext.Context.Response.ContentType ?? string.Empty;
@@ -208,7 +208,7 @@ app.UseStaticFiles(new StaticFileOptions
             return;
         }
 
-        staticFileContext.Context.Response.Headers["Cache-Control"] = "public,max-age=31536000,immutable";
+        staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
 
         var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
         var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
@@ -216,7 +216,7 @@ app.UseStaticFiles(new StaticFileOptions
         if (requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
             && !isImage)
         {
-            staticFileContext.Context.Response.Headers["Content-Disposition"] = "attachment";
+            staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
             return;
         }
 
@@ -224,7 +224,7 @@ app.UseStaticFiles(new StaticFileOptions
             && !isImage
             && !isVideo)
         {
-            staticFileContext.Context.Response.Headers["Content-Disposition"] = "attachment";
+            staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
         }
     }
 });

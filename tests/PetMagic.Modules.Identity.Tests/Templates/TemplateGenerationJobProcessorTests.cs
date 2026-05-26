@@ -61,14 +61,12 @@ public sealed class TemplateGenerationJobProcessorTests
         dbContext.TemplateGenerationJobs.Add(job);
         await dbContext.SaveChangesAsync();
 
-        var mediaStorage = new TrackingMediaStorage();
-        var processor = CreateProcessor(dbContext, mediaStorage: mediaStorage, options: CreateOptions(retentionDays: 7));
+        var processor = CreateProcessor(dbContext, options: CreateOptions(retentionDays: 7));
 
         var processed = await processor.CleanupNextExpiredGenerationAsync(CancellationToken.None);
 
         Assert.True(processed);
         Assert.False(await dbContext.TemplateGenerationJobs.AnyAsync(x => x.Id == job.Id));
-        Assert.Empty(mediaStorage.DeletedUrls);
     }
 
     [Fact]
@@ -86,8 +84,7 @@ public sealed class TemplateGenerationJobProcessorTests
         dbContext.TemplateGenerationJobs.Add(job);
         await dbContext.SaveChangesAsync();
 
-        var mediaStorage = new TrackingMediaStorage();
-        var processor = CreateProcessor(dbContext, mediaStorage: mediaStorage, options: CreateOptions(retentionDays: 7));
+        var processor = CreateProcessor(dbContext, options: CreateOptions(retentionDays: 7));
 
         var processed = await processor.CleanupNextExpiredGenerationAsync(CancellationToken.None);
 
@@ -95,7 +92,6 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.False(processed);
         Assert.Equal(TemplateGenerationStatus.Failed, persisted.Status);
         Assert.Null(persisted.RefundedAtUtc);
-        Assert.Empty(mediaStorage.DeletedUrls);
     }
 
     [Fact]
@@ -340,7 +336,6 @@ public sealed class TemplateGenerationJobProcessorTests
 
     private static TemplateGenerationJobProcessor CreateProcessor(
         TemplatesDbContext dbContext,
-        IMediaStorage? mediaStorage = null,
         ITemplateGenerationBilling? billing = null,
         IImagePreprocessor? imagePreprocessor = null,
         IImageGenerator? imageGenerator = null,

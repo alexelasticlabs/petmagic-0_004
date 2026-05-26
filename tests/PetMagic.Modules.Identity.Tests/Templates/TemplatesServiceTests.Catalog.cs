@@ -1,14 +1,7 @@
-using System.Threading.Channels;
-
 using Microsoft.EntityFrameworkCore;
 
-using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
-using PetMagic.Modules.Templates.Infrastructure;
-using PetMagic.Modules.Templates.Infrastructure.Data;
-using PetMagic.Modules.Templates.Infrastructure.Entities;
-using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -350,7 +343,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(firstPage.IsSuccess);
         Assert.True(firstPage.Value.HasMore);
         Assert.NotNull(firstPage.Value.NextCursor);
-        Assert.Equal([newestId, middleId], firstPage.Value.Items.Select(item => item.TemplateId).ToArray());
+        Assert.Equal([newestId, middleId], [.. firstPage.Value.Items.Select(item => item.TemplateId)]);
 
         var secondPage = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, firstPage.Value.NextCursor),
@@ -386,7 +379,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(firstPage.IsSuccess);
         Assert.True(firstPage.Value.HasMore);
         Assert.NotNull(firstPage.Value.NextCursor);
-        Assert.Equal([newestId, middleId], firstPage.Value.Items.Select(item => item.TemplateId).ToArray());
+        Assert.Equal([newestId, middleId], [.. firstPage.Value.Items.Select(item => item.TemplateId)]);
 
         var secondPage = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "PORTRAIT", [], null, "PoRtRaIt", 2, firstPage.Value.NextCursor),
@@ -415,7 +408,7 @@ public sealed partial class TemplatesServiceTests
         var categories = await service.ListPublicCategoriesAsync(CancellationToken.None);
 
         Assert.True(categories.IsSuccess);
-        Assert.Equal(["Magic"], categories.Value.Select(x => x.Name).ToArray());
+        Assert.Equal(["Magic"], [.. categories.Value.Select(x => x.Name)]);
     }
 
     [Fact]

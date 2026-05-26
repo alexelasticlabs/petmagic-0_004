@@ -1,12 +1,10 @@
 using System.Collections.Concurrent;
-using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Threading.Channels;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -21,7 +19,6 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Api;
-using PetMagic.Modules.Templates.Api.Endpoints;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -443,12 +440,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         while (true)
         {
-            var line = await reader.ReadLineAsync();
-            if (line is null)
-            {
-                throw new InvalidOperationException("SSE stream closed before an event was received.");
-            }
-
+            var line = await reader.ReadLineAsync() ?? throw new InvalidOperationException("SSE stream closed before an event was received.");
             if (line.Length == 0)
             {
                 if (!string.IsNullOrWhiteSpace(topic))

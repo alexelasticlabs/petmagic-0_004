@@ -6,13 +6,8 @@ using PetMagic.Modules.Identity.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Infrastructure.Data;
 
-public sealed class IdentityDbContext : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>
+public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
-    public IdentityDbContext(DbContextOptions<IdentityDbContext> options)
-        : base(options)
-    {
-    }
-
     public DbSet<RefreshTokenSession> RefreshTokenSessions => Set<RefreshTokenSession>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();

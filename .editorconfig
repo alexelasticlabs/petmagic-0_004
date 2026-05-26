@@ -20,3 +20,33 @@ csharp_style_var_for_built_in_types = true:suggestion
 csharp_style_var_when_type_is_apparent = true:suggestion
 csharp_style_var_elsewhere = true:suggestion
 dotnet_diagnostic.IDE0005.severity = suggestion
+# Preserve collection contracts; concrete substitutions are not justified by a measurable hot path.
+dotnet_diagnostic.CA1859.severity = none
+
+# The result accessor enforces the success invariant and is intentionally backed by a field.
+[src/BuildingBlocks/PetMagic.BuildingBlocks/Results/Result.cs]
+dotnet_diagnostic.IDE0032.severity = none
+
+# Deconstructing this large parsed event obscures the aggregate and makes the handler harder to follow.
+[src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/EconomyService.Webhooks.cs]
+dotnet_diagnostic.IDE0042.severity = none
+
+# These string operations are translated by EF Core; StringComparison overloads are not portable SQL expressions.
+[src/Modules/Identity/PetMagic.Modules.Identity.Infrastructure/IdentityService.cs]
+dotnet_diagnostic.CA1862.severity = none
+
+[src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplatesService.Public.cs]
+dotnet_diagnostic.CA1862.severity = none
+
+[src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/TemplateAdminAnalyticsService.cs]
+dotnet_diagnostic.CA1862.severity = none
+
+# Migration source is generated history; style and allocation changes add churn without runtime benefit.
+[**/Data/Migrations/*.cs]
+dotnet_diagnostic.IDE0005.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+# These startup hosts intentionally use explicit authorization option configuration for fixture readability.
+[tests/**/*.cs]
+dotnet_diagnostic.ASP0025.severity = none

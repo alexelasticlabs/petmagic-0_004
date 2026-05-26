@@ -225,7 +225,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             .Take(take)
             .ToArrayAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>(jobs.Select(TemplateGenerationService.MapResponse).ToArray());
+        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>([.. jobs.Select(TemplateGenerationService.MapResponse)]);
     }
 
     public async Task<Result<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>> GetAdminFailureBreakdownAsync(Guid templateId, CancellationToken cancellationToken)
@@ -315,33 +315,30 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             totalViews,
             totals?.TotalVideoViews ?? 0,
             totals?.TotalComplaints ?? 0,
-            sourceCounts
+            [.. sourceCounts
                 .OrderByDescending(x => x.Count)
                 .ThenBy(x => x.Key)
                 .Select(x => new AdminTemplateAnalyticsDimensionResponse(
                     x.Key,
                     FormatDimensionLabel(x.Key),
                     x.Count,
-                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))
-                .ToArray(),
-            deviceCounts
+                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))],
+            [.. deviceCounts
                 .OrderByDescending(x => x.Count)
                 .ThenBy(x => x.Key)
                 .Select(x => new AdminTemplateAnalyticsDimensionResponse(
                     x.Key,
                     FormatDimensionLabel(x.Key),
                     x.Count,
-                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))
-                .ToArray(),
-            geographyCounts
+                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))],
+            [.. geographyCounts
                 .OrderByDescending(x => x.Count)
                 .ThenBy(x => x.Key)
                 .Select(x => new AdminTemplateAnalyticsDimensionResponse(
                     x.Key,
                     FormatDimensionLabel(x.Key),
                     x.Count,
-                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))
-                .ToArray());
+                    Math.Round((double)x.Count * 100 / totalViews, 1, MidpointRounding.AwayFromZero)))]);
 
         return Result.Success(response);
     }
@@ -419,7 +416,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
         var templateIds = templates.Select(x => x.Id).ToHashSet();
 
         var jobs = templateIds.Count == 0
-            ? Array.Empty<GenerationAnalyticsProjection>()
+            ? []
             : await dbContext.TemplateGenerationJobs
                 .AsNoTracking()
                 .Where(x => templateIds.Contains(x.TemplateId))
@@ -443,7 +440,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                 .ToArrayAsync(cancellationToken);
 
         var events = templateIds.Count == 0
-            ? Array.Empty<TemplateAnalyticsEvent>()
+            ? []
             : await dbContext.TemplateAnalyticsEvents
                 .AsNoTracking()
                 .Where(x => templateIds.Contains(x.TemplateId))
@@ -511,7 +508,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                 Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero),
                 totalComplaints),
             BuildTemplatesAnalyticsTrend(jobs, events),
-            sortedRows.Take(5).ToArray(),
+            [.. sortedRows.Take(5)],
             BuildTemplatesAnalyticsBreakdown(rows, row => row.Category),
             BuildTemplatesAnalyticsBreakdown(rows, row => row.TemplateType),
             BuildDimension(viewEvents, x => x.Source, "direct"),
@@ -524,13 +521,12 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                 completed,
                 rows.Sum(x => x.FailedGenerations),
                 totalComplaints),
-            sortedRows.Take(take).ToArray(),
-            allTemplates
+            [.. sortedRows.Take(take)],
+            [.. allTemplates
                 .Select(x => x.Category)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(x => x)
-                .ToArray(),
+                .OrderBy(x => x)],
             generatedAtUtc);
 
         return Result.Success(response);
@@ -606,7 +602,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             .GroupBy(x => x.CreatedAtUtc.Date)
             .ToDictionary(x => x.Key, x => x.ToArray());
 
-        return jobsByDay.Keys
+        return [.. jobsByDay.Keys
             .Concat(eventsByDay.Keys)
             .Distinct()
             .OrderBy(x => x)
@@ -625,15 +621,14 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                     dayJobs.Count(x => x.Status == TemplateGenerationStatus.Failed),
                     totalTokenCost,
                     Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero));
-            })
-            .ToArray();
+            })];
     }
 
     private static IReadOnlyList<AdminTemplatesAnalyticsBreakdownResponse> BuildTemplatesAnalyticsBreakdown(
         IReadOnlyCollection<AdminTemplatesAnalyticsTemplateRowResponse> rows,
         Func<AdminTemplatesAnalyticsTemplateRowResponse, string> selector)
     {
-        return rows
+        return [.. rows
             .GroupBy(row => NormalizeAnalyticsValue(selector(row), "unknown", 128))
             .OrderByDescending(group => group.Sum(x => x.Views))
             .ThenByDescending(group => group.Sum(x => x.GenerationStarts))
@@ -655,8 +650,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                     CalculatePercent(completed, starts),
                     totalTokenCost,
                     Math.Round(totalProviderCostUsd, 4, MidpointRounding.AwayFromZero));
-            })
-            .ToArray();
+            })];
     }
 
     private static IEnumerable<AdminTemplatesAnalyticsTemplateRowResponse> SortTemplatesAnalyticsRows(
@@ -664,7 +658,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
         string? sort)
     {
         var normalizedSort = NormalizeAnalyticsFilter(sort) ?? "views";
-        IOrderedEnumerable<AdminTemplatesAnalyticsTemplateRowResponse> ordered = normalizedSort switch
+        var ordered = normalizedSort switch
         {
             "starts" => rows.OrderByDescending(x => x.GenerationStarts),
             "conversion" => rows.OrderByDescending(x => x.ConversionPercent),
@@ -720,7 +714,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             return [];
         }
 
-        return events
+        return [.. events
             .Select(selector)
             .Select(value => NormalizeAnalyticsValue(value, fallback, 64))
             .GroupBy(value => value)
@@ -730,8 +724,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                 group.Key,
                 FormatDimensionLabel(group.Key),
                 group.Count(),
-                Math.Round((double)group.Count() * 100 / events.Count, 1, MidpointRounding.AwayFromZero)))
-            .ToArray();
+                Math.Round((double)group.Count() * 100 / events.Count, 1, MidpointRounding.AwayFromZero)))];
     }
 
     private static string NormalizeAnalyticsValue(string? value, string fallback, int maxLength)

@@ -96,10 +96,9 @@ internal sealed partial class TemplatesService
         }
         else
         {
-            filtered = (await orderedQuery.ToArrayAsync(cancellationToken))
+            filtered = [.. (await orderedQuery.ToArrayAsync(cancellationToken))
                 .Where(template => normalizedTags.All(tag => DeserializeTags(template.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)))
-                .Take(take + 1)
-                .ToArray();
+                .Take(take + 1)];
         }
 
         var pageItems = filtered.Take(take).ToArray();
@@ -109,7 +108,7 @@ internal sealed partial class TemplatesService
             : null;
 
         return Result.Success(new PublicTemplatesFeedResponse(
-            pageItems.Select(MapPublicListItem).ToArray(),
+            [.. pageItems.Select(MapPublicListItem)],
             nextCursor,
             hasMore,
             DateTime.UtcNow));

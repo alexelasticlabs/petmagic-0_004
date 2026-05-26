@@ -43,7 +43,7 @@ internal sealed partial class TemplatesService
             .OrderByDescending(x => x.UpdatedAtUtc)
             .ToArrayAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<AdminTemplateListItemResponse>>(items.Select(MapAdminListItem).ToArray());
+        return Result.Success<IReadOnlyList<AdminTemplateListItemResponse>>([.. items.Select(MapAdminListItem)]);
     }
 
     public async Task<Result<AdminTemplateResponse>> GetAdminAsync(Guid templateId, CancellationToken cancellationToken)

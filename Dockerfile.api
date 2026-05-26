@@ -1,10 +1,10 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS builder
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 WORKDIR /src
 COPY ["src/", "src/"]
 RUN dotnet restore "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj"
-RUN dotnet publish "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" -c Release --no-restore -o /app/publish
+RUN dotnet publish "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" -c Release --no-restore -o /app/publish -p:PublishReadyToRun=true
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
     && rm -rf /var/lib/apt/lists/*

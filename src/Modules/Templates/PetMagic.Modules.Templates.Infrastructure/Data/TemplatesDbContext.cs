@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 
-using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data;

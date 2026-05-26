@@ -409,12 +409,12 @@ public sealed partial class EconomyService
 
     private static string NormalizeRedeemCode(string rawCode)
     {
-        return Regex.Replace(rawCode.Trim().ToUpperInvariant(), "\\s+", string.Empty, RegexOptions.CultureInvariant);
+        return WhitespaceRegex().Replace(rawCode.Trim().ToUpperInvariant(), string.Empty);
     }
 
     private static string NormalizeReferralCode(string rawCode)
     {
-        return Regex.Replace(rawCode.Trim().ToUpperInvariant(), "[^A-Z0-9]", string.Empty, RegexOptions.CultureInvariant);
+        return NonAlphanumericRegex().Replace(rawCode.Trim().ToUpperInvariant(), string.Empty);
     }
 
     private static string NormalizeRewardKind(string rawRewardKind)
@@ -506,11 +506,10 @@ public sealed partial class EconomyService
 
     private static List<PaywallPaymentMethodResponse> SortPaymentMethods(IEnumerable<PaywallPaymentMethodResponse> methods)
     {
-        return methods
+        return [.. methods
             .OrderByDescending(x => x.IsSelectedByDefault)
             .ThenByDescending(x => x.IsRecommended)
-            .ThenBy(x => x.Provider, StringComparer.Ordinal)
-            .ToList();
+            .ThenBy(x => x.Provider, StringComparer.Ordinal)];
     }
 
     private static PaywallLegalTextsResponse BuildPaywallLegalTexts()
@@ -520,4 +519,10 @@ public sealed partial class EconomyService
             "External checkout opens a secure billing flow outside the store. Premium activates after verification, and additional disclosures may apply in your region.",
             "Stripe checkout and customer portal are secure. PetMagic does not store raw card details and subscription management stays available inside PetMagic settings.");
     }
+
+    [GeneratedRegex("\\s+", RegexOptions.CultureInvariant)]
+    private static partial Regex WhitespaceRegex();
+
+    [GeneratedRegex("[^A-Z0-9]", RegexOptions.CultureInvariant)]
+    private static partial Regex NonAlphanumericRegex();
 }

@@ -682,10 +682,9 @@ public sealed class IdentityService(
             .GroupBy(x => x.UserId)
             .ToDictionaryAsync(
                 group => group.Key,
-                group => (IReadOnlyList<string>)group
+                group => (IReadOnlyList<string>)[.. group
                     .Select(x => x.RoleName)
-                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                    .ToArray(),
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)],
                 cancellationToken);
 
         var output = users
@@ -744,7 +743,7 @@ public sealed class IdentityService(
         var economyService = serviceProvider.GetRequiredService<IEconomyService>();
         var normalizedOperation = command.Operation.Trim().ToLowerInvariant();
         var reason = command.Reason.Trim();
-        Result<WalletOperationResponse> operationResult = normalizedOperation switch
+        var operationResult = normalizedOperation switch
         {
             "credit" => await economyService.CreditAsync(
                 new CreditBalanceCommand(command.UserId, command.Amount, WalletLedgerSource.AdminGrant, reason),
@@ -1159,7 +1158,7 @@ public sealed class IdentityService(
             user.PrivacyPolicyAccepted,
             user.MarketingEmailsEnabled,
             ToLegalAcceptanceResponse(user),
-            roles.ToList(),
+            [.. roles],
             user.CreatedAtUtc,
             ToAvatarResponse(user));
 
@@ -1167,14 +1166,13 @@ public sealed class IdentityService(
     {
         var userLogins = await userManager.GetLoginsAsync(user);
 
-        return userLogins
+        return [.. userLogins
             .GroupBy(x => x.LoginProvider, StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Select(group => new LinkedAccountResponse(
                 group.First().LoginProvider,
                 ToLinkedAccountDisplayName(group.First().ProviderDisplayName ?? group.First().LoginProvider),
-                CanDisconnectLinkedProvider(user, userLogins, group.Count())))
-            .ToList();
+                CanDisconnectLinkedProvider(user, userLogins, group.Count())))];
     }
 
     private static bool CanDisconnectLinkedProvider(AppUser user, IEnumerable<UserLoginInfo> allLogins, int providerLoginCount)
@@ -1213,6 +1211,6 @@ public sealed class IdentityService(
             user.PrivacyPolicyAccepted,
             user.MarketingEmailsEnabled,
             ToLegalAcceptanceResponse(user),
-            roles.ToList(),
+            [.. roles],
             ToAvatarResponse(user));
 }
