@@ -12,6 +12,8 @@ public sealed record PurchaseCheckoutResponse(
     int SparkToGrant,
     DateTime CreatedAtUtc);
 
+public sealed record VerifyStripeCheckoutSessionCommand(Guid UserId, Guid OrderId, string StripeSessionId);
+
 public sealed record PurchaseOrderResponse(
     Guid OrderId,
     Guid UserId,

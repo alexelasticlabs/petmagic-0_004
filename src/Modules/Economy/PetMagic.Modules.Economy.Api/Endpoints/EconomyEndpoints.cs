@@ -98,6 +98,9 @@ public static class EconomyEndpoints
         group.MapPost("/purchases/{orderId:guid}/confirm", ConfirmPurchaseAsync)
             .RequireAuthorization();
 
+        group.MapPost("/purchases/{orderId:guid}/verify-stripe", VerifyStripeCheckoutAsync)
+            .RequireAuthorization();
+
         group.MapGet("/purchases/{orderId:guid}", GetPurchaseAsync)
             .RequireAuthorization();
 
@@ -727,6 +730,37 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> VerifyStripeCheckoutAsync(
+        HttpContext context,
+        Guid orderId,
+        VerifyStripeCheckoutRequest request,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.StripeSessionId))
+        {
+            return TypedResults.Problem(title: "economy.invalid_request", detail: "Stripe session ID is required.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var command = new VerifyStripeCheckoutSessionCommand(userId!.Value, orderId, request.StripeSessionId);
+        var result = await service.VerifyStripeCheckoutSessionAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, PurchaseNotFoundCode, StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> GetPurchaseAsync(
         HttpContext context,
         Guid orderId,
@@ -886,6 +920,8 @@ public static class EconomyEndpoints
     public sealed record ReferralCodeRequest(string Code);
 
     public sealed record PaymentMethodSetupRequest(string PaymentProvider = "stripe");
+
+    public sealed record VerifyStripeCheckoutRequest(string StripeSessionId);
 
     public sealed record CreatePurchaseRequest(
         Guid PackId,

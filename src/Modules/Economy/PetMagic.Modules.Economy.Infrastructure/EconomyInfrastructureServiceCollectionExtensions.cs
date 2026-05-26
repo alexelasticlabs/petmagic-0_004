@@ -397,6 +397,29 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Notes = "EU-only alternative billing path for Android eligible regions.",
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
+            },
+            new PaymentProviderConfiguration
+            {
+                Id = Guid.NewGuid(),
+                Provider = "stripe",
+                Platform = "android",
+                Region = "*",
+                IsEnabled = true,
+                IsRecommended = false,
+                IsSelectedByDefault = false,
+                RequiresExternalWarning = true,
+                RequiresStoreDisclosure = false,
+                AllowedFromAppVersion = "0.0.0",
+                ExternalCheckoutAllowed = true,
+                BonusTokensPercent = 0,
+                DisplayLabel = "Stripe",
+                DisplaySubtitle = "Pay securely via Stripe",
+                WarningTitle = "Payment via Stripe",
+                WarningMessage = "You will continue to Stripe Checkout to complete payment securely. PetMagic does not store your card details.",
+                Mode = defaultMode,
+                Notes = "Global fallback Stripe external checkout for Android (non-EU).",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
             }
         };
 

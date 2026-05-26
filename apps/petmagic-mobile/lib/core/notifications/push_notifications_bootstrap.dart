@@ -10,6 +10,8 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 
 class PushNotificationsBootstrap extends ConsumerStatefulWidget {
   const PushNotificationsBootstrap({
@@ -129,6 +131,28 @@ class _PushNotificationsBootstrapState
 
   void _openDeepLink(Uri uri) {
     if (uri.scheme != 'petmagic') {
+      return;
+    }
+
+    if (uri.host == 'checkout') {
+      final path = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+      widget.router.go(WalletPage.routePath);
+      if (path == 'success') {
+        final sessionId = uri.queryParameters['session_id'];
+        if (sessionId != null && sessionId.isNotEmpty) {
+          Future.microtask(
+            () => ref
+                .read(walletControllerProvider.notifier)
+                .verifyStripeCheckout(sessionId),
+          );
+        } else {
+          Future.microtask(
+            () => ref
+                .read(walletControllerProvider.notifier)
+                .verifyCheckoutStatus(),
+          );
+        }
+      }
       return;
     }
 

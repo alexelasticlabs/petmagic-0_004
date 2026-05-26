@@ -244,9 +244,18 @@ class WalletController extends Notifier<WalletState> {
   Future<String?> buyPack(CurrencyPackModel pack) async {
     final paymentMethod = state.selectedPaymentMethod;
     if (paymentMethod == null) {
+      developer.log(
+        'Checkout blocked: no enabled Stripe payment method (pack=${pack.code}, methods=${state.paymentMethods.length})',
+        name: 'PetMagic.Wallet.Checkout',
+      );
       state = state.copyWith(errorMessage: 'wallet.payment_unavailable');
       return null;
     }
+
+    developer.log(
+      'Checkout start (pack=${pack.code}, provider=${paymentMethod.provider}, currency=${pack.currencyCode}, amount=${pack.priceAmount})',
+      name: 'PetMagic.Wallet.Checkout',
+    );
 
     state = state.copyWith(
       isBuying: true,
@@ -264,6 +273,11 @@ class WalletController extends Notifier<WalletState> {
         pack,
         paymentMethod,
         WidgetsBinding.instance.platformDispatcher.locale,
+      );
+
+      developer.log(
+        'Checkout response (order=${checkout.orderId}, status=${checkout.status}, urlLength=${checkout.checkoutUrl.length})',
+        name: 'PetMagic.Wallet.Checkout',
       );
 
       final checkoutUrl = checkout.checkoutUrl.trim();
@@ -302,6 +316,11 @@ class WalletController extends Notifier<WalletState> {
       );
       return checkoutUrl;
     } catch (error) {
+      developer.log(
+        'Checkout failed (pack=${pack.code}, provider=${paymentMethod.provider})',
+        name: 'PetMagic.Wallet.Checkout',
+        error: error,
+      );
       state = state.copyWith(isBuying: false, errorMessage: error.toString());
       return null;
     }
@@ -439,5 +458,42 @@ class WalletController extends Notifier<WalletState> {
       checkoutVerificationState: WalletCheckoutVerificationState.pending,
       clearCheckoutError: true,
     );
+  }
+
+  Future<void> verifyStripeCheckout(String stripeSessionId) async {
+    final pendingOrderId = state.pendingCheckoutOrderId;
+    if (pendingOrderId == null || pendingOrderId.isEmpty) {
+      return;
+    }
+
+    state = state.copyWith(
+      checkoutVerificationState: WalletCheckoutVerificationState.checking,
+      clearCheckoutGrantedSpark: true,
+      clearCheckoutError: true,
+      clearHighlightedPurchaseOrderId: true,
+    );
+
+    try {
+      final purchase = await _repository.verifyStripeCheckoutSession(
+        orderId: pendingOrderId,
+        stripeSessionId: stripeSessionId,
+      );
+
+      if (purchase.status == 'succeeded') {
+        await load(refresh: true);
+        state = state.copyWith(
+          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+          checkoutGrantedSpark: purchase.sparkToGrant,
+          highlightedPurchaseOrderId: purchase.orderId,
+          clearPendingCheckout: true,
+          clearCheckoutError: true,
+        );
+        return;
+      }
+    } catch (_) {
+      // Fall through to polling-based verification
+    }
+
+    await verifyCheckoutStatus();
   }
 }

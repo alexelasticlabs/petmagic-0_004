@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
@@ -138,12 +139,22 @@ class WalletRepository {
       'locale': locale.toLanguageTag(),
     };
 
+    developer.log(
+      'POST /api/economy/purchases/create (packId=${pack.packId}, provider=${paymentMethod.provider}, currency=${pack.currencyCode}, country=${locale.countryCode ?? '*'})',
+      name: 'PetMagic.Wallet.Api',
+    );
+
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/purchases/create',
         data: payload,
         options: _authOptions(session.accessToken),
       ),
+    );
+
+    developer.log(
+      'POST /api/economy/purchases/create -> ${response.statusCode}',
+      name: 'PetMagic.Wallet.Api',
     );
 
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});
@@ -182,6 +193,21 @@ class WalletRepository {
     );
 
     return fetchRewards();
+  }
+
+  Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
+    required String orderId,
+    required String stripeSessionId,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/economy/purchases/$orderId/verify-stripe',
+        data: {'stripeSessionId': stripeSessionId},
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return PurchaseHistoryItem.fromJson(response.data ?? const {});
   }
 
   Future<Response<T>> _authorizedRequest<T>(

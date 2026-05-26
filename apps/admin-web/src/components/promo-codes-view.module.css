@@ -901,3 +901,77 @@
     transform: none;
   }
 }
+
+/* ── Form editor enhancements ── */
+
+.codeInput {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.88rem;
+  letter-spacing: 0.05em;
+}
+
+.quickChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.28rem;
+}
+
+.quickChip {
+  appearance: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.42rem;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  padding: 0.16rem 0.54rem;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 130ms ease,
+    background-color 130ms ease,
+    color 130ms ease;
+}
+
+.quickChip:hover {
+  border-color: rgba(83, 155, 245, 0.54);
+  background: rgba(26, 115, 232, 0.14);
+  color: var(--text-strong);
+}
+
+.quickChipActive {
+  border-color: rgba(83, 155, 245, 0.8);
+  background: rgba(26, 115, 232, 0.22);
+  color: #c2dcff;
+}
+
+.formSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.36rem;
+  padding: 0.52rem 0.72rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.72rem;
+  background: rgba(10, 16, 28, 0.56);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.formSummaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  color: var(--text-soft);
+}
+
+.formSummaryItem strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.formSummarySep {
+  color: var(--border-strong);
+  user-select: none;
+}

@@ -11,6 +11,8 @@ using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 using PetMagic.Modules.Identity.Application.Contracts;
 
+using Stripe;
+
 namespace PetMagic.Modules.Economy.Infrastructure;
 
 public sealed partial class EconomyService
@@ -696,24 +698,25 @@ public sealed partial class EconomyService
                 dbContext.CurrencyPacks.AsNoTracking(),
                 order => order.PackId,
                 pack => pack.Id,
-                (order, pack) => new PurchaseHistoryItemResponse(
-                    order.Id,
-                    order.UserId,
-                    order.PackId,
-                    pack.Code,
-                    pack.DisplayName,
-                    order.PaymentProvider,
-                    order.Status,
-                    order.PriceAmount,
-                    order.CurrencyCode,
-                    order.SparkToGrant,
-                    order.ExternalPaymentId,
-                    order.CreatedAtUtc,
-                    order.ConfirmedAtUtc))
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .ThenByDescending(x => x.OrderId)
+                (order, pack) => new { order, pack })
+            .OrderByDescending(x => x.order.CreatedAtUtc)
+            .ThenByDescending(x => x.order.Id)
             .Skip(normalizedSkip)
             .Take(normalizedTake + 1)
+            .Select(x => new PurchaseHistoryItemResponse(
+                x.order.Id,
+                x.order.UserId,
+                x.order.PackId,
+                x.pack.Code,
+                x.pack.DisplayName,
+                x.order.PaymentProvider,
+                x.order.Status,
+                x.order.PriceAmount,
+                x.order.CurrencyCode,
+                x.order.SparkToGrant,
+                x.order.ExternalPaymentId,
+                x.order.CreatedAtUtc,
+                x.order.ConfirmedAtUtc))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
@@ -736,6 +739,60 @@ public sealed partial class EconomyService
         }
 
         return Result.Success(ToPurchaseOrderResponse(confirmResult.Value));
+    }
+
+    public async Task<Result<PurchaseOrderResponse>> VerifyStripeCheckoutSessionAsync(VerifyStripeCheckoutSessionCommand command, CancellationToken cancellationToken)
+    {
+        var order = await dbContext.PurchaseOrders
+            .FirstOrDefaultAsync(x => x.Id == command.OrderId && x.UserId == command.UserId, cancellationToken);
+
+        if (order is null)
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
+        }
+
+        if (!string.Equals(order.ExternalPaymentId, command.StripeSessionId, StringComparison.Ordinal))
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
+        }
+
+        if (string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal))
+        {
+            return Result.Success(ToPurchaseOrderResponse(order));
+        }
+
+        var apiKey = ResolveStripeApiKey();
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        StripeConfiguration.ApiKey = apiKey;
+
+        try
+        {
+            var sessionService = new Stripe.Checkout.SessionService();
+            var session = await sessionService.GetAsync(command.StripeSessionId, cancellationToken: cancellationToken);
+
+            if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(session.Status, "complete", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Success(ToPurchaseOrderResponse(order));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Stripe session verification failed for session {SessionId}", command.StripeSessionId);
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
+        if (confirmResult.IsFailure && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+        {
+            return Result.Failure<PurchaseOrderResponse>(confirmResult.Error);
+        }
+
+        return Result.Success(ToPurchaseOrderResponse(order));
     }
 
     public async Task<Result<PurchaseOrderResponse>> GetPurchaseAsync(Guid userId, Guid orderId, CancellationToken cancellationToken)

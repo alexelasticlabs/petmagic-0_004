@@ -9,11 +9,11 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/stripe_checkout_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 part 'widgets/wallet_page_activity_widgets.dart';
 part 'widgets/wallet_page_overview_widgets.dart';
@@ -28,31 +28,11 @@ class WalletPage extends ConsumerStatefulWidget {
   ConsumerState<WalletPage> createState() => _WalletPageState();
 }
 
-class _WalletPageState extends ConsumerState<WalletPage>
-    with WidgetsBindingObserver {
-  bool _shouldReloadOnResume = false;
-
+class _WalletPageState extends ConsumerState<WalletPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() => ref.read(walletControllerProvider.notifier).load());
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
-      _shouldReloadOnResume = false;
-      unawaited(
-        ref.read(walletControllerProvider.notifier).verifyCheckoutStatus(),
-      );
-    }
   }
 
   @override
@@ -177,73 +157,35 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
   Future<void> _openCheckout(String checkoutUrl) async {
     final text = AppLocalizations.of(context);
-    final uri = _checkoutUri(checkoutUrl);
-    if (uri == null) {
-      debugPrint('PETMAGIC_WALLET_CHECKOUT invalid_url="$checkoutUrl"');
-      if (!mounted) {
-        return;
-      }
-
+    if (checkoutUrl.trim().isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
       );
       return;
     }
 
-    debugPrint('PETMAGIC_WALLET_CHECKOUT opening uri="$uri"');
-    _shouldReloadOnResume = true;
-    var launched = false;
-    try {
-      launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      debugPrint(
-        'PETMAGIC_WALLET_CHECKOUT in_app_browser_view launched=$launched',
-      );
-    } catch (_) {
-      debugPrint('PETMAGIC_WALLET_CHECKOUT in_app_browser_view threw');
-      launched = false;
-    }
+    debugPrint('PETMAGIC_WALLET_CHECKOUT opening url="$checkoutUrl"');
+    final result = await StripeCheckoutPage.open(context, checkoutUrl);
+    debugPrint('PETMAGIC_WALLET_CHECKOUT result=${result.runtimeType}');
 
-    if (!launched) {
-      try {
-        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        debugPrint(
-          'PETMAGIC_WALLET_CHECKOUT external_application launched=$launched',
-        );
-      } catch (_) {
-        debugPrint('PETMAGIC_WALLET_CHECKOUT external_application threw');
-        launched = false;
-      }
-    }
+    if (!mounted) return;
+    final controller = ref.read(walletControllerProvider.notifier);
 
-    if (!launched && mounted) {
-      debugPrint('PETMAGIC_WALLET_CHECKOUT failed_to_launch');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
-      );
+    switch (result) {
+      case StripeCheckoutSuccess(:final sessionId):
+        if (sessionId.isNotEmpty) {
+          await controller.verifyStripeCheckout(sessionId);
+        } else {
+          await controller.verifyCheckoutStatus();
+        }
+      case StripeCheckoutCancelled():
+        await controller.verifyCheckoutStatus();
+      case StripeCheckoutDismissed():
+        // User dismissed without completing — do nothing.
+        break;
     }
   }
-}
-
-Uri? _checkoutUri(String rawUrl) {
-  final value = rawUrl.trim();
-  if (value.isEmpty) {
-    return null;
-  }
-
-  final parsed = Uri.tryParse(value);
-  if (parsed == null) {
-    return null;
-  }
-
-  if (parsed.hasScheme) {
-    return parsed;
-  }
-
-  if (parsed.hasAuthority) {
-    return parsed.replace(scheme: 'https');
-  }
-
-  return null;
 }
 
 Future<void> _showPackDetailSheet(
@@ -386,12 +328,23 @@ Future<void> _showPackDetailSheet(
                 onPressed: isBuying
                     ? null
                     : () async {
+                        debugPrint(
+                          'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${pack.code}',
+                        );
                         final checkoutUrl = await onBuy();
                         if (!sheetContext.mounted) {
                           return;
                         }
 
                         if (checkoutUrl == null || checkoutUrl.isEmpty) {
+                          debugPrint(
+                            'PETMAGIC_WALLET_CHECKOUT buy_result empty_url',
+                          );
+                          ScaffoldMessenger.of(sheetContext).showSnackBar(
+                            SnackBar(
+                              content: Text(text.walletPaymentUnavailableError),
+                            ),
+                          );
                           return;
                         }
 

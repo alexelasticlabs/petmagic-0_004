@@ -76,7 +76,7 @@ export function PromoCodesEditorDrawer({
                 <span className={styles.fieldLabel}>{text.promoCodesCodeLabel}</span>
                 <div className={styles.inlineField}>
                   <input
-                    className={styles.input}
+                    className={`${styles.input} ${styles.codeInput}`}
                     value={form.code}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -103,6 +103,7 @@ export function PromoCodesEditorDrawer({
                 <span className={styles.fieldLabel}>{text.promoCodesDescriptionLabel}</span>
                 <input
                   className={styles.input}
+                  placeholder="Например: Новогодняя акция 2025"
                   value={form.description}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, description: event.target.value }))
@@ -160,6 +161,20 @@ export function PromoCodesEditorDrawer({
                       setForm((current) => ({ ...current, rewardValue: event.target.value }))
                     }
                   />
+                  <div className={styles.quickChips}>
+                    {[50, 100, 250, 500, 1000].map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        className={`${styles.quickChip}${form.rewardValue === String(v) ? ` ${styles.quickChipActive}` : ""}`}
+                        onClick={() =>
+                          setForm((current) => ({ ...current, rewardValue: String(v) }))
+                        }
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
                 </label>
               </div>
             </section>
@@ -180,6 +195,20 @@ export function PromoCodesEditorDrawer({
                       setForm((current) => ({ ...current, maxRedemptions: event.target.value }))
                     }
                   />
+                  <div className={styles.quickChips}>
+                    {[50, 100, 500, 1000].map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        className={`${styles.quickChip}${form.maxRedemptions === String(v) ? ` ${styles.quickChipActive}` : ""}`}
+                        onClick={() =>
+                          setForm((current) => ({ ...current, maxRedemptions: String(v) }))
+                        }
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
                 </label>
                 <label className={styles.formField}>
                   <span className={styles.fieldLabel}>{text.promoCodesPerUserLimitLabel}</span>
@@ -194,6 +223,20 @@ export function PromoCodesEditorDrawer({
                       }))
                     }
                   />
+                  <div className={styles.quickChips}>
+                    {[1, 2, 3, 5].map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        className={`${styles.quickChip}${form.maxRedemptionsPerUser === String(v) ? ` ${styles.quickChipActive}` : ""}`}
+                        onClick={() =>
+                          setForm((current) => ({ ...current, maxRedemptionsPerUser: String(v) }))
+                        }
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
                 </label>
               </div>
             </section>
@@ -215,16 +258,25 @@ export function PromoCodesEditorDrawer({
                         setForm((current) => ({ ...current, startsAtUtc: event.target.value }))
                       }
                     />
-                    {form.startsAtUtc ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setForm((current) => ({ ...current, startsAtUtc: "" }))}
-                      >
-                        {text.resetForm}
-                      </Button>
-                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setForm((current) => ({
+                          ...current,
+                          startsAtUtc: current.startsAtUtc
+                            ? ""
+                            : new Date(
+                                new Date().getTime() - new Date().getTimezoneOffset() * 60_000
+                              )
+                                .toISOString()
+                                .slice(0, 16),
+                        }))
+                      }
+                    >
+                      {form.startsAtUtc ? text.resetForm : text.promoCodesPickDateAction}
+                    </Button>
                   </div>
                   <span className={styles.helperText}>{text.promoCodesDatesOptionalHint}</span>
                 </label>
@@ -291,6 +343,7 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesCampaignNameLabel}</span>
                   <input
                     className={styles.input}
+                    placeholder="Например: summer2025"
                     value={form.campaignName}
                     onChange={(event) =>
                       setForm((current) => ({ ...current, campaignName: event.target.value }))
@@ -301,6 +354,7 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesCampaignChannelLabel}</span>
                   <input
                     className={styles.input}
+                    placeholder="Например: telegram, email"
                     value={form.campaignChannel}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -312,6 +366,31 @@ export function PromoCodesEditorDrawer({
                 </label>
               </div>
             </section>
+
+            <div className={styles.formSummary} aria-label="Сводка параметров промокода">
+              <span className={styles.formSummaryItem}>
+                🎁 <strong>{form.rewardValue || "—"}</strong>
+                {" PawSpark"}
+              </span>
+              <span className={styles.formSummarySep} aria-hidden="true">
+                ·
+              </span>
+              <span className={styles.formSummaryItem}>
+                🔢 лимит <strong>{form.maxRedemptions || "—"}</strong>
+                {" ("}
+                <strong>{form.maxRedemptionsPerUser || "—"}</strong>
+                {" / чел)"}
+              </span>
+              <span className={styles.formSummarySep} aria-hidden="true">
+                ·
+              </span>
+              <span className={styles.formSummaryItem}>
+                📅{" "}
+                {form.expiresAtUtc
+                  ? form.expiresAtUtc.replace("T", " ")
+                  : text.promoCodesNoExpiryAction}
+              </span>
+            </div>
 
             <div className={styles.formActionsSticky}>
               {panelMode === "edit" && selectedCode ? (

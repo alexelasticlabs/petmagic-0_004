@@ -19,6 +19,13 @@
 }
 
 .phoneMedia {
+  /* Phone preview always renders on dark video/image background.
+     Override theme-sensitive variables to fixed "phone-screen" values
+     so text/badges are readable regardless of the admin colour scheme. */
+  --text-inverse: #f2f5fa;
+  --surface-0: #000000;
+  --surface-2: #0c1118;
+
   position: relative;
   aspect-ratio: var(--phone-preview-aspect-ratio, var(--template-image-aspect-ratio));
   height: auto;
