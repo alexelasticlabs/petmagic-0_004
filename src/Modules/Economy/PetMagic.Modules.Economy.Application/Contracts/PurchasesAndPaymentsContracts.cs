@@ -6,13 +6,17 @@ public sealed record PurchaseCheckoutResponse(
     string PaymentProvider,
     string ExternalPaymentId,
     string CheckoutUrl,
+    string? PaymentIntentClientSecret,
+    string? CustomerId,
+    string? CustomerEphemeralKeySecret,
+    string? PublishableKey,
     string Status,
     decimal PriceAmount,
     string CurrencyCode,
     int SparkToGrant,
     DateTime CreatedAtUtc);
 
-public sealed record VerifyStripeCheckoutSessionCommand(Guid UserId, Guid OrderId, string StripeSessionId);
+public sealed record VerifyStripeCheckoutSessionCommand(Guid UserId, Guid OrderId, string StripeReferenceId);
 
 public sealed record PurchaseOrderResponse(
     Guid OrderId,

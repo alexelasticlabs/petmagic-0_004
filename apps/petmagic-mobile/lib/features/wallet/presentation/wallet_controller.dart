@@ -241,7 +241,7 @@ class WalletController extends Notifier<WalletState> {
     }
   }
 
-  Future<String?> buyPack(CurrencyPackModel pack) async {
+  Future<PurchaseCheckoutModel?> buyPack(CurrencyPackModel pack) async {
     final paymentMethod = state.selectedPaymentMethod;
     if (paymentMethod == null) {
       developer.log(
@@ -281,7 +281,7 @@ class WalletController extends Notifier<WalletState> {
       );
 
       final checkoutUrl = checkout.checkoutUrl.trim();
-      if (checkoutUrl.isEmpty) {
+      if (checkoutUrl.isEmpty && !checkout.usesPaymentSheet) {
         final payload = <String, Object>{
           'pack_id': pack.packId,
           'pack_code': pack.code,
@@ -314,7 +314,7 @@ class WalletController extends Notifier<WalletState> {
         checkoutUrl: checkoutUrl,
         pendingCheckoutOrderId: checkout.orderId,
       );
-      return checkoutUrl;
+      return checkout;
     } catch (error) {
       developer.log(
         'Checkout failed (pack=${pack.code}, provider=${paymentMethod.provider})',
@@ -460,7 +460,7 @@ class WalletController extends Notifier<WalletState> {
     );
   }
 
-  Future<void> verifyStripeCheckout(String stripeSessionId) async {
+  Future<void> verifyStripeCheckout(String stripeReferenceId) async {
     final pendingOrderId = state.pendingCheckoutOrderId;
     if (pendingOrderId == null || pendingOrderId.isEmpty) {
       return;
@@ -476,7 +476,7 @@ class WalletController extends Notifier<WalletState> {
     try {
       final purchase = await _repository.verifyStripeCheckoutSession(
         orderId: pendingOrderId,
-        stripeSessionId: stripeSessionId,
+        stripeReferenceId: stripeReferenceId,
       );
 
       if (purchase.status == 'succeeded') {

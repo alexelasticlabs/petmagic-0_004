@@ -17,6 +17,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
     {
         var section = configuration.GetSection(EconomyOptions.SectionName);
         var legacyStripeSecretKey = ReadValue(section, "StripeSecretKey", "STRIPE_SECRET_KEY") ?? string.Empty;
+        var legacyStripePublishableKey = ReadValue(section, "StripePublishableKey", "STRIPE_PUBLISHABLE_KEY") ?? string.Empty;
         var legacyStripeWebhookSecret = ReadValue(section, "StripeWebhookSecret", "STRIPE_WEBHOOK_SECRET") ?? string.Empty;
 
         var economyOptions = new EconomyOptions
@@ -26,16 +27,27 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             AdRewardSpark = ParseInt(section["AdRewardSpark"], 15),
             AdRewardDailyLimit = ParseInt(section["AdRewardDailyLimit"], 5),
             StripeSecretKey = legacyStripeSecretKey,
+            StripePublishableKey = legacyStripePublishableKey,
             StripeTestSecretKey = ReadValue(
                 section,
                 "StripeTestSecretKey",
                 "STRIPE_TEST_SECRET_KEY",
                 "STRIPE_SECRET_KEY_TEST") ?? legacyStripeSecretKey,
+            StripeTestPublishableKey = ReadValue(
+                section,
+                "StripeTestPublishableKey",
+                "STRIPE_TEST_PUBLISHABLE_KEY",
+                "STRIPE_PUBLISHABLE_KEY_TEST") ?? legacyStripePublishableKey,
             StripeLiveSecretKey = ReadValue(
                 section,
                 "StripeLiveSecretKey",
                 "STRIPE_LIVE_SECRET_KEY",
                 "STRIPE_SECRET_KEY_LIVE") ?? legacyStripeSecretKey,
+            StripeLivePublishableKey = ReadValue(
+                section,
+                "StripeLivePublishableKey",
+                "STRIPE_LIVE_PUBLISHABLE_KEY",
+                "STRIPE_PUBLISHABLE_KEY_LIVE") ?? legacyStripePublishableKey,
             StripeWebhookSecret = legacyStripeWebhookSecret,
             StripeTestWebhookSecret = ReadValue(
                 section,

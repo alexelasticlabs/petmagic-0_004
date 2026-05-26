@@ -61,7 +61,7 @@
   color: var(--text-muted);
   text-decoration: none;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .compactHeaderLink:hover {
@@ -133,7 +133,7 @@
 .optionGroupLabel {
   color: var(--text-muted);
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -153,7 +153,7 @@
   padding: 0.52rem 0.78rem;
   font: inherit;
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   cursor: pointer;
   transition:
@@ -192,7 +192,7 @@
 .paneEyebrow {
   color: var(--text-muted);
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -222,7 +222,7 @@
   border: 1px solid rgba(34, 197, 94, 0.26);
   color: #effcf4;
   font-size: 0.85rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .searchField {
@@ -342,7 +342,7 @@
 
 .rowTitle {
   font-size: 0.92rem;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-strong);
 }
 
@@ -385,7 +385,7 @@
 .rowSecondaryMeta {
   color: var(--text-muted);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -398,7 +398,7 @@
   border-radius: 999px;
   border: 1px solid transparent;
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
 }
@@ -450,7 +450,7 @@
   border-radius: 999px;
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.24), rgba(18, 102, 58, 0.85));
   color: var(--text-strong);
-  font-weight: 800;
+  font-weight: 600;
   border: 1px solid rgba(34, 197, 94, 0.28);
 }
 
@@ -501,7 +501,7 @@
   align-items: center;
   justify-content: center;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .chatShell {
@@ -535,7 +535,7 @@
   background: var(--surface-2);
   color: #dce7f2;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .chatUserName {
@@ -698,7 +698,7 @@
   border: 1px solid rgba(34, 197, 94, 0.22);
   color: var(--toast-success-fg);
   font-size: 0.74rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.06em;
 }
 
@@ -751,7 +751,7 @@
   background: rgba(127, 145, 168, 0.14);
   color: #d2deec;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
@@ -955,7 +955,7 @@
 .workflowDangerLabel {
   color: #ffb8b1;
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -979,7 +979,7 @@
   padding: 0.5rem 0.72rem;
   font: inherit;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   width: 100%;
   justify-content: center;
@@ -1461,3 +1461,4 @@
   justify-content: flex-end;
   gap: 8px;
 }
+

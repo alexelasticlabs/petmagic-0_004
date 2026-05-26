@@ -394,7 +394,15 @@ public sealed partial class EconomyService
         }
 
         if (string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(normalizedPlatform, "web", StringComparison.Ordinal)
             && !IsStripeModeConfigured(config.Mode))
+        {
+            return null;
+        }
+
+        if (string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(normalizedPlatform, "web", StringComparison.Ordinal)
+            && !IsStripeMobileModeConfigured(config.Mode))
         {
             return null;
         }
@@ -421,6 +429,23 @@ public sealed partial class EconomyService
             "test" => FirstNonEmpty(options.Value.StripeTestSecretKey, options.Value.StripeSecretKey),
             _ => FirstNonEmpty(options.Value.StripeSecretKey, options.Value.StripeLiveSecretKey, options.Value.StripeTestSecretKey)
         };
+    }
+
+    private string? ResolveStripePublishableKey(string? mode = null)
+    {
+        var normalizedMode = mode is null ? null : EconomyPaymentProviderPolicy.NormalizeMode(mode);
+        return normalizedMode switch
+        {
+            "live" => FirstNonEmpty(options.Value.StripeLivePublishableKey, options.Value.StripePublishableKey),
+            "test" => FirstNonEmpty(options.Value.StripeTestPublishableKey, options.Value.StripePublishableKey),
+            _ => FirstNonEmpty(options.Value.StripePublishableKey, options.Value.StripeLivePublishableKey, options.Value.StripeTestPublishableKey)
+        };
+    }
+
+    private bool IsStripeMobileModeConfigured(string? mode)
+    {
+        return !string.IsNullOrWhiteSpace(ResolveStripeApiKey(mode))
+            && !string.IsNullOrWhiteSpace(ResolveStripePublishableKey(mode));
     }
 
     private IReadOnlyList<string> ResolveStripeWebhookSecrets()

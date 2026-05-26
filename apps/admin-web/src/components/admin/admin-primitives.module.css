@@ -195,7 +195,7 @@
   background: var(--accent-soft-bg);
   color: var(--text-strong);
   font-size: 0.74rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -354,7 +354,7 @@
   margin-top: 0.5rem;
   color: var(--stat-accent, #22c55e);
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .statDelta svg {
@@ -437,7 +437,7 @@
 
 .numeric {
   color: var(--text-strong);
-  font-weight: 700;
+  font-weight: 600;
   text-align: right;
 }
 
@@ -452,7 +452,7 @@
   background: color-mix(in srgb, var(--status-color, #22c55e) 14%, var(--surface-2));
   color: var(--status-color, #22c55e);
   font-size: 0.74rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -607,7 +607,7 @@
 .kpiDelta {
   color: var(--tone-color);
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -667,7 +667,7 @@
   margin: 0;
   color: var(--text-strong);
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.18;
 }
 
@@ -907,3 +907,4 @@
     grid-template-columns: 1fr;
   }
 }
+

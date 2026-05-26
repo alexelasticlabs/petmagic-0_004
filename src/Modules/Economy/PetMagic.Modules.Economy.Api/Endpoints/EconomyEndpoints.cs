@@ -743,12 +743,12 @@ public static class EconomyEndpoints
             return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        if (string.IsNullOrWhiteSpace(request.StripeSessionId))
+        if (string.IsNullOrWhiteSpace(request.StripeReferenceId))
         {
-            return TypedResults.Problem(title: "economy.invalid_request", detail: "Stripe session ID is required.", statusCode: StatusCodes.Status400BadRequest);
+            return TypedResults.Problem(title: "economy.invalid_request", detail: "Stripe reference ID is required.", statusCode: StatusCodes.Status400BadRequest);
         }
 
-        var command = new VerifyStripeCheckoutSessionCommand(userId!.Value, orderId, request.StripeSessionId);
+        var command = new VerifyStripeCheckoutSessionCommand(userId!.Value, orderId, request.StripeReferenceId);
         var result = await service.VerifyStripeCheckoutSessionAsync(command, cancellationToken);
         if (result.IsFailure)
         {
@@ -921,7 +921,7 @@ public static class EconomyEndpoints
 
     public sealed record PaymentMethodSetupRequest(string PaymentProvider = "stripe");
 
-    public sealed record VerifyStripeCheckoutRequest(string StripeSessionId);
+    public sealed record VerifyStripeCheckoutRequest(string StripeReferenceId);
 
     public sealed record CreatePurchaseRequest(
         Guid PackId,

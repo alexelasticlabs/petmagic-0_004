@@ -156,7 +156,7 @@
   color: var(--accent-contrast);
   font: inherit;
   font-size: 0.92rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
   box-shadow: none;
@@ -290,3 +290,4 @@
     width: 100%;
   }
 }
+

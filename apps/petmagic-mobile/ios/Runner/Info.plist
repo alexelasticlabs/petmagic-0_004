@@ -30,6 +30,16 @@
 				<string>petmagic</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.petmagic.app.stripe</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>petmagicstripe</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>

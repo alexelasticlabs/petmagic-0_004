@@ -182,7 +182,7 @@
   background: rgba(17, 34, 58, 0.94);
   color: rgba(186, 230, 253, 0.96);
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .toolbarActions {
@@ -203,7 +203,7 @@
   background: rgba(13, 30, 45, 0.72);
   color: #bae6fd;
   font-size: 0.66rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .autoRefreshBadge {
@@ -217,7 +217,7 @@
   background: rgba(8, 23, 36, 0.82);
   color: #c7f1ff;
   font-size: 0.66rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -407,7 +407,7 @@
 .usagePercent {
   color: rgba(173, 189, 207, 0.9);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .usageToneGood {
@@ -694,7 +694,7 @@
 .usageEmpty strong {
   color: var(--text-strong);
   font-size: 0.86rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .usageEmpty span {
@@ -975,3 +975,4 @@
   color: var(--border-strong);
   user-select: none;
 }
+

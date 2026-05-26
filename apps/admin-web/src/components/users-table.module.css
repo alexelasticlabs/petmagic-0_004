@@ -20,7 +20,7 @@
 .emptyTitle {
   margin: 0;
   color: var(--text-strong);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .emptyDescription {
@@ -190,3 +190,4 @@
     max-width: var(--admin-page-max-wide);
   }
 }
+

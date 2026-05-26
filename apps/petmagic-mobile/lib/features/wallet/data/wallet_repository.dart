@@ -197,12 +197,12 @@ class WalletRepository {
 
   Future<PurchaseHistoryItem> verifyStripeCheckoutSession({
     required String orderId,
-    required String stripeSessionId,
+    required String stripeReferenceId,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/purchases/$orderId/verify-stripe',
-        data: {'stripeSessionId': stripeSessionId},
+        data: {'stripeReferenceId': stripeReferenceId},
         options: _authOptions(session.accessToken),
       ),
     );

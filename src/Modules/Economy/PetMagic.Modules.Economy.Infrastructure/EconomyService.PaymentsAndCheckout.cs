@@ -639,6 +639,19 @@ public sealed partial class EconomyService
             return Result.Success(ToPurchaseCheckoutResponse(confirmResult.Value));
         }
 
+        var usePaymentSheet = string.Equals(command.Platform, "android", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(command.Platform, "ios", StringComparison.OrdinalIgnoreCase);
+        string? stripePublishableKey = null;
+
+        if (usePaymentSheet)
+        {
+            stripePublishableKey = ResolveStripePublishableKey(providerConfig.Mode);
+            if (string.IsNullOrWhiteSpace(stripePublishableKey))
+            {
+                return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+            }
+        }
+
         var paymentResult = await paymentGateway.CreatePaymentAsync(
             new PaymentCreateRequest(
                 provider,
@@ -648,7 +661,10 @@ public sealed partial class EconomyService
                 order.CurrencyCode,
                 order.SparkToGrant,
                 pack.DisplayName,
-                stripeApiKey),
+                stripeApiKey,
+                stripePublishableKey,
+                null,
+                usePaymentSheet),
             cancellationToken);
 
         if (paymentResult.IsFailure)
@@ -656,7 +672,8 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        if (string.IsNullOrWhiteSpace(paymentResult.Value.CheckoutUrl))
+        if (string.IsNullOrWhiteSpace(paymentResult.Value.CheckoutUrl)
+            && string.IsNullOrWhiteSpace(paymentResult.Value.PaymentIntentClientSecret))
         {
             EmptyCheckoutUrlCounter.Add(
                 1,
@@ -679,7 +696,21 @@ public sealed partial class EconomyService
         dbContext.PurchaseOrders.Add(order);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(ToPurchaseCheckoutResponse(order));
+        return Result.Success(new PurchaseCheckoutResponse(
+            order.Id,
+            order.UserId,
+            order.PaymentProvider,
+            order.ExternalPaymentId ?? string.Empty,
+            order.CheckoutUrl ?? string.Empty,
+            paymentResult.Value.PaymentIntentClientSecret,
+            paymentResult.Value.CustomerId,
+            paymentResult.Value.CustomerEphemeralKeySecret,
+            paymentResult.Value.PublishableKey,
+            order.Status,
+            order.PriceAmount,
+            order.CurrencyCode,
+            order.SparkToGrant,
+            order.CreatedAtUtc));
     }
 
     public async Task<Result<OffsetPagedResponse<PurchaseHistoryItemResponse>>> GetPurchaseHistoryAsync(
@@ -751,7 +782,7 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
         }
 
-        if (!string.Equals(order.ExternalPaymentId, command.StripeSessionId, StringComparison.Ordinal))
+        if (!string.Equals(order.ExternalPaymentId, command.StripeReferenceId, StringComparison.Ordinal))
         {
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
         }
@@ -771,18 +802,35 @@ public sealed partial class EconomyService
 
         try
         {
-            var sessionService = new Stripe.Checkout.SessionService();
-            var session = await sessionService.GetAsync(command.StripeSessionId, cancellationToken: cancellationToken);
-
-            if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(session.Status, "complete", StringComparison.OrdinalIgnoreCase))
+            if (command.StripeReferenceId.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
             {
-                return Result.Success(ToPurchaseOrderResponse(order));
+                var sessionService = new Stripe.Checkout.SessionService();
+                var session = await sessionService.GetAsync(command.StripeReferenceId, cancellationToken: cancellationToken);
+
+                if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(session.Status, "complete", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Result.Success(ToPurchaseOrderResponse(order));
+                }
+            }
+            else if (command.StripeReferenceId.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
+            {
+                var paymentIntentService = new PaymentIntentService();
+                var paymentIntent = await paymentIntentService.GetAsync(command.StripeReferenceId, cancellationToken: cancellationToken);
+
+                if (!string.Equals(paymentIntent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Result.Success(ToPurchaseOrderResponse(order));
+                }
+            }
+            else
+            {
+                return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
             }
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "Stripe session verification failed for session {SessionId}", command.StripeSessionId);
+            logger?.LogWarning(ex, "Stripe payment verification failed for reference {StripeReferenceId}", command.StripeReferenceId);
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 

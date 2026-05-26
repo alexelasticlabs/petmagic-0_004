@@ -41,7 +41,7 @@
 .sectionHeader h4 {
   color: var(--text-strong);
   font-size: 0.95rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .sectionHeader p,
@@ -63,7 +63,7 @@
 .field span {
   color: var(--text-strong);
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .input,
@@ -143,3 +143,4 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+

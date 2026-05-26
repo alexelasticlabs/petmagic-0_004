@@ -27,6 +27,50 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
         ConfigureStripe(apiKey);
 
         var amountInMinorUnits = (long)decimal.Round(request.PriceAmount * 100m, 0, MidpointRounding.AwayFromZero);
+        if (request.UsePaymentSheet)
+        {
+            try
+            {
+                var paymentIntent = await new PaymentIntentService().CreateAsync(
+                    new PaymentIntentCreateOptions
+                    {
+                        Amount = amountInMinorUnits,
+                        Currency = request.CurrencyCode.Trim().ToLowerInvariant(),
+                        AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
+                        {
+                            Enabled = true,
+                        },
+                        Metadata = new Dictionary<string, string>
+                        {
+                            ["order_id"] = request.OrderId.ToString("D"),
+                            ["user_id"] = request.UserId.ToString("D")
+                        },
+                        Description = $"{request.ProductName} ({request.SparkToGrant} PawSpark)"
+                    },
+                    new RequestOptions
+                    {
+                        IdempotencyKey = $"economy-order-mobile-{request.OrderId:D}"
+                    },
+                    cancellationToken);
+
+                return Result.Success(new PaymentCreateResponse(
+                    paymentIntent.Id,
+                    string.Empty,
+                    paymentIntent.ClientSecret,
+                    null,
+                    null,
+                    request.PublishableKey));
+            }
+            catch (StripeException)
+            {
+                return Result.Failure<PaymentCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+            catch
+            {
+                return Result.Failure<PaymentCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+        }
+
         var checkoutOptions = new SessionCreateOptions
         {
             Mode = "payment",

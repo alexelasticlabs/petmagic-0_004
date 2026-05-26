@@ -153,22 +153,24 @@ class ApiBaseUrlResolver {
     var runningWorkers = 0;
 
     Future<void> runWorker() async {
-      while (!completer.isCompleted) {
-        if (queue.isEmpty) {
-          break;
-        }
+      try {
+        while (!completer.isCompleted) {
+          if (queue.isEmpty) {
+            return;
+          }
 
-        final candidate = queue.removeFirst();
-        final isHealthy = await _probe(candidate);
-        if (isHealthy) {
-          completer.complete(candidate);
-          return;
+          final candidate = queue.removeFirst();
+          final isHealthy = await _probe(candidate);
+          if (isHealthy && !completer.isCompleted) {
+            completer.complete(candidate);
+            return;
+          }
         }
-      }
-
-      runningWorkers--;
-      if (runningWorkers == 0 && !completer.isCompleted) {
-        completer.complete(null);
+      } finally {
+        runningWorkers--;
+        if (runningWorkers == 0 && !completer.isCompleted) {
+          completer.complete(null);
+        }
       }
     }
 

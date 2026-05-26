@@ -33,9 +33,18 @@ public sealed record PaymentCreateRequest(
     string CurrencyCode,
     int SparkToGrant,
     string ProductName,
-    string? ApiSecretKey = null);
+    string? ApiSecretKey = null,
+    string? PublishableKey = null,
+    string? ExternalCustomerId = null,
+    bool UsePaymentSheet = false);
 
-public sealed record PaymentCreateResponse(string ExternalPaymentId, string CheckoutUrl);
+public sealed record PaymentCreateResponse(
+    string ExternalPaymentId,
+    string CheckoutUrl,
+    string? PaymentIntentClientSecret = null,
+    string? CustomerId = null,
+    string? CustomerEphemeralKeySecret = null,
+    string? PublishableKey = null);
 
 public sealed record SubscriptionCheckoutCreateRequest(
     string Provider,

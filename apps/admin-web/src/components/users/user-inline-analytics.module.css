@@ -21,7 +21,7 @@
 .identity h3 {
   color: var(--text-strong);
   font-size: 1.2rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .identity p {
@@ -44,7 +44,7 @@
   background: rgba(37, 99, 235, 0.12);
   color: var(--text-strong);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.78rem;
 }
 
@@ -64,7 +64,7 @@
 .section h4 {
   color: var(--text-strong);
   font-size: 0.94rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .timeline,
@@ -120,3 +120,4 @@
     grid-template-columns: 1fr;
   }
 }
+

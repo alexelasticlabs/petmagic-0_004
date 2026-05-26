@@ -363,6 +363,10 @@ public sealed partial class EconomyService
             order.PaymentProvider,
             order.ExternalPaymentId ?? string.Empty,
             order.CheckoutUrl ?? string.Empty,
+            null,
+            null,
+            null,
+            null,
             order.Status,
             order.PriceAmount,
             order.CurrencyCode,
@@ -468,7 +472,7 @@ public sealed partial class EconomyService
         var stripeMobileConfig = EconomyPaymentProviderPolicy.SelectProviderConfig(configs, "stripe", platform, region, isEuRegion, query.AppVersion);
         if (stripeMobileConfig is not null
             && stripeMobileConfig.ExternalCheckoutAllowed
-            && IsStripeModeConfigured(stripeMobileConfig.Mode))
+            && IsStripeMobileModeConfigured(stripeMobileConfig.Mode))
         {
             methods.Add(ToPaywallPaymentMethodResponse(
                 stripeMobileConfig,

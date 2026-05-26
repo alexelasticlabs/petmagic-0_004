@@ -231,7 +231,7 @@
   border-radius: 999px;
   padding: 0.18rem 0.4rem;
   font-size: 0.58rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -318,3 +318,4 @@
     align-self: flex-start;
   }
 }
+

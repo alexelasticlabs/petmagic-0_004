@@ -5,9 +5,10 @@ import type { SetTemplateFormState, TemplateFormState } from "@/components/templ
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
-import { getImageModelPrice, getMotionModelPrice, formatPrice } from "@/lib/model-pricing";
+import { formatPrice, getImageModelPrice, getMotionModelPrice } from "@/lib/model-pricing";
 
 const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
+const promptMaxLength = 2000;
 
 type TemplateReferenceAssetSectionProps = {
   text: Dictionary;
@@ -264,11 +265,13 @@ export function TemplateVideoModelSection({
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.preprocessingPromptLabel}</span>
-              <span className={styles.fieldCounter}>{form.preprocessingPrompt.length}/1500</span>
+              <span className={styles.fieldCounter}>
+                {form.preprocessingPrompt.length}/{promptMaxLength}
+              </span>
             </span>
             <textarea
               value={form.preprocessingPrompt}
-              maxLength={1500}
+              maxLength={promptMaxLength}
               onChange={(event) =>
                 setForm((current) => ({ ...current, preprocessingPrompt: event.target.value }))
               }
@@ -297,11 +300,13 @@ export function TemplateVideoModelSection({
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.klingPromptLabel}</span>
-              <span className={styles.fieldCounter}>{form.klingPrompt.length}/1000</span>
+              <span className={styles.fieldCounter}>
+                {form.klingPrompt.length}/{promptMaxLength}
+              </span>
             </span>
             <textarea
               value={form.klingPrompt}
-              maxLength={1000}
+              maxLength={promptMaxLength}
               onChange={(event) =>
                 setForm((current) => ({ ...current, klingPrompt: event.target.value }))
               }
@@ -356,11 +361,13 @@ export function TemplateImageModelSection({
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.imagePromptLabel}</span>
-              <span className={styles.fieldCounter}>{form.imagePrompt.length}/1000</span>
+              <span className={styles.fieldCounter}>
+                {form.imagePrompt.length}/{promptMaxLength}
+              </span>
             </span>
             <textarea
               value={form.imagePrompt}
-              maxLength={1000}
+              maxLength={promptMaxLength}
               onChange={(event) =>
                 setForm((current) => ({ ...current, imagePrompt: event.target.value }))
               }

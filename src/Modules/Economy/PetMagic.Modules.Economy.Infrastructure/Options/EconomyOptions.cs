@@ -16,9 +16,15 @@ public sealed class EconomyOptions
 
     public string StripeSecretKey { get; init; } = string.Empty;
 
+    public string StripePublishableKey { get; init; } = string.Empty;
+
     public string StripeTestSecretKey { get; init; } = string.Empty;
 
+    public string StripeTestPublishableKey { get; init; } = string.Empty;
+
     public string StripeLiveSecretKey { get; init; } = string.Empty;
+
+    public string StripeLivePublishableKey { get; init; } = string.Empty;
 
     public string StripeWebhookSecret { get; init; } = string.Empty;
 

@@ -103,7 +103,7 @@
 .previewWindowTitle {
   margin-left: 5px;
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
@@ -160,7 +160,7 @@
 
 .previewStatLabel {
   font-size: 0.58rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
@@ -168,13 +168,13 @@
 
 .previewStatValue {
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-strong);
 }
 
 .previewStatDelta {
   font-size: 0.57rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent);
 }
 
@@ -210,7 +210,7 @@
   color: var(--text-strong);
   font: inherit;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -288,3 +288,4 @@
     padding: 0.85rem;
   }
 }
+

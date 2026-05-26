@@ -17,7 +17,7 @@
   background: rgba(15, 23, 42, 0.62);
   color: var(--text-strong);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .profileHeader {
@@ -41,7 +41,7 @@
 .profileTitle {
   color: var(--text-strong);
   font-size: 1.22rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .profileEmail {
@@ -119,3 +119,4 @@
     grid-template-columns: 1fr;
   }
 }
+
