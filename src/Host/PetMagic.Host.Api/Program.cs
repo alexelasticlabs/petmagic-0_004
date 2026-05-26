@@ -19,6 +19,8 @@ using PetMagic.Modules.Templates.Infrastructure;
 
 using Serilog;
 
+LoadDotEnvFileIfPresent();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((context, loggerConfiguration) =>
@@ -287,4 +289,60 @@ static X509Certificate2 LoadOrCreateDataProtectionCertificate(
         certificatePath,
         certificatePassword,
         X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+}
+
+static void LoadDotEnvFileIfPresent()
+{
+    var currentDirectory = new DirectoryInfo(Directory.GetCurrentDirectory());
+    while (currentDirectory is not null)
+    {
+        var envPath = Path.Combine(currentDirectory.FullName, ".env");
+        if (File.Exists(envPath))
+        {
+            foreach (var rawLine in File.ReadLines(envPath))
+            {
+                var line = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("export ", StringComparison.Ordinal))
+                {
+                    line = line["export ".Length..].TrimStart();
+                }
+
+                var separatorIndex = line.IndexOf('=');
+                if (separatorIndex <= 0)
+                {
+                    continue;
+                }
+
+                var key = line[..separatorIndex].Trim();
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                if (Environment.GetEnvironmentVariable(key) is not null)
+                {
+                    continue;
+                }
+
+                var value = line[(separatorIndex + 1)..].Trim();
+                if (value.Length >= 2
+                    && ((value.StartsWith('"') && value.EndsWith('"'))
+                        || (value.StartsWith('\'') && value.EndsWith('\''))))
+                {
+                    value = value[1..^1];
+                }
+
+                Environment.SetEnvironmentVariable(key, value);
+            }
+
+            return;
+        }
+
+        currentDirectory = currentDirectory.Parent;
+    }
 }

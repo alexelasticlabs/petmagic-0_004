@@ -3,27 +3,25 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
 
 import {
   CalendarIcon,
-  DownloadIcon,
-  MoreHorizontalIcon,
   PromoCodeIcon,
-  RefreshIcon,
   TrendUpIcon,
   UsersIcon,
 } from "@/components/admin/admin-icons";
 import {
   AdminCard,
-  AdminFilterBar,
   AdminKpiCard,
   AdminPage,
   AdminStateCard,
-  AdminStatusBadge,
-  AdminToolbar,
-  adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { PromoCodesActionsMenuPortal } from "@/components/promo-codes-actions-menu-portal";
+import { PromoCodeActivationsCard } from "@/components/promo-code-activations-card";
+import { PromoCodesEditorDrawer } from "@/components/promo-codes-editor-drawer";
+import { PromoCodesListCard } from "@/components/promo-codes-list-card";
+import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.options";
+import { usePromoActionsMenu } from "@/components/use-promo-actions-menu";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import {
   buildPromoCodesCsv,
@@ -31,15 +29,9 @@ import {
   copyTextToClipboard,
   createDefaultPromoForm,
   createGeneratedPromoCode,
-  formatCampaignMeta,
-  formatDateTime,
   formatNumber,
-  formatRewardValue,
   formatSevenDayDelta,
-  formatWindow,
   getPromoStatus,
-  getRewardKindLabel,
-  getUserLabels,
   toCreatePayload,
   toPromoForm,
   toUpdatePayload,
@@ -51,7 +43,6 @@ import {
 } from "@/components/promo-codes-view.helpers";
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
-import { Select, type SelectOption } from "@/components/ui/select";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   createAdminRedeemCode,
@@ -68,21 +59,12 @@ import {
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 const DEFAULT_PAGE_SIZE = 10;
-const PAGE_SIZE_OPTIONS = [6, 10, 20] as const;
 const PROMO_CODES_AUTO_REFRESH_MS = 15_000;
 const EMPTY_PROMO_CODES: AdminRedeemCode[] = [];
 const EMPTY_REDEMPTIONS: AdminRedeemCodeRedemption[] = [];
 const ACTIVATIONS_PREVIEW_LIMIT = 5;
 const ACTIVATIONS_EXPANDED_LIMIT = 20;
-const ACTIONS_MENU_WIDTH_PX = 220;
-const ACTIONS_MENU_HEIGHT_ESTIMATE_PX = 236;
-const ACTIONS_MENU_GAP_PX = 8;
-
-type ActionsMenuPosition = {
-  top: number;
-  left: number;
-  openUpward: boolean;
-};
+const PROMO_ACTIONS_MENU_MIN_WIDTH_PX = 220;
 
 export function PromoCodesView({ locale }: { locale: Locale }) {
   const text = getDictionary(locale);
@@ -105,10 +87,14 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const [feedback, setFeedback] = useState<PromoFeedback | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [busyCodeId, setBusyCodeId] = useState<string | null>(null);
-  const [actionsMenuCodeId, setActionsMenuCodeId] = useState<string | null>(null);
-  const [actionsMenuPosition, setActionsMenuPosition] = useState<ActionsMenuPosition | null>(null);
   const [showAllActivations, setShowAllActivations] = useState(false);
   const [activationsPage, setActivationsPage] = useState(1);
+  const {
+    actionsMenuCodeId,
+    actionsMenuPosition,
+    closeActionsMenu,
+    handleToggleActionsMenu,
+  } = usePromoActionsMenu();
 
   useEffect(() => {
     if (!session) {
@@ -125,63 +111,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       window.clearInterval(timerId);
     };
   }, []);
-
-  useEffect(() => {
-    if (!actionsMenuCodeId) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("[data-promo-actions-root]")) {
-        return;
-      }
-
-      setActionsMenuCodeId(null);
-      setActionsMenuPosition(null);
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [actionsMenuCodeId]);
-
-  useEffect(() => {
-    if (!actionsMenuCodeId) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeActionsMenu();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [actionsMenuCodeId]);
-
-  useEffect(() => {
-    if (!actionsMenuCodeId) {
-      return;
-    }
-
-    function handleViewportChange() {
-      setActionsMenuCodeId(null);
-      setActionsMenuPosition(null);
-    }
-
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
-
-    return () => {
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
-    };
-  }, [actionsMenuCodeId]);
 
   useEffect(() => {
     if (!isEditorOpen) {
@@ -260,15 +189,13 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const redemptionsForView = activationsQuery.isError ? fallbackRedemptions : visibleRedemptions;
   const hasMoreRedemptions = Boolean(activationsQuery.data?.hasMore);
   const hasAnyRedemptions = (selectedCode?.redeemedCount ?? 0) > 0;
+  const canExpandActivations = !showAllActivations && (selectedCode?.redeemedCount ?? 0) > ACTIVATIONS_PREVIEW_LIMIT;
   const canGoToPreviousActivationsPage = showAllActivations && activationsPage > 1;
   const canGoToNextActivationsPage = activationsQuery.isError
     ? localRedemptions.length > activationsSkip + activationsTake
     : hasMoreRedemptions;
 
-  const selectedUserIds = useMemo(
-    () => [...new Set(redemptionsForView.map((item) => item.userId))],
-    [redemptionsForView]
-  );
+  const selectedUserIds = useMemo(() => [...new Set(redemptionsForView.map((item) => item.userId))], [redemptionsForView]);
 
   const selectedUsersQueries = useQueries({
     queries: selectedUserIds.map((userId) => ({
@@ -589,40 +516,8 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     closeActionsMenu();
   }
 
-  function closeActionsMenu() {
-    setActionsMenuCodeId(null);
-    setActionsMenuPosition(null);
-  }
-
   function getCurrentLocalDateTimeValue() {
-    return new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60_000)
-      .toISOString()
-      .slice(0, 16);
-  }
-
-  function getActionsMenuPosition(trigger: HTMLElement): ActionsMenuPosition {
-    const rect = trigger.getBoundingClientRect();
-    const openUpward = window.innerHeight - rect.bottom < ACTIONS_MENU_HEIGHT_ESTIMATE_PX;
-    const maxLeft = Math.max(
-      ACTIONS_MENU_GAP_PX,
-      window.innerWidth - ACTIONS_MENU_WIDTH_PX - ACTIONS_MENU_GAP_PX
-    );
-
-    return {
-      top: openUpward ? rect.top - ACTIONS_MENU_GAP_PX : rect.bottom + ACTIONS_MENU_GAP_PX,
-      left: Math.min(Math.max(ACTIONS_MENU_GAP_PX, rect.right - ACTIONS_MENU_WIDTH_PX), maxLeft),
-      openUpward,
-    };
-  }
-
-  function handleToggleActionsMenu(code: AdminRedeemCode, trigger: HTMLElement) {
-    if (actionsMenuCodeId === code.redeemCodeId) {
-      closeActionsMenu();
-      return;
-    }
-
-    setActionsMenuCodeId(code.redeemCodeId);
-    setActionsMenuPosition(getActionsMenuPosition(trigger));
+    return new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   }
 
   async function handleCopyCode(code: string) {
@@ -760,50 +655,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     }
   }
 
-  const statusOptions: SelectOption[] = [
-    { value: "all", label: text.promoCodesStatusAll, tone: "neutral" },
-    { value: "draft", label: text.promoCodesStatusDraft, tone: "neutral" },
-    { value: "active", label: text.promoCodesStatusActiveOption, tone: "recommended" },
-    { value: "scheduled", label: text.promoCodesStatusScheduled, tone: "fast" },
-    { value: "paused", label: text.promoCodesStatusPaused, tone: "premium" },
-    { value: "exhausted", label: text.promoCodesStatusLimitReached, tone: "premium" },
-    { value: "expired", label: text.promoCodesStatusExpired, tone: "neutral" },
-    { value: "archived", label: text.promoCodesStatusArchived, tone: "neutral" },
-  ];
-
-  const statusTabs: Array<{ value: PromoStatusFilter; label: string }> = [
-    { value: "all", label: locale === "ru" ? "Все" : "All" },
-    { value: "active", label: locale === "ru" ? "Активные" : "Active" },
-    { value: "draft", label: locale === "ru" ? "Черновики" : "Drafts" },
-    { value: "paused", label: locale === "ru" ? "Приостановленные" : "Paused" },
-    { value: "expired", label: locale === "ru" ? "Истекшие" : "Expired" },
-    { value: "archived", label: locale === "ru" ? "Архивные" : "Archived" },
-  ];
-
-  const rewardOptions: SelectOption[] = [
-    { value: "all", label: locale === "ru" ? "Все награды" : "All rewards", tone: "neutral" },
-    { value: "spark", label: text.promoCodesRewardTypeSparkOption, tone: "recommended" },
-    { value: "premium_days", label: text.promoCodesRewardTypePremiumOption, tone: "premium" },
-  ];
-
-  const formStatusOptions: SelectOption[] = [
-    { value: "active", label: text.promoCodesStatusActiveOption, tone: "recommended" },
-    { value: "paused", label: text.promoCodesStatusPausedOption, tone: "premium" },
-  ];
-
-  const sortOptions: SelectOption[] = [
-    { value: "updated", label: text.promoCodesSortUpdated, tone: "recommended" },
-    { value: "usage", label: text.promoCodesSortUsage, tone: "premium" },
-    { value: "reward", label: text.promoCodesSortReward, tone: "fast" },
-    { value: "code", label: text.promoCodesSortCode, tone: "neutral" },
-    { value: "expiry", label: text.promoCodesSortExpiry, tone: "neutral" },
-  ];
-
-  const pageSizeOptions: SelectOption[] = PAGE_SIZE_OPTIONS.map((option) => ({
-    value: option.toString(),
-    label: locale === "ru" ? `${option} на странице` : `${option} per page`,
-    tone: "neutral",
-  }));
+  const { statusTabs, statusOptions, rewardOptions, formStatusOptions, sortOptions, pageSizeOptions } = buildPromoCodesViewOptions(locale, text);
 
   if (promoCodesQuery.isLoading) {
     return (
@@ -835,8 +687,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   const selectedStatus = selectedCode ? getPromoStatus(selectedCode, text, nowMs) : null;
-  const actionsMenuCode =
-    promoCodes.find((code) => code.redeemCodeId === actionsMenuCodeId) ?? null;
+  const actionsMenuCode = promoCodes.find((code) => code.redeemCodeId === actionsMenuCodeId) ?? null;
   const actionsMenuStatus = actionsMenuCode ? getPromoStatus(actionsMenuCode, text, nowMs) : null;
   const isActionsMenuArchived = actionsMenuStatus?.key === "archived";
   const isActionsMenuBusy = actionsMenuCode !== null && busyCodeId === actionsMenuCode.redeemCodeId;
@@ -892,909 +743,136 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       </div>
 
       <div className={styles.workspace}>
-        <AdminCard className={styles.tableCard}>
-          <AdminToolbar className={styles.tableTopBar}>
-            <div
-              className={styles.statusTabs}
-              role="tablist"
-              aria-label={text.promoCodesStatusFilterLabel}
-            >
-              {statusTabs.map((tab, index) => {
-                const isActiveTab = statusFilter === tab.value;
+        <PromoCodesListCard
+          text={text}
+          locale={locale}
+          nowMs={nowMs}
+          search={search}
+          statusFilter={statusFilter}
+          rewardFilter={rewardFilter}
+          sortMode={sortMode}
+          statusTabs={statusTabs}
+          statusCounts={statusCounts}
+          statusOptions={statusOptions}
+          rewardOptions={rewardOptions}
+          sortOptions={sortOptions}
+          pageSizeOptions={pageSizeOptions}
+          hasCodes={hasCodes}
+          hasFilteredCodes={hasFilteredCodes}
+          promoCodesQueryIsFetching={promoCodesQuery.isFetching}
+          secondsUntilAutoRefresh={secondsUntilAutoRefresh}
+          pagedCodes={pagedCodes}
+          filteredCodesCount={filteredCodes.length}
+          selectedCodeId={selectedCodeId}
+          actionsMenuCodeId={actionsMenuCodeId}
+          busyCodeId={busyCodeId}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          visiblePageNumbers={visiblePageNumbers}
+          shownRangeStart={shownRangeStart}
+          shownRangeEnd={shownRangeEnd}
+          pageSize={pageSize}
+          onStatusTabChange={(value) => {
+            setStatusFilter(value);
+            setPage(1);
+          }}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          onStatusFilterChange={(value) => {
+            setStatusFilter(value);
+            setPage(1);
+          }}
+          onRewardFilterChange={(value) => {
+            setRewardFilter(value);
+            setPage(1);
+          }}
+          onSortModeChange={(value) => {
+            setSortMode(value);
+            setPage(1);
+          }}
+          onPageSizeChange={(value) => {
+            setPageSize(value);
+            setPage(1);
+          }}
+          onResetFilters={() => {
+            setSearch("");
+            setStatusFilter("all");
+            setRewardFilter("all");
+            setPage(1);
+          }}
+          onExport={handleExport}
+          onRefresh={() => void promoCodesQuery.refetch()}
+          onOpenCreatePanel={handleOpenCreatePanel}
+          onFocusUsage={handleFocusUsage}
+          onToggleActionsMenu={handleToggleActionsMenu}
+          onPreviousPage={() => setPage(Math.max(1, currentPage - 1))}
+          onNextPage={() => setPage(Math.min(totalPages, currentPage + 1))}
+          onSelectPage={setPage}
+        />
 
-                return (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActiveTab}
-                    className={`${styles.statusTab}${isActiveTab ? ` ${styles.statusTabActive}` : ""}`}
-                    onClick={() => {
-                      setStatusFilter(tab.value);
-                      setPage(1);
-                    }}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key !== "ArrowLeft" &&
-                        event.key !== "ArrowRight" &&
-                        event.key !== "Home" &&
-                        event.key !== "End"
-                      ) {
-                        return;
-                      }
-
-                      event.preventDefault();
-
-                      let nextIndex = index;
-                      if (event.key === "ArrowRight") {
-                        nextIndex = (index + 1) % statusTabs.length;
-                      } else if (event.key === "ArrowLeft") {
-                        nextIndex = (index - 1 + statusTabs.length) % statusTabs.length;
-                      } else if (event.key === "Home") {
-                        nextIndex = 0;
-                      } else if (event.key === "End") {
-                        nextIndex = statusTabs.length - 1;
-                      }
-
-                      setStatusFilter(statusTabs[nextIndex].value);
-                      setPage(1);
-                    }}
-                  >
-                    <span>{tab.label}</span>
-                    <span className={styles.statusTabCount}>
-                      {formatNumber(statusCounts[tab.value], locale)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className={styles.toolbarActions}>
-              <Button variant="secondary" onClick={handleExport} disabled={!hasFilteredCodes}>
-                <DownloadIcon className={styles.actionIcon} /> {text.promoCodesExportAction}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => void promoCodesQuery.refetch()}
-                disabled={promoCodesQuery.isFetching}
-              >
-                <RefreshIcon className={styles.actionIcon} /> {text.promoCodesRefreshAction}
-              </Button>
-              <Button variant="primary" onClick={handleOpenCreatePanel}>
-                {text.promoCodesCreateAction}
-              </Button>
-              <span
-                className={`${styles.autoRefreshBadge}${promoCodesQuery.isFetching ? ` ${styles.autoRefreshBadgeLoading}` : ""}`}
-                aria-live="polite"
-              >
-                <span className={styles.autoRefreshDot} />
-                {promoCodesQuery.isFetching
-                  ? text.promoCodesUpdatingLabel
-                  : locale === "ru"
-                    ? `Автообновление: ${secondsUntilAutoRefresh}с`
-                    : `Auto refresh: ${secondsUntilAutoRefresh}s`}
-              </span>
-            </div>
-          </AdminToolbar>
-
-          <AdminFilterBar className={styles.filterBar}>
-            <label className={styles.searchField}>
-              <span className={styles.fieldLabel}>{text.promoCodesSearchPlaceholder}</span>
-              <input
-                className={styles.searchInput}
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(1);
-                }}
-                placeholder={text.promoCodesSearchPlaceholder}
-              />
-            </label>
-            <div className={styles.selectField}>
-              <span className={styles.fieldLabel}>{text.promoCodesStatusFilterLabel}</span>
-              <Select
-                value={statusFilter}
-                options={statusOptions}
-                onChange={(value) => {
-                  setStatusFilter(value as PromoStatusFilter);
-                  setPage(1);
-                }}
-                ariaLabel={text.promoCodesStatusFilterLabel}
-                showSelectedDescription={false}
-              />
-            </div>
-            <div className={styles.selectField}>
-              <span className={styles.fieldLabel}>{text.promoCodesRewardTypeLabel}</span>
-              <Select
-                value={rewardFilter}
-                options={rewardOptions}
-                onChange={(value) => {
-                  setRewardFilter(value as "all" | AdminRedeemRewardKind);
-                  setPage(1);
-                }}
-                ariaLabel={text.promoCodesRewardTypeLabel}
-                showSelectedDescription={false}
-              />
-            </div>
-            <div className={styles.selectField}>
-              <span className={styles.fieldLabel}>{text.promoCodesSortLabel}</span>
-              <Select
-                value={sortMode}
-                options={sortOptions}
-                onChange={(value) => {
-                  setSortMode(value as PromoSortMode);
-                  setPage(1);
-                }}
-                ariaLabel={text.promoCodesSortLabel}
-                showSelectedDescription={false}
-              />
-            </div>
-          </AdminFilterBar>
-
-          {!hasCodes ? (
-            <AdminStateCard
-              tone="info"
-              title={text.navPromoCodes}
-              description={text.promoCodesEmptyDescription}
-            />
-          ) : !hasFilteredCodes ? (
-            <AdminStateCard
-              tone="neutral"
-              title={text.navPromoCodes}
-              description={text.promoCodesNoResults}
-              action={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setSearch("");
-                    setStatusFilter("all");
-                    setRewardFilter("all");
-                    setPage(1);
-                  }}
-                >
-                  {text.resetForm}
-                </Button>
-              }
-            />
-          ) : (
-            <>
-              <div className={adminTableStyles.tableWrap}>
-                <table className={adminTableStyles.table}>
-                  <thead>
-                    <tr>
-                      <th>{text.promoCodesCodeLabel}</th>
-                      <th>{text.promoCodesRewardLabel}</th>
-                      <th>{text.promoCodesUsageLabel}</th>
-                      <th>{text.promoCodesPerUserLimitLabel}</th>
-                      <th>{text.promoCodesWindowLabel}</th>
-                      <th>{text.statusLabel}</th>
-                      <th>{text.createdAtLabel}</th>
-                      <th>{text.actionsLabel}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedCodes.map((code) => {
-                      const status = getPromoStatus(code, text, nowMs);
-                      const isSelected = selectedCodeId === code.redeemCodeId;
-                      const codeValue = code.code || `${code.codePrefix}...`;
-                      const actionBusy = busyCodeId === code.redeemCodeId;
-                      const campaignMeta = formatCampaignMeta(code);
-                      const usagePercent = Math.min(
-                        100,
-                        Math.round((code.redeemedCount / Math.max(1, code.maxRedemptions)) * 100)
-                      );
-                      const usageToneClass =
-                        usagePercent >= 80
-                          ? styles.usageToneCritical
-                          : usagePercent >= 45
-                            ? styles.usageToneMedium
-                            : styles.usageToneGood;
-
-                      return (
-                        <tr
-                          key={code.redeemCodeId}
-                          className={`${styles.tableRow}${isSelected ? ` ${styles.rowSelected}` : ""}`}
-                          onClick={() => handleFocusUsage(code)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              handleFocusUsage(code);
-                            }
-                          }}
-                          tabIndex={0}
-                          aria-selected={isSelected}
-                        >
-                          <td>
-                            <div className={styles.codeCell}>
-                              <strong className={styles.codeValue}>{codeValue}</strong>
-                              <span className={styles.codeMeta}>
-                                {code.description.trim() || "-"}
-                              </span>
-                              {campaignMeta ? (
-                                <span className={styles.codeMeta}>{campaignMeta}</span>
-                              ) : null}
-                              <span className={styles.codeMeta}>
-                                {text.promoCodesUpdatedLabel}:{" "}
-                                {formatDateTime(code.updatedAtUtc, locale)}
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <div className={styles.rewardCell}>
-                              <AdminStatusBadge
-                                color={code.rewardKind === "spark" ? "#22c55e" : "#60a5fa"}
-                              >
-                                {formatRewardValue(code.rewardValue, code.rewardKind, text)}
-                              </AdminStatusBadge>
-                              <span className={styles.descriptionMeta}>
-                                {getRewardKindLabel(code.rewardKind, text)}
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <div className={styles.usageCell}>
-                              <div className={styles.usageTopRow}>
-                                <strong>
-                                  {formatNumber(code.redeemedCount, locale)} /{" "}
-                                  {formatNumber(code.maxRedemptions, locale)}
-                                </strong>
-                                <span className={`${styles.usagePercent} ${usageToneClass}`}>
-                                  {usagePercent}%
-                                </span>
-                              </div>
-                              <div className={`${styles.usageMeter} ${usageToneClass}`}>
-                                <span style={{ width: `${usagePercent}%` }} />
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <span className={styles.inlineNumeric}>
-                              {formatNumber(code.maxRedemptionsPerUser, locale)}
-                            </span>
-                          </td>
-                          <td className={styles.windowCell}>{formatWindow(code, locale, text)}</td>
-                          <td>
-                            <AdminStatusBadge color={status.color}>{status.label}</AdminStatusBadge>
-                          </td>
-                          <td>
-                            <div className={styles.createdCell}>
-                              <strong>{formatDateTime(code.createdAtUtc, locale)}</strong>
-                              <span>{code.createdBy?.trim() || "-"}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <div
-                              className={styles.actionsMenu}
-                              data-promo-actions-root
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={styles.actionMenuTrigger}
-                                aria-label={text.promoCodesActionsMenuLabel}
-                                aria-haspopup="menu"
-                                aria-expanded={actionsMenuCodeId === code.redeemCodeId}
-                                onClick={(event) =>
-                                  handleToggleActionsMenu(code, event.currentTarget)
-                                }
-                                disabled={actionBusy}
-                              >
-                                <MoreHorizontalIcon className={styles.inlineIcon} />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className={styles.pagination}>
-                <span className={styles.paginationInfo}>
-                  {locale === "ru"
-                    ? `Показано ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} из ${formatNumber(filteredCodes.length, locale)}`
-                    : `Showing ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} of ${formatNumber(filteredCodes.length, locale)}`}
-                </span>
-                <div className={styles.paginationCenter}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage <= 1}
-                    aria-label={text.promoCodesPreviousAction}
-                  >
-                    {"<"}
-                  </Button>
-
-                  <div className={styles.paginationActions}>
-                    {visiblePageNumbers.map((pageNumber) => (
-                      <Button
-                        key={pageNumber}
-                        variant={pageNumber === currentPage ? "primary" : "secondary"}
-                        size="sm"
-                        className={styles.paginationNumber}
-                        onClick={() => setPage(pageNumber)}
-                      >
-                        {formatNumber(pageNumber, locale)}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage >= totalPages}
-                    aria-label={text.promoCodesNextAction}
-                  >
-                    {">"}
-                  </Button>
-                </div>
-
-                <div className={styles.pageSizeControl}>
-                  <Select
-                    value={pageSize.toString()}
-                    options={pageSizeOptions}
-                    onChange={(value) => {
-                      setPageSize(Number(value));
-                      setPage(1);
-                    }}
-                    ariaLabel={locale === "ru" ? "Размер страницы" : "Page size"}
-                    showSelectedDescription={false}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </AdminCard>
-
-        <AdminCard
-          title={text.promoCodesRecentUsageTitle}
-          description={
-            selectedCode
-              ? `${selectedCode.code || `${selectedCode.codePrefix}...`} · ${selectedStatus?.label ?? ""}`
-              : text.promoCodesNoCodeSelectedDescription
+        <PromoCodeActivationsCard
+          text={text}
+          locale={locale}
+          selectedCode={selectedCode}
+          selectedStatusLabel={selectedStatus?.label}
+          activationsIsLoading={activationsQuery.isLoading}
+          activationsIsError={activationsQuery.isError}
+          activationsIsFetching={activationsQuery.isFetching}
+          redemptionsForView={redemptionsForView}
+          selectedUsersById={selectedUsersById}
+          hasAnyRedemptions={hasAnyRedemptions}
+          showAllActivations={showAllActivations}
+          canExpandActivations={canExpandActivations}
+          canGoToPreviousActivationsPage={canGoToPreviousActivationsPage}
+          canGoToNextActivationsPage={canGoToNextActivationsPage}
+          onRefetchActivations={activationsQuery.refetch}
+          onShowAllActivations={() => {
+            setShowAllActivations(true);
+            setActivationsPage(1);
+          }}
+          onPreviousActivationsPage={() =>
+            setActivationsPage((current) => Math.max(1, current - 1))
           }
-          className={styles.usageCard}
-        >
-          {!selectedCode ? (
-            <div className={styles.usageEmpty}>
-              <strong>{text.promoCodesNoCodeSelectedTitle}</strong>
-              <span>{text.promoCodesNoCodeSelectedDescription}</span>
-            </div>
-          ) : activationsQuery.isLoading ? (
-            <div className={styles.usageEmpty}>
-              <strong>{text.promoCodesRecentUsageTitle}</strong>
-              <span>{text.promoCodesActivationsLoading}</span>
-            </div>
-          ) : !hasAnyRedemptions ? (
-            <div className={styles.usageEmpty}>
-              <strong>{text.promoCodesRecentUsageTitle}</strong>
-              <span>{text.promoCodesRecentUsageEmpty}</span>
-            </div>
-          ) : (
-            <>
-              {activationsQuery.isError ? (
-                <div className={styles.usageWarning}>
-                  <span>{text.promoCodesActivationsError}</span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void activationsQuery.refetch()}
-                  >
-                    {text.promoCodesRefreshAction}
-                  </Button>
-                </div>
-              ) : null}
-
-              <div className={styles.usageTableWrap}>
-                <table className={styles.usageTable}>
-                  <thead>
-                    <tr>
-                      <th>{text.promoCodesActivationUserColumn}</th>
-                      <th>{text.promoCodesActivationDateColumn}</th>
-                      <th>{text.promoCodesActivationRewardColumn}</th>
-                      <th>{text.promoCodesActivationStatusColumn}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {redemptionsForView.map((redemption) => {
-                      const labels = getUserLabels(
-                        redemption.userId,
-                        selectedUsersById.get(redemption.userId)
-                      );
-
-                      return (
-                        <tr key={redemption.redemptionId}>
-                          <td>
-                            <div className={styles.codeCell}>
-                              <strong>{labels.primary}</strong>
-                              <span className={styles.codeMeta}>{labels.secondary}</span>
-                            </div>
-                          </td>
-                          <td>{formatDateTime(redemption.redeemedAtUtc, locale)}</td>
-                          <td>
-                            {formatRewardValue(redemption.rewardValue, redemption.rewardKind, text)}
-                          </td>
-                          <td>
-                            <AdminStatusBadge color="#22c55e">
-                              {text.promoCodesActivationStatusSuccess}
-                            </AdminStatusBadge>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className={styles.usageActions}>
-                {!showAllActivations && selectedCode.redeemedCount > ACTIVATIONS_PREVIEW_LIMIT ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setShowAllActivations(true);
-                      setActivationsPage(1);
-                    }}
-                  >
-                    {text.promoCodesViewAllActivationsAction}
-                  </Button>
-                ) : null}
-
-                {showAllActivations ? (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setActivationsPage((current) => Math.max(1, current - 1))}
-                      disabled={!canGoToPreviousActivationsPage || activationsQuery.isFetching}
-                    >
-                      {text.promoCodesPreviousAction}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setActivationsPage((current) => current + 1)}
-                      disabled={!canGoToNextActivationsPage || activationsQuery.isFetching}
-                    >
-                      {text.promoCodesNextAction}
-                    </Button>
-                  </>
-                ) : null}
-
-                {showAllActivations ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setShowAllActivations(false);
-                      setActivationsPage(1);
-                    }}
-                  >
-                    {text.promoCodesShowLatestActivationsAction}
-                  </Button>
-                ) : null}
-              </div>
-            </>
-          )}
-        </AdminCard>
+          onNextActivationsPage={() => setActivationsPage((current) => current + 1)}
+          onShowLatestActivations={() => {
+            setShowAllActivations(false);
+            setActivationsPage(1);
+          }}
+        />
       </div>
 
-      {actionsMenuCode && actionsMenuPosition && typeof window !== "undefined"
-        ? createPortal(
-            <div
-              className={styles.actionsMenuPortal}
-              style={{
-                top: actionsMenuPosition.top,
-                left: actionsMenuPosition.left,
-                minWidth: ACTIONS_MENU_WIDTH_PX,
-                transform: actionsMenuPosition.openUpward ? "translateY(-100%)" : undefined,
-              }}
-              role="menu"
-              aria-label={text.promoCodesActionsMenuLabel}
-              data-promo-actions-root
-            >
-              <div className={`${styles.actionsMenuList} ${styles.actionsMenuListPortal}`}>
-                {isActionsMenuArchived ? (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.actionsMenuItem}
-                      onClick={() => handleFocusUsage(actionsMenuCode)}
-                    >
-                      {text.promoCodesViewActivationsAction}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.actionsMenuItem}
-                      onClick={() => handleRestore(actionsMenuCode)}
-                      disabled={isActionsMenuBusy}
-                    >
-                      {text.promoCodesRestoreAction}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.actionsMenuItem}
-                      onClick={() =>
-                        void handleCopyCode(
-                          actionsMenuCode.code || `${actionsMenuCode.codePrefix}...`
-                        )
-                      }
-                    >
-                      {text.promoCodesCopyAction}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.actionsMenuItem}
-                      onClick={() => handleOpenEditPanel(actionsMenuCode)}
-                    >
-                      {text.editTemplate}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.actionsMenuItem}
-                      onClick={() => handleFocusUsage(actionsMenuCode)}
-                    >
-                      {text.promoCodesViewActivationsAction}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.actionsMenuItem}
-                      onClick={() => handleToggleCodeState(actionsMenuCode)}
-                      disabled={isActionsMenuBusy}
-                    >
-                      {actionsMenuCode.isActive
-                        ? text.promoCodesPauseAction
-                        : text.promoCodesResumeAction}
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionsMenuItem} ${styles.actionsMenuItemDanger}`}
-                      onClick={() => handleArchive(actionsMenuCode)}
-                      disabled={!actionsMenuCode.isActive || isActionsMenuBusy}
-                    >
-                      {text.archive}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+      <PromoCodesActionsMenuPortal
+        actionsMenuCode={actionsMenuCode}
+        actionsMenuPosition={actionsMenuPosition}
+        text={text}
+        minWidthPx={PROMO_ACTIONS_MENU_MIN_WIDTH_PX}
+        isActionsMenuArchived={isActionsMenuArchived}
+        isActionsMenuBusy={isActionsMenuBusy}
+        onViewActivations={handleFocusUsage}
+        onRestore={handleRestore}
+        onCopyCode={handleCopyCode}
+        onEdit={handleOpenEditPanel}
+        onToggleState={handleToggleCodeState}
+        onArchive={handleArchive}
+      />
 
-      {isEditorOpen ? (
-        <div className={styles.drawerBackdrop} onClick={handleCloseEditor}>
-          <aside
-            className={styles.editorDrawer}
-            role="dialog"
-            aria-modal="true"
-            aria-label={
-              panelMode === "edit"
-                ? text.promoCodesEditPanelTitle
-                : panelMode === "duplicate"
-                  ? text.promoCodesDuplicatePanelTitle
-                  : text.promoCodesCreatePanelTitle
-            }
-            onClick={(event) => event.stopPropagation()}
-          >
-            <AdminCard
-              title={
-                panelMode === "edit"
-                  ? text.promoCodesEditPanelTitle
-                  : panelMode === "duplicate"
-                    ? text.promoCodesDuplicatePanelTitle
-                    : text.promoCodesCreatePanelTitle
-              }
-              description={text.promoCodesFormCardDescription}
-              className={styles.formCard}
-            >
-              <form className={styles.form} onSubmit={handleSubmit}>
-                <section className={styles.formSection}>
-                  <header className={styles.formSectionHeader}>
-                    <h3 className={styles.formSectionTitle}>{text.promoCodesSectionMainTitle}</h3>
-                  </header>
-
-                  <label className={styles.formField}>
-                    <span className={styles.fieldLabel}>{text.promoCodesCodeLabel}</span>
-                    <div className={styles.inlineField}>
-                      <input
-                        className={styles.input}
-                        value={form.code}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            code: event.target.value.toUpperCase(),
-                          }))
-                        }
-                        readOnly={panelMode === "edit"}
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleGenerateCode}
-                        disabled={panelMode === "edit"}
-                      >
-                        {text.promoCodesGenerateCodeAction}
-                      </Button>
-                    </div>
-                    <span className={styles.helperText}>{text.promoCodesCodeHelp}</span>
-                  </label>
-
-                  <label className={styles.formField}>
-                    <span className={styles.fieldLabel}>{text.promoCodesDescriptionLabel}</span>
-                    <input
-                      className={styles.input}
-                      value={form.description}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, description: event.target.value }))
-                      }
-                    />
-                  </label>
-
-                  <label className={styles.formField}>
-                    <span className={styles.fieldLabel}>{text.promoCodesStatusFieldLabel}</span>
-                    <Select
-                      value={form.isActive ? "active" : "paused"}
-                      options={formStatusOptions}
-                      onChange={(value) =>
-                        setForm((current) => ({ ...current, isActive: value === "active" }))
-                      }
-                      ariaLabel={text.promoCodesStatusFieldLabel}
-                      showSelectedDescription={false}
-                    />
-                  </label>
-                </section>
-
-                <section className={styles.formSection}>
-                  <header className={styles.formSectionHeader}>
-                    <h3 className={styles.formSectionTitle}>{text.promoCodesSectionRewardTitle}</h3>
-                  </header>
-
-                  <div className={styles.formGrid}>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>{text.promoCodesRewardTypeLabel}</span>
-                      <select
-                        className={`${styles.input} ${styles.selectInput}`}
-                        value={form.rewardKind}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            rewardKind: event.target.value as AdminRedeemRewardKind,
-                          }))
-                        }
-                      >
-                        <option value="spark">{text.promoCodesRewardTypeSparkOption}</option>
-                        <option value="premium_days" disabled>
-                          {text.promoCodesRewardTypePremiumOption}
-                        </option>
-                      </select>
-                      <span className={styles.helperText}>{text.promoCodesRewardTypeHint}</span>
-                    </label>
-
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>{text.promoCodesRewardValueLabel}</span>
-                      <input
-                        className={styles.input}
-                        inputMode="numeric"
-                        value={form.rewardValue}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, rewardValue: event.target.value }))
-                        }
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <section className={styles.formSection}>
-                  <header className={styles.formSectionHeader}>
-                    <h3 className={styles.formSectionTitle}>{text.promoCodesSectionLimitsTitle}</h3>
-                  </header>
-
-                  <div className={styles.formGrid}>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>{text.promoCodesLimitLabel}</span>
-                      <input
-                        className={styles.input}
-                        inputMode="numeric"
-                        value={form.maxRedemptions}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, maxRedemptions: event.target.value }))
-                        }
-                      />
-                    </label>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>{text.promoCodesPerUserLimitLabel}</span>
-                      <input
-                        className={styles.input}
-                        inputMode="numeric"
-                        value={form.maxRedemptionsPerUser}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            maxRedemptionsPerUser: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <section className={styles.formSection}>
-                  <header className={styles.formSectionHeader}>
-                    <h3 className={styles.formSectionTitle}>{text.promoCodesWindowLabel}</h3>
-                  </header>
-
-                  <div className={styles.formGrid}>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>{text.promoCodesStartsLabel}</span>
-                      <div className={styles.optionalDateControl}>
-                        <input
-                          className={styles.input}
-                          type="datetime-local"
-                          value={form.startsAtUtc}
-                          onChange={(event) =>
-                            setForm((current) => ({ ...current, startsAtUtc: event.target.value }))
-                          }
-                        />
-                        {form.startsAtUtc ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setForm((current) => ({ ...current, startsAtUtc: "" }))}
-                          >
-                            {text.resetForm}
-                          </Button>
-                        ) : null}
-                      </div>
-                      <span className={styles.helperText}>{text.promoCodesDatesOptionalHint}</span>
-                    </label>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>{text.promoCodesExpiresLabel}</span>
-                      <div className={styles.optionalDateControl}>
-                        <input
-                          className={styles.input}
-                          type="datetime-local"
-                          value={form.expiresAtUtc}
-                          onChange={(event) =>
-                            setForm((current) => ({ ...current, expiresAtUtc: event.target.value }))
-                          }
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setForm((current) => ({
-                              ...current,
-                              expiresAtUtc: current.expiresAtUtc
-                                ? ""
-                                : new Date(
-                                    new Date().getTime() - new Date().getTimezoneOffset() * 60_000
-                                  )
-                                    .toISOString()
-                                    .slice(0, 16),
-                            }))
-                          }
-                        >
-                          {form.expiresAtUtc
-                            ? text.promoCodesNoExpiryAction
-                            : text.promoCodesPickDateAction}
-                        </Button>
-                      </div>
-                      <span className={styles.helperText}>{text.promoCodesDatesOptionalHint}</span>
-                    </label>
-                  </div>
-                </section>
-
-                <section className={styles.formSection}>
-                  <header className={styles.formSectionHeader}>
-                    <h3 className={styles.formSectionTitle}>
-                      {text.promoCodesSectionCampaignTitle}
-                    </h3>
-                  </header>
-
-                  <div className={styles.formGrid}>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>
-                        {text.promoCodesMinimumPurchasesLabel}
-                      </span>
-                      <input
-                        className={styles.input}
-                        inputMode="numeric"
-                        value={form.minimumSuccessfulPurchases}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            minimumSuccessfulPurchases: event.target.value,
-                          }))
-                        }
-                      />
-                      <span className={styles.helperText}>
-                        {text.promoCodesMinimumPurchasesHint}
-                      </span>
-                    </label>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>{text.promoCodesCampaignNameLabel}</span>
-                      <input
-                        className={styles.input}
-                        value={form.campaignName}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, campaignName: event.target.value }))
-                        }
-                      />
-                    </label>
-                    <label className={styles.formField}>
-                      <span className={styles.fieldLabel}>
-                        {text.promoCodesCampaignChannelLabel}
-                      </span>
-                      <input
-                        className={styles.input}
-                        value={form.campaignChannel}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            campaignChannel: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <div className={styles.formActionsSticky}>
-                  {panelMode === "edit" && selectedCode ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className={styles.deactivateButton}
-                      disabled={isMutating}
-                      onClick={() => handleToggleCodeState(selectedCode)}
-                    >
-                      {selectedCode.isActive ? text.deactivate : text.activate}
-                    </Button>
-                  ) : (
-                    <span />
-                  )}
-
-                  <div className={styles.formActions}>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleCloseEditor}
-                      disabled={isMutating}
-                    >
-                      {text.editorCancel}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleResetPanel}
-                      disabled={isMutating}
-                    >
-                      {text.resetForm}
-                    </Button>
-                    <Button variant="primary" type="submit" disabled={isMutating}>
-                      {panelMode === "edit"
-                        ? text.promoCodesSaveUpdateAction
-                        : text.promoCodesSaveCreateAction}
-                    </Button>
-                  </div>
-                </div>
-              </form>
-            </AdminCard>
-          </aside>
-        </div>
-      ) : null}
+      <PromoCodesEditorDrawer
+        isOpen={isEditorOpen}
+        panelMode={panelMode}
+        text={text}
+        form={form}
+        setForm={setForm}
+        formStatusOptions={formStatusOptions}
+        selectedCode={selectedCode}
+        isMutating={isMutating}
+        onSubmit={handleSubmit}
+        onClose={handleCloseEditor}
+        onReset={handleResetPanel}
+        onGenerateCode={handleGenerateCode}
+        onToggleCodeState={handleToggleCodeState}
+      />
     </AdminPage>
   );
 }

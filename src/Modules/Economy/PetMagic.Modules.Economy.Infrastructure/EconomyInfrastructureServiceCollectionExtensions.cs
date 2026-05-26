@@ -47,9 +47,18 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 "StripeLiveWebhookSecret",
                 "STRIPE_LIVE_WEBHOOK_SECRET",
                 "STRIPE_WEBHOOK_SECRET_LIVE") ?? legacyStripeWebhookSecret,
-            StripeCheckoutSuccessUrl = section["StripeCheckoutSuccessUrl"] ?? "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}",
-            StripeCheckoutCancelUrl = section["StripeCheckoutCancelUrl"] ?? "https://petmagic.app/payments/cancel",
-            StripeBillingPortalReturnUrl = section["StripeBillingPortalReturnUrl"] ?? "https://petmagic.app/profile/premium",
+            StripeCheckoutSuccessUrl = ReadValue(
+                section,
+                "StripeCheckoutSuccessUrl",
+                "STRIPE_CHECKOUT_SUCCESS_URL") ?? "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}",
+            StripeCheckoutCancelUrl = ReadValue(
+                section,
+                "StripeCheckoutCancelUrl",
+                "STRIPE_CHECKOUT_CANCEL_URL") ?? "https://petmagic.app/payments/cancel",
+            StripeBillingPortalReturnUrl = ReadValue(
+                section,
+                "StripeBillingPortalReturnUrl",
+                "STRIPE_BILLING_PORTAL_RETURN_URL") ?? "https://petmagic.app/profile/premium",
             GooglePlayPackageName = section["GooglePlayPackageName"] ?? "com.petmagic.app",
             GooglePlayServiceAccountEmail = ReadValue(section, "GooglePlayServiceAccountEmail", "GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL") ?? string.Empty,
             GooglePlayPrivateKeyPem = NormalizePem(ReadValue(section, "GooglePlayPrivateKeyPem", "GOOGLE_PLAY_PRIVATE_KEY_PEM")),
@@ -66,6 +75,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });
 
+        services.AddScoped<EconomyAdminConfigurationService>();
+        services.AddScoped<EconomyAdminRedeemCodeService>();
         services.AddScoped<IEconomyService, EconomyService>();
         services.AddScoped<IAdminUserEconomyAnalyticsReader, AdminUserEconomyAnalyticsReader>();
         services.AddSingleton<IGoogleStoreWebhookTokenVerifier, GoogleStoreWebhookTokenVerifier>();

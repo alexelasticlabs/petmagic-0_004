@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -20,10 +22,20 @@ void main() {
 
     await tester.pumpWidget(harness.app());
     await tester.pumpAndSettle();
+    final text = _text(tester);
 
-    expect(find.text('В процессе'), findsAtLeastNWidgets(1));
-    expect(find.text('Готово'), findsAtLeastNWidgets(1));
-    expect(find.text('Ошибка'), findsAtLeastNWidgets(1));
+    expect(
+      find.text(text.generationStatusSectionActive),
+      findsAtLeastNWidgets(1),
+    );
+    expect(
+      find.text(text.generationStatusSectionReady),
+      findsAtLeastNWidgets(1),
+    );
+    expect(
+      find.text(text.generationStatusSectionFailed),
+      findsAtLeastNWidgets(1),
+    );
 
     expect(find.text('Hidden Ready'), findsNothing);
   });
@@ -37,8 +49,12 @@ void main() {
 
     await tester.pumpWidget(harness.app());
     await tester.pumpAndSettle();
+    final text = _text(tester);
 
-    final failedChip = find.widgetWithText(ChoiceChip, 'Ошибка');
+    final failedChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterFailed,
+    );
     await tester.ensureVisible(failedChip);
     await tester.tap(failedChip, warnIfMissed: false);
     await tester.pumpAndSettle();
@@ -59,8 +75,12 @@ void main() {
 
     await tester.pumpWidget(harness.app());
     await tester.pumpAndSettle();
+    final text = _text(tester);
 
-    final readyChip = find.widgetWithText(ChoiceChip, 'Готово');
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
     await tester.ensureVisible(readyChip);
     await tester.tap(readyChip, warnIfMissed: false);
     await tester.pumpAndSettle();
@@ -68,13 +88,13 @@ void main() {
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Открыть'), findsOneWidget);
-    expect(find.text('Сохранить'), findsOneWidget);
-    expect(find.text('Поделиться'), findsOneWidget);
-    expect(find.text('Удалить'), findsOneWidget);
-    expect(find.text('Сообщить о проблеме'), findsOneWidget);
+    expect(find.text(text.generationStatusOpenStatusAction), findsOneWidget);
+    expect(find.text(text.generationStatusSaveAction), findsOneWidget);
+    expect(find.text(text.supportChatShareAction), findsOneWidget);
+    expect(find.text(text.generationStatusDeleteAction), findsOneWidget);
+    expect(find.text(text.generationStatusReportProblemAction), findsOneWidget);
 
-    await tester.tap(find.text('Открыть'));
+    await tester.tap(find.text(text.generationStatusOpenStatusAction));
     await tester.pumpAndSettle();
 
     expect(find.text('status:g-ready-1'), findsOneWidget);
@@ -91,8 +111,9 @@ void main() {
 
     await tester.pumpWidget(harness.app());
     await tester.pumpAndSettle();
+    final text = _text(tester);
 
-    await tester.tap(find.text('Открыть').first);
+    await tester.tap(find.text(text.generationStatusOpenStatusAction).first);
     await tester.pumpAndSettle();
 
     expect(harness.controller.markReadCalls, contains('g-active-1'));
@@ -110,13 +131,19 @@ void main() {
 
     await tester.pumpWidget(harness.app());
     await tester.pumpAndSettle();
+    final text = _text(tester);
 
-    final failedChip = find.widgetWithText(ChoiceChip, 'Ошибка');
+    final failedChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterFailed,
+    );
     await tester.ensureVisible(failedChip);
     await tester.tap(failedChip, warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Выбрать другое фото').first);
+    await tester.tap(
+      find.text(text.generationStatusPickAnotherPhotoAction).first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('templates-route'), findsOneWidget);
 
@@ -127,10 +154,17 @@ void main() {
     await tester.tap(failedChip, warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Сообщить в поддержку').first);
+    await tester.tap(
+      find.text(text.generationStatusContactSupportAction).first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('support-route'), findsOneWidget);
   });
+}
+
+AppLocalizations _text(WidgetTester tester) {
+  final context = tester.element(find.byType(GenerationsGalleryPage).first);
+  return AppLocalizations.of(context);
 }
 
 class _GalleryHarness {
@@ -177,7 +211,18 @@ class _GalleryHarness {
       overrides: [
         generationHistoryControllerProvider.overrideWith(() => controller),
       ],
-      child: MaterialApp.router(routerConfig: router, theme: AppTheme.dark()),
+      child: MaterialApp.router(
+        routerConfig: router,
+        theme: AppTheme.dark(),
+        locale: const Locale('ru'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+      ),
     );
   }
 }
