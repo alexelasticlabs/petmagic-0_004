@@ -30,10 +30,7 @@ describe("buildPromoCodesViewOptions", () => {
       "premium_days",
     ]);
 
-    expect(result.formStatusOptions.map((item) => item.value)).toEqual([
-      "active",
-      "paused",
-    ]);
+    expect(result.formStatusOptions.map((item) => item.value)).toEqual(["active", "paused"]);
 
     expect(result.sortOptions.map((item) => item.value)).toEqual([
       "updated",

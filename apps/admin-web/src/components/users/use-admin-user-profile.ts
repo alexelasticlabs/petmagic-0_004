@@ -4,10 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    fetchAdminUser,
-    fetchAdminUserAnalytics,
-    type AdminUserAnalytics,
-    type AdminUserDetail,
+  fetchAdminUser,
+  fetchAdminUserAnalytics,
+  type AdminUserAnalytics,
+  type AdminUserDetail,
 } from "@/lib/api-client";
 
 type UseAdminUserProfileOptions = {
@@ -29,8 +29,10 @@ export function useAdminUserProfile({ userId }: UseAdminUserProfileOptions) {
 
   const user = userQuery.data ?? null;
   const analytics = analyticsQuery.data ?? null;
-  const isLoading = Boolean(userId) && (!user || !analytics) && (userQuery.isLoading || analyticsQuery.isLoading);
-  const hasError = Boolean(userId) && ((!user && userQuery.isError) || (!analytics && analyticsQuery.isError));
+  const isLoading =
+    Boolean(userId) && (!user || !analytics) && (userQuery.isLoading || analyticsQuery.isLoading);
+  const hasError =
+    Boolean(userId) && ((!user && userQuery.isError) || (!analytics && analyticsQuery.isError));
 
   async function refresh() {
     if (!userId) {

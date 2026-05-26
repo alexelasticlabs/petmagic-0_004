@@ -8,7 +8,10 @@ type ImageTemplatesCatalogPageProps = {
   searchParams: Promise<{ category?: string | string[] }>;
 };
 
-export default async function ImageTemplatesCatalogPage({ params, searchParams }: ImageTemplatesCatalogPageProps) {
+export default async function ImageTemplatesCatalogPage({
+  params,
+  searchParams,
+}: ImageTemplatesCatalogPageProps) {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
@@ -18,5 +21,7 @@ export default async function ImageTemplatesCatalogPage({ params, searchParams }
   const { category } = await searchParams;
   const initialCategory = Array.isArray(category) ? category[0] : category;
 
-  return <TemplatesCatalogView locale={locale} templateType="Image" initialCategory={initialCategory} />;
+  return (
+    <TemplatesCatalogView locale={locale} templateType="Image" initialCategory={initialCategory} />
+  );
 }

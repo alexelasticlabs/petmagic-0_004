@@ -35,7 +35,10 @@ export default function Error({ error, reset }: ErrorPageProps) {
             <Button variant="primary" onClick={reset}>
               {locale === "ru" ? "Повторить" : "Retry"}
             </Button>
-            <Link href={`/${locale}/dashboard`} className="ui-button ui-button--secondary ui-button--md">
+            <Link
+              href={`/${locale}/dashboard`}
+              className="ui-button ui-button--secondary ui-button--md"
+            >
               {text.navDashboard}
             </Link>
           </div>

@@ -2,11 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  DownloadIcon,
-  MoreHorizontalIcon,
-  RefreshIcon,
-} from "@/components/admin/admin-icons";
+import { DownloadIcon, MoreHorizontalIcon, RefreshIcon } from "@/components/admin/admin-icons";
 import {
   AdminCard,
   AdminFilterBar,
@@ -29,10 +25,7 @@ import {
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
-import {
-  type AdminRedeemCode,
-  type AdminRedeemRewardKind,
-} from "@/lib/api-client";
+import { type AdminRedeemCode, type AdminRedeemRewardKind } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type PromoCodesListCardProps = {
@@ -131,7 +124,11 @@ export function PromoCodesListCard({
   return (
     <AdminCard className={styles.tableCard}>
       <AdminToolbar className={styles.tableTopBar}>
-        <div className={styles.statusTabs} role="tablist" aria-label={text.promoCodesStatusFilterLabel}>
+        <div
+          className={styles.statusTabs}
+          role="tablist"
+          aria-label={text.promoCodesStatusFilterLabel}
+        >
           {statusTabs.map((tab, index) => {
             const isActiveTab = statusFilter === tab.value;
 
@@ -311,15 +308,20 @@ export function PromoCodesListCard({
                         <div className={styles.codeCell}>
                           <strong className={styles.codeValue}>{codeValue}</strong>
                           <span className={styles.codeMeta}>{code.description.trim() || "-"}</span>
-                          {campaignMeta ? <span className={styles.codeMeta}>{campaignMeta}</span> : null}
+                          {campaignMeta ? (
+                            <span className={styles.codeMeta}>{campaignMeta}</span>
+                          ) : null}
                           <span className={styles.codeMeta}>
-                            {text.promoCodesUpdatedLabel}: {formatDateTime(code.updatedAtUtc, locale)}
+                            {text.promoCodesUpdatedLabel}:{" "}
+                            {formatDateTime(code.updatedAtUtc, locale)}
                           </span>
                         </div>
                       </td>
                       <td>
                         <div className={styles.rewardCell}>
-                          <AdminStatusBadge color={code.rewardKind === "spark" ? "#22c55e" : "#60a5fa"}>
+                          <AdminStatusBadge
+                            color={code.rewardKind === "spark" ? "#22c55e" : "#60a5fa"}
+                          >
                             {formatRewardValue(code.rewardValue, code.rewardKind, text)}
                           </AdminStatusBadge>
                           <span className={styles.descriptionMeta}>
@@ -331,9 +333,12 @@ export function PromoCodesListCard({
                         <div className={styles.usageCell}>
                           <div className={styles.usageTopRow}>
                             <strong>
-                              {formatNumber(code.redeemedCount, locale)} / {formatNumber(code.maxRedemptions, locale)}
+                              {formatNumber(code.redeemedCount, locale)} /{" "}
+                              {formatNumber(code.maxRedemptions, locale)}
                             </strong>
-                            <span className={`${styles.usagePercent} ${usageToneClass}`}>{usagePercent}%</span>
+                            <span className={`${styles.usagePercent} ${usageToneClass}`}>
+                              {usagePercent}%
+                            </span>
                           </div>
                           <div className={`${styles.usageMeter} ${usageToneClass}`}>
                             <span style={{ width: `${usagePercent}%` }} />
@@ -347,7 +352,9 @@ export function PromoCodesListCard({
                       </td>
                       <td className={styles.windowCell}>{formatWindow(code, locale, text)}</td>
                       <td>
-                        <AdminStatusBadge color={statusView.color}>{statusView.label}</AdminStatusBadge>
+                        <AdminStatusBadge color={statusView.color}>
+                          {statusView.label}
+                        </AdminStatusBadge>
                       </td>
                       <td>
                         <div className={styles.createdCell}>
@@ -368,7 +375,9 @@ export function PromoCodesListCard({
                             aria-label={text.promoCodesActionsMenuLabel}
                             aria-haspopup="menu"
                             aria-expanded={actionsMenuCodeId === code.redeemCodeId}
-                            onClick={(event) => onToggleActionsMenu(code.redeemCodeId, event.currentTarget)}
+                            onClick={(event) =>
+                              onToggleActionsMenu(code.redeemCodeId, event.currentTarget)
+                            }
                             disabled={actionBusy}
                           >
                             <MoreHorizontalIcon className={styles.inlineIcon} />

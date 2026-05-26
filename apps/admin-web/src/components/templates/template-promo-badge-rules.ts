@@ -15,7 +15,9 @@ type AutoPromoBadgeContext = {
   now?: number;
 };
 
-export function resolveAutoPromoBadge(context: AutoPromoBadgeContext): Exclude<TemplatePromoBadgeMode, "Auto"> | undefined {
+export function resolveAutoPromoBadge(
+  context: AutoPromoBadgeContext
+): Exclude<TemplatePromoBadgeMode, "Auto"> | undefined {
   const now = context.now ?? Date.now();
   const createdAt = context.createdAtUtc ? new Date(context.createdAtUtc).getTime() : now;
   const updatedAt = context.updatedAtUtc ? new Date(context.updatedAtUtc).getTime() : now;
@@ -24,16 +26,24 @@ export function resolveAutoPromoBadge(context: AutoPromoBadgeContext): Exclude<T
     return "New";
   }
 
-  if (context.status === "Active" && updatedAt >= now - TRENDING_PROMO_BADGE_DAYS * 24 * 60 * 60 * 1000) {
+  if (
+    context.status === "Active" &&
+    updatedAt >= now - TRENDING_PROMO_BADGE_DAYS * 24 * 60 * 60 * 1000
+  ) {
     return "Trending";
   }
 
-  if (context.status === "Active" && (context.isPremium || context.tokenCost >= POPULAR_PROMO_BADGE_TOKEN_COST_THRESHOLD)) {
+  if (
+    context.status === "Active" &&
+    (context.isPremium || context.tokenCost >= POPULAR_PROMO_BADGE_TOKEN_COST_THRESHOLD)
+  ) {
     return "Popular";
   }
 
   const searchText = context.searchFragments
-    .filter((fragment): fragment is string => typeof fragment === "string" && fragment.trim().length > 0)
+    .filter(
+      (fragment): fragment is string => typeof fragment === "string" && fragment.trim().length > 0
+    )
     .join(" ")
     .toLowerCase();
 

@@ -27,7 +27,9 @@ export function Button({
   type = "button",
   ...rest
 }: ButtonProps) {
-  const classes = [variantClassMap[variant], sizeClassMap[size], className].filter(Boolean).join(" ");
+  const classes = [variantClassMap[variant], sizeClassMap[size], className]
+    .filter(Boolean)
+    .join(" ");
 
   return <button type={type} className={classes} {...rest} />;
 }

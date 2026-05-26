@@ -28,7 +28,10 @@ export function TemplatePreviewAssetSection({
 }: TemplatePreviewAssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const localPreviewUrl = useMemo(() => (previewFile ? URL.createObjectURL(previewFile) : null), [previewFile]);
+  const localPreviewUrl = useMemo(
+    () => (previewFile ? URL.createObjectURL(previewFile) : null),
+    [previewFile]
+  );
   const persistedPreviewUrl = form.previewUrl.trim();
   const effectivePreviewUrl = localPreviewUrl ?? persistedPreviewUrl;
   const hasPreview = Boolean(effectivePreviewUrl);
@@ -114,14 +117,32 @@ export function TemplatePreviewAssetSection({
         onDrop={handlePreviewDrop}
       >
         <div className={styles.assetPreviewOverlay}>
-          <span className={styles.assetPreviewBadge}>{previewKind === "video" ? "Video preview" : "Cover asset"}</span>
-          <span className={`${styles.assetPreviewState} ${hasPreview ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}>{previewStateLabel}</span>
+          <span className={styles.assetPreviewBadge}>
+            {previewKind === "video" ? "Video preview" : "Cover asset"}
+          </span>
+          <span
+            className={`${styles.assetPreviewState} ${hasPreview ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}
+          >
+            {previewStateLabel}
+          </span>
         </div>
         {hasPreview ? (
           previewKind === "video" ? (
-            <video src={effectivePreviewUrl} className={styles.assetPreviewMedia} controls playsInline />
+            <video
+              src={effectivePreviewUrl}
+              className={styles.assetPreviewMedia}
+              controls
+              playsInline
+            />
           ) : (
-            <Image src={effectivePreviewUrl} alt={previewFileLabel || text.previewAssetTitle} width={480} height={600} unoptimized className={styles.assetPreviewMedia} />
+            <Image
+              src={effectivePreviewUrl}
+              alt={previewFileLabel || text.previewAssetTitle}
+              width={480}
+              height={600}
+              unoptimized
+              className={styles.assetPreviewMedia}
+            />
           )
         ) : (
           <div className={styles.assetPreviewPlaceholder}>
@@ -136,7 +157,12 @@ export function TemplatePreviewAssetSection({
           <span className={styles.fieldHeader}>
             <span>{text.previewUrlLabel}</span>
           </span>
-          <input value={form.previewUrl} onChange={(event) => setForm((current) => ({ ...current, previewUrl: event.target.value }))} />
+          <input
+            value={form.previewUrl}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, previewUrl: event.target.value }))
+            }
+          />
         </label>
         <div className={styles.uploadPanel}>
           <div className={styles.uploadPanelHeader}>
@@ -144,12 +170,20 @@ export function TemplatePreviewAssetSection({
               <p className={styles.uploadPanelEyebrow}>{text.selectedFileLabel}</p>
               <p className={styles.uploadPanelTitle}>{previewFileLabel}</p>
             </div>
-            <span className={`${styles.inlineState} ${hasPreview ? styles.inlineStateReady : styles.inlineStateAttention}`}>
+            <span
+              className={`${styles.inlineState} ${hasPreview ? styles.inlineStateReady : styles.inlineStateAttention}`}
+            >
               {previewStateLabel}
             </span>
           </div>
           <div className={styles.uploadActions}>
-            <Button type="button" variant="primary" className={styles.primaryButton} disabled={!previewFile || uploadingKind !== null} onClick={onUploadPreview}>
+            <Button
+              type="button"
+              variant="primary"
+              className={styles.primaryButton}
+              disabled={!previewFile || uploadingKind !== null}
+              onClick={onUploadPreview}
+            >
               {uploadingKind === "Preview" ? text.uploadingMedia : text.uploadAction}
             </Button>
             <Button

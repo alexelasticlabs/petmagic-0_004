@@ -17,11 +17,7 @@ export function getTemplateStatusLabel(status: TemplateStatus, locale: Locale) {
     return status;
   }
 
-  return status === "Active"
-    ? "Активен"
-    : status === "Draft"
-      ? "Черновик"
-      : "Архив";
+  return status === "Active" ? "Активен" : status === "Draft" ? "Черновик" : "Архив";
 }
 
 export function getCharacterOrientationLabel(value: string | undefined, text: TemplateKindText) {

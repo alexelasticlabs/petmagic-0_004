@@ -15,9 +15,9 @@ import {
   getTemplateListCacheKey,
   getTemplateRecentGenerationsCacheKey,
 } from "./api-client.core";
+
 import type {
   AdminTemplate,
-  AdminTemplateAnalyticsDimension,
   AdminTemplateCategory,
   AdminTemplateEventAnalytics,
   AdminTemplateFailureBreakdownItem,
@@ -34,11 +34,11 @@ import type {
   TemplateAsset,
   TemplateAssetKind,
   TemplateCategoryPayload,
-  TemplateGenerationJobStatus,
   TemplateStatus,
   TemplateType,
   VideoTemplatePayload,
 } from "./api-client.types";
+
 export async function fetchAdminTemplates(type?: TemplateType): Promise<AdminTemplateListItem[]> {
   const cacheKey = getTemplateListCacheKey(type);
   const query = type ? `?type=${encodeURIComponent(type)}` : "";

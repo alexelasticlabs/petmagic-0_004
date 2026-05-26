@@ -68,7 +68,10 @@
   font-family: var(--font-heading), sans-serif;
   font-size: 0.78rem;
   font-weight: 700;
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .primaryButton {

@@ -5,11 +5,17 @@
 }
 
 .phonePreviewVideo {
-  --phone-preview-aspect-ratio: var(--phone-preview-card-aspect-ratio, var(--template-video-aspect-ratio));
+  --phone-preview-aspect-ratio: var(
+    --phone-preview-card-aspect-ratio,
+    var(--template-video-aspect-ratio)
+  );
 }
 
 .phonePreviewImage {
-  --phone-preview-aspect-ratio: var(--phone-preview-card-aspect-ratio, var(--template-image-aspect-ratio));
+  --phone-preview-aspect-ratio: var(
+    --phone-preview-card-aspect-ratio,
+    var(--template-image-aspect-ratio)
+  );
 }
 
 .phoneMedia {
@@ -21,17 +27,34 @@
   border: 1px solid var(--border-soft);
   border-radius: 1.28rem;
   background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--accent) 20%, transparent), transparent 34%),
+    radial-gradient(
+      circle at top,
+      color-mix(in srgb, var(--accent) 20%, transparent),
+      transparent 34%
+    ),
     linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent), 0 16px 32px color-mix(in srgb, var(--surface-0) 42%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent),
+    0 16px 32px color-mix(in srgb, var(--surface-0) 42%, transparent);
 }
 
 .phoneCardShade {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--surface-0) 2%, transparent) 46%, color-mix(in srgb, var(--surface-0) 8%, transparent) 68%, color-mix(in srgb, var(--surface-0) 22%, transparent) 84%, color-mix(in srgb, var(--surface-0) 42%, transparent) 100%),
-    radial-gradient(circle at 50% 115%, color-mix(in srgb, var(--surface-2) 34%, transparent) 0%, transparent 58%);
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--surface-0) 2%, transparent) 46%,
+      color-mix(in srgb, var(--surface-0) 8%, transparent) 68%,
+      color-mix(in srgb, var(--surface-0) 22%, transparent) 84%,
+      color-mix(in srgb, var(--surface-0) 42%, transparent) 100%
+    ),
+    radial-gradient(
+      circle at 50% 115%,
+      color-mix(in srgb, var(--surface-2) 34%, transparent) 0%,
+      transparent 58%
+    );
   pointer-events: none;
 }
 
@@ -69,7 +92,11 @@
   min-height: 1.34rem;
   padding: 0.1rem 0.48rem;
   border: 1px solid color-mix(in srgb, var(--text-inverse) 34%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 62%, transparent) 0%, color-mix(in srgb, var(--surface-2) 48%, transparent) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 62%, transparent) 0%,
+    color-mix(in srgb, var(--surface-2) 48%, transparent) 100%
+  );
   color: var(--text-inverse);
   font-size: 0.56rem;
   letter-spacing: 0.14em;
@@ -100,9 +127,11 @@
   box-shadow: none;
 }
 
-.phoneMediaKindBadgeVideo {}
+.phoneMediaKindBadgeVideo {
+}
 
-.phoneMediaKindBadgeImage {}
+.phoneMediaKindBadgeImage {
+}
 
 .phoneMediaKindIcon {
   display: inline-flex;
@@ -121,15 +150,29 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--text-inverse) 20%, transparent) 0%, color-mix(in srgb, var(--text-inverse) 8%, transparent) 35%, transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--text-inverse) 12%, transparent) 0%, color-mix(in srgb, var(--text-inverse) 4%, transparent) 46%, transparent 100%);
+    radial-gradient(
+      circle at 50% 0%,
+      color-mix(in srgb, var(--text-inverse) 20%, transparent) 0%,
+      color-mix(in srgb, var(--text-inverse) 8%, transparent) 35%,
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-inverse) 12%, transparent) 0%,
+      color-mix(in srgb, var(--text-inverse) 4%, transparent) 46%,
+      transparent 100%
+    );
   opacity: 0.72;
   pointer-events: none;
 }
 
 .phoneHeroBadgeNew {
   border-color: color-mix(in srgb, var(--success) 72%, var(--text-inverse));
-  background: linear-gradient(135deg, color-mix(in srgb, var(--success) 82%, var(--text-inverse)) 0%, color-mix(in srgb, var(--success) 56%, var(--surface-2)) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--success) 82%, var(--text-inverse)) 0%,
+    color-mix(in srgb, var(--success) 56%, var(--surface-2)) 100%
+  );
   color: var(--text-inverse);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 36%, transparent),
@@ -139,7 +182,11 @@
 
 .phoneHeroBadgeTrending {
   border-color: color-mix(in srgb, var(--warning) 50%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--warning) 56%, var(--surface-2)) 0%, color-mix(in srgb, var(--warning) 34%, var(--surface-0)) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--warning) 56%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--warning) 34%, var(--surface-0)) 100%
+  );
   color: var(--warning);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 30%, transparent),
@@ -148,7 +195,11 @@
 
 .phoneHeroBadgePopular {
   border-color: color-mix(in srgb, var(--info) 48%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--info) 52%, var(--surface-2)) 0%, color-mix(in srgb, var(--accent) 34%, var(--surface-0)) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--info) 52%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--accent) 34%, var(--surface-0)) 100%
+  );
   color: var(--text-strong);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 28%, transparent),
@@ -157,7 +208,11 @@
 
 .phoneHeroBadgeFunny {
   border-color: color-mix(in srgb, var(--magenta) 48%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--magenta) 50%, var(--surface-2)) 0%, color-mix(in srgb, var(--magenta) 34%, var(--surface-0)) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--magenta) 50%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--magenta) 34%, var(--surface-0)) 100%
+  );
   color: var(--text-inverse);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 28%, transparent),
@@ -182,8 +237,16 @@
   height: 100%;
   display: block;
   background:
-    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 22%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-0) 22%, transparent) 0%, color-mix(in srgb, var(--surface-0) 4%, transparent) 100%);
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 22%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-0) 22%, transparent) 0%,
+      color-mix(in srgb, var(--surface-0) 4%, transparent) 100%
+    );
 }
 
 .phoneBottomContent {
@@ -205,8 +268,21 @@
   inset: 0;
   border-radius: inherit;
   background:
-    linear-gradient(180deg, transparent 0%, transparent 10%, color-mix(in srgb, var(--surface-2) 65%, transparent) 30%, color-mix(in srgb, var(--surface-2) 78%, transparent) 62%, color-mix(in srgb, var(--surface-0) 90%, transparent) 84%, color-mix(in srgb, var(--surface-0) 97%, transparent) 100%),
-    linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--text-inverse) 1%, transparent) 38%, color-mix(in srgb, var(--text-inverse) 3%, transparent) 100%);
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 10%,
+      color-mix(in srgb, var(--surface-2) 65%, transparent) 30%,
+      color-mix(in srgb, var(--surface-2) 78%, transparent) 62%,
+      color-mix(in srgb, var(--surface-0) 90%, transparent) 84%,
+      color-mix(in srgb, var(--surface-0) 97%, transparent) 100%
+    ),
+    linear-gradient(
+      135deg,
+      transparent 0%,
+      color-mix(in srgb, var(--text-inverse) 1%, transparent) 38%,
+      color-mix(in srgb, var(--text-inverse) 3%, transparent) 100%
+    );
   backdrop-filter: blur(10px) saturate(1.06);
   -webkit-backdrop-filter: blur(10px) saturate(1.06);
   pointer-events: none;
@@ -328,9 +404,15 @@
   margin-top: 0.02rem;
   border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent);
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--warning) 18%, transparent) 0%, color-mix(in srgb, var(--warning) 10%, var(--surface-2)) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--warning) 18%, transparent) 0%,
+    color-mix(in srgb, var(--warning) 10%, var(--surface-2)) 100%
+  );
   color: color-mix(in srgb, var(--warning) 96%, var(--text-inverse));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent), 0 8px 18px color-mix(in srgb, var(--surface-0) 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent),
+    0 8px 18px color-mix(in srgb, var(--surface-0) 16%, transparent);
 }
 
 .phoneMusicLabel svg {
@@ -387,7 +469,11 @@
 
 .phoneAccessTagPremium {
   border-color: color-mix(in srgb, var(--warning) 50%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--warning) 58%, var(--surface-0)) 0%, color-mix(in srgb, var(--warning) 38%, var(--surface-2)) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--warning) 58%, var(--surface-0)) 0%,
+    color-mix(in srgb, var(--warning) 38%, var(--surface-2)) 100%
+  );
   color: var(--warning);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 22%, transparent),
@@ -397,7 +483,11 @@
 
 .phoneAccessTagFree {
   border-color: color-mix(in srgb, var(--success) 45%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--success) 62%, var(--surface-0)) 0%, color-mix(in srgb, var(--success) 42%, var(--surface-2)) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--success) 62%, var(--surface-0)) 0%,
+    color-mix(in srgb, var(--success) 42%, var(--surface-2)) 100%
+  );
   color: var(--toast-success-fg);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--success) 14%, transparent),
@@ -417,5 +507,3 @@
   width: 100%;
   height: 100%;
 }
-
-

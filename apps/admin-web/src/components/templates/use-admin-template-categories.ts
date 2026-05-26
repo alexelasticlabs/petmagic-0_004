@@ -10,7 +10,10 @@ type UseAdminTemplateCategoriesOptions = {
   includeArchived?: boolean;
 };
 
-export function useAdminTemplateCategories({ enabled = true, includeArchived = true }: UseAdminTemplateCategoriesOptions = {}) {
+export function useAdminTemplateCategories({
+  enabled = true,
+  includeArchived = true,
+}: UseAdminTemplateCategoriesOptions = {}) {
   const categoriesQuery = useQuery<AdminTemplateCategory[]>({
     queryKey: adminQueryKeys.templateCategories(includeArchived),
     queryFn: () => fetchAdminTemplateCategories(includeArchived),

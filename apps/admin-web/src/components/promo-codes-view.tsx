@@ -10,19 +10,12 @@ import {
   TrendUpIcon,
   UsersIcon,
 } from "@/components/admin/admin-icons";
-import {
-  AdminCard,
-  AdminKpiCard,
-  AdminPage,
-  AdminStateCard,
-} from "@/components/admin/admin-primitives";
-import { PromoCodesActionsMenuPortal } from "@/components/promo-codes-actions-menu-portal";
+import { AdminKpiCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import { PromoCodeActivationsCard } from "@/components/promo-code-activations-card";
+import { PromoCodesActionsMenuPortal } from "@/components/promo-codes-actions-menu-portal";
 import { PromoCodesEditorDrawer } from "@/components/promo-codes-editor-drawer";
 import { PromoCodesListCard } from "@/components/promo-codes-list-card";
-import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.options";
-import { usePromoActionsMenu } from "@/components/use-promo-actions-menu";
-import { ensureAdminSession } from "@/components/admin/admin-session";
 import {
   buildPromoCodesCsv,
   comparePromoCodes,
@@ -42,7 +35,9 @@ import {
   type PromoStatusFilter,
 } from "@/components/promo-codes-view.helpers";
 import styles from "@/components/promo-codes-view.module.css";
+import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.options";
 import { Button } from "@/components/ui/button";
+import { usePromoActionsMenu } from "@/components/use-promo-actions-menu";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   createAdminRedeemCode,
@@ -88,12 +83,8 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const [busyCodeId, setBusyCodeId] = useState<string | null>(null);
   const [showAllActivations, setShowAllActivations] = useState(false);
   const [activationsPage, setActivationsPage] = useState(1);
-  const {
-    actionsMenuCodeId,
-    actionsMenuPosition,
-    closeActionsMenu,
-    handleToggleActionsMenu,
-  } = usePromoActionsMenu();
+  const { actionsMenuCodeId, actionsMenuPosition, closeActionsMenu, handleToggleActionsMenu } =
+    usePromoActionsMenu();
 
   useEffect(() => {
     if (!session) {
@@ -178,13 +169,17 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const redemptionsForView = activationsQuery.isError ? fallbackRedemptions : visibleRedemptions;
   const hasMoreRedemptions = Boolean(activationsQuery.data?.hasMore);
   const hasAnyRedemptions = (selectedCode?.redeemedCount ?? 0) > 0;
-  const canExpandActivations = !showAllActivations && (selectedCode?.redeemedCount ?? 0) > ACTIVATIONS_PREVIEW_LIMIT;
+  const canExpandActivations =
+    !showAllActivations && (selectedCode?.redeemedCount ?? 0) > ACTIVATIONS_PREVIEW_LIMIT;
   const canGoToPreviousActivationsPage = showAllActivations && activationsPage > 1;
   const canGoToNextActivationsPage = activationsQuery.isError
     ? localRedemptions.length > activationsSkip + activationsTake
     : hasMoreRedemptions;
 
-  const selectedUserIds = useMemo(() => [...new Set(redemptionsForView.map((item) => item.userId))], [redemptionsForView]);
+  const selectedUserIds = useMemo(
+    () => [...new Set(redemptionsForView.map((item) => item.userId))],
+    [redemptionsForView]
+  );
 
   const selectedUsersQueries = useQueries({
     queries: selectedUserIds.map((userId) => ({
@@ -480,7 +475,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   function getCurrentLocalDateTimeValue() {
-    return new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    return new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16);
   }
 
   async function handleCopyCode(code: string) {
@@ -618,7 +615,14 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     }
   }
 
-  const { statusTabs, statusOptions, rewardOptions, formStatusOptions, sortOptions, pageSizeOptions } = buildPromoCodesViewOptions(locale, text);
+  const {
+    statusTabs,
+    statusOptions,
+    rewardOptions,
+    formStatusOptions,
+    sortOptions,
+    pageSizeOptions,
+  } = buildPromoCodesViewOptions(locale, text);
 
   if (promoCodesQuery.isLoading) {
     return (
@@ -650,7 +654,8 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   const selectedStatus = selectedCode ? getPromoStatus(selectedCode, text, nowMs) : null;
-  const actionsMenuCode = promoCodes.find((code) => code.redeemCodeId === actionsMenuCodeId) ?? null;
+  const actionsMenuCode =
+    promoCodes.find((code) => code.redeemCodeId === actionsMenuCodeId) ?? null;
   const actionsMenuStatus = actionsMenuCode ? getPromoStatus(actionsMenuCode, text, nowMs) : null;
   const isActionsMenuArchived = actionsMenuStatus?.key === "archived";
   const isActionsMenuBusy = actionsMenuCode !== null && busyCodeId === actionsMenuCode.redeemCodeId;

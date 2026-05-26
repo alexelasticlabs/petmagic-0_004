@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 
-import { AdminBadge, AdminCard, AdminKpiCard, AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
+import {
+  AdminBadge,
+  AdminCard,
+  AdminKpiCard,
+  AdminMetricStrip,
+  AdminStateCard,
+} from "@/components/admin/admin-primitives";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-inline-analytics.module.css";
@@ -21,12 +27,22 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
 
   if (!userId) {
     return (
-      <AdminStateCard tone="info" title={text.userInlineAnalyticsTitle} description={text.userSelectForAnalytics} />
+      <AdminStateCard
+        tone="info"
+        title={text.userInlineAnalyticsTitle}
+        description={text.userSelectForAnalytics}
+      />
     );
   }
 
   if (isLoading) {
-    return <AdminStateCard tone="info" title={text.userInlineAnalyticsTitle} description={text.loading} />;
+    return (
+      <AdminStateCard
+        tone="info"
+        title={text.userInlineAnalyticsTitle}
+        description={text.loading}
+      />
+    );
   }
 
   if (hasError || !user || !analytics) {
@@ -37,28 +53,73 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
     <AdminCard
       title={text.userInlineAnalyticsTitle}
       description={text.userInlineAnalyticsDescription}
-      action={<Link href={`/${locale}/users/${user.userId}`} className={styles.profileLink}>{text.userOpenFullProfile}</Link>}
+      action={
+        <Link href={`/${locale}/users/${user.userId}`} className={styles.profileLink}>
+          {text.userOpenFullProfile}
+        </Link>
+      }
     >
       <div className={styles.header}>
-        <UserAvatarView avatar={user.avatar} label={`${text.avatarLabel}: ${user.displayName ?? user.email}`} fallbackLabel={user.displayName ?? user.email} size="lg" />
+        <UserAvatarView
+          avatar={user.avatar}
+          label={`${text.avatarLabel}: ${user.displayName ?? user.email}`}
+          fallbackLabel={user.displayName ?? user.email}
+          size="lg"
+        />
         <div className={styles.identity}>
           <h3>{user.displayName?.trim() || user.email}</h3>
           <p>{user.email}</p>
           <div className={styles.badges}>
-            <AdminBadge tone={user.isActive ? "success" : "danger"}>{user.isActive ? text.activeLabel : text.deactivate}</AdminBadge>
-            <AdminBadge tone={user.isPremium ? "warning" : "neutral"}>{user.isPremium ? text.premiumLabel : text.freeLabel}</AdminBadge>
-            <AdminBadge tone={user.emailConfirmed ? "info" : "neutral"}>{user.emailConfirmed ? text.emailConfirmedLabel : text.noLabel}</AdminBadge>
+            <AdminBadge tone={user.isActive ? "success" : "danger"}>
+              {user.isActive ? text.activeLabel : text.deactivate}
+            </AdminBadge>
+            <AdminBadge tone={user.isPremium ? "warning" : "neutral"}>
+              {user.isPremium ? text.premiumLabel : text.freeLabel}
+            </AdminBadge>
+            <AdminBadge tone={user.emailConfirmed ? "info" : "neutral"}>
+              {user.emailConfirmed ? text.emailConfirmedLabel : text.noLabel}
+            </AdminBadge>
           </div>
         </div>
       </div>
 
       <div className={styles.kpiGrid}>
-        <AdminKpiCard label={text.tokenBalanceLabel} value={String(analytics.summary.walletBalance)} hint={`${text.tokensGrantedLabel}: ${analytics.summary.totalTokensCredited}`} tone="primary" />
-        <AdminKpiCard label={text.loginsLabel} value={String(analytics.summary.successfulLogins)} hint={`${text.failedLoginsLabel}: ${analytics.summary.failedLogins}`} tone="magenta" />
-        <AdminKpiCard label={text.viewsLabel} value={String(analytics.summary.totalViews)} hint={`${text.videoViewsLabel}: ${analytics.summary.totalVideoViews}`} tone="info" />
-        <AdminKpiCard label={text.totalPurchasesLabel} value={String(analytics.summary.totalPurchases)} hint={`${text.successfulPurchasesLabel}: ${analytics.summary.successfulPurchases}`} tone="info" />
-        <AdminKpiCard label={text.totalGenerationsLabel} value={String(analytics.summary.totalGenerations)} hint={`${text.completedGenerationsLabel}: ${analytics.summary.completedGenerations}`} tone="success" />
-        <AdminKpiCard label={text.failedGenerationsLabel} value={String(analytics.summary.failedGenerations)} hint={`${text.templateEventsLabel}: ${analytics.summary.templateAnalyticsEvents}`} tone="danger" />
+        <AdminKpiCard
+          label={text.tokenBalanceLabel}
+          value={String(analytics.summary.walletBalance)}
+          hint={`${text.tokensGrantedLabel}: ${analytics.summary.totalTokensCredited}`}
+          tone="primary"
+        />
+        <AdminKpiCard
+          label={text.loginsLabel}
+          value={String(analytics.summary.successfulLogins)}
+          hint={`${text.failedLoginsLabel}: ${analytics.summary.failedLogins}`}
+          tone="magenta"
+        />
+        <AdminKpiCard
+          label={text.viewsLabel}
+          value={String(analytics.summary.totalViews)}
+          hint={`${text.videoViewsLabel}: ${analytics.summary.totalVideoViews}`}
+          tone="info"
+        />
+        <AdminKpiCard
+          label={text.totalPurchasesLabel}
+          value={String(analytics.summary.totalPurchases)}
+          hint={`${text.successfulPurchasesLabel}: ${analytics.summary.successfulPurchases}`}
+          tone="info"
+        />
+        <AdminKpiCard
+          label={text.totalGenerationsLabel}
+          value={String(analytics.summary.totalGenerations)}
+          hint={`${text.completedGenerationsLabel}: ${analytics.summary.completedGenerations}`}
+          tone="success"
+        />
+        <AdminKpiCard
+          label={text.failedGenerationsLabel}
+          value={String(analytics.summary.failedGenerations)}
+          hint={`${text.templateEventsLabel}: ${analytics.summary.templateAnalyticsEvents}`}
+          tone="danger"
+        />
       </div>
 
       <div className={styles.section}>
@@ -66,7 +127,10 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
         {analytics.recentActivity.length ? (
           <div className={styles.timeline}>
             {analytics.recentActivity.slice(0, 6).map((item) => (
-              <article key={`${item.kind}:${item.occurredAtUtc}:${item.title}`} className={styles.timelineItem}>
+              <article
+                key={`${item.kind}:${item.occurredAtUtc}:${item.title}`}
+                className={styles.timelineItem}
+              >
                 <div className={styles.timelineHeader}>
                   <strong>{item.title}</strong>
                   <span>{formatDateTime(item.occurredAtUtc, locale)}</span>
@@ -88,8 +152,12 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
               {analytics.recentPurchases.slice(0, 4).map((purchase) => (
                 <article key={purchase.orderId} className={styles.compactCard}>
                   <strong>{purchase.sparkToGrant} spark</strong>
-                  <span>{purchase.priceAmount} {purchase.currencyCode}</span>
-                  <span>{formatDateTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}</span>
+                  <span>
+                    {purchase.priceAmount} {purchase.currencyCode}
+                  </span>
+                  <span>
+                    {formatDateTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}
+                  </span>
                 </article>
               ))}
             </div>
@@ -105,8 +173,12 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
               {analytics.recentGenerations.slice(0, 4).map((generation) => (
                 <article key={generation.generationId} className={styles.compactCard}>
                   <strong>{generation.templateTitle}</strong>
-                  <span>{generation.status} • {generation.tokenCost}</span>
-                  <span>{formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
+                  <span>
+                    {generation.status} • {generation.tokenCost}
+                  </span>
+                  <span>
+                    {formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}
+                  </span>
                 </article>
               ))}
             </div>

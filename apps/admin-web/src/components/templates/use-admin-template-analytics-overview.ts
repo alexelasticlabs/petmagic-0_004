@@ -4,18 +4,18 @@ import { useQuery } from "@tanstack/react-query";
 
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    fetchAdminTemplate,
-    fetchAdminTemplateEventAnalytics,
-    fetchAdminTemplateFailureBreakdown,
-    fetchAdminTemplateRecentGenerations,
-    fetchAdminTemplateStatistics,
-    fetchAdminTemplateTrends,
-    type AdminTemplate,
-    type AdminTemplateEventAnalytics,
-    type AdminTemplateFailureBreakdownItem,
-    type AdminTemplateRecentGeneration,
-    type AdminTemplateStatistics,
-    type AdminTemplateTrendPoint,
+  fetchAdminTemplate,
+  fetchAdminTemplateEventAnalytics,
+  fetchAdminTemplateFailureBreakdown,
+  fetchAdminTemplateRecentGenerations,
+  fetchAdminTemplateStatistics,
+  fetchAdminTemplateTrends,
+  type AdminTemplate,
+  type AdminTemplateEventAnalytics,
+  type AdminTemplateFailureBreakdownItem,
+  type AdminTemplateRecentGeneration,
+  type AdminTemplateStatistics,
+  type AdminTemplateTrendPoint,
 } from "@/lib/api-client";
 
 type AdminTemplateAnalyticsOverview = {
@@ -33,7 +33,11 @@ type UseAdminTemplateAnalyticsOverviewOptions = {
   templateId: string;
 };
 
-export function useAdminTemplateAnalyticsOverview({ enabled = true, previewTake, templateId }: UseAdminTemplateAnalyticsOverviewOptions) {
+export function useAdminTemplateAnalyticsOverview({
+  enabled = true,
+  previewTake,
+  templateId,
+}: UseAdminTemplateAnalyticsOverviewOptions) {
   const primaryQuery = useQuery<Pick<AdminTemplateAnalyticsOverview, "statistics" | "template">>({
     queryKey: adminQueryKeys.templateAnalyticsPrimary(templateId),
     queryFn: async () => {
@@ -50,7 +54,12 @@ export function useAdminTemplateAnalyticsOverview({ enabled = true, previewTake,
     enabled,
   });
 
-  const secondaryQuery = useQuery<Pick<AdminTemplateAnalyticsOverview, "eventAnalytics" | "failureBreakdown" | "recentRunsPreview" | "trendPoints">>({
+  const secondaryQuery = useQuery<
+    Pick<
+      AdminTemplateAnalyticsOverview,
+      "eventAnalytics" | "failureBreakdown" | "recentRunsPreview" | "trendPoints"
+    >
+  >({
     queryKey: adminQueryKeys.templateAnalyticsSecondary(templateId, previewTake),
     queryFn: async () => {
       const [trendPoints, recentRunsPreview, failureBreakdown, eventAnalytics] = await Promise.all([

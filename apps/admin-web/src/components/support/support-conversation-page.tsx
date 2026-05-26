@@ -11,11 +11,8 @@ import {
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
 import {
-  formatAccountAge,
   formatClockTime,
-  formatDateTime,
   formatFileSize,
-  formatMoney,
   formatRelativeTime,
   getConversationSla,
   hasAttachment,
@@ -24,11 +21,6 @@ import {
   shortId,
   shouldRenderMessageBody,
 } from "@/components/support/support-conversation-helpers";
-import {
-  SectionBlock,
-  SidePanelAsyncState,
-  TimelineCard,
-} from "@/components/support/support-conversation-ui-primitives";
 import { SupportConversationSidePanel } from "@/components/support/support-conversation-side-panel";
 import { SupportOptionGroup } from "@/components/support/support-option-group";
 import styles from "@/components/support/support-page.module.css";
@@ -37,7 +29,6 @@ import {
   priorityTone,
   statusHint,
   statusLabel,
-  toneForGeneration,
   toneForStatus,
 } from "@/components/support/support-status-helpers";
 import {
@@ -625,8 +616,9 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
               </AdminCard>
             </div>
 
-            <SupportConversationSidePanel locale={locale} controller={
-              {
+            <SupportConversationSidePanel
+              locale={locale}
+              controller={{
                 activeSidePanelTab,
                 accountCreatedAt,
                 activityTimeline,
@@ -688,8 +680,8 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 userDisplayName,
                 userQuery,
                 visibleTemplates,
-              }
-            } />
+              }}
+            />
           </div>
           {fullscreenImage ? (
             <div

@@ -45,7 +45,10 @@ export function TemplateReferenceAssetSection({
 }: TemplateReferenceAssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const localReferenceUrl = useMemo(() => (referenceFile ? URL.createObjectURL(referenceFile) : null), [referenceFile]);
+  const localReferenceUrl = useMemo(
+    () => (referenceFile ? URL.createObjectURL(referenceFile) : null),
+    [referenceFile]
+  );
   const persistedReferenceUrl = form.referenceUrl.trim();
   const effectiveReferenceUrl = localReferenceUrl ?? persistedReferenceUrl;
   const hasReference = Boolean(effectiveReferenceUrl);
@@ -125,10 +128,19 @@ export function TemplateReferenceAssetSection({
       >
         <div className={styles.assetPreviewOverlay}>
           <span className={styles.assetPreviewBadge}>Motion source</span>
-          <span className={`${styles.assetPreviewState} ${hasReference ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}>{referenceStateLabel}</span>
+          <span
+            className={`${styles.assetPreviewState} ${hasReference ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}
+          >
+            {referenceStateLabel}
+          </span>
         </div>
         {hasReference ? (
-          <video src={effectiveReferenceUrl} className={styles.assetPreviewMedia} controls playsInline />
+          <video
+            src={effectiveReferenceUrl}
+            className={styles.assetPreviewMedia}
+            controls
+            playsInline
+          />
         ) : (
           <div className={styles.assetPreviewPlaceholder}>
             <span className={styles.assetPreviewPlaceholderTitle}>{text.uploadReference}</span>
@@ -142,7 +154,12 @@ export function TemplateReferenceAssetSection({
           <span className={styles.fieldHeader}>
             <span>{text.referenceUrlLabel}</span>
           </span>
-          <input value={form.referenceUrl} onChange={(event) => setForm((current) => ({ ...current, referenceUrl: event.target.value }))} />
+          <input
+            value={form.referenceUrl}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, referenceUrl: event.target.value }))
+            }
+          />
         </label>
         <div className={styles.uploadPanel}>
           <div className={styles.uploadPanelHeader}>
@@ -150,12 +167,20 @@ export function TemplateReferenceAssetSection({
               <p className={styles.uploadPanelEyebrow}>{text.selectedFileLabel}</p>
               <p className={styles.uploadPanelTitle}>{referenceFileLabel}</p>
             </div>
-            <span className={`${styles.inlineState} ${hasReference ? styles.inlineStateReady : styles.inlineStateAttention}`}>
+            <span
+              className={`${styles.inlineState} ${hasReference ? styles.inlineStateReady : styles.inlineStateAttention}`}
+            >
               {referenceStateLabel}
             </span>
           </div>
           <div className={styles.uploadActions}>
-            <Button type="button" variant="primary" className={styles.primaryButton} disabled={!referenceFile || uploadingKind !== null} onClick={onUploadReference}>
+            <Button
+              type="button"
+              variant="primary"
+              className={styles.primaryButton}
+              disabled={!referenceFile || uploadingKind !== null}
+              onClick={onUploadReference}
+            >
               {uploadingKind === "ReferenceMotion" ? text.uploadingMedia : text.uploadAction}
             </Button>
             <Button
@@ -202,8 +227,16 @@ function isSupportedReferenceMotionFile(file: File): boolean {
   return file.name.toLowerCase().endsWith(".mp4");
 }
 
-export function TemplateVideoModelSection({ text, form, setForm, preprocessingModels, klingModels }: TemplateVideoModelSectionProps) {
-  const preprocessingOptions = preprocessingModels.map((model) => buildModelOption(model, "preprocess"));
+export function TemplateVideoModelSection({
+  text,
+  form,
+  setForm,
+  preprocessingModels,
+  klingModels,
+}: TemplateVideoModelSectionProps) {
+  const preprocessingOptions = preprocessingModels.map((model) =>
+    buildModelOption(model, "preprocess")
+  );
   const klingOptions = klingModels.map((model) => buildModelOption(model, "motion"));
 
   return (
@@ -219,14 +252,28 @@ export function TemplateVideoModelSection({ text, form, setForm, preprocessingMo
               <span>{text.preprocessingModelLabel}</span>
               <span className={styles.fieldMeta}>fal.ai</span>
             </span>
-            <Select value={form.preprocessingModel} options={preprocessingOptions} ariaLabel={text.preprocessingModelLabel} onChange={(value) => setForm((current) => ({ ...current, preprocessingModel: value }))} />
+            <Select
+              value={form.preprocessingModel}
+              options={preprocessingOptions}
+              ariaLabel={text.preprocessingModelLabel}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, preprocessingModel: value }))
+              }
+            />
           </label>
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.preprocessingPromptLabel}</span>
               <span className={styles.fieldCounter}>{form.preprocessingPrompt.length}/1500</span>
             </span>
-            <textarea value={form.preprocessingPrompt} maxLength={1500} onChange={(event) => setForm((current) => ({ ...current, preprocessingPrompt: event.target.value }))} rows={7} />
+            <textarea
+              value={form.preprocessingPrompt}
+              maxLength={1500}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, preprocessingPrompt: event.target.value }))
+              }
+              rows={7}
+            />
           </label>
         </div>
 
@@ -240,27 +287,50 @@ export function TemplateVideoModelSection({ text, form, setForm, preprocessingMo
               <span>{text.klingModelLabel}</span>
               <span className={styles.fieldMeta}>fal.ai</span>
             </span>
-            <Select value={form.klingModel} options={klingOptions} ariaLabel={text.klingModelLabel} onChange={(value) => setForm((current) => ({ ...current, klingModel: value }))} />
+            <Select
+              value={form.klingModel}
+              options={klingOptions}
+              ariaLabel={text.klingModelLabel}
+              onChange={(value) => setForm((current) => ({ ...current, klingModel: value }))}
+            />
           </label>
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.klingPromptLabel}</span>
               <span className={styles.fieldCounter}>{form.klingPrompt.length}/1000</span>
             </span>
-            <textarea value={form.klingPrompt} maxLength={1000} onChange={(event) => setForm((current) => ({ ...current, klingPrompt: event.target.value }))} rows={7} />
+            <textarea
+              value={form.klingPrompt}
+              maxLength={1000}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, klingPrompt: event.target.value }))
+              }
+              rows={7}
+            />
           </label>
         </div>
       </div>
 
       <label className={styles.switchCard}>
-        <input type="checkbox" checked={form.keepOriginalSound} onChange={(event) => setForm((current) => ({ ...current, keepOriginalSound: event.target.checked }))} />
+        <input
+          type="checkbox"
+          checked={form.keepOriginalSound}
+          onChange={(event) =>
+            setForm((current) => ({ ...current, keepOriginalSound: event.target.checked }))
+          }
+        />
         <span className={styles.switchCopy}>{text.keepOriginalSoundLabel}</span>
       </label>
     </div>
   );
 }
 
-export function TemplateImageModelSection({ text, form, setForm, imageModels }: TemplateImageModelSectionProps) {
+export function TemplateImageModelSection({
+  text,
+  form,
+  setForm,
+  imageModels,
+}: TemplateImageModelSectionProps) {
   const imageOptions = imageModels.map((model) => buildModelOption(model, "preprocess"));
 
   return (
@@ -276,14 +346,26 @@ export function TemplateImageModelSection({ text, form, setForm, imageModels }: 
               <span>{text.imageModelLabel}</span>
               <span className={styles.fieldMeta}>fal.ai</span>
             </span>
-            <Select value={form.imageModel} options={imageOptions} ariaLabel={text.imageModelLabel} onChange={(value) => setForm((current) => ({ ...current, imageModel: value }))} />
+            <Select
+              value={form.imageModel}
+              options={imageOptions}
+              ariaLabel={text.imageModelLabel}
+              onChange={(value) => setForm((current) => ({ ...current, imageModel: value }))}
+            />
           </label>
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.imagePromptLabel}</span>
               <span className={styles.fieldCounter}>{form.imagePrompt.length}/1000</span>
             </span>
-            <textarea value={form.imagePrompt} maxLength={1000} onChange={(event) => setForm((current) => ({ ...current, imagePrompt: event.target.value }))} rows={7} />
+            <textarea
+              value={form.imagePrompt}
+              maxLength={1000}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, imagePrompt: event.target.value }))
+              }
+              rows={7}
+            />
           </label>
         </div>
       </div>

@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 
-import { AdminCard, AdminKpiCard, AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
+import {
+  AdminCard,
+  AdminKpiCard,
+  AdminMetricStrip,
+  AdminStateCard,
+} from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import styles from "@/components/users/user-wallet-panel.module.css";
-import {
-  adjustAdminUserWallet,
-  type AdminUserAnalytics,
-} from "@/lib/api-client";
+import { adjustAdminUserWallet, type AdminUserAnalytics } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
@@ -25,7 +27,9 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
   const [amount, setAmount] = useState("50");
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(
+    null
+  );
 
   async function handleSubmit() {
     const parsedAmount = Number(amount);
@@ -52,12 +56,38 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
   return (
     <AdminCard title={text.userWalletTitle} description={text.userWalletDescription}>
       <div className={styles.kpiGrid}>
-        <AdminKpiCard label={text.tokenBalanceLabel} value={String(analytics.summary.walletBalance)} tone="primary" />
-        <AdminKpiCard label={text.tokensGrantedLabel} value={String(analytics.summary.totalTokensCredited)} tone="success" />
-        <AdminKpiCard label={text.tokensSpentLabel} value={String(analytics.summary.totalTokensSpent)} tone="warning" />
-        <AdminKpiCard label={text.viewsLabel} value={String(analytics.summary.totalViews)} hint={`${text.videoViewsLabel}: ${analytics.summary.totalVideoViews}`} tone="info" />
-        <AdminKpiCard label={text.loginsLabel} value={String(analytics.summary.successfulLogins)} hint={`${text.failedLoginsLabel}: ${analytics.summary.failedLogins}`} tone="magenta" />
-        <AdminKpiCard label={text.lastLoginLabel} value={formatDateTime(analytics.summary.lastLoginAtUtc, locale)} tone="neutral" />
+        <AdminKpiCard
+          label={text.tokenBalanceLabel}
+          value={String(analytics.summary.walletBalance)}
+          tone="primary"
+        />
+        <AdminKpiCard
+          label={text.tokensGrantedLabel}
+          value={String(analytics.summary.totalTokensCredited)}
+          tone="success"
+        />
+        <AdminKpiCard
+          label={text.tokensSpentLabel}
+          value={String(analytics.summary.totalTokensSpent)}
+          tone="warning"
+        />
+        <AdminKpiCard
+          label={text.viewsLabel}
+          value={String(analytics.summary.totalViews)}
+          hint={`${text.videoViewsLabel}: ${analytics.summary.totalVideoViews}`}
+          tone="info"
+        />
+        <AdminKpiCard
+          label={text.loginsLabel}
+          value={String(analytics.summary.successfulLogins)}
+          hint={`${text.failedLoginsLabel}: ${analytics.summary.failedLogins}`}
+          tone="magenta"
+        />
+        <AdminKpiCard
+          label={text.lastLoginLabel}
+          value={formatDateTime(analytics.summary.lastLoginAtUtc, locale)}
+          tone="neutral"
+        />
       </div>
 
       <AdminMetricStrip
@@ -79,7 +109,11 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
           <div className={styles.formGrid}>
             <label className={styles.field}>
               <span>{text.walletOperationLabel}</span>
-              <select value={operation} onChange={(event) => setOperation(event.target.value as "credit" | "debit")} className={styles.select}>
+              <select
+                value={operation}
+                onChange={(event) => setOperation(event.target.value as "credit" | "debit")}
+                className={styles.select}
+              >
                 <option value="credit">{text.walletOperationCredit}</option>
                 <option value="debit">{text.walletOperationDebit}</option>
               </select>
@@ -87,13 +121,24 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
 
             <label className={styles.field}>
               <span>{text.walletAmountLabel}</span>
-              <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="numeric" className={styles.input} />
+              <input
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                inputMode="numeric"
+                className={styles.input}
+              />
             </label>
           </div>
 
           <label className={styles.field}>
             <span>{text.walletReasonLabel}</span>
-            <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} className={styles.textarea} placeholder={text.walletReasonPlaceholder} />
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={3}
+              className={styles.textarea}
+              placeholder={text.walletReasonPlaceholder}
+            />
           </label>
 
           <div className={styles.actions}>
@@ -102,7 +147,13 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
             </Button>
           </div>
 
-          {feedback ? <AdminStateCard tone={feedback.tone} title={feedback.message} className={styles.feedback} /> : null}
+          {feedback ? (
+            <AdminStateCard
+              tone={feedback.tone}
+              title={feedback.message}
+              className={styles.feedback}
+            />
+          ) : null}
         </section>
 
         <section className={styles.ledger}>
@@ -117,14 +168,17 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
                 <article key={item.entryId} className={styles.card}>
                   <div className={styles.cardHeader}>
                     <strong className={item.delta >= 0 ? styles.positive : styles.negative}>
-                      {item.delta >= 0 ? "+" : ""}{item.delta}
+                      {item.delta >= 0 ? "+" : ""}
+                      {item.delta}
                     </strong>
                     <span>{formatDateTime(item.createdAtUtc, locale)}</span>
                   </div>
                   <p>{item.reason}</p>
                   <div className={styles.meta}>
                     <span>{item.source}</span>
-                    <span>{text.walletBalanceLabel}: {item.balanceAfter}</span>
+                    <span>
+                      {text.walletBalanceLabel}: {item.balanceAfter}
+                    </span>
                   </div>
                 </article>
               ))}

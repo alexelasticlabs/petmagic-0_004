@@ -6,30 +6,44 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-    CalendarIcon,
-    ChartIcon,
-    DashboardIcon,
-    DownloadIcon,
-    ImageIcon,
-    TableIcon,
-    TrendUpIcon,
-    VideoIcon,
+  CalendarIcon,
+  ChartIcon,
+  DashboardIcon,
+  DownloadIcon,
+  ImageIcon,
+  TableIcon,
+  TrendUpIcon,
+  VideoIcon,
 } from "@/components/admin/admin-icons";
-import { AdminFilterBar, AdminKpiCard, AdminMetricStrip, AdminPage, AdminPageHero, AdminSelectField, AdminStateCard, AdminToolbar, type AdminTone } from "@/components/admin/admin-primitives";
+import {
+  AdminFilterBar,
+  AdminKpiCard,
+  AdminMetricStrip,
+  AdminPage,
+  AdminPageHero,
+  AdminSelectField,
+  AdminStateCard,
+  AdminToolbar,
+  type AdminTone,
+} from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
-import { getTemplateAccessLabel, getTemplateStatusLabel, getTemplateTypeLabel } from "@/components/templates/template-admin-shared";
+import {
+  getTemplateAccessLabel,
+  getTemplateStatusLabel,
+  getTemplateTypeLabel,
+} from "@/components/templates/template-admin-shared";
 import styles from "@/components/templates/templates-analytics-hub-page.module.css";
 import {
-    fetchAdminTemplatesAnalyticsOverview,
-    type AdminTemplateAnalyticsDimension,
-    type AdminTemplatesAnalyticsBreakdown,
-    type AdminTemplatesAnalyticsFeedbackItem,
-    type AdminTemplatesAnalyticsOverview,
-    type AdminTemplatesAnalyticsQuery,
-    type AdminTemplatesAnalyticsTemplateRow,
-    type AdminTemplatesAnalyticsTrendPoint,
-    type TemplateStatus,
-    type TemplateType,
+  fetchAdminTemplatesAnalyticsOverview,
+  type AdminTemplateAnalyticsDimension,
+  type AdminTemplatesAnalyticsBreakdown,
+  type AdminTemplatesAnalyticsFeedbackItem,
+  type AdminTemplatesAnalyticsOverview,
+  type AdminTemplatesAnalyticsQuery,
+  type AdminTemplatesAnalyticsTemplateRow,
+  type AdminTemplatesAnalyticsTrendPoint,
+  type TemplateStatus,
+  type TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Locale as AppLocale } from "@/lib/i18n";
 
@@ -38,7 +52,11 @@ type TemplatesAnalyticsHubPageProps = {
 };
 
 type PeriodKey = "7" | "30" | "90" | "all";
-type TrendMetricKey = "totalViews" | "totalGenerationStarts" | "completedGenerations" | "totalProviderCostUsd";
+type TrendMetricKey =
+  | "totalViews"
+  | "totalGenerationStarts"
+  | "completedGenerations"
+  | "totalProviderCostUsd";
 
 type Copy = ReturnType<typeof getCopy>;
 
@@ -65,15 +83,18 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const query = useMemo<AdminTemplatesAnalyticsQuery>(() => ({
-    periodDays: period === "all" ? undefined : Number(period),
-    templateType,
-    category: category || undefined,
-    status,
-    access,
-    sort,
-    take: 50,
-  }), [access, category, period, sort, status, templateType]);
+  const query = useMemo<AdminTemplatesAnalyticsQuery>(
+    () => ({
+      periodDays: period === "all" ? undefined : Number(period),
+      templateType,
+      category: category || undefined,
+      status,
+      access,
+      sort,
+      take: 50,
+    }),
+    [access, category, period, sort, status, templateType]
+  );
 
   useEffect(() => {
     let isCancelled = false;
@@ -114,7 +135,9 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       return;
     }
 
-    const blob = new Blob([JSON.stringify({ query, overview }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ query, overview }, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -124,22 +147,65 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   }
 
   if (isLoading && !overview) {
-    return <AdminPage className={styles.page}><AdminStateCard tone="info" title={text.loading} /></AdminPage>;
+    return (
+      <AdminPage className={styles.page}>
+        <AdminStateCard tone="info" title={text.loading} />
+      </AdminPage>
+    );
   }
 
   if (error || !overview) {
-    return <AdminPage className={styles.page}><AdminStateCard tone="danger" title={error ?? text.loadError} /></AdminPage>;
+    return (
+      <AdminPage className={styles.page}>
+        <AdminStateCard tone="danger" title={error ?? text.loadError} />
+      </AdminPage>
+    );
   }
 
   const summary = overview.summary;
   const kpis = [
-    { label: text.views, value: formatNumber(summary.totalViews, locale), hint: text.viewsHint, tone: "green" },
-    { label: text.starts, value: formatNumber(summary.totalGenerationStarts, locale), hint: text.startsHint, tone: "violet" },
-    { label: text.completed, value: formatNumber(summary.completedGenerations, locale), hint: text.completedHint, tone: "green" },
-    { label: text.conversion, value: formatPercent(summary.conversionPercent, isRu), hint: text.conversionHint, tone: "blue" },
-    { label: text.tokens, value: formatTokens(summary.totalTokenCost, isRu), hint: text.tokensHint, tone: "amber" },
-    { label: text.providerSpend, value: formatMoney(summary.totalProviderCostUsd, locale), hint: text.providerSpendHint, tone: "red" },
-    { label: text.complaints, value: formatNumber(summary.totalComplaints, locale), hint: text.complaintsHint, tone: summary.totalComplaints > 0 ? "red" : "neutral" },
+    {
+      label: text.views,
+      value: formatNumber(summary.totalViews, locale),
+      hint: text.viewsHint,
+      tone: "green",
+    },
+    {
+      label: text.starts,
+      value: formatNumber(summary.totalGenerationStarts, locale),
+      hint: text.startsHint,
+      tone: "violet",
+    },
+    {
+      label: text.completed,
+      value: formatNumber(summary.completedGenerations, locale),
+      hint: text.completedHint,
+      tone: "green",
+    },
+    {
+      label: text.conversion,
+      value: formatPercent(summary.conversionPercent, isRu),
+      hint: text.conversionHint,
+      tone: "blue",
+    },
+    {
+      label: text.tokens,
+      value: formatTokens(summary.totalTokenCost, isRu),
+      hint: text.tokensHint,
+      tone: "amber",
+    },
+    {
+      label: text.providerSpend,
+      value: formatMoney(summary.totalProviderCostUsd, locale),
+      hint: text.providerSpendHint,
+      tone: "red",
+    },
+    {
+      label: text.complaints,
+      value: formatNumber(summary.totalComplaints, locale),
+      hint: text.complaintsHint,
+      tone: summary.totalComplaints > 0 ? "red" : "neutral",
+    },
   ];
   const chartTabs: Array<{ key: TrendMetricKey; label: string }> = [
     { key: "totalViews", label: text.chartViews },
@@ -154,12 +220,18 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         eyebrow={text.eyebrow}
         title={text.title}
         description={text.description}
-        actions={(
+        actions={
           <div className={styles.heroActions}>
-            <Link href={`/${locale}/templates/video`} className={styles.secondaryLink}><TableIcon className={styles.controlIcon} /><span>{text.catalog}</span></Link>
-            <button type="button" className={styles.primaryButton} onClick={handleExport}><DownloadIcon className={styles.controlIcon} /><span>{text.export}</span></button>
+            <Link href={`/${locale}/templates/video`} className={styles.secondaryLink}>
+              <TableIcon className={styles.controlIcon} />
+              <span>{text.catalog}</span>
+            </Link>
+            <button type="button" className={styles.primaryButton} onClick={handleExport}>
+              <DownloadIcon className={styles.controlIcon} />
+              <span>{text.export}</span>
+            </button>
           </div>
-        )}
+        }
         metaItems={[
           `${text.templates}: ${formatNumber(summary.totalTemplates, locale)}`,
           `${text.video}: ${formatNumber(summary.videoTemplates, locale)}`,
@@ -178,7 +250,12 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       <AdminToolbar className={styles.toolbar}>
         <div className={styles.segmented} aria-label={text.periodLabel}>
           {PERIOD_OPTIONS.map((option) => (
-            <button key={option.key} type="button" className={period === option.key ? styles.segmentedActive : styles.segmentedButton} onClick={() => setPeriod(option.key)}>
+            <button
+              key={option.key}
+              type="button"
+              className={period === option.key ? styles.segmentedActive : styles.segmentedButton}
+              onClick={() => setPeriod(option.key)}
+            >
               <CalendarIcon className={styles.controlIcon} />
               <span>{isRu ? option.ru : option.en}</span>
             </button>
@@ -186,39 +263,112 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         </div>
 
         <AdminFilterBar className={styles.filters}>
-          <SelectBox label={text.typeFilter} value={templateType} onChange={(value) => setTemplateType(value as TemplateType | "All")} options={[{ value: "All", label: text.allTemplates }, { value: "Video", label: getTemplateTypeLabel("Video", dictionary) }, { value: "Image", label: getTemplateTypeLabel("Image", dictionary) }]} />
-          <SelectBox label={text.categoryFilter} value={category} onChange={setCategory} options={[{ value: "", label: text.allCategories }, ...overview.availableCategories.map((value) => ({ value, label: value }))]} />
-          <SelectBox label={text.statusFilter} value={status} onChange={(value) => setStatus(value as TemplateStatus | "All")} options={[{ value: "All", label: text.allStatuses }, { value: "Active", label: getTemplateStatusLabel("Active", locale) }, { value: "Draft", label: getTemplateStatusLabel("Draft", locale) }, { value: "Archived", label: getTemplateStatusLabel("Archived", locale) }]} />
-          <SelectBox label={text.accessFilter} value={access} onChange={(value) => setAccess(value as "all" | "free" | "premium")} options={[{ value: "all", label: text.allAccess }, { value: "free", label: getTemplateAccessLabel(false, dictionary) }, { value: "premium", label: getTemplateAccessLabel(true, dictionary) }]} />
-          <SelectBox label={text.sortFilter} value={sort} onChange={(value) => setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>)} options={[{ value: "views", label: text.sortViews }, { value: "starts", label: text.sortStarts }, { value: "conversion", label: text.sortConversion }, { value: "cost", label: text.sortCost }, { value: "updated", label: text.sortUpdated }]} />
+          <SelectBox
+            label={text.typeFilter}
+            value={templateType}
+            onChange={(value) => setTemplateType(value as TemplateType | "All")}
+            options={[
+              { value: "All", label: text.allTemplates },
+              { value: "Video", label: getTemplateTypeLabel("Video", dictionary) },
+              { value: "Image", label: getTemplateTypeLabel("Image", dictionary) },
+            ]}
+          />
+          <SelectBox
+            label={text.categoryFilter}
+            value={category}
+            onChange={setCategory}
+            options={[
+              { value: "", label: text.allCategories },
+              ...overview.availableCategories.map((value) => ({ value, label: value })),
+            ]}
+          />
+          <SelectBox
+            label={text.statusFilter}
+            value={status}
+            onChange={(value) => setStatus(value as TemplateStatus | "All")}
+            options={[
+              { value: "All", label: text.allStatuses },
+              { value: "Active", label: getTemplateStatusLabel("Active", locale) },
+              { value: "Draft", label: getTemplateStatusLabel("Draft", locale) },
+              { value: "Archived", label: getTemplateStatusLabel("Archived", locale) },
+            ]}
+          />
+          <SelectBox
+            label={text.accessFilter}
+            value={access}
+            onChange={(value) => setAccess(value as "all" | "free" | "premium")}
+            options={[
+              { value: "all", label: text.allAccess },
+              { value: "free", label: getTemplateAccessLabel(false, dictionary) },
+              { value: "premium", label: getTemplateAccessLabel(true, dictionary) },
+            ]}
+          />
+          <SelectBox
+            label={text.sortFilter}
+            value={sort}
+            onChange={(value) =>
+              setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>)
+            }
+            options={[
+              { value: "views", label: text.sortViews },
+              { value: "starts", label: text.sortStarts },
+              { value: "conversion", label: text.sortConversion },
+              { value: "cost", label: text.sortCost },
+              { value: "updated", label: text.sortUpdated },
+            ]}
+          />
         </AdminFilterBar>
       </AdminToolbar>
 
       <div className={styles.kpiGrid}>
-        {kpis.map((item) => <AdminKpiCard key={item.label} label={item.label} value={item.value} hint={item.hint} tone={getKpiTone(item.tone)} />)}
+        {kpis.map((item) => (
+          <AdminKpiCard
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            hint={item.hint}
+            tone={getKpiTone(item.tone)}
+          />
+        ))}
       </div>
 
       <div className={styles.mainGrid}>
         <section className={`${styles.panel} ${styles.panelWide}`}>
           <div className={styles.panelHeaderRow}>
             <div>
-              <h2 className={styles.panelTitle}><TrendUpIcon className={styles.panelIcon} />{text.trendTitle}</h2>
+              <h2 className={styles.panelTitle}>
+                <TrendUpIcon className={styles.panelIcon} />
+                {text.trendTitle}
+              </h2>
               <p>{text.trendHint}</p>
             </div>
             <div className={styles.chartTabs}>
               {chartTabs.map((tab) => (
-                <button key={tab.key} type="button" className={chartMetric === tab.key ? styles.chartTabActive : styles.chartTab} onClick={() => setChartMetric(tab.key)}>
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={chartMetric === tab.key ? styles.chartTabActive : styles.chartTab}
+                  onClick={() => setChartMetric(tab.key)}
+                >
                   {tab.label}
                 </button>
               ))}
             </div>
           </div>
-          <TrendChart points={overview.trendPoints} metric={chartMetric} locale={locale} text={text} />
+          <TrendChart
+            points={overview.trendPoints}
+            metric={chartMetric}
+            locale={locale}
+            text={text}
+          />
         </section>
 
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}><DashboardIcon className={styles.panelIcon} />{text.funnelTitle}</h2>
+            <h2 className={styles.panelTitle}>
+              <DashboardIcon className={styles.panelIcon} />
+              {text.funnelTitle}
+            </h2>
             <p>{text.funnelHint}</p>
           </div>
           <FunnelList overview={overview} locale={locale} text={text} />
@@ -226,29 +376,56 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       </div>
 
       <div className={styles.secondaryGrid}>
-        <BreakdownPanel title={text.categoriesTitle} hint={text.categoriesHint} rows={overview.categories} locale={locale} templateCountLabel={text.templateCountLabel} />
+        <BreakdownPanel
+          title={text.categoriesTitle}
+          hint={text.categoriesHint}
+          rows={overview.categories}
+          locale={locale}
+          templateCountLabel={text.templateCountLabel}
+        />
         <TypePanel rows={overview.templateTypes} locale={locale} text={text} />
         <TopTemplatesPanel rows={overview.topTemplates} locale={locale} text={text} />
       </div>
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}><ChartIcon className={styles.panelIcon} />{text.feedbackTitle}</h2>
+          <h2 className={styles.panelTitle}>
+            <ChartIcon className={styles.panelIcon} />
+            {text.feedbackTitle}
+          </h2>
           <p>{text.feedbackHint}</p>
         </div>
         <FeedbackFeedPanel items={overview.feedbackItems} locale={locale} text={text} />
       </section>
 
       <div className={styles.dimensionGrid}>
-        <EventDimensionPanel title={text.sourcesTitle} hint={text.sourcesHint} rows={overview.sources} locale={locale} />
-        <EventDimensionPanel title={text.devicesTitle} hint={text.devicesHint} rows={overview.devices} locale={locale} />
-        <EventDimensionPanel title={text.geographyTitle} hint={text.geographyHint} rows={overview.geography} locale={locale} />
+        <EventDimensionPanel
+          title={text.sourcesTitle}
+          hint={text.sourcesHint}
+          rows={overview.sources}
+          locale={locale}
+        />
+        <EventDimensionPanel
+          title={text.devicesTitle}
+          hint={text.devicesHint}
+          rows={overview.devices}
+          locale={locale}
+        />
+        <EventDimensionPanel
+          title={text.geographyTitle}
+          hint={text.geographyHint}
+          rows={overview.geography}
+          locale={locale}
+        />
       </div>
 
       <section className={styles.panel}>
         <div className={styles.panelHeaderRow}>
           <div>
-            <h2 className={styles.panelTitle}><TableIcon className={styles.panelIcon} />{text.tableTitle}</h2>
+            <h2 className={styles.panelTitle}>
+              <TableIcon className={styles.panelIcon} />
+              {text.tableTitle}
+            </h2>
             <p>{text.tableHint}</p>
           </div>
           {isLoading ? <span className={styles.refreshPill}>{text.refreshing}</span> : null}
@@ -259,7 +436,17 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   );
 }
 
-function SelectBox({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
+function SelectBox({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
   return <AdminSelectField label={label} value={value} options={options} onChange={onChange} />;
 }
 
@@ -287,7 +474,15 @@ function getKpiTone(tone: string): AdminTone {
   return "neutral";
 }
 
-function FeedbackFeedPanel({ items, locale, text }: { items: readonly AdminTemplatesAnalyticsFeedbackItem[]; locale: AppLocale; text: Copy }) {
+function FeedbackFeedPanel({
+  items,
+  locale,
+  text,
+}: {
+  items: readonly AdminTemplatesAnalyticsFeedbackItem[];
+  locale: AppLocale;
+  text: Copy;
+}) {
   const isRu = locale === "ru";
 
   if (!items.length) {
@@ -297,28 +492,50 @@ function FeedbackFeedPanel({ items, locale, text }: { items: readonly AdminTempl
   return (
     <div className={styles.feedbackList}>
       {items.map((item) => {
-        const templatePath = item.templateType === "Video"
-          ? `/${locale}/templates/video/analytics/${item.templateId}`
-          : `/${locale}/templates/image/analytics/${item.templateId}`;
+        const templatePath =
+          item.templateType === "Video"
+            ? `/${locale}/templates/video/analytics/${item.templateId}`
+            : `/${locale}/templates/image/analytics/${item.templateId}`;
 
         return (
           <article key={item.eventId} className={styles.feedbackItem}>
             <div className={styles.feedbackHeader}>
               <div className={styles.feedbackTitleBlock}>
-                <span className={`${styles.statusBadge} ${styles[item.eventType === "complaint" ? "status_failed" : "status_active"]}`}>
-                  {item.eventType === "complaint" ? text.feedbackTypeComplaint : text.feedbackTypeFeedback}
+                <span
+                  className={`${styles.statusBadge} ${styles[item.eventType === "complaint" ? "status_failed" : "status_active"]}`}
+                >
+                  {item.eventType === "complaint"
+                    ? text.feedbackTypeComplaint
+                    : text.feedbackTypeFeedback}
                 </span>
-                <Link href={templatePath} className={styles.feedbackTemplateLink}>{item.templateTitle}</Link>
+                <Link href={templatePath} className={styles.feedbackTemplateLink}>
+                  {item.templateTitle}
+                </Link>
               </div>
               <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
             </div>
-            <p className={styles.feedbackMessage}>{item.feedbackMessage?.trim() || text.feedbackMessageMissing}</p>
+            <p className={styles.feedbackMessage}>
+              {item.feedbackMessage?.trim() || text.feedbackMessageMissing}
+            </p>
             <div className={styles.feedbackMeta}>
-              <span>{text.feedbackSourceLabel}: {formatAnalyticsValue(item.source)}</span>
-              <span>{text.feedbackDeviceLabel}: {formatAnalyticsValue(item.deviceClass)}</span>
-              <span>{text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}</span>
-              <span>{text.feedbackUserLabel}: {item.userId ? shortId(item.userId) : (isRu ? "анон" : "guest")}</span>
-              {item.generationId ? <span>{text.feedbackGenerationLabel}: {shortId(item.generationId)}</span> : null}
+              <span>
+                {text.feedbackSourceLabel}: {formatAnalyticsValue(item.source)}
+              </span>
+              <span>
+                {text.feedbackDeviceLabel}: {formatAnalyticsValue(item.deviceClass)}
+              </span>
+              <span>
+                {text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}
+              </span>
+              <span>
+                {text.feedbackUserLabel}:{" "}
+                {item.userId ? shortId(item.userId) : isRu ? "анон" : "guest"}
+              </span>
+              {item.generationId ? (
+                <span>
+                  {text.feedbackGenerationLabel}: {shortId(item.generationId)}
+                </span>
+              ) : null}
             </div>
           </article>
         );
@@ -327,7 +544,17 @@ function FeedbackFeedPanel({ items, locale, text }: { items: readonly AdminTempl
   );
 }
 
-function TrendChart({ points, metric, locale, text }: { points: AdminTemplatesAnalyticsTrendPoint[]; metric: TrendMetricKey; locale: AppLocale; text: Copy }) {
+function TrendChart({
+  points,
+  metric,
+  locale,
+  text,
+}: {
+  points: AdminTemplatesAnalyticsTrendPoint[];
+  metric: TrendMetricKey;
+  locale: AppLocale;
+  text: Copy;
+}) {
   if (!points.length) {
     return <div className={styles.emptyChart}>{text.noTrend}</div>;
   }
@@ -346,12 +573,19 @@ function TrendChart({ points, metric, locale, text }: { points: AdminTemplatesAn
     const y = paddingY + chartHeight - (value / maxValue) * chartHeight;
     return { x, y, value, point: points[index] };
   });
-  const path = coordinates.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
+  const path = coordinates
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`)
+    .join(" ");
   const area = `${path} L${paddingX + chartWidth},${height - paddingY} L${paddingX},${height - paddingY} Z`;
 
   return (
     <div className={styles.chartWrap}>
-      <svg viewBox={`0 0 ${width} ${height}`} className={styles.chartSvg} role="img" aria-label={text.trendTitle}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={styles.chartSvg}
+        role="img"
+        aria-label={text.trendTitle}
+      >
         <defs>
           <linearGradient id="templatesHubLine" x1="0" x2="1" y1="0" y2="0">
             <stop offset="0" stopColor="#22c55e" />
@@ -368,33 +602,68 @@ function TrendChart({ points, metric, locale, text }: { points: AdminTemplatesAn
           return (
             <g key={`${ratio}-${index}`}>
               <line x1={paddingX} x2={width - paddingX} y1={y} y2={y} className={styles.gridLine} />
-              <text x={paddingX} y={y - 5} className={styles.tickLabel}>{formatTrendValue(value, metric, locale)}</text>
+              <text x={paddingX} y={y - 5} className={styles.tickLabel}>
+                {formatTrendValue(value, metric, locale)}
+              </text>
             </g>
           );
         })}
         <path d={area} fill="url(#templatesHubArea)" />
-        <path d={path} fill="none" stroke="url(#templatesHubLine)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d={path}
+          fill="none"
+          stroke="url(#templatesHubLine)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
         {coordinates.map((point, index) => (
           <g key={`${point.point.dateUtc}-${index}`}>
             <circle cx={point.x} cy={point.y} r="4.5" className={styles.chartPoint} />
-            <text x={point.x} y={height - 8} className={styles.dateLabel}>{formatShortDate(point.point.dateUtc, locale)}</text>
+            <text x={point.x} y={height - 8} className={styles.dateLabel}>
+              {formatShortDate(point.point.dateUtc, locale)}
+            </text>
           </g>
         ))}
       </svg>
       <div className={styles.chartSummary}>
         <span>{text.currentMetric}</span>
-        <strong>{formatTrendValue(values.reduce((total, value) => total + value, 0), metric, locale)}</strong>
+        <strong>
+          {formatTrendValue(
+            values.reduce((total, value) => total + value, 0),
+            metric,
+            locale
+          )}
+        </strong>
       </div>
     </div>
   );
 }
 
-function FunnelList({ overview, locale, text }: { overview: AdminTemplatesAnalyticsOverview; locale: AppLocale; text: Copy }) {
-  const max = Math.max(1, overview.conversionFunnel.views, overview.conversionFunnel.generationStarts, overview.conversionFunnel.completedGenerations, overview.conversionFunnel.failedGenerations);
+function FunnelList({
+  overview,
+  locale,
+  text,
+}: {
+  overview: AdminTemplatesAnalyticsOverview;
+  locale: AppLocale;
+  text: Copy;
+}) {
+  const max = Math.max(
+    1,
+    overview.conversionFunnel.views,
+    overview.conversionFunnel.generationStarts,
+    overview.conversionFunnel.completedGenerations,
+    overview.conversionFunnel.failedGenerations
+  );
   const rows = [
     { label: text.funnelViews, value: overview.conversionFunnel.views, tone: "green" },
     { label: text.funnelStarts, value: overview.conversionFunnel.generationStarts, tone: "violet" },
-    { label: text.funnelCompleted, value: overview.conversionFunnel.completedGenerations, tone: "blue" },
+    {
+      label: text.funnelCompleted,
+      value: overview.conversionFunnel.completedGenerations,
+      tone: "blue",
+    },
     { label: text.funnelFailed, value: overview.conversionFunnel.failedGenerations, tone: "red" },
     { label: text.funnelComplaints, value: overview.conversionFunnel.complaints, tone: "amber" },
   ];
@@ -403,28 +672,56 @@ function FunnelList({ overview, locale, text }: { overview: AdminTemplatesAnalyt
     <div className={styles.funnelList}>
       {rows.map((row) => (
         <div key={row.label} className={styles.funnelRow}>
-          <div><span>{row.label}</span><strong>{formatNumber(row.value, locale)}</strong></div>
-          <div className={styles.funnelTrack}><span className={styles[`funnel_${row.tone}`]} style={{ width: `${Math.max(5, (row.value / max) * 100)}%` }} /></div>
+          <div>
+            <span>{row.label}</span>
+            <strong>{formatNumber(row.value, locale)}</strong>
+          </div>
+          <div className={styles.funnelTrack}>
+            <span
+              className={styles[`funnel_${row.tone}`]}
+              style={{ width: `${Math.max(5, (row.value / max) * 100)}%` }}
+            />
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-function BreakdownPanel({ title, hint, rows, locale, templateCountLabel }: { title: string; hint: string; rows: AdminTemplatesAnalyticsBreakdown[]; locale: AppLocale; templateCountLabel: string }) {
+function BreakdownPanel({
+  title,
+  hint,
+  rows,
+  locale,
+  templateCountLabel,
+}: {
+  title: string;
+  hint: string;
+  rows: AdminTemplatesAnalyticsBreakdown[];
+  locale: AppLocale;
+  templateCountLabel: string;
+}) {
   const maxViews = Math.max(1, ...rows.map((row) => row.views));
 
   return (
     <section className={styles.panel}>
       <div className={styles.panelHeader}>
-        <h2 className={styles.panelTitle}><ChartIcon className={styles.panelIcon} />{title}</h2>
+        <h2 className={styles.panelTitle}>
+          <ChartIcon className={styles.panelIcon} />
+          {title}
+        </h2>
         <p>{hint}</p>
       </div>
       <div className={styles.breakdownList}>
         {rows.slice(0, 6).map((row) => (
           <div key={row.key} className={styles.breakdownRow}>
-            <div className={styles.breakdownMeta}><strong>{row.label}</strong><span>{formatTemplateCount(row.templateCount, locale, templateCountLabel)}</span></div>
-            <div className={styles.breakdownBar}><span style={{ width: `${Math.max(6, (row.views / maxViews) * 100)}%` }} /></div>
+            <div className={styles.breakdownMeta}>
+              <strong>{row.label}</strong>
+              <span>{formatTemplateCount(row.templateCount, locale, templateCountLabel)}</span>
+            </div>
+            <div className={styles.breakdownBar}>
+              <span style={{ width: `${Math.max(6, (row.views / maxViews) * 100)}%` }} />
+            </div>
             <span>{formatNumber(row.views, locale)}</span>
           </div>
         ))}
@@ -434,22 +731,43 @@ function BreakdownPanel({ title, hint, rows, locale, templateCountLabel }: { tit
   );
 }
 
-function TypePanel({ rows, locale, text }: { rows: AdminTemplatesAnalyticsBreakdown[]; locale: AppLocale; text: Copy }) {
+function TypePanel({
+  rows,
+  locale,
+  text,
+}: {
+  rows: AdminTemplatesAnalyticsBreakdown[];
+  locale: AppLocale;
+  text: Copy;
+}) {
   const dictionary = getDictionary(locale);
   return (
     <section className={styles.panel}>
       <div className={styles.panelHeader}>
-        <h2 className={styles.panelTitle}><VideoIcon className={styles.panelIcon} />{text.typesTitle}</h2>
+        <h2 className={styles.panelTitle}>
+          <VideoIcon className={styles.panelIcon} />
+          {text.typesTitle}
+        </h2>
         <p>{text.typesHint}</p>
       </div>
       <div className={styles.typeGrid}>
         {rows.map((row) => (
           <article key={row.key} className={styles.typeCard}>
-            {row.key === "image" ? <ImageIcon className={styles.typeIcon} /> : <VideoIcon className={styles.typeIcon} />}
+            {row.key === "image" ? (
+              <ImageIcon className={styles.typeIcon} />
+            ) : (
+              <VideoIcon className={styles.typeIcon} />
+            )}
             <span>{getTemplateTypeLabel(row.key === "image" ? "Image" : "Video", dictionary)}</span>
             <strong>{formatNumber(row.views, locale)}</strong>
-            <p>{formatNumber(row.generationStarts, locale)} {text.startsShort} · {formatPercent(row.conversionPercent, locale === "ru")}</p>
-            <p>{formatTokens(row.totalTokenCost, locale === "ru")} · {formatMoney(row.totalProviderCostUsd, locale)}</p>
+            <p>
+              {formatNumber(row.generationStarts, locale)} {text.startsShort} ·{" "}
+              {formatPercent(row.conversionPercent, locale === "ru")}
+            </p>
+            <p>
+              {formatTokens(row.totalTokenCost, locale === "ru")} ·{" "}
+              {formatMoney(row.totalProviderCostUsd, locale)}
+            </p>
           </article>
         ))}
       </div>
@@ -457,11 +775,24 @@ function TypePanel({ rows, locale, text }: { rows: AdminTemplatesAnalyticsBreakd
   );
 }
 
-function EventDimensionPanel({ title, hint, rows, locale }: { title: string; hint: string; rows: AdminTemplateAnalyticsDimension[]; locale: AppLocale }) {
+function EventDimensionPanel({
+  title,
+  hint,
+  rows,
+  locale,
+}: {
+  title: string;
+  hint: string;
+  rows: AdminTemplateAnalyticsDimension[];
+  locale: AppLocale;
+}) {
   return (
     <section className={styles.panel}>
       <div className={styles.panelHeader}>
-        <h2 className={styles.panelTitle}><ChartIcon className={styles.panelIcon} />{title}</h2>
+        <h2 className={styles.panelTitle}>
+          <ChartIcon className={styles.panelIcon} />
+          {title}
+        </h2>
         <p>{hint}</p>
       </div>
       <div className={styles.dimensionList}>
@@ -483,12 +814,23 @@ function EventDimensionPanel({ title, hint, rows, locale }: { title: string; hin
   );
 }
 
-function TopTemplatesPanel({ rows, locale, text }: { rows: AdminTemplatesAnalyticsTemplateRow[]; locale: AppLocale; text: Copy }) {
+function TopTemplatesPanel({
+  rows,
+  locale,
+  text,
+}: {
+  rows: AdminTemplatesAnalyticsTemplateRow[];
+  locale: AppLocale;
+  text: Copy;
+}) {
   const dictionary = getDictionary(locale);
   return (
     <section className={`${styles.panel} ${styles.topPanel}`}>
       <div className={styles.panelHeader}>
-        <h2 className={styles.panelTitle}><DashboardIcon className={styles.panelIcon} />{text.topTitle}</h2>
+        <h2 className={styles.panelTitle}>
+          <DashboardIcon className={styles.panelIcon} />
+          {text.topTitle}
+        </h2>
         <p>{text.topHint}</p>
       </div>
       <div className={styles.topList}>
@@ -498,7 +840,9 @@ function TopTemplatesPanel({ rows, locale, text }: { rows: AdminTemplatesAnalyti
             <TemplateThumb row={row} />
             <div>
               <strong>{row.title}</strong>
-              <span>{getTemplateTypeLabel(row.templateType, dictionary)} · {row.category}</span>
+              <span>
+                {getTemplateTypeLabel(row.templateType, dictionary)} · {row.category}
+              </span>
             </div>
             <span>{formatNumber(row.views, locale)}</span>
             <span>{formatNumber(row.generationStarts, locale)}</span>
@@ -509,7 +853,15 @@ function TopTemplatesPanel({ rows, locale, text }: { rows: AdminTemplatesAnalyti
   );
 }
 
-function TemplatesTable({ rows, locale, text }: { rows: AdminTemplatesAnalyticsTemplateRow[]; locale: AppLocale; text: Copy }) {
+function TemplatesTable({
+  rows,
+  locale,
+  text,
+}: {
+  rows: AdminTemplatesAnalyticsTemplateRow[];
+  locale: AppLocale;
+  text: Copy;
+}) {
   const dictionary = getDictionary(locale);
   return (
     <div className={styles.tableWrap}>
@@ -532,10 +884,24 @@ function TemplatesTable({ rows, locale, text }: { rows: AdminTemplatesAnalyticsT
         <tbody>
           {rows.map((row) => (
             <tr key={row.templateId}>
-              <td><div className={styles.templateCell}><TemplateThumb row={row} /><div><strong>{row.title}</strong><span>{shortId(row.templateId)}</span></div></div></td>
+              <td>
+                <div className={styles.templateCell}>
+                  <TemplateThumb row={row} />
+                  <div>
+                    <strong>{row.title}</strong>
+                    <span>{shortId(row.templateId)}</span>
+                  </div>
+                </div>
+              </td>
               <td>{getTemplateTypeLabel(row.templateType, dictionary)}</td>
               <td>{row.category}</td>
-              <td><span className={`${styles.statusBadge} ${styles[`status_${row.status.toLowerCase()}`]}`}>{getTemplateStatusLabel(row.status, locale)}</span></td>
+              <td>
+                <span
+                  className={`${styles.statusBadge} ${styles[`status_${row.status.toLowerCase()}`]}`}
+                >
+                  {getTemplateStatusLabel(row.status, locale)}
+                </span>
+              </td>
               <td>{getTemplateAccessLabel(row.isPremium, dictionary)}</td>
               <td>{formatNumber(row.views, locale)}</td>
               <td>{formatNumber(row.generationStarts, locale)}</td>
@@ -543,7 +909,12 @@ function TemplatesTable({ rows, locale, text }: { rows: AdminTemplatesAnalyticsT
               <td>{formatTokens(row.totalTokenCost, locale === "ru")}</td>
               <td>{formatMoney(row.totalProviderCostUsd, locale)}</td>
               <td>
-                <Link className={styles.inlineAction} href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${row.templateId}`}>{text.openAnalytics}</Link>
+                <Link
+                  className={styles.inlineAction}
+                  href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${row.templateId}`}
+                >
+                  {text.openAnalytics}
+                </Link>
               </td>
             </tr>
           ))}
@@ -560,7 +931,9 @@ function TemplateThumb({ row }: { row: AdminTemplatesAnalyticsTemplateRow }) {
     return <div className={styles.thumbFallback}>{row.title.slice(0, 1)}</div>;
   }
 
-  return <Image src={previewUrl} alt="" width={48} height={48} unoptimized className={styles.thumb} />;
+  return (
+    <Image src={previewUrl} alt="" width={48} height={48} unoptimized className={styles.thumb} />
+  );
 }
 
 function getTrendValue(point: AdminTemplatesAnalyticsTrendPoint, metric: TrendMetricKey) {
@@ -576,7 +949,9 @@ function formatTrendValue(value: number, metric: TrendMetricKey, locale: AppLoca
 }
 
 function formatNumber(value: number, locale: AppLocale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", { maximumFractionDigits: value % 1 === 0 ? 0 : 1 }).format(value);
+  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    maximumFractionDigits: value % 1 === 0 ? 0 : 1,
+  }).format(value);
 }
 
 function formatPercent(value: number, isRu: boolean) {
@@ -595,13 +970,14 @@ function formatTemplateCount(value: number, locale: AppLocale, fallbackLabel: st
 
   const normalized = Math.abs(value) % 100;
   const lastDigit = normalized % 10;
-  const label = normalized > 10 && normalized < 20
-    ? "шаблонов"
-    : lastDigit === 1
-      ? "шаблон"
-      : lastDigit >= 2 && lastDigit <= 4
-        ? "шаблона"
-        : "шаблонов";
+  const label =
+    normalized > 10 && normalized < 20
+      ? "шаблонов"
+      : lastDigit === 1
+        ? "шаблон"
+        : lastDigit >= 2 && lastDigit <= 4
+          ? "шаблона"
+          : "шаблонов";
 
   return `${formattedValue} ${label}`;
 }
@@ -616,11 +992,17 @@ function formatMoney(value: number, locale: AppLocale) {
 }
 
 function formatDateTime(value: string, locale: AppLocale) {
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function formatShortDate(value: string, locale: AppLocale) {
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", { day: "2-digit", month: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(value));
 }
 
 function shortId(value: string) {
@@ -638,7 +1020,9 @@ function getCopy(locale: AppLocale) {
   return {
     eyebrow: isRu ? "Интеллект шаблонов" : "Template intelligence",
     title: isRu ? "Аналитика шаблонов" : "Template analytics",
-    description: isRu ? "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов." : "Global view of template views, generations, spend, and performance.",
+    description: isRu
+      ? "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов."
+      : "Global view of template views, generations, spend, and performance.",
     catalog: isRu ? "Каталог" : "Catalog",
     export: isRu ? "Экспорт" : "Export",
     templates: isRu ? "Шаблонов" : "Templates",
@@ -649,7 +1033,9 @@ function getCopy(locale: AppLocale) {
     premium: "Premium",
     free: "Free",
     loading: isRu ? "Загрузка аналитики шаблонов..." : "Loading template analytics...",
-    loadError: isRu ? "Не удалось загрузить аналитику шаблонов." : "Failed to load template analytics.",
+    loadError: isRu
+      ? "Не удалось загрузить аналитику шаблонов."
+      : "Failed to load template analytics.",
     periodLabel: isRu ? "Период" : "Period",
     typeFilter: isRu ? "Тип" : "Type",
     categoryFilter: isRu ? "Категория" : "Category",
@@ -668,22 +1054,38 @@ function getCopy(locale: AppLocale) {
     sortCost: isRu ? "Затраты" : "Cost",
     sortUpdated: isRu ? "Обновление" : "Updated",
     views: isRu ? "Просмотры шаблонов" : "Template views",
-    viewsHint: isRu ? "Просмотры всех выбранных шаблонов." : "View events across selected templates.",
+    viewsHint: isRu
+      ? "Просмотры всех выбранных шаблонов."
+      : "View events across selected templates.",
     starts: isRu ? "Запуски генераций" : "Generation starts",
-    startsHint: isRu ? "Запуски генерации за выбранный период." : "Generation jobs created in the selected period.",
+    startsHint: isRu
+      ? "Запуски генерации за выбранный период."
+      : "Generation jobs created in the selected period.",
     completed: isRu ? "Успешные генерации" : "Completed generations",
     completedHint: isRu ? "Завершились готовым результатом." : "Completed with an output result.",
     conversion: isRu ? "Конверсия в результат" : "Result conversion",
-    conversionHint: isRu ? "Успешные генерации от всех запусков." : "Completed jobs divided by starts.",
+    conversionHint: isRu
+      ? "Успешные генерации от всех запусков."
+      : "Completed jobs divided by starts.",
     tokens: isRu ? "Потрачено токенов" : "Token spend",
-    tokensHint: isRu ? "Суммарный расход пользователей на генерации." : "Total user token spend for generations.",
+    tokensHint: isRu
+      ? "Суммарный расход пользователей на генерации."
+      : "Total user token spend for generations.",
     providerSpend: isRu ? "Наши затраты" : "Provider spend",
-    providerSpendHint: isRu ? "Реальные USD-затраты на AI-провайдера." : "Real AI provider USD costs from jobs.",
+    providerSpendHint: isRu
+      ? "Реальные USD-затраты на AI-провайдера."
+      : "Real AI provider USD costs from jobs.",
     complaints: isRu ? "Жалобы" : "Complaints",
-    complaintsHint: isRu ? "Количество complaint событий; ниже доступен список самих обращений." : "Complaint event count; see the feed below for actual messages.",
+    complaintsHint: isRu
+      ? "Количество complaint событий; ниже доступен список самих обращений."
+      : "Complaint event count; see the feed below for actual messages.",
     feedbackTitle: isRu ? "Жалобы и фидбек" : "Complaints and feedback",
-    feedbackHint: isRu ? "Последние complaint и feedback события по выбранным шаблонам с текстом сообщения и переходом в конкретный шаблон." : "Latest complaint and feedback events for the selected templates with message text and a link to the specific template.",
-    feedbackEmpty: isRu ? "По выбранным фильтрам пока нет жалоб или фидбека." : "There are no complaints or feedback items for the current filters yet.",
+    feedbackHint: isRu
+      ? "Последние complaint и feedback события по выбранным шаблонам с текстом сообщения и переходом в конкретный шаблон."
+      : "Latest complaint and feedback events for the selected templates with message text and a link to the specific template.",
+    feedbackEmpty: isRu
+      ? "По выбранным фильтрам пока нет жалоб или фидбека."
+      : "There are no complaints or feedback items for the current filters yet.",
     feedbackMessageMissing: isRu ? "Без текста сообщения." : "No message text provided.",
     feedbackTypeComplaint: isRu ? "Жалоба" : "Complaint",
     feedbackTypeFeedback: isRu ? "Фидбек" : "Feedback",
@@ -697,31 +1099,47 @@ function getCopy(locale: AppLocale) {
     chartCompleted: isRu ? "Успех" : "Completed",
     chartCost: isRu ? "Затраты" : "Cost",
     trendTitle: isRu ? "Динамика по времени" : "Trend over time",
-    trendHint: isRu ? "Дневная динамика просмотров, запусков, успешных генераций и реальных затрат." : "Daily backend buckets for views, starts, completions, and real spend.",
+    trendHint: isRu
+      ? "Дневная динамика просмотров, запусков, успешных генераций и реальных затрат."
+      : "Daily backend buckets for views, starts, completions, and real spend.",
     noTrend: isRu ? "Пока нет точек тренда." : "No trend points yet.",
     currentMetric: isRu ? "Сумма выбранной метрики" : "Selected metric total",
     funnelTitle: isRu ? "Воронка конверсии" : "Conversion funnel",
-    funnelHint: isRu ? "От просмотра шаблона до результата и жалоб." : "From template view to result and complaints.",
+    funnelHint: isRu
+      ? "От просмотра шаблона до результата и жалоб."
+      : "From template view to result and complaints.",
     funnelViews: isRu ? "Увидели шаблон" : "Viewed template",
     funnelStarts: isRu ? "Запустили генерацию" : "Started generation",
     funnelCompleted: isRu ? "Получили результат" : "Completed result",
     funnelFailed: isRu ? "Получили ошибку" : "Failed",
     funnelComplaints: isRu ? "Пожаловались" : "Complaints",
     categoriesTitle: isRu ? "Категории" : "Categories",
-    categoriesHint: isRu ? "Где концентрируются просмотры, запуски и расходы." : "Where views, starts, and spend concentrate.",
+    categoriesHint: isRu
+      ? "Где концентрируются просмотры, запуски и расходы."
+      : "Where views, starts, and spend concentrate.",
     typesTitle: isRu ? "Типы шаблонов" : "Template types",
     typesHint: isRu ? "Видео и изображения в одной сводке." : "Video and Image in one overview.",
     sourcesTitle: isRu ? "Источники просмотров" : "View sources",
-    sourcesHint: isRu ? "Откуда пользователи открывали выбранные шаблоны." : "Real source events for selected templates.",
+    sourcesHint: isRu
+      ? "Откуда пользователи открывали выбранные шаблоны."
+      : "Real source events for selected templates.",
     devicesTitle: isRu ? "Устройства" : "Devices",
-    devicesHint: isRu ? "Классы устройств из публичной аналитики шаблонов." : "Device class from public analytics instrumentation.",
+    devicesHint: isRu
+      ? "Классы устройств из публичной аналитики шаблонов."
+      : "Device class from public analytics instrumentation.",
     geographyTitle: isRu ? "География" : "Geography",
-    geographyHint: isRu ? "Страны из событий просмотра, без расчётных догадок." : "Country code from view events, without guessing.",
+    geographyHint: isRu
+      ? "Страны из событий просмотра, без расчётных догадок."
+      : "Country code from view events, without guessing.",
     startsShort: isRu ? "запусков" : "starts",
     topTitle: isRu ? "Топ шаблонов" : "Top templates",
-    topHint: isRu ? "Сортировка синхронизирована с выбранными фильтрами." : "Sorted by the backend query.",
+    topHint: isRu
+      ? "Сортировка синхронизирована с выбранными фильтрами."
+      : "Sorted by the backend query.",
     tableTitle: isRu ? "Все шаблоны" : "All templates",
-    tableHint: isRu ? "Сводная таблица шаблонов по просмотрам, генерациям, ошибкам и реальным затратам." : "Template table with views, generations, failures, and real provider costs.",
+    tableHint: isRu
+      ? "Сводная таблица шаблонов по просмотрам, генерациям, ошибкам и реальным затратам."
+      : "Template table with views, generations, failures, and real provider costs.",
     templateCountLabel: isRu ? "шаблонов" : "templates",
     refreshing: isRu ? "обновляется" : "refreshing",
     templateColumn: isRu ? "Шаблон" : "Template",
@@ -737,6 +1155,8 @@ function getCopy(locale: AppLocale) {
     actionsColumn: isRu ? "Действия" : "Actions",
     openAnalytics: isRu ? "Аналитика" : "Analytics",
     openEditor: isRu ? "Редактор" : "Editor",
-    noRows: isRu ? "Под выбранные фильтры шаблоны не найдены." : "No templates match the selected filters.",
+    noRows: isRu
+      ? "Под выбранные фильтры шаблоны не найдены."
+      : "No templates match the selected filters.",
   };
 }

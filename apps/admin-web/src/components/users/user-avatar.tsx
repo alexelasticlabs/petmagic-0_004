@@ -13,11 +13,7 @@ type UserAvatarProps = {
 };
 
 function getInitials(label: string) {
-  const parts = label
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
+  const parts = label.trim().split(/\s+/).filter(Boolean).slice(0, 2);
 
   if (!parts.length) {
     return "?";
@@ -30,9 +26,18 @@ export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: Us
   const initials = getInitials(fallbackLabel);
 
   return (
-    <span className={`${styles.avatar} ${size === "lg" ? styles.avatarLg : styles.avatarSm}`} aria-label={label}>
+    <span
+      className={`${styles.avatar} ${size === "lg" ? styles.avatarLg : styles.avatarSm}`}
+      aria-label={label}
+    >
       {avatar?.url ? (
-        <Image src={avatar.url} alt={label} className={styles.image} fill sizes={size === "lg" ? "88px" : "40px"} />
+        <Image
+          src={avatar.url}
+          alt={label}
+          className={styles.image}
+          fill
+          sizes={size === "lg" ? "88px" : "40px"}
+        />
       ) : (
         <span className={styles.initials}>{initials}</span>
       )}

@@ -1,21 +1,26 @@
 import Link from "next/link";
 
 import {
-    BrandMark,
-    CaretDownIcon,
-    ChartIcon,
-    DashboardIcon,
-    DollarIcon,
-    ImageIcon,
-    LogoutIcon,
-    PromoCodeIcon,
-    SupportIcon,
-    TemplatesIcon,
-    UsersIcon,
-    VideoIcon,
+  BrandMark,
+  CaretDownIcon,
+  ChartIcon,
+  DashboardIcon,
+  DollarIcon,
+  ImageIcon,
+  LogoutIcon,
+  PromoCodeIcon,
+  SupportIcon,
+  TemplatesIcon,
+  UsersIcon,
+  VideoIcon,
 } from "@/components/admin/admin-icons";
 import styles from "@/components/admin/admin-shell.module.css";
-import { getAdminNavItems, matchesAdminPath, type AdminNavEntry, type AdminSectionKey } from "@/lib/admin-navigation";
+import {
+  getAdminNavItems,
+  matchesAdminPath,
+  type AdminNavEntry,
+  type AdminSectionKey,
+} from "@/lib/admin-navigation";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type AdminSidebarProps = {
@@ -66,12 +71,21 @@ function buildNavSections(navItems: AdminNavEntry[], locale: Locale): NavSection
     .map((section) => ({
       key: section.key,
       label: section.label,
-      items: section.itemKeys.map((itemKey) => byKey.get(itemKey)).filter((item): item is AdminNavEntry => Boolean(item)),
+      items: section.itemKeys
+        .map((itemKey) => byKey.get(itemKey))
+        .filter((item): item is AdminNavEntry => Boolean(item)),
     }))
     .filter((section) => section.items.length > 0);
 }
 
-export function AdminSidebar({ locale, currentPath, isOpen, onNavigate, onLogout, logoutLabel }: AdminSidebarProps) {
+export function AdminSidebar({
+  locale,
+  currentPath,
+  isOpen,
+  onNavigate,
+  onLogout,
+  logoutLabel,
+}: AdminSidebarProps) {
   const navItems = getAdminNavItems(locale);
   const navSections = buildNavSections(navItems, locale);
   const brandCaption = locale === "ru" ? "Операционная админ-зона" : "Operational admin workspace";
@@ -80,7 +94,9 @@ export function AdminSidebar({ locale, currentPath, isOpen, onNavigate, onLogout
     if (item.type === "group") {
       const Icon = iconMap[item.key];
       const groupCurrent = matchesAdminPath(currentPath, getTargetPath(item.href));
-      const groupActive = item.items.some((child) => matchesAdminPath(currentPath, getTargetPath(child.href)));
+      const groupActive = item.items.some((child) =>
+        matchesAdminPath(currentPath, getTargetPath(child.href))
+      );
 
       return (
         <div key={item.key} className={styles.navGroup}>
@@ -92,7 +108,9 @@ export function AdminSidebar({ locale, currentPath, isOpen, onNavigate, onLogout
           >
             <Icon className={styles.navIcon} />
             <span className={styles.navLabel}>{item.label}</span>
-            <CaretDownIcon className={`${styles.groupCaret}${groupActive ? ` ${styles.groupCaretOpen}` : ""}`} />
+            <CaretDownIcon
+              className={`${styles.groupCaret}${groupActive ? ` ${styles.groupCaretOpen}` : ""}`}
+            />
           </Link>
 
           <div className={styles.navChildren} role="group" aria-label={item.label}>
@@ -134,7 +152,11 @@ export function AdminSidebar({ locale, currentPath, isOpen, onNavigate, onLogout
   }
 
   return (
-    <aside id="admin-sidebar" className={`${styles.sidebar}${isOpen ? ` ${styles.sidebarOpen}` : ""}`} aria-label="Admin navigation">
+    <aside
+      id="admin-sidebar"
+      className={`${styles.sidebar}${isOpen ? ` ${styles.sidebarOpen}` : ""}`}
+      aria-label="Admin navigation"
+    >
       <div className={styles.brand}>
         <BrandMark className={styles.brandMark} />
         <div>

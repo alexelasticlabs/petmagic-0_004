@@ -8,7 +8,10 @@ type VideoTemplatesCatalogPageProps = {
   searchParams: Promise<{ category?: string | string[] }>;
 };
 
-export default async function VideoTemplatesCatalogPage({ params, searchParams }: VideoTemplatesCatalogPageProps) {
+export default async function VideoTemplatesCatalogPage({
+  params,
+  searchParams,
+}: VideoTemplatesCatalogPageProps) {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
@@ -18,5 +21,7 @@ export default async function VideoTemplatesCatalogPage({ params, searchParams }
   const { category } = await searchParams;
   const initialCategory = Array.isArray(category) ? category[0] : category;
 
-  return <TemplatesCatalogView locale={locale} templateType="Video" initialCategory={initialCategory} />;
+  return (
+    <TemplatesCatalogView locale={locale} templateType="Video" initialCategory={initialCategory} />
+  );
 }

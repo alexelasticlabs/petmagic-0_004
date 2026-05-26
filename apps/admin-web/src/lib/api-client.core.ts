@@ -22,6 +22,7 @@ import type {
   TemplateType,
   UserListItem,
 } from "./api-client.types";
+
 const AUTH_KEY = "petmagic_admin_auth";
 const AUTH_SESSION_EVENT = "petmagic_admin_auth_changed";
 const ADMIN_LIST_CACHE_TTL_MS = 120_000;
@@ -51,7 +52,10 @@ let cachedAuthRaw: string | null | undefined;
 let cachedAuthSession: AuthSession | null = null;
 let volatileRefreshToken: string | null = null;
 export const cachedUsersLists = new Map<string, { value: UserListItem[]; expiresAt: number }>();
-export const cachedAdminUserDetails = new Map<string, { value: AdminUserDetail; expiresAt: number }>();
+export const cachedAdminUserDetails = new Map<
+  string,
+  { value: AdminUserDetail; expiresAt: number }
+>();
 export const cachedAdminUserAnalytics = new Map<
   string,
   { value: AdminUserAnalytics; expiresAt: number }
@@ -80,7 +84,10 @@ export const cachedTemplatesAnalyticsOverview = new Map<
   string,
   { value: AdminTemplatesAnalyticsOverview; expiresAt: number }
 >();
-export const cachedAdminTemplateDetails = new Map<string, { value: AdminTemplate; expiresAt: number }>();
+export const cachedAdminTemplateDetails = new Map<
+  string,
+  { value: AdminTemplate; expiresAt: number }
+>();
 export const cachedAdminTemplateStatistics = new Map<
   string,
   { value: AdminTemplateStatistics; expiresAt: number }

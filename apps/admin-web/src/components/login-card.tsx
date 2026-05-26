@@ -12,7 +12,12 @@ function IconEmail() {
   return (
     <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="2" y="4" width="20" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M22 6.5L12 13.5L2 6.5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path
+        d="M22 6.5L12 13.5L2 6.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -21,7 +26,12 @@ function IconLock() {
   return (
     <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="3" y="11" width="18" height="11" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path
+        d="M7 11V7a5 5 0 0 1 10 0v4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -60,7 +70,15 @@ function IconEyeOff() {
         strokeWidth="1.6"
         strokeLinecap="round"
       />
-      <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <line
+        x1="1"
+        y1="1"
+        x2="23"
+        y2="23"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -77,7 +95,8 @@ export function LoginCard({ locale }: LoginCardProps) {
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const existingSession = useAuthSession();
   const isCheckingSession = existingSession === undefined;
-  const hasValidExistingSession = Boolean(existingSession?.accessToken) && !isAuthSessionExpired(existingSession);
+  const hasValidExistingSession =
+    Boolean(existingSession?.accessToken) && !isAuthSessionExpired(existingSession);
   const isRedirecting = hasValidExistingSession;
 
   useEffect(() => {
@@ -184,8 +203,12 @@ export function LoginCard({ locale }: LoginCardProps) {
               className={styles.eyeButton}
               aria-label={
                 showPassword
-                  ? isRu ? "Скрыть пароль" : "Hide password"
-                  : isRu ? "Показать пароль" : "Show password"
+                  ? isRu
+                    ? "Скрыть пароль"
+                    : "Hide password"
+                  : isRu
+                    ? "Показать пароль"
+                    : "Show password"
               }
               onClick={() => setShowPassword((c) => !c)}
             >

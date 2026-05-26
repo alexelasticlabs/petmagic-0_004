@@ -64,7 +64,9 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: color 140ms ease, transform 140ms ease;
+  transition:
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .userAnchor:hover,
@@ -86,7 +88,11 @@
   font-size: 0.78rem;
   font-weight: 600;
   text-decoration: none;
-  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .inlineLink:hover {
@@ -111,7 +117,12 @@
   color: var(--text-soft) !important;
   box-shadow: none;
   gap: 0.38rem;
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .adminButton:hover:not(:disabled) {
@@ -148,7 +159,12 @@
 .skeletonLine {
   height: 2.2rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, var(--surface-1) 0%, var(--surface-3) 50%, var(--surface-1) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--surface-1) 0%,
+    var(--surface-3) 50%,
+    var(--surface-1) 100%
+  );
   background-size: 220% 100%;
   animation: shimmer 1.4s linear infinite;
 }

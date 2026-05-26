@@ -3,20 +3,20 @@
 import { ChartIcon, TableIcon, VideoIcon } from "@/components/admin/admin-icons";
 import styles from "@/components/templates/template-analytics-page.module.css";
 import {
-    formatAnalyticsValue,
-    formatDateTime,
-    formatFailureCode,
-    formatJobStatus,
-    formatModelSummary,
-    formatRangeDuration,
-    formatTokens,
-    getJobStatusClassName,
-    shortenId,
+  formatAnalyticsValue,
+  formatDateTime,
+  formatFailureCode,
+  formatJobStatus,
+  formatModelSummary,
+  formatRangeDuration,
+  formatTokens,
+  getJobStatusClassName,
+  shortenId,
 } from "@/components/templates/template-analytics-utils";
 import type {
-    AdminTemplateFailureBreakdownItem,
-    AdminTemplateFeedbackItem,
-    AdminTemplateRecentGeneration,
+  AdminTemplateFailureBreakdownItem,
+  AdminTemplateFeedbackItem,
+  AdminTemplateRecentGeneration,
 } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
 
@@ -102,8 +102,17 @@ export function TemplateAnalyticsRecentRunsSection({
     <section className={`${styles.sectionCard} ${styles.sectionCardWide}`}>
       <div className={styles.sectionHeaderRow}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitleWithIcon}><TableIcon className={styles.sectionTitleIcon} /><span>{text.recentRunsTitle}</span></h2>
-          <p>{mode === "all" ? text.recentRunsAllHint : mode === "failed" ? text.failedRunsHint : text.recentRunsHint}</p>
+          <h2 className={styles.sectionTitleWithIcon}>
+            <TableIcon className={styles.sectionTitleIcon} />
+            <span>{text.recentRunsTitle}</span>
+          </h2>
+          <p>
+            {mode === "all"
+              ? text.recentRunsAllHint
+              : mode === "failed"
+                ? text.failedRunsHint
+                : text.recentRunsHint}
+          </p>
         </div>
 
         {canShowRecentRunModes ? (
@@ -154,7 +163,10 @@ export function TemplateAnalyticsFailureBreakdownSection({
   return (
     <section className={styles.sectionCard}>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitleWithIcon}><ChartIcon className={styles.sectionTitleIcon} /><span>{text.failureBreakdownTitle}</span></h2>
+        <h2 className={styles.sectionTitleWithIcon}>
+          <ChartIcon className={styles.sectionTitleIcon} />
+          <span>{text.failureBreakdownTitle}</span>
+        </h2>
         <p>{text.failureBreakdownHint}</p>
       </div>
       <FailureBreakdownList locale={locale} items={items} text={text} />
@@ -191,7 +203,10 @@ export function TemplateAnalyticsFeedbackSection({
     <section className={styles.sectionCard}>
       <div className={styles.sectionHeaderRow}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitleWithIcon}><ChartIcon className={styles.sectionTitleIcon} /><span>{text.feedbackTitle}</span></h2>
+          <h2 className={styles.sectionTitleWithIcon}>
+            <ChartIcon className={styles.sectionTitleIcon} />
+            <span>{text.feedbackTitle}</span>
+          </h2>
           <p>{text.feedbackHint}</p>
         </div>
         <div className={styles.feedbackToolbar}>
@@ -218,17 +233,39 @@ export function TemplateAnalyticsFeedbackSection({
         </div>
       </div>
       {error ? <p className={styles.emptyState}>{error}</p> : null}
-      <FeedbackList locale={locale} items={items} text={text} isLoading={isLoading} hasActiveFilter={hasActiveFilter} />
+      <FeedbackList
+        locale={locale}
+        items={items}
+        text={text}
+        isLoading={isLoading}
+        hasActiveFilter={hasActiveFilter}
+      />
     </section>
   );
 }
 
-function RecentRunsTable({ locale, items, text, mode }: { locale: Locale; items: readonly AdminTemplateRecentGeneration[]; text: RecentRunsText; mode: RecentRunsMode }) {
+function RecentRunsTable({
+  locale,
+  items,
+  text,
+  mode,
+}: {
+  locale: Locale;
+  items: readonly AdminTemplateRecentGeneration[];
+  text: RecentRunsText;
+  mode: RecentRunsMode;
+}) {
   const isRu = locale === "ru";
-  const hasFailureDetails = items.some((item) => item.status === "Failed" || Boolean(item.failureCode) || Boolean(item.failureMessage));
+  const hasFailureDetails = items.some(
+    (item) => item.status === "Failed" || Boolean(item.failureCode) || Boolean(item.failureMessage)
+  );
 
   if (!items.length) {
-    return <p className={styles.emptyState}>{mode === "failed" ? text.failedRunsEmpty : text.recentRunsEmpty}</p>;
+    return (
+      <p className={styles.emptyState}>
+        {mode === "failed" ? text.failedRunsEmpty : text.recentRunsEmpty}
+      </p>
+    );
   }
 
   return (
@@ -251,11 +288,17 @@ function RecentRunsTable({ locale, items, text, mode }: { locale: Locale; items:
         <tbody>
           {items.map((item) => (
             <tr key={item.generationId}>
-              <td><span className={styles.monoCell}>{shortenId(item.generationId)}</span></td>
-              <td><span className={styles.monoCell}>{shortenId(item.userId)}</span></td>
+              <td>
+                <span className={styles.monoCell}>{shortenId(item.generationId)}</span>
+              </td>
+              <td>
+                <span className={styles.monoCell}>{shortenId(item.userId)}</span>
+              </td>
               <td>{formatDateTime(item.createdAtUtc, locale)}</td>
               <td>
-                <span className={`${styles.statusChip} ${styles[getJobStatusClassName(item.status)]}`}>
+                <span
+                  className={`${styles.statusChip} ${styles[getJobStatusClassName(item.status)]}`}
+                >
                   {formatJobStatus(item.status, isRu)}
                 </span>
               </td>
@@ -264,17 +307,32 @@ function RecentRunsTable({ locale, items, text, mode }: { locale: Locale; items:
               <td>{formatModelSummary(item.usedPreprocessingModel, item.usedKlingModel)}</td>
               {hasFailureDetails ? (
                 <td>
-                  {item.failureCode ? <span className={styles.failureCodeCell}>{formatFailureCode(item.failureCode, text.unknownFailure)}</span> : <span className={styles.mutedCell}>-</span>}
+                  {item.failureCode ? (
+                    <span className={styles.failureCodeCell}>
+                      {formatFailureCode(item.failureCode, text.unknownFailure)}
+                    </span>
+                  ) : (
+                    <span className={styles.mutedCell}>-</span>
+                  )}
                 </td>
               ) : null}
               {hasFailureDetails ? (
                 <td>
-                  {item.failureMessage ? <span className={styles.failureReasonCell}>{item.failureMessage}</span> : <span className={styles.mutedCell}>-</span>}
+                  {item.failureMessage ? (
+                    <span className={styles.failureReasonCell}>{item.failureMessage}</span>
+                  ) : (
+                    <span className={styles.mutedCell}>-</span>
+                  )}
                 </td>
               ) : null}
               <td>
                 {item.outputUrl ? (
-                  <a href={item.outputUrl} target="_blank" rel="noreferrer" className={styles.inlineLink}>
+                  <a
+                    href={item.outputUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={styles.inlineLink}
+                  >
                     <VideoIcon className={styles.inlineIcon} />
                     <span>{text.openOutput}</span>
                   </a>
@@ -290,7 +348,15 @@ function RecentRunsTable({ locale, items, text, mode }: { locale: Locale; items:
   );
 }
 
-function FailureBreakdownList({ locale, items, text }: { locale: Locale; items: readonly AdminTemplateFailureBreakdownItem[]; text: FailureBreakdownText }) {
+function FailureBreakdownList({
+  locale,
+  items,
+  text,
+}: {
+  locale: Locale;
+  items: readonly AdminTemplateFailureBreakdownItem[];
+  text: FailureBreakdownText;
+}) {
   if (!items.length) {
     return <p className={styles.emptyState}>{text.failuresEmpty}</p>;
   }
@@ -328,7 +394,11 @@ function FeedbackList({
   }
 
   if (!items.length) {
-    return <p className={styles.emptyState}>{hasActiveFilter ? text.feedbackFilteredEmpty : text.feedbackEmpty}</p>;
+    return (
+      <p className={styles.emptyState}>
+        {hasActiveFilter ? text.feedbackFilteredEmpty : text.feedbackEmpty}
+      </p>
+    );
   }
 
   const isRu = locale === "ru";
@@ -338,18 +408,36 @@ function FeedbackList({
       {items.map((item) => (
         <article key={item.eventId} className={styles.feedbackItem}>
           <div className={styles.feedbackHeader}>
-            <span className={`${styles.statusChip} ${styles[item.eventType === "complaint" ? "statusChip_danger" : "statusChip_info"]}`}>
-              {item.eventType === "complaint" ? text.feedbackTypeComplaint : text.feedbackTypeFeedback}
+            <span
+              className={`${styles.statusChip} ${styles[item.eventType === "complaint" ? "statusChip_danger" : "statusChip_info"]}`}
+            >
+              {item.eventType === "complaint"
+                ? text.feedbackTypeComplaint
+                : text.feedbackTypeFeedback}
             </span>
             <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
           </div>
-          <p className={styles.feedbackMessage}>{item.feedbackMessage?.trim() || text.feedbackMessageMissing}</p>
+          <p className={styles.feedbackMessage}>
+            {item.feedbackMessage?.trim() || text.feedbackMessageMissing}
+          </p>
           <div className={styles.feedbackMeta}>
-            <span>{text.feedbackSourceLabel}: {formatAnalyticsValue(item.source)}</span>
-            <span>{text.feedbackDeviceLabel}: {formatAnalyticsValue(item.deviceClass)}</span>
-            <span>{text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}</span>
-            <span>{text.userHeader}: {item.userId ? shortenId(item.userId) : (isRu ? "анон" : "guest")}</span>
-            {item.generationId ? <span>{text.generationIdHeader}: {shortenId(item.generationId)}</span> : null}
+            <span>
+              {text.feedbackSourceLabel}: {formatAnalyticsValue(item.source)}
+            </span>
+            <span>
+              {text.feedbackDeviceLabel}: {formatAnalyticsValue(item.deviceClass)}
+            </span>
+            <span>
+              {text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}
+            </span>
+            <span>
+              {text.userHeader}: {item.userId ? shortenId(item.userId) : isRu ? "анон" : "guest"}
+            </span>
+            {item.generationId ? (
+              <span>
+                {text.generationIdHeader}: {shortenId(item.generationId)}
+              </span>
+            ) : null}
           </div>
         </article>
       ))}

@@ -16,7 +16,7 @@ let supportRealtimeBlockedUntil = 0;
 
 export function useSupportRealtime(
   accessToken: string | undefined,
-  onConversationUpdated: (event: SupportConversationUpdatedEvent) => void,
+  onConversationUpdated: (event: SupportConversationUpdatedEvent) => void
 ) {
   const handleConversationUpdated = useEffectEvent(onConversationUpdated);
 
@@ -48,15 +48,18 @@ export function useSupportRealtime(
       }
     });
 
-    void connection.start().then(() => {
-      if (!isDisposed) {
-        supportRealtimeBlockedUntil = 0;
-      }
-    }).catch((error: unknown) => {
-      if (!isDisposed && isExpectedConnectionFailure(error)) {
-        supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
-      }
-    });
+    void connection
+      .start()
+      .then(() => {
+        if (!isDisposed) {
+          supportRealtimeBlockedUntil = 0;
+        }
+      })
+      .catch((error: unknown) => {
+        if (!isDisposed && isExpectedConnectionFailure(error)) {
+          supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
+        }
+      });
 
     return () => {
       isDisposed = true;
@@ -71,7 +74,9 @@ function isExpectedConnectionFailure(error: unknown) {
     return true;
   }
 
-  return /failed to (start the connection|complete negotiation)|failed to fetch|networkerror/i.test(error.message);
+  return /failed to (start the connection|complete negotiation)|failed to fetch|networkerror/i.test(
+    error.message
+  );
 }
 
 function normalizeConversationUpdated(payload: unknown): SupportConversationUpdatedEvent | null {

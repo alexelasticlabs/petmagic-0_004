@@ -4,14 +4,14 @@ import { SupportInboxPage } from "@/components/support/support-inbox-page";
 import { isLocale, type Locale } from "@/lib/i18n";
 
 type SupportInboxRouteProps = {
-    params: Promise<{ locale: string }>;
+  params: Promise<{ locale: string }>;
 };
 
 export default async function SupportInboxRoute({ params }: SupportInboxRouteProps) {
-    const { locale } = await params;
-    if (!isLocale(locale)) {
-        notFound();
-    }
+  const { locale } = await params;
+  if (!isLocale(locale)) {
+    notFound();
+  }
 
-    return <SupportInboxPage locale={locale as Locale} />;
+  return <SupportInboxPage locale={locale as Locale} />;
 }

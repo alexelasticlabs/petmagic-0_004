@@ -5,12 +5,14 @@ import {
   cachedGet,
   cachedUsersLists,
 } from "./api-client.core";
+
 import type {
   AdminUserAnalytics,
   AdminUserDetail,
   AdminUserWalletOperation,
   UserListItem,
 } from "./api-client.types";
+
 export async function fetchUsers(): Promise<UserListItem[]> {
   return cachedGet("users", cachedUsersLists, () =>
     apiRequest<UserListItem[]>("/api/admin/users/", { method: "GET" })

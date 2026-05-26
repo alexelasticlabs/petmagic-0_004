@@ -2,29 +2,38 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import {
-    CalendarIcon,
-    ChartIcon,
-    ClockIcon,
-    DownloadIcon,
-    ImageIcon,
-    PlayCircleIcon,
-    RefreshIcon,
-    TableIcon,
-    VideoIcon,
+  CalendarIcon,
+  ChartIcon,
+  ClockIcon,
+  DownloadIcon,
+  ImageIcon,
+  PlayCircleIcon,
+  RefreshIcon,
+  TableIcon,
+  VideoIcon,
 } from "@/components/admin/admin-icons";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/templates/template-test-page.module.css";
 import { Button } from "@/components/ui/button";
 import {
-    fetchAdminTemplate,
-    fetchAdminTemplateTest,
-    fetchAdminTemplateTestHistory,
-    startAdminTemplateTest,
-    type AdminTemplate,
-    type AdminTemplateTestRun,
+  fetchAdminTemplate,
+  fetchAdminTemplateTest,
+  fetchAdminTemplateTestHistory,
+  startAdminTemplateTest,
+  type AdminTemplate,
+  type AdminTemplateTestRun,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
@@ -66,7 +75,9 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const selectedFilePreviewObjectUrlRef = useRef<string | null>(null);
   const [run, setRun] = useState<AdminTemplateTestRun | null>(null);
   const [history, setHistory] = useState<AdminTemplateTestRun[]>([]);
-  const [selectedHistoryGenerationId, setSelectedHistoryGenerationId] = useState<string | null>(null);
+  const [selectedHistoryGenerationId, setSelectedHistoryGenerationId] = useState<string | null>(
+    null
+  );
   const [runError, setRunError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSourceDragActive, setIsSourceDragActive] = useState(false);
@@ -102,7 +113,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         }
       } catch {
         if (!isCancelled) {
-          setLoadError(isRu ? "Не удалось загрузить шаблон для теста." : "Failed to load the template for testing.");
+          setLoadError(
+            isRu
+              ? "Не удалось загрузить шаблон для теста."
+              : "Failed to load the template for testing."
+          );
         }
       } finally {
         if (!isCancelled) {
@@ -127,7 +142,12 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       try {
         const latest = await fetchAdminTemplateTest(run.generationId);
         setRun(latest);
-        setHistory((current) => [latest, ...current.filter((item) => item.generationId !== latest.generationId)].slice(0, 12));
+        setHistory((current) =>
+          [latest, ...current.filter((item) => item.generationId !== latest.generationId)].slice(
+            0,
+            12
+          )
+        );
       } catch {
         setRunError(isRu ? "Не удалось обновить статус теста." : "Failed to refresh test status.");
       }
@@ -138,15 +158,20 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     };
   }, [isRu, run]);
 
-  useEffect(() => () => {
-    if (selectedFilePreviewObjectUrlRef.current) {
-      URL.revokeObjectURL(selectedFilePreviewObjectUrlRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (selectedFilePreviewObjectUrlRef.current) {
+        URL.revokeObjectURL(selectedFilePreviewObjectUrlRef.current);
+      }
+    },
+    []
+  );
 
   async function handleStartTest() {
     if (!selectedFile) {
-      setRunError(isRu ? "Сначала выберите тестовое фото питомца." : "Choose a test pet photo first.");
+      setRunError(
+        isRu ? "Сначала выберите тестовое фото питомца." : "Choose a test pet photo first."
+      );
       return;
     }
 
@@ -157,7 +182,12 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       const started = await startAdminTemplateTest(templateId, selectedFile);
       setRun(started);
       setSelectedHistoryGenerationId(null);
-      setHistory((current) => [started, ...current.filter((item) => item.generationId !== started.generationId)].slice(0, 12));
+      setHistory((current) =>
+        [started, ...current.filter((item) => item.generationId !== started.generationId)].slice(
+          0,
+          12
+        )
+      );
     } catch (error) {
       setRunError(getStartTestErrorMessage(error, isRu, template?.templateType === "Video"));
     } finally {
@@ -171,7 +201,9 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     }
 
     if (!file.type.startsWith("image/")) {
-      setRunError(isRu ? "Можно загрузить только image/* файл." : "Only image/* files are supported.");
+      setRunError(
+        isRu ? "Можно загрузить только image/* файл." : "Only image/* files are supported."
+      );
       return;
     }
 
@@ -211,29 +243,50 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
     return history.find((item) => item.generationId === selectedHistoryGenerationId) ?? run;
   }, [history, run, selectedHistoryGenerationId]);
-  const timeline = useMemo(() => buildTimeline(activeRun, locale, isVideoTemplate), [activeRun, isVideoTemplate, locale]);
+  const timeline = useMemo(
+    () => buildTimeline(activeRun, locale, isVideoTemplate),
+    [activeRun, isVideoTemplate, locale]
+  );
   const catalogPath = `/${locale}/templates/${templateSlug}`;
   const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${templateId}`;
   const sourceImageUrl = selectedFilePreviewUrl ?? activeRun?.sourceImageAsset?.url ?? undefined;
-  const selectedFileName = selectedFile?.name ?? activeRun?.sourceImageAsset?.fileName ?? (isRu ? "Фото не выбрано" : "No photo selected");
+  const selectedFileName =
+    selectedFile?.name ??
+    activeRun?.sourceImageAsset?.fileName ??
+    (isRu ? "Фото не выбрано" : "No photo selected");
   const selectedFileMeta = selectedFile
     ? `${formatBytes(selectedFile.size)} • ${selectedFile.type || "image/*"}`
     : activeRun?.sourceImageAsset?.fileSizeBytes
       ? `${formatBytes(activeRun.sourceImageAsset.fileSizeBytes)} • ${activeRun.sourceImageAsset.contentType}`
-      : (isRu ? "Выберите image/* файл" : "Choose an image/* file");
+      : isRu
+        ? "Выберите image/* файл"
+        : "Choose an image/* file";
   const generationDuration = formatGenerationDuration(activeRun, isRu);
   const petMagicBillingLabel = isRu ? "Стоимость PetMagic" : "PetMagic billing";
-  const falProviderCostLabel = isRu ? "Стоимость Fal" : (isVideoTemplate ? "Fal motion cost" : "Fal image cost");
-  const falInferenceLabel = isRu ? "Fal inference" : (isVideoTemplate ? "Fal inference time" : "Fal image inference");
+  const falProviderCostLabel = isRu
+    ? "Стоимость Fal"
+    : isVideoTemplate
+      ? "Fal motion cost"
+      : "Fal image cost";
+  const falInferenceLabel = isRu
+    ? "Fal inference"
+    : isVideoTemplate
+      ? "Fal inference time"
+      : "Fal image inference";
   const internalTokenCost = activeRun?.tokenCost ?? template?.tokenCost ?? 0;
   const internalBillingText = formatTokenCost(internalTokenCost, isRu);
   const providerCostText = formatProviderCost(activeRun, locale);
   const providerInferenceText = formatProviderInference(activeRun, isRu, isVideoTemplate);
   const statusText = activeRun?.status ?? (isRu ? "Ожидает запуска" : "Waiting to start");
   const lastUpdateText = activeRun ? formatDateTime(activeRun.updatedAtUtc, locale, true) : "-";
-  const finalDownloadName = activeRun && template
-    ? buildGeneratedDownloadName(template.title, activeRun.generationId, isVideoTemplate ? ".mp4" : ".png")
-    : undefined;
+  const finalDownloadName =
+    activeRun && template
+      ? buildGeneratedDownloadName(
+          template.title,
+          activeRun.generationId,
+          isVideoTemplate ? ".mp4" : ".png"
+        )
+      : undefined;
   const runDetails = buildRunDetails({
     run: activeRun,
     locale,
@@ -248,32 +301,64 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const hasSourceImage = Boolean(sourceImageUrl);
   const middleArtifact: ArtifactItem | null = isVideoTemplate
     ? {
-      key: "normalized",
-      title: isRu ? "Препроцессинг" : "Preprocessing",
-      accent: "preprocess",
-      imageUrl: run?.normalizedImageUrl ?? undefined,
-      placeholderEyebrow: isRu ? "Stage 01" : "Stage 01",
-      placeholderTitle: isRu ? "Нормализованное фото" : "Normalized photo",
-      placeholderText: selectedFile || run?.sourceImageAsset
-        ? (isRu ? "Карточка заполнится сразу после завершения препроцессинга." : "This frame will fill in as soon as preprocessing finishes.")
-        : (isRu ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения." : "Upload a pet photo to prepare the frame for motion generation."),
-    }
+        key: "normalized",
+        title: isRu ? "Препроцессинг" : "Preprocessing",
+        accent: "preprocess",
+        imageUrl: run?.normalizedImageUrl ?? undefined,
+        placeholderEyebrow: isRu ? "Stage 01" : "Stage 01",
+        placeholderTitle: isRu ? "Нормализованное фото" : "Normalized photo",
+        placeholderText:
+          selectedFile || run?.sourceImageAsset
+            ? isRu
+              ? "Карточка заполнится сразу после завершения препроцессинга."
+              : "This frame will fill in as soon as preprocessing finishes."
+            : isRu
+              ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения."
+              : "Upload a pet photo to prepare the frame for motion generation.",
+      }
     : null;
   const resultArtifact: ArtifactItem = {
     key: "output",
-    title: isVideoTemplate ? (isRu ? "Финальное видео" : "Final video") : (isRu ? "Финальное изображение" : "Final image"),
+    title: isVideoTemplate
+      ? isRu
+        ? "Финальное видео"
+        : "Final video"
+      : isRu
+        ? "Финальное изображение"
+        : "Final image",
     accent: "result",
-    imageUrl: isVideoTemplate ? undefined : run?.outputUrl ?? undefined,
-    videoUrl: isVideoTemplate ? run?.outputUrl ?? undefined : undefined,
-    placeholderEyebrow: isVideoTemplate ? (isRu ? "Stage 02" : "Stage 02") : (isRu ? "Result" : "Result"),
-    placeholderTitle: isVideoTemplate ? (isRu ? "Готовый ролик" : "Ready video") : (isRu ? "Готовое изображение" : "Ready image"),
-    placeholderText: run?.status === "Processing"
-      ? (isVideoTemplate
-        ? (isRu ? "Видео собирается. После завершения здесь появятся просмотр и скачивание." : "The video is being assembled. Preview and download will appear here after completion.")
-        : (isRu ? "Изображение генерируется. После завершения здесь появятся просмотр и скачивание." : "The image is being generated. Preview and download will appear here after completion."))
-      : (isVideoTemplate
-        ? (isRu ? "После генерации здесь всегда будут доступны просмотр и скачивание финального видео." : "After generation, preview and download for the final video will always appear here.")
-        : (isRu ? "После генерации здесь будут доступны просмотр и скачивание итогового изображения." : "After generation, preview and download for the final image will appear here.")),
+    imageUrl: isVideoTemplate ? undefined : (run?.outputUrl ?? undefined),
+    videoUrl: isVideoTemplate ? (run?.outputUrl ?? undefined) : undefined,
+    placeholderEyebrow: isVideoTemplate
+      ? isRu
+        ? "Stage 02"
+        : "Stage 02"
+      : isRu
+        ? "Result"
+        : "Result",
+    placeholderTitle: isVideoTemplate
+      ? isRu
+        ? "Готовый ролик"
+        : "Ready video"
+      : isRu
+        ? "Готовое изображение"
+        : "Ready image",
+    placeholderText:
+      run?.status === "Processing"
+        ? isVideoTemplate
+          ? isRu
+            ? "Видео собирается. После завершения здесь появятся просмотр и скачивание."
+            : "The video is being assembled. Preview and download will appear here after completion."
+          : isRu
+            ? "Изображение генерируется. После завершения здесь появятся просмотр и скачивание."
+            : "The image is being generated. Preview and download will appear here after completion."
+        : isVideoTemplate
+          ? isRu
+            ? "После генерации здесь всегда будут доступны просмотр и скачивание финального видео."
+            : "After generation, preview and download for the final video will always appear here."
+          : isRu
+            ? "После генерации здесь будут доступны просмотр и скачивание итогового изображения."
+            : "After generation, preview and download for the final image will appear here.",
     openLabel: isRu ? "Открыть" : "Open",
     downloadLabel: isRu ? "Скачать" : "Download",
     downloadName: finalDownloadName,
@@ -282,7 +367,9 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   if (isLoading) {
     return (
       <section className={styles.page}>
-        <p className={styles.infoText}>{isRu ? "Загрузка тестового стенда..." : "Loading test workspace..."}</p>
+        <p className={styles.infoText}>
+          {isRu ? "Загрузка тестового стенда..." : "Loading test workspace..."}
+        </p>
       </section>
     );
   }
@@ -290,7 +377,9 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   if (loadError || !template) {
     return (
       <section className={styles.page}>
-        <p className={styles.errorText}>{loadError ?? (isRu ? "Шаблон не найден." : "Template was not found.")}</p>
+        <p className={styles.errorText}>
+          {loadError ?? (isRu ? "Шаблон не найден." : "Template was not found.")}
+        </p>
       </section>
     );
   }
@@ -299,7 +388,15 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     <section className={styles.page}>
       <div className={styles.pageHeader}>
         <div className={styles.breadcrumbs}>
-          <Link href={catalogPath}>{isVideoTemplate ? (isRu ? "Видео шаблоны" : "Video templates") : (isRu ? "Шаблоны изображений" : "Image templates")}</Link>
+          <Link href={catalogPath}>
+            {isVideoTemplate
+              ? isRu
+                ? "Видео шаблоны"
+                : "Video templates"
+              : isRu
+                ? "Шаблоны изображений"
+                : "Image templates"}
+          </Link>
           <span aria-hidden="true">/</span>
           <Link href={editorPath}>{template.title}</Link>
           <span aria-hidden="true">/</span>
@@ -309,18 +406,38 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         <div className={styles.headerGrid}>
           <div className={styles.headerMeta}>
             <div className={styles.pillRow}>
-              <StatusPill tone={template.status === "Active" ? "success" : template.status === "Draft" ? "warning" : "muted"}>
+              <StatusPill
+                tone={
+                  template.status === "Active"
+                    ? "success"
+                    : template.status === "Draft"
+                      ? "warning"
+                      : "muted"
+                }
+              >
                 {formatTemplateStatus(template.status, locale)}
               </StatusPill>
-              <StatusPill tone={template.isPremium ? "premium" : "success"}>{template.isPremium ? text.premiumLabel : text.freeLabel}</StatusPill>
+              <StatusPill tone={template.isPremium ? "premium" : "success"}>
+                {template.isPremium ? text.premiumLabel : text.freeLabel}
+              </StatusPill>
               <StatusPill tone="muted">{template.tokenCost} tokens</StatusPill>
-              <StatusPill tone="muted">{isVideoTemplate ? formatReferenceDuration(template.referenceVideoDurationSeconds, isRu) : (template.imageModel ?? (isRu ? "Image model" : "Image model"))}</StatusPill>
+              <StatusPill tone="muted">
+                {isVideoTemplate
+                  ? formatReferenceDuration(template.referenceVideoDurationSeconds, isRu)
+                  : (template.imageModel ?? (isRu ? "Image model" : "Image model"))}
+              </StatusPill>
             </div>
           </div>
 
           <div className={styles.headerActions}>
-            <Link href={catalogPath} className={styles.secondaryLink}><TableIcon className={styles.inlineIcon} /><span>{isRu ? "К каталогу" : "Back to catalog"}</span></Link>
-            <Link href={editorPath} className={styles.primaryLink}><ChartIcon className={styles.inlineIcon} /><span>{isRu ? "Открыть редактор" : "Open editor"}</span></Link>
+            <Link href={catalogPath} className={styles.secondaryLink}>
+              <TableIcon className={styles.inlineIcon} />
+              <span>{isRu ? "К каталогу" : "Back to catalog"}</span>
+            </Link>
+            <Link href={editorPath} className={styles.primaryLink}>
+              <ChartIcon className={styles.inlineIcon} />
+              <span>{isRu ? "Открыть редактор" : "Open editor"}</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -331,19 +448,41 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
             <div className={styles.sectionHeaderRow}>
               <StepHeader number="1" title={isRu ? "Результат генерации" : "Generation result"} />
               <div className={styles.resultHeaderActions}>
-                <StatusPill tone={activeRun?.status === "Completed" ? "success" : activeRun?.status === "Failed" ? "danger" : activeRun ? "info" : "muted"}>
+                <StatusPill
+                  tone={
+                    activeRun?.status === "Completed"
+                      ? "success"
+                      : activeRun?.status === "Failed"
+                        ? "danger"
+                        : activeRun
+                          ? "info"
+                          : "muted"
+                  }
+                >
                   {statusText}
                 </StatusPill>
-                <Button variant="primary" disabled={isSubmitting} onClick={() => void handleStartTest()}>
+                <Button
+                  variant="primary"
+                  disabled={isSubmitting}
+                  onClick={() => void handleStartTest()}
+                >
                   <PlayCircleIcon className={styles.inlineIcon} />
-                  {isSubmitting ? (isRu ? "Запуск..." : "Launching...") : (isRu ? "Сгенерировать тест" : "Generate test")}
+                  {isSubmitting
+                    ? isRu
+                      ? "Запуск..."
+                      : "Launching..."
+                    : isRu
+                      ? "Сгенерировать тест"
+                      : "Generate test"}
                 </Button>
               </div>
             </div>
 
             {runError ? <p className={styles.errorText}>{runError}</p> : null}
 
-            <div className={`${styles.mediaGrid} ${isVideoTemplate ? "" : styles.mediaGridImage}`.trim()}>
+            <div
+              className={`${styles.mediaGrid} ${isVideoTemplate ? "" : styles.mediaGridImage}`.trim()}
+            >
               <SourceUploadCard
                 isRu={isRu}
                 imageUrl={sourceImageUrl}
@@ -392,27 +531,46 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <MetricTile label={petMagicBillingLabel} value={internalBillingText} />
               <MetricTile label={falProviderCostLabel} value={providerCostText} />
               <MetricTile label={falInferenceLabel} value={providerInferenceText} />
-              <MetricTile label={isRu ? "Время генерации" : "Generation time"} value={generationDuration} />
-              <MetricTile label={isRu ? "Последнее обновление" : "Last update"} value={lastUpdateText} />
+              <MetricTile
+                label={isRu ? "Время генерации" : "Generation time"}
+                value={generationDuration}
+              />
+              <MetricTile
+                label={isRu ? "Последнее обновление" : "Last update"}
+                value={lastUpdateText}
+              />
             </div>
           </section>
 
           <section className={styles.card}>
             <StepHeader number="2" title={isRu ? "События генерации" : "Generation events"} />
             <div className={styles.timeline}>
-              {timeline.length ? timeline.map((event) => (
-                <div key={`${event.label}-${event.at}`} className={styles.timelineItem}>
-                  <span className={`${styles.timelineDot} ${event.done ? styles.timelineDotDone : ""}`} aria-hidden="true">✓</span>
-                  <div className={styles.timelineText}>
-                    <strong>{event.label}</strong>
-                    <span>{event.description}</span>
+              {timeline.length ? (
+                timeline.map((event) => (
+                  <div key={`${event.label}-${event.at}`} className={styles.timelineItem}>
+                    <span
+                      className={`${styles.timelineDot} ${event.done ? styles.timelineDotDone : ""}`}
+                      aria-hidden="true"
+                    >
+                      ✓
+                    </span>
+                    <div className={styles.timelineText}>
+                      <strong>{event.label}</strong>
+                      <span>{event.description}</span>
+                    </div>
+                    <time>{event.at}</time>
+                    <StatusPill tone={event.done ? "success" : "info"}>
+                      {event.done ? (isRu ? "Готово" : "Done") : isRu ? "В работе" : "Running"}
+                    </StatusPill>
                   </div>
-                  <time>{event.at}</time>
-                  <StatusPill tone={event.done ? "success" : "info"}>
-                    {event.done ? (isRu ? "Готово" : "Done") : (isRu ? "В работе" : "Running")}
-                  </StatusPill>
-                </div>
-              )) : <p className={styles.infoText}>{isRu ? "После запуска здесь появятся этапы тестовой генерации." : "Pipeline milestones appear here after the test starts."}</p>}
+                ))
+              ) : (
+                <p className={styles.infoText}>
+                  {isRu
+                    ? "После запуска здесь появятся этапы тестовой генерации."
+                    : "Pipeline milestones appear here after the test starts."}
+                </p>
+              )}
             </div>
           </section>
 
@@ -420,18 +578,29 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
             <StepHeader number="3" title={isRu ? "Сводка запуска" : "Run summary"} />
             <div className={styles.detailGrid}>
               {runDetails.map((item) => (
-                <DetailRow key={item.label} label={item.label} value={item.value} multiline={item.multiline} />
+                <DetailRow
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  multiline={item.multiline}
+                />
               ))}
             </div>
           </section>
 
           <section className={styles.card}>
-            <StepHeader number="4" title={isRu ? "История тестов" : "Test history"} badge={history.length ? String(history.length) : undefined} />
+            <StepHeader
+              number="4"
+              title={isRu ? "История тестов" : "Test history"}
+              badge={history.length ? String(history.length) : undefined}
+            />
             {history.length ? (
               <div className={styles.historyList}>
                 {history.map((item) => {
                   const isCurrent = activeRun?.generationId === item.generationId;
-                  const sourceLabel = item.sourceImageAsset?.fileName ?? (isRu ? "Фото не выбрано" : "No photo selected");
+                  const sourceLabel =
+                    item.sourceImageAsset?.fileName ??
+                    (isRu ? "Фото не выбрано" : "No photo selected");
 
                   return (
                     <button
@@ -448,22 +617,46 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                           <strong>{formatDateTime(item.createdAtUtc, locale, true)}</strong>
                           <span>{sourceLabel}</span>
                         </div>
-                        <StatusPill tone={item.status === "Completed" ? "success" : item.status === "Failed" ? "danger" : item.status === "Queued" ? "info" : "muted"}>
+                        <StatusPill
+                          tone={
+                            item.status === "Completed"
+                              ? "success"
+                              : item.status === "Failed"
+                                ? "danger"
+                                : item.status === "Queued"
+                                  ? "info"
+                                  : "muted"
+                          }
+                        >
                           {item.status}
                         </StatusPill>
                       </div>
                       <div className={styles.historyItemMeta}>
-                        <span>{isRu ? "Попытка" : "Attempt"}: {item.attemptCount}</span>
-                        <span>{isRu ? "Токены" : "Tokens"}: {item.tokenCost}</span>
-                        <span>{isRu ? "Старт" : "Started"}: {formatDateTime(item.startedAtUtc, locale, true)}</span>
-                        <span>{isRu ? "Завершён" : "Completed"}: {formatDateTime(item.completedAtUtc, locale, true)}</span>
+                        <span>
+                          {isRu ? "Попытка" : "Attempt"}: {item.attemptCount}
+                        </span>
+                        <span>
+                          {isRu ? "Токены" : "Tokens"}: {item.tokenCost}
+                        </span>
+                        <span>
+                          {isRu ? "Старт" : "Started"}:{" "}
+                          {formatDateTime(item.startedAtUtc, locale, true)}
+                        </span>
+                        <span>
+                          {isRu ? "Завершён" : "Completed"}:{" "}
+                          {formatDateTime(item.completedAtUtc, locale, true)}
+                        </span>
                       </div>
                     </button>
                   );
                 })}
               </div>
             ) : (
-              <p className={styles.infoText}>{isRu ? "История тестовых запусков появится после первого запуска." : "Test run history will appear after the first run starts."}</p>
+              <p className={styles.infoText}>
+                {isRu
+                  ? "История тестовых запусков появится после первого запуска."
+                  : "Test run history will appear after the first run starts."}
+              </p>
             )}
           </section>
         </div>
@@ -483,7 +676,9 @@ type ApiLikeError = {
 function getStartTestErrorMessage(error: unknown, isRu: boolean, isVideoTemplate: boolean): string {
   const apiError = error as ApiLikeError | null;
   if (!apiError) {
-    return isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation.";
+    return isRu
+      ? "Не удалось запустить тестовую генерацию."
+      : "Failed to start the test generation.";
   }
 
   if (Array.isArray(apiError.validationErrors) && apiError.validationErrors.length > 0) {
@@ -496,7 +691,10 @@ function getStartTestErrorMessage(error: unknown, isRu: boolean, isVideoTemplate
       : "Test is unavailable. Check template status and required fields in the editor.";
   }
 
-  if (apiError.code === "templates.image_model_required" || apiError.code === "templates.invalid_image_model") {
+  if (
+    apiError.code === "templates.image_model_required" ||
+    apiError.code === "templates.invalid_image_model"
+  ) {
     return isRu
       ? "Для image-теста нужно выбрать корректную image model в редакторе шаблона."
       : "Image test requires a valid image model in the template editor.";
@@ -526,7 +724,11 @@ function getStartTestErrorMessage(error: unknown, isRu: boolean, isVideoTemplate
       : "Video test requires reference duration so character orientation can be resolved.";
   }
 
-  if (typeof apiError.message === "string" && apiError.message.trim().length > 0 && !/^API request failed with status \d+$/i.test(apiError.message)) {
+  if (
+    typeof apiError.message === "string" &&
+    apiError.message.trim().length > 0 &&
+    !/^API request failed with status \d+$/i.test(apiError.message)
+  ) {
     return apiError.message;
   }
 
@@ -569,31 +771,70 @@ function buildRunDetails({
     { label: isRu ? "Статус" : "Status", value: statusText },
     { label: petMagicBillingLabel, value: internalBillingText },
     { label: falProviderCostLabel, value: providerCostText },
-    { label: isRu ? "Создан" : "Created", value: run ? formatDateTime(run.createdAtUtc, locale, true) : "-" },
+    {
+      label: isRu ? "Создан" : "Created",
+      value: run ? formatDateTime(run.createdAtUtc, locale, true) : "-",
+    },
     { label: isRu ? "Запущен" : "Started", value: formatDateTime(run?.startedAtUtc, locale, true) },
   ];
 
   if (!isVideoTemplate) {
     return [
       ...common,
-      { label: isRu ? "Генерация изображения завершена" : "Image generation completed", value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true) },
-      { label: isRu ? "Fal image request" : "Fal image request", value: run?.preprocessingProviderRequestId ?? "-" },
-      { label: isRu ? "Fal image inference" : "Fal image inference", value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu) },
-      { label: isRu ? "Импорт медиа" : "Media import", value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true) },
+      {
+        label: isRu ? "Генерация изображения завершена" : "Image generation completed",
+        value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true),
+      },
+      {
+        label: isRu ? "Fal image request" : "Fal image request",
+        value: run?.preprocessingProviderRequestId ?? "-",
+      },
+      {
+        label: isRu ? "Fal image inference" : "Fal image inference",
+        value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu),
+      },
+      {
+        label: isRu ? "Импорт медиа" : "Media import",
+        value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true),
+      },
       { label: isRu ? "Ошибка" : "Failure", value: run?.failureMessage ?? "-", multiline: true },
     ];
   }
 
   return [
     ...common,
-    { label: isRu ? "Препроцессинг завершён" : "Preprocessing completed", value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true) },
-    { label: isRu ? "Fal preprocess request" : "Fal preprocess request", value: run?.preprocessingProviderRequestId ?? "-" },
-    { label: isRu ? "Fal preprocess inference" : "Fal preprocess inference", value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu) },
-    { label: isRu ? "Motion завершён" : "Motion completed", value: formatDateTime(run?.motionGenerationCompletedAtUtc, locale, true) },
-    { label: isRu ? "Fal motion request" : "Fal motion request", value: run?.motionProviderRequestId ?? "-" },
-    { label: isRu ? "Fal motion inference" : "Fal motion inference", value: formatSeconds(run?.motionInferenceTimeSeconds, isRu) },
-    { label: isRu ? "Длительность финального видео" : "Final video duration", value: formatSeconds(run?.outputVideoDurationSeconds, isRu) },
-    { label: isRu ? "Импорт медиа" : "Media import", value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true) },
+    {
+      label: isRu ? "Препроцессинг завершён" : "Preprocessing completed",
+      value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true),
+    },
+    {
+      label: isRu ? "Fal preprocess request" : "Fal preprocess request",
+      value: run?.preprocessingProviderRequestId ?? "-",
+    },
+    {
+      label: isRu ? "Fal preprocess inference" : "Fal preprocess inference",
+      value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu),
+    },
+    {
+      label: isRu ? "Motion завершён" : "Motion completed",
+      value: formatDateTime(run?.motionGenerationCompletedAtUtc, locale, true),
+    },
+    {
+      label: isRu ? "Fal motion request" : "Fal motion request",
+      value: run?.motionProviderRequestId ?? "-",
+    },
+    {
+      label: isRu ? "Fal motion inference" : "Fal motion inference",
+      value: formatSeconds(run?.motionInferenceTimeSeconds, isRu),
+    },
+    {
+      label: isRu ? "Длительность финального видео" : "Final video duration",
+      value: formatSeconds(run?.outputVideoDurationSeconds, isRu),
+    },
+    {
+      label: isRu ? "Импорт медиа" : "Media import",
+      value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true),
+    },
     { label: isRu ? "Ошибка" : "Failure", value: run?.failureMessage ?? "-", multiline: true },
   ];
 }
@@ -608,17 +849,19 @@ function WorkflowConnector() {
 }
 
 function StepHeader({ number, title, badge }: { number: string; title: string; badge?: string }) {
-  const icon = number === "1"
-    ? <PlayCircleIcon className={styles.stepIcon} />
-    : number === "2"
-      ? <RefreshIcon className={styles.stepIcon} />
-      : <TableIcon className={styles.stepIcon} />;
+  const icon =
+    number === "1" ? (
+      <PlayCircleIcon className={styles.stepIcon} />
+    ) : number === "2" ? (
+      <RefreshIcon className={styles.stepIcon} />
+    ) : (
+      <TableIcon className={styles.stepIcon} />
+    );
 
   return (
     <div className={styles.stepHeader}>
       <h2>
-        <span>{number}.</span>{" "}
-        {icon}
+        <span>{number}.</span> {icon}
         {title}
       </h2>
       {badge ? <StatusPill tone="success">{badge}</StatusPill> : null}
@@ -626,7 +869,13 @@ function StepHeader({ number, title, badge }: { number: string; title: string; b
   );
 }
 
-function StatusPill({ children, tone }: { children: ReactNode; tone: "success" | "warning" | "danger" | "info" | "premium" | "muted" }) {
+function StatusPill({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone: "success" | "warning" | "danger" | "info" | "premium" | "muted";
+}) {
   return <span className={`${styles.statusPill} ${styles[`statusPill_${tone}`]}`}>{children}</span>;
 }
 
@@ -639,22 +888,35 @@ function MetricTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DetailRow({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
-  const icon = /attempt|попыт/i.test(label)
-    ? <RefreshIcon className={styles.detailIcon} />
-    : /status|статус/i.test(label)
-      ? <ChartIcon className={styles.detailIcon} />
-      : /created|создан|started|запущен|completed|заверш|update|обнов/i.test(label)
-        ? <CalendarIcon className={styles.detailIcon} />
-        : /duration|время|inference|sec|длительность/i.test(label)
-          ? <ClockIcon className={styles.detailIcon} />
-          : /media|video|motion|preprocess|fal/i.test(label)
-            ? <VideoIcon className={styles.detailIcon} />
-            : <ImageIcon className={styles.detailIcon} />;
+function DetailRow({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  multiline?: boolean;
+}) {
+  const icon = /attempt|попыт/i.test(label) ? (
+    <RefreshIcon className={styles.detailIcon} />
+  ) : /status|статус/i.test(label) ? (
+    <ChartIcon className={styles.detailIcon} />
+  ) : /created|создан|started|запущен|completed|заверш|update|обнов/i.test(label) ? (
+    <CalendarIcon className={styles.detailIcon} />
+  ) : /duration|время|inference|sec|длительность/i.test(label) ? (
+    <ClockIcon className={styles.detailIcon} />
+  ) : /media|video|motion|preprocess|fal/i.test(label) ? (
+    <VideoIcon className={styles.detailIcon} />
+  ) : (
+    <ImageIcon className={styles.detailIcon} />
+  );
 
   return (
     <div className={multiline ? styles.detailRowMultiline : styles.detailRow}>
-      <span className={styles.detailLabel}><span className={styles.detailLabelIcon}>{icon}</span><span>{label}</span></span>
+      <span className={styles.detailLabel}>
+        <span className={styles.detailLabelIcon}>{icon}</span>
+        <span>{label}</span>
+      </span>
       <strong>{value}</strong>
     </div>
   );
@@ -713,14 +975,33 @@ function MediaPreviewCard({
   return (
     <section className={`${styles.mediaPreviewCard} ${styles[`mediaPreviewCard_${accent}`]}`}>
       <div className={styles.mediaCardHeader}>
-        <strong className={styles.mediaCardTitle}>{videoUrl ? <VideoIcon className={styles.inlineIcon} /> : <ImageIcon className={styles.inlineIcon} />}<span>{title}</span></strong>
+        <strong className={styles.mediaCardTitle}>
+          {videoUrl ? (
+            <VideoIcon className={styles.inlineIcon} />
+          ) : (
+            <ImageIcon className={styles.inlineIcon} />
+          )}
+          <span>{title}</span>
+        </strong>
         <span>{placeholderEyebrow}</span>
       </div>
 
       {videoUrl ? (
-        <video src={videoUrl} controls muted playsInline preload="metadata" className={styles.mediaAsset} />
+        <video
+          src={videoUrl}
+          controls
+          muted
+          playsInline
+          preload="metadata"
+          className={styles.mediaAsset}
+        />
       ) : imageUrl ? (
-        <div role="img" aria-label={title} className={`${styles.mediaAsset} ${styles.mediaAssetImage}`} style={{ backgroundImage: toCssImageUrl(imageUrl) }} />
+        <div
+          role="img"
+          aria-label={title}
+          className={`${styles.mediaAsset} ${styles.mediaAssetImage}`}
+          style={{ backgroundImage: toCssImageUrl(imageUrl) }}
+        />
       ) : (
         <div className={`${styles.mediaAsset} ${styles.mediaPlaceholder}`}>
           <div className={styles.mediaPlaceholderGlow} aria-hidden="true" />
@@ -735,11 +1016,24 @@ function MediaPreviewCard({
       <div className={styles.mediaFooter}>
         {previewUrl ? (
           <div className={styles.mediaActions}>
-            <a href={previewUrl} target="_blank" rel="noreferrer" className={styles.mediaActionLink}>
-              {videoUrl ? <PlayCircleIcon className={styles.inlineIcon} /> : <ImageIcon className={styles.inlineIcon} />}
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.mediaActionLink}
+            >
+              {videoUrl ? (
+                <PlayCircleIcon className={styles.inlineIcon} />
+              ) : (
+                <ImageIcon className={styles.inlineIcon} />
+              )}
               <span>{openLabel ?? "Open"}</span>
             </a>
-            <button type="button" onClick={() => void handleDownload()} className={`${styles.mediaActionLink} ${styles.mediaActionLinkPrimary}`}>
+            <button
+              type="button"
+              onClick={() => void handleDownload()}
+              className={`${styles.mediaActionLink} ${styles.mediaActionLinkPrimary}`}
+            >
               <DownloadIcon className={styles.inlineIcon} />
               <span>{downloadLabel ?? "Download"}</span>
             </button>
@@ -804,7 +1098,10 @@ function SourceUploadCard({
   return (
     <section className={`${styles.mediaPreviewCard} ${styles.mediaPreviewCard_source}`}>
       <div className={styles.mediaCardHeader}>
-        <strong className={styles.mediaCardTitle}><ImageIcon className={styles.inlineIcon} /><span>{isRu ? "Исходник" : "Source"}</span></strong>
+        <strong className={styles.mediaCardTitle}>
+          <ImageIcon className={styles.inlineIcon} />
+          <span>{isRu ? "Исходник" : "Source"}</span>
+        </strong>
         <span>{isRu ? "Input" : "Input"}</span>
       </div>
 
@@ -816,27 +1113,52 @@ function SourceUploadCard({
         onKeyDown={handleKeyDown}
         tabIndex={0}
       >
-        <input ref={inputRef} className={styles.uploadDropzoneInput} type="file" accept="image/*" onChange={handleInputChange} />
+        <input
+          ref={inputRef}
+          className={styles.uploadDropzoneInput}
+          type="file"
+          accept="image/*"
+          onChange={handleInputChange}
+        />
         {imageUrl ? (
-          <div role="img" aria-label={fileName} className={`${styles.mediaAsset} ${styles.mediaAssetImage}`} style={{ backgroundImage: toCssImageUrl(imageUrl) }} />
+          <div
+            role="img"
+            aria-label={fileName}
+            className={`${styles.mediaAsset} ${styles.mediaAssetImage}`}
+            style={{ backgroundImage: toCssImageUrl(imageUrl) }}
+          />
         ) : (
           <div className={`${styles.mediaAsset} ${styles.mediaPlaceholder}`}>
             <div className={styles.mediaPlaceholderGlow} aria-hidden="true" />
             <div className={styles.mediaPlaceholderBody}>
               <span>{isRu ? "Dropzone" : "Dropzone"}</span>
               <strong>{isRu ? "Добавьте фото питомца" : "Add pet photo"}</strong>
-              <p>{isRu ? "Нажмите на карточку или перетащите сюда изображение." : "Click the card or drag an image here."}</p>
+              <p>
+                {isRu
+                  ? "Нажмите на карточку или перетащите сюда изображение."
+                  : "Click the card or drag an image here."}
+              </p>
             </div>
           </div>
         )}
 
-        {imageUrl ? <span className={styles.uploadDropzoneBadge}>{isRu ? "Нажмите или перетащите для замены" : "Click or drag to replace"}</span> : null}
+        {imageUrl ? (
+          <span className={styles.uploadDropzoneBadge}>
+            {isRu ? "Нажмите или перетащите для замены" : "Click or drag to replace"}
+          </span>
+        ) : null}
       </label>
 
       <div className={styles.sourceUploadFooter}>
         <div className={styles.sourceUploadMeta}>
-          <strong>{imageUrl ? fileName : (isRu ? "Фото не выбрано" : "No photo selected")}</strong>
-          <span>{imageUrl ? fileMeta : (isRu ? "Поддерживается image/* и drag-and-drop." : "Supports image/* and drag-and-drop.")}</span>
+          <strong>{imageUrl ? fileName : isRu ? "Фото не выбрано" : "No photo selected"}</strong>
+          <span>
+            {imageUrl
+              ? fileMeta
+              : isRu
+                ? "Поддерживается image/* и drag-and-drop."
+                : "Supports image/* and drag-and-drop."}
+          </span>
         </div>
         {onReset ? (
           <button type="button" className={styles.sourceUploadReset} onClick={onReset}>
@@ -855,7 +1177,9 @@ function formatReferenceDuration(value: number | undefined, isRu: boolean) {
   }
 
   const rounded = Math.max(0, Math.round(value));
-  const minutes = Math.floor(rounded / 60).toString().padStart(2, "0");
+  const minutes = Math.floor(rounded / 60)
+    .toString()
+    .padStart(2, "0");
   const seconds = (rounded % 60).toString().padStart(2, "0");
   return rounded >= 60 ? `${minutes}:${seconds}` : isRu ? `${rounded} сек` : `${rounded} sec`;
 }
@@ -911,17 +1235,33 @@ function formatProviderCost(run: AdminTemplateTestRun | null, locale: Locale) {
   }
 
   return locale === "ru"
-    ? (run ? "После завершения" : "После генерации")
-    : (run ? "After completion" : "After generation");
+    ? run
+      ? "После завершения"
+      : "После генерации"
+    : run
+      ? "After completion"
+      : "After generation";
 }
 
-function formatProviderInference(run: AdminTemplateTestRun | null, isRu: boolean, isVideoTemplate: boolean) {
-  const value = isVideoTemplate ? run?.motionInferenceTimeSeconds : run?.preprocessingInferenceTimeSeconds;
+function formatProviderInference(
+  run: AdminTemplateTestRun | null,
+  isRu: boolean,
+  isVideoTemplate: boolean
+) {
+  const value = isVideoTemplate
+    ? run?.motionInferenceTimeSeconds
+    : run?.preprocessingInferenceTimeSeconds;
   if (typeof value === "number" && !Number.isNaN(value)) {
     return formatSeconds(value, isRu);
   }
 
-  return isRu ? (run ? "После завершения" : "После генерации") : (run ? "After completion" : "After generation");
+  return isRu
+    ? run
+      ? "После завершения"
+      : "После генерации"
+    : run
+      ? "After completion"
+      : "After generation";
 }
 
 function formatDateTime(value: string | undefined | null, locale: Locale, withDate = false) {
@@ -938,16 +1278,16 @@ function formatDateTime(value: string | undefined | null, locale: Locale, withDa
     locale === "ru" ? "ru-RU" : "en-US",
     withDate
       ? {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      }
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        }
       : {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      },
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }
   ).format(date);
 }
 
@@ -959,7 +1299,11 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function buildGeneratedDownloadName(templateTitle: string, generationId: string, extension: ".mp4" | ".png") {
+function buildGeneratedDownloadName(
+  templateTitle: string,
+  generationId: string,
+  extension: ".mp4" | ".png"
+) {
   const safeTitle = templateTitle
     .trim()
     .toLowerCase()
@@ -986,7 +1330,11 @@ function formatTemplateStatus(status: AdminTemplate["status"], locale: Locale) {
   return "Архив";
 }
 
-function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideoTemplate: boolean): TimelineItem[] {
+function buildTimeline(
+  run: AdminTemplateTestRun | null,
+  locale: Locale,
+  isVideoTemplate: boolean
+): TimelineItem[] {
   const isRu = locale === "ru";
   if (!run) {
     return [];
@@ -996,7 +1344,9 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideo
     {
       label: isRu ? "Тест поставлен в очередь" : "Test queued",
       at: formatDateTime(run.createdAtUtc, locale),
-      description: isRu ? "Создана админская тестовая задача без списания токенов." : "A non-billed admin test job was created.",
+      description: isRu
+        ? "Создана админская тестовая задача без списания токенов."
+        : "A non-billed admin test job was created.",
       done: true,
     },
   ];
@@ -1005,14 +1355,22 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideo
     items.push({
       label: isRu ? "Фото загружено" : "Photo uploaded",
       at: formatDateTime(run.createdAtUtc, locale),
-      description: isRu ? "Исходный файл принят системой и закреплён за запуском." : "The source file was accepted and attached to the run.",
+      description: isRu
+        ? "Исходный файл принят системой и закреплён за запуском."
+        : "The source file was accepted and attached to the run.",
       done: true,
     });
   }
 
   if (run.startedAtUtc) {
     items.push({
-      label: isVideoTemplate ? (isRu ? "Препроцессинг запущен" : "Preprocessing started") : (isRu ? "Генерация изображения запущена" : "Image generation started"),
+      label: isVideoTemplate
+        ? isRu
+          ? "Препроцессинг запущен"
+          : "Preprocessing started"
+        : isRu
+          ? "Генерация изображения запущена"
+          : "Image generation started",
       at: formatDateTime(run.startedAtUtc, locale),
       description: `${isRu ? "Модель" : "Model"}: ${run.usedPreprocessingModel ?? "-"}`,
       done: Boolean(run.preprocessingCompletedAtUtc),
@@ -1021,11 +1379,21 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideo
 
   if (run.preprocessingCompletedAtUtc) {
     items.push({
-      label: isVideoTemplate ? (isRu ? "Препроцессинг завершён" : "Preprocessing completed") : (isRu ? "Изображение получено от провайдера" : "Image received from provider"),
+      label: isVideoTemplate
+        ? isRu
+          ? "Препроцессинг завершён"
+          : "Preprocessing completed"
+        : isRu
+          ? "Изображение получено от провайдера"
+          : "Image received from provider",
       at: formatDateTime(run.preprocessingCompletedAtUtc, locale),
       description: isVideoTemplate
-        ? (isRu ? "Нормализованное изображение готово для генерации движения." : "The normalized image is ready for motion generation.")
-        : (isRu ? "Итоговое изображение готово к импорту в media storage." : "The generated image is ready for media storage import."),
+        ? isRu
+          ? "Нормализованное изображение готово для генерации движения."
+          : "The normalized image is ready for motion generation."
+        : isRu
+          ? "Итоговое изображение готово к импорту в media storage."
+          : "The generated image is ready for media storage import.",
       done: true,
     });
   }
@@ -1043,8 +1411,12 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideo
     items.push({
       label: isRu ? "Видео получено от провайдера" : "Video received from provider",
       at: formatDateTime(run.motionGenerationCompletedAtUtc, locale),
-      description: isRu ? "Промежуточный результат готов к импорту в media storage." : "The intermediate video is ready for media storage import.",
-      done: Boolean(run.mediaImportCompletedAtUtc || (run.completedAtUtc && run.status === "Completed")),
+      description: isRu
+        ? "Промежуточный результат готов к импорту в media storage."
+        : "The intermediate video is ready for media storage import.",
+      done: Boolean(
+        run.mediaImportCompletedAtUtc || (run.completedAtUtc && run.status === "Completed")
+      ),
     });
   }
 
@@ -1053,8 +1425,12 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideo
       label: isRu ? "Импорт в media storage" : "Media storage import",
       at: formatDateTime(run.mediaImportCompletedAtUtc, locale),
       description: isVideoTemplate
-        ? (isRu ? "Финальное видео сохранено и доступно для проверки." : "The final video was saved and is available for review.")
-        : (isRu ? "Финальное изображение сохранено и доступно для проверки." : "The final image was saved and is available for review."),
+        ? isRu
+          ? "Финальное видео сохранено и доступно для проверки."
+          : "The final video was saved and is available for review."
+        : isRu
+          ? "Финальное изображение сохранено и доступно для проверки."
+          : "The final image was saved and is available for review.",
       done: run.status === "Completed",
     });
   }
@@ -1063,7 +1439,9 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideo
     items.push({
       label: isRu ? "Тест завершён успешно" : "Test completed successfully",
       at: formatDateTime(run.completedAtUtc, locale),
-      description: isRu ? "Все артефакты доступны на этой странице." : "All generated artifacts are available on this page.",
+      description: isRu
+        ? "Все артефакты доступны на этой странице."
+        : "All generated artifacts are available on this page.",
       done: true,
     });
   }
@@ -1072,7 +1450,8 @@ function buildTimeline(run: AdminTemplateTestRun | null, locale: Locale, isVideo
     items.push({
       label: isRu ? "Тест завершён с ошибкой" : "Test failed",
       at: formatDateTime(run.completedAtUtc, locale),
-      description: run.failureMessage ?? run.failureCode ?? (isRu ? "Ошибка генерации" : "Generation failed"),
+      description:
+        run.failureMessage ?? run.failureCode ?? (isRu ? "Ошибка генерации" : "Generation failed"),
       done: false,
     });
   }

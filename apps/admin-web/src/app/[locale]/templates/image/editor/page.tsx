@@ -8,7 +8,10 @@ type ImageTemplateEditorPageProps = {
   searchParams: Promise<{ templateId?: string | string[] }>;
 };
 
-export default async function ImageTemplateEditorPage({ params, searchParams }: ImageTemplateEditorPageProps) {
+export default async function ImageTemplateEditorPage({
+  params,
+  searchParams,
+}: ImageTemplateEditorPageProps) {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
@@ -18,5 +21,7 @@ export default async function ImageTemplateEditorPage({ params, searchParams }: 
   const { templateId } = await searchParams;
   const initialTemplateId = Array.isArray(templateId) ? templateId[0] : templateId;
 
-  return <TemplateEditor locale={locale} templateType="Image" initialTemplateId={initialTemplateId} />;
+  return (
+    <TemplateEditor locale={locale} templateType="Image" initialTemplateId={initialTemplateId} />
+  );
 }

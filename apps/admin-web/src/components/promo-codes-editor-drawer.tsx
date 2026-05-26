@@ -7,10 +7,7 @@ import { type PromoForm, type PromoFormMode } from "@/components/promo-codes-vie
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
-import {
-  type AdminRedeemCode,
-  type AdminRedeemRewardKind,
-} from "@/lib/api-client";
+import { type AdminRedeemCode, type AdminRedeemRewardKind } from "@/lib/api-client";
 import { getDictionary } from "@/lib/i18n";
 
 type PromoCodesEditorDrawerProps = {
@@ -252,10 +249,10 @@ export function PromoCodesEditorDrawer({
                           expiresAtUtc: current.expiresAtUtc
                             ? ""
                             : new Date(
-                              new Date().getTime() - new Date().getTimezoneOffset() * 60_000
-                            )
-                              .toISOString()
-                              .slice(0, 16),
+                                new Date().getTime() - new Date().getTimezoneOffset() * 60_000
+                              )
+                                .toISOString()
+                                .slice(0, 16),
                         }))
                       }
                     >
@@ -271,16 +268,12 @@ export function PromoCodesEditorDrawer({
 
             <section className={styles.formSection}>
               <header className={styles.formSectionHeader}>
-                <h3 className={styles.formSectionTitle}>
-                  {text.promoCodesSectionCampaignTitle}
-                </h3>
+                <h3 className={styles.formSectionTitle}>{text.promoCodesSectionCampaignTitle}</h3>
               </header>
 
               <div className={styles.formGrid}>
                 <label className={styles.formField}>
-                  <span className={styles.fieldLabel}>
-                    {text.promoCodesMinimumPurchasesLabel}
-                  </span>
+                  <span className={styles.fieldLabel}>{text.promoCodesMinimumPurchasesLabel}</span>
                   <input
                     className={styles.input}
                     inputMode="numeric"
@@ -292,9 +285,7 @@ export function PromoCodesEditorDrawer({
                       }))
                     }
                   />
-                  <span className={styles.helperText}>
-                    {text.promoCodesMinimumPurchasesHint}
-                  </span>
+                  <span className={styles.helperText}>{text.promoCodesMinimumPurchasesHint}</span>
                 </label>
                 <label className={styles.formField}>
                   <span className={styles.fieldLabel}>{text.promoCodesCampaignNameLabel}</span>
@@ -307,9 +298,7 @@ export function PromoCodesEditorDrawer({
                   />
                 </label>
                 <label className={styles.formField}>
-                  <span className={styles.fieldLabel}>
-                    {text.promoCodesCampaignChannelLabel}
-                  </span>
+                  <span className={styles.fieldLabel}>{text.promoCodesCampaignChannelLabel}</span>
                   <input
                     className={styles.input}
                     value={form.campaignChannel}
@@ -340,20 +329,10 @@ export function PromoCodesEditorDrawer({
               )}
 
               <div className={styles.formActions}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={onClose}
-                  disabled={isMutating}
-                >
+                <Button type="button" variant="secondary" onClick={onClose} disabled={isMutating}>
                   {text.editorCancel}
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={onReset}
-                  disabled={isMutating}
-                >
+                <Button type="button" variant="secondary" onClick={onReset} disabled={isMutating}>
                   {text.resetForm}
                 </Button>
                 <Button variant="primary" type="submit" disabled={isMutating}>

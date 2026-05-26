@@ -6,11 +6,7 @@ import { useEffect, useState } from "react";
 
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
-import {
-    fetchUsers,
-    useAuthSession,
-    type UserListItem,
-} from "@/lib/api-client";
+import { fetchUsers, useAuthSession, type UserListItem } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 export type UsersToastState = {
@@ -45,7 +41,7 @@ export function useUsersAdmin(locale: Locale) {
   useEffect(() => {
     if (!session) {
       ensureAdminSession(locale, router);
-    };
+    }
   }, [locale, router, session]);
 
   const isLoading = usersQuery.isLoading || usersQuery.isFetching;

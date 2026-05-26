@@ -7,7 +7,9 @@ type VideoTemplateAnalyticsRoutePageProps = {
   params: Promise<{ locale: string; templateId: string }>;
 };
 
-export default async function VideoTemplateAnalyticsRoutePage({ params }: VideoTemplateAnalyticsRoutePageProps) {
+export default async function VideoTemplateAnalyticsRoutePage({
+  params,
+}: VideoTemplateAnalyticsRoutePageProps) {
   const { locale, templateId } = await params;
 
   if (!isLocale(locale)) {

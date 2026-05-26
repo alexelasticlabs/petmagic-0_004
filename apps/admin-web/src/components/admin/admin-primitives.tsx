@@ -2,7 +2,14 @@ import { type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 
 import styles from "@/components/admin/admin-primitives.module.css";
 
-export type AdminTone = "neutral" | "primary" | "info" | "success" | "warning" | "danger" | "magenta";
+export type AdminTone =
+  | "neutral"
+  | "primary"
+  | "info"
+  | "success"
+  | "warning"
+  | "danger"
+  | "magenta";
 
 type AdminCardProps = {
   title?: ReactNode;
@@ -138,11 +145,27 @@ function toneClass(prefix: string, tone: AdminTone) {
 }
 
 export function AdminPage({ children, className, ...rest }: AdminPageProps) {
-  return <section className={joinClassNames(styles.page, className)} {...rest}>{children}</section>;
+  return (
+    <section className={joinClassNames(styles.page, className)} {...rest}>
+      {children}
+    </section>
+  );
 }
 
-export function AdminPageGrid({ children, columns = "auto", className, ...rest }: AdminPageGridProps) {
-  return <div className={joinClassNames(styles.pageGrid, styleClass(`pageGrid_${columns}`), className)} {...rest}>{children}</div>;
+export function AdminPageGrid({
+  children,
+  columns = "auto",
+  className,
+  ...rest
+}: AdminPageGridProps) {
+  return (
+    <div
+      className={joinClassNames(styles.pageGrid, styleClass(`pageGrid_${columns}`), className)}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function AdminToolbar({ children, className }: AdminToolbarProps) {
@@ -154,10 +177,22 @@ export function AdminFilterBar({ children, className }: AdminToolbarProps) {
 }
 
 export function AdminIconTile({ icon, tone = "primary", className }: AdminIconTileProps) {
-  return <span className={joinClassNames(styles.iconTile, toneClass("iconTile", tone), className)}>{icon}</span>;
+  return (
+    <span className={joinClassNames(styles.iconTile, toneClass("iconTile", tone), className)}>
+      {icon}
+    </span>
+  );
 }
 
-export function AdminKpiCard({ label, value, hint, delta, icon, tone = "primary", className }: AdminKpiCardProps) {
+export function AdminKpiCard({
+  label,
+  value,
+  hint,
+  delta,
+  icon,
+  tone = "primary",
+  className,
+}: AdminKpiCardProps) {
   return (
     <article className={joinClassNames(styles.kpiCard, toneClass("kpiCard", tone), className)}>
       <div className={styles.kpiBody}>
@@ -172,10 +207,22 @@ export function AdminKpiCard({ label, value, hint, delta, icon, tone = "primary"
 }
 
 export function AdminBadge({ children, tone = "neutral", className }: AdminBadgeProps) {
-  return <span className={joinClassNames(styles.badge, toneClass("badge", tone), className)}>{children}</span>;
+  return (
+    <span className={joinClassNames(styles.badge, toneClass("badge", tone), className)}>
+      {children}
+    </span>
+  );
 }
 
-export function AdminStateCard({ title, description, icon, action, children, tone = "neutral", className }: AdminStateCardProps) {
+export function AdminStateCard({
+  title,
+  description,
+  icon,
+  action,
+  children,
+  tone = "neutral",
+  className,
+}: AdminStateCardProps) {
   return (
     <section className={joinClassNames(styles.stateCard, toneClass("stateCard", tone), className)}>
       {icon ? <AdminIconTile icon={icon} tone={tone} /> : null}
@@ -189,20 +236,45 @@ export function AdminStateCard({ title, description, icon, action, children, ton
   );
 }
 
-export function AdminSelectField({ label, value, options, onChange, id, name, disabled, className }: AdminSelectFieldProps) {
+export function AdminSelectField({
+  label,
+  value,
+  options,
+  onChange,
+  id,
+  name,
+  disabled,
+  className,
+}: AdminSelectFieldProps) {
   return (
     <label className={joinClassNames(styles.selectField, className)}>
       <span className={styles.selectLabel}>{label}</span>
-      <select id={id} name={name} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={styles.selectControl}>
+      <select
+        id={id}
+        name={name}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className={styles.selectControl}
+      >
         {options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </option>
         ))}
       </select>
     </label>
   );
 }
 
-export function AdminCard({ title, description, action, children, padding = "lg", className }: AdminCardProps) {
+export function AdminCard({
+  title,
+  description,
+  action,
+  children,
+  padding = "lg",
+  className,
+}: AdminCardProps) {
   const paddingClass = padding === "lg" ? styles.cardPaddingLg : styles.cardPaddingMd;
   const hasHeader = title || description || action;
 
@@ -222,7 +294,14 @@ export function AdminCard({ title, description, action, children, padding = "lg"
   );
 }
 
-export function AdminStatCard({ label, value, delta, subtext, accentColor, icon }: AdminStatCardProps) {
+export function AdminStatCard({
+  label,
+  value,
+  delta,
+  subtext,
+  accentColor,
+  icon,
+}: AdminStatCardProps) {
   const style = { "--stat-accent": accentColor } as CSSProperties;
 
   return (
@@ -257,13 +336,23 @@ export function AdminSummaryChips({ items, className }: AdminSummaryChipsProps) 
   return (
     <div className={joinClassNames(styles.pageMeta, className)}>
       {visibleItems.map((item, index) => (
-        <span key={index} className={styles.pageMetaItem}>{item}</span>
+        <span key={index} className={styles.pageMetaItem}>
+          {item}
+        </span>
       ))}
     </div>
   );
 }
 
-export function AdminPageHero({ eyebrow, title, description, badge, actions, metaItems = [], className }: AdminPageHeroProps) {
+export function AdminPageHero({
+  eyebrow,
+  title,
+  description,
+  badge,
+  actions,
+  metaItems = [],
+  className,
+}: AdminPageHeroProps) {
   const hasAside = badge || actions;
 
   return (
@@ -286,7 +375,13 @@ export function AdminPageHero({ eyebrow, title, description, badge, actions, met
   );
 }
 
-export function AdminSectionHeader({ eyebrow, title, description, aside, className }: AdminSectionHeaderProps) {
+export function AdminSectionHeader({
+  eyebrow,
+  title,
+  description,
+  aside,
+  className,
+}: AdminSectionHeaderProps) {
   return (
     <div className={joinClassNames(styles.sectionHeader, className)}>
       <div className={styles.sectionHeaderCopy}>

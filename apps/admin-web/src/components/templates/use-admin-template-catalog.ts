@@ -4,11 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    fetchAdminTemplates,
-    fetchAdminTemplatesAnalyticsOverview,
-    type AdminTemplateListItem,
-    type AdminTemplatesAnalyticsTemplateRow,
-    type TemplateType,
+  fetchAdminTemplates,
+  fetchAdminTemplatesAnalyticsOverview,
+  type AdminTemplateListItem,
+  type AdminTemplatesAnalyticsTemplateRow,
+  type TemplateType,
 } from "@/lib/api-client";
 
 type UseAdminTemplateCatalogOptions = {
@@ -18,7 +18,10 @@ type UseAdminTemplateCatalogOptions = {
 
 type AnalyticsRowsMap = Record<string, AdminTemplatesAnalyticsTemplateRow>;
 
-export function useAdminTemplateCatalog({ enabled = true, templateType }: UseAdminTemplateCatalogOptions) {
+export function useAdminTemplateCatalog({
+  enabled = true,
+  templateType,
+}: UseAdminTemplateCatalogOptions) {
   const templatesQuery = useQuery<AdminTemplateListItem[]>({
     queryKey: adminQueryKeys.templateCatalog(templateType),
     queryFn: () => fetchAdminTemplates(templateType),
@@ -28,7 +31,11 @@ export function useAdminTemplateCatalog({ enabled = true, templateType }: UseAdm
   const analyticsRowsQuery = useQuery<AnalyticsRowsMap>({
     queryKey: adminQueryKeys.templateCatalogAnalyticsRows(templateType),
     queryFn: async () => {
-      const response = await fetchAdminTemplatesAnalyticsOverview({ templateType, sort: "updated", take: 500 });
+      const response = await fetchAdminTemplatesAnalyticsOverview({
+        templateType,
+        sort: "updated",
+        take: 500,
+      });
       return Object.fromEntries(response.templates.map((row) => [row.templateId, row]));
     },
     enabled,

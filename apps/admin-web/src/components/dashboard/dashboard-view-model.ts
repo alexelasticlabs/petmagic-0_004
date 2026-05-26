@@ -53,7 +53,9 @@ export function buildDashboardViewModel(locale: Locale) {
     },
     revenueChart: {
       title: isRu ? "Динамика выручки" : "Revenue dynamics",
-      description: isRu ? "Последние семь дней по активным заказам" : "Last seven days across active orders",
+      description: isRu
+        ? "Последние семь дней по активным заказам"
+        : "Last seven days across active orders",
       rangeLabel: isRu ? "Неделя" : "Week",
       ariaLabel: isRu ? "График выручки" : "Revenue chart",
       xLabels: isRu
@@ -114,20 +116,79 @@ export function buildDashboardViewModel(locale: Locale) {
       },
     ] satisfies DashboardStatItem[],
     orders: [
-      { id: "#10245", user: isRu ? "Иван Петров" : "Ivan Petrov", amount: "$152.00", status: isRu ? "Новый" : "New", statusType: "new" },
-      { id: "#10244", user: isRu ? "Мария Смирнова" : "Maria Smirnova", amount: "$89.90", status: isRu ? "В обработке" : "Processing", statusType: "processing" },
-      { id: "#10243", user: isRu ? "Алексей Иванов" : "Alexei Ivanov", amount: "$129.50", status: isRu ? "Доставлен" : "Delivered", statusType: "delivered" },
-      { id: "#10242", user: isRu ? "Ольга Кузнецова" : "Olga Kuznetsova", amount: "$75.00", status: isRu ? "Отменён" : "Cancelled", statusType: "cancelled" },
-      { id: "#10241", user: isRu ? "Дмитрий Соколов" : "Dmitry Sokolov", amount: "$199.99", status: isRu ? "Доставлен" : "Delivered", statusType: "delivered" },
+      {
+        id: "#10245",
+        user: isRu ? "Иван Петров" : "Ivan Petrov",
+        amount: "$152.00",
+        status: isRu ? "Новый" : "New",
+        statusType: "new",
+      },
+      {
+        id: "#10244",
+        user: isRu ? "Мария Смирнова" : "Maria Smirnova",
+        amount: "$89.90",
+        status: isRu ? "В обработке" : "Processing",
+        statusType: "processing",
+      },
+      {
+        id: "#10243",
+        user: isRu ? "Алексей Иванов" : "Alexei Ivanov",
+        amount: "$129.50",
+        status: isRu ? "Доставлен" : "Delivered",
+        statusType: "delivered",
+      },
+      {
+        id: "#10242",
+        user: isRu ? "Ольга Кузнецова" : "Olga Kuznetsova",
+        amount: "$75.00",
+        status: isRu ? "Отменён" : "Cancelled",
+        statusType: "cancelled",
+      },
+      {
+        id: "#10241",
+        user: isRu ? "Дмитрий Соколов" : "Dmitry Sokolov",
+        amount: "$199.99",
+        status: isRu ? "Доставлен" : "Delivered",
+        statusType: "delivered",
+      },
     ] satisfies DashboardOrderItem[],
     activities: [
-      { type: "new", text: isRu ? "Иван Петров создал новый заказ #10245" : "Ivan Petrov created new order #10245", time: isRu ? "2 мин. назад" : "2 min ago" },
-      { type: "update", text: isRu ? "Мария Смирнова обновила статус заказа #10244" : "Maria Smirnova updated order #10244 status", time: isRu ? "15 мин. назад" : "15 min ago" },
-      { type: "register", text: isRu ? "Алексей Иванов зарегистрировался в системе" : "Alexei Ivanov registered in the system", time: isRu ? "1 час назад" : "1 hour ago" },
-      { type: "cancel", text: isRu ? "Ольга Кузнецова отменила заказ #10242" : "Olga Kuznetsova cancelled order #10242", time: isRu ? "2 часа назад" : "2 hours ago" },
+      {
+        type: "new",
+        text: isRu
+          ? "Иван Петров создал новый заказ #10245"
+          : "Ivan Petrov created new order #10245",
+        time: isRu ? "2 мин. назад" : "2 min ago",
+      },
+      {
+        type: "update",
+        text: isRu
+          ? "Мария Смирнова обновила статус заказа #10244"
+          : "Maria Smirnova updated order #10244 status",
+        time: isRu ? "15 мин. назад" : "15 min ago",
+      },
+      {
+        type: "register",
+        text: isRu
+          ? "Алексей Иванов зарегистрировался в системе"
+          : "Alexei Ivanov registered in the system",
+        time: isRu ? "1 час назад" : "1 hour ago",
+      },
+      {
+        type: "cancel",
+        text: isRu
+          ? "Ольга Кузнецова отменила заказ #10242"
+          : "Olga Kuznetsova cancelled order #10242",
+        time: isRu ? "2 часа назад" : "2 hours ago",
+      },
     ] satisfies DashboardActivityItem[],
     userDistribution: [
-      { color: "#22c55e", label: isRu ? "Администраторы" : "Administrators", pct: "12%", count: "151" },
+      {
+        color: "#22c55e",
+        label: isRu ? "Администраторы" : "Administrators",
+        pct: "12%",
+        count: "151",
+      },
       { color: "#059669", label: isRu ? "Менеджеры" : "Managers", pct: "28%", count: "352" },
       { color: "#1f5d3c", label: isRu ? "Пользователи" : "Users", pct: "60%", count: "753" },
     ] satisfies DashboardUserDistributionItem[],

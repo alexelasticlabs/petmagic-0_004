@@ -18,7 +18,7 @@ export function Providers({ children }: ProvidersProps) {
             staleTime: 120_000,
           },
         },
-      }),
+      })
   );
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;

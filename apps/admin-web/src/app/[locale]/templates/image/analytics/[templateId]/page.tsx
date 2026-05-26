@@ -7,7 +7,9 @@ type ImageTemplateAnalyticsRoutePageProps = {
   params: Promise<{ locale: string; templateId: string }>;
 };
 
-export default async function ImageTemplateAnalyticsRoutePage({ params }: ImageTemplateAnalyticsRoutePageProps) {
+export default async function ImageTemplateAnalyticsRoutePage({
+  params,
+}: ImageTemplateAnalyticsRoutePageProps) {
   const { locale, templateId } = await params;
 
   if (!isLocale(locale)) {

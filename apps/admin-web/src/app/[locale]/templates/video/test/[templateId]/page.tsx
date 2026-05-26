@@ -7,7 +7,9 @@ type VideoTemplateTestRoutePageProps = {
   params: Promise<{ locale: string; templateId: string }>;
 };
 
-export default async function VideoTemplateTestRoutePage({ params }: VideoTemplateTestRoutePageProps) {
+export default async function VideoTemplateTestRoutePage({
+  params,
+}: VideoTemplateTestRoutePageProps) {
   const { locale, templateId } = await params;
 
   if (!isLocale(locale)) {

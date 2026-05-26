@@ -11,9 +11,14 @@ import {
   GlobeIcon,
   RefreshIcon,
   TableIcon,
-  TrendUpIcon
+  TrendUpIcon,
 } from "@/components/admin/admin-icons";
-import { AdminMetricStrip, AdminPage, AdminStateCard, AdminToolbar } from "@/components/admin/admin-primitives";
+import {
+  AdminMetricStrip,
+  AdminPage,
+  AdminStateCard,
+  AdminToolbar,
+} from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateAnalyticsCopy } from "@/components/templates/template-analytics-copy";
 import {
@@ -119,7 +124,10 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const feedbackError = hasFeedbackError ? text.feedbackLoadError : null;
   const secondaryStateMessage = isSecondaryLoading ? text.loading : text.loadError;
 
-  const periodAnalytics = useMemo(() => buildPeriodAnalytics(trendPoints, period), [trendPoints, period]);
+  const periodAnalytics = useMemo(
+    () => buildPeriodAnalytics(trendPoints, period),
+    [trendPoints, period]
+  );
   const feedbackOptions: Array<{ key: FeedbackFilterKey; label: string }> = [
     { key: "all", label: text.feedbackFilterAll },
     { key: "complaint", label: text.feedbackFilterComplaint },
@@ -132,7 +140,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     }
 
     if (recentRunsMode === "failed") {
-      return allRuns.filter((run) => run.status === "Failed" || Boolean(run.failureCode) || Boolean(run.failureMessage));
+      return allRuns.filter(
+        (run) => run.status === "Failed" || Boolean(run.failureCode) || Boolean(run.failureMessage)
+      );
     }
 
     return recentRunsPreview;
@@ -173,9 +183,14 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const templateSlug = template.templateType === "Video" ? "video" : "image";
   const catalogPath = `/${locale}/templates/${templateSlug}`;
   const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${templateId}`;
-  const breadcrumbsRoot = template.templateType === "Video"
-    ? (isRu ? "Видео шаблоны" : "Video templates")
-    : (isRu ? "Шаблоны изображений" : "Image templates");
+  const breadcrumbsRoot =
+    template.templateType === "Video"
+      ? isRu
+        ? "Видео шаблоны"
+        : "Video templates"
+      : isRu
+        ? "Шаблоны изображений"
+        : "Image templates";
   const activeRuns = statistics.queuedRuns + statistics.processingRuns;
   const canShowAllRecentRuns = statistics.totalRuns > RECENT_RUNS_PREVIEW_LIMIT;
   const canShowFailedRecentRuns = statistics.failedRuns > 0;
@@ -183,10 +198,19 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const isSecondaryReady = !isSecondaryLoading && !hasSecondaryError;
   const events = eventAnalytics ?? EMPTY_EVENT_ANALYTICS;
   const selectedTotals = isSecondaryReady
-    ? (period === "all" ? totalsFromStatistics(statistics) : periodAnalytics.current)
-    : (period === "all" ? totalsFromStatistics(statistics) : null);
-  const previousTotals = isSecondaryReady && isComparisonEnabled && period !== "all" ? periodAnalytics.previous : null;
-  const chartPoints = isSecondaryReady ? (period === "all" ? trendPoints : periodAnalytics.currentPoints) : [];
+    ? period === "all"
+      ? totalsFromStatistics(statistics)
+      : periodAnalytics.current
+    : period === "all"
+      ? totalsFromStatistics(statistics)
+      : null;
+  const previousTotals =
+    isSecondaryReady && isComparisonEnabled && period !== "all" ? periodAnalytics.previous : null;
+  const chartPoints = isSecondaryReady
+    ? period === "all"
+      ? trendPoints
+      : periodAnalytics.currentPoints
+    : [];
 
   async function handleRecentRunsModeChange(mode: RecentRunsMode) {
     setRecentRunsError(null);
@@ -224,34 +248,45 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       value: selectedTotals ? formatNumber(selectedTotals.totalRuns, locale) : "...",
       hint: selectedTotals ? text.generationStartsHint : secondaryStateMessage,
       accent: "blue" as MetricAccent,
-      delta: selectedTotals ? calculateChange(selectedTotals.totalRuns, previousTotals?.totalRuns) : null,
+      delta: selectedTotals
+        ? calculateChange(selectedTotals.totalRuns, previousTotals?.totalRuns)
+        : null,
     },
     {
       label: text.successfulGenerations,
       value: selectedTotals ? formatNumber(selectedTotals.completedRuns, locale) : "...",
       hint: selectedTotals ? text.successfulGenerationsHint : secondaryStateMessage,
       accent: "green" as MetricAccent,
-      delta: selectedTotals ? calculateChange(selectedTotals.completedRuns, previousTotals?.completedRuns) : null,
+      delta: selectedTotals
+        ? calculateChange(selectedTotals.completedRuns, previousTotals?.completedRuns)
+        : null,
     },
     {
       label: text.generationConversion,
       value: selectedTotals ? formatPercent(selectedTotals.successRatePercent, isRu) : "...",
       hint: selectedTotals ? text.generationConversionHint : secondaryStateMessage,
       accent: "green" as MetricAccent,
-      delta: selectedTotals ? calculateChange(selectedTotals.successRatePercent, previousTotals?.successRatePercent) : null,
+      delta: selectedTotals
+        ? calculateChange(selectedTotals.successRatePercent, previousTotals?.successRatePercent)
+        : null,
     },
     {
       label: text.tokenSpend,
       value: selectedTotals ? formatTokens(selectedTotals.totalTokenCost, isRu) : "...",
       hint: selectedTotals ? text.tokenSpendHint : secondaryStateMessage,
       accent: "cyan" as MetricAccent,
-      delta: selectedTotals ? calculateChange(selectedTotals.totalTokenCost, previousTotals?.totalTokenCost) : null,
+      delta: selectedTotals
+        ? calculateChange(selectedTotals.totalTokenCost, previousTotals?.totalTokenCost)
+        : null,
     },
     {
       label: text.complaints,
       value: isSecondaryReady ? formatNumber(events.totalComplaints, locale) : "...",
       hint: isSecondaryReady ? text.complaintsHint : secondaryStateMessage,
-      accent: isSecondaryReady && events.totalComplaints > 0 ? "red" as MetricAccent : "neutral" as MetricAccent,
+      accent:
+        isSecondaryReady && events.totalComplaints > 0
+          ? ("red" as MetricAccent)
+          : ("neutral" as MetricAccent),
     },
   ];
   const periodOptions: Array<{ key: PeriodKey; label: string }> = [
@@ -305,8 +340,14 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         </div>
 
         <div className={styles.heroActions}>
-          <Link href={catalogPath} className={styles.secondaryLink}><TableIcon className={styles.controlIcon} /><span>{text.backToCatalog}</span></Link>
-          <Link href={editorPath} className={styles.primaryLink}><ChartIcon className={styles.controlIcon} /><span>{text.openEditor}</span></Link>
+          <Link href={catalogPath} className={styles.secondaryLink}>
+            <TableIcon className={styles.controlIcon} />
+            <span>{text.backToCatalog}</span>
+          </Link>
+          <Link href={editorPath} className={styles.primaryLink}>
+            <ChartIcon className={styles.controlIcon} />
+            <span>{text.openEditor}</span>
+          </Link>
         </div>
       </div>
 
@@ -314,8 +355,14 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         className={styles.metricStrip}
         items={[
           { label: text.lastRun, value: formatDateTime(statistics.lastRunAtUtc, locale) },
-          { label: text.lastCompleted, value: formatDateTime(statistics.lastCompletedAtUtc, locale) },
-          { label: text.averageGenerationTime, value: formatDuration(statistics.averageGenerationSeconds, isRu) },
+          {
+            label: text.lastCompleted,
+            value: formatDateTime(statistics.lastCompletedAtUtc, locale),
+          },
+          {
+            label: text.averageGenerationTime,
+            value: formatDuration(statistics.averageGenerationSeconds, isRu),
+          },
           { label: text.activeQueue, value: String(activeRuns) },
         ]}
       />
@@ -326,7 +373,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             <button
               key={option.key}
               type="button"
-              className={option.key === period ? styles.segmentedButtonActive : styles.segmentedButton}
+              className={
+                option.key === period ? styles.segmentedButtonActive : styles.segmentedButton
+              }
               onClick={() => setPeriod(option.key)}
             >
               <CalendarIcon className={styles.controlIcon} />
@@ -345,7 +394,12 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             <RefreshIcon className={styles.controlIcon} />
             <span>{text.comparePeriod}</span>
           </button>
-          <button type="button" className={styles.exportButton} onClick={handleExportAnalytics} disabled={isSecondaryLoading}>
+          <button
+            type="button"
+            className={styles.exportButton}
+            onClick={handleExportAnalytics}
+            disabled={isSecondaryLoading}
+          >
             <DownloadIcon className={styles.controlIcon} />
             <span>{text.exportAnalytics}</span>
           </button>
@@ -381,10 +435,30 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         />
       ) : (
         <div className={styles.insightGrid}>
-          <TemplateAnalyticsSectionPlaceholder icon={GlobeIcon} message={secondaryStateMessage} title={text.sourcesTitle} hint={text.sourcesHint} />
-          <TemplateAnalyticsSectionPlaceholder icon={TrendUpIcon} message={secondaryStateMessage} title={text.retentionTitle} hint={text.retentionHint} />
-          <TemplateAnalyticsSectionPlaceholder icon={GlobeIcon} message={secondaryStateMessage} title={text.geographyTitle} hint={text.geographyHint} />
-          <TemplateAnalyticsSectionPlaceholder icon={GlobeIcon} message={secondaryStateMessage} title={text.devicesTitle} hint={text.devicesHint} />
+          <TemplateAnalyticsSectionPlaceholder
+            icon={GlobeIcon}
+            message={secondaryStateMessage}
+            title={text.sourcesTitle}
+            hint={text.sourcesHint}
+          />
+          <TemplateAnalyticsSectionPlaceholder
+            icon={TrendUpIcon}
+            message={secondaryStateMessage}
+            title={text.retentionTitle}
+            hint={text.retentionHint}
+          />
+          <TemplateAnalyticsSectionPlaceholder
+            icon={GlobeIcon}
+            message={secondaryStateMessage}
+            title={text.geographyTitle}
+            hint={text.geographyHint}
+          />
+          <TemplateAnalyticsSectionPlaceholder
+            icon={GlobeIcon}
+            message={secondaryStateMessage}
+            title={text.devicesTitle}
+            hint={text.devicesHint}
+          />
         </div>
       )}
 
@@ -466,13 +540,17 @@ function TemplateAnalyticsSectionPlaceholder({
   wide?: boolean;
 }) {
   return (
-    <section className={wide ? `${styles.sectionCard} ${styles.sectionCardWide}` : styles.sectionCard}>
+    <section
+      className={wide ? `${styles.sectionCard} ${styles.sectionCardWide}` : styles.sectionCard}
+    >
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitleWithIcon}><Icon className={styles.sectionTitleIcon} /><span>{title}</span></h2>
+        <h2 className={styles.sectionTitleWithIcon}>
+          <Icon className={styles.sectionTitleIcon} />
+          <span>{title}</span>
+        </h2>
         <p>{hint}</p>
       </div>
       <p className={styles.emptyState}>{message}</p>
     </section>
   );
 }
-

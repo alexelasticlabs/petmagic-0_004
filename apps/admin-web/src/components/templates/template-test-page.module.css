@@ -10,7 +10,8 @@
 .pageHeader {
   display: grid;
   gap: 0.72rem;
-  padding: clamp(0.72rem, 0.66rem + 0.18vw, 0.84rem) clamp(0.72rem, 0.64rem + 0.22vw, 0.88rem) clamp(0.76rem, 0.68rem + 0.22vw, 0.9rem);
+  padding: clamp(0.72rem, 0.66rem + 0.18vw, 0.84rem) clamp(0.72rem, 0.64rem + 0.22vw, 0.88rem)
+    clamp(0.76rem, 0.68rem + 0.22vw, 0.9rem);
   border: 1px solid var(--border-soft);
   border-radius: 0.86rem;
   background: var(--surface-1);
@@ -28,11 +29,11 @@
   min-width: 0;
 }
 
-.breadcrumbs>*,
-.pillRow>*,
-.headerActions>*,
-.uploadActions>*,
-.resultHeaderActions>* {
+.breadcrumbs > *,
+.pillRow > *,
+.headerActions > *,
+.uploadActions > *,
+.resultHeaderActions > * {
   min-width: 0;
 }
 
@@ -92,7 +93,12 @@
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.01em;
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease, color 160ms ease;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .secondaryLink,
@@ -203,13 +209,13 @@
   min-width: 0;
 }
 
-.stepHeader>*,
-.sectionHeaderRow>*,
-.mediaHeading>*,
-.toggleLine>*,
-.detailRow>*,
-.detailRowMultiline>*,
-.readonlyField>* {
+.stepHeader > *,
+.sectionHeaderRow > *,
+.mediaHeading > *,
+.toggleLine > *,
+.detailRow > *,
+.detailRowMultiline > *,
+.readonlyField > * {
   min-width: 0;
 }
 
@@ -392,7 +398,13 @@
   width: 2px;
   height: 1.55rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 0%, transparent) 0%, color-mix(in srgb, var(--accent) 72%, transparent) 44%, color-mix(in srgb, var(--accent) 92%, transparent) 58%, color-mix(in srgb, var(--accent) 16%, transparent) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 72%, transparent) 44%,
+    color-mix(in srgb, var(--accent) 92%, transparent) 58%,
+    color-mix(in srgb, var(--accent) 16%, transparent) 100%
+  );
   box-shadow: none;
 }
 
@@ -497,7 +509,7 @@
   min-width: 0;
 }
 
-.sourceUploadFooter>* {
+.sourceUploadFooter > * {
   min-width: 0;
 }
 
@@ -557,7 +569,7 @@
   min-width: 0;
 }
 
-.mediaCardHeader>* {
+.mediaCardHeader > * {
   min-width: 0;
 }
 
@@ -625,7 +637,11 @@
   inset: 14% 18% auto;
   height: 32%;
   border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--info) 8%, transparent), color-mix(in srgb, var(--accent) 8%, transparent));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--info) 8%, transparent),
+    color-mix(in srgb, var(--accent) 8%, transparent)
+  );
   filter: blur(20px);
   pointer-events: none;
 }
@@ -668,7 +684,7 @@
   min-width: 0;
 }
 
-.mediaFooter>* {
+.mediaFooter > * {
   min-width: 0;
 }
 
@@ -803,7 +819,7 @@
   background: var(--surface-2);
 }
 
-.timelineItem>* {
+.timelineItem > * {
   min-width: 0;
 }
 
@@ -866,7 +882,6 @@
 }
 
 @media (max-width: 1280px) {
-
   .workflowGrid,
   .headerGrid {
     grid-template-columns: 1fr;
@@ -885,7 +900,9 @@
 
 @media (min-width: 1240px) {
   .mediaGrid {
-    grid-template-columns: minmax(0, 19rem) clamp(4.2rem, 4.8vw, 5.4rem) minmax(0, 19rem) clamp(4.2rem, 4.8vw, 5.4rem) minmax(0, 19rem);
+    grid-template-columns:
+      minmax(0, 19rem) clamp(4.2rem, 4.8vw, 5.4rem) minmax(0, 19rem) clamp(4.2rem, 4.8vw, 5.4rem)
+      minmax(0, 19rem);
     justify-content: space-between;
     align-items: center;
   }
@@ -906,7 +923,13 @@
     min-width: 1.9rem;
     max-width: 2.8rem;
     height: 2px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 0%, transparent) 0%, color-mix(in srgb, var(--info) 72%, transparent) 36%, color-mix(in srgb, var(--accent) 92%, transparent) 58%, color-mix(in srgb, var(--accent) 16%, transparent) 100%);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 0%, transparent) 0%,
+      color-mix(in srgb, var(--info) 72%, transparent) 36%,
+      color-mix(in srgb, var(--accent) 92%, transparent) 58%,
+      color-mix(in srgb, var(--accent) 16%, transparent) 100%
+    );
   }
 
   .mediaConnectorArrow {
@@ -935,7 +958,6 @@
 }
 
 @media (max-width: 620px) {
-
   .pageHeader,
   .card {
     border-radius: 0.72rem;
@@ -946,7 +968,7 @@
     width: 100%;
   }
 
-  .headerActions>*,
+  .headerActions > *,
   .resultHeaderActions :global(.ui-button) {
     width: 100%;
   }
@@ -984,4 +1006,3 @@
     width: 100%;
   }
 }
-

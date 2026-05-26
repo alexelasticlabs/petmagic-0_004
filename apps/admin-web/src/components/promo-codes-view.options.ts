@@ -1,8 +1,5 @@
+import { type PromoSortMode, type PromoStatusFilter } from "@/components/promo-codes-view.helpers";
 import { type SelectOption } from "@/components/ui/select";
-import {
-  type PromoSortMode,
-  type PromoStatusFilter,
-} from "@/components/promo-codes-view.helpers";
 import { type AdminRedeemRewardKind } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 

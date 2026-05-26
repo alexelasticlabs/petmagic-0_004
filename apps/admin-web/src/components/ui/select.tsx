@@ -21,7 +21,13 @@ type SelectProps = {
   showSelectedDescription?: boolean;
 };
 
-export function Select({ value, options, onChange, ariaLabel, showSelectedDescription = true }: SelectProps) {
+export function Select({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  showSelectedDescription = true,
+}: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -29,7 +35,10 @@ export function Select({ value, options, onChange, ariaLabel, showSelectedDescri
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const listboxId = useId();
   const selectedOption = options.find((option) => option.value === value) ?? options[0];
-  const selectedIndex = Math.max(0, options.findIndex((option) => option.value === selectedOption?.value));
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === selectedOption?.value)
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -143,11 +152,21 @@ export function Select({ value, options, onChange, ariaLabel, showSelectedDescri
           <span className={styles.triggerTopRow}>
             <span className={styles.value}>{selectedOption?.label ?? value}</span>
             <span className={styles.triggerMeta}>
-              {selectedOption?.price ? <span className={styles.triggerPrice}>{selectedOption.price}</span> : null}
-              {selectedOption?.badge ? <span className={`${styles.badge} ${getBadgeToneClassName(selectedOption.tone)}`.trim()}>{selectedOption.badge}</span> : null}
+              {selectedOption?.price ? (
+                <span className={styles.triggerPrice}>{selectedOption.price}</span>
+              ) : null}
+              {selectedOption?.badge ? (
+                <span
+                  className={`${styles.badge} ${getBadgeToneClassName(selectedOption.tone)}`.trim()}
+                >
+                  {selectedOption.badge}
+                </span>
+              ) : null}
             </span>
           </span>
-          {showSelectedDescription && selectedOption?.description ? <span className={styles.triggerDescription}>{selectedOption.description}</span> : null}
+          {showSelectedDescription && selectedOption?.description ? (
+            <span className={styles.triggerDescription}>{selectedOption.description}</span>
+          ) : null}
         </span>
         <span className={styles.chevron} aria-hidden="true" />
       </button>
@@ -211,12 +230,24 @@ export function Select({ value, options, onChange, ariaLabel, showSelectedDescri
                   <span className={styles.optionTopRow}>
                     <span className={styles.optionLabel}>{option.label}</span>
                     <span className={styles.optionMeta}>
-                      {option.price ? <span className={styles.optionPrice}>{option.price}</span> : null}
-                      {option.badge ? <span className={`${styles.badge} ${getBadgeToneClassName(option.tone)}`.trim()}>{option.badge}</span> : null}
-                      {isSelected ? <span className={styles.optionIndicator} aria-hidden="true" /> : null}
+                      {option.price ? (
+                        <span className={styles.optionPrice}>{option.price}</span>
+                      ) : null}
+                      {option.badge ? (
+                        <span
+                          className={`${styles.badge} ${getBadgeToneClassName(option.tone)}`.trim()}
+                        >
+                          {option.badge}
+                        </span>
+                      ) : null}
+                      {isSelected ? (
+                        <span className={styles.optionIndicator} aria-hidden="true" />
+                      ) : null}
                     </span>
                   </span>
-                  {option.description ? <span className={styles.optionDescription}>{option.description}</span> : null}
+                  {option.description ? (
+                    <span className={styles.optionDescription}>{option.description}</span>
+                  ) : null}
                 </span>
               </button>
             );

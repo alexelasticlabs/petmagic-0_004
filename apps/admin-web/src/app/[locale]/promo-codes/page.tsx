@@ -4,15 +4,15 @@ import { PromoCodesView } from "@/components/promo-codes-view";
 import { isLocale } from "@/lib/i18n";
 
 type PromoCodesRouteProps = {
-    params: Promise<{ locale: string }>;
+  params: Promise<{ locale: string }>;
 };
 
 export default async function PromoCodesRoute({ params }: PromoCodesRouteProps) {
-    const { locale } = await params;
+  const { locale } = await params;
 
-    if (!isLocale(locale)) {
-        notFound();
-    }
+  if (!isLocale(locale)) {
+    notFound();
+  }
 
-    return <PromoCodesView locale={locale} />;
+  return <PromoCodesView locale={locale} />;
 }

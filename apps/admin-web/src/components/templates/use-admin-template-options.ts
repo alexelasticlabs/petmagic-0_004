@@ -3,7 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { adminQueryKeys } from "@/lib/admin-query-keys";
-import { fetchAdminTemplates, type AdminTemplateListItem, type TemplateType } from "@/lib/api-client";
+import {
+  fetchAdminTemplates,
+  type AdminTemplateListItem,
+  type TemplateType,
+} from "@/lib/api-client";
 
 type UseAdminTemplateOptions = {
   enabled?: boolean;

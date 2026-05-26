@@ -15,14 +15,21 @@ type UseAdminTemplateFeedbackOptions = {
   templateId: string;
 };
 
-export function useAdminTemplateFeedback({ enabled = true, filter, search, take = 50, templateId }: UseAdminTemplateFeedbackOptions) {
+export function useAdminTemplateFeedback({
+  enabled = true,
+  filter,
+  search,
+  take = 50,
+  templateId,
+}: UseAdminTemplateFeedbackOptions) {
   const feedbackQuery = useQuery<AdminTemplateFeedbackItem[]>({
     queryKey: adminQueryKeys.templateAnalyticsFeedback(templateId, filter, search),
-    queryFn: () => fetchAdminTemplateFeedback(templateId, {
-      search: search || undefined,
-      take,
-      type: filter === "all" ? undefined : filter,
-    }),
+    queryFn: () =>
+      fetchAdminTemplateFeedback(templateId, {
+        search: search || undefined,
+        take,
+        type: filter === "all" ? undefined : filter,
+      }),
     enabled,
   });
 

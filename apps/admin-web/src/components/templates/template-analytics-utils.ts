@@ -1,13 +1,18 @@
 import type {
-    AdminTemplateStatistics,
-    AdminTemplateTrendPoint,
-    TemplateGenerationJobStatus,
-    TemplateStatus,
+  AdminTemplateStatistics,
+  AdminTemplateTrendPoint,
+  TemplateGenerationJobStatus,
+  TemplateStatus,
 } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
 
 export type PeriodKey = "7d" | "30d" | "90d" | "all";
-export type TrendMetricKey = "totalRuns" | "completedRuns" | "failedRuns" | "totalTokenCost" | "averageGenerationSeconds";
+export type TrendMetricKey =
+  | "totalRuns"
+  | "completedRuns"
+  | "failedRuns"
+  | "totalTokenCost"
+  | "averageGenerationSeconds";
 
 export type TrendTotals = {
   totalRuns: number;
@@ -34,8 +39,13 @@ const PERIOD_DAY_COUNTS: Record<Exclude<PeriodKey, "all">, number> = {
   "90d": 90,
 };
 
-export function buildPeriodAnalytics(points: readonly AdminTemplateTrendPoint[], period: PeriodKey): PeriodAnalytics {
-  const sortedPoints = [...points].sort((left, right) => getUtcDay(left.dateUtc) - getUtcDay(right.dateUtc));
+export function buildPeriodAnalytics(
+  points: readonly AdminTemplateTrendPoint[],
+  period: PeriodKey
+): PeriodAnalytics {
+  const sortedPoints = [...points].sort(
+    (left, right) => getUtcDay(left.dateUtc) - getUtcDay(right.dateUtc)
+  );
 
   if (!sortedPoints.length) {
     return {
@@ -106,7 +116,7 @@ export function summarizeTrendPoints(points: readonly AdminTemplateTrendPoint[])
       totalProviderCostUsd: 0,
       durationSeconds: 0,
       durationSamples: 0,
-    },
+    }
   );
 
   return {
@@ -117,7 +127,8 @@ export function summarizeTrendPoints(points: readonly AdminTemplateTrendPoint[])
     failedRuns: totals.failedRuns,
     totalTokenCost: totals.totalTokenCost,
     totalProviderCostUsd: totals.totalProviderCostUsd,
-    averageGenerationSeconds: totals.durationSamples > 0 ? totals.durationSeconds / totals.durationSamples : null,
+    averageGenerationSeconds:
+      totals.durationSamples > 0 ? totals.durationSeconds / totals.durationSamples : null,
     successRatePercent: totals.totalRuns > 0 ? (totals.completedRuns / totals.totalRuns) * 100 : 0,
   };
 }
@@ -164,7 +175,12 @@ export function buildChartTicks(maxValue: number) {
   return [top, top - step, top - step * 2, step, 0];
 }
 
-export function formatTrendValue(value: number, metric: TrendMetricKey, locale: Locale, failedRunsLabel: string) {
+export function formatTrendValue(
+  value: number,
+  metric: TrendMetricKey,
+  locale: Locale,
+  failedRunsLabel: string
+) {
   if (metric === "totalTokenCost") {
     return formatTokens(value, locale === "ru");
   }
@@ -237,9 +253,7 @@ export function formatAnalyticsValue(value: string | null | undefined) {
     return "-";
   }
 
-  return value.toUpperCase() === value && value.length <= 3
-    ? value
-    : value.replace(/[_-]+/g, " ");
+  return value.toUpperCase() === value && value.length <= 3 ? value : value.replace(/[_-]+/g, " ");
 }
 
 export function formatPercent(value: number, isRu: boolean) {
@@ -299,7 +313,11 @@ export function formatDuration(value: number | null | undefined, isRu: boolean) 
   return `${rounded} ${isRu ? "сек" : "sec"}`;
 }
 
-export function formatRangeDuration(startedAtUtc: string | null | undefined, completedAtUtc: string | null | undefined, isRu: boolean) {
+export function formatRangeDuration(
+  startedAtUtc: string | null | undefined,
+  completedAtUtc: string | null | undefined,
+  isRu: boolean
+) {
   if (!startedAtUtc || !completedAtUtc) {
     return "-";
   }
@@ -343,13 +361,14 @@ export function formatShortDate(value: string, locale: Locale) {
   }).format(date);
 }
 
-export function formatModelSummary(preprocessingModel: string | null | undefined, klingModel: string | null | undefined) {
-  const values = [preprocessingModel, klingModel]
-    .filter(Boolean)
-    .map((value) => {
-      const parts = value!.split("/");
-      return parts.length >= 2 ? parts.slice(-2).join("/") : value!;
-    });
+export function formatModelSummary(
+  preprocessingModel: string | null | undefined,
+  klingModel: string | null | undefined
+) {
+  const values = [preprocessingModel, klingModel].filter(Boolean).map((value) => {
+    const parts = value!.split("/");
+    return parts.length >= 2 ? parts.slice(-2).join("/") : value!;
+  });
 
   return values.length ? values.join(" + ") : "-";
 }

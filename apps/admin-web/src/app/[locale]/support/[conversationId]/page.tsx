@@ -4,14 +4,19 @@ import { SupportConversationPage } from "@/components/support/support-conversati
 import { isLocale, type Locale } from "@/lib/i18n";
 
 type SupportConversationRouteProps = {
-    params: Promise<{ locale: string; conversationId: string }>;
+  params: Promise<{ locale: string; conversationId: string }>;
 };
 
 export default async function SupportConversationRoute({ params }: SupportConversationRouteProps) {
-    const resolved = await params;
-    if (!isLocale(resolved.locale)) {
-        notFound();
-    }
+  const resolved = await params;
+  if (!isLocale(resolved.locale)) {
+    notFound();
+  }
 
-    return <SupportConversationPage locale={resolved.locale as Locale} conversationId={resolved.conversationId} />;
+  return (
+    <SupportConversationPage
+      locale={resolved.locale as Locale}
+      conversationId={resolved.conversationId}
+    />
+  );
 }

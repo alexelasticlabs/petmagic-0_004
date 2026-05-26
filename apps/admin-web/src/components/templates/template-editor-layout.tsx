@@ -95,9 +95,13 @@ export function TemplateEditorRail({
             category={editorModel.category || text.editorDraft}
             isPremium={form.isPremium}
             accessLabel={form.isPremium ? text.premiumLabel : text.freeLabel}
-            referenceDurationSeconds={"referenceDuration" in editorModel ? editorModel.referenceDuration : undefined}
+            referenceDurationSeconds={
+              "referenceDuration" in editorModel ? editorModel.referenceDuration : undefined
+            }
             promoBadge={editorModel.promoBadge}
-            musicDescription={"musicDescription" in editorModel ? editorModel.musicDescription : undefined}
+            musicDescription={
+              "musicDescription" in editorModel ? editorModel.musicDescription : undefined
+            }
           />
         </div>
       </section>
@@ -124,13 +128,32 @@ export function TemplateEditorRail({
             const showDetail = item.detail !== stateLabel;
 
             return (
-              <div key={item.label} className={joinClassNames(styles.checklistItem, item.ready ? styles.checklistItemReady : styles.checklistItemMissing)}>
-                <span className={joinClassNames(styles.checkIndicator, item.ready ? styles.checkReady : styles.checkMissing)} aria-hidden="true" />
+              <div
+                key={item.label}
+                className={joinClassNames(
+                  styles.checklistItem,
+                  item.ready ? styles.checklistItemReady : styles.checklistItemMissing
+                )}
+              >
+                <span
+                  className={joinClassNames(
+                    styles.checkIndicator,
+                    item.ready ? styles.checkReady : styles.checkMissing
+                  )}
+                  aria-hidden="true"
+                />
                 <div className={styles.checklistCopy}>
                   <div className={styles.checklistLabel}>{item.label}</div>
                   {showDetail ? <div className={styles.checklistDetail}>{item.detail}</div> : null}
                 </div>
-                <span className={joinClassNames(styles.checklistState, item.ready ? styles.checklistStateReady : styles.checklistStateMissing)}>{stateLabel}</span>
+                <span
+                  className={joinClassNames(
+                    styles.checklistState,
+                    item.ready ? styles.checklistStateReady : styles.checklistStateMissing
+                  )}
+                >
+                  {stateLabel}
+                </span>
               </div>
             );
           })}
@@ -163,14 +186,23 @@ export function TemplateEditorFooter({
         <div className={styles.footerStatusCopy}>
           <span className={styles.footerStatusLabel}>{text.editorVisibilityTitle}</span>
           <p className={styles.footerStatusHint}>
-            {editorStatus === "Active" ? text.editorVisibleToUsersHint : text.editorHiddenFromUsersHint}
+            {editorStatus === "Active"
+              ? text.editorVisibleToUsersHint
+              : text.editorHiddenFromUsersHint}
           </p>
         </div>
 
-        <div className={styles.footerStatusSwitch} role="group" aria-label={text.editorVisibilityTitle}>
+        <div
+          className={styles.footerStatusSwitch}
+          role="group"
+          aria-label={text.editorVisibilityTitle}
+        >
           <button
             type="button"
-            className={joinClassNames(styles.footerStatusButton, editorStatus === "Draft" ? styles.footerStatusButtonActive : null)}
+            className={joinClassNames(
+              styles.footerStatusButton,
+              editorStatus === "Draft" ? styles.footerStatusButtonActive : null
+            )}
             aria-pressed={editorStatus === "Draft"}
             onClick={() => onSetEditorStatus("Draft")}
           >
@@ -178,7 +210,11 @@ export function TemplateEditorFooter({
           </button>
           <button
             type="button"
-            className={joinClassNames(styles.footerStatusButton, editorStatus === "Active" ? styles.footerStatusButtonActive : null, editorStatus === "Active" ? styles.footerStatusButtonLive : null)}
+            className={joinClassNames(
+              styles.footerStatusButton,
+              editorStatus === "Active" ? styles.footerStatusButtonActive : null,
+              editorStatus === "Active" ? styles.footerStatusButtonLive : null
+            )}
             aria-pressed={editorStatus === "Active"}
             onClick={() => onSetEditorStatus("Active")}
           >
@@ -188,13 +224,30 @@ export function TemplateEditorFooter({
       </div>
 
       <div className={styles.footerActions}>
-        <Button type="button" variant="secondary" className={styles.adminButton} disabled={isSaving} onClick={() => onCancel(catalogPath)}>
+        <Button
+          type="button"
+          variant="secondary"
+          className={styles.adminButton}
+          disabled={isSaving}
+          onClick={() => onCancel(catalogPath)}
+        >
           {text.editorCancel}
         </Button>
-        <Button type="button" variant="ghost" className={styles.adminButton} disabled={isSaving} onClick={onReset}>
+        <Button
+          type="button"
+          variant="ghost"
+          className={styles.adminButton}
+          disabled={isSaving}
+          onClick={onReset}
+        >
           {text.resetForm}
         </Button>
-        <Button type="submit" variant="primary" className={styles.primaryButton} disabled={isSaving}>
+        <Button
+          type="submit"
+          variant="primary"
+          className={styles.primaryButton}
+          disabled={isSaving}
+        >
           {text.saveTemplate}
         </Button>
       </div>

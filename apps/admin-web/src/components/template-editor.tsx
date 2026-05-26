@@ -3,18 +3,22 @@
 import { AdminMetricStrip, AdminSectionHeader } from "@/components/admin/admin-primitives";
 import { TemplateBasicFields } from "@/components/templates/template-basic-fields";
 import {
-    TemplateEditorFooter,
-    TemplateEditorHeader,
-    TemplateEditorLoadingState,
-    TemplateEditorRail,
+  TemplateEditorFooter,
+  TemplateEditorHeader,
+  TemplateEditorLoadingState,
+  TemplateEditorRail,
 } from "@/components/templates/template-editor-layout";
 import { formatDuration } from "@/components/templates/template-editor-model";
-import { TemplateImageModelSection, TemplateReferenceAssetSection, TemplateVideoModelSection } from "@/components/templates/template-editor-sections";
+import {
+  TemplateImageModelSection,
+  TemplateReferenceAssetSection,
+  TemplateVideoModelSection,
+} from "@/components/templates/template-editor-sections";
 import styles from "@/components/templates/template-editor.module.css";
 import {
-    IMAGE_MODELS,
-    KLING_MODELS,
-    PREPROCESSING_MODELS,
+  IMAGE_MODELS,
+  KLING_MODELS,
+  PREPROCESSING_MODELS,
 } from "@/components/templates/template-form-mappers";
 import { TemplatePreviewAssetSection } from "@/components/templates/template-preview-asset-section";
 import { useTemplateEditorController } from "@/components/templates/use-template-editor-controller";
@@ -76,11 +80,18 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
             <section id="template-basics" className={styles.sectionCard}>
               <AdminSectionHeader
                 title={text.editorStepBasics}
-                aside={(
-                  <span className={joinClassNames(styles.inlineState, editorModel.basicInfoReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
+                aside={
+                  <span
+                    className={joinClassNames(
+                      styles.inlineState,
+                      editorModel.basicInfoReady
+                        ? styles.inlineStateReady
+                        : styles.inlineStateAttention
+                    )}
+                  >
                     {editorModel.basicInfoReady ? text.editorReady : text.editorMissing}
                   </span>
-                )}
+                }
               />
 
               <TemplateBasicFields
@@ -95,11 +106,16 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
             <section id="template-media" className={styles.sectionCard}>
               <AdminSectionHeader
                 title={text.editorStepMedia}
-                aside={(
-                  <span className={joinClassNames(styles.inlineState, editorModel.mediaReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
+                aside={
+                  <span
+                    className={joinClassNames(
+                      styles.inlineState,
+                      editorModel.mediaReady ? styles.inlineStateReady : styles.inlineStateAttention
+                    )}
+                  >
                     {editorModel.mediaReady ? text.editorReady : text.editorMissing}
                   </span>
-                )}
+                }
               />
 
               <div className={styles.mediaGrid}>
@@ -130,8 +146,14 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
                 <AdminMetricStrip
                   className={styles.derivedGrid}
                   items={[
-                    { label: text.referenceDurationLabel, value: formatDuration(editorModel.referenceDuration) },
-                    { label: text.characterOrientationLabel, value: editorModel.characterOrientation || text.editorMissing },
+                    {
+                      label: text.referenceDurationLabel,
+                      value: formatDuration(editorModel.referenceDuration),
+                    },
+                    {
+                      label: text.characterOrientationLabel,
+                      value: editorModel.characterOrientation || text.editorMissing,
+                    },
                   ]}
                 />
               ) : null}
@@ -140,11 +162,16 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
             <section id="template-ai" className={styles.sectionCard}>
               <AdminSectionHeader
                 title={text.editorStepAi}
-                aside={(
-                  <span className={joinClassNames(styles.inlineState, editorModel.aiReady ? styles.inlineStateReady : styles.inlineStateAttention)}>
+                aside={
+                  <span
+                    className={joinClassNames(
+                      styles.inlineState,
+                      editorModel.aiReady ? styles.inlineStateReady : styles.inlineStateAttention
+                    )}
+                  >
                     {editorModel.aiReady ? text.editorReady : text.editorMissing}
                   </span>
-                )}
+                }
               />
 
               {isVideo ? (
@@ -164,7 +191,6 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
                 />
               )}
             </section>
-
           </div>
 
           <TemplateEditorRail

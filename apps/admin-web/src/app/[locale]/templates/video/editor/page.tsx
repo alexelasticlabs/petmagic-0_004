@@ -8,7 +8,10 @@ type VideoTemplateEditorPageProps = {
   searchParams: Promise<{ templateId?: string | string[] }>;
 };
 
-export default async function VideoTemplateEditorPage({ params, searchParams }: VideoTemplateEditorPageProps) {
+export default async function VideoTemplateEditorPage({
+  params,
+  searchParams,
+}: VideoTemplateEditorPageProps) {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
@@ -18,5 +21,7 @@ export default async function VideoTemplateEditorPage({ params, searchParams }: 
   const { templateId } = await searchParams;
   const initialTemplateId = Array.isArray(templateId) ? templateId[0] : templateId;
 
-  return <TemplateEditor locale={locale} templateType="Video" initialTemplateId={initialTemplateId} />;
+  return (
+    <TemplateEditor locale={locale} templateType="Video" initialTemplateId={initialTemplateId} />
+  );
 }

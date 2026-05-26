@@ -8,7 +8,9 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     backToCatalog: isRu ? "К каталогу" : "Back to catalog",
     openEditor: isRu ? "Открыть редактор" : "Open editor",
     loading: isRu ? "Загрузка аналитики шаблона..." : "Loading template analytics...",
-    loadError: isRu ? "Не удалось загрузить аналитику шаблона." : "Failed to load template analytics.",
+    loadError: isRu
+      ? "Не удалось загрузить аналитику шаблона."
+      : "Failed to load template analytics.",
     rangeLabel: isRu ? "Период аналитики" : "Analytics period",
     range7: isRu ? "7 дней" : "7 days",
     range30: isRu ? "30 дней" : "30 days",
@@ -32,17 +34,27 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     totalTokenCost: isRu ? "Всего токенов" : "Total token cost",
     averageTokenCost: isRu ? "Средний cost" : "Average token cost",
     views: isRu ? "Просмотры" : "Views",
-    viewsHint: isRu ? "События view из публичного template endpoint." : "View events from the public template endpoint.",
+    viewsHint: isRu
+      ? "События view из публичного template endpoint."
+      : "View events from the public template endpoint.",
     generationStarts: isRu ? "Запуски генерации" : "Generation starts",
-    generationStartsHint: isRu ? "Созданные задания генерации за выбранный период." : "Generation jobs created in the selected period.",
+    generationStartsHint: isRu
+      ? "Созданные задания генерации за выбранный период."
+      : "Generation jobs created in the selected period.",
     successfulGenerations: isRu ? "Успешные генерации" : "Successful generations",
-    successfulGenerationsHint: isRu ? "Задания, завершённые готовым видео." : "Jobs completed with an output video.",
+    successfulGenerationsHint: isRu
+      ? "Задания, завершённые готовым видео."
+      : "Jobs completed with an output video.",
     generationConversion: isRu ? "Конверсия в результат" : "Result conversion",
-    generationConversionHint: isRu ? "Доля успешных jobs среди запусков." : "Completed jobs as a share of started jobs.",
+    generationConversionHint: isRu
+      ? "Доля успешных jobs среди запусков."
+      : "Completed jobs as a share of started jobs.",
     tokenSpend: isRu ? "Потрачено токенов" : "Token spend",
     tokenSpendHint: isRu ? "Суммарная стоимость запусков в токенах." : "Total token cost of runs.",
     complaints: isRu ? "Жалобы" : "Complaints",
-    complaintsHint: isRu ? "События complaint из публичного analytics endpoint." : "Complaint events from the public analytics endpoint.",
+    complaintsHint: isRu
+      ? "События complaint из публичного analytics endpoint."
+      : "Complaint events from the public analytics endpoint.",
     feedbackTitle: isRu ? "Жалобы и фидбек" : "Complaints and feedback",
     feedbackHint: isRu
       ? "Последние обращения пользователей по шаблону: complaint и feedback события с текстом и метаданными."
@@ -57,8 +69,12 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     feedbackEmpty: isRu
       ? "Пока нет пользовательских жалоб или фидбека по этому шаблону."
       : "There is no user complaint or feedback for this template yet.",
-    feedbackFilteredEmpty: isRu ? "По текущему фильтру и поиску ничего не найдено." : "No items matched the current filter and search.",
-    feedbackLoadError: isRu ? "Не удалось загрузить жалобы и фидбек." : "Failed to load complaints and feedback.",
+    feedbackFilteredEmpty: isRu
+      ? "По текущему фильтру и поиску ничего не найдено."
+      : "No items matched the current filter and search.",
+    feedbackLoadError: isRu
+      ? "Не удалось загрузить жалобы и фидбек."
+      : "Failed to load complaints and feedback.",
     feedbackMessageMissing: isRu ? "Без текста сообщения." : "No message text provided.",
     feedbackTypeComplaint: isRu ? "Жалоба" : "Complaint",
     feedbackTypeFeedback: isRu ? "Фидбек" : "Feedback",
@@ -74,24 +90,34 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
       ? "Этот блок собирается из существующей admin statistics модели и служит опорной сводкой для dashboard выше."
       : "This block is built from the existing admin statistics model and acts as the anchor summary for the dashboard above.",
     trendTitle: isRu ? "Динамика запусков" : "Run trend",
-    trendHint: isRu ? "Группировка generation jobs по дням создания шаблонных запусков." : "Generation jobs grouped by creation day.",
-    trendEmpty: isRu ? "Для этого шаблона ещё нет исторических точек тренда." : "There are no trend points for this template yet.",
+    trendHint: isRu
+      ? "Группировка generation jobs по дням создания шаблонных запусков."
+      : "Generation jobs grouped by creation day.",
+    trendEmpty: isRu
+      ? "Для этого шаблона ещё нет исторических точек тренда."
+      : "There are no trend points for this template yet.",
     chartRuns: isRu ? "Запуски" : "Runs",
     chartCompleted: isRu ? "Успешные" : "Completed",
     chartFailed: isRu ? "Ошибки" : "Failed",
     chartTokens: isRu ? "Токены" : "Tokens",
     chartDuration: isRu ? "Время" : "Duration",
     statusBreakdownTitle: isRu ? "Состояние пайплайна" : "Pipeline health",
-    statusBreakdownHint: isRu ? "Распределение текущих и завершённых состояний генерации." : "Distribution of current and completed generation pipeline states.",
+    statusBreakdownHint: isRu
+      ? "Распределение текущих и завершённых состояний генерации."
+      : "Distribution of current and completed generation pipeline states.",
     runsInQueue: isRu ? "В очереди" : "Queued",
     processingNow: isRu ? "В обработке" : "Processing",
     sourcesTitle: isRu ? "Источники просмотров" : "View sources",
-    sourcesHint: isRu ? "Реальные source breakdown из template view events." : "Real source breakdown from template view events.",
+    sourcesHint: isRu
+      ? "Реальные source breakdown из template view events."
+      : "Real source breakdown from template view events.",
     instrumentationPending: isRu
       ? "Нужна запись событий в публичном приложении/API, чтобы показывать эти метрики без догадок."
       : "Public app/API instrumentation is required to show this without guessing.",
     retentionTitle: isRu ? "Воронка генерации" : "Generation funnel",
-    retentionHint: isRu ? "Реальная operational воронка по generation jobs." : "Real operational funnel from generation jobs.",
+    retentionHint: isRu
+      ? "Реальная operational воронка по generation jobs."
+      : "Real operational funnel from generation jobs.",
     funnelStarted: isRu ? "Начали генерацию" : "Started generation",
     funnelCompleted: isRu ? "Дождались результата" : "Completed result",
     funnelFailed: isRu ? "Получили ошибку" : "Failed",
@@ -101,9 +127,13 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
       ? "Реальная география из событий public traffic, если страна была записана."
       : "Real geography from public traffic events when country was captured.",
     devicesTitle: isRu ? "Устройства" : "Devices",
-    devicesHint: isRu ? "Реальное распределение устройств из записанных analytics events." : "Real device distribution from recorded analytics events.",
+    devicesHint: isRu
+      ? "Реальное распределение устройств из записанных analytics events."
+      : "Real device distribution from recorded analytics events.",
     recentRunsTitle: isRu ? "Последние генерации" : "Recent generations",
-    recentRunsHint: isRu ? "Последние задания по этому шаблону с минимальным operational срезом." : "Latest jobs for this template with a compact operational snapshot.",
+    recentRunsHint: isRu
+      ? "Последние задания по этому шаблону с минимальным operational срезом."
+      : "Latest jobs for this template with a compact operational snapshot.",
     recentRunsAllHint: isRu
       ? "Все доступные генерации по этому шаблону за весь период, который хранится в системе."
       : "All available generations for this template across the full retained history.",
@@ -111,12 +141,18 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     recentRunsAll: isRu ? "Все генерации" : "All generations",
     recentRunsFailed: isRu ? "Ошибочные" : "Failed only",
     recentRunsLoading: isRu ? "Загрузка..." : "Loading...",
-    recentRunsExpandError: isRu ? "Не удалось загрузить полный список генераций." : "Failed to load the full generation history.",
-    recentRunsEmpty: isRu ? "У шаблона пока нет недавних генераций." : "This template has no recent generations yet.",
+    recentRunsExpandError: isRu
+      ? "Не удалось загрузить полный список генераций."
+      : "Failed to load the full generation history.",
+    recentRunsEmpty: isRu
+      ? "У шаблона пока нет недавних генераций."
+      : "This template has no recent generations yet.",
     failedRunsHint: isRu
       ? "Все завершившиеся с ошибкой генерации по шаблону с кодом и текстом причины."
       : "All failed generations for this template with failure code and reason text.",
-    failedRunsEmpty: isRu ? "По этому шаблону пока нет ошибочных генераций." : "There are no failed generations for this template yet.",
+    failedRunsEmpty: isRu
+      ? "По этому шаблону пока нет ошибочных генераций."
+      : "There are no failed generations for this template yet.",
     generationIdHeader: isRu ? "ID генерации" : "Generation ID",
     userHeader: isRu ? "Пользователь" : "User",
     recentCreated: isRu ? "Создан" : "Created",
@@ -133,7 +169,9 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     failureBreakdownHint: isRu
       ? "Сводка по failure codes из завершившихся с ошибкой generation jobs."
       : "Summary of failure codes from failed generation jobs.",
-    failuresEmpty: isRu ? "Пока нет зарегистрированных ошибок по этому шаблону." : "There are no recorded failures for this template yet.",
+    failuresEmpty: isRu
+      ? "Пока нет зарегистрированных ошибок по этому шаблону."
+      : "There are no recorded failures for this template yet.",
     lastFailure: isRu ? "Последняя" : "Last",
     unknownFailure: isRu ? "Неизвестная ошибка" : "Unknown failure",
     preprocessingModel: isRu ? "Image model" : "Image model",

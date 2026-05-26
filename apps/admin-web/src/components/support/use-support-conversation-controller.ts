@@ -69,7 +69,12 @@ export type TemplateDraft = {
   sortOrder: number;
 };
 
-export const statusOptions: SupportConversationStatus[] = ["Open", "InProgress", "Resolved", "Closed"];
+export const statusOptions: SupportConversationStatus[] = [
+  "Open",
+  "InProgress",
+  "Resolved",
+  "Closed",
+];
 
 export const emptyTemplateDraft: TemplateDraft = {
   templateId: null,
@@ -79,7 +84,10 @@ export const emptyTemplateDraft: TemplateDraft = {
   sortOrder: 0,
 };
 
-export function useSupportConversationController({ locale, conversationId }: UseSupportConversationControllerParams) {
+export function useSupportConversationController({
+  locale,
+  conversationId,
+}: UseSupportConversationControllerParams) {
   const text = getDictionary(locale);
   const router = useRouter();
   const session = useAuthSession();
@@ -93,7 +101,7 @@ export function useSupportConversationController({ locale, conversationId }: Use
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("profile");
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1321px)").matches,
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1321px)").matches
   );
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
@@ -109,7 +117,9 @@ export function useSupportConversationController({ locale, conversationId }: Use
 
   const refreshConversationData = useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportConversation(conversationId) }),
+      queryClient.invalidateQueries({
+        queryKey: adminQueryKeys.supportConversation(conversationId),
+      }),
       queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot }),
     ]);
   }, [conversationId, queryClient]);
@@ -147,7 +157,7 @@ export function useSupportConversationController({ locale, conversationId }: Use
         URL.revokeObjectURL(attachmentPreviewUrl);
       }
     },
-    [attachmentPreviewUrl],
+    [attachmentPreviewUrl]
   );
 
   const conversationQuery = useQuery<AdminSupportConversation>({
@@ -171,7 +181,9 @@ export function useSupportConversationController({ locale, conversationId }: Use
   useSupportRealtime(session?.accessToken, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
     if (event.conversationId === conversationId) {
-      void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportConversation(conversationId) });
+      void queryClient.invalidateQueries({
+        queryKey: adminQueryKeys.supportConversation(conversationId),
+      });
     }
   });
 
@@ -271,17 +283,23 @@ export function useSupportConversationController({ locale, conversationId }: Use
 
   const conversation = conversationQuery.data;
   const sessionUserId = session?.user.userId ?? null;
-  const isAssignedToCurrentAdmin = Boolean(sessionUserId && conversation?.assignedAdminId === sessionUserId);
+  const isAssignedToCurrentAdmin = Boolean(
+    sessionUserId && conversation?.assignedAdminId === sessionUserId
+  );
   const subjectUserId = conversation?.initiatorUserId ?? null;
 
   const userQuery = useQuery<AdminUserDetail>({
-    queryKey: subjectUserId ? adminQueryKeys.userDetail(subjectUserId) : adminQueryKeys.userDetailDisabled,
+    queryKey: subjectUserId
+      ? adminQueryKeys.userDetail(subjectUserId)
+      : adminQueryKeys.userDetailDisabled,
     queryFn: () => fetchAdminUser(subjectUserId!),
     enabled: Boolean(session && subjectUserId),
   });
 
   const analyticsQuery = useQuery<AdminUserAnalytics>({
-    queryKey: subjectUserId ? adminQueryKeys.userAnalytics(subjectUserId) : adminQueryKeys.userAnalyticsDisabled,
+    queryKey: subjectUserId
+      ? adminQueryKeys.userAnalytics(subjectUserId)
+      : adminQueryKeys.userAnalyticsDisabled,
     queryFn: () => fetchAdminUserAnalytics(subjectUserId!),
     enabled: Boolean(session && subjectUserId),
   });
@@ -318,7 +336,7 @@ export function useSupportConversationController({ locale, conversationId }: Use
 
         return left.title.localeCompare(right.title, locale === "ru" ? "ru" : "en");
       }),
-    [locale, templatesQuery.data],
+    [locale, templatesQuery.data]
   );
 
   const filteredTemplates = useMemo(() => {
@@ -335,13 +353,15 @@ export function useSupportConversationController({ locale, conversationId }: Use
 
   const visibleTemplates = useMemo(
     () => sortedTemplates.filter((template) => template.isEnabled).slice(0, 4),
-    [sortedTemplates],
+    [sortedTemplates]
   );
 
   const composerValue = reply;
   const composerPlaceholder = text.supportReplyPlaceholder;
   const userDisplayName =
-    conversation?.userDisplayName?.trim() || conversation?.userEmail || text.supportConversationTitle;
+    conversation?.userDisplayName?.trim() ||
+    conversation?.userEmail ||
+    text.supportConversationTitle;
   const hasComposerAttachment = selectedAttachment !== null;
 
   const sidePanelTabs = useMemo<ReadonlyArray<{ value: SidePanelTab; label: string }>>(
@@ -360,7 +380,7 @@ export function useSupportConversationController({ locale, conversationId }: Use
       text.supportViewProfileTab,
       text.supportViewPurchasesTab,
       text.supportViewTemplatesTab,
-    ],
+    ]
   );
 
   const sidePanelTitle =
@@ -384,21 +404,23 @@ export function useSupportConversationController({ locale, conversationId }: Use
         : null;
 
   const selectedTemplate =
-    filteredTemplates.find((template) => template.templateId === selectedTemplateId)
-    ?? filteredTemplates[0]
-    ?? null;
+    filteredTemplates.find((template) => template.templateId === selectedTemplateId) ??
+    filteredTemplates[0] ??
+    null;
 
   const accountCreatedAt = userQuery.data?.createdAtUtc ?? conversation?.createdAtUtc ?? null;
-  const conversationWaitingSince = conversation?.lastMessageAtUtc ?? conversation?.createdAtUtc ?? null;
+  const conversationWaitingSince =
+    conversation?.lastMessageAtUtc ?? conversation?.createdAtUtc ?? null;
   const conversationSla = getConversationSla(
     conversationWaitingSince,
     locale,
-    conversation?.adminUnreadCount ?? 0,
+    conversation?.adminUnreadCount ?? 0
   );
   const totalPurchases = analyticsQuery.data?.summary.totalPurchases ?? 0;
   const failedGenerations =
-    analyticsQuery.data?.recentGenerations.filter((generation) => generation.status.toLowerCase() === "failed")
-    ?? [];
+    analyticsQuery.data?.recentGenerations.filter(
+      (generation) => generation.status.toLowerCase() === "failed"
+    ) ?? [];
   const recentFailures = analyticsQuery.data?.failureBreakdown.slice(0, 4) ?? [];
 
   const chatFacts = [
@@ -409,10 +431,16 @@ export function useSupportConversationController({ locale, conversationId }: Use
   ];
 
   const activityTimeline: SupportTimelineItem[] = buildActivityTimeline(analyticsQuery.data);
-  const availableStatusActions = conversation ? getAvailableStatusActions(conversation.status, text) : [];
-  const primaryStatusAction = availableStatusActions.find((action) => action.variant === "primary") ?? null;
-  const secondaryStatusActions = availableStatusActions.filter((action) => action.variant === "secondary");
-  const destructiveStatusAction = availableStatusActions.find((action) => action.variant === "danger") ?? null;
+  const availableStatusActions = conversation
+    ? getAvailableStatusActions(conversation.status, text)
+    : [];
+  const primaryStatusAction =
+    availableStatusActions.find((action) => action.variant === "primary") ?? null;
+  const secondaryStatusActions = availableStatusActions.filter(
+    (action) => action.variant === "secondary"
+  );
+  const destructiveStatusAction =
+    availableStatusActions.find((action) => action.variant === "danger") ?? null;
 
   const conversationTimeline: SupportTimelineItem[] = buildConversationTimeline({
     conversation,

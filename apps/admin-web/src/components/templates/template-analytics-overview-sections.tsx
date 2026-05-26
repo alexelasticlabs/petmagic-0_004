@@ -3,37 +3,35 @@
 import Image from "next/image";
 import { useState } from "react";
 
+import { ChartIcon, DashboardIcon, GlobeIcon, TrendUpIcon } from "@/components/admin/admin-icons";
 import {
-    ChartIcon,
-    DashboardIcon,
-    GlobeIcon,
-    TrendUpIcon,
-} from "@/components/admin/admin-icons";
-import { getTemplateAccessLabel, getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
+  getTemplateAccessLabel,
+  getTemplateStatusLabel,
+} from "@/components/templates/template-admin-shared";
 import styles from "@/components/templates/template-analytics-page.module.css";
 import {
-    buildChartTicks,
-    formatDateTime,
-    formatDelta,
-    formatDuration,
-    formatModelValue,
-    formatNumber,
-    formatPercent,
-    formatShortDate,
-    formatTokens,
-    formatTrendValue,
-    formatUsd,
-    getStatusBadgeClassName,
-    getTrendMetricValue,
-    shortenId,
-    type TrendMetricKey,
+  buildChartTicks,
+  formatDateTime,
+  formatDelta,
+  formatDuration,
+  formatModelValue,
+  formatNumber,
+  formatPercent,
+  formatShortDate,
+  formatTokens,
+  formatTrendValue,
+  formatUsd,
+  getStatusBadgeClassName,
+  getTrendMetricValue,
+  shortenId,
+  type TrendMetricKey,
 } from "@/components/templates/template-analytics-utils";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import {
-    type AdminTemplate,
-    type AdminTemplateEventAnalytics,
-    type AdminTemplateStatistics,
-    type AdminTemplateTrendPoint,
+  type AdminTemplate,
+  type AdminTemplateEventAnalytics,
+  type AdminTemplateStatistics,
+  type AdminTemplateTrendPoint,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
@@ -105,7 +103,10 @@ export function TemplateAnalyticsVisualSection({
       <section className={`${styles.sectionCard} ${styles.sectionCardWide}`}>
         <div className={styles.sectionHeaderRow}>
           <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitleWithIcon}><TrendUpIcon className={styles.sectionTitleIcon} /><span>{text.trendTitle}</span></h2>
+            <h2 className={styles.sectionTitleWithIcon}>
+              <TrendUpIcon className={styles.sectionTitleIcon} />
+              <span>{text.trendTitle}</span>
+            </h2>
             <p>{text.trendHint}</p>
           </div>
 
@@ -123,11 +124,20 @@ export function TemplateAnalyticsVisualSection({
             ))}
           </div>
         </div>
-        <TrendChart points={chartPoints} metric={chartMetric} locale={locale} emptyLabel={text.trendEmpty} text={text} />
+        <TrendChart
+          points={chartPoints}
+          metric={chartMetric}
+          locale={locale}
+          emptyLabel={text.trendEmpty}
+          text={text}
+        />
       </section>
       <section className={styles.sectionCard}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitleWithIcon}><DashboardIcon className={styles.sectionTitleIcon} /><span>{text.statusBreakdownTitle}</span></h2>
+          <h2 className={styles.sectionTitleWithIcon}>
+            <DashboardIcon className={styles.sectionTitleIcon} />
+            <span>{text.statusBreakdownTitle}</span>
+          </h2>
           <p>{text.statusBreakdownHint}</p>
         </div>
         <StatusRing statistics={statistics} text={text} isRu={isRu} />
@@ -195,7 +205,10 @@ export function TemplateAnalyticsSnapshotSection({
   return (
     <section className={styles.sectionCard}>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitleWithIcon}><GlobeIcon className={styles.sectionTitleIcon} /><span>{text.snapshotTitle}</span></h2>
+        <h2 className={styles.sectionTitleWithIcon}>
+          <GlobeIcon className={styles.sectionTitleIcon} />
+          <span>{text.snapshotTitle}</span>
+        </h2>
         <p>{text.snapshotHint}</p>
       </div>
 
@@ -205,15 +218,36 @@ export function TemplateAnalyticsSnapshotSection({
         <SummaryRow label={text.failedRuns} value={String(statistics.failedRuns)} />
         <SummaryRow label={text.runsInQueue} value={String(statistics.queuedRuns)} />
         <SummaryRow label={text.processingNow} value={String(statistics.processingRuns)} />
-        <SummaryRow label={text.successRate} value={formatPercent(statistics.successRatePercent, isRu)} />
-        <SummaryRow label={text.totalTokenCost} value={formatTokens(statistics.totalTokenCost, isRu)} />
-        <SummaryRow label={text.averageTokenCost} value={formatTokens(statistics.averageTokenCost, isRu)} />
-        <SummaryRow label={text.averageGenerationTime} value={formatDuration(statistics.averageGenerationSeconds, isRu)} />
+        <SummaryRow
+          label={text.successRate}
+          value={formatPercent(statistics.successRatePercent, isRu)}
+        />
+        <SummaryRow
+          label={text.totalTokenCost}
+          value={formatTokens(statistics.totalTokenCost, isRu)}
+        />
+        <SummaryRow
+          label={text.averageTokenCost}
+          value={formatTokens(statistics.averageTokenCost, isRu)}
+        />
+        <SummaryRow
+          label={text.averageGenerationTime}
+          value={formatDuration(statistics.averageGenerationSeconds, isRu)}
+        />
         <SummaryRow label={text.lastRun} value={formatDateTime(statistics.lastRunAtUtc, locale)} />
-        <SummaryRow label={text.lastCompleted} value={formatDateTime(statistics.lastCompletedAtUtc, locale)} />
+        <SummaryRow
+          label={text.lastCompleted}
+          value={formatDateTime(statistics.lastCompletedAtUtc, locale)}
+        />
         <SummaryRow label={text.activeQueue} value={String(activeRuns)} />
-        <SummaryRow label={text.estimatedTemplateCostLabel} value={formatUsd(template.estimatedProviderCostUsd, locale)} />
-        <SummaryRow label={text.preprocessingModel} value={formatModelValue(template.preprocessingModel)} />
+        <SummaryRow
+          label={text.estimatedTemplateCostLabel}
+          value={formatUsd(template.estimatedProviderCostUsd, locale)}
+        />
+        <SummaryRow
+          label={text.preprocessingModel}
+          value={formatModelValue(template.preprocessingModel)}
+        />
         <SummaryRow label={text.motionModel} value={formatModelValue(template.klingModel)} />
       </div>
 
@@ -222,7 +256,17 @@ export function TemplateAnalyticsSnapshotSection({
   );
 }
 
-function TemplateProfileCard({ template, locale, text, isRu }: { template: AdminTemplate; locale: Locale; text: AnalyticsText; isRu: boolean }) {
+function TemplateProfileCard({
+  template,
+  locale,
+  text,
+  isRu,
+}: {
+  template: AdminTemplate;
+  locale: Locale;
+  text: AnalyticsText;
+  isRu: boolean;
+}) {
   const dictionary = getDictionary(locale);
   const previewUrl = template.previewAsset?.url;
   const previewContentType = template.previewAsset?.contentType ?? "";
@@ -232,7 +276,9 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
 
   return (
     <article className={styles.templateCard}>
-      <div className={`${styles.templatePreviewWrap} ${previewKind === "video" ? styles.templatePreviewWrapVideo : ""}`.trim()}>
+      <div
+        className={`${styles.templatePreviewWrap} ${previewKind === "video" ? styles.templatePreviewWrapVideo : ""}`.trim()}
+      >
         {previewUrl && !isPreviewBroken ? (
           previewKind === "video" ? (
             <video
@@ -246,7 +292,15 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
               onError={() => setBrokenPreviewUrl(previewUrl)}
             />
           ) : (
-            <Image src={previewUrl} alt="" width={480} height={600} unoptimized className={styles.templatePreviewImage} onError={() => setBrokenPreviewUrl(previewUrl)} />
+            <Image
+              src={previewUrl}
+              alt=""
+              width={480}
+              height={600}
+              unoptimized
+              className={styles.templatePreviewImage}
+              onError={() => setBrokenPreviewUrl(previewUrl)}
+            />
           )
         ) : (
           <div className={styles.templatePreviewFallback}>{template.title.slice(0, 1)}</div>
@@ -259,7 +313,11 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
             <span>{text.templateOverviewTitle}</span>
             <h2>{template.title}</h2>
           </div>
-          <span className={`${styles.statusBadge} ${styles[getStatusBadgeClassName(template.status)]}`}>{getTemplateStatusLabel(template.status, locale)}</span>
+          <span
+            className={`${styles.statusBadge} ${styles[getStatusBadgeClassName(template.status)]}`}
+          >
+            {getTemplateStatusLabel(template.status, locale)}
+          </span>
         </div>
 
         <p>{template.shortDescription}</p>
@@ -267,11 +325,23 @@ function TemplateProfileCard({ template, locale, text, isRu }: { template: Admin
         <div className={styles.templateMetaGrid}>
           <SummaryRow label={text.templateIdLabel} value={shortenId(template.templateId)} />
           <SummaryRow label={text.categoryLabel} value={template.category} />
-          <SummaryRow label={text.priceLabel} value={getTemplateAccessLabel(template.isPremium, dictionary)} />
+          <SummaryRow
+            label={text.priceLabel}
+            value={getTemplateAccessLabel(template.isPremium, dictionary)}
+          />
           <SummaryRow label={text.tokenCostLabel} value={formatTokens(template.tokenCost, isRu)} />
-          <SummaryRow label={text.estimatedTemplateCostLabel} value={formatUsd(template.estimatedProviderCostUsd, locale)} />
-          <SummaryRow label={text.createdLabel} value={formatDateTime(template.createdAtUtc, locale)} />
-          <SummaryRow label={text.updatedLabel} value={formatDateTime(template.updatedAtUtc, locale)} />
+          <SummaryRow
+            label={text.estimatedTemplateCostLabel}
+            value={formatUsd(template.estimatedProviderCostUsd, locale)}
+          />
+          <SummaryRow
+            label={text.createdLabel}
+            value={formatDateTime(template.createdAtUtc, locale)}
+          />
+          <SummaryRow
+            label={text.updatedLabel}
+            value={formatDateTime(template.updatedAtUtc, locale)}
+          />
         </div>
       </div>
     </article>
@@ -295,7 +365,8 @@ function KpiCard({
   text: AnalyticsText;
   isRu: boolean;
 }) {
-  const deltaClassName = typeof delta === "number" && delta < 0 ? styles.deltaNegative : styles.deltaPositive;
+  const deltaClassName =
+    typeof delta === "number" && delta < 0 ? styles.deltaNegative : styles.deltaPositive;
 
   return (
     <article className={`${styles.statCard} ${styles[`statCard_${accent}`]}`}>
@@ -327,7 +398,10 @@ function AnalyticsDimensionPanel({
   return (
     <section className={styles.sectionCard}>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitleWithIcon}><GlobeIcon className={styles.sectionTitleIcon} /><span>{title}</span></h2>
+        <h2 className={styles.sectionTitleWithIcon}>
+          <GlobeIcon className={styles.sectionTitleIcon} />
+          <span>{title}</span>
+        </h2>
         <p>{hint}</p>
       </div>
       {rows.length ? (
@@ -350,19 +424,42 @@ function AnalyticsDimensionPanel({
   );
 }
 
-function FunnelPanel({ statistics, text, isRu }: { statistics: AdminTemplateStatistics; text: AnalyticsText; isRu: boolean }) {
+function FunnelPanel({
+  statistics,
+  text,
+  isRu,
+}: {
+  statistics: AdminTemplateStatistics;
+  text: AnalyticsText;
+  isRu: boolean;
+}) {
   const total = Math.max(statistics.totalRuns, 1);
   const rows = [
     { label: text.funnelStarted, value: statistics.totalRuns, percent: 100 },
-    { label: text.funnelCompleted, value: statistics.completedRuns, percent: (statistics.completedRuns / total) * 100 },
-    { label: text.funnelFailed, value: statistics.failedRuns, percent: (statistics.failedRuns / total) * 100 },
-    { label: text.funnelActive, value: statistics.queuedRuns + statistics.processingRuns, percent: ((statistics.queuedRuns + statistics.processingRuns) / total) * 100 },
+    {
+      label: text.funnelCompleted,
+      value: statistics.completedRuns,
+      percent: (statistics.completedRuns / total) * 100,
+    },
+    {
+      label: text.funnelFailed,
+      value: statistics.failedRuns,
+      percent: (statistics.failedRuns / total) * 100,
+    },
+    {
+      label: text.funnelActive,
+      value: statistics.queuedRuns + statistics.processingRuns,
+      percent: ((statistics.queuedRuns + statistics.processingRuns) / total) * 100,
+    },
   ];
 
   return (
     <section className={styles.sectionCard}>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitleWithIcon}><TrendUpIcon className={styles.sectionTitleIcon} /><span>{text.retentionTitle}</span></h2>
+        <h2 className={styles.sectionTitleWithIcon}>
+          <TrendUpIcon className={styles.sectionTitleIcon} />
+          <span>{text.retentionTitle}</span>
+        </h2>
         <p>{text.retentionHint}</p>
       </div>
       <div className={styles.funnelList}>
@@ -421,9 +518,8 @@ function TrendChart({
 
   const coordinates = points.map((point, index) => {
     const value = getTrendMetricValue(point, metric);
-    const x = points.length === 1
-      ? width / 2
-      : paddingX + (graphWidth * index) / (points.length - 1);
+    const x =
+      points.length === 1 ? width / 2 : paddingX + (graphWidth * index) / (points.length - 1);
     const y = paddingTop + graphHeight - (value / maxValue) * graphHeight;
     return { point, value, x, y };
   });
@@ -435,7 +531,12 @@ function TrendChart({
 
   return (
     <div className={styles.chartShell}>
-      <svg viewBox={`0 0 ${width} ${height}`} className={styles.chartSvg} aria-label="Template analytics trend chart" role="img">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={styles.chartSvg}
+        aria-label="Template analytics trend chart"
+        role="img"
+      >
         <defs>
           <linearGradient id="template-analytics-area" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="rgba(74, 222, 128, 0.36)" />
@@ -447,8 +548,16 @@ function TrendChart({
           const y = paddingTop + (graphHeight * index) / (yTicks.length - 1 || 1);
           return (
             <g key={`${tick}-${index}`}>
-              <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} className={styles.chartGridLine} />
-              <text x={paddingX} y={y - 6} className={styles.chartTick}>{formatTrendValue(tick, metric, locale, text.failedRuns)}</text>
+              <line
+                x1={paddingX}
+                y1={y}
+                x2={width - paddingX}
+                y2={y}
+                className={styles.chartGridLine}
+              />
+              <text x={paddingX} y={y - 6} className={styles.chartTick}>
+                {formatTrendValue(tick, metric, locale, text.failedRuns)}
+              </text>
             </g>
           );
         })}
@@ -459,13 +568,30 @@ function TrendChart({
         {coordinates.map(({ point, value, x, y }) => {
           const label = formatTrendValue(value, metric, locale, text.failedRuns);
           const labelWidth = Math.max(48, Math.min(132, label.length * 7.2 + 20));
-          const labelX = Math.min(width - paddingX - labelWidth, Math.max(paddingX, x - labelWidth / 2));
+          const labelX = Math.min(
+            width - paddingX - labelWidth,
+            Math.max(paddingX, x - labelWidth / 2)
+          );
           const labelY = Math.max(8, y - 34);
 
           return (
             <g key={point.dateUtc}>
-              <rect x={labelX} y={labelY} width={labelWidth} height="24" rx="8" className={styles.chartPointBadge} />
-              <text x={labelX + labelWidth / 2} y={labelY + 16} textAnchor="middle" className={styles.chartPointValue}>{label}</text>
+              <rect
+                x={labelX}
+                y={labelY}
+                width={labelWidth}
+                height="24"
+                rx="8"
+                className={styles.chartPointBadge}
+              />
+              <text
+                x={labelX + labelWidth / 2}
+                y={labelY + 16}
+                textAnchor="middle"
+                className={styles.chartPointValue}
+              >
+                {label}
+              </text>
               <circle cx={x} cy={y} r="4.5" className={styles.chartDot} />
               <text x={x} y={height - 12} textAnchor="middle" className={styles.chartLabel}>
                 {formatShortDate(point.dateUtc, locale)}
@@ -479,7 +605,14 @@ function TrendChart({
         {points.slice(-4).map((point) => (
           <div key={point.dateUtc} className={styles.chartSummaryItem}>
             <span>{formatShortDate(point.dateUtc, locale)}</span>
-            <strong>{formatTrendValue(getTrendMetricValue(point, metric), metric, locale, text.failedRuns)}</strong>
+            <strong>
+              {formatTrendValue(
+                getTrendMetricValue(point, metric),
+                metric,
+                locale,
+                text.failedRuns
+              )}
+            </strong>
           </div>
         ))}
       </div>
@@ -487,7 +620,15 @@ function TrendChart({
   );
 }
 
-function StatusRing({ statistics, text, isRu }: { statistics: AdminTemplateStatistics; text: AnalyticsText; isRu: boolean }) {
+function StatusRing({
+  statistics,
+  text,
+  isRu,
+}: {
+  statistics: AdminTemplateStatistics;
+  text: AnalyticsText;
+  isRu: boolean;
+}) {
   const total = Math.max(statistics.totalRuns, 1);
   const segments = [
     { label: text.completedRuns, value: statistics.completedRuns, color: "#22c55e" },
