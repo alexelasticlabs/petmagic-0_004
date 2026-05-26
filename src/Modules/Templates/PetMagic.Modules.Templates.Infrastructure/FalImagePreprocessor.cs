@@ -1,4 +1,5 @@
 using System.Text.Json;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 

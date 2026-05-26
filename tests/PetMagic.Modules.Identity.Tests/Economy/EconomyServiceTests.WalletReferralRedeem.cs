@@ -1,26 +1,14 @@
-using System.Security.Cryptography;
-using System.Text;
-
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
-using PetMagic.BuildingBlocks.Results;
-using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
-using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
-using PetMagic.Modules.Economy.Infrastructure.Options;
-using PetMagic.Modules.Economy.Infrastructure.Payments;
-using PetMagic.Modules.Identity.Application.Abstractions;
-using PetMagic.Modules.Identity.Application.Contracts;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
 public sealed partial class EconomyServiceTests
 {
-
     [Fact]
     public async Task CreditAsync_ShouldIncreaseWalletAndAppendLedgerEntry()
     {
@@ -693,6 +681,62 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task ListAdminRedeemCodesAsync_ShouldReturnAggregatesWithBoundedRedemptionPreview()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        var thirdUserId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var codeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("FEED-BIG", "Feed campaign", RedeemCodeRewardKind.Spark, 20, 20, 3, true, null, now.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(codeResult.IsSuccess);
+
+        var applies = new[]
+        {
+            await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(firstUserId, "FEED-BIG"), CancellationToken.None),
+            await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(firstUserId, "FEED-BIG"), CancellationToken.None),
+            await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(firstUserId, "FEED-BIG"), CancellationToken.None),
+            await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(secondUserId, "FEED-BIG"), CancellationToken.None),
+            await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(secondUserId, "FEED-BIG"), CancellationToken.None),
+            await service.ApplyRedeemCodeAsync(new ApplyRedeemCodeCommand(thirdUserId, "FEED-BIG"), CancellationToken.None),
+        };
+
+        Assert.All(applies, apply => Assert.True(apply.IsSuccess));
+
+        var redemptions = await dbContext.RedeemCodeRedemptions
+            .Where(x => x.RedeemCodeId == codeResult.Value.RedeemCodeId)
+            .OrderBy(x => x.RedeemedAtUtc)
+            .ThenBy(x => x.Id)
+            .ToListAsync();
+
+        redemptions[0].RedeemedAtUtc = now.AddDays(-10);
+        redemptions[1].RedeemedAtUtc = now.AddDays(-8);
+        redemptions[2].RedeemedAtUtc = now.AddDays(-6);
+        redemptions[3].RedeemedAtUtc = now.AddDays(-4);
+        redemptions[4].RedeemedAtUtc = now.AddDays(-2);
+        redemptions[5].RedeemedAtUtc = now.AddHours(-1);
+        await dbContext.SaveChangesAsync();
+
+        var list = await service.ListAdminRedeemCodesAsync(CancellationToken.None);
+
+        Assert.True(list.IsSuccess);
+        var code = Assert.Single(list.Value, x => x.RedeemCodeId == codeResult.Value.RedeemCodeId);
+
+        Assert.Equal(4, code.UsesLast7d);
+        Assert.Equal(80, code.GrantedLast7d);
+        Assert.Equal(3, code.MaxRedeemedBySingleUser);
+        Assert.Equal(5, code.Redemptions.Count);
+        Assert.Equal(redemptions.Max(x => x.RedeemedAtUtc), code.LastRedeemedAtUtc);
+        Assert.DoesNotContain(code.Redemptions, x => x.RedeemedAtUtc == now.AddDays(-10));
+    }
+
+    [Fact]
     public async Task CreateRedeemCodeAsync_ShouldRejectUnsupportedRewardKind()
     {
         await using var dbContext = CreateDbContext();
@@ -706,6 +750,4 @@ public sealed partial class EconomyServiceTests
         Assert.True(result.IsFailure);
         Assert.Equal(EconomyErrors.RedeemCodeRewardUnsupported.Code, result.Error.Code);
     }
-
-
 }

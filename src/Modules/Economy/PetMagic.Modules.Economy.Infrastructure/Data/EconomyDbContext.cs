@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Economy.Infrastructure.Data;

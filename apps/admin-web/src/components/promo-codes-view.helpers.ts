@@ -304,6 +304,10 @@ export function formatWindow(code: AdminRedeemCode, locale: Locale, text: PromoD
 }
 
 export function getLastUsedAt(code: AdminRedeemCode) {
+  if (code.lastRedeemedAtUtc) {
+    return code.lastRedeemedAtUtc;
+  }
+
   if (!code.redemptions.length) {
     return null;
   }
@@ -365,6 +369,10 @@ function toIsoOrNull(value: string) {
 }
 
 function getMaxUserRedemptions(code: AdminRedeemCode) {
+  if (typeof code.maxRedeemedBySingleUser === "number") {
+    return code.maxRedeemedBySingleUser;
+  }
+
   const usageByUser = new Map<string, number>();
 
   for (const redemption of code.redemptions) {

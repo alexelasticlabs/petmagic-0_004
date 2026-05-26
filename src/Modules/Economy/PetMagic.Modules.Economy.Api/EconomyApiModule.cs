@@ -1,6 +1,8 @@
 using FluentValidation;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+
 using PetMagic.Modules.Economy.Api.Endpoints;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Application.Validation;

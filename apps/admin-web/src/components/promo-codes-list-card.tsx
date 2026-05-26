@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+
 import {
   DownloadIcon,
   MoreHorizontalIcon,
@@ -50,7 +52,8 @@ type PromoCodesListCardProps = {
   hasCodes: boolean;
   hasFilteredCodes: boolean;
   promoCodesQueryIsFetching: boolean;
-  secondsUntilAutoRefresh: number;
+  autoRefreshMs: number;
+  dataUpdatedAt: number;
   pagedCodes: AdminRedeemCode[];
   filteredCodesCount: number;
   selectedCodeId: string | null;
@@ -96,7 +99,8 @@ export function PromoCodesListCard({
   hasCodes,
   hasFilteredCodes,
   promoCodesQueryIsFetching,
-  secondsUntilAutoRefresh,
+  autoRefreshMs,
+  dataUpdatedAt,
   pagedCodes,
   filteredCodesCount,
   selectedCodeId,
@@ -184,17 +188,13 @@ export function PromoCodesListCard({
           <Button variant="primary" onClick={onOpenCreatePanel}>
             {text.promoCodesCreateAction}
           </Button>
-          <span
-            className={`${styles.autoRefreshBadge}${promoCodesQueryIsFetching ? ` ${styles.autoRefreshBadgeLoading}` : ""}`}
-            aria-live="polite"
-          >
-            <span className={styles.autoRefreshDot} />
-            {promoCodesQueryIsFetching
-              ? text.promoCodesUpdatingLabel
-              : locale === "ru"
-                ? `Автообновление: ${secondsUntilAutoRefresh}с`
-                : `Auto refresh: ${secondsUntilAutoRefresh}s`}
-          </span>
+          <PromoCodesAutoRefreshBadge
+            text={text}
+            locale={locale}
+            isFetching={promoCodesQueryIsFetching}
+            autoRefreshMs={autoRefreshMs}
+            dataUpdatedAt={dataUpdatedAt}
+          />
         </div>
       </AdminToolbar>
 
@@ -437,5 +437,54 @@ export function PromoCodesListCard({
         </>
       )}
     </AdminCard>
+  );
+}
+
+function PromoCodesAutoRefreshBadge({
+  text,
+  locale,
+  isFetching,
+  autoRefreshMs,
+  dataUpdatedAt,
+}: {
+  text: ReturnType<typeof getDictionary>;
+  locale: Locale;
+  isFetching: boolean;
+  autoRefreshMs: number;
+  dataUpdatedAt: number;
+}) {
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const secondsUntilAutoRefresh = useMemo(() => {
+    if (!dataUpdatedAt) {
+      return Math.ceil(autoRefreshMs / 1000);
+    }
+
+    const elapsed = Math.max(0, nowTick - dataUpdatedAt);
+    const remaining = autoRefreshMs - (elapsed % autoRefreshMs);
+    return Math.max(1, Math.ceil(remaining / 1000));
+  }, [autoRefreshMs, dataUpdatedAt, nowTick]);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, []);
+
+  return (
+    <span
+      className={`${styles.autoRefreshBadge}${isFetching ? ` ${styles.autoRefreshBadgeLoading}` : ""}`}
+      aria-live="polite"
+    >
+      <span className={styles.autoRefreshDot} />
+      {isFetching
+        ? text.promoCodesUpdatingLabel
+        : locale === "ru"
+          ? `Автообновление: ${secondsUntilAutoRefresh}с`
+          : `Auto refresh: ${secondsUntilAutoRefresh}s`}
+    </span>
   );
 }

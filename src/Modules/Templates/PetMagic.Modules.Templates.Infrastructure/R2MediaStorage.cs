@@ -1,5 +1,6 @@
 using Amazon.S3;
 using Amazon.S3.Model;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;

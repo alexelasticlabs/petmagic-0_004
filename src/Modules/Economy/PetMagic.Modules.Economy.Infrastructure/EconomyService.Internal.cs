@@ -4,21 +4,13 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
-using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
-using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
-using PetMagic.Modules.Identity.Application.Abstractions;
-using PetMagic.Modules.Identity.Application.Contracts;
-
-using Stripe;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
@@ -528,8 +520,4 @@ public sealed partial class EconomyService
             "External checkout opens a secure billing flow outside the store. Premium activates after verification, and additional disclosures may apply in your region.",
             "Stripe checkout and customer portal are secure. PetMagic does not store raw card details and subscription management stays available inside PetMagic settings.");
     }
-
-
 }
-
-

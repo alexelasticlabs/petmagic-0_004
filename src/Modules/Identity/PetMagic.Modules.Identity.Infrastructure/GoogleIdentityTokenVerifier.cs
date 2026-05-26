@@ -1,4 +1,5 @@
 using Google.Apis.Auth;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;

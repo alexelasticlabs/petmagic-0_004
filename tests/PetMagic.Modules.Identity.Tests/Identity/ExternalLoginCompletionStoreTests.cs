@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+
 using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Application.Contracts;
 

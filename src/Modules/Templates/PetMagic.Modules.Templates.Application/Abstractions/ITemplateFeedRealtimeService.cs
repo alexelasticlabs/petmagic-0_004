@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+
 using PetMagic.Modules.Templates.Application.Contracts;
 
 namespace PetMagic.Modules.Templates.Application.Abstractions;

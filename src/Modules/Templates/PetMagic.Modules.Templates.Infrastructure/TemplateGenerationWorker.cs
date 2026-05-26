@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
@@ -17,6 +18,7 @@ internal sealed class TemplateGenerationWorker(
             return;
         }
 
+        var consecutiveFailures = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -38,6 +40,8 @@ internal sealed class TemplateGenerationWorker(
                 {
                     await Task.Delay(options.GenerationWorkerPollIntervalMilliseconds, stoppingToken);
                 }
+
+                consecutiveFailures = 0;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -45,9 +49,18 @@ internal sealed class TemplateGenerationWorker(
             }
             catch (Exception exception)
             {
+                consecutiveFailures++;
                 logger.LogError(exception, "Template generation worker loop failed.");
-                await Task.Delay(options.GenerationWorkerPollIntervalMilliseconds, stoppingToken);
+                await Task.Delay(GetBackoffDelay(options.GenerationWorkerPollIntervalMilliseconds, consecutiveFailures), stoppingToken);
             }
         }
+    }
+
+    private static TimeSpan GetBackoffDelay(int pollIntervalMilliseconds, int consecutiveFailures)
+    {
+        var baseDelayMilliseconds = Math.Max(1_000, pollIntervalMilliseconds);
+        var multiplier = 1 << Math.Min(consecutiveFailures - 1, 5);
+        var delayMilliseconds = Math.Min(baseDelayMilliseconds * multiplier, 300_000);
+        return TimeSpan.FromMilliseconds(delayMilliseconds);
     }
 }

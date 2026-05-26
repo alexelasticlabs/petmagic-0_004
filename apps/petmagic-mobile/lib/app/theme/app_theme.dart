@@ -129,14 +129,6 @@ extension PetMagicTheme on BuildContext {
       return colors;
     }
 
-    assert(() {
-      debugPrint(
-        'PetMagicColors extension is missing from ThemeData. '
-        'A fallback palette is used to avoid runtime crashes.',
-      );
-      return true;
-    }());
-
     return AppTheme._fallbackColors(theme.brightness);
   }
 }

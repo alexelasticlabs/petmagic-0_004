@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -18,7 +18,7 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                 table: "support_reply_templates");
 
             migrationBuilder.DropIndex(
-                name: "IX_support_messages_ConversationId_IsFromAdmin_IsInternalNote_~",
+                name: "IX_support_messages_ConversationId_IsFromAdmin_IsInternalNote_ReadAtUtc",
                 table: "support_messages");
 
             migrationBuilder.DropColumn(
@@ -32,12 +32,12 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_support_reply_templates_SortOrder_IsEnabled",
                 table: "support_reply_templates",
-                columns: new[] { "SortOrder", "IsEnabled" });
+                columns: ["SortOrder", "IsEnabled"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_support_messages_ConversationId_IsFromAdmin_ReadAtUtc",
                 table: "support_messages",
-                columns: new[] { "ConversationId", "IsFromAdmin", "ReadAtUtc" });
+                columns: ["ConversationId", "IsFromAdmin", "ReadAtUtc"]);
         }
 
         /// <inheritdoc />
@@ -68,12 +68,12 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_support_reply_templates_Kind_SortOrder_IsEnabled",
                 table: "support_reply_templates",
-                columns: new[] { "Kind", "SortOrder", "IsEnabled" });
+                columns: ["Kind", "SortOrder", "IsEnabled"]);
 
             migrationBuilder.CreateIndex(
-                name: "IX_support_messages_ConversationId_IsFromAdmin_IsInternalNote_~",
+                name: "IX_support_messages_ConversationId_IsFromAdmin_IsInternalNote_ReadAtUtc",
                 table: "support_messages",
-                columns: new[] { "ConversationId", "IsFromAdmin", "IsInternalNote", "ReadAtUtc" });
+                columns: ["ConversationId", "IsFromAdmin", "IsInternalNote", "ReadAtUtc"]);
         }
     }
 }

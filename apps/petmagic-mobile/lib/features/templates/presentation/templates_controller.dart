@@ -124,9 +124,12 @@ class TemplatesController extends Notifier<TemplatesState> {
   TemplatesState build() {
     _repository = ref.watch(templatesRepositoryProvider);
     _realtimeClient = ref.watch(realtimeClientProvider);
-    unawaited(_realtimeClient.connect());
-    _realtimeSubscription?.cancel();
-    _realtimeSubscription = _realtimeClient.events.listen(_handleRealtimeEvent);
+    if (_realtimeSubscription == null) {
+      unawaited(_realtimeClient.connect());
+      _realtimeSubscription = _realtimeClient.events.listen(
+        _handleRealtimeEvent,
+      );
+    }
     ref.onDispose(() {
       _realtimeRefreshTimer?.cancel();
       unawaited(_realtimeSubscription?.cancel());

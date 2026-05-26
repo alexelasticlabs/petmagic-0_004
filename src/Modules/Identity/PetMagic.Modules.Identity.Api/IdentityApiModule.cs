@@ -1,6 +1,8 @@
 using FluentValidation;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+
 using PetMagic.Modules.Identity.Api.Authentication;
 using PetMagic.Modules.Identity.Api.Endpoints;
 using PetMagic.Modules.Identity.Application.Contracts;

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
@@ -23,6 +24,7 @@ internal sealed class EmailDispatchWorker(
             return;
         }
 
+        var consecutiveFailures = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -40,6 +42,8 @@ internal sealed class EmailDispatchWorker(
                 {
                     await Task.Delay(options.DispatchPollIntervalMilliseconds, stoppingToken);
                 }
+
+                consecutiveFailures = 0;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -47,9 +51,18 @@ internal sealed class EmailDispatchWorker(
             }
             catch (Exception exception)
             {
+                consecutiveFailures++;
                 logger.LogError(exception, "Email dispatch worker loop failed.");
-                await Task.Delay(options.DispatchPollIntervalMilliseconds, stoppingToken);
+                await Task.Delay(GetBackoffDelay(options.DispatchPollIntervalMilliseconds, consecutiveFailures), stoppingToken);
             }
         }
+    }
+
+    private static TimeSpan GetBackoffDelay(int pollIntervalMilliseconds, int consecutiveFailures)
+    {
+        var baseDelayMilliseconds = Math.Max(1_000, pollIntervalMilliseconds);
+        var multiplier = 1 << Math.Min(consecutiveFailures - 1, 5);
+        var delayMilliseconds = Math.Min(baseDelayMilliseconds * multiplier, 300_000);
+        return TimeSpan.FromMilliseconds(delayMilliseconds);
     }
 }

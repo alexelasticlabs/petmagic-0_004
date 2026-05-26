@@ -1,4 +1,3 @@
-using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -64,18 +63,18 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_economy_currency_packs_Code_CurrencyCode",
                 table: "economy_currency_packs",
-                columns: new[] { "Code", "CurrencyCode" },
+                columns: ["Code", "CurrencyCode"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_currency_packs_CurrencyCode_IsActive_SortOrder",
                 table: "economy_currency_packs",
-                columns: new[] { "CurrencyCode", "IsActive", "SortOrder" });
+                columns: ["CurrencyCode", "IsActive", "SortOrder"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_wallet_ledger_UserId_CreatedAtUtc",
                 table: "economy_wallet_ledger",
-                columns: new[] { "UserId", "CreatedAtUtc" });
+                columns: ["UserId", "CreatedAtUtc"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_wallets_UpdatedAtUtc",

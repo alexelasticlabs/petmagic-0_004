@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -110,49 +109,49 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_economy_payment_provider_configs_Platform_IsEnabled",
                 table: "economy_payment_provider_configs",
-                columns: new[] { "Platform", "IsEnabled" });
+                columns: ["Platform", "IsEnabled"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_payment_provider_configs_Provider_Platform_Region",
                 table: "economy_payment_provider_configs",
-                columns: new[] { "Provider", "Platform", "Region" },
+                columns: ["Provider", "Platform", "Region"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_subscription_event_logs_Provider_ExternalEventId",
                 table: "economy_subscription_event_logs",
-                columns: new[] { "Provider", "ExternalEventId" });
+                columns: ["Provider", "ExternalEventId"]);
 
             migrationBuilder.CreateIndex(
-                name: "IX_economy_subscription_event_logs_Provider_ExternalSubscripti~",
+                name: "IX_economy_subscription_event_logs_Provider_ExternalSubscriptionId",
                 table: "economy_subscription_event_logs",
-                columns: new[] { "Provider", "ExternalSubscriptionId" });
+                columns: ["Provider", "ExternalSubscriptionId"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_subscription_event_logs_UserId_CreatedAtUtc",
                 table: "economy_subscription_event_logs",
-                columns: new[] { "UserId", "CreatedAtUtc" });
+                columns: ["UserId", "CreatedAtUtc"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_subscription_plans_IsActive_DisplayOrder",
                 table: "economy_subscription_plans",
-                columns: new[] { "IsActive", "DisplayOrder" });
+                columns: ["IsActive", "DisplayOrder"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_user_subscriptions_Provider_ExternalSubscriptionId",
                 table: "economy_user_subscriptions",
-                columns: new[] { "Provider", "ExternalSubscriptionId" },
+                columns: ["Provider", "ExternalSubscriptionId"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_user_subscriptions_UserId_Status_CurrentPeriodEndUtc",
                 table: "economy_user_subscriptions",
-                columns: new[] { "UserId", "Status", "CurrentPeriodEndUtc" });
+                columns: ["UserId", "Status", "CurrentPeriodEndUtc"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_user_subscriptions_UserId_UpdatedAtUtc",
                 table: "economy_user_subscriptions",
-                columns: new[] { "UserId", "UpdatedAtUtc" });
+                columns: ["UserId", "UpdatedAtUtc"]);
         }
 
         /// <inheritdoc />

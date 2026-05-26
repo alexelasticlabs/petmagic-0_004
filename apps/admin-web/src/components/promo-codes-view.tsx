@@ -85,7 +85,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const [selectedCodeId, setSelectedCodeId] = useState<string | null>(null);
   const [form, setForm] = useState<PromoForm>(() => createDefaultPromoForm());
   const [feedback, setFeedback] = useState<PromoFeedback | null>(null);
-  const [nowTick, setNowTick] = useState(() => Date.now());
   const [busyCodeId, setBusyCodeId] = useState<string | null>(null);
   const [showAllActivations, setShowAllActivations] = useState(false);
   const [activationsPage, setActivationsPage] = useState(1);
@@ -101,16 +100,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       ensureAdminSession(locale, router);
     }
   }, [locale, router, session]);
-
-  useEffect(() => {
-    const timerId = window.setInterval(() => {
-      setNowTick(Date.now());
-    }, 1000);
-
-    return () => {
-      window.clearInterval(timerId);
-    };
-  }, []);
 
   useEffect(() => {
     if (!isEditorOpen) {
@@ -348,26 +337,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       return isActive && new Date(code.updatedAtUtc).getTime() >= sevenDaysAgo;
     }).length;
 
-    const usesLast7d = promoCodes.reduce(
-      (sum, code) =>
-        sum +
-        code.redemptions.filter(
-          (redemption) => new Date(redemption.redeemedAtUtc).getTime() >= sevenDaysAgo
-        ).length,
-      0
-    );
+    const usesLast7d = promoCodes.reduce((sum, code) => sum + code.usesLast7d, 0);
 
     const grantedLast7d = promoCodes.reduce((sum, code) => {
-      return (
-        sum +
-        code.redemptions
-          .filter(
-            (redemption) =>
-              new Date(redemption.redeemedAtUtc).getTime() >= sevenDaysAgo &&
-              redemption.rewardKind === "spark"
-          )
-          .reduce((innerSum, redemption) => innerSum + redemption.rewardValue, 0)
-      );
+      return sum + code.grantedLast7d;
     }, 0);
 
     return {
@@ -419,16 +392,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const shownRangeEnd = hasFilteredCodes
     ? Math.min(filteredCodes.length, currentPage * pageSize)
     : 0;
-
-  const secondsUntilAutoRefresh = useMemo(() => {
-    if (!promoCodesQuery.dataUpdatedAt) {
-      return Math.ceil(PROMO_CODES_AUTO_REFRESH_MS / 1000);
-    }
-
-    const elapsed = Math.max(0, nowTick - promoCodesQuery.dataUpdatedAt);
-    const remaining = PROMO_CODES_AUTO_REFRESH_MS - (elapsed % PROMO_CODES_AUTO_REFRESH_MS);
-    return Math.max(1, Math.ceil(remaining / 1000));
-  }, [nowTick, promoCodesQuery.dataUpdatedAt]);
 
   const visiblePageNumbers = useMemo(() => {
     const maxVisible = 5;
@@ -760,7 +723,8 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           hasCodes={hasCodes}
           hasFilteredCodes={hasFilteredCodes}
           promoCodesQueryIsFetching={promoCodesQuery.isFetching}
-          secondsUntilAutoRefresh={secondsUntilAutoRefresh}
+          autoRefreshMs={PROMO_CODES_AUTO_REFRESH_MS}
+          dataUpdatedAt={promoCodesQuery.dataUpdatedAt}
           pagedCodes={pagedCodes}
           filteredCodesCount={filteredCodes.length}
           selectedCodeId={selectedCodeId}

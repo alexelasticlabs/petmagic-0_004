@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 

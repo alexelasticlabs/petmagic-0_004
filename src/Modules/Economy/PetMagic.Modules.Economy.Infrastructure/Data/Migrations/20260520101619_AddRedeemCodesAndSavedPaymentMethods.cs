@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -99,19 +98,19 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_economy_payment_customers_Provider_ExternalCustomerId",
                 table: "economy_payment_customers",
-                columns: new[] { "Provider", "ExternalCustomerId" },
+                columns: ["Provider", "ExternalCustomerId"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_redeem_code_redemptions_RedeemCodeId_UserId",
                 table: "economy_redeem_code_redemptions",
-                columns: new[] { "RedeemCodeId", "UserId" },
+                columns: ["RedeemCodeId", "UserId"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_redeem_code_redemptions_UserId_RedeemedAtUtc",
                 table: "economy_redeem_code_redemptions",
-                columns: new[] { "UserId", "RedeemedAtUtc" });
+                columns: ["UserId", "RedeemedAtUtc"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_redeem_codes_CodeHash",
@@ -122,18 +121,18 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_economy_redeem_codes_IsActive_ExpiresAtUtc",
                 table: "economy_redeem_codes",
-                columns: new[] { "IsActive", "ExpiresAtUtc" });
+                columns: ["IsActive", "ExpiresAtUtc"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_saved_payment_methods_Provider_ExternalPaymentMetho~",
                 table: "economy_saved_payment_methods",
-                columns: new[] { "Provider", "ExternalPaymentMethodId" },
+                columns: ["Provider", "ExternalPaymentMethodId"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_saved_payment_methods_UserId_IsActive_IsDefault",
                 table: "economy_saved_payment_methods",
-                columns: new[] { "UserId", "IsActive", "IsDefault" });
+                columns: ["UserId", "IsActive", "IsDefault"]);
         }
 
         /// <inheritdoc />

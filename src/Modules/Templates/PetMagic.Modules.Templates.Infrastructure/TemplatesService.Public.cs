@@ -1,11 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
-using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
-using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
-using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
@@ -75,7 +72,7 @@ internal sealed partial class TemplatesService
                 || (template.ShortDescription ?? string.Empty).ToLower().Contains(normalizedSearchLower)
                 || (template.Category ?? string.Empty).ToLower().Contains(normalizedSearchLower)
                 || (template.Tags ?? string.Empty).ToLower().Contains(normalizedSearchLower)
-                || ((template.PetPhotoRequirements ?? string.Empty).ToLower().Contains(normalizedSearchLower)));
+                || (template.PetPhotoRequirements ?? string.Empty).ToLower().Contains(normalizedSearchLower));
         }
 
         if (cursor is not null)
@@ -129,4 +126,3 @@ internal sealed partial class TemplatesService
         return Result.Success(MapPublicResponse(template));
     }
 }
-

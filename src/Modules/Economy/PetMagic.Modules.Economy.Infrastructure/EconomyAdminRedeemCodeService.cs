@@ -12,6 +12,8 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
 {
+    private const int AdminRedeemCodeRedemptionsPreviewLimit = 5;
+
     public async Task<Result<IReadOnlyList<AdminRedeemCodeResponse>>> ListAdminRedeemCodesAsync(CancellationToken cancellationToken)
     {
         var codes = await dbContext.RedeemCodes
@@ -20,22 +22,85 @@ internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
             .ToListAsync(cancellationToken);
 
         var codeIds = codes.Select(x => x.Id).ToArray();
-        var redemptions = await dbContext.RedeemCodeRedemptions
+
+        if (codeIds.Length == 0)
+        {
+            return Result.Success<IReadOnlyList<AdminRedeemCodeResponse>>([]);
+        }
+
+        var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+        var lastRedeemedAtByCode = await dbContext.RedeemCodeRedemptions
             .AsNoTracking()
             .Where(x => codeIds.Contains(x.RedeemCodeId))
-            .OrderByDescending(x => x.RedeemedAtUtc)
+            .GroupBy(x => x.RedeemCodeId)
+            .Select(group => new
+            {
+                RedeemCodeId = group.Key,
+                LastRedeemedAtUtc = group.Max(x => (DateTime?)x.RedeemedAtUtc)
+            })
+            .ToDictionaryAsync(x => x.RedeemCodeId, x => x.LastRedeemedAtUtc, cancellationToken);
+
+        var recentStatsByCode = await dbContext.RedeemCodeRedemptions
+            .AsNoTracking()
+            .Where(x => codeIds.Contains(x.RedeemCodeId) && x.RedeemedAtUtc >= sevenDaysAgo)
+            .GroupBy(x => x.RedeemCodeId)
+            .Select(group => new
+            {
+                RedeemCodeId = group.Key,
+                UsesLast7d = group.Count(),
+                GrantedLast7d = group.Sum(x => x.RewardKind == RedeemCodeRewardKind.Spark ? x.RewardValue : 0)
+            })
+            .ToDictionaryAsync(x => x.RedeemCodeId, cancellationToken);
+
+        var maxRedeemedBySingleUserByCode = await dbContext.RedeemCodeRedemptions
+            .AsNoTracking()
+            .Where(x => codeIds.Contains(x.RedeemCodeId))
+            .GroupBy(x => new { x.RedeemCodeId, x.UserId })
+            .Select(group => new
+            {
+                group.Key.RedeemCodeId,
+                Count = group.Count()
+            })
+            .GroupBy(x => x.RedeemCodeId)
+            .Select(group => new
+            {
+                RedeemCodeId = group.Key,
+                MaxRedeemedBySingleUser = group.Max(x => x.Count)
+            })
+            .ToDictionaryAsync(x => x.RedeemCodeId, x => x.MaxRedeemedBySingleUser, cancellationToken);
+
+        var redemptionPreviewRows = await dbContext.RedeemCodes
+            .AsNoTracking()
+            .Where(code => codeIds.Contains(code.Id))
+            .SelectMany(code => dbContext.RedeemCodeRedemptions
+                .AsNoTracking()
+                .Where(redemption => redemption.RedeemCodeId == code.Id)
+                .OrderByDescending(redemption => redemption.RedeemedAtUtc)
+                .ThenByDescending(redemption => redemption.Id)
+                .Take(AdminRedeemCodeRedemptionsPreviewLimit))
+            .Select(ToAdminRedeemCodeRedemptionResponseProjection())
             .ToListAsync(cancellationToken);
 
-        var redemptionsByCode = redemptions
+        var redemptionsByCode = redemptionPreviewRows
             .GroupBy(x => x.RedeemCodeId)
             .ToDictionary(
                 group => group.Key,
                 group => (IReadOnlyList<AdminRedeemCodeRedemptionResponse>)group
-                    .Select(ToAdminRedeemCodeRedemptionResponse)
+                    .Select(x => x.Response)
                     .ToList());
 
         var result = codes
-            .Select(code => ToAdminRedeemCodeResponse(code, redemptionsByCode.GetValueOrDefault(code.Id) ?? []))
+            .Select(code =>
+            {
+                recentStatsByCode.TryGetValue(code.Id, out var recentStats);
+                return ToAdminRedeemCodeResponse(
+                    code,
+                    redemptionsByCode.GetValueOrDefault(code.Id) ?? [],
+                    lastRedeemedAtByCode.GetValueOrDefault(code.Id),
+                    recentStats?.UsesLast7d ?? 0,
+                    recentStats?.GrantedLast7d ?? 0,
+                    maxRedeemedBySingleUserByCode.GetValueOrDefault(code.Id));
+            })
             .ToList();
 
         return Result.Success<IReadOnlyList<AdminRedeemCodeResponse>>(result);
@@ -201,17 +266,31 @@ internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
             .OrderByDescending(x => x.RedeemedAtUtc)
             .ToListAsync(cancellationToken);
 
-        return Result.Success(ToAdminRedeemCodeResponse(code, redemptions.Select(ToAdminRedeemCodeRedemptionResponse).ToList()));
+        return Result.Success(ToAdminRedeemCodeResponse(code, [.. redemptions.Select(ToAdminRedeemCodeRedemptionResponse)]));
     }
 
     private static AdminRedeemCodeResponse ToAdminRedeemCodeResponse(
         RedeemCode code,
-        IReadOnlyList<AdminRedeemCodeRedemptionResponse> redemptions)
+        IReadOnlyList<AdminRedeemCodeRedemptionResponse> redemptions,
+        DateTime? lastRedeemedAtUtc = null,
+        int? usesLast7d = null,
+        int? grantedLast7d = null,
+        int? maxRedeemedBySingleUser = null)
     {
-        var lastRedeemedAtUtc = redemptions
+        lastRedeemedAtUtc ??= redemptions
             .OrderByDescending(x => x.RedeemedAtUtc)
             .Select(x => (DateTime?)x.RedeemedAtUtc)
             .FirstOrDefault();
+        var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+        usesLast7d ??= redemptions.Count(x => x.RedeemedAtUtc >= sevenDaysAgo);
+        grantedLast7d ??= redemptions
+            .Where(x => x.RedeemedAtUtc >= sevenDaysAgo && x.RewardKind == RedeemCodeRewardKind.Spark)
+            .Sum(x => x.RewardValue);
+        maxRedeemedBySingleUser ??= redemptions
+            .GroupBy(x => x.UserId)
+            .Select(group => group.Count())
+            .DefaultIfEmpty(0)
+            .Max();
 
         return new AdminRedeemCodeResponse(
             code.Id,
@@ -233,7 +312,26 @@ internal sealed class EconomyAdminRedeemCodeService(EconomyDbContext dbContext)
             code.CampaignChannel,
             code.MinimumSuccessfulPurchases,
             code.CreatedBy,
-            lastRedeemedAtUtc);
+            lastRedeemedAtUtc,
+            usesLast7d.Value,
+            grantedLast7d.Value,
+            maxRedeemedBySingleUser.Value);
+    }
+
+    private sealed record AdminRedeemCodeRedemptionPreview(Guid RedeemCodeId, AdminRedeemCodeRedemptionResponse Response);
+
+    private static System.Linq.Expressions.Expression<Func<RedeemCodeRedemption, AdminRedeemCodeRedemptionPreview>> ToAdminRedeemCodeRedemptionResponseProjection()
+    {
+        return redemption => new AdminRedeemCodeRedemptionPreview(
+            redemption.RedeemCodeId,
+            new AdminRedeemCodeRedemptionResponse(
+                redemption.Id,
+                redemption.UserId,
+                redemption.RewardKind,
+                redemption.RewardValue,
+                redemption.WalletLedgerEntryId,
+                redemption.PremiumExpiresAtUtc,
+                redemption.RedeemedAtUtc));
     }
 
     private static AdminRedeemCodeRedemptionResponse ToAdminRedeemCodeRedemptionResponse(RedeemCodeRedemption redemption)

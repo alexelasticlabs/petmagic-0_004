@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -8,6 +7,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
     /// <inheritdoc />
     public partial class AddPurchasesAndWebhookEvents : Migration
     {
+        private static readonly string[] columns = ["Provider", "EventId"];
+
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -56,18 +57,18 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_economy_processed_webhook_events_Provider_EventId",
                 table: "economy_processed_webhook_events",
-                columns: new[] { "Provider", "EventId" },
+                columns: columns,
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_purchase_orders_PaymentProvider_ExternalPaymentId",
                 table: "economy_purchase_orders",
-                columns: new[] { "PaymentProvider", "ExternalPaymentId" });
+                columns: ["PaymentProvider", "ExternalPaymentId"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_economy_purchase_orders_UserId_CreatedAtUtc",
                 table: "economy_purchase_orders",
-                columns: new[] { "UserId", "CreatedAtUtc" });
+                columns: ["UserId", "CreatedAtUtc"]);
         }
 
         /// <inheritdoc />

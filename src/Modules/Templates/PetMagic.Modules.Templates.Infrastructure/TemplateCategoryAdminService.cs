@@ -27,7 +27,7 @@ internal sealed class TemplateCategoryAdminService(
             .ToArrayAsync(cancellationToken);
 
         var response = categories
-            .Select(category => MapAdminCategory(category, templates.Where(template => string.Equals(template.Category, category.Name, StringComparison.Ordinal)).ToArray()))
+            .Select(category => MapAdminCategory(category, [.. templates.Where(template => string.Equals(template.Category, category.Name, StringComparison.Ordinal))]))
             .ToArray();
 
         return Result.Success<IReadOnlyList<AdminTemplateCategoryListItemResponse>>(response);
@@ -184,11 +184,10 @@ internal sealed class TemplateCategoryAdminService(
 
     private static string[] NormalizeTags(IEnumerable<string> tags)
     {
-        return tags
+        return [.. tags
             .Select(tag => tag.Trim())
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     private static string[] DeserializeTags(string? tags)

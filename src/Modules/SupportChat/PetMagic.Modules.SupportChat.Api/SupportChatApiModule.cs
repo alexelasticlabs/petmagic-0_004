@@ -1,9 +1,11 @@
 using FluentValidation;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using PetMagic.Modules.SupportChat.Application.Abstractions;
+
 using PetMagic.Modules.SupportChat.Api.Endpoints;
 using PetMagic.Modules.SupportChat.Api.Realtime;
+using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Application.Validation;
 

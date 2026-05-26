@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;

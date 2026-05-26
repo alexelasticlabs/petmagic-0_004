@@ -63,42 +63,24 @@ export function usePromoActionsMenu() {
       closeActionsMenu();
     }
 
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [actionsMenuCodeId, closeActionsMenu]);
-
-  useEffect(() => {
-    if (!actionsMenuCodeId) {
-      return;
-    }
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         closeActionsMenu();
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [actionsMenuCodeId, closeActionsMenu]);
-
-  useEffect(() => {
-    if (!actionsMenuCodeId) {
-      return;
-    }
-
     function handleViewportChange() {
       closeActionsMenu();
     }
 
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("resize", handleViewportChange);
     window.addEventListener("scroll", handleViewportChange, true);
 
     return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("scroll", handleViewportChange, true);
     };

@@ -93,7 +93,6 @@ public sealed class SupportChatService(
     {
         var conversationsQuery = supportChatDbContext.SupportConversations
             .AsNoTracking()
-            .Include(x => x.Messages)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Status))
@@ -115,20 +114,41 @@ public sealed class SupportChatService(
             conversationsQuery = conversationsQuery.Where(x => x.AssignedAdminId == null);
         }
 
-        var conversations = await conversationsQuery
+        var conversationRows = await conversationsQuery
             .OrderByDescending(x => x.UpdatedAtUtc)
             .ThenByDescending(x => x.LastMessageAtUtc ?? x.CreatedAtUtc)
+            .Select(conversation => new
+            {
+                conversation.Id,
+                conversation.InitiatorUserId,
+                conversation.AssignedAdminId,
+                conversation.Status,
+                conversation.Priority,
+                conversation.LastMessageAtUtc,
+                conversation.CreatedAtUtc,
+                conversation.UpdatedAtUtc,
+                LastMessage = conversation.Messages
+                    .OrderByDescending(message => message.CreatedAtUtc)
+                    .Select(message => new
+                    {
+                        message.Body,
+                        message.CreatedAtUtc
+                    })
+                    .FirstOrDefault(),
+                UnreadAdminCount = conversation.Messages.Count(message => !message.IsFromAdmin && message.ReadAtUtc == null),
+                UnreadUserCount = conversation.Messages.Count(message => message.IsFromAdmin && message.ReadAtUtc == null)
+            })
             .ToListAsync(cancellationToken);
 
-        var relatedUserIds = conversations
+        var relatedUserIds = conversationRows
             .Select(x => x.InitiatorUserId)
-            .Concat(conversations.Where(x => x.AssignedAdminId.HasValue).Select(x => x.AssignedAdminId!.Value))
+            .Concat(conversationRows.Where(x => x.AssignedAdminId.HasValue).Select(x => x.AssignedAdminId!.Value))
             .Distinct()
             .ToList();
 
         var users = await identityUserLookupService.GetUsersByIdsAsync(relatedUserIds, cancellationToken);
 
-        var summaries = conversations.Select(conversation =>
+        var summaries = conversationRows.Select(conversation =>
         {
             users.TryGetValue(conversation.InitiatorUserId, out var initiator);
             IdentityUserLookup? assignedAdmin = null;
@@ -136,10 +156,6 @@ public sealed class SupportChatService(
             {
                 users.TryGetValue(conversation.AssignedAdminId.Value, out assignedAdmin);
             }
-
-            var lastMessage = conversation.Messages.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault();
-            var unreadAdminCount = conversation.Messages.Count(x => !x.IsFromAdmin && x.ReadAtUtc is null);
-            var unreadUserCount = conversation.Messages.Count(x => x.IsFromAdmin && x.ReadAtUtc is null);
 
             return new SupportConversationSummaryResponse(
                 conversation.Id,
@@ -150,10 +166,10 @@ public sealed class SupportChatService(
                 ResolveDisplayName(assignedAdmin?.Email, assignedAdmin?.DisplayName),
                 conversation.Status.ToString(),
                 conversation.Priority.ToString(),
-                lastMessage is null ? null : Truncate(lastMessage.Body, 140),
-                lastMessage?.CreatedAtUtc ?? conversation.LastMessageAtUtc,
-                unreadUserCount,
-                unreadAdminCount,
+                conversation.LastMessage is null ? null : Truncate(conversation.LastMessage.Body, 140),
+                conversation.LastMessage?.CreatedAtUtc ?? conversation.LastMessageAtUtc,
+                conversation.UnreadUserCount,
+                conversation.UnreadAdminCount,
                 conversation.CreatedAtUtc,
                 conversation.UpdatedAtUtc);
         }).ToList();
@@ -189,7 +205,7 @@ public sealed class SupportChatService(
             return Result.Failure<SupportMessageResponse>(Forbidden);
         }
 
-        var shouldAppendAutomaticReply = !command.IsAdmin && !conversation.Messages.Any();
+        var shouldAppendAutomaticReply = !command.IsAdmin && conversation.Messages.Count == 0;
 
         var message = await AppendMessageAsync(
             conversation,
@@ -316,6 +332,7 @@ public sealed class SupportChatService(
                 }
 
                 break;
+
             case SupportAttachmentUploadStatus.Uploaded:
                 if (string.IsNullOrWhiteSpace(command.AttachmentUrl)
                     || string.IsNullOrWhiteSpace(command.AttachmentFileName)
@@ -331,6 +348,7 @@ public sealed class SupportChatService(
                 message.AttachmentFileSizeBytes = command.AttachmentFileSizeBytes;
                 message.AttachmentUploadErrorCode = null;
                 break;
+
             case SupportAttachmentUploadStatus.Failed:
                 message.AttachmentUrl = null;
                 message.AttachmentFileSizeBytes = null;
@@ -338,6 +356,7 @@ public sealed class SupportChatService(
                     ? SupportChatErrors.AttachmentStorageFailed.Code
                     : command.AttachmentUploadErrorCode;
                 break;
+
             case SupportAttachmentUploadStatus.Retry:
                 message.AttachmentUrl = null;
                 message.AttachmentFileSizeBytes = null;
@@ -353,6 +372,7 @@ public sealed class SupportChatService(
                 }
 
                 break;
+
             default:
                 return Result.Failure<SupportMessageResponse>(SupportChatErrors.InvalidAttachmentUpload);
         }

@@ -3,11 +3,8 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
-using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
-using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
-using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
@@ -334,4 +331,3 @@ internal sealed partial class TemplatesService
         return obsoleteUrl;
     }
 }
-

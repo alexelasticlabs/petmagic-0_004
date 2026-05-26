@@ -10,8 +10,8 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
-using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure;
+using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 using PetMagic.Modules.Identity.Application.Abstractions;

@@ -10,20 +10,17 @@ using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Data;
-using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
-using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
-using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 using IdentityModuleDbContext = PetMagic.Modules.Identity.Infrastructure.Data.IdentityDbContext;
 using TemplatesContracts = PetMagic.Modules.Templates.Application.Contracts;
@@ -32,7 +29,6 @@ namespace PetMagic.Modules.Identity.Tests.Identity;
 
 public sealed partial class IdentityServiceProfileTests
 {
-
     private const string CurrentLegalVersion = "2026-05-20";
 
     private static IdentityModuleDbContext CreateIdentityDbContext()

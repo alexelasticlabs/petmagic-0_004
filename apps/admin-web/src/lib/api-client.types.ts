@@ -322,6 +322,9 @@ export type AdminRedeemCode = {
   createdAtUtc: string;
   updatedAtUtc: string;
   lastRedeemedAtUtc?: string | null;
+  usesLast7d: number;
+  grantedLast7d: number;
+  maxRedeemedBySingleUser: number;
   redemptions: AdminRedeemCodeRedemption[];
 };
 

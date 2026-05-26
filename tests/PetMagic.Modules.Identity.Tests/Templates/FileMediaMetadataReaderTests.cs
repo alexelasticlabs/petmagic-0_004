@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 

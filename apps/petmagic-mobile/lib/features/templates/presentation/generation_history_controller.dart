@@ -80,8 +80,12 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   GenerationHistoryState build() {
     _repository = ref.watch(templateGenerationRepositoryProvider);
     _realtimeClient = ref.watch(realtimeClientProvider);
-    unawaited(_realtimeClient.connect());
-    _realtimeSubscription = _realtimeClient.events.listen(_handleRealtimeEvent);
+    if (_realtimeSubscription == null) {
+      unawaited(_realtimeClient.connect());
+      _realtimeSubscription = _realtimeClient.events.listen(
+        _handleRealtimeEvent,
+      );
+    }
     ref.onDispose(() {
       unawaited(_realtimeSubscription?.cancel());
     });

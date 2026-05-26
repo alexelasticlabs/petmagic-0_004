@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mail;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;

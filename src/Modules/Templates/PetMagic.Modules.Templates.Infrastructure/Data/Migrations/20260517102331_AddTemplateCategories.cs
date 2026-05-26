@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -30,7 +29,7 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_templates_categories_IsArchived_Name",
                 table: "templates_categories",
-                columns: new[] { "IsArchived", "Name" });
+                columns: ["IsArchived", "Name"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_templates_categories_NormalizedName",

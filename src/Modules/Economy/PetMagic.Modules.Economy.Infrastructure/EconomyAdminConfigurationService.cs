@@ -72,7 +72,7 @@ internal sealed class EconomyAdminConfigurationService(
             .ToListAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>(
-            configs.Select(ToAdminPaymentProviderConfigurationResponse).ToList());
+            [.. configs.Select(ToAdminPaymentProviderConfigurationResponse)]);
     }
 
     public async Task<Result<AdminPaymentProviderConfigurationResponse>> CreatePaymentProviderConfigurationAsync(
@@ -235,7 +235,7 @@ internal sealed class EconomyAdminConfigurationService(
                 appVersion,
                 false,
                 false,
-                string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase) ? IsStripeModeConfigured("test") || IsStripeModeConfigured("live") : true,
+                !string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase) || IsStripeModeConfigured("test") || IsStripeModeConfigured("live"),
                 "config_not_found",
                 "No enabled route matched provider/platform/region/appVersion.",
                 null));

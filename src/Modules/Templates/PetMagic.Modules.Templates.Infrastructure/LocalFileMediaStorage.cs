@@ -169,7 +169,7 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         if (normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
             var subtype = normalizedContentType["image/".Length..];
-            if (!ImageSubtypeExtensions.TryGetValue(subtype, out string? mappedImageExtension)
+            if (!ImageSubtypeExtensions.TryGetValue(subtype, out var mappedImageExtension)
                 || string.IsNullOrWhiteSpace(mappedImageExtension))
             {
                 return false;
@@ -213,7 +213,7 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
 
         var fileExtension = Path.GetExtension(fileName).Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(fileExtension)
-            || !ExtensionContentTypes.TryGetValue(fileExtension, out string? extensionContentType)
+            || !ExtensionContentTypes.TryGetValue(fileExtension, out var extensionContentType)
             || string.IsNullOrWhiteSpace(extensionContentType))
         {
             return false;

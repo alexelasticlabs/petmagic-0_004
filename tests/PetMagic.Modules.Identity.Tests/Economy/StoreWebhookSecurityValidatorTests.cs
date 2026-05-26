@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Options;

@@ -1,6 +1,7 @@
-using System.Text.Json;
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Threading.Channels;
+
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 

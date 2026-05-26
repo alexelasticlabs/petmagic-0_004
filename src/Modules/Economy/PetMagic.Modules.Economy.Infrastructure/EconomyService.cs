@@ -1,7 +1,4 @@
 using System.Data;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.RegularExpressions;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -16,9 +13,6 @@ using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 using PetMagic.Modules.Identity.Application.Abstractions;
-using PetMagic.Modules.Identity.Application.Contracts;
-
-using Stripe;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
@@ -32,6 +26,7 @@ public sealed partial class EconomyService(
 {
     private readonly EconomyAdminConfigurationService _adminConfigurationService =
         new(dbContext, options);
+
     private readonly EconomyAdminRedeemCodeService _adminRedeemCodeService =
         new(dbContext);
 
@@ -333,7 +328,4 @@ public sealed partial class EconomyService(
             options.Value.ReferralBonusSpark,
             now));
     }
-
-
 }
-

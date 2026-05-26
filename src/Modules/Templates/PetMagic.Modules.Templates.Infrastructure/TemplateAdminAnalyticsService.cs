@@ -61,16 +61,16 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var durationSamples = await dbContext.TemplateGenerationJobs
+        var averageGenerationSeconds = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.TemplateId == templateId
                 && x.Status == TemplateGenerationStatus.Completed
                 && x.StartedAtUtc.HasValue
-                && x.CompletedAtUtc.HasValue)
-            .Select(x => (x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds)
-            .ToArrayAsync(cancellationToken);
+                && x.CompletedAtUtc.HasValue
+                && x.CompletedAtUtc >= x.StartedAtUtc)
+            .Select(x => (double?)(x.CompletedAtUtc!.Value - x.StartedAtUtc!.Value).TotalSeconds)
+            .AverageAsync(cancellationToken);
 
-        var validDurationSamples = durationSamples.Where(x => x >= 0).ToArray();
         var totalRuns = summary?.TotalRuns ?? 0;
         var completedRuns = summary?.CompletedRuns ?? 0;
         var successRatePercent = totalRuns == 0
@@ -82,9 +82,9 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
         var averageProviderCostUsd = summary is null || summary.ProviderCostSamples == 0
             ? 0m
             : Math.Round(summary.TotalProviderCostUsd / summary.ProviderCostSamples, 4, MidpointRounding.AwayFromZero);
-        double? averageGenerationSeconds = validDurationSamples.Length == 0
+        averageGenerationSeconds = averageGenerationSeconds is null
             ? null
-            : Math.Round(validDurationSamples.Average(), 1, MidpointRounding.AwayFromZero);
+            : Math.Round(averageGenerationSeconds.Value, 1, MidpointRounding.AwayFromZero);
 
         return Result.Success(new AdminTemplateStatisticsResponse(
             templateId,

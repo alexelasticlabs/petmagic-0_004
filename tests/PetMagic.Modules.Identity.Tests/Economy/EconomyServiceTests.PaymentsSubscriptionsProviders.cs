@@ -1,26 +1,15 @@
-using System.Security.Cryptography;
 using System.Text;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
-using PetMagic.BuildingBlocks.Results;
-using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
-using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
-using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
-using PetMagic.Modules.Economy.Infrastructure.Options;
-using PetMagic.Modules.Economy.Infrastructure.Payments;
-using PetMagic.Modules.Identity.Application.Abstractions;
-using PetMagic.Modules.Identity.Application.Contracts;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
 public sealed partial class EconomyServiceTests
 {
-
     [Fact]
     public async Task HandleStripeWebhook_ShouldBeIdempotent()
     {
@@ -554,5 +543,4 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("allowed", result.Value.DecisionCode);
         Assert.NotNull(result.Value.MatchedConfiguration);
     }
-
 }

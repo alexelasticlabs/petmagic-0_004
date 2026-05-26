@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using PetMagic.Modules.SupportChat.Application.Contracts;
 namespace PetMagic.Modules.SupportChat.Application.Validation;
 

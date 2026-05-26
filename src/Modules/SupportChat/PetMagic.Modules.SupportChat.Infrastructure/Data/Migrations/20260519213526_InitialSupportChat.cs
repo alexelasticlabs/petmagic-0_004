@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -72,17 +71,17 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_support_conversations_Status_UpdatedAtUtc",
                 table: "support_conversations",
-                columns: new[] { "Status", "UpdatedAtUtc" });
+                columns: ["Status", "UpdatedAtUtc"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_support_messages_ConversationId_CreatedAtUtc",
                 table: "support_messages",
-                columns: new[] { "ConversationId", "CreatedAtUtc" });
+                columns: ["ConversationId", "CreatedAtUtc"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_support_messages_ConversationId_IsFromAdmin_ReadAtUtc",
                 table: "support_messages",
-                columns: new[] { "ConversationId", "IsFromAdmin", "ReadAtUtc" });
+                columns: ["ConversationId", "IsFromAdmin", "ReadAtUtc"]);
         }
 
         /// <inheritdoc />

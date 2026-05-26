@@ -187,7 +187,7 @@ internal sealed class LocalSupportAttachmentStorage(
         {
             var fileExtension = Path.GetExtension(fileName).Trim().ToLowerInvariant();
             if (string.IsNullOrWhiteSpace(fileExtension)
-                || !ExtensionContentTypes.TryGetValue(fileExtension, out string? extensionContentType)
+                || !ExtensionContentTypes.TryGetValue(fileExtension, out var extensionContentType)
                 || string.IsNullOrWhiteSpace(extensionContentType))
             {
                 return false;

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;

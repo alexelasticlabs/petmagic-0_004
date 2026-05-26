@@ -1,5 +1,7 @@
 using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -344,12 +346,11 @@ internal sealed class TemplateGenerationService(
 
     private static string[] NormalizeFeedbackReasons(IReadOnlyCollection<string> rawReasons)
     {
-        return rawReasons
+        return [.. rawReasons
             .Select(x => NormalizeOptionalText(x, 120))
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Cast<string>()
-            .ToArray();
+            .Cast<string>()];
     }
 
     private static string? ResolveFeedbackModel(TemplateGenerationJob job)

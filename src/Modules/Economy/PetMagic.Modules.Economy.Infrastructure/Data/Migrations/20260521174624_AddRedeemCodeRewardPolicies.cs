@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -67,7 +66,7 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_economy_redeem_code_redemptions_RedeemCodeId_UserId",
                 table: "economy_redeem_code_redemptions",
-                columns: new[] { "RedeemCodeId", "UserId" });
+                columns: ["RedeemCodeId", "UserId"]);
         }
 
         /// <inheritdoc />
@@ -115,7 +114,7 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_economy_redeem_code_redemptions_RedeemCodeId_UserId",
                 table: "economy_redeem_code_redemptions",
-                columns: new[] { "RedeemCodeId", "UserId" },
+                columns: ["RedeemCodeId", "UserId"],
                 unique: true);
         }
     }

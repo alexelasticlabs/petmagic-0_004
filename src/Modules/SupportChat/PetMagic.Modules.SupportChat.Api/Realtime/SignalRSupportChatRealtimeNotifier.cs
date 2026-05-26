@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 
 namespace PetMagic.Modules.SupportChat.Api.Realtime;
