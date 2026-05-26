@@ -10,6 +10,14 @@ import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { buildLocaleSwitchPath, getAdminPageMeta, stripLocalePrefix } from "@/lib/admin-navigation";
 import { logout, useAuthSession } from "@/lib/api-client";
 import { type Locale, getDictionary } from "@/lib/i18n";
+import {
+  type AdminTheme,
+  applyAdminTheme,
+  nextAdminTheme,
+  readStoredAdminTheme,
+  resolveAdminTheme,
+  storeAdminTheme,
+} from "@/lib/theme";
 
 type AdminShellProps = { locale: Locale; children: ReactNode };
 
@@ -27,6 +35,18 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<AdminTheme>(() => {
+    if (typeof window === "undefined") {
+      return "dark";
+    }
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    return resolveAdminTheme(readStoredAdminTheme(), media.matches);
+  });
+
+  useEffect(() => {
+    applyAdminTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!isLoginPage && session === null) {
@@ -37,7 +57,9 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   /* Keyboard: close sidebar on Escape */
   useEffect(() => {
     if (!sidebarOpen) return;
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setSidebarOpen(false); }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSidebarOpen(false);
+    }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
@@ -47,9 +69,22 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     router.replace(`/${locale}`);
   }
 
+  function handleToggleTheme() {
+    setTheme((currentTheme) => {
+      const nextThemeValue = nextAdminTheme(currentTheme);
+      applyAdminTheme(nextThemeValue);
+      storeAdminTheme(nextThemeValue);
+      return nextThemeValue;
+    });
+  }
+
   /* ── Login screen ───────────────────────────────────────────── */
   if (isLoginPage) {
-    return <AdminLoginScreen locale={locale}>{children}</AdminLoginScreen>;
+    return (
+      <AdminLoginScreen locale={locale} theme={theme} onToggleTheme={handleToggleTheme}>
+        {children}
+      </AdminLoginScreen>
+    );
   }
 
   if (session == null) {
@@ -65,16 +100,22 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
   /* ── Admin panel layout ────────────────────────────────────── */
   const userName = session?.user?.displayName || session?.user?.email?.split("@")[0] || "";
-  const userRole = session?.user?.roles?.[0] || (locale === "ru" ? "Администратор" : "Administrator");
+  const userRole =
+    session?.user?.roles?.[0] || (locale === "ru" ? "Администратор" : "Administrator");
   const userInitial = (session?.user?.displayName || session?.user?.email || "A")[0].toUpperCase();
-  const userBadgeName = session?.user?.displayName || session?.user?.email || (locale === "ru" ? "Администратор" : "Administrator");
+  const userBadgeName =
+    session?.user?.displayName ||
+    session?.user?.email ||
+    (locale === "ru" ? "Администратор" : "Administrator");
   const pageMeta = getAdminPageMeta(locale, currentPath, userName);
   const ruPath = buildLocaleSwitchPath("ru", pathname);
   const enPath = buildLocaleSwitchPath("en", pathname);
 
   return (
     <div className={styles.layout}>
-      {sidebarOpen ? <div className={styles.backdrop} onClick={() => setSidebarOpen(false)} aria-hidden="true" /> : null}
+      {sidebarOpen ? (
+        <div className={styles.backdrop} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+      ) : null}
 
       <AdminSidebar
         locale={locale}
@@ -90,6 +131,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
           locale={locale}
           pageTitle={pageMeta.title}
           pageDescription={pageMeta.description}
+          theme={theme}
           userName={userBadgeName}
           userRole={userRole}
           userInitial={userInitial}
@@ -97,6 +139,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
           enPath={enPath}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((current) => !current)}
+          onToggleTheme={handleToggleTheme}
         />
 
         <main className={styles.content}>{children}</main>

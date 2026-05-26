@@ -34,6 +34,9 @@ jobs:
       - name: Generate localization
         run: flutter gen-l10n
 
+      - name: Verify generation localization completeness
+        run: dart run tool/check_generation_status_l10n.dart
+
       - name: Analyze
         run: flutter analyze
 

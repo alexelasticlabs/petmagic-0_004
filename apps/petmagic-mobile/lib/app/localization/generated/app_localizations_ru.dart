@@ -1969,4 +1969,440 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get rewardsActionComingSoon => 'Центр наград скоро появится.';
+
+  @override
+  String get templateFlowPhotoSourceGallery => 'Галерея';
+
+  @override
+  String get templateFlowPhotoSourceCamera => 'Камера';
+
+  @override
+  String get templateFlowReadyTitle => 'Готово к созданию!';
+
+  @override
+  String get templateFlowCheckDetailsSubtitle =>
+      'Проверьте детали перед созданием';
+
+  @override
+  String get templateFlowTemplateLabel => 'Шаблон';
+
+  @override
+  String get templateFlowCostLabel => 'Стоимость';
+
+  @override
+  String get templateFlowBalanceLabel => 'Ваш баланс';
+
+  @override
+  String get templateFlowDurationHint =>
+      'Создание может занять от 10 секунд до 1 минуты.';
+
+  @override
+  String get templateFlowCreateMagicAction => 'Создать магию';
+
+  @override
+  String get templateFlowChangePhotoAction => 'Изменить фото';
+
+  @override
+  String get templateFlowPremiumTemplateTitle => 'Premium-шаблон';
+
+  @override
+  String get templateFlowPremiumTemplateMessage =>
+      'Этот шаблон доступен с Premium.';
+
+  @override
+  String get templateFlowInsufficientBalanceTitle => 'Недостаточно PawSpark';
+
+  @override
+  String templateFlowInsufficientBalanceMessage(
+    Object tokenCost,
+    Object balance,
+  ) {
+    return 'Шаблон стоит $tokenCost PawSpark. Ваш баланс: $balance PawSpark.';
+  }
+
+  @override
+  String get templateFlowChooseAnotherTemplateAction => 'Выбрать другой шаблон';
+
+  @override
+  String get templateFlowCreateFailedTitle => 'Не получилось создать магию';
+
+  @override
+  String get templateFlowCreateFailedBalanceHint =>
+      'Пополните баланс и запустите создание еще раз.';
+
+  @override
+  String get templateFlowCreateFailedRetryHint =>
+      'Попробуйте другое фото или повторите позже.';
+
+  @override
+  String get templateFlowCreateHint => 'Это может занять немного времени';
+
+  @override
+  String get templateFlowStepProcessPhoto => 'Обработка фото';
+
+  @override
+  String get templateFlowStepAnalyzePet => 'Анализ питомца';
+
+  @override
+  String get templateFlowStepCreateMagic => 'Создание волшебства';
+
+  @override
+  String get templateFlowStepFinalTouches => 'Финальные штрихи';
+
+  @override
+  String get templateFlowTopUpBalanceAction => 'Пополнить баланс';
+
+  @override
+  String get templateFlowResultReadyTitle => 'Готово!';
+
+  @override
+  String get templateFlowResultReadySubtitle => 'Ваша магия готова';
+
+  @override
+  String get templateFlowResultUnavailable => 'Результат пока недоступен';
+
+  @override
+  String get templateFlowLoadingResult => 'Загружаем результат...';
+
+  @override
+  String get templateFlowResultLoadFailed => 'Не удалось загрузить результат';
+
+  @override
+  String get templateFlowCreateMoreAction => 'Создать еще';
+
+  @override
+  String get templateFlowPreviewFallback => 'Превью';
+
+  @override
+  String get templateFlowLoadingPreview => 'Загружаем превью...';
+
+  @override
+  String get templateFlowPreviewUnavailable => 'Превью недоступно';
+
+  @override
+  String get templateFlowLoadingVideo => 'Загружаем видео...';
+
+  @override
+  String get templateFlowBestPhotoTitle => 'Лучшее фото для этого шаблона:';
+
+  @override
+  String get templateFlowUploadPetPhotoAction => 'Загрузить фото питомца';
+
+  @override
+  String get templateFlowPremiumRequiredError =>
+      'Этот шаблон доступен только с Premium.';
+
+  @override
+  String get templateFlowInsufficientBalanceError =>
+      'Недостаточно PawSpark для запуска генерации.';
+
+  @override
+  String get templateFlowNetworkError =>
+      'Нет соединения. Проверьте интернет и попробуйте снова.';
+
+  @override
+  String get templateFlowServerError =>
+      'Сервис временно недоступен. Попробуйте чуть позже.';
+
+  @override
+  String get templateFlowStartFailedError =>
+      'Не удалось запустить генерацию. Попробуйте еще раз.';
+
+  @override
+  String get generationStatusTitle => 'Статус генерации';
+
+  @override
+  String get generationStatusCreatedLabel => 'Создано';
+
+  @override
+  String get generationStatusStartedLabel => 'Начато';
+
+  @override
+  String get generationStatusTypeLabel => 'Тип';
+
+  @override
+  String get generationStatusAttemptLabel => 'Попытка';
+
+  @override
+  String get generationStatusUntitledFallback => 'Без названия';
+
+  @override
+  String get generationStatusDetailsTitle => 'Детали';
+
+  @override
+  String get generationStatusFeedbackTitle => 'Как вам результат?';
+
+  @override
+  String get generationStatusFeedbackExcellent => 'Отлично';
+
+  @override
+  String get generationStatusFeedbackOkay => 'Нормально';
+
+  @override
+  String get generationStatusFeedbackBad => 'Не очень';
+
+  @override
+  String get generationStatusSaveAction => 'Сохранить';
+
+  @override
+  String get generationStatusDeleteAction => 'Удалить';
+
+  @override
+  String get generationStatusReportProblemAction => 'Сообщить о проблеме';
+
+  @override
+  String get generationStatusPickAnotherPhotoAction => 'Выбрать другое фото';
+
+  @override
+  String get generationStatusRetryAction => 'Попробовать снова';
+
+  @override
+  String get generationStatusContactSupportAction => 'Сообщить в поддержку';
+
+  @override
+  String get generationStatusOpenGalleryAction => 'Открыть галерею';
+
+  @override
+  String get generationStatusOpenStatusAction => 'Открыть статус';
+
+  @override
+  String get generationStatusCancelGenerationAction => 'Отменить генерацию';
+
+  @override
+  String get generationStatusResultUnavailableForSave =>
+      'Результат пока недоступен для сохранения.';
+
+  @override
+  String get generationStatusResultUnavailableForShare =>
+      'Результат пока недоступен для шаринга.';
+
+  @override
+  String get generationStatusSaveFileDialogTitle => 'Сохранить файл';
+
+  @override
+  String get generationStatusFileSavedMessage => 'Файл сохранен на устройство.';
+
+  @override
+  String get generationStatusFileSaveFailedMessage =>
+      'Не удалось сохранить файл. Попробуйте снова.';
+
+  @override
+  String get generationStatusDeleteSoonMessage => 'Удаление скоро добавим.';
+
+  @override
+  String get generationStatusCancelSoonMessage =>
+      'Отмена генерации появится в ближайшем обновлении.';
+
+  @override
+  String get generationStatusRetrySoonMessage =>
+      'Попробуйте выбрать фото и запустить генерацию снова.';
+
+  @override
+  String get generationStatusFeedbackThanksMessage =>
+      'Спасибо! Ваш отзыв поможет улучшить PetMagic.';
+
+  @override
+  String get generationStatusResultTitle => 'Результат PetMagic';
+
+  @override
+  String get generationStatusNonTerminalHint =>
+      'Обычно это занимает несколько минут. Вы можете продолжить пользоваться приложением.';
+
+  @override
+  String get generationStatusStageQueued => 'В очереди';
+
+  @override
+  String get generationStatusStageDone => 'Готово';
+
+  @override
+  String get generationStatusVideoReady => 'Видео готово';
+
+  @override
+  String get generationStatusShareVideoAction => 'Поделиться видео';
+
+  @override
+  String get generationStatusFailedTitle => 'Не удалось создать результат';
+
+  @override
+  String get generationStatusTokensRefundedHint =>
+      'Токены возвращены на ваш баланс.';
+
+  @override
+  String get generationStatusTokensRefundedShort => 'Токены возвращены';
+
+  @override
+  String get generationStatusSupportHint =>
+      'Если ошибка повторится, напишите в поддержку.';
+
+  @override
+  String get generationStatusBackgroundHint =>
+      'Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.';
+
+  @override
+  String get generationStatusDownloadAction => 'Скачать';
+
+  @override
+  String get generationStatusContinueInAppAction => 'Продолжить в приложении';
+
+  @override
+  String get generationStatusFeedbackImproveTitle => 'Что можно улучшить?';
+
+  @override
+  String get generationStatusFeedbackCommentLabel => 'Комментарий';
+
+  @override
+  String get generationStatusFeedbackCommentHint =>
+      'Расскажите коротко, что не так';
+
+  @override
+  String get generationStatusFeedbackSubmitAction => 'Отправить отзыв';
+
+  @override
+  String get generationStatusFeedbackReasonPetNotSimilar =>
+      'Питомец плохо похож на себя';
+
+  @override
+  String get generationStatusFeedbackReasonFaceDistorted =>
+      'Морда или лицо искажены';
+
+  @override
+  String get generationStatusFeedbackReasonStrangeMotion =>
+      'Движение выглядит странно';
+
+  @override
+  String get generationStatusFeedbackReasonPreviewMismatch =>
+      'Результат отличается от превью';
+
+  @override
+  String get generationStatusFeedbackReasonLowQuality =>
+      'Качество получилось низким';
+
+  @override
+  String get generationStatusFeedbackReasonStyleDisliked =>
+      'Не понравился стиль';
+
+  @override
+  String get generationStatusFeedbackReasonOther => 'Другое';
+
+  @override
+  String generationStatusEtaEstimated(Object value) {
+    return 'Примерно $value осталось';
+  }
+
+  @override
+  String get generationStatusEtaQueued => 'Ожидание в очереди';
+
+  @override
+  String get generationStatusEtaFinalizing => 'Почти готово';
+
+  @override
+  String get generationStatusEtaDefault => 'Примерно 1-2 мин осталось';
+
+  @override
+  String get generationStatusEtaStartsSoon => 'Начнем через несколько минут';
+
+  @override
+  String get generationStatusEtaNotifyHint =>
+      'Мы сообщим, когда результат будет готов.';
+
+  @override
+  String get generationStatusFailurePhotoHint =>
+      'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
+
+  @override
+  String get generationStatusFailureTechnicalHint =>
+      'Не удалось создать результат из-за технической ошибки. Мы вернули токены на ваш баланс.';
+
+  @override
+  String get generationStatusStatusCompleted => 'Ваш результат готов';
+
+  @override
+  String get generationStatusStatusFailed => 'Не удалось создать результат';
+
+  @override
+  String get generationStatusStatusCreatingMagic => 'Создаем магию...';
+
+  @override
+  String get generationStatusTerminalRefundedHint =>
+      'Токены возвращены автоматически.';
+
+  @override
+  String get generationStatusTerminalFailureHint =>
+      'Техническая ошибка уже зафиксирована.';
+
+  @override
+  String get generationStatusTerminalSuccessHint =>
+      'Откройте результат, поделитесь им или оставьте отзыв.';
+
+  @override
+  String get generationStatusSectionActive => 'В процессе';
+
+  @override
+  String get generationStatusSectionReady => 'Готово';
+
+  @override
+  String get generationStatusSectionFailed => 'Ошибка';
+
+  @override
+  String get generationStatusFilterActive => 'В процессе';
+
+  @override
+  String get generationStatusFilterReady => 'Готово';
+
+  @override
+  String get generationStatusFilterFailed => 'Ошибка';
+
+  @override
+  String generationStatusShowMoreAction(int hiddenCount) {
+    return 'Показать еще ($hiddenCount) ▾';
+  }
+
+  @override
+  String get generationStatusCollapseAction => 'Свернуть ▲';
+
+  @override
+  String get generationStatusActiveInfoHint =>
+      'Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.';
+
+  @override
+  String generationStatusUnreadCount(int count) {
+    return '$count новых';
+  }
+
+  @override
+  String get generationStatusEmptyTitle => 'Здесь появятся ваши результаты';
+
+  @override
+  String get generationStatusEmptyMessage =>
+      'Выберите шаблон, загрузите фото питомца и создайте первый магический арт.';
+
+  @override
+  String get generationStatusSubtitleAll => 'Ваши магические создания';
+
+  @override
+  String get generationStatusSubtitleActive => 'Активные генерации';
+
+  @override
+  String get generationStatusSubtitleReady => 'Ваши готовые результаты';
+
+  @override
+  String get generationStatusSubtitleFailed => 'Проблемы с генерацией';
+
+  @override
+  String generationStatusDateToday(Object time) {
+    return 'Сегодня, $time';
+  }
+
+  @override
+  String generationStatusDateYesterday(Object time) {
+    return 'Вчера, $time';
+  }
+
+  @override
+  String shellActiveGenerationLabel(Object templateTitle) {
+    return '✨ Создаем $templateTitle';
+  }
+
+  @override
+  String get shellActiveGenerationFallback => 'результат';
 }

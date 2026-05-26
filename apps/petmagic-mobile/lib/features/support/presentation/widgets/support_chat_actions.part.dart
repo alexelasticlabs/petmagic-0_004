@@ -259,18 +259,17 @@ extension _SupportChatPageActions on _SupportChatPageState {
     try {
       final bytes = await _downloadImageBytesImpl(imageUrl);
       final safeFileName = _safeImageFileNameImpl(fileName);
-      final targetPath = await FilePicker.platform.saveFile(
+      final wasSaved = await saveBytesToDevice(
+        bytes: bytes,
         dialogTitle: text.supportChatSaveImageAction,
         fileName: safeFileName,
-        type: FileType.custom,
         allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
       );
 
-      if (targetPath == null || targetPath.trim().isEmpty) {
+      if (!wasSaved) {
         return;
       }
 
-      await File(targetPath).writeAsBytes(bytes, flush: true);
       if (!mounted) {
         return;
       }
@@ -321,22 +320,13 @@ extension _SupportChatPageActions on _SupportChatPageState {
   }
 
   Future<List<int>> _downloadImageBytesImpl(String imageUrl) async {
-    final response = await Dio().get<List<int>>(
-      imageUrl,
-      options: Options(responseType: ResponseType.bytes),
-    );
-    return response.data ?? const <int>[];
+    return downloadFileBytes(imageUrl);
   }
 
   String _safeImageFileNameImpl(String? value) {
     final fallback =
         'support-image-${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final candidate = value?.trim();
-    if (candidate == null || candidate.isEmpty) {
-      return fallback;
-    }
-
-    return candidate.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return sanitizeFileName(value, fallback: fallback);
   }
 
   String _formatDayLabelImpl(DateTime value) {

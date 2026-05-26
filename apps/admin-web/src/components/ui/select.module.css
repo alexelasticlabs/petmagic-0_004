@@ -21,29 +21,29 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.59rem;
   padding: 0.52rem 0.66rem;
-  background: linear-gradient(180deg, rgba(21, 27, 35, 0.98) 0%, rgba(13, 17, 23, 0.98) 100%);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%);
   color: var(--text-strong);
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 6px 14px rgba(2, 6, 23, 0.14);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent), 0 6px 14px color-mix(in srgb, var(--surface-0) 14%, transparent);
   transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease, transform 140ms ease;
 }
 
 .trigger:hover {
   border-color: var(--border-strong);
-  background: rgba(21, 27, 35, 1);
+  background: var(--surface-hover);
   box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
 }
 
 .triggerOpen {
-  border-color: rgba(83, 155, 245, 0.44);
-  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 22px rgba(2, 6, 23, 0.18);
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 5%, transparent), 0 10px 22px color-mix(in srgb, var(--surface-0) 18%, transparent);
 }
 
 .trigger:focus-visible {
   outline: none;
-  border-color: rgba(83, 155, 245, 0.52);
+  border-color: var(--border-accent);
   box-shadow: var(--focus-ring);
 }
 
@@ -110,8 +110,8 @@
   padding: 0.38rem;
   border: 1px solid var(--border-strong);
   border-radius: 0.65rem;
-  background: linear-gradient(180deg, rgba(21, 27, 35, 0.995) 0%, rgba(13, 17, 23, 0.99) 100%);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+  background: linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--surface-0) 22%, transparent);
   backdrop-filter: blur(10px);
   transform-origin: top center;
   animation: menuFadeIn 160ms ease;
@@ -120,33 +120,33 @@
 .option {
   width: 100%;
   display: block;
-  border: 1px solid rgba(59, 69, 82, 0.42);
+  border: 1px solid var(--border-soft);
   border-radius: 0.58rem;
   padding: 0.58rem 0.68rem;
-  background: rgba(17, 22, 29, 0.92);
+  background: var(--surface-2);
   color: var(--text-soft);
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent);
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .option:hover {
   border-color: var(--border-strong);
-  background: rgba(21, 27, 35, 0.98);
+  background: var(--surface-2);
   box-shadow: none;
   transform: translateY(-1px);
 }
 
 .optionSelected {
-  border-color: rgba(83, 155, 245, 0.34);
-  background: rgba(88, 166, 255, 0.08);
-  box-shadow: 0 0 0 1px rgba(83, 155, 245, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent), inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent);
 }
 
 .option:focus-visible {
   outline: none;
-  border-color: rgba(83, 155, 245, 0.52);
+  border-color: var(--border-accent);
   box-shadow: var(--focus-ring);
 }
 
@@ -221,27 +221,27 @@
 }
 
 .badgeRecommended {
-  border-color: rgba(56, 189, 248, 0.28);
-  background: rgba(56, 189, 248, 0.14);
-  color: #7dd3fc;
+  border-color: color-mix(in srgb, var(--info) 28%, transparent);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+  color: var(--info);
 }
 
 .badgeFast {
-  border-color: rgba(245, 158, 11, 0.28);
-  background: rgba(245, 158, 11, 0.14);
-  color: #fcd34d;
+  border-color: color-mix(in srgb, var(--warning) 28%, transparent);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
 }
 
 .badgePremium {
-  border-color: rgba(34, 197, 94, 0.28);
-  background: rgba(34, 197, 94, 0.14);
-  color: #86efac;
+  border-color: color-mix(in srgb, var(--success) 28%, transparent);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
 }
 
 .badgeNeutral {
-  border-color: rgba(148, 163, 184, 0.24);
-  background: rgba(148, 163, 184, 0.12);
-  color: #cbd5e1;
+  border-color: color-mix(in srgb, var(--text-soft) 24%, transparent);
+  background: color-mix(in srgb, var(--text-soft) 12%, transparent);
+  color: var(--text-soft);
 }
 
 .optionIndicator {
@@ -249,8 +249,8 @@
   width: 0.72rem;
   height: 0.72rem;
   border-radius: 999px;
-  background: #4ade80;
-  box-shadow: 0 0 0 0.22rem rgba(34, 197, 94, 0.14);
+  background: var(--success);
+  box-shadow: 0 0 0 0.22rem color-mix(in srgb, var(--success) 14%, transparent);
 }
 
 @keyframes menuFadeIn {
@@ -301,3 +301,4 @@
     align-self: flex-start;
   }
 }
+

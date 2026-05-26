@@ -58,23 +58,23 @@
 }
 
 .compactHeaderLink {
-  color: #7f91a8;
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .compactHeaderLink:hover {
-  color: #edf4ff;
+  color: var(--text-strong);
 }
 
 .compactHeaderTrail strong {
-  color: #f7fbff;
+  color: var(--text-strong);
   font-size: 0.92rem;
 }
 
 .compactHeaderSeparator {
-  color: #4c5f77;
+  color: var(--text-subtle);
 }
 
 .inboxPane,
@@ -131,7 +131,7 @@
 }
 
 .optionGroupLabel {
-  color: #7f91a8;
+  color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -146,9 +146,9 @@
 }
 
 .optionChip {
-  border: 1px solid rgba(26, 39, 56, 0.84);
+  border: 1px solid var(--border-soft);
   border-radius: 999px;
-  background: rgba(13, 20, 33, 0.92);
+  background: var(--surface-2);
   color: #90a2b7;
   padding: 0.52rem 0.78rem;
   font: inherit;
@@ -180,7 +180,7 @@
   gap: 12px;
   padding-bottom: 12px;
   margin-bottom: 10px;
-  border-bottom: 1px solid rgba(26, 39, 56, 0.72);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .paneTitleGroup {
@@ -190,7 +190,7 @@
 }
 
 .paneEyebrow {
-  color: #7f91a8;
+  color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -198,13 +198,13 @@
 }
 
 .paneTitle {
-  color: #f7fbff;
+  color: var(--text-strong);
   font-size: 1rem;
   line-height: 1.2;
 }
 
 .paneDescription {
-  color: #8ea0b6;
+  color: var(--text-muted);
   font-size: 0.82rem;
   line-height: 1.45;
 }
@@ -244,7 +244,7 @@
 
 .searchLabel,
 .subtle {
-  color: #7f91a8;
+  color: var(--text-muted);
   font-size: 0.82rem;
 }
 
@@ -253,9 +253,9 @@
 .textarea {
   width: 100%;
   border-radius: 0.85rem;
-  border: 1px solid #1a2738;
-  background: rgba(13, 20, 33, 0.96);
-  color: #edf4ff;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-strong);
   padding: 0.85rem 0.95rem;
   font: inherit;
   outline: none;
@@ -288,9 +288,9 @@
   gap: 10px;
   padding: 12px 13px;
   border-radius: 1.05rem;
-  border: 1px solid rgba(26, 39, 56, 0.88);
-  background: rgba(14, 20, 31, 0.86);
-  color: #edf4ff;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-strong);
   text-decoration: none;
   overflow: hidden;
   transition:
@@ -302,7 +302,7 @@
 .conversationRow:hover {
   border-color: rgba(34, 197, 94, 0.46);
   transform: translateY(-1px);
-  background: rgba(15, 24, 39, 0.94);
+  background: var(--surface-hover);
 }
 
 .conversationRowActive {
@@ -343,7 +343,7 @@
 .rowTitle {
   font-size: 0.92rem;
   font-weight: 800;
-  color: #f7fbff;
+  color: var(--text-strong);
 }
 
 .rowTextStack {
@@ -354,7 +354,7 @@
 
 .rowPreview,
 .messageBody {
-  color: #c7d4e4;
+  color: var(--text-soft);
   font-size: 0.88rem;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -383,7 +383,7 @@
 }
 
 .rowSecondaryMeta {
-  color: #8fa2b8;
+  color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
@@ -449,7 +449,7 @@
   justify-content: center;
   border-radius: 999px;
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.24), rgba(18, 102, 58, 0.85));
-  color: #f6fff8;
+  color: var(--text-strong);
   font-weight: 800;
   border: 1px solid rgba(34, 197, 94, 0.28);
 }
@@ -473,19 +473,19 @@
 }
 
 .timePill {
-  color: #98abc1;
+  color: var(--text-muted);
   font-size: 0.72rem;
   white-space: nowrap;
 }
 
 .waitingLabel {
-  color: #98abc1;
+  color: var(--text-muted);
   font-size: 0.72rem;
   white-space: nowrap;
 }
 
 .rowDetailValue {
-  color: #d7e2ee;
+  color: var(--text-soft);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -496,7 +496,7 @@
   padding: 0 7px;
   border-radius: 999px;
   background: rgba(34, 197, 94, 0.18);
-  color: #3ae27f;
+  color: var(--success);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -531,8 +531,8 @@
   min-height: 1.9rem;
   padding: 0.35rem 0.72rem;
   border-radius: 999px;
-  border: 1px solid rgba(26, 39, 56, 0.8);
-  background: rgba(11, 17, 27, 0.9);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
   color: #dce7f2;
   font-size: 0.76rem;
   font-weight: 700;
@@ -540,7 +540,7 @@
 
 .chatUserName {
   font-size: 1rem;
-  color: #f7fbff;
+  color: var(--text-strong);
 }
 
 .chatIdentityCompact {
@@ -553,18 +553,18 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #22c55e;
+  background: var(--success);
   box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
 }
 
 .detailRow span,
 .userCardBody span {
-  color: #8fa2b8;
+  color: var(--text-muted);
   font-size: 0.82rem;
 }
 
 .chatMetaLine {
-  color: #8fa2b8;
+  color: var(--text-muted);
   font-size: 0.8rem;
 }
 
@@ -585,7 +585,7 @@
 }
 
 .chatStatusNote {
-  color: #8ea0b6;
+  color: var(--text-muted);
   font-size: 0.78rem;
   line-height: 1.45;
   max-width: 24rem;
@@ -601,7 +601,7 @@
 
 .dayDivider {
   align-self: center;
-  color: #8ea0b6;
+  color: var(--text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -622,8 +622,8 @@
   max-width: min(88%, 46rem);
   padding: 12px 14px;
   border-radius: 0.95rem;
-  border: 1px solid rgba(26, 39, 56, 0.82);
-  background: rgba(14, 20, 31, 0.96);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
 }
 
 .messageAdmin {
@@ -634,7 +634,7 @@
 
 .messageUser {
   justify-self: start;
-  background: rgba(16, 24, 37, 0.96);
+  background: var(--surface-1);
 }
 
 .messageImageButton,
@@ -682,7 +682,7 @@
   padding: 11px 12px;
   border-radius: 0.95rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(7, 12, 20, 0.26);
+  background: var(--accent-soft-bg);
   color: inherit;
 }
 
@@ -696,7 +696,7 @@
   border-radius: 0.85rem;
   background: rgba(34, 197, 94, 0.14);
   border: 1px solid rgba(34, 197, 94, 0.22);
-  color: #dff8e9;
+  color: var(--toast-success-fg);
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -711,7 +711,7 @@
 
 .messageAttachmentMeta strong,
 .attachmentPreviewMeta strong {
-  color: #f7fbff;
+  color: var(--text-strong);
   font-size: 0.88rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -720,7 +720,7 @@
 
 .messageAttachmentMeta span,
 .attachmentActionButton {
-  color: #9fb2c7;
+  color: var(--text-soft);
   font-size: 0.78rem;
 }
 
@@ -766,7 +766,7 @@
 .messageAttachmentStatus_uploaded {
   border-color: rgba(34, 197, 94, 0.48);
   background: rgba(34, 197, 94, 0.17);
-  color: #dff8e9;
+  color: var(--toast-success-fg);
 }
 
 .messageAttachmentStatus_failed {
@@ -776,7 +776,7 @@
 }
 
 .messageAttachmentStatusErrorCode {
-  color: #9fb2c7;
+  color: var(--text-soft);
   font-size: 0.72rem;
 }
 
@@ -795,7 +795,7 @@
   display: grid;
   gap: 12px;
   padding-top: 8px;
-  border-top: 1px solid rgba(26, 39, 56, 0.94);
+  border-top: 1px solid var(--border-soft);
   min-width: 0;
 }
 
@@ -817,8 +817,8 @@
   align-items: center;
   padding: 12px;
   border-radius: 1rem;
-  border: 1px solid rgba(26, 39, 56, 0.82);
-  background: rgba(12, 19, 31, 0.78);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
   min-width: 0;
 }
 
@@ -848,14 +848,14 @@
   justify-content: flex-start;
   min-height: 2.1rem;
   padding-inline: 0.82rem;
-  border: 1px solid rgba(26, 39, 56, 0.82);
+  border: 1px solid var(--border-soft);
   border-radius: 999px;
-  background: rgba(12, 18, 28, 0.88);
+  background: var(--surface-2);
 }
 
 .quickTemplateButton:hover {
   border-color: rgba(34, 197, 94, 0.34);
-  background: rgba(15, 23, 36, 0.98);
+  background: var(--surface-hover);
 }
 
 .textarea {
@@ -882,7 +882,7 @@
   padding: 0.82rem;
   border-radius: 1rem;
   border: 1px solid rgba(34, 197, 94, 0.18);
-  background: rgba(11, 17, 27, 0.94);
+  background: var(--surface-2);
 }
 
 .statusOverviewHeader {
@@ -899,7 +899,7 @@
 }
 
 .statusOverviewTitle {
-  color: #f7fbff;
+  color: var(--text-strong);
   font-size: 1rem;
   line-height: 1.2;
 }
@@ -914,8 +914,8 @@
 .statusOverviewHint {
   padding: 0.62rem 0.72rem;
   border-radius: 0.9rem;
-  border: 1px solid rgba(26, 39, 56, 0.72);
-  background: rgba(10, 16, 27, 0.82);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
 }
 
 .workflowPrimaryRow,
@@ -972,10 +972,10 @@
 }
 
 .sidePanelTab {
-  border: 1px solid rgba(26, 39, 56, 0.84);
+  border: 1px solid var(--border-soft);
   border-radius: 0.85rem;
   background: rgba(13, 20, 33, 0.84);
-  color: #8fa2b8;
+  color: var(--text-muted);
   padding: 0.5rem 0.72rem;
   font: inherit;
   font-size: 0.76rem;
@@ -1012,21 +1012,21 @@
   gap: 4px;
   padding: 0.62rem 0.68rem;
   border-radius: 0.9rem;
-  background: rgba(12, 19, 31, 0.78);
-  border: 1px solid rgba(26, 39, 56, 0.72);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
 }
 
 .metricTile span,
 .timelineCardHeader span,
 .timelineCardBody {
-  color: #8fa2b8;
+  color: var(--text-muted);
   font-size: 0.8rem;
 }
 
 .metricTile strong,
 .timelineCardHeader strong,
 .sectionHeaderCompact strong {
-  color: #f6faff;
+  color: var(--text-strong);
   font-size: 0.92rem;
 }
 
@@ -1052,13 +1052,13 @@
 }
 
 .userCardBody strong {
-  color: #f6faff;
+  color: var(--text-strong);
   font-size: 0.95rem;
 }
 
 .userSummaryHeader {
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(26, 39, 56, 0.72);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .userSummaryHeader :global(.ui-button) {
@@ -1076,7 +1076,7 @@
   gap: 12px;
   align-items: center;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(26, 39, 56, 0.84);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .detailRow:last-child {
@@ -1085,7 +1085,7 @@
 }
 
 .detailRow strong {
-  color: #f6faff;
+  color: var(--text-strong);
   font-size: 0.9rem;
   text-align: right;
 }
@@ -1104,9 +1104,9 @@
   text-align: left;
   padding: 14px;
   border-radius: 1rem;
-  border: 1px solid #1a2738;
+  border: 1px solid var(--border-soft);
   background: rgba(15, 22, 36, 0.94);
-  color: #edf4ff;
+  color: var(--text-strong);
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -1135,7 +1135,7 @@
 
 .templateSnippet,
 .templatePreviewBody {
-  color: #c7d4e4;
+  color: var(--text-soft);
   font-size: 0.9rem;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -1152,8 +1152,8 @@
 .templateDetailPane {
   padding: 14px;
   border-radius: 1rem;
-  border: 1px solid rgba(26, 39, 56, 0.72);
-  background: rgba(12, 19, 31, 0.82);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
 }
 
 .templatePreviewBody {
@@ -1164,7 +1164,7 @@
 
 .templateEditor {
   padding-top: 14px;
-  border-top: 1px solid rgba(26, 39, 56, 0.94);
+  border-top: 1px solid var(--border-soft);
 }
 
 .templateToolbarCompact {
@@ -1181,7 +1181,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  color: #d7e2ee;
+  color: var(--text-soft);
   font-size: 0.95rem;
 }
 
@@ -1413,7 +1413,7 @@
   display: grid;
   place-items: center;
   padding: 1.2rem;
-  background: rgba(2, 6, 13, 0.86);
+  background: color-mix(in srgb, var(--surface-0) 86%, transparent);
   backdrop-filter: blur(4px);
 }
 
@@ -1426,7 +1426,7 @@
   padding: 0.9rem;
   border-radius: 1rem;
   border: 1px solid rgba(34, 197, 94, 0.26);
-  background: rgba(7, 12, 20, 0.96);
+  background: var(--surface-1);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.46);
 }
 
@@ -1435,7 +1435,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  color: #f7fbff;
+  color: var(--text-strong);
 }
 
 .imageViewerBody {
@@ -1461,3 +1461,4 @@
   justify-content: flex-end;
   gap: 8px;
 }
+

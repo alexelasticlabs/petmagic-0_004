@@ -503,10 +503,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     return Math.max(1, Math.ceil(remaining / 1000));
   }, [nowTick, promoCodesQuery.dataUpdatedAt]);
 
-  useEffect(() => {
-    setPage((current) => Math.min(current, totalPages));
-  }, [totalPages]);
-
   const visiblePageNumbers = useMemo(() => {
     const maxVisible = 5;
     if (totalPages <= maxVisible) {
@@ -514,9 +510,8 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     }
 
     const half = Math.floor(maxVisible / 2);
-    let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + maxVisible - 1);
-    start = Math.max(1, end - maxVisible + 1);
+    const end = Math.min(totalPages, Math.max(1, currentPage - half) + maxVisible - 1);
+    const start = Math.max(1, end - maxVisible + 1);
 
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }, [currentPage, totalPages]);
@@ -1207,7 +1202,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    onClick={() => setPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage <= 1}
                     aria-label={text.promoCodesPreviousAction}
                   >
@@ -1231,7 +1226,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage >= totalPages}
                     aria-label={text.promoCodesNextAction}
                   >

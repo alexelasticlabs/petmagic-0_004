@@ -1,22 +1,22 @@
 .layout {
   --admin-bg: var(--surface-0);
   --admin-bg-muted: var(--surface-1);
-  --admin-surface: rgba(9, 11, 14, 0.97);
-  --admin-surface-strong: rgba(0, 0, 0, 0.98);
+  --admin-surface: var(--surface-overlay);
+  --admin-surface-strong: var(--surface-raised);
   --admin-border: var(--border-soft);
   --admin-border-strong: var(--border-strong);
   --admin-text: var(--text-strong);
   --admin-text-soft: var(--text-soft);
   --admin-text-dim: var(--text-muted);
   --admin-accent: var(--accent);
-  --admin-accent-soft: rgba(138, 180, 248, 0.12);
+  --admin-accent-soft: var(--accent-soft-bg);
   --admin-page-max: 110rem;
   --admin-page-max-wide: 118rem;
   --admin-page-max-ultra: 126rem;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 15.5rem minmax(0, 1fr);
-  background: #020407;
+  background: var(--admin-bg);
   color: var(--admin-text);
 }
 
@@ -33,7 +33,7 @@
   gap: 0.65rem;
   padding: 0.72rem 0.68rem;
   border-right: 1px solid var(--admin-border);
-  background: rgba(3, 5, 8, 0.98);
+  background: var(--admin-surface);
   backdrop-filter: blur(4px);
   box-shadow: none;
 }
@@ -84,7 +84,7 @@
   display: grid;
   gap: 0.3rem;
   padding-top: 0.46rem;
-  border-top: 1px solid rgba(43, 54, 68, 0.72);
+  border-top: 1px solid var(--admin-border);
 }
 
 .navSection:first-child {
@@ -94,7 +94,7 @@
 
 .navSectionTitle {
   padding: 0 0.68rem;
-  color: rgba(163, 176, 194, 0.78);
+  color: var(--text-muted);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -121,20 +121,24 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--admin-text-soft);
-  background: rgba(4, 7, 12, 0.64);
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  background: var(--surface-2);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
 }
 
 .navItem:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(8, 12, 18, 0.92);
+  background: var(--surface-3);
   color: var(--admin-text);
   box-shadow: none;
 }
 
 .navItemActive {
-  border-color: rgba(138, 180, 248, 0.34);
-  background: rgba(18, 36, 67, 0.78);
+  border-color: var(--border-accent);
+  background: var(--admin-accent-soft);
   color: var(--admin-text);
   box-shadow: inset 2px 0 0 var(--admin-accent);
 }
@@ -158,7 +162,9 @@
   width: 0.72rem;
   height: 0.72rem;
   color: var(--admin-text-dim);
-  transition: transform 140ms ease, color 140ms ease;
+  transition:
+    transform 140ms ease,
+    color 140ms ease;
 }
 
 .groupCaretOpen {
@@ -171,7 +177,7 @@
   gap: 0.18rem;
   margin-left: 0.78rem;
   padding-left: 0.72rem;
-  border-left: 1px solid rgba(59, 69, 82, 0.86);
+  border-left: 1px solid var(--admin-border);
 }
 
 .navChild {
@@ -182,21 +188,25 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--admin-text-dim);
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
 }
 
 .navChild:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(8, 12, 18, 0.9);
+  background: var(--surface-3);
   color: var(--admin-text);
   box-shadow: none;
 }
 
 .navChildActive {
-  border-color: rgba(138, 180, 248, 0.28);
-  background: rgba(18, 36, 67, 0.72);
+  border-color: var(--border-accent);
+  background: var(--admin-accent-soft);
   color: var(--admin-text);
-  box-shadow: inset 2px 0 0 rgba(138, 180, 248, 0.92);
+  box-shadow: inset 2px 0 0 var(--admin-accent);
 }
 
 .navChildLabel {
@@ -224,13 +234,17 @@
   color: var(--admin-text-soft);
   font: inherit;
   cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
 }
 
 .logoutButton:hover {
-  border-color: rgba(251, 113, 133, 0.34);
-  background: rgba(71, 20, 24, 0.34);
-  color: #ffd8d3;
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--admin-border));
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-fg);
   box-shadow: none;
 }
 
@@ -252,7 +266,7 @@
   min-width: 0;
   padding: 0.72rem clamp(0.82rem, 0.5rem + 0.62vw, 1.1rem);
   border-bottom: 1px solid var(--admin-border);
-  background: rgba(2, 4, 7, 0.94);
+  background: var(--admin-surface);
   backdrop-filter: blur(4px);
   box-shadow: none;
 }
@@ -269,15 +283,20 @@
   height: 2.6rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius-sm);
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-2);
   color: var(--admin-text-soft);
   cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .sidebarToggle:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-3);
   color: var(--admin-text);
   box-shadow: none;
   transform: none;
@@ -330,9 +349,12 @@
   padding: 0.3rem 0.36rem 0.3rem 0.3rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius);
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-2);
   box-shadow: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .userBadge:hover {
@@ -347,7 +369,7 @@
   display: grid;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: #1a73e8;
+  background: var(--primary-bg);
   color: var(--accent-contrast);
   font-size: 0.78rem;
   font-weight: 700;
@@ -394,9 +416,11 @@
   place-items: center;
   padding: 1.5rem;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px),
-    linear-gradient(180deg, #000000 0%, #07090c 100%);
-  background-size: 32px 32px, auto;
+    linear-gradient(90deg, var(--bg-grid-primary) 1px, transparent 1px),
+    linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+  background-size:
+    32px 32px,
+    auto;
   color: var(--text-strong);
 }
 
@@ -407,7 +431,7 @@
   padding: 0.9rem 1rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
   color: var(--text-soft);
   font-size: 0.92rem;
   font-weight: 700;
@@ -420,7 +444,7 @@
   display: grid;
   place-items: center;
   border-radius: var(--radius-sm);
-  background: #1a73e8;
+  background: var(--primary-bg);
   color: var(--accent-contrast);
   font-size: 0.72rem;
   font-weight: 700;
@@ -438,19 +462,36 @@
   padding: 0.38rem 0.68rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius-sm);
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-2);
   color: var(--admin-text);
   font: inherit;
   font-size: 0.83rem;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
 }
 
 .localeTrigger:hover {
   border-color: var(--admin-border-strong);
-  background: rgba(9, 14, 22, 0.98);
+  background: var(--surface-hover);
   box-shadow: var(--interactive-glow);
+}
+
+.themeTrigger {
+  min-width: 6.4rem;
+  justify-content: center;
+}
+
+.themeIndicator {
+  width: 0.56rem;
+  height: 0.56rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .localeIcon {
@@ -469,7 +510,7 @@
   padding: 0.35rem;
   border: 1px solid var(--admin-border);
   border-radius: var(--radius);
-  background: rgba(3, 5, 8, 0.99);
+  background: var(--surface-1);
   box-shadow: var(--shadow-strong);
 }
 
@@ -483,17 +524,19 @@
   color: var(--admin-text-soft);
   font-size: 0.83rem;
   font-weight: 700;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
 }
 
 .localeOption:hover {
-  background: rgba(8, 12, 18, 0.92);
+  background: var(--surface-hover);
   color: var(--admin-text);
 }
 
 .localeOptionActive {
   color: var(--admin-text);
-  background: rgba(18, 36, 67, 0.78);
+  background: var(--admin-accent-soft);
 }
 
 .localeCheck {
@@ -551,7 +594,7 @@
   .backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(2, 4, 3, 0.68);
+    background: color-mix(in srgb, var(--surface-0) 62%, transparent);
     backdrop-filter: blur(3px);
     z-index: 29;
   }

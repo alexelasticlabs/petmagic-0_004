@@ -734,5 +734,173 @@
   "templateGuestPreview": "Гостевой просмотр",
   "templateActionComingSoon": "Студия шаблонов скоро появится.",
   "tokensActionComingSoon": "Кошелёк токенов скоро появится.",
-  "rewardsActionComingSoon": "Центр наград скоро появится."
+  "rewardsActionComingSoon": "Центр наград скоро появится.",
+  "templateFlowPhotoSourceGallery": "Галерея",
+  "templateFlowPhotoSourceCamera": "Камера",
+  "templateFlowReadyTitle": "Готово к созданию!",
+  "templateFlowCheckDetailsSubtitle": "Проверьте детали перед созданием",
+  "templateFlowTemplateLabel": "Шаблон",
+  "templateFlowCostLabel": "Стоимость",
+  "templateFlowBalanceLabel": "Ваш баланс",
+  "templateFlowDurationHint": "Создание может занять от 10 секунд до 1 минуты.",
+  "templateFlowCreateMagicAction": "Создать магию",
+  "templateFlowChangePhotoAction": "Изменить фото",
+  "templateFlowPremiumTemplateTitle": "Premium-шаблон",
+  "templateFlowPremiumTemplateMessage": "Этот шаблон доступен с Premium.",
+  "templateFlowInsufficientBalanceTitle": "Недостаточно PawSpark",
+  "templateFlowInsufficientBalanceMessage": "Шаблон стоит {tokenCost} PawSpark. Ваш баланс: {balance} PawSpark.",
+  "@templateFlowInsufficientBalanceMessage": {
+    "placeholders": {
+      "tokenCost": {},
+      "balance": {}
+    }
+  },
+  "templateFlowChooseAnotherTemplateAction": "Выбрать другой шаблон",
+  "templateFlowCreateFailedTitle": "Не получилось создать магию",
+  "templateFlowCreateFailedBalanceHint": "Пополните баланс и запустите создание еще раз.",
+  "templateFlowCreateFailedRetryHint": "Попробуйте другое фото или повторите позже.",
+  "templateFlowCreateHint": "Это может занять немного времени",
+  "templateFlowStepProcessPhoto": "Обработка фото",
+  "templateFlowStepAnalyzePet": "Анализ питомца",
+  "templateFlowStepCreateMagic": "Создание волшебства",
+  "templateFlowStepFinalTouches": "Финальные штрихи",
+  "templateFlowTopUpBalanceAction": "Пополнить баланс",
+  "templateFlowResultReadyTitle": "Готово!",
+  "templateFlowResultReadySubtitle": "Ваша магия готова",
+  "templateFlowResultUnavailable": "Результат пока недоступен",
+  "templateFlowLoadingResult": "Загружаем результат...",
+  "templateFlowResultLoadFailed": "Не удалось загрузить результат",
+  "templateFlowCreateMoreAction": "Создать еще",
+  "templateFlowPreviewFallback": "Превью",
+  "templateFlowLoadingPreview": "Загружаем превью...",
+  "templateFlowPreviewUnavailable": "Превью недоступно",
+  "templateFlowLoadingVideo": "Загружаем видео...",
+  "templateFlowBestPhotoTitle": "Лучшее фото для этого шаблона:",
+  "templateFlowUploadPetPhotoAction": "Загрузить фото питомца",
+  "templateFlowPremiumRequiredError": "Этот шаблон доступен только с Premium.",
+  "templateFlowInsufficientBalanceError": "Недостаточно PawSpark для запуска генерации.",
+  "templateFlowNetworkError": "Нет соединения. Проверьте интернет и попробуйте снова.",
+  "templateFlowServerError": "Сервис временно недоступен. Попробуйте чуть позже.",
+  "templateFlowStartFailedError": "Не удалось запустить генерацию. Попробуйте еще раз.",
+  "generationStatusTitle": "Статус генерации",
+  "generationStatusCreatedLabel": "Создано",
+  "generationStatusStartedLabel": "Начато",
+  "generationStatusTypeLabel": "Тип",
+  "generationStatusAttemptLabel": "Попытка",
+  "generationStatusUntitledFallback": "Без названия",
+  "generationStatusDetailsTitle": "Детали",
+  "generationStatusFeedbackTitle": "Как вам результат?",
+  "generationStatusFeedbackExcellent": "Отлично",
+  "generationStatusFeedbackOkay": "Нормально",
+  "generationStatusFeedbackBad": "Не очень",
+  "generationStatusSaveAction": "Сохранить",
+  "generationStatusDeleteAction": "Удалить",
+  "generationStatusReportProblemAction": "Сообщить о проблеме",
+  "generationStatusPickAnotherPhotoAction": "Выбрать другое фото",
+  "generationStatusRetryAction": "Попробовать снова",
+  "generationStatusContactSupportAction": "Сообщить в поддержку",
+  "generationStatusOpenGalleryAction": "Открыть галерею",
+  "generationStatusOpenStatusAction": "Открыть статус",
+  "generationStatusCancelGenerationAction": "Отменить генерацию",
+  "generationStatusResultUnavailableForSave": "Результат пока недоступен для сохранения.",
+  "generationStatusResultUnavailableForShare": "Результат пока недоступен для шаринга.",
+  "generationStatusSaveFileDialogTitle": "Сохранить файл",
+  "generationStatusFileSavedMessage": "Файл сохранен на устройство.",
+  "generationStatusFileSaveFailedMessage": "Не удалось сохранить файл. Попробуйте снова.",
+  "generationStatusDeleteSoonMessage": "Удаление скоро добавим.",
+  "generationStatusCancelSoonMessage": "Отмена генерации появится в ближайшем обновлении.",
+  "generationStatusRetrySoonMessage": "Попробуйте выбрать фото и запустить генерацию снова.",
+  "generationStatusFeedbackThanksMessage": "Спасибо! Ваш отзыв поможет улучшить PetMagic.",
+  "generationStatusResultTitle": "Результат PetMagic",
+  "generationStatusNonTerminalHint": "Обычно это занимает несколько минут. Вы можете продолжить пользоваться приложением.",
+  "generationStatusStageQueued": "В очереди",
+  "generationStatusStageDone": "Готово",
+  "generationStatusVideoReady": "Видео готово",
+  "generationStatusShareVideoAction": "Поделиться видео",
+  "generationStatusFailedTitle": "Не удалось создать результат",
+  "generationStatusTokensRefundedHint": "Токены возвращены на ваш баланс.",
+  "generationStatusTokensRefundedShort": "Токены возвращены",
+  "generationStatusSupportHint": "Если ошибка повторится, напишите в поддержку.",
+  "generationStatusBackgroundHint": "Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.",
+  "generationStatusDownloadAction": "Скачать",
+  "generationStatusContinueInAppAction": "Продолжить в приложении",
+  "generationStatusFeedbackImproveTitle": "Что можно улучшить?",
+  "generationStatusFeedbackCommentLabel": "Комментарий",
+  "generationStatusFeedbackCommentHint": "Расскажите коротко, что не так",
+  "generationStatusFeedbackSubmitAction": "Отправить отзыв",
+  "generationStatusFeedbackReasonPetNotSimilar": "Питомец плохо похож на себя",
+  "generationStatusFeedbackReasonFaceDistorted": "Морда или лицо искажены",
+  "generationStatusFeedbackReasonStrangeMotion": "Движение выглядит странно",
+  "generationStatusFeedbackReasonPreviewMismatch": "Результат отличается от превью",
+  "generationStatusFeedbackReasonLowQuality": "Качество получилось низким",
+  "generationStatusFeedbackReasonStyleDisliked": "Не понравился стиль",
+  "generationStatusFeedbackReasonOther": "Другое",
+  "generationStatusEtaEstimated": "Примерно {value} осталось",
+  "@generationStatusEtaEstimated": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "generationStatusEtaQueued": "Ожидание в очереди",
+  "generationStatusEtaFinalizing": "Почти готово",
+  "generationStatusEtaDefault": "Примерно 1-2 мин осталось",
+  "generationStatusEtaStartsSoon": "Начнем через несколько минут",
+  "generationStatusEtaNotifyHint": "Мы сообщим, когда результат будет готов.",
+  "generationStatusFailurePhotoHint": "Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.",
+  "generationStatusFailureTechnicalHint": "Не удалось создать результат из-за технической ошибки. Мы вернули токены на ваш баланс.",
+  "generationStatusStatusCompleted": "Ваш результат готов",
+  "generationStatusStatusFailed": "Не удалось создать результат",
+  "generationStatusStatusCreatingMagic": "Создаем магию...",
+  "generationStatusTerminalRefundedHint": "Токены возвращены автоматически.",
+  "generationStatusTerminalFailureHint": "Техническая ошибка уже зафиксирована.",
+  "generationStatusTerminalSuccessHint": "Откройте результат, поделитесь им или оставьте отзыв.",
+  "generationStatusSectionActive": "В процессе",
+  "generationStatusSectionReady": "Готово",
+  "generationStatusSectionFailed": "Ошибка",
+  "generationStatusFilterActive": "В процессе",
+  "generationStatusFilterReady": "Готово",
+  "generationStatusFilterFailed": "Ошибка",
+  "generationStatusShowMoreAction": "Показать еще ({hiddenCount}) ▾",
+  "@generationStatusShowMoreAction": {
+    "placeholders": {
+      "hiddenCount": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusCollapseAction": "Свернуть ▲",
+  "generationStatusActiveInfoHint": "Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.",
+  "generationStatusUnreadCount": "{count} новых",
+  "@generationStatusUnreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusEmptyTitle": "Здесь появятся ваши результаты",
+  "generationStatusEmptyMessage": "Выберите шаблон, загрузите фото питомца и создайте первый магический арт.",
+  "generationStatusSubtitleAll": "Ваши магические создания",
+  "generationStatusSubtitleActive": "Активные генерации",
+  "generationStatusSubtitleReady": "Ваши готовые результаты",
+  "generationStatusSubtitleFailed": "Проблемы с генерацией",
+  "generationStatusDateToday": "Сегодня, {time}",
+  "@generationStatusDateToday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "generationStatusDateYesterday": "Вчера, {time}",
+  "@generationStatusDateYesterday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "shellActiveGenerationLabel": "✨ Создаем {templateTitle}",
+  "@shellActiveGenerationLabel": {
+    "placeholders": {
+      "templateTitle": {}
+    }
+  },
+  "shellActiveGenerationFallback": "результат"
 }

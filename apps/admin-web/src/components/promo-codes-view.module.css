@@ -15,14 +15,14 @@
 
 .feedback {
   border-radius: 1.05rem;
-  border: 1px solid #1a2738;
+  border: 1px solid var(--border-soft);
   padding: 0.86rem 1rem;
   font-size: 0.9rem;
 }
 
 .feedbackSuccess {
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(8, 18, 14, 0.92));
-  color: #d4ffe1;
+  color: var(--toast-success-fg);
 }
 
 .feedbackDanger {
@@ -32,7 +32,7 @@
 
 .feedbackInfo {
   background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(8, 16, 24, 0.92));
-  color: #dff6ff;
+  color: var(--text-strong);
 }
 
 .kpiGrid {
@@ -70,13 +70,13 @@
 
 .pageSubtitle {
   margin: 0;
-  color: rgba(173, 189, 207, 0.78);
+  color: var(--text-muted);
   font-size: 0.86rem;
   line-height: 1.5;
 }
 
 .tableCard {
-  border-color: #1f2d3f;
+  border-color: var(--border-soft);
   background:
     radial-gradient(circle at top left, rgba(26, 115, 232, 0.12), transparent 34%),
     rgba(6, 12, 20, 0.98);
@@ -167,7 +167,7 @@
 .statusTabActive {
   border-color: rgba(83, 155, 245, 0.8);
   background: rgba(26, 115, 232, 0.22);
-  color: #eef4ff;
+  color: var(--text-strong);
   box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.28);
 }
 
@@ -225,7 +225,7 @@
   width: 0.42rem;
   height: 0.42rem;
   border-radius: 999px;
-  background: #22c55e;
+  background: var(--success);
   box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45);
   animation: pulseDot 1.6s ease-out infinite;
 }
@@ -236,7 +236,7 @@
 }
 
 .autoRefreshBadgeLoading .autoRefreshDot {
-  background: #38bdf8;
+  background: var(--info);
   box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45);
 }
 
@@ -246,9 +246,9 @@
   gap: 0.46rem;
   margin-bottom: 0.56rem;
   padding: 0.42rem;
-  border: 1px solid rgba(31, 45, 63, 0.92);
+  border: 1px solid var(--border-soft);
   border-radius: 0.68rem;
-  background: rgba(4, 10, 18, 0.88);
+  background: var(--surface-2);
 }
 
 .filterBar:focus-within {
@@ -273,9 +273,9 @@
 .searchInput,
 .input {
   width: 100%;
-  border: 1px solid #1a2738;
-  background: rgba(9, 15, 25, 0.9);
-  color: #eef4ff;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-strong);
   border-radius: 0.58rem;
   padding: 0.52rem 0.68rem;
   min-height: 2rem;
@@ -302,8 +302,8 @@
 .selectInput {
   appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, rgba(173, 189, 207, 0.65) 50%),
-    linear-gradient(135deg, rgba(173, 189, 207, 0.65) 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
   background-position:
     calc(100% - 1.02rem) calc(50% - 0.14rem),
     calc(100% - 0.76rem) calc(50% - 0.14rem);
@@ -316,7 +316,7 @@
 
 .searchInput::placeholder,
 .input::placeholder {
-  color: rgba(173, 189, 207, 0.55);
+  color: var(--text-subtle);
 }
 
 .input[readonly] {
@@ -324,14 +324,14 @@
 }
 
 .helperText {
-  color: rgba(173, 189, 207, 0.62);
+  color: var(--text-muted);
   font-size: 0.76rem;
   line-height: 1.45;
 }
 
 .tableCard :global(table thead th) {
   padding: 0.54rem 0.52rem;
-  border-bottom: 1px solid rgba(31, 45, 63, 0.96);
+  border-bottom: 1px solid var(--border-soft);
   background: rgba(8, 15, 25, 0.84);
   color: rgba(173, 189, 207, 0.88);
   font-size: 0.66rem;
@@ -356,11 +356,11 @@
 }
 
 .tableRow:nth-child(even) td {
-  background: rgba(8, 14, 24, 0.48);
+  background: var(--surface-2);
 }
 
 .tableRow:hover td {
-  background: rgba(17, 33, 54, 0.58);
+  background: var(--accent-soft-bg);
 }
 
 .tableRow:focus-visible td {
@@ -415,11 +415,11 @@
 }
 
 .usageToneMedium {
-  color: #fcd34d;
+  color: var(--warning);
 }
 
 .usageToneCritical {
-  color: #fca5a5;
+  color: var(--danger-soft-fg);
 }
 
 .usageMeter {
@@ -434,18 +434,18 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  background: linear-gradient(90deg, var(--success), var(--info));
   background-size: 180% 100%;
   transition: width 220ms ease;
   animation: usageFlow 5.8s linear infinite;
 }
 
 .usageMeter.usageToneMedium > span {
-  background: linear-gradient(90deg, #f59e0b, #fcd34d);
+  background: linear-gradient(90deg, var(--warning), var(--warning));
 }
 
 .usageMeter.usageToneCritical > span {
-  background: linear-gradient(90deg, #ef4444, #f97316);
+  background: linear-gradient(90deg, var(--danger), var(--danger));
 }
 
 .windowCell {
@@ -463,12 +463,12 @@
 .createdCell {
   display: grid;
   gap: 0.16rem;
-  color: rgba(173, 189, 207, 0.72);
+  color: var(--text-muted);
   font-size: 0.73rem;
 }
 
 .createdCell strong {
-  color: #f0f5ff;
+  color: var(--text-strong);
   font-size: 0.78rem;
   font-weight: 600;
 }
@@ -497,9 +497,9 @@
   display: grid;
   gap: 0.12rem;
   padding: 0.38rem;
-  border: 1px solid #1a2738;
+  border: 1px solid var(--border-soft);
   border-radius: 0.85rem;
-  background: rgba(8, 13, 22, 0.98);
+  background: var(--surface-1);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.42);
 }
 
@@ -524,7 +524,7 @@
   border: 0;
   border-radius: 0.66rem;
   background: transparent;
-  color: #dbe7f6;
+  color: var(--text-soft);
   text-align: left;
   padding: 0.52rem 0.62rem;
   font-size: 0.82rem;
@@ -533,7 +533,7 @@
 }
 
 .actionsMenuItem:hover {
-  background: rgba(26, 39, 56, 0.76);
+  background: var(--surface-hover);
 }
 
 .actionsMenuItem:disabled {
@@ -542,11 +542,11 @@
 }
 
 .actionsMenuItemDanger {
-  color: #fca5a5;
+  color: var(--danger-soft-fg);
 }
 
 .actionsMenuItemDanger:hover {
-  background: rgba(90, 26, 31, 0.6);
+  background: var(--danger-soft-bg);
 }
 
 .pagination {
@@ -555,7 +555,7 @@
   justify-content: space-between;
   gap: 0.62rem;
   margin-top: 0.78rem;
-  border-top: 1px solid rgba(31, 45, 63, 0.82);
+  border-top: 1px solid var(--border-soft);
   padding-top: 0.64rem;
 }
 
@@ -612,7 +612,7 @@
 .formSection {
   display: grid;
   gap: 0.72rem;
-  border-top: 1px solid rgba(26, 39, 56, 0.92);
+  border-top: 1px solid var(--border-soft);
   padding-top: 0.82rem;
 }
 
@@ -670,35 +670,35 @@
   justify-content: space-between;
   gap: 0.7rem;
   padding-top: 0.7rem;
-  border-top: 1px solid rgba(26, 39, 56, 0.92);
-  background: linear-gradient(180deg, rgba(8, 13, 22, 0), rgba(8, 13, 22, 0.98) 18%);
+  border-top: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, rgba(8, 13, 22, 0), var(--surface-1) 18%);
 }
 
 .deactivateButton {
-  color: #fca5a5;
+  color: var(--danger-soft-fg);
 }
 
 .deactivateButton:hover {
-  background: rgba(90, 26, 31, 0.45);
+  background: var(--danger-soft-bg);
 }
 
 .usageEmpty {
   display: grid;
   gap: 0.36rem;
   padding: 0.84rem;
-  border: 1px dashed rgba(26, 39, 56, 0.9);
+  border: 1px dashed var(--border-soft);
   border-radius: 0.86rem;
   background: rgba(10, 16, 28, 0.62);
 }
 
 .usageEmpty strong {
-  color: #eef4ff;
+  color: var(--text-strong);
   font-size: 0.86rem;
   font-weight: 700;
 }
 
 .usageEmpty span {
-  color: rgba(173, 189, 207, 0.7);
+  color: var(--text-muted);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -706,7 +706,7 @@
 .usageTableWrap {
   width: 100%;
   overflow-x: auto;
-  border: 1px solid rgba(26, 39, 56, 0.9);
+  border: 1px solid var(--border-soft);
   border-radius: 0.86rem;
 }
 
@@ -718,18 +718,18 @@
 
 .usageTable th {
   padding: 0.58rem 0.62rem;
-  border-bottom: 1px solid rgba(26, 39, 56, 0.9);
+  border-bottom: 1px solid var(--border-soft);
   text-align: left;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   font-size: 0.66rem;
-  color: rgba(173, 189, 207, 0.78);
+  color: var(--text-muted);
 }
 
 .usageTable td {
   padding: 0.62rem;
-  border-bottom: 1px solid rgba(26, 39, 56, 0.7);
-  color: #d7e3f2;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-soft);
   font-size: 0.8rem;
   vertical-align: top;
 }
@@ -754,7 +754,7 @@
   padding: 0.62rem 0.74rem;
   border: 1px solid rgba(248, 113, 113, 0.34);
   border-radius: 0.8rem;
-  background: rgba(39, 13, 13, 0.42);
+  background: var(--danger-soft-bg);
   color: #fecaca;
   font-size: 0.8rem;
 }
@@ -809,9 +809,9 @@
 .editorDrawer {
   width: min(46rem, 100%);
   height: 100%;
-  border: 1px solid #1a2738;
+  border: 1px solid var(--border-soft);
   border-radius: 1.05rem;
-  background: rgba(8, 13, 22, 0.98);
+  background: var(--surface-1);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
@@ -901,3 +901,4 @@
     transform: none;
   }
 }
+

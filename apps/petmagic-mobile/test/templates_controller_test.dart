@@ -68,12 +68,120 @@ void main() {
       expect(repository.fetchCategoriesCalls, 2);
     },
   );
+
+  test(
+    'clears stale list immediately when switching to uncached filter',
+    () async {
+      final videoFetchCompleter = Completer<void>();
+      final repository = _FakeTemplatesRepository(
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [_template('all-1', TemplateType.image)],
+            hasMore: false,
+          ),
+          const TemplatesQuery(
+            type: TemplateType.video,
+          ).cacheKey: TemplatesFeedPage(
+            items: [_template('video-1', TemplateType.video)],
+            hasMore: false,
+          ),
+        },
+        videoFetchCompleter: videoFetchCompleter,
+      );
+      final realtimeClient = _FakeRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      await controller.loadInitial(forceRefresh: true);
+      expect(container.read(templatesControllerProvider).items, hasLength(1));
+
+      controller.setType(TemplateType.video);
+      await Future<void>.delayed(Duration.zero);
+
+      final interim = container.read(templatesControllerProvider);
+      expect(interim.items, isEmpty);
+      expect(interim.isLoading, isTrue);
+
+      videoFetchCompleter.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final afterLoad = container.read(templatesControllerProvider);
+      expect(afterLoad.items.map((item) => item.templateId), ['video-1']);
+    },
+  );
+
+  test(
+    'reuses in-memory cache when returning to previously loaded filter',
+    () async {
+      final repository = _FakeTemplatesRepository(
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [_template('all-1', TemplateType.image)],
+            hasMore: false,
+          ),
+          const TemplatesQuery(
+            type: TemplateType.video,
+          ).cacheKey: TemplatesFeedPage(
+            items: [_template('video-1', TemplateType.video)],
+            hasMore: false,
+          ),
+        },
+      );
+      final realtimeClient = _FakeRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      await controller.loadInitial(forceRefresh: true);
+      expect(repository.fetchFeedCalls, 1);
+
+      controller.setType(TemplateType.video);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(repository.fetchFeedCalls, 2);
+      expect(
+        container
+            .read(templatesControllerProvider)
+            .items
+            .map((e) => e.templateId),
+        ['video-1'],
+      );
+
+      controller.setType(null);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.fetchFeedCalls, 2);
+      expect(
+        container
+            .read(templatesControllerProvider)
+            .items
+            .map((e) => e.templateId),
+        ['all-1'],
+      );
+    },
+  );
 }
 
 class _FakeTemplatesRepository implements TemplatesRepository {
-  _FakeTemplatesRepository({this.firstFetchCompleter});
+  _FakeTemplatesRepository({
+    this.firstFetchCompleter,
+    this.videoFetchCompleter,
+    this.pagesByKey = const {},
+  });
 
   final Completer<void>? firstFetchCompleter;
+  final Completer<void>? videoFetchCompleter;
+  final Map<String, TemplatesFeedPage> pagesByKey;
   int fetchFeedCalls = 0;
   int fetchCategoriesCalls = 0;
 
@@ -89,7 +197,12 @@ class _FakeTemplatesRepository implements TemplatesRepository {
       await firstFetchCompleter!.future;
     }
 
-    return const TemplatesFeedPage(items: [], hasMore: false);
+    if (query.type == TemplateType.video && videoFetchCompleter != null) {
+      await videoFetchCompleter!.future;
+    }
+
+    return pagesByKey[query.cacheKey] ??
+        const TemplatesFeedPage(items: [], hasMore: false);
   }
 
   @override
@@ -103,6 +216,20 @@ class _FakeTemplatesRepository implements TemplatesRepository {
       firstFetchCompleter!.complete();
     }
   }
+}
+
+TemplateItem _template(String id, TemplateType type) {
+  return TemplateItem(
+    templateId: id,
+    templateType: type,
+    title: id,
+    shortDescription: id,
+    petPhotoRequirements: const ['Clear photo'],
+    category: 'Portrait',
+    tags: const ['pet'],
+    isPremium: false,
+    tokenCost: 1,
+  );
 }
 
 class _FakeRealtimeClient implements RealtimeClient {

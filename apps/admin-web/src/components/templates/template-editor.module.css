@@ -106,7 +106,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.76rem;
   padding: clamp(0.72rem, 0.64rem + 0.2vw, 0.86rem);
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
   box-shadow: none;
 }
 
@@ -149,18 +149,18 @@
   color: var(--text-soft);
   font-size: 0.74rem;
   font-weight: 700;
-  background: rgba(21, 27, 35, 0.86);
+  background: var(--surface-2);
 }
 
 .inlineStateReady {
   border-color: rgba(46, 160, 67, 0.3);
-  color: #8ddb9c;
+  color: var(--success);
   background: rgba(46, 160, 67, 0.12);
 }
 
 .inlineStateAttention {
   border-color: rgba(245, 158, 11, 0.28);
-  color: #fde68a;
+  color: var(--warning);
   background: rgba(120, 53, 15, 0.18);
 }
 
@@ -186,7 +186,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.59rem;
   padding: 0.58rem 0.7rem;
-  background: rgba(4, 7, 12, 0.9);
+  background: var(--surface-2);
 }
 
 .reviewTileLabel {
@@ -209,7 +209,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.68rem;
   padding: clamp(0.58rem, 0.52rem + 0.18vw, 0.7rem);
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
   box-shadow: none;
 }
 
@@ -248,7 +248,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.58rem;
   padding: 0.56rem 0.65rem;
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-2);
 }
 
 .railStatCardReady {
@@ -296,7 +296,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.59rem;
   padding: 0.52rem 0.6rem;
-  background: rgba(4, 7, 12, 0.92);
+  background: var(--surface-2);
 }
 
 .checklistItemReady {
@@ -356,13 +356,13 @@
 .checklistStateReady {
   border-color: rgba(46, 160, 67, 0.18);
   background: rgba(22, 101, 52, 0.18);
-  color: #8ddb9c;
+  color: var(--success);
 }
 
 .checklistStateMissing {
   border-color: rgba(245, 158, 11, 0.18);
   background: rgba(120, 53, 15, 0.18);
-  color: #fde68a;
+  color: var(--warning);
 }
 
 .hintList {
@@ -385,7 +385,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.65rem;
   padding: clamp(0.7rem, 0.55rem + 0.35vw, 0.86rem) clamp(0.78rem, 0.62rem + 0.45vw, 0.95rem);
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
 }
 
 .footerBar>* {
@@ -426,7 +426,7 @@
   padding: 0.25rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-2);
 }
 
 .footerStatusButton {
@@ -448,14 +448,14 @@
 }
 
 .footerStatusButtonActive {
-  background: rgba(18, 36, 67, 0.82);
+  background: var(--accent-soft-bg);
   color: var(--text-strong);
   box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.18);
 }
 
 .footerStatusButtonLive.footerStatusButtonActive {
   background: rgba(16, 55, 42, 0.82);
-  color: #d8f3dc;
+  color: var(--toast-success-fg);
 }
 
 .footerActions {
@@ -517,7 +517,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.59rem;
   padding: 0.7rem 0.78rem;
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-2);
   color: var(--text-soft);
   text-align: left;
   cursor: pointer;
@@ -527,7 +527,7 @@
 }
 
 .accessOptionFree {
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-2);
 }
 
 .accessOptionPremium {
@@ -537,7 +537,7 @@
 
 .accessOption:hover {
   border-color: var(--border-accent);
-  background: rgba(9, 14, 22, 0.98);
+  background: var(--surface-hover);
   transform: translateY(-1px);
   box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.08);
 }
@@ -549,7 +549,7 @@
 
 .accessOptionActiveFree {
   border-color: rgba(83, 155, 245, 0.32);
-  background: rgba(14, 28, 51, 0.9);
+  background: var(--accent-soft-bg);
   box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.08);
 }
 
@@ -638,13 +638,13 @@
 .assetPreviewStateReady {
   border: 1px solid rgba(34, 197, 94, 0.24);
   background: rgba(46, 160, 67, 0.18);
-  color: #8ddb9c;
+  color: var(--success);
 }
 
 .assetPreviewStateMissing {
   border: 1px solid rgba(245, 158, 11, 0.24);
   background: rgba(180, 83, 9, 0.16);
-  color: #fde68a;
+  color: var(--warning);
 }
 
 .assetPreviewMedia {
@@ -698,7 +698,7 @@
   border-radius: var(--radius-sm);
   max-width: 100%;
   padding: 0.34rem 0.62rem;
-  background: rgba(4, 7, 12, 0.9);
+  background: var(--surface-2);
   color: var(--text-muted);
   font-size: 0.73rem;
   font-weight: 700;
@@ -722,7 +722,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.72rem;
   padding: 0.86rem;
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
   box-shadow: none;
 }
 
@@ -735,7 +735,7 @@
 
 .modelCardEyebrow {
   margin: 0;
-  color: #58a6ff;
+  color: var(--accent);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -765,7 +765,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.68rem;
   padding: 0.78rem 0.88rem;
-  background: rgba(4, 7, 12, 0.9);
+  background: var(--surface-2);
 }
 
 .switchCard input {
@@ -790,7 +790,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.76rem;
   padding: 0.96rem;
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
 }
 
 .loadingGrid {
@@ -817,7 +817,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.76rem;
   padding: 0.96rem;
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
   box-shadow: none;
 }
 
@@ -880,21 +880,21 @@
 
 .adminButton:hover:not(:disabled) {
   border-color: var(--border-accent) !important;
-  background: rgba(9, 14, 22, 0.98) !important;
-  color: #ffffff !important;
+  background: var(--surface-hover) !important;
+  color: var(--text-strong) !important;
 }
 
 .primaryButton {
   border-color: rgba(83, 155, 245, 0.38) !important;
   background: rgba(18, 36, 67, 0.9) !important;
-  color: #e8f0fe !important;
+  color: var(--text-strong) !important;
   box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.08) !important;
 }
 
 .dangerButton {
   border-color: rgba(248, 113, 113, 0.26) !important;
   background: rgba(58, 20, 30, 0.72) !important;
-  color: #ffe4e6 !important;
+  color: var(--danger-soft-fg) !important;
   box-shadow: none !important;
 }
 
@@ -910,7 +910,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.72rem;
   padding: 0.82rem;
-  background: rgba(4, 7, 12, 0.9);
+  background: var(--surface-2);
 }
 
 .formSection:first-of-type {
@@ -949,7 +949,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.61rem;
   padding: 0.72rem 0.8rem;
-  background: rgba(4, 7, 12, 0.92);
+  background: var(--surface-2);
   color: var(--text-soft);
   font: inherit;
   font-size: 0.88rem;
@@ -987,7 +987,7 @@
 
 .readonly input {
   color: var(--text-muted);
-  background: rgba(21, 27, 35, 0.52);
+  background: var(--surface-2);
 }
 
 .checkboxRow {
@@ -1329,3 +1329,4 @@
     justify-self: start;
   }
 }
+

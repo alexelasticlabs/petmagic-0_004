@@ -4,12 +4,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:share_plus/share_plus.dart';
@@ -54,6 +56,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final generation = _generation;
     final bottomInset = petMagicBottomNavInset(
@@ -82,10 +85,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
               padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset),
               children: [
                 _Header(
-                  title: generation?.templateTitle ?? 'Статус генерации',
+                  title:
+                      generation?.templateTitle ?? text.generationStatusTitle,
                   subtitle: generation == null
                       ? null
-                      : '${_typeLabel(generation)} • ${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
+                      : '${_typeLabel(text, generation)} • ${generation.tokenCost} PawSpark',
                   onBack: () => context.go('/creations'),
                   onMenu: generation == null
                       ? null
@@ -103,49 +107,74 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                     _ResultCard(generation: generation),
                     const SizedBox(height: 14),
                     _ReadyActionsRow(
-                      onSave: _saveSoon,
+                      onSave: () => unawaited(_saveToDevice(generation)),
                       onShare: () => _shareResult(generation),
                       onDelete: _deleteSoon,
                     ),
                     const SizedBox(height: 14),
                     _DetailsCard(
+                      title: text.generationStatusDetailsTitle,
                       rows: [
-                        ('Шаблон', generation.templateTitle ?? 'Без названия'),
                         (
-                          'Создано',
+                          text.templateFlowTemplateLabel,
+                          generation.templateTitle ??
+                              text.generationStatusUntitledFallback,
+                        ),
+                        (
+                          text.generationStatusCreatedLabel,
                           _formatDateTime(
-                            generation.completedAtUtc ?? generation.updatedAtUtc,
+                            generation.completedAtUtc ??
+                                generation.updatedAtUtc,
                           ),
                         ),
-                        ('Тип', _typeLabel(generation)),
                         (
-                          'Стоимость',
-                          '${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
+                          text.generationStatusTypeLabel,
+                          _typeLabel(text, generation),
+                        ),
+                        (
+                          text.templateFlowCostLabel,
+                          '${generation.tokenCost} PawSpark',
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
                     _FeedbackCard(
                       isSubmitting: _isSubmittingFeedback,
+                      title: text.generationStatusFeedbackTitle,
+                      excellentLabel: text.generationStatusFeedbackExcellent,
+                      okayLabel: text.generationStatusFeedbackOkay,
+                      badLabel: text.generationStatusFeedbackBad,
                       onRatingSelected: _handleRatingSelected,
                     ),
                   ] else if (generation.isFailed) ...[
                     _FailureCard(generation: generation),
                     const SizedBox(height: 14),
                     _FailedActions(
-                      onPickAnotherPhoto: () => context.go(TemplatesPage.routePath),
+                      onPickAnotherPhoto: () =>
+                          context.go(TemplatesPage.routePath),
                       onRetry: _retrySoon,
                       onSupport: () => context.go(SupportChatPage.routePath),
                     ),
                     const SizedBox(height: 14),
                     _DetailsCard(
+                      title: text.generationStatusDetailsTitle,
                       rows: [
-                        ('Шаблон', generation.templateTitle ?? 'Без названия'),
-                        ('Тип', _typeLabel(generation)),
-                        ('Попытка', '${generation.attemptCount}'),
                         (
-                          'Стоимость',
-                          '${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
+                          text.templateFlowTemplateLabel,
+                          generation.templateTitle ??
+                              text.generationStatusUntitledFallback,
+                        ),
+                        (
+                          text.generationStatusTypeLabel,
+                          _typeLabel(text, generation),
+                        ),
+                        (
+                          text.generationStatusAttemptLabel,
+                          '${generation.attemptCount}',
+                        ),
+                        (
+                          text.templateFlowCostLabel,
+                          '${generation.tokenCost} PawSpark',
                         ),
                       ],
                     ),
@@ -160,13 +189,24 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                     ),
                     const SizedBox(height: 14),
                     _DetailsCard(
+                      title: text.generationStatusDetailsTitle,
                       rows: [
-                        ('Шаблон', generation.templateTitle ?? 'Без названия'),
-                        ('Начато', _formatDateTime(generation.createdAtUtc)),
-                        ('Тип', _typeLabel(generation)),
                         (
-                          'Стоимость',
-                          '${generation.tokenCost} ${_tokensLabel(generation.tokenCost)}',
+                          text.templateFlowTemplateLabel,
+                          generation.templateTitle ??
+                              text.generationStatusUntitledFallback,
+                        ),
+                        (
+                          text.generationStatusStartedLabel,
+                          _formatDateTime(generation.createdAtUtc),
+                        ),
+                        (
+                          text.generationStatusTypeLabel,
+                          _typeLabel(text, generation),
+                        ),
+                        (
+                          text.templateFlowCostLabel,
+                          '${generation.tokenCost} PawSpark',
                         ),
                       ],
                     ),
@@ -181,6 +221,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
   }
 
   Future<void> _openActionsSheet(TemplateGenerationResult generation) async {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     await showModalBottomSheet<void>(
       context: context,
@@ -194,15 +235,15 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
               if (generation.isCompleted) ...[
                 ListTile(
                   leading: const Icon(Icons.download_rounded),
-                  title: const Text('Сохранить'),
+                  title: Text(text.generationStatusSaveAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    _saveSoon();
+                    unawaited(_saveToDevice(generation));
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.share_rounded),
-                  title: const Text('Поделиться'),
+                  title: Text(text.supportChatShareAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _shareResult(generation);
@@ -210,7 +251,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded),
-                  title: const Text('Удалить'),
+                  title: Text(text.generationStatusDeleteAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _deleteSoon();
@@ -218,7 +259,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.flag_outlined),
-                  title: const Text('Сообщить о проблеме'),
+                  title: Text(text.generationStatusReportProblemAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     context.go(SupportChatPage.routePath);
@@ -227,7 +268,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
               ] else if (generation.isFailed) ...[
                 ListTile(
                   leading: const Icon(Icons.image_search_rounded),
-                  title: const Text('Выбрать другое фото'),
+                  title: Text(text.generationStatusPickAnotherPhotoAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     context.go(TemplatesPage.routePath);
@@ -235,7 +276,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.refresh_rounded),
-                  title: const Text('Попробовать снова'),
+                  title: Text(text.generationStatusRetryAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _retrySoon();
@@ -243,7 +284,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.support_agent_rounded),
-                  title: const Text('Сообщить в поддержку'),
+                  title: Text(text.generationStatusContactSupportAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     context.go(SupportChatPage.routePath);
@@ -252,7 +293,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
               ] else ...[
                 ListTile(
                   leading: const Icon(Icons.photo_library_outlined),
-                  title: const Text('Открыть галерею'),
+                  title: Text(text.generationStatusOpenGalleryAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     context.go('/creations');
@@ -260,7 +301,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.close_rounded),
-                  title: const Text('Отменить генерацию'),
+                  title: Text(text.generationStatusCancelGenerationAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _cancelSoon();
@@ -274,27 +315,63 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
     );
   }
 
-  void _saveSoon() {
-    _showInfo('Сохранение появится в ближайшем обновлении.');
+  Future<void> _saveToDevice(TemplateGenerationResult generation) async {
+    final text = AppLocalizations.of(context);
+    final outputUrl = generation.outputUrl;
+    if (outputUrl == null || outputUrl.isEmpty) {
+      _showInfo(text.generationStatusResultUnavailableForSave);
+      return;
+    }
+
+    final fileName = _buildOutputFileName(generation, outputUrl);
+    final extension = extractFileExtension(fileName);
+    final allowedExtensions = extension == null ? null : <String>[extension];
+
+    try {
+      final bytes = await downloadFileBytes(outputUrl);
+      final wasSaved = await saveBytesToDevice(
+        bytes: bytes,
+        dialogTitle: text.generationStatusSaveFileDialogTitle,
+        fileName: fileName,
+        allowedExtensions: allowedExtensions,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!wasSaved) {
+        return;
+      }
+
+      _showInfo(text.generationStatusFileSavedMessage);
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      _showInfo(text.generationStatusFileSaveFailedMessage);
+    }
   }
 
   void _deleteSoon() {
-    _showInfo('Удаление из истории скоро добавим.');
+    _showInfo(AppLocalizations.of(context).generationStatusDeleteSoonMessage);
   }
 
   void _cancelSoon() {
-    _showInfo('Отмена генерации появится в ближайшем обновлении.');
+    _showInfo(AppLocalizations.of(context).generationStatusCancelSoonMessage);
   }
 
   void _retrySoon() {
-    _showInfo('Попробуйте выбрать фото и запустить генерацию снова.');
+    _showInfo(AppLocalizations.of(context).generationStatusRetrySoonMessage);
     context.go(TemplatesPage.routePath);
   }
 
   void _shareResult(TemplateGenerationResult generation) {
+    final text = AppLocalizations.of(context);
     final outputUrl = generation.outputUrl;
     if (outputUrl == null || outputUrl.isEmpty) {
-      _showInfo('Результат пока недоступен для шаринга.');
+      _showInfo(text.generationStatusResultUnavailableForShare);
       return;
     }
 
@@ -302,7 +379,28 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
   }
 
   void _showInfo(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _buildOutputFileName(
+    TemplateGenerationResult generation,
+    String outputUrl,
+  ) {
+    final normalizedTitle = sanitizeFileName(
+      generation.templateTitle,
+      fallback: 'petmagic_result',
+    );
+    final extensionFromRemote = extensionFromUrl(outputUrl);
+    final extension = extensionFromRemote.isEmpty
+        ? _defaultOutputExtension(generation)
+        : extensionFromRemote;
+    return '${normalizedTitle}_${generation.generationId}.$extension';
+  }
+
+  String _defaultOutputExtension(TemplateGenerationResult generation) {
+    return _isVideo(generation) ? 'mp4' : 'jpg';
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -398,8 +496,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Спасибо! Ваш отзыв поможет улучшить PetMagic.'),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).generationStatusFeedbackThanksMessage,
+          ),
         ),
       );
     } finally {
@@ -480,6 +580,7 @@ class _StatusHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final progress = generation.effectiveProgressPercent;
     return _Panel(
@@ -495,7 +596,7 @@ class _StatusHero extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  generation.templateTitle ?? 'PetMagic result',
+                  generation.templateTitle ?? text.generationStatusResultTitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -508,7 +609,7 @@ class _StatusHero extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            _statusTitle(generation),
+            _statusTitle(text, generation),
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: colors.textSoft,
               fontWeight: FontWeight.w700,
@@ -546,7 +647,7 @@ class _StatusHero extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    _etaLabel(generation),
+                    _etaLabel(text, generation),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colors.textSoft,
                       fontWeight: FontWeight.w600,
@@ -568,8 +669,8 @@ class _StatusHero extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             generation.isTerminal
-                ? _terminalHint(generation)
-                : 'Обычно это занимает несколько минут. Вы можете продолжить пользоваться приложением.',
+                ? _terminalHint(text, generation)
+                : text.generationStatusNonTerminalHint,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colors.textMuted,
               height: 1.35,
@@ -588,26 +689,30 @@ class _StageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     return _Panel(
       child: Column(
         children: [
           _StageRow(
-            label: 'В очереди',
+            label: text.generationStatusStageQueued,
             done: generation.effectiveProgressPercent >= 10,
           ),
           _StageRow(
-            label: 'Подготавливаем фото',
+            label: text.templateFlowStepProcessPhoto,
             done: generation.effectiveProgressPercent >= 30,
           ),
           _StageRow(
-            label: 'Создаем результат',
+            label: text.templateFlowStepCreateMagic,
             done: generation.effectiveProgressPercent >= 65,
           ),
           _StageRow(
-            label: 'Сохраняем файл',
+            label: text.templateFlowStepFinalTouches,
             done: generation.effectiveProgressPercent >= 90,
           ),
-          _StageRow(label: 'Готово', done: generation.isCompleted),
+          _StageRow(
+            label: text.generationStatusStageDone,
+            done: generation.isCompleted,
+          ),
         ],
       ),
     );
@@ -655,6 +760,7 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final outputUrl = generation.outputUrl ?? '';
     return _Panel(
@@ -666,16 +772,15 @@ class _ResultCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: outputUrl.isEmpty
-                  ? _MediaPlaceholder(label: 'Результат пока недоступен')
+                  ? _MediaPlaceholder(label: text.templateFlowResultUnavailable)
                   : _isVideo(generation)
-                  ? _MediaPlaceholder(label: 'Видео готово')
+                  ? _MediaPlaceholder(label: text.generationStatusVideoReady)
                   : CachedNetworkImage(
                       imageUrl: outputUrl,
                       fit: BoxFit.cover,
-                      errorWidget: (context, url, error) =>
-                          const _MediaPlaceholder(
-                            label: 'Не удалось загрузить результат',
-                          ),
+                      errorWidget: (context, url, error) => _MediaPlaceholder(
+                        label: text.templateFlowResultLoadFailed,
+                      ),
                     ),
             ),
           ),
@@ -686,7 +791,9 @@ class _ResultCard extends StatelessWidget {
                 : () => SharePlus.instance.share(ShareParams(text: outputUrl)),
             icon: const Icon(Icons.ios_share_rounded),
             label: Text(
-              _isVideo(generation) ? 'Поделиться видео' : 'Поделиться',
+              _isVideo(generation)
+                  ? text.generationStatusShareVideoAction
+                  : text.supportChatShareAction,
               style: TextStyle(color: colors.textStrong),
             ),
           ),
@@ -703,6 +810,7 @@ class _FailureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return _Panel(
       child: Column(
@@ -713,7 +821,7 @@ class _FailureCard extends StatelessWidget {
               Icon(Icons.error_outline_rounded, color: colors.danger),
               const SizedBox(width: 8),
               Text(
-                'Не удалось создать',
+                text.generationStatusFailedTitle,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   color: colors.danger,
                   fontWeight: FontWeight.w800,
@@ -723,7 +831,7 @@ class _FailureCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            _failureReasonMessage(generation),
+            _failureReasonMessage(text, generation),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colors.textSoft,
               height: 1.4,
@@ -732,8 +840,8 @@ class _FailureCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             generation.refundedAtUtc != null
-                ? 'Токены возвращены на ваш баланс.'
-                : 'Если ошибка повторится, напишите в поддержку.',
+                ? text.generationStatusTokensRefundedHint
+                : text.generationStatusSupportHint,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colors.textMuted,
               fontWeight: FontWeight.w600,
@@ -752,6 +860,7 @@ class _BackgroundHintCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return _Panel(
       child: Row(
@@ -761,7 +870,7 @@ class _BackgroundHintCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.',
+              text.generationStatusBackgroundHint,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colors.textSoft,
                 height: 1.4,
@@ -787,23 +896,24 @@ class _ReadyActionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     return Row(
       children: [
         _ActionTile(
           icon: Icons.download_rounded,
-          label: 'Скачать',
+          label: text.generationStatusDownloadAction,
           onTap: onSave,
         ),
         const SizedBox(width: 8),
         _ActionTile(
           icon: Icons.share_rounded,
-          label: 'Поделиться',
+          label: text.supportChatShareAction,
           onTap: onShare,
         ),
         const SizedBox(width: 8),
         _ActionTile(
           icon: Icons.delete_outline_rounded,
-          label: 'Удалить',
+          label: text.generationStatusDeleteAction,
           onTap: onDelete,
         ),
       ],
@@ -824,19 +934,23 @@ class _FailedActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton(
           onPressed: onPickAnotherPhoto,
-          child: const Text('Выбрать другое фото'),
+          child: Text(text.generationStatusPickAnotherPhotoAction),
         ),
         const SizedBox(height: 8),
-        OutlinedButton(onPressed: onRetry, child: const Text('Попробовать снова')),
+        OutlinedButton(
+          onPressed: onRetry,
+          child: Text(text.generationStatusRetryAction),
+        ),
         const SizedBox(height: 8),
         OutlinedButton(
           onPressed: onSupport,
-          child: const Text('Сообщить в поддержку'),
+          child: Text(text.generationStatusContactSupportAction),
         ),
       ],
     );
@@ -851,17 +965,18 @@ class _ActiveActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton(
           onPressed: onContinue,
-          child: const Text('Продолжить в приложении'),
+          child: Text(text.generationStatusContinueInAppAction),
         ),
         const SizedBox(height: 8),
         OutlinedButton(
           onPressed: onCancel,
-          child: const Text('Отменить генерацию'),
+          child: Text(text.generationStatusCancelGenerationAction),
         ),
       ],
     );
@@ -917,8 +1032,9 @@ class _ActionTile extends StatelessWidget {
 }
 
 class _DetailsCard extends StatelessWidget {
-  const _DetailsCard({required this.rows});
+  const _DetailsCard({required this.title, required this.rows});
 
+  final String title;
   final List<(String, String)> rows;
 
   @override
@@ -929,7 +1045,7 @@ class _DetailsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Детали',
+            title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: colors.textStrong,
               fontWeight: FontWeight.w800,
@@ -944,9 +1060,9 @@ class _DetailsCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       row.$1,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.textMuted,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: colors.textMuted),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -971,10 +1087,18 @@ class _DetailsCard extends StatelessWidget {
 
 class _FeedbackCard extends StatelessWidget {
   const _FeedbackCard({
+    required this.title,
+    required this.excellentLabel,
+    required this.okayLabel,
+    required this.badLabel,
     required this.isSubmitting,
     required this.onRatingSelected,
   });
 
+  final String title;
+  final String excellentLabel;
+  final String okayLabel;
+  final String badLabel;
   final bool isSubmitting;
   final ValueChanged<int> onRatingSelected;
 
@@ -986,7 +1110,7 @@ class _FeedbackCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Как вам результат?',
+            title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: colors.textStrong,
               fontWeight: FontWeight.w800,
@@ -996,19 +1120,19 @@ class _FeedbackCard extends StatelessWidget {
           Row(
             children: [
               _RatingButton(
-                label: 'Отлично',
+                label: excellentLabel,
                 icon: Icons.favorite_rounded,
                 onTap: isSubmitting ? null : () => onRatingSelected(3),
               ),
               const SizedBox(width: 8),
               _RatingButton(
-                label: 'Нормально',
+                label: okayLabel,
                 icon: Icons.thumb_up_alt_rounded,
                 onTap: isSubmitting ? null : () => onRatingSelected(2),
               ),
               const SizedBox(width: 8),
               _RatingButton(
-                label: 'Не очень',
+                label: badLabel,
                 icon: Icons.sentiment_dissatisfied_rounded,
                 onTap: isSubmitting ? null : () => onRatingSelected(1),
               ),
@@ -1087,15 +1211,16 @@ class _NegativeFeedbackSheetState extends State<_NegativeFeedbackSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final reasons = <(String, String)>[
-      ('pet_not_similar', 'Питомец плохо похож на себя'),
-      ('face_distorted', 'Морда или лицо искажены'),
-      ('strange_motion', 'Движение выглядит странно'),
-      ('preview_mismatch', 'Результат отличается от превью'),
-      ('low_quality', 'Качество получилось низким'),
-      ('style_disliked', 'Не понравился стиль'),
-      ('other', 'Другое'),
+      ('pet_not_similar', text.generationStatusFeedbackReasonPetNotSimilar),
+      ('face_distorted', text.generationStatusFeedbackReasonFaceDistorted),
+      ('strange_motion', text.generationStatusFeedbackReasonStrangeMotion),
+      ('preview_mismatch', text.generationStatusFeedbackReasonPreviewMismatch),
+      ('low_quality', text.generationStatusFeedbackReasonLowQuality),
+      ('style_disliked', text.generationStatusFeedbackReasonStyleDisliked),
+      ('other', text.generationStatusFeedbackReasonOther),
     ];
 
     return Padding(
@@ -1115,7 +1240,7 @@ class _NegativeFeedbackSheetState extends State<_NegativeFeedbackSheet> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Что можно улучшить?',
+                  text.generationStatusFeedbackImproveTitle,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: colors.textStrong,
                     fontWeight: FontWeight.w800,
@@ -1147,9 +1272,9 @@ class _NegativeFeedbackSheetState extends State<_NegativeFeedbackSheet> {
                   controller: _commentController,
                   minLines: 2,
                   maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Комментарий',
-                    hintText: 'Расскажите коротко, что не так',
+                  decoration: InputDecoration(
+                    labelText: text.generationStatusFeedbackCommentLabel,
+                    hintText: text.generationStatusFeedbackCommentHint,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1162,7 +1287,7 @@ class _NegativeFeedbackSheetState extends State<_NegativeFeedbackSheet> {
                           : _commentController.text.trim(),
                     ),
                   ),
-                  child: const Text('Отправить отзыв'),
+                  child: Text(text.generationStatusFeedbackSubmitAction),
                 ),
               ],
             ),
@@ -1204,6 +1329,7 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return _Panel(
       child: Column(
@@ -1211,7 +1337,7 @@ class _ErrorCard extends StatelessWidget {
         children: [
           Text(message, style: TextStyle(color: colors.textSoft)),
           const SizedBox(height: 12),
-          FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+          FilledButton(onPressed: onRetry, child: Text(text.retryAction)),
         ],
       ),
     );
@@ -1260,59 +1386,39 @@ class _Panel extends StatelessWidget {
   }
 }
 
-String _typeLabel(TemplateGenerationResult generation) {
-  return _isVideo(generation) ? 'Видео' : 'Изображение';
-}
-
-String _tokensLabel(int value) {
-  final last = value % 10;
-  final lastTwo = value % 100;
-  if (last == 1 && lastTwo != 11) {
-    return 'токен';
-  }
-  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
-    return 'токена';
-  }
-  return 'токенов';
+String _typeLabel(AppLocalizations text, TemplateGenerationResult generation) {
+  return _isVideo(generation) ? text.videoLabel : text.imageLabel;
 }
 
 String _formatDateTime(DateTime value) {
-  const months = <String>[
-    'янв',
-    'фев',
-    'мар',
-    'апр',
-    'мая',
-    'июн',
-    'июл',
-    'авг',
-    'сен',
-    'окт',
-    'ноя',
-    'дек',
-  ];
   final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final year = local.year;
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
-  return '${local.day} ${months[local.month - 1]}, $hour:$minute';
+  return '$day.$month.$year, $hour:$minute';
 }
 
-String _etaLabel(TemplateGenerationResult generation) {
+String _etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
   final estimated = generation.estimatedDurationLabel;
   if (estimated != null && estimated.isNotEmpty) {
-    return 'Примерно $estimated осталось';
+    return text.generationStatusEtaEstimated(estimated);
   }
 
   if (generation.stage == 'queued') {
-    return 'Ожидание в очереди';
+    return text.generationStatusEtaQueued;
   }
   if (generation.stage == 'finalizing') {
-    return 'Почти готово';
+    return text.generationStatusEtaFinalizing;
   }
-  return 'Примерно 1-2 мин осталось';
+  return text.generationStatusEtaDefault;
 }
 
-String _failureReasonMessage(TemplateGenerationResult generation) {
+String _failureReasonMessage(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
   final code = (generation.failureCode ?? '').toLowerCase();
   final message = (generation.failureMessage ?? '').toLowerCase();
   final combined = '$code $message';
@@ -1321,35 +1427,41 @@ String _failureReasonMessage(TemplateGenerationResult generation) {
       combined.contains('face') ||
       combined.contains('pet') ||
       combined.contains('quality')) {
-    return 'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
+    return text.generationStatusFailurePhotoHint;
   }
 
-  return 'Произошла техническая ошибка при генерации.';
+  return text.generationStatusFailureTechnicalHint;
 }
 
-String _statusTitle(TemplateGenerationResult generation) {
+String _statusTitle(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
   if (generation.isCompleted) {
-    return 'Ваш результат готов';
+    return text.generationStatusStatusCompleted;
   }
   if (generation.isFailed) {
-    return 'Не удалось создать результат';
+    return text.generationStatusStatusFailed;
   }
   return switch (generation.stage) {
-    'queued' => 'В очереди',
-    'preprocessing' => 'Подготавливаем фото',
-    'generating' => 'Создаем результат',
-    'finalizing' => 'Сохраняем файл',
-    _ => 'Создаем магию...',
+    'queued' => text.generationStatusStageQueued,
+    'preprocessing' => text.templateFlowStepProcessPhoto,
+    'generating' => text.templateFlowStepCreateMagic,
+    'finalizing' => text.templateFlowStepFinalTouches,
+    _ => text.generationStatusStatusCreatingMagic,
   };
 }
 
-String _terminalHint(TemplateGenerationResult generation) {
+String _terminalHint(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
   if (generation.isFailed) {
     return generation.refundedAtUtc != null
-        ? 'Токены возвращены автоматически.'
-        : 'Техническая ошибка уже зафиксирована.';
+        ? text.generationStatusTerminalRefundedHint
+        : text.generationStatusTerminalFailureHint;
   }
-  return 'Откройте результат, поделитесь им или оставьте отзыв.';
+  return text.generationStatusTerminalSuccessHint;
 }
 
 IconData _statusIcon(TemplateGenerationResult generation) {

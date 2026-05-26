@@ -4,20 +4,46 @@ import { BrandMark } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import styles from "@/components/admin/admin-login-screen.module.css";
 import { type Locale } from "@/lib/i18n";
+import { type AdminTheme } from "@/lib/theme";
 
 type AdminLoginScreenProps = {
   locale: Locale;
+  theme: AdminTheme;
+  onToggleTheme: () => void;
   children: ReactNode;
 };
 
-export function AdminLoginScreen({ locale, children }: AdminLoginScreenProps) {
+export function AdminLoginScreen({
+  locale,
+  theme,
+  onToggleTheme,
+  children,
+}: AdminLoginScreenProps) {
   const welcomeTitle = locale === "ru" ? "Добро пожаловать!" : "Welcome!";
-  const welcomeSubtitle = locale === "ru"
-    ? "Войдите в панель администратора, чтобы продолжить работу"
-    : "Sign in to the admin panel to continue your work";
-  const copyright = locale === "ru"
-    ? "© 2026 Admin Panel. Все права защищены."
-    : "© 2026 Admin Panel. All rights reserved.";
+  const welcomeSubtitle =
+    locale === "ru"
+      ? "Войдите в панель администратора, чтобы продолжить работу"
+      : "Sign in to the admin panel to continue your work";
+  const copyright =
+    locale === "ru"
+      ? "© 2026 Admin Panel. Все права защищены."
+      : "© 2026 Admin Panel. All rights reserved.";
+  const themeLabel =
+    locale === "ru"
+      ? theme === "dark"
+        ? "Тёмная"
+        : "Светлая"
+      : theme === "dark"
+        ? "Dark"
+        : "Light";
+  const toggleThemeAriaLabel =
+    locale === "ru"
+      ? theme === "dark"
+        ? "Включить светлую тему"
+        : "Включить тёмную тему"
+      : theme === "dark"
+        ? "Switch to light theme"
+        : "Switch to dark theme";
 
   return (
     <div className={styles.screen}>
@@ -30,6 +56,15 @@ export function AdminLoginScreen({ locale, children }: AdminLoginScreenProps) {
 
       <div className={styles.right}>
         <div className={styles.topbar}>
+          <button
+            type="button"
+            className={styles.themeToggle}
+            onClick={onToggleTheme}
+            aria-label={toggleThemeAriaLabel}
+          >
+            <span className={styles.themeToggleIndicator} aria-hidden="true" />
+            <span>{themeLabel}</span>
+          </button>
           <AdminLangDropdown locale={locale} ruPath="/ru" enPath="/en" />
         </div>
         <div className={styles.body}>{children}</div>
@@ -63,15 +98,30 @@ function LoginDashboardPreview({ locale }: { locale: Locale }) {
 
         <div className={styles.previewMain}>
           <div className={styles.previewChart}>
-            <svg viewBox="0 0 180 52" fill="none" preserveAspectRatio="none" width="100%" height="100%">
+            <svg
+              viewBox="0 0 180 52"
+              fill="none"
+              preserveAspectRatio="none"
+              width="100%"
+              height="100%"
+            >
               <defs>
                 <linearGradient id="loginDashboardGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#22c55e" stopOpacity="0.35" />
                   <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <polygon points="0,44 22,34 44,38 70,21 90,27 110,15 130,19 155,11 180,14 180,52 0,52" fill="url(#loginDashboardGradient)" />
-              <polyline points="0,44 22,34 44,38 70,21 90,27 110,15 130,19 155,11 180,14" stroke="#22c55e" strokeWidth="1.8" fill="none" strokeLinejoin="round" />
+              <polygon
+                points="0,44 22,34 44,38 70,21 90,27 110,15 130,19 155,11 180,14 180,52 0,52"
+                fill="url(#loginDashboardGradient)"
+              />
+              <polyline
+                points="0,44 22,34 44,38 70,21 90,27 110,15 130,19 155,11 180,14"
+                stroke="#22c55e"
+                strokeWidth="1.8"
+                fill="none"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
 

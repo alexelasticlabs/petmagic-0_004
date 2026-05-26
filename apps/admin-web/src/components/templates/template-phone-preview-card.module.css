@@ -18,20 +18,20 @@
   height: auto;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(140, 156, 176, 0.14);
+  border: 1px solid var(--border-soft);
   border-radius: 1.28rem;
   background:
-    radial-gradient(circle at top, rgba(18, 32, 51, 0.42), transparent 34%),
-    linear-gradient(180deg, rgba(7, 12, 20, 0.98) 0%, rgba(7, 12, 20, 0.94) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 32px rgba(1, 6, 16, 0.42);
+    radial-gradient(circle at top, color-mix(in srgb, var(--accent) 20%, transparent), transparent 34%),
+    linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent), 0 16px 32px color-mix(in srgb, var(--surface-0) 42%, transparent);
 }
 
 .phoneCardShade {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(4, 8, 14, 0) 0%, rgba(4, 8, 14, 0.015) 46%, rgba(4, 8, 14, 0.08) 68%, rgba(4, 8, 14, 0.22) 84%, rgba(4, 8, 14, 0.42) 100%),
-    radial-gradient(circle at 50% 115%, rgba(7, 16, 29, 0.34) 0%, rgba(7, 16, 29, 0) 58%);
+    linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--surface-0) 2%, transparent) 46%, color-mix(in srgb, var(--surface-0) 8%, transparent) 68%, color-mix(in srgb, var(--surface-0) 22%, transparent) 84%, color-mix(in srgb, var(--surface-0) 42%, transparent) 100%),
+    radial-gradient(circle at 50% 115%, color-mix(in srgb, var(--surface-2) 34%, transparent) 0%, transparent 58%);
   pointer-events: none;
 }
 
@@ -68,35 +68,35 @@
   isolation: isolate;
   min-height: 1.34rem;
   padding: 0.1rem 0.48rem;
-  border: 1px solid rgba(242, 249, 255, 0.34);
-  background: linear-gradient(180deg, rgba(22, 34, 48, 0.62) 0%, rgba(8, 13, 22, 0.48) 100%);
-  color: #fdfefe;
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 34%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 62%, transparent) 0%, color-mix(in srgb, var(--surface-2) 48%, transparent) 100%);
+  color: var(--text-inverse);
   font-size: 0.56rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.38);
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--surface-0) 38%, transparent);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(4, 8, 14, 0.12),
-    0 10px 16px rgba(4, 8, 14, 0.22);
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 22%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--surface-0) 12%, transparent),
+    0 10px 16px color-mix(in srgb, var(--surface-0) 22%, transparent);
 }
 
 .phoneMediaKindBadge {
   gap: 0.32rem;
   min-height: 1.54rem;
   padding: 0.14rem 0.58rem 0.14rem 0.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(8, 11, 18, 0.48);
-  color: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 10%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 48%, transparent);
+  color: var(--text-inverse);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.015em;
   text-transform: none;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--surface-0) 42%, transparent);
   box-shadow: none;
 }
 
@@ -121,47 +121,47 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 35%, rgba(255, 255, 255, 0) 70%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 46%, rgba(255, 255, 255, 0) 100%);
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--text-inverse) 20%, transparent) 0%, color-mix(in srgb, var(--text-inverse) 8%, transparent) 35%, transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--text-inverse) 12%, transparent) 0%, color-mix(in srgb, var(--text-inverse) 4%, transparent) 46%, transparent 100%);
   opacity: 0.72;
   pointer-events: none;
 }
 
 .phoneHeroBadgeNew {
-  border-color: rgba(171, 255, 214, 0.72);
-  background: linear-gradient(135deg, rgba(132, 255, 189, 0.82) 0%, rgba(17, 138, 101, 0.56) 100%);
-  color: #f7fffb;
+  border-color: color-mix(in srgb, var(--success) 72%, var(--text-inverse));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--success) 82%, var(--text-inverse)) 0%, color-mix(in srgb, var(--success) 56%, var(--surface-2)) 100%);
+  color: var(--text-inverse);
   box-shadow:
-    inset 0 1px 0 rgba(236, 255, 244, 0.36),
-    inset 0 -1px 0 rgba(7, 32, 24, 0.22),
-    0 12px 18px rgba(4, 16, 12, 0.28);
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 36%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--surface-0) 22%, transparent),
+    0 12px 18px color-mix(in srgb, var(--success) 28%, transparent);
 }
 
 .phoneHeroBadgeTrending {
-  border-color: rgba(240, 191, 107, 0.5);
-  background: linear-gradient(135deg, rgba(184, 139, 58, 0.56) 0%, rgba(118, 72, 24, 0.34) 100%);
-  color: #fff4d5;
+  border-color: color-mix(in srgb, var(--warning) 50%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--warning) 56%, var(--surface-2)) 0%, color-mix(in srgb, var(--warning) 34%, var(--surface-0)) 100%);
+  color: var(--warning);
   box-shadow:
-    inset 0 1px 0 rgba(255, 237, 193, 0.3),
-    0 10px 18px rgba(17, 11, 4, 0.24);
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 30%, transparent),
+    0 10px 18px color-mix(in srgb, var(--surface-0) 24%, transparent);
 }
 
 .phoneHeroBadgePopular {
-  border-color: rgba(123, 174, 232, 0.48);
-  background: linear-gradient(135deg, rgba(72, 124, 196, 0.52) 0%, rgba(29, 57, 112, 0.34) 100%);
-  color: #edf5ff;
+  border-color: color-mix(in srgb, var(--info) 48%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--info) 52%, var(--surface-2)) 0%, color-mix(in srgb, var(--accent) 34%, var(--surface-0)) 100%);
+  color: var(--text-strong);
   box-shadow:
-    inset 0 1px 0 rgba(219, 235, 255, 0.28),
-    0 10px 18px rgba(4, 9, 18, 0.24);
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 28%, transparent),
+    0 10px 18px color-mix(in srgb, var(--surface-0) 24%, transparent);
 }
 
 .phoneHeroBadgeFunny {
-  border-color: rgba(230, 153, 195, 0.48);
-  background: linear-gradient(135deg, rgba(176, 92, 140, 0.5) 0%, rgba(105, 37, 85, 0.34) 100%);
-  color: #fff0f8;
+  border-color: color-mix(in srgb, var(--magenta) 48%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--magenta) 50%, var(--surface-2)) 0%, color-mix(in srgb, var(--magenta) 34%, var(--surface-0)) 100%);
+  color: var(--text-inverse);
   box-shadow:
-    inset 0 1px 0 rgba(255, 225, 241, 0.28),
-    0 10px 18px rgba(18, 5, 14, 0.24);
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 28%, transparent),
+    0 10px 18px color-mix(in srgb, var(--surface-0) 24%, transparent);
 }
 
 .phoneMediaAsset {
@@ -182,8 +182,8 @@
   height: 100%;
   display: block;
   background:
-    radial-gradient(circle at 50% 38%, rgba(29, 78, 216, 0.08), transparent 22%),
-    linear-gradient(180deg, rgba(6, 10, 18, 0.22) 0%, rgba(6, 10, 18, 0.04) 100%);
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 22%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-0) 22%, transparent) 0%, color-mix(in srgb, var(--surface-0) 4%, transparent) 100%);
 }
 
 .phoneBottomContent {
@@ -205,8 +205,8 @@
   inset: 0;
   border-radius: inherit;
   background:
-    linear-gradient(180deg, rgba(236, 244, 255, 0) 0%, rgba(236, 244, 255, 0) 10%, rgba(20, 31, 47, 0.65) 30%, rgba(9, 15, 24, 0.78) 62%, rgba(4, 8, 14, 0.9) 84%, rgba(2, 5, 10, 0.97) 100%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.01) 38%, rgba(255, 255, 255, 0.028) 100%);
+    linear-gradient(180deg, transparent 0%, transparent 10%, color-mix(in srgb, var(--surface-2) 65%, transparent) 30%, color-mix(in srgb, var(--surface-2) 78%, transparent) 62%, color-mix(in srgb, var(--surface-0) 90%, transparent) 84%, color-mix(in srgb, var(--surface-0) 97%, transparent) 100%),
+    linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--text-inverse) 1%, transparent) 38%, color-mix(in srgb, var(--text-inverse) 3%, transparent) 100%);
   backdrop-filter: blur(10px) saturate(1.06);
   -webkit-backdrop-filter: blur(10px) saturate(1.06);
   pointer-events: none;
@@ -229,11 +229,11 @@
   gap: 0.35rem;
   min-height: 1.5rem;
   padding: 0.16rem 0.46rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(15, 24, 37, 0.28);
-  color: #eef6ff;
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 9%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 28%, transparent);
+  color: var(--text-strong);
   font-size: 0.76rem;
-  box-shadow: 0 8px 16px rgba(2, 6, 14, 0.15);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--surface-0) 15%, transparent);
 }
 
 .phoneMetricIcon {
@@ -241,7 +241,7 @@
   place-items: center;
   width: 1rem;
   height: 1rem;
-  color: #73dd8c;
+  color: var(--success);
 }
 
 .phoneMetricIcon svg {
@@ -252,7 +252,7 @@
 
 .phoneTitle {
   margin: 0;
-  color: #ffffff;
+  color: var(--text-inverse);
   max-width: 12.8rem;
   display: -webkit-box;
   line-clamp: 2;
@@ -263,7 +263,7 @@
   font-weight: 700;
   line-height: 1.03;
   letter-spacing: -0.03em;
-  text-shadow: 0 8px 20px rgba(3, 7, 15, 0.62);
+  text-shadow: 0 8px 20px color-mix(in srgb, var(--surface-0) 62%, transparent);
 }
 
 .phoneDescription {
@@ -274,10 +274,10 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  color: rgba(236, 244, 255, 0.9);
+  color: color-mix(in srgb, var(--text-inverse) 90%, transparent);
   font-size: 0.68rem;
   line-height: 1.3;
-  text-shadow: 0 6px 16px rgba(3, 7, 15, 0.48);
+  text-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 48%, transparent);
 }
 
 .phoneMusicDescription {
@@ -286,10 +286,10 @@
   display: flex;
   align-items: flex-start;
   gap: 0.42rem;
-  color: rgba(223, 233, 246, 0.88);
+  color: color-mix(in srgb, var(--text-inverse) 88%, transparent);
   font-size: 0.7rem;
   line-height: 1.42;
-  text-shadow: 0 6px 16px rgba(3, 7, 15, 0.42);
+  text-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 42%, transparent);
 }
 
 .phoneTagRow {
@@ -305,10 +305,10 @@
   min-height: 1.28rem;
   max-width: 100%;
   padding: 0.14rem 0.46rem;
-  border: 1px solid rgba(125, 211, 252, 0.18);
+  border: 1px solid color-mix(in srgb, var(--info) 18%, transparent);
   border-radius: var(--radius-sm);
-  background: rgba(10, 18, 31, 0.34);
-  color: rgba(183, 227, 255, 0.94);
+  background: color-mix(in srgb, var(--surface-2) 34%, transparent);
+  color: color-mix(in srgb, var(--text-inverse) 94%, transparent);
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -316,7 +316,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent);
 }
 
 .phoneMusicLabel {
@@ -326,11 +326,11 @@
   width: 1.2rem;
   height: 1.2rem;
   margin-top: 0.02rem;
-  border: 1px solid rgba(251, 191, 36, 0.2);
+  border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent);
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(251, 191, 36, 0.18) 0%, rgba(217, 119, 6, 0.1) 100%);
-  color: rgba(255, 228, 157, 0.96);
-  box-shadow: inset 0 1px 0 rgba(255, 250, 224, 0.08), 0 8px 18px rgba(20, 12, 2, 0.16);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--warning) 18%, transparent) 0%, color-mix(in srgb, var(--warning) 10%, var(--surface-2)) 100%);
+  color: color-mix(in srgb, var(--warning) 96%, var(--text-inverse));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent), 0 8px 18px color-mix(in srgb, var(--surface-0) 16%, transparent);
 }
 
 .phoneMusicLabel svg {
@@ -348,7 +348,7 @@
 }
 
 .phoneMetaRow {
-  color: rgba(228, 238, 251, 0.9);
+  color: color-mix(in srgb, var(--text-inverse) 90%, transparent);
   font-size: 0.74rem;
   font-weight: 700;
 }
@@ -357,8 +357,8 @@
   width: 0.24rem;
   height: 0.24rem;
   border-radius: var(--radius-sm);
-  background: #46b0ff;
-  box-shadow: 0 0 0 0.18rem rgba(70, 176, 255, 0.12);
+  background: var(--info);
+  box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--info) 12%, transparent);
 }
 
 .phoneMetaSpacer {
@@ -369,10 +369,10 @@
   gap: 0.32rem;
   min-height: 1.5rem;
   padding: 0.18rem 0.56rem 0.18rem 0.42rem;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(6, 12, 20, 0.24);
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 7%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 24%, transparent);
   backdrop-filter: blur(12px) saturate(1.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -386,30 +386,30 @@
 }
 
 .phoneAccessTagPremium {
-  border-color: rgba(245, 208, 101, 0.5);
-  background: linear-gradient(135deg, rgba(133, 77, 14, 0.58) 0%, rgba(63, 43, 12, 0.38) 100%);
-  color: #ffe89e;
+  border-color: color-mix(in srgb, var(--warning) 50%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--warning) 58%, var(--surface-0)) 0%, color-mix(in srgb, var(--warning) 38%, var(--surface-2)) 100%);
+  color: var(--warning);
   box-shadow:
-    inset 0 1px 0 rgba(255, 244, 180, 0.22),
-    0 0 14px rgba(245, 208, 101, 0.35),
-    0 3px 10px rgba(0, 0, 0, 0.36);
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 22%, transparent),
+    0 0 14px color-mix(in srgb, var(--warning) 35%, transparent),
+    0 3px 10px color-mix(in srgb, var(--surface-0) 36%, transparent);
 }
 
 .phoneAccessTagFree {
-  border-color: rgba(74, 222, 128, 0.45);
-  background: linear-gradient(135deg, rgba(21, 60, 32, 0.62) 0%, rgba(15, 37, 24, 0.42) 100%);
-  color: #dff3e4;
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--success) 62%, var(--surface-0)) 0%, color-mix(in srgb, var(--success) 42%, var(--surface-2)) 100%);
+  color: var(--toast-success-fg);
   box-shadow:
-    inset 0 1px 0 rgba(134, 239, 172, 0.14),
-    0 3px 10px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 color-mix(in srgb, var(--success) 14%, transparent),
+    0 3px 10px color-mix(in srgb, var(--surface-0) 30%, transparent);
 }
 
 .phoneAccessIconPremium {
-  color: #f2c96a;
+  color: var(--warning);
 }
 
 .phoneAccessIconFree {
-  color: #6ae394;
+  color: var(--success);
 }
 
 .phoneAccessIcon svg {
@@ -417,4 +417,5 @@
   width: 100%;
   height: 100%;
 }
+
 

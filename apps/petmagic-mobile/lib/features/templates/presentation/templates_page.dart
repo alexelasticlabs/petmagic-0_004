@@ -316,6 +316,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
     final router = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final text = AppLocalizations.of(context);
     final generation = await generationController.startGeneration(template);
     if (!mounted) {
       return;
@@ -329,8 +330,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         SnackBar(
           content: Text(
             errorMessage == null || errorMessage.isEmpty
-                ? 'Не удалось запустить генерацию. Попробуйте ещё раз.'
-                : _generationStartErrorText(errorMessage),
+                ? text.templateFlowStartFailedError
+                : _generationStartErrorText(text, errorMessage),
           ),
         ),
       );
@@ -381,21 +382,21 @@ String _mapTemplatesError(AppLocalizations text, String raw) {
   return raw;
 }
 
-String _generationStartErrorText(String raw) {
+String _generationStartErrorText(AppLocalizations text, String raw) {
   if (raw.contains('templates.premium_required')) {
-    return 'Этот шаблон доступен только с Premium.';
+    return text.templateFlowPremiumRequiredError;
   }
 
   if (raw.contains('templates.insufficient_balance')) {
-    return 'Недостаточно PawSpark для запуска генерации.';
+    return text.templateFlowInsufficientBalanceError;
   }
 
   if (raw.contains('templates.network_unavailable')) {
-    return 'Нет соединения. Проверьте интернет и попробуйте снова.';
+    return text.templateFlowNetworkError;
   }
 
   if (raw.contains('templates.server_unavailable')) {
-    return 'Сервис временно недоступен. Попробуйте чуть позже.';
+    return text.templateFlowServerError;
   }
 
   return raw;

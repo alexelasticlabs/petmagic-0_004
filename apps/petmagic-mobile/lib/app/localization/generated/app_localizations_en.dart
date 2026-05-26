@@ -1965,4 +1965,440 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rewardsActionComingSoon => 'Rewards center is coming soon.';
+
+  @override
+  String get templateFlowPhotoSourceGallery => 'Gallery';
+
+  @override
+  String get templateFlowPhotoSourceCamera => 'Camera';
+
+  @override
+  String get templateFlowReadyTitle => 'Ready to create!';
+
+  @override
+  String get templateFlowCheckDetailsSubtitle =>
+      'Check the details before creating';
+
+  @override
+  String get templateFlowTemplateLabel => 'Template';
+
+  @override
+  String get templateFlowCostLabel => 'Cost';
+
+  @override
+  String get templateFlowBalanceLabel => 'Your balance';
+
+  @override
+  String get templateFlowDurationHint =>
+      'Creation can take from 10 seconds to 1 minute.';
+
+  @override
+  String get templateFlowCreateMagicAction => 'Create magic';
+
+  @override
+  String get templateFlowChangePhotoAction => 'Change photo';
+
+  @override
+  String get templateFlowPremiumTemplateTitle => 'Premium template';
+
+  @override
+  String get templateFlowPremiumTemplateMessage =>
+      'This template is available with Premium.';
+
+  @override
+  String get templateFlowInsufficientBalanceTitle => 'Not enough PawSpark';
+
+  @override
+  String templateFlowInsufficientBalanceMessage(
+    Object tokenCost,
+    Object balance,
+  ) {
+    return 'This template costs $tokenCost PawSpark. Your balance: $balance PawSpark.';
+  }
+
+  @override
+  String get templateFlowChooseAnotherTemplateAction =>
+      'Choose another template';
+
+  @override
+  String get templateFlowCreateFailedTitle => 'Could not create magic';
+
+  @override
+  String get templateFlowCreateFailedBalanceHint =>
+      'Top up your balance and try creating again.';
+
+  @override
+  String get templateFlowCreateFailedRetryHint =>
+      'Try another photo or retry later.';
+
+  @override
+  String get templateFlowCreateHint => 'This may take a little time';
+
+  @override
+  String get templateFlowStepProcessPhoto => 'Processing photo';
+
+  @override
+  String get templateFlowStepAnalyzePet => 'Analyzing pet';
+
+  @override
+  String get templateFlowStepCreateMagic => 'Creating magic';
+
+  @override
+  String get templateFlowStepFinalTouches => 'Final touches';
+
+  @override
+  String get templateFlowTopUpBalanceAction => 'Top up balance';
+
+  @override
+  String get templateFlowResultReadyTitle => 'Done!';
+
+  @override
+  String get templateFlowResultReadySubtitle => 'Your magic is ready';
+
+  @override
+  String get templateFlowResultUnavailable => 'Result is not available yet';
+
+  @override
+  String get templateFlowLoadingResult => 'Loading result...';
+
+  @override
+  String get templateFlowResultLoadFailed => 'Could not load result';
+
+  @override
+  String get templateFlowCreateMoreAction => 'Create more';
+
+  @override
+  String get templateFlowPreviewFallback => 'Preview';
+
+  @override
+  String get templateFlowLoadingPreview => 'Loading preview...';
+
+  @override
+  String get templateFlowPreviewUnavailable => 'Preview unavailable';
+
+  @override
+  String get templateFlowLoadingVideo => 'Loading video...';
+
+  @override
+  String get templateFlowBestPhotoTitle => 'Best photo for this template:';
+
+  @override
+  String get templateFlowUploadPetPhotoAction => 'Upload a pet photo';
+
+  @override
+  String get templateFlowPremiumRequiredError =>
+      'This template is available only with Premium.';
+
+  @override
+  String get templateFlowInsufficientBalanceError =>
+      'Not enough PawSpark to start generation.';
+
+  @override
+  String get templateFlowNetworkError =>
+      'No connection. Check your network and try again.';
+
+  @override
+  String get templateFlowServerError =>
+      'Service is temporarily unavailable. Please try again later.';
+
+  @override
+  String get templateFlowStartFailedError =>
+      'Could not start generation. Please try again.';
+
+  @override
+  String get generationStatusTitle => 'Generation status';
+
+  @override
+  String get generationStatusCreatedLabel => 'Created';
+
+  @override
+  String get generationStatusStartedLabel => 'Started';
+
+  @override
+  String get generationStatusTypeLabel => 'Type';
+
+  @override
+  String get generationStatusAttemptLabel => 'Attempt';
+
+  @override
+  String get generationStatusUntitledFallback => 'Untitled';
+
+  @override
+  String get generationStatusDetailsTitle => 'Details';
+
+  @override
+  String get generationStatusFeedbackTitle => 'How is the result?';
+
+  @override
+  String get generationStatusFeedbackExcellent => 'Excellent';
+
+  @override
+  String get generationStatusFeedbackOkay => 'Okay';
+
+  @override
+  String get generationStatusFeedbackBad => 'Not great';
+
+  @override
+  String get generationStatusSaveAction => 'Save';
+
+  @override
+  String get generationStatusDeleteAction => 'Delete';
+
+  @override
+  String get generationStatusReportProblemAction => 'Report a problem';
+
+  @override
+  String get generationStatusPickAnotherPhotoAction => 'Choose another photo';
+
+  @override
+  String get generationStatusRetryAction => 'Try again';
+
+  @override
+  String get generationStatusContactSupportAction => 'Contact support';
+
+  @override
+  String get generationStatusOpenGalleryAction => 'Open gallery';
+
+  @override
+  String get generationStatusOpenStatusAction => 'Open status';
+
+  @override
+  String get generationStatusCancelGenerationAction => 'Cancel generation';
+
+  @override
+  String get generationStatusResultUnavailableForSave =>
+      'Result is not available for saving yet.';
+
+  @override
+  String get generationStatusResultUnavailableForShare =>
+      'Result is not available for sharing yet.';
+
+  @override
+  String get generationStatusSaveFileDialogTitle => 'Save file';
+
+  @override
+  String get generationStatusFileSavedMessage => 'File saved to device.';
+
+  @override
+  String get generationStatusFileSaveFailedMessage =>
+      'Could not save file. Please try again.';
+
+  @override
+  String get generationStatusDeleteSoonMessage =>
+      'Deletion will be available soon.';
+
+  @override
+  String get generationStatusCancelSoonMessage =>
+      'Generation cancellation is coming soon.';
+
+  @override
+  String get generationStatusRetrySoonMessage =>
+      'Choose another photo and start generation again.';
+
+  @override
+  String get generationStatusFeedbackThanksMessage =>
+      'Thanks! Your feedback helps improve PetMagic.';
+
+  @override
+  String get generationStatusResultTitle => 'PetMagic result';
+
+  @override
+  String get generationStatusNonTerminalHint =>
+      'This usually takes a few minutes. You can keep using the app.';
+
+  @override
+  String get generationStatusStageQueued => 'In queue';
+
+  @override
+  String get generationStatusStageDone => 'Done';
+
+  @override
+  String get generationStatusVideoReady => 'Video is ready';
+
+  @override
+  String get generationStatusShareVideoAction => 'Share video';
+
+  @override
+  String get generationStatusFailedTitle => 'Could not create result';
+
+  @override
+  String get generationStatusTokensRefundedHint =>
+      'Tokens were returned to your balance.';
+
+  @override
+  String get generationStatusTokensRefundedShort => 'Tokens refunded';
+
+  @override
+  String get generationStatusSupportHint => 'If this repeats, contact support.';
+
+  @override
+  String get generationStatusBackgroundHint =>
+      'Generation continues on the server. We will show the result in Gallery when it is ready.';
+
+  @override
+  String get generationStatusDownloadAction => 'Download';
+
+  @override
+  String get generationStatusContinueInAppAction => 'Continue in app';
+
+  @override
+  String get generationStatusFeedbackImproveTitle => 'What can we improve?';
+
+  @override
+  String get generationStatusFeedbackCommentLabel => 'Comment';
+
+  @override
+  String get generationStatusFeedbackCommentHint =>
+      'Briefly tell us what was wrong';
+
+  @override
+  String get generationStatusFeedbackSubmitAction => 'Submit feedback';
+
+  @override
+  String get generationStatusFeedbackReasonPetNotSimilar =>
+      'Pet does not look like itself';
+
+  @override
+  String get generationStatusFeedbackReasonFaceDistorted =>
+      'Face or muzzle is distorted';
+
+  @override
+  String get generationStatusFeedbackReasonStrangeMotion =>
+      'Motion looks strange';
+
+  @override
+  String get generationStatusFeedbackReasonPreviewMismatch =>
+      'Result differs from preview';
+
+  @override
+  String get generationStatusFeedbackReasonLowQuality => 'Quality is too low';
+
+  @override
+  String get generationStatusFeedbackReasonStyleDisliked =>
+      'Did not like the style';
+
+  @override
+  String get generationStatusFeedbackReasonOther => 'Other';
+
+  @override
+  String generationStatusEtaEstimated(Object value) {
+    return 'About $value left';
+  }
+
+  @override
+  String get generationStatusEtaQueued => 'Waiting in queue';
+
+  @override
+  String get generationStatusEtaFinalizing => 'Almost ready';
+
+  @override
+  String get generationStatusEtaDefault => 'About 1-2 min left';
+
+  @override
+  String get generationStatusEtaStartsSoon => 'Will start in a few minutes';
+
+  @override
+  String get generationStatusEtaNotifyHint =>
+      'We will notify you when the result is ready.';
+
+  @override
+  String get generationStatusFailurePhotoHint =>
+      'The photo is not suitable for this template. Try a photo where the pet is clearly visible.';
+
+  @override
+  String get generationStatusFailureTechnicalHint =>
+      'Could not create the result due to a technical issue. Tokens were returned to your balance.';
+
+  @override
+  String get generationStatusStatusCompleted => 'Your result is ready';
+
+  @override
+  String get generationStatusStatusFailed => 'Could not create result';
+
+  @override
+  String get generationStatusStatusCreatingMagic => 'Creating magic...';
+
+  @override
+  String get generationStatusTerminalRefundedHint =>
+      'Tokens were refunded automatically.';
+
+  @override
+  String get generationStatusTerminalFailureHint =>
+      'A technical issue has been recorded.';
+
+  @override
+  String get generationStatusTerminalSuccessHint =>
+      'Open result, share it, or leave feedback.';
+
+  @override
+  String get generationStatusSectionActive => 'In progress';
+
+  @override
+  String get generationStatusSectionReady => 'Ready';
+
+  @override
+  String get generationStatusSectionFailed => 'Failed';
+
+  @override
+  String get generationStatusFilterActive => 'In progress';
+
+  @override
+  String get generationStatusFilterReady => 'Ready';
+
+  @override
+  String get generationStatusFilterFailed => 'Failed';
+
+  @override
+  String generationStatusShowMoreAction(int hiddenCount) {
+    return 'Show more ($hiddenCount) ▾';
+  }
+
+  @override
+  String get generationStatusCollapseAction => 'Collapse ▲';
+
+  @override
+  String get generationStatusActiveInfoHint =>
+      'You can close the app. We will notify you when the result is ready.';
+
+  @override
+  String generationStatusUnreadCount(int count) {
+    return '$count new';
+  }
+
+  @override
+  String get generationStatusEmptyTitle => 'Your results will appear here';
+
+  @override
+  String get generationStatusEmptyMessage =>
+      'Choose a template, upload your pet photo and create your first magic art.';
+
+  @override
+  String get generationStatusSubtitleAll => 'Your magical creations';
+
+  @override
+  String get generationStatusSubtitleActive => 'Active generations';
+
+  @override
+  String get generationStatusSubtitleReady => 'Your ready results';
+
+  @override
+  String get generationStatusSubtitleFailed => 'Generation issues';
+
+  @override
+  String generationStatusDateToday(Object time) {
+    return 'Today, $time';
+  }
+
+  @override
+  String generationStatusDateYesterday(Object time) {
+    return 'Yesterday, $time';
+  }
+
+  @override
+  String shellActiveGenerationLabel(Object templateTitle) {
+    return '✨ Creating $templateTitle';
+  }
+
+  @override
+  String get shellActiveGenerationFallback => 'result';
 }

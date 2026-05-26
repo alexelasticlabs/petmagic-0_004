@@ -24,10 +24,10 @@
 .error {
   margin-bottom: 1rem;
   padding: 0.65rem 0.9rem;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border-soft));
   border-radius: 5.76px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #fca5a5;
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-fg);
   font-size: 0.875rem;
   font-weight: 600;
 }
@@ -73,11 +73,14 @@
   padding: 0.76rem 0.88rem 0.76rem 2.5rem;
   border: 1px solid var(--border-soft);
   border-radius: 7.2px;
-  background: rgba(5, 8, 14, 0.94);
+  background: var(--surface-1);
   color: var(--text-strong);
   font: inherit;
   font-size: 0.875rem;
-  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
   appearance: none;
 }
 
@@ -93,7 +96,7 @@
 
 .input:hover {
   border-color: var(--border-strong);
-  background: rgba(9, 14, 22, 0.98);
+  background: var(--surface-hover);
 }
 
 .inputPaddedRight {
@@ -114,7 +117,11 @@
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease, transform 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
 }
 
 .eyeButton svg {
@@ -123,7 +130,7 @@
 }
 
 .eyeButton:hover {
-  background: rgba(18, 36, 67, 0.78);
+  background: var(--accent-soft-bg);
   box-shadow: none;
   color: var(--text-soft);
   transform: none;
@@ -131,7 +138,7 @@
 
 .eyeButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(83, 155, 245, 0.38);
+  box-shadow: var(--focus-ring);
 }
 
 .submit {
@@ -143,22 +150,25 @@
   min-height: 44px;
   margin-top: 0.25rem;
   padding: 0.74rem 0.95rem;
-  border: 1px solid rgba(83, 155, 245, 0.48);
+  border: 1px solid var(--primary-border);
   border-radius: 7.2px;
-  background: #1a73e8;
-  color: #eef4ff;
+  background: var(--primary-bg);
+  color: var(--accent-contrast);
   font: inherit;
   font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
   box-shadow: none;
-  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .submit:hover:not(:disabled) {
-  background: #226fdb;
-  border-color: rgba(166, 196, 255, 0.9);
+  background: var(--primary-bg-hover);
+  border-color: var(--primary-border-hover);
   box-shadow: none;
 }
 
@@ -168,7 +178,7 @@
 
 .submit:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.28);
+  box-shadow: var(--focus-ring);
 }
 
 .submit:disabled {
@@ -180,8 +190,8 @@
 .spinner {
   width: 16px;
   height: 16px;
-  border: 2.5px solid rgba(255, 255, 255, 0.22);
-  border-top-color: #eef4ff;
+  border: 2.5px solid color-mix(in srgb, var(--accent-contrast) 30%, transparent);
+  border-top-color: var(--accent-contrast);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
@@ -204,7 +214,7 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: rgba(42, 51, 63, 0.72);
+  background: var(--border-soft);
 }
 
 .contact {
@@ -215,13 +225,13 @@
 }
 
 .contactLink {
-  color: #58a6ff;
+  color: var(--accent);
   font-weight: 600;
   transition: color 120ms ease;
 }
 
 .contactLink:hover {
-  color: #9ec1ff;
+  color: var(--accent-strong);
   text-decoration: underline;
 }
 
@@ -233,7 +243,12 @@
 
 .skeletonLine {
   border-radius: 5.76px;
-  background: linear-gradient(90deg, var(--surface-1) 0%, var(--surface-3) 50%, var(--surface-1) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--surface-1) 0%,
+    var(--surface-3) 50%,
+    var(--surface-1) 100%
+  );
   background-size: 220% 100%;
   animation: shimmer 1.5s linear infinite;
 }
@@ -275,5 +290,3 @@
     width: 100%;
   }
 }
-
-

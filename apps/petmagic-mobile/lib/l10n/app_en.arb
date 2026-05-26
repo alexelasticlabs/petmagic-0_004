@@ -734,5 +734,173 @@
   "templateGuestPreview": "Guest preview",
   "templateActionComingSoon": "Template studio is coming soon.",
   "tokensActionComingSoon": "Token wallet is coming soon.",
-  "rewardsActionComingSoon": "Rewards center is coming soon."
+  "rewardsActionComingSoon": "Rewards center is coming soon.",
+  "templateFlowPhotoSourceGallery": "Gallery",
+  "templateFlowPhotoSourceCamera": "Camera",
+  "templateFlowReadyTitle": "Ready to create!",
+  "templateFlowCheckDetailsSubtitle": "Check the details before creating",
+  "templateFlowTemplateLabel": "Template",
+  "templateFlowCostLabel": "Cost",
+  "templateFlowBalanceLabel": "Your balance",
+  "templateFlowDurationHint": "Creation can take from 10 seconds to 1 minute.",
+  "templateFlowCreateMagicAction": "Create magic",
+  "templateFlowChangePhotoAction": "Change photo",
+  "templateFlowPremiumTemplateTitle": "Premium template",
+  "templateFlowPremiumTemplateMessage": "This template is available with Premium.",
+  "templateFlowInsufficientBalanceTitle": "Not enough PawSpark",
+  "templateFlowInsufficientBalanceMessage": "This template costs {tokenCost} PawSpark. Your balance: {balance} PawSpark.",
+  "@templateFlowInsufficientBalanceMessage": {
+    "placeholders": {
+      "tokenCost": {},
+      "balance": {}
+    }
+  },
+  "templateFlowChooseAnotherTemplateAction": "Choose another template",
+  "templateFlowCreateFailedTitle": "Could not create magic",
+  "templateFlowCreateFailedBalanceHint": "Top up your balance and try creating again.",
+  "templateFlowCreateFailedRetryHint": "Try another photo or retry later.",
+  "templateFlowCreateHint": "This may take a little time",
+  "templateFlowStepProcessPhoto": "Processing photo",
+  "templateFlowStepAnalyzePet": "Analyzing pet",
+  "templateFlowStepCreateMagic": "Creating magic",
+  "templateFlowStepFinalTouches": "Final touches",
+  "templateFlowTopUpBalanceAction": "Top up balance",
+  "templateFlowResultReadyTitle": "Done!",
+  "templateFlowResultReadySubtitle": "Your magic is ready",
+  "templateFlowResultUnavailable": "Result is not available yet",
+  "templateFlowLoadingResult": "Loading result...",
+  "templateFlowResultLoadFailed": "Could not load result",
+  "templateFlowCreateMoreAction": "Create more",
+  "templateFlowPreviewFallback": "Preview",
+  "templateFlowLoadingPreview": "Loading preview...",
+  "templateFlowPreviewUnavailable": "Preview unavailable",
+  "templateFlowLoadingVideo": "Loading video...",
+  "templateFlowBestPhotoTitle": "Best photo for this template:",
+  "templateFlowUploadPetPhotoAction": "Upload a pet photo",
+  "templateFlowPremiumRequiredError": "This template is available only with Premium.",
+  "templateFlowInsufficientBalanceError": "Not enough PawSpark to start generation.",
+  "templateFlowNetworkError": "No connection. Check your network and try again.",
+  "templateFlowServerError": "Service is temporarily unavailable. Please try again later.",
+  "templateFlowStartFailedError": "Could not start generation. Please try again.",
+  "generationStatusTitle": "Generation status",
+  "generationStatusCreatedLabel": "Created",
+  "generationStatusStartedLabel": "Started",
+  "generationStatusTypeLabel": "Type",
+  "generationStatusAttemptLabel": "Attempt",
+  "generationStatusUntitledFallback": "Untitled",
+  "generationStatusDetailsTitle": "Details",
+  "generationStatusFeedbackTitle": "How is the result?",
+  "generationStatusFeedbackExcellent": "Excellent",
+  "generationStatusFeedbackOkay": "Okay",
+  "generationStatusFeedbackBad": "Not great",
+  "generationStatusSaveAction": "Save",
+  "generationStatusDeleteAction": "Delete",
+  "generationStatusReportProblemAction": "Report a problem",
+  "generationStatusPickAnotherPhotoAction": "Choose another photo",
+  "generationStatusRetryAction": "Try again",
+  "generationStatusContactSupportAction": "Contact support",
+  "generationStatusOpenGalleryAction": "Open gallery",
+  "generationStatusOpenStatusAction": "Open status",
+  "generationStatusCancelGenerationAction": "Cancel generation",
+  "generationStatusResultUnavailableForSave": "Result is not available for saving yet.",
+  "generationStatusResultUnavailableForShare": "Result is not available for sharing yet.",
+  "generationStatusSaveFileDialogTitle": "Save file",
+  "generationStatusFileSavedMessage": "File saved to device.",
+  "generationStatusFileSaveFailedMessage": "Could not save file. Please try again.",
+  "generationStatusDeleteSoonMessage": "Deletion will be available soon.",
+  "generationStatusCancelSoonMessage": "Generation cancellation is coming soon.",
+  "generationStatusRetrySoonMessage": "Choose another photo and start generation again.",
+  "generationStatusFeedbackThanksMessage": "Thanks! Your feedback helps improve PetMagic.",
+  "generationStatusResultTitle": "PetMagic result",
+  "generationStatusNonTerminalHint": "This usually takes a few minutes. You can keep using the app.",
+  "generationStatusStageQueued": "In queue",
+  "generationStatusStageDone": "Done",
+  "generationStatusVideoReady": "Video is ready",
+  "generationStatusShareVideoAction": "Share video",
+  "generationStatusFailedTitle": "Could not create result",
+  "generationStatusTokensRefundedHint": "Tokens were returned to your balance.",
+  "generationStatusTokensRefundedShort": "Tokens refunded",
+  "generationStatusSupportHint": "If this repeats, contact support.",
+  "generationStatusBackgroundHint": "Generation continues on the server. We will show the result in Gallery when it is ready.",
+  "generationStatusDownloadAction": "Download",
+  "generationStatusContinueInAppAction": "Continue in app",
+  "generationStatusFeedbackImproveTitle": "What can we improve?",
+  "generationStatusFeedbackCommentLabel": "Comment",
+  "generationStatusFeedbackCommentHint": "Briefly tell us what was wrong",
+  "generationStatusFeedbackSubmitAction": "Submit feedback",
+  "generationStatusFeedbackReasonPetNotSimilar": "Pet does not look like itself",
+  "generationStatusFeedbackReasonFaceDistorted": "Face or muzzle is distorted",
+  "generationStatusFeedbackReasonStrangeMotion": "Motion looks strange",
+  "generationStatusFeedbackReasonPreviewMismatch": "Result differs from preview",
+  "generationStatusFeedbackReasonLowQuality": "Quality is too low",
+  "generationStatusFeedbackReasonStyleDisliked": "Did not like the style",
+  "generationStatusFeedbackReasonOther": "Other",
+  "generationStatusEtaEstimated": "About {value} left",
+  "@generationStatusEtaEstimated": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "generationStatusEtaQueued": "Waiting in queue",
+  "generationStatusEtaFinalizing": "Almost ready",
+  "generationStatusEtaDefault": "About 1-2 min left",
+  "generationStatusEtaStartsSoon": "Will start in a few minutes",
+  "generationStatusEtaNotifyHint": "We will notify you when the result is ready.",
+  "generationStatusFailurePhotoHint": "The photo is not suitable for this template. Try a photo where the pet is clearly visible.",
+  "generationStatusFailureTechnicalHint": "Could not create the result due to a technical issue. Tokens were returned to your balance.",
+  "generationStatusStatusCompleted": "Your result is ready",
+  "generationStatusStatusFailed": "Could not create result",
+  "generationStatusStatusCreatingMagic": "Creating magic...",
+  "generationStatusTerminalRefundedHint": "Tokens were refunded automatically.",
+  "generationStatusTerminalFailureHint": "A technical issue has been recorded.",
+  "generationStatusTerminalSuccessHint": "Open result, share it, or leave feedback.",
+  "generationStatusSectionActive": "In progress",
+  "generationStatusSectionReady": "Ready",
+  "generationStatusSectionFailed": "Failed",
+  "generationStatusFilterActive": "In progress",
+  "generationStatusFilterReady": "Ready",
+  "generationStatusFilterFailed": "Failed",
+  "generationStatusShowMoreAction": "Show more ({hiddenCount}) ▾",
+  "@generationStatusShowMoreAction": {
+    "placeholders": {
+      "hiddenCount": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusCollapseAction": "Collapse ▲",
+  "generationStatusActiveInfoHint": "You can close the app. We will notify you when the result is ready.",
+  "generationStatusUnreadCount": "{count} new",
+  "@generationStatusUnreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusEmptyTitle": "Your results will appear here",
+  "generationStatusEmptyMessage": "Choose a template, upload your pet photo and create your first magic art.",
+  "generationStatusSubtitleAll": "Your magical creations",
+  "generationStatusSubtitleActive": "Active generations",
+  "generationStatusSubtitleReady": "Your ready results",
+  "generationStatusSubtitleFailed": "Generation issues",
+  "generationStatusDateToday": "Today, {time}",
+  "@generationStatusDateToday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "generationStatusDateYesterday": "Yesterday, {time}",
+  "@generationStatusDateYesterday": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "shellActiveGenerationLabel": "✨ Creating {templateTitle}",
+  "@shellActiveGenerationLabel": {
+    "placeholders": {
+      "templateTitle": {}
+    }
+  },
+  "shellActiveGenerationFallback": "result"
 }

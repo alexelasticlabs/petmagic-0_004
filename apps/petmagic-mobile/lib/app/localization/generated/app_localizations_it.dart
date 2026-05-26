@@ -773,89 +773,89 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get premiumPageSubtitle =>
-      'Unlimited pet magic, faster generation and premium templates in one plan.';
+      'Magia illimitata per animali, generazione più veloce e modelli premium in un unico piano.';
 
   @override
-  String get premiumHeroEyebrow => 'Premium magic';
+  String get premiumHeroEyebrow => 'Magia Premium';
 
   @override
-  String get premiumHeroTitle => 'Get Premium and create more content.';
+  String get premiumHeroTitle => 'Passa a Premium e crea più contenuti.';
 
   @override
   String get premiumHeroSubtitle =>
-      'Unlock premium templates, faster generation and more room for photos and videos in one plan.';
+      'Sblocca modelli premium, generazione più veloce e più spazio per foto e video in un unico piano.';
 
   @override
-  String get premiumAlreadyActive => 'Premium active';
+  String get premiumAlreadyActive => 'Premium attivo';
 
   @override
-  String get premiumBenefitUnlimitedTemplates => 'Unlimited templates';
+  String get premiumBenefitUnlimitedTemplates => 'Modelli illimitati';
 
   @override
-  String get premiumBenefitFastGeneration => 'Faster generation';
+  String get premiumBenefitFastGeneration => 'Generazione più veloce';
 
   @override
-  String get premiumBenefitHighQuality => 'High quality output';
+  String get premiumBenefitHighQuality => 'Output ad alta qualità';
 
   @override
-  String get premiumBenefitExclusive => 'Exclusive templates';
+  String get premiumBenefitExclusive => 'Modelli esclusivi';
 
   @override
-  String get premiumChoosePlanTitle => 'Choose plan';
+  String get premiumChoosePlanTitle => 'Scegli un piano';
 
   @override
-  String get premiumWeeklyPlan => 'Weekly';
+  String get premiumWeeklyPlan => 'Settimanale';
 
   @override
-  String get premiumMonthlyPlan => 'Monthly';
+  String get premiumMonthlyPlan => 'Mensile';
 
   @override
-  String get premiumYearlyPlan => 'Yearly';
+  String get premiumYearlyPlan => 'Annuale';
 
   @override
-  String get premiumWeeklyPeriod => '/ week';
+  String get premiumWeeklyPeriod => '/ settimana';
 
   @override
-  String get premiumMonthlyPeriod => '/ month';
+  String get premiumMonthlyPeriod => '/ mese';
 
   @override
-  String get premiumYearlyPeriod => '/ year';
+  String get premiumYearlyPeriod => '/ anno';
 
   @override
-  String get premiumPopularBadge => 'Most popular';
+  String get premiumPopularBadge => 'Più popolare';
 
   @override
   String premiumTokensPerWeek(Object count) {
-    return '$count tokens / week';
+    return '$count token / settimana';
   }
 
   @override
   String premiumTokensPerMonth(Object count) {
-    return '$count tokens / month';
+    return '$count token / mese';
   }
 
   @override
   String premiumDiscountLabel(Object percent) {
-    return 'Save $percent%';
+    return 'Risparmia $percent%';
   }
 
   @override
-  String get premiumCancelAnytime => 'Cancel anytime';
+  String get premiumCancelAnytime => 'Annulla in qualsiasi momento';
 
   @override
-  String get premiumIncludesTitle => 'What Premium includes';
+  String get premiumIncludesTitle => 'Cosa include Premium';
 
   @override
   String premiumTokenEstimate(Object videos, Object photos) {
-    return '$videos videos or $photos photos per month, depending on template complexity.';
+    return '$videos video o $photos foto al mese, in base alla complessità del modello.';
   }
 
   @override
   String get premiumSocialProof =>
-      'Most chosen plan for regular PetMagic creators.';
+      'Il piano più scelto dai creator abituali di PetMagic.';
 
   @override
-  String get premiumPaymentTitle => 'Payment method';
+  String get premiumPaymentTitle => 'Metodo di pagamento';
 
   @override
   String get premiumPaymentStripe => 'Card via Stripe';
@@ -878,42 +878,42 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get premiumComparisonTitle => 'What changes with Premium';
+  String get premiumComparisonTitle => 'Cosa cambia con Premium';
 
   @override
-  String get premiumFreeColumn => 'Free';
+  String get premiumFreeColumn => 'Gratis';
 
   @override
   String get premiumPremiumColumn => 'Premium';
 
   @override
-  String get premiumComparisonFreeTemplates => 'Free templates';
+  String get premiumComparisonFreeTemplates => 'Modelli gratuiti';
 
   @override
-  String get premiumComparisonPremiumTemplates => 'Premium templates';
+  String get premiumComparisonPremiumTemplates => 'Modelli premium';
 
   @override
-  String get premiumComparisonTokens => 'Tokens per month';
+  String get premiumComparisonTokens => 'Token al mese';
 
   @override
   String premiumComparisonPremiumTokens(Object count) {
-    return 'Up to $count';
+    return 'Fino a $count';
   }
 
   @override
-  String get premiumComparisonPremiumTokensFallback => 'Up to 1000';
+  String get premiumComparisonPremiumTokensFallback => 'Fino a 1000';
 
   @override
-  String get premiumComparisonFast => 'Fast generation';
+  String get premiumComparisonFast => 'Generazione rapida';
 
   @override
-  String get premiumComparisonHighQuality => 'High quality export';
+  String get premiumComparisonHighQuality => 'Esportazione ad alta qualità';
 
   @override
-  String get premiumComparisonNoWatermark => 'No watermark';
+  String get premiumComparisonNoWatermark => 'Senza filigrana';
 
   @override
-  String get premiumComparisonPrioritySupport => 'Priority support';
+  String get premiumComparisonPrioritySupport => 'Supporto prioritario';
 
   @override
   String get premiumFreeSummaryTokens => '20 tokens per month';
@@ -928,14 +928,14 @@ class AppLocalizationsIt extends AppLocalizations {
   String get premiumFreeSummaryQuality => 'Standard quality';
 
   @override
-  String get premiumSecurePaymentTitle => 'Secure payment';
+  String get premiumSecurePaymentTitle => 'Pagamento sicuro';
 
   @override
   String get premiumSecurePaymentSubtitle =>
-      'Manage or cancel your subscription from billing settings at any time.';
+      'Gestisci o annulla l\'abbonamento in qualsiasi momento dalle impostazioni di fatturazione.';
 
   @override
-  String get premiumContinueAction => 'Start Premium';
+  String get premiumContinueAction => 'Continua';
 
   @override
   String get externalCheckoutStripeTitle => 'Payment via Stripe';
@@ -960,41 +960,41 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
-    return 'Continue with $plan — $price $period';
+    return 'Continua con $plan — $price $period';
   }
 
   @override
-  String get premiumManageAction => 'Manage subscription';
+  String get premiumManageAction => 'Gestisci abbonamento';
 
   @override
-  String get premiumRestoreAction => 'Restore purchases';
+  String get premiumRestoreAction => 'Ripristina acquisti';
 
   @override
   String get premiumTermsNotice =>
-      'By continuing, you agree to the Terms of Use and Privacy Policy.';
+      'Continuando, accetti i Termini di utilizzo e l\'Informativa sulla privacy.';
 
   @override
   String get premiumStoreUnavailable =>
-      'Store subscriptions are waiting for App Store / Google Play product setup. Use Stripe checkout for now.';
+      'Gli abbonamenti store sono in attesa della configurazione prodotti su App Store / Google Play. Per ora usa Stripe Checkout.';
 
   @override
   String get premiumStoreProductUnavailable =>
-      'This subscription product is not available in the store on this device.';
+      'Questo prodotto in abbonamento non è disponibile nello store su questo dispositivo.';
 
   @override
   String get premiumStoreVerificationUnavailable =>
-      'Server-side store verification is not configured yet.';
+      'La verifica store lato server non è ancora configurata.';
 
   @override
   String get premiumStorePurchaseInvalid =>
-      'The purchase could not be verified.';
+      'Non è stato possibile verificare l\'acquisto.';
 
   @override
   String get premiumStorePurchaseInactive =>
-      'This subscription is no longer active.';
+      'Questo abbonamento non è più attivo.';
 
   @override
-  String get premiumPurchaseActivated => 'Premium is active now.';
+  String get premiumPurchaseActivated => 'Premium è ora attivo.';
 
   @override
   String get premiumRecentlyActivatedBadge => 'Just activated';
@@ -1007,19 +1007,19 @@ class AppLocalizationsIt extends AppLocalizations {
       'Your Premium access is active on this device and ready to use.';
 
   @override
-  String get premiumPurchaseCancelled => 'Purchase was cancelled.';
+  String get premiumPurchaseCancelled => 'L\'acquisto è stato annullato.';
 
   @override
   String get premiumCheckoutFailed =>
-      'Premium checkout is temporarily unavailable.';
+      'Premium checkout è temporaneamente non disponibile.';
 
   @override
   String get premiumManageFailed =>
-      'Billing management is not available yet for this account.';
+      'La gestione della fatturazione non è ancora disponibile per questo account.';
 
   @override
   String get premiumRestoreStarted =>
-      'Premium status refreshed on this device.';
+      'Lo stato Premium è stato aggiornato su questo dispositivo.';
 
   @override
   String get profileCommunicationsTitle => 'Aggiornamenti di PetMagic';
@@ -1982,4 +1982,446 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get rewardsActionComingSoon =>
       'Il centro premi sarà presto disponibile.';
+
+  @override
+  String get templateFlowPhotoSourceGallery => 'Gallery';
+
+  @override
+  String get templateFlowPhotoSourceCamera => 'Camera';
+
+  @override
+  String get templateFlowReadyTitle => 'Ready to create!';
+
+  @override
+  String get templateFlowCheckDetailsSubtitle =>
+      'Check the details before creating';
+
+  @override
+  String get templateFlowTemplateLabel => 'Modello';
+
+  @override
+  String get templateFlowCostLabel => 'Costo';
+
+  @override
+  String get templateFlowBalanceLabel => 'Your balance';
+
+  @override
+  String get templateFlowDurationHint =>
+      'Creation can take from 10 seconds to 1 minute.';
+
+  @override
+  String get templateFlowCreateMagicAction => 'Create magic';
+
+  @override
+  String get templateFlowChangePhotoAction => 'Change photo';
+
+  @override
+  String get templateFlowPremiumTemplateTitle => 'Premium template';
+
+  @override
+  String get templateFlowPremiumTemplateMessage =>
+      'This template is available with Premium.';
+
+  @override
+  String get templateFlowInsufficientBalanceTitle => 'Not enough PawSpark';
+
+  @override
+  String templateFlowInsufficientBalanceMessage(
+    Object tokenCost,
+    Object balance,
+  ) {
+    return 'This template costs $tokenCost PawSpark. Your balance: $balance PawSpark.';
+  }
+
+  @override
+  String get templateFlowChooseAnotherTemplateAction =>
+      'Choose another template';
+
+  @override
+  String get templateFlowCreateFailedTitle => 'Could not create magic';
+
+  @override
+  String get templateFlowCreateFailedBalanceHint =>
+      'Top up your balance and try creating again.';
+
+  @override
+  String get templateFlowCreateFailedRetryHint =>
+      'Try another photo or retry later.';
+
+  @override
+  String get templateFlowCreateHint => 'This may take a little time';
+
+  @override
+  String get templateFlowStepProcessPhoto => 'Elaborazione foto';
+
+  @override
+  String get templateFlowStepAnalyzePet => 'Analyzing pet';
+
+  @override
+  String get templateFlowStepCreateMagic => 'Creazione della magia';
+
+  @override
+  String get templateFlowStepFinalTouches => 'Ritocchi finali';
+
+  @override
+  String get templateFlowTopUpBalanceAction => 'Top up balance';
+
+  @override
+  String get templateFlowResultReadyTitle => 'Done!';
+
+  @override
+  String get templateFlowResultReadySubtitle => 'Your magic is ready';
+
+  @override
+  String get templateFlowResultUnavailable =>
+      'Il risultato non e ancora disponibile';
+
+  @override
+  String get templateFlowLoadingResult => 'Loading result...';
+
+  @override
+  String get templateFlowResultLoadFailed =>
+      'Impossibile caricare il risultato';
+
+  @override
+  String get templateFlowCreateMoreAction => 'Create more';
+
+  @override
+  String get templateFlowPreviewFallback => 'Preview';
+
+  @override
+  String get templateFlowLoadingPreview => 'Loading preview...';
+
+  @override
+  String get templateFlowPreviewUnavailable => 'Preview unavailable';
+
+  @override
+  String get templateFlowLoadingVideo => 'Loading video...';
+
+  @override
+  String get templateFlowBestPhotoTitle => 'Best photo for this template:';
+
+  @override
+  String get templateFlowUploadPetPhotoAction => 'Upload a pet photo';
+
+  @override
+  String get templateFlowPremiumRequiredError =>
+      'This template is available only with Premium.';
+
+  @override
+  String get templateFlowInsufficientBalanceError =>
+      'Not enough PawSpark to start generation.';
+
+  @override
+  String get templateFlowNetworkError =>
+      'No connection. Check your network and try again.';
+
+  @override
+  String get templateFlowServerError =>
+      'Service is temporarily unavailable. Please try again later.';
+
+  @override
+  String get templateFlowStartFailedError =>
+      'Could not start generation. Please try again.';
+
+  @override
+  String get generationStatusTitle => 'Stato generazione';
+
+  @override
+  String get generationStatusCreatedLabel => 'Creato';
+
+  @override
+  String get generationStatusStartedLabel => 'Avviato';
+
+  @override
+  String get generationStatusTypeLabel => 'Tipo';
+
+  @override
+  String get generationStatusAttemptLabel => 'Tentativo';
+
+  @override
+  String get generationStatusUntitledFallback => 'Senza titolo';
+
+  @override
+  String get generationStatusDetailsTitle => 'Dettagli';
+
+  @override
+  String get generationStatusFeedbackTitle => 'Com\'e il risultato?';
+
+  @override
+  String get generationStatusFeedbackExcellent => 'Eccellente';
+
+  @override
+  String get generationStatusFeedbackOkay => 'Buono';
+
+  @override
+  String get generationStatusFeedbackBad => 'Non molto buono';
+
+  @override
+  String get generationStatusSaveAction => 'Salva';
+
+  @override
+  String get generationStatusDeleteAction => 'Elimina';
+
+  @override
+  String get generationStatusReportProblemAction => 'Segnala un problema';
+
+  @override
+  String get generationStatusPickAnotherPhotoAction => 'Scegli un\'altra foto';
+
+  @override
+  String get generationStatusRetryAction => 'Riprova';
+
+  @override
+  String get generationStatusContactSupportAction => 'Contatta supporto';
+
+  @override
+  String get generationStatusOpenGalleryAction => 'Apri galleria';
+
+  @override
+  String get generationStatusOpenStatusAction => 'Apri stato';
+
+  @override
+  String get generationStatusCancelGenerationAction => 'Annulla generazione';
+
+  @override
+  String get generationStatusResultUnavailableForSave =>
+      'Il risultato non e ancora disponibile per il salvataggio.';
+
+  @override
+  String get generationStatusResultUnavailableForShare =>
+      'Il risultato non e ancora disponibile per la condivisione.';
+
+  @override
+  String get generationStatusSaveFileDialogTitle => 'Salva file';
+
+  @override
+  String get generationStatusFileSavedMessage =>
+      'File salvato sul dispositivo.';
+
+  @override
+  String get generationStatusFileSaveFailedMessage =>
+      'Impossibile salvare il file. Riprova.';
+
+  @override
+  String get generationStatusDeleteSoonMessage =>
+      'L\'eliminazione sara disponibile presto.';
+
+  @override
+  String get generationStatusCancelSoonMessage =>
+      'L\'annullamento della generazione sara disponibile presto.';
+
+  @override
+  String get generationStatusRetrySoonMessage =>
+      'Scegli un\'altra foto e avvia di nuovo la generazione.';
+
+  @override
+  String get generationStatusFeedbackThanksMessage =>
+      'Grazie! Il tuo feedback aiuta a migliorare PetMagic.';
+
+  @override
+  String get generationStatusResultTitle => 'Risultato PetMagic';
+
+  @override
+  String get generationStatusNonTerminalHint =>
+      'Di solito richiede alcuni minuti. Puoi continuare a usare l\'app.';
+
+  @override
+  String get generationStatusStageQueued => 'In coda';
+
+  @override
+  String get generationStatusStageDone => 'Fatto';
+
+  @override
+  String get generationStatusVideoReady => 'Il video e pronto';
+
+  @override
+  String get generationStatusShareVideoAction => 'Condividi video';
+
+  @override
+  String get generationStatusFailedTitle => 'Impossibile creare il risultato';
+
+  @override
+  String get generationStatusTokensRefundedHint =>
+      'I token sono stati restituiti al tuo saldo.';
+
+  @override
+  String get generationStatusTokensRefundedShort => 'Token rimborsati';
+
+  @override
+  String get generationStatusSupportHint =>
+      'Se si ripete, contatta il supporto.';
+
+  @override
+  String get generationStatusBackgroundHint =>
+      'La generazione continua sul server. Mostreremo il risultato nella Galleria quando sara pronto.';
+
+  @override
+  String get generationStatusDownloadAction => 'Scarica';
+
+  @override
+  String get generationStatusContinueInAppAction => 'Continua nell\'app';
+
+  @override
+  String get generationStatusFeedbackImproveTitle =>
+      'Cosa possiamo migliorare?';
+
+  @override
+  String get generationStatusFeedbackCommentLabel => 'Commento';
+
+  @override
+  String get generationStatusFeedbackCommentHint =>
+      'Descrivi brevemente cosa non e andato';
+
+  @override
+  String get generationStatusFeedbackSubmitAction => 'Invia feedback';
+
+  @override
+  String get generationStatusFeedbackReasonPetNotSimilar =>
+      'L\'animale non sembra se stesso';
+
+  @override
+  String get generationStatusFeedbackReasonFaceDistorted =>
+      'Viso o muso sono distorti';
+
+  @override
+  String get generationStatusFeedbackReasonStrangeMotion =>
+      'Il movimento sembra strano';
+
+  @override
+  String get generationStatusFeedbackReasonPreviewMismatch =>
+      'Il risultato differisce dall\'anteprima';
+
+  @override
+  String get generationStatusFeedbackReasonLowQuality =>
+      'La qualita e troppo bassa';
+
+  @override
+  String get generationStatusFeedbackReasonStyleDisliked =>
+      'Lo stile non mi e piaciuto';
+
+  @override
+  String get generationStatusFeedbackReasonOther => 'Altro';
+
+  @override
+  String generationStatusEtaEstimated(Object value) {
+    return 'Mancano circa $value';
+  }
+
+  @override
+  String get generationStatusEtaQueued => 'In attesa in coda';
+
+  @override
+  String get generationStatusEtaFinalizing => 'Quasi pronto';
+
+  @override
+  String get generationStatusEtaDefault => 'Mancano circa 1-2 min';
+
+  @override
+  String get generationStatusEtaStartsSoon => 'Iniziera tra pochi minuti';
+
+  @override
+  String get generationStatusEtaNotifyHint =>
+      'Ti avviseremo quando il risultato sara pronto.';
+
+  @override
+  String get generationStatusFailurePhotoHint =>
+      'La foto non e adatta a questo template. Prova una foto in cui l\'animale sia chiaramente visibile.';
+
+  @override
+  String get generationStatusFailureTechnicalHint =>
+      'Impossibile creare il risultato a causa di un problema tecnico. I token sono stati restituiti al tuo saldo.';
+
+  @override
+  String get generationStatusStatusCompleted => 'Il tuo risultato e pronto';
+
+  @override
+  String get generationStatusStatusFailed => 'Impossibile creare il risultato';
+
+  @override
+  String get generationStatusStatusCreatingMagic => 'Creazione della magia...';
+
+  @override
+  String get generationStatusTerminalRefundedHint =>
+      'I token sono stati rimborsati automaticamente.';
+
+  @override
+  String get generationStatusTerminalFailureHint =>
+      'E stato registrato un problema tecnico.';
+
+  @override
+  String get generationStatusTerminalSuccessHint =>
+      'Apri il risultato, condividilo o lascia un feedback.';
+
+  @override
+  String get generationStatusSectionActive => 'In corso';
+
+  @override
+  String get generationStatusSectionReady => 'Pronto';
+
+  @override
+  String get generationStatusSectionFailed => 'Fallito';
+
+  @override
+  String get generationStatusFilterActive => 'In corso';
+
+  @override
+  String get generationStatusFilterReady => 'Pronto';
+
+  @override
+  String get generationStatusFilterFailed => 'Fallito';
+
+  @override
+  String generationStatusShowMoreAction(int hiddenCount) {
+    return 'Mostra altro ($hiddenCount) ▾';
+  }
+
+  @override
+  String get generationStatusCollapseAction => 'Comprimi ▲';
+
+  @override
+  String get generationStatusActiveInfoHint =>
+      'Puoi chiudere l\'app. Ti avviseremo quando il risultato sara pronto.';
+
+  @override
+  String generationStatusUnreadCount(int count) {
+    return '$count nuovi';
+  }
+
+  @override
+  String get generationStatusEmptyTitle => 'I tuoi risultati appariranno qui';
+
+  @override
+  String get generationStatusEmptyMessage =>
+      'Scegli un template, carica la foto del tuo animale e crea la tua prima opera magica.';
+
+  @override
+  String get generationStatusSubtitleAll => 'Le tue creazioni magiche';
+
+  @override
+  String get generationStatusSubtitleActive => 'Generazioni attive';
+
+  @override
+  String get generationStatusSubtitleReady => 'I tuoi risultati pronti';
+
+  @override
+  String get generationStatusSubtitleFailed => 'Problemi di generazione';
+
+  @override
+  String generationStatusDateToday(Object time) {
+    return 'Oggi, $time';
+  }
+
+  @override
+  String generationStatusDateYesterday(Object time) {
+    return 'Ieri, $time';
+  }
+
+  @override
+  String shellActiveGenerationLabel(Object templateTitle) {
+    return '✨ Creazione di $templateTitle';
+  }
+
+  @override
+  String get shellActiveGenerationFallback => 'risultato';
 }

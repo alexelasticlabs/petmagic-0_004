@@ -276,6 +276,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     final previewUrl = generation.sourceImageAsset?.url;
@@ -347,7 +348,10 @@ class _ActiveGenerationBanner extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          '✨ Создаем ${generation.templateTitle ?? 'результат'}',
+                          text.shellActiveGenerationLabel(
+                            generation.templateTitle ??
+                                text.shellActiveGenerationFallback,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall

@@ -30,6 +30,7 @@ class GenerationHistoryState {
     this.unreadCount = 0,
     this.isLoading = false,
     this.errorMessage,
+    this.cachedItemsByFilter = const {},
   });
 
   final List<TemplateGenerationResult> items;
@@ -37,6 +38,8 @@ class GenerationHistoryState {
   final int unreadCount;
   final bool isLoading;
   final String? errorMessage;
+  final Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
+  cachedItemsByFilter;
 
   TemplateGenerationResult? get activeGeneration {
     for (final item in items) {
@@ -53,6 +56,8 @@ class GenerationHistoryState {
     int? unreadCount,
     bool? isLoading,
     String? errorMessage,
+    Map<GenerationHistoryFilter, List<TemplateGenerationResult>>?
+    cachedItemsByFilter,
     bool clearError = false,
   }) {
     return GenerationHistoryState(
@@ -61,6 +66,7 @@ class GenerationHistoryState {
       unreadCount: unreadCount ?? this.unreadCount,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      cachedItemsByFilter: cachedItemsByFilter ?? this.cachedItemsByFilter,
     );
   }
 }
@@ -88,11 +94,23 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     bool refresh = false,
   }) async {
     final nextFilter = filter ?? state.filter;
-    if (state.isLoading && !refresh) {
+    if (state.isLoading && !refresh && nextFilter == state.filter) {
+      return;
+    }
+
+    final cachedItems = state.cachedItemsByFilter[nextFilter];
+    if (!refresh && cachedItems != null) {
+      state = state.copyWith(
+        filter: nextFilter,
+        items: cachedItems,
+        isLoading: false,
+        clearError: true,
+      );
       return;
     }
 
     state = state.copyWith(
+      items: cachedItems ?? const [],
       filter: nextFilter,
       isLoading: true,
       clearError: true,
@@ -104,10 +122,15 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         take: 50,
       );
       final unreadCount = await _repository.fetchUnreadGenerationCount();
+      final updatedCache =
+          Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
+            state.cachedItemsByFilter,
+          )..[nextFilter] = items;
       state = state.copyWith(
         items: items,
         unreadCount: unreadCount,
         isLoading: false,
+        cachedItemsByFilter: updatedCache,
         clearError: true,
       );
     } catch (error) {
@@ -124,47 +147,14 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
   Future<void> markRead(String generationId) async {
     await _repository.markGenerationRead(generationId);
-    final updated = [
-      for (final item in state.items)
-        if (item.generationId == generationId)
-          TemplateGenerationResult(
-            generationId: item.generationId,
-            userId: item.userId,
-            templateId: item.templateId,
-            status: item.status,
-            tokenCost: item.tokenCost,
-            attemptCount: item.attemptCount,
-            createdAtUtc: item.createdAtUtc,
-            updatedAtUtc: item.updatedAtUtc,
-            userMediaExpired: item.userMediaExpired,
-            templateTitle: item.templateTitle,
-            templateType: item.templateType,
-            stage: item.stage,
-            progressPercent: item.progressPercent,
-            estimatedDurationLabel: item.estimatedDurationLabel,
-            sourceImageAsset: item.sourceImageAsset,
-            normalizedImageUrl: item.normalizedImageUrl,
-            referenceMotionUrl: item.referenceMotionUrl,
-            outputUrl: item.outputUrl,
-            usedPreprocessingModel: item.usedPreprocessingModel,
-            usedKlingModel: item.usedKlingModel,
-            outputVideoDurationSeconds: item.outputVideoDurationSeconds,
-            failureCode: item.failureCode,
-            failureMessage: item.failureMessage,
-            startedAtUtc: item.startedAtUtc,
-            preprocessingCompletedAtUtc: item.preprocessingCompletedAtUtc,
-            motionGenerationCompletedAtUtc: item.motionGenerationCompletedAtUtc,
-            mediaImportCompletedAtUtc: item.mediaImportCompletedAtUtc,
-            completedAtUtc: item.completedAtUtc,
-            chargedAtUtc: item.chargedAtUtc,
-            refundedAtUtc: item.refundedAtUtc,
-            isUnread: false,
-          )
-        else
-          item,
-    ];
+    final updated = _markReadInList(state.items, generationId);
+    final updatedCache = _markReadInCaches(
+      state.cachedItemsByFilter,
+      generationId,
+    );
     state = state.copyWith(
       items: updated,
+      cachedItemsByFilter: updatedCache,
       unreadCount: state.unreadCount > 0 ? state.unreadCount - 1 : 0,
     );
   }
@@ -199,28 +189,124 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   void _upsertGeneration(TemplateGenerationResult generation) {
-    if (!_matchesCurrentFilter(generation)) {
-      state = state.copyWith(
-        items: state.items
-            .where((item) => item.generationId != generation.generationId)
-            .toList(growable: false),
-      );
-      return;
-    }
-
-    final items = [
+    final updatedCache = _upsertGenerationInCaches(
+      state.cachedItemsByFilter,
       generation,
-      for (final item in state.items)
-        if (item.generationId != generation.generationId) item,
-    ];
-    items.sort(
-      (left, right) => right.updatedAtUtc.compareTo(left.updatedAtUtc),
     );
-    state = state.copyWith(items: items);
+
+    final visibleItems = state.cachedItemsByFilter.containsKey(state.filter)
+        ? (updatedCache[state.filter] ?? const <TemplateGenerationResult>[])
+        : _upsertGenerationInList(state.items, generation, state.filter);
+
+    state = state.copyWith(
+      items: visibleItems,
+      cachedItemsByFilter: updatedCache,
+    );
   }
 
-  bool _matchesCurrentFilter(TemplateGenerationResult generation) {
-    return switch (state.filter) {
+  Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
+  _upsertGenerationInCaches(
+    Map<GenerationHistoryFilter, List<TemplateGenerationResult>> caches,
+    TemplateGenerationResult generation,
+  ) {
+    final updated = <GenerationHistoryFilter, List<TemplateGenerationResult>>{};
+    for (final entry in caches.entries) {
+      updated[entry.key] = _upsertGenerationInList(
+        entry.value,
+        generation,
+        entry.key,
+      );
+    }
+    return updated;
+  }
+
+  List<TemplateGenerationResult> _upsertGenerationInList(
+    List<TemplateGenerationResult> source,
+    TemplateGenerationResult generation,
+    GenerationHistoryFilter filter,
+  ) {
+    final next = [
+      for (final item in source)
+        if (item.generationId != generation.generationId) item,
+    ];
+
+    if (_matchesFilter(generation, filter)) {
+      next.insert(0, generation);
+    }
+
+    next.sort((left, right) => right.updatedAtUtc.compareTo(left.updatedAtUtc));
+    return next;
+  }
+
+  Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
+  _markReadInCaches(
+    Map<GenerationHistoryFilter, List<TemplateGenerationResult>> caches,
+    String generationId,
+  ) {
+    final updated = <GenerationHistoryFilter, List<TemplateGenerationResult>>{};
+    for (final entry in caches.entries) {
+      updated[entry.key] = _markReadInList(entry.value, generationId);
+    }
+    return updated;
+  }
+
+  List<TemplateGenerationResult> _markReadInList(
+    List<TemplateGenerationResult> source,
+    String generationId,
+  ) {
+    return [
+      for (final item in source)
+        if (item.generationId == generationId)
+          _copyWithUnread(item, isUnread: false)
+        else
+          item,
+    ];
+  }
+
+  TemplateGenerationResult _copyWithUnread(
+    TemplateGenerationResult item, {
+    required bool isUnread,
+  }) {
+    return TemplateGenerationResult(
+      generationId: item.generationId,
+      userId: item.userId,
+      templateId: item.templateId,
+      status: item.status,
+      tokenCost: item.tokenCost,
+      attemptCount: item.attemptCount,
+      createdAtUtc: item.createdAtUtc,
+      updatedAtUtc: item.updatedAtUtc,
+      userMediaExpired: item.userMediaExpired,
+      templateTitle: item.templateTitle,
+      templateType: item.templateType,
+      stage: item.stage,
+      progressPercent: item.progressPercent,
+      estimatedDurationLabel: item.estimatedDurationLabel,
+      sourceImageAsset: item.sourceImageAsset,
+      normalizedImageUrl: item.normalizedImageUrl,
+      referenceMotionUrl: item.referenceMotionUrl,
+      outputUrl: item.outputUrl,
+      usedPreprocessingModel: item.usedPreprocessingModel,
+      usedKlingModel: item.usedKlingModel,
+      outputVideoDurationSeconds: item.outputVideoDurationSeconds,
+      failureCode: item.failureCode,
+      failureMessage: item.failureMessage,
+      startedAtUtc: item.startedAtUtc,
+      preprocessingCompletedAtUtc: item.preprocessingCompletedAtUtc,
+      motionGenerationCompletedAtUtc: item.motionGenerationCompletedAtUtc,
+      mediaImportCompletedAtUtc: item.mediaImportCompletedAtUtc,
+      completedAtUtc: item.completedAtUtc,
+      chargedAtUtc: item.chargedAtUtc,
+      refundedAtUtc: item.refundedAtUtc,
+      isUnread: isUnread,
+    );
+  }
+
+  bool _matchesFilter(
+    TemplateGenerationResult generation,
+    GenerationHistoryFilter filter,
+  ) {
+    return switch (filter) {
       GenerationHistoryFilter.all => true,
       GenerationHistoryFilter.active => !generation.isTerminal,
       GenerationHistoryFilter.ready => generation.isCompleted,

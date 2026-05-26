@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --font-body: var(--font-admin-body);
   --font-heading: var(--font-admin-heading);
   --font-manrope: var(--font-body);
@@ -47,8 +48,88 @@
   --scrollbar-track: rgba(0, 0, 0, 0.96);
   --scrollbar-thumb: rgba(68, 76, 86, 0.92);
   --scrollbar-thumb-hover: rgba(96, 105, 118, 0.96);
+  --bg-grid-primary: rgba(255, 255, 255, 0.012);
+  --bg-grid-secondary: rgba(255, 255, 255, 0.01);
+  --bg-glow: rgba(138, 180, 248, 0.035);
+  --bg-gradient-start: #000000;
+  --bg-gradient-end: #020304;
+  --primary-bg: #1a73e8;
+  --primary-bg-hover: #226fdb;
+  --primary-border: rgba(138, 180, 248, 0.6);
+  --primary-border-hover: rgba(166, 196, 255, 0.92);
+  --ghost-bg: rgba(5, 8, 14, 0.94);
+  --secondary-bg: rgba(8, 10, 13, 0.96);
+  --surface-hover: rgba(9, 14, 22, 0.98);
+  --accent-soft-bg: rgba(18, 36, 67, 0.78);
+  --danger-soft-bg: rgba(71, 20, 24, 0.52);
+  --danger-soft-fg: #ffd8d3;
+  --toast-success-bg: rgba(20, 54, 33, 0.96);
+  --toast-success-fg: #dff3e4;
+  --toast-success-border: rgba(46, 160, 67, 0.44);
+  --toast-error-bg: rgba(71, 20, 24, 0.96);
+  --toast-error-fg: #ffd8d3;
+  --toast-error-border: rgba(248, 81, 73, 0.44);
   --template-image-aspect-ratio: 2 / 3;
   --template-video-aspect-ratio: 2 / 3;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --surface-0: #f5f7fb;
+  --surface-1: #ffffff;
+  --surface-2: #f7f9fc;
+  --surface-3: #eef2f7;
+  --surface-raised: #ffffff;
+  --surface-overlay: rgba(255, 255, 255, 0.94);
+  --text-strong: #121a26;
+  --text-soft: #334155;
+  --text-muted: #5b6b7d;
+  --text-subtle: #748396;
+  --text-inverse: #f7f9fc;
+  --border-soft: #d7dee8;
+  --border-strong: #c4ceda;
+  --border-accent: #2563eb;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-contrast: #f8fbff;
+  --brand: #16a34a;
+  --brand-strong: #15803d;
+  --info: #2563eb;
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --error: #dc2626;
+  --magenta: #9333ea;
+  --neutral: #64748b;
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 4px 14px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 12px 24px rgba(15, 23, 42, 0.16);
+  --focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.24);
+  --interactive-glow: 0 0 0 1px rgba(37, 99, 235, 0.12);
+  --scrollbar-track: rgba(237, 242, 247, 0.95);
+  --scrollbar-thumb: rgba(148, 163, 184, 0.9);
+  --scrollbar-thumb-hover: rgba(100, 116, 139, 0.95);
+  --bg-grid-primary: rgba(15, 23, 42, 0.04);
+  --bg-grid-secondary: rgba(15, 23, 42, 0.03);
+  --bg-glow: rgba(37, 99, 235, 0.1);
+  --bg-gradient-start: #f8fafc;
+  --bg-gradient-end: #eef3f9;
+  --primary-bg: #2563eb;
+  --primary-bg-hover: #1d4ed8;
+  --primary-border: rgba(37, 99, 235, 0.58);
+  --primary-border-hover: rgba(29, 78, 216, 0.72);
+  --ghost-bg: rgba(247, 250, 252, 0.94);
+  --secondary-bg: rgba(255, 255, 255, 0.96);
+  --surface-hover: rgba(241, 245, 249, 0.98);
+  --accent-soft-bg: rgba(37, 99, 235, 0.12);
+  --danger-soft-bg: rgba(220, 38, 38, 0.12);
+  --danger-soft-fg: #991b1b;
+  --toast-success-bg: rgba(220, 252, 231, 0.95);
+  --toast-success-fg: #14532d;
+  --toast-success-border: rgba(22, 163, 74, 0.34);
+  --toast-error-bg: rgba(254, 226, 226, 0.95);
+  --toast-error-fg: #991b1b;
+  --toast-error-border: rgba(220, 38, 38, 0.34);
 }
 
 * {
@@ -100,11 +181,15 @@ body {
   line-height: 1.55;
   letter-spacing: 0;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
-    radial-gradient(circle at top left, rgba(138, 180, 248, 0.035), transparent 24rem),
-    linear-gradient(180deg, #000000 0%, #020304 100%);
-  background-size: 32px 32px, 32px 32px, auto, auto;
+    linear-gradient(90deg, var(--bg-grid-primary) 1px, transparent 1px),
+    linear-gradient(180deg, var(--bg-grid-secondary) 1px, transparent 1px),
+    radial-gradient(circle at top left, var(--bg-glow), transparent 24rem),
+    linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto,
+    auto;
 }
 
 a {
@@ -134,15 +219,15 @@ select {
 }
 
 .ui-toast--success {
-  color: #dff3e4;
-  border-color: rgba(46, 160, 67, 0.44);
-  background: rgba(20, 54, 33, 0.96);
+  color: var(--toast-success-fg);
+  border-color: var(--toast-success-border);
+  background: var(--toast-success-bg);
 }
 
 .ui-toast--error {
-  color: #ffd8d3;
-  border-color: rgba(248, 81, 73, 0.44);
-  background: rgba(71, 20, 24, 0.96);
+  color: var(--toast-error-fg);
+  border-color: var(--toast-error-border);
+  background: var(--toast-error-bg);
 }
 
 .ui-button {
@@ -155,7 +240,13 @@ select {
   font-family: inherit;
   line-height: 1;
   cursor: pointer;
-  transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease,
+    filter 150ms ease;
 }
 
 .ui-button--md {
@@ -170,28 +261,28 @@ select {
 }
 
 .ui-button--primary {
-  border-color: rgba(138, 180, 248, 0.6);
+  border-color: var(--primary-border);
   color: var(--accent-contrast);
-  background: #1a73e8;
+  background: var(--primary-bg);
   box-shadow: none;
 }
 
 .ui-button--secondary {
   color: var(--text-strong);
   border-color: var(--border-strong);
-  background: rgba(8, 10, 13, 0.96);
+  background: var(--secondary-bg);
 }
 
 .ui-button--ghost {
   color: var(--text-soft);
   border-color: var(--border-soft);
-  background: rgba(5, 8, 14, 0.94);
+  background: var(--ghost-bg);
 }
 
 .ui-button--danger {
   border-color: rgba(248, 81, 73, 0.4);
-  color: #ffd8d3;
-  background: rgba(71, 20, 24, 0.52);
+  color: var(--danger-soft-fg);
+  background: var(--danger-soft-bg);
 }
 
 .ui-button:hover:not(:disabled) {
@@ -201,8 +292,8 @@ select {
 }
 
 .ui-button--primary:hover:not(:disabled) {
-  border-color: rgba(166, 196, 255, 0.92);
-  background: #226fdb;
+  border-color: var(--primary-border-hover);
+  background: var(--primary-bg-hover);
   box-shadow: none;
 }
 

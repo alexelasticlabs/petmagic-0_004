@@ -85,85 +85,142 @@ class PetMagicColors extends ThemeExtension<PetMagicColors> {
     }
 
     return PetMagicColors(
-      backgroundTop: Color.lerp(backgroundTop, other.backgroundTop, t)!,
-      backgroundBottom: Color.lerp(
+      backgroundTop: AppTheme._safeLerpColor(
+        backgroundTop,
+        other.backgroundTop,
+        t,
+      ),
+      backgroundBottom: AppTheme._safeLerpColor(
         backgroundBottom,
         other.backgroundBottom,
         t,
-      )!,
-      surface: Color.lerp(surface, other.surface, t)!,
-      surfaceGlass: Color.lerp(surfaceGlass, other.surfaceGlass, t)!,
-      surfaceStrong: Color.lerp(surfaceStrong, other.surfaceStrong, t)!,
-      border: Color.lerp(border, other.border, t)!,
-      textStrong: Color.lerp(textStrong, other.textStrong, t)!,
-      textSoft: Color.lerp(textSoft, other.textSoft, t)!,
-      textMuted: Color.lerp(textMuted, other.textMuted, t)!,
-      accent: Color.lerp(accent, other.accent, t)!,
-      accentSoft: Color.lerp(accentSoft, other.accentSoft, t)!,
-      gold: Color.lerp(gold, other.gold, t)!,
-      purple: Color.lerp(purple, other.purple, t)!,
-      blue: Color.lerp(blue, other.blue, t)!,
-      danger: Color.lerp(danger, other.danger, t)!,
-      shadow: Color.lerp(shadow, other.shadow, t)!,
+      ),
+      surface: AppTheme._safeLerpColor(surface, other.surface, t),
+      surfaceGlass: AppTheme._safeLerpColor(
+        surfaceGlass,
+        other.surfaceGlass,
+        t,
+      ),
+      surfaceStrong: AppTheme._safeLerpColor(
+        surfaceStrong,
+        other.surfaceStrong,
+        t,
+      ),
+      border: AppTheme._safeLerpColor(border, other.border, t),
+      textStrong: AppTheme._safeLerpColor(textStrong, other.textStrong, t),
+      textSoft: AppTheme._safeLerpColor(textSoft, other.textSoft, t),
+      textMuted: AppTheme._safeLerpColor(textMuted, other.textMuted, t),
+      accent: AppTheme._safeLerpColor(accent, other.accent, t),
+      accentSoft: AppTheme._safeLerpColor(accentSoft, other.accentSoft, t),
+      gold: AppTheme._safeLerpColor(gold, other.gold, t),
+      purple: AppTheme._safeLerpColor(purple, other.purple, t),
+      blue: AppTheme._safeLerpColor(blue, other.blue, t),
+      danger: AppTheme._safeLerpColor(danger, other.danger, t),
+      shadow: AppTheme._safeLerpColor(shadow, other.shadow, t),
     );
   }
 }
 
 extension PetMagicTheme on BuildContext {
-  PetMagicColors get petMagicColors =>
-      Theme.of(this).extension<PetMagicColors>()!;
+  PetMagicColors get petMagicColors {
+    final theme = Theme.of(this);
+    final colors = theme.extension<PetMagicColors>();
+    if (colors != null) {
+      return colors;
+    }
+
+    assert(() {
+      debugPrint(
+        'PetMagicColors extension is missing from ThemeData. '
+        'A fallback palette is used to avoid runtime crashes.',
+      );
+      return true;
+    }());
+
+    return AppTheme._fallbackColors(theme.brightness);
+  }
 }
 
 class AppTheme {
   static const _accent = Color(0xFF10C878);
+  static const _onAccentDark = Color(0xFF04110B);
+  static const _onAccentLight = Color(0xFFF8FBFF);
 
-  static final ThemeData _lightTheme = _base(
-    Brightness.light,
-    const PetMagicColors(
-      backgroundTop: Color(0xFFFFFFFF),
-      backgroundBottom: Color(0xFFF5F8FC),
-      surface: Color(0xFFFFFFFF),
-      surfaceGlass: Color(0xECFFFFFF),
-      surfaceStrong: Color(0xFFF8FAFD),
-      border: Color(0xFFE2E8F0),
-      textStrong: Color(0xFF101B31),
-      textSoft: Color(0xFF334155),
-      textMuted: Color(0xFF8290A3),
-      accent: _accent,
-      accentSoft: Color(0xFFE7FAF1),
-      gold: Color(0xFFFFB703),
-      purple: Color(0xFFA855F7),
-      blue: Color(0xFF0EA5E9),
-      danger: Color(0xFFEF4444),
-      shadow: Color(0x1A0F172A),
-    ),
+  static const PetMagicColors _lightColors = PetMagicColors(
+    backgroundTop: Color(0xFFFFFFFF),
+    backgroundBottom: Color(0xFFF5F8FC),
+    surface: Color(0xFFFFFFFF),
+    surfaceGlass: Color(0xECFFFFFF),
+    surfaceStrong: Color(0xFFF8FAFD),
+    border: Color(0xFFE2E8F0),
+    textStrong: Color(0xFF101B31),
+    textSoft: Color(0xFF334155),
+    textMuted: Color(0xFF8290A3),
+    accent: _accent,
+    accentSoft: Color(0xFFE7FAF1),
+    gold: Color(0xFFFFB703),
+    purple: Color(0xFFA855F7),
+    blue: Color(0xFF0EA5E9),
+    danger: Color(0xFFEF4444),
+    shadow: Color(0x1A0F172A),
   );
 
-  static final ThemeData _darkTheme = _base(
-    Brightness.dark,
-    const PetMagicColors(
-      backgroundTop: Color(0xFF000306),
-      backgroundBottom: Color(0xFF04070D),
-      surface: Color(0xFF0A121B),
-      surfaceGlass: Color(0xCC101925),
-      surfaceStrong: Color(0xFF141E2A),
-      border: Color(0xFF1E2A38),
-      textStrong: Color(0xFFF8FBFF),
-      textSoft: Color(0xFFD0DAE6),
-      textMuted: Color(0xFF7F8EA0),
-      accent: _accent,
-      accentSoft: Color(0x2622C55E),
-      gold: Color(0xFFFFC107),
-      purple: Color(0xFFB56BFF),
-      blue: Color(0xFF38BDF8),
-      danger: Color(0xFFFB7185),
-      shadow: Color(0xCC00040A),
-    ),
+  static const PetMagicColors _darkColors = PetMagicColors(
+    backgroundTop: Color(0xFF000306),
+    backgroundBottom: Color(0xFF04070D),
+    surface: Color(0xFF0A121B),
+    surfaceGlass: Color(0xCC101925),
+    surfaceStrong: Color(0xFF141E2A),
+    border: Color(0xFF1E2A38),
+    textStrong: Color(0xFFF8FBFF),
+    textSoft: Color(0xFFD0DAE6),
+    textMuted: Color(0xFF7F8EA0),
+    accent: _accent,
+    accentSoft: Color(0x2622C55E),
+    gold: Color(0xFFFFC107),
+    purple: Color(0xFFB56BFF),
+    blue: Color(0xFF38BDF8),
+    danger: Color(0xFFFB7185),
+    shadow: Color(0xCC00040A),
   );
 
-  static ThemeData light() => _lightTheme;
+  static ThemeData? _lightTheme;
+  static ThemeData? _darkTheme;
 
-  static ThemeData dark() => _darkTheme;
+  static ThemeData light() {
+    return _lightTheme ??= _base(Brightness.light, _lightColors);
+  }
+
+  static ThemeData dark() {
+    return _darkTheme ??= _base(Brightness.dark, _darkColors);
+  }
+
+  static PetMagicColors _fallbackColors(Brightness brightness) {
+    return brightness == Brightness.dark ? _darkColors : _lightColors;
+  }
+
+  static Color _safeLerpColor(Color start, Color end, double t) {
+    return Color.lerp(start, end, t) ?? (t < 0.5 ? start : end);
+  }
+
+  static Color _onColor(Color background) {
+    final darkContrast = _contrastRatio(_onAccentDark, background);
+    final lightContrast = _contrastRatio(_onAccentLight, background);
+    return darkContrast >= lightContrast ? _onAccentDark : _onAccentLight;
+  }
+
+  static double _contrastRatio(Color foreground, Color background) {
+    final foregroundLuminance = foreground.computeLuminance();
+    final backgroundLuminance = background.computeLuminance();
+    final lighter = foregroundLuminance > backgroundLuminance
+        ? foregroundLuminance
+        : backgroundLuminance;
+    final darker = foregroundLuminance > backgroundLuminance
+        ? backgroundLuminance
+        : foregroundLuminance;
+
+    return (lighter + 0.05) / (darker + 0.05);
+  }
 
   static ThemeData _base(Brightness brightness, PetMagicColors colors) {
     final textTheme = _buildTextTheme(colors);
@@ -186,9 +243,7 @@ class AppTheme {
           minimumSize: const Size.fromHeight(54),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           backgroundColor: colors.accent,
-          foregroundColor: brightness == Brightness.dark
-              ? const Color(0xFF04110B)
-              : const Color(0xFF082313),
+          foregroundColor: _onColor(colors.accent),
           disabledBackgroundColor: colors.border,
           disabledForegroundColor: colors.textMuted,
           elevation: 0.8,

@@ -24,11 +24,11 @@ import 'package:petmagic_mobile/features/support/data/support_chat_realtime_clie
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -623,7 +623,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Delete account'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(FilledButton),
+        matching: find.text('Delete account'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Delete account'), findsWidgets);
     expect(find.text('CURRENT STATUS'), findsOneWidget);
     expect(
       find.textContaining('Deletion is not available as a one-tap action'),

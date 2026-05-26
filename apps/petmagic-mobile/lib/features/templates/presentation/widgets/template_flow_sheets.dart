@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -58,6 +59,7 @@ Future<TemplateDetailAction?> showTemplateDetailSheet(
 }
 
 Future<PetPhotoSourceAction?> showPetPhotoSourceSheet(BuildContext context) {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   return showPetMagicModalBottomSheet<PetPhotoSourceAction>(
     context: context,
@@ -84,7 +86,7 @@ Future<PetPhotoSourceAction?> showPetPhotoSourceSheet(BuildContext context) {
                   color: colors.accent,
                 ),
                 title: Text(
-                  'Галерея',
+                  text.templateFlowPhotoSourceGallery,
                   style: TextStyle(color: colors.textStrong),
                 ),
                 onTap: () => Navigator.of(
@@ -97,7 +99,7 @@ Future<PetPhotoSourceAction?> showPetPhotoSourceSheet(BuildContext context) {
                   color: colors.accent,
                 ),
                 title: Text(
-                  'Камера',
+                  text.templateFlowPhotoSourceCamera,
                   style: TextStyle(color: colors.textStrong),
                 ),
                 onTap: () =>
@@ -118,6 +120,7 @@ Future<bool?> showTemplateGenerationConfirmSheet({
   required XFile photo,
   required TemplateGenerationGate gate,
 }) {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   return showPetMagicModalBottomSheet<bool>(
     context: context,
@@ -141,7 +144,7 @@ Future<bool?> showTemplateGenerationConfirmSheet({
               Center(child: _SheetHandle(color: colors.border)),
               const SizedBox(height: 18),
               Text(
-                'Готово к созданию!',
+                text.templateFlowReadyTitle,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: colors.textStrong,
@@ -150,7 +153,7 @@ Future<bool?> showTemplateGenerationConfirmSheet({
               ),
               const SizedBox(height: 5),
               Text(
-                'Проверьте детали перед созданием',
+                text.templateFlowCheckDetailsSubtitle,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colors.textMuted,
@@ -175,13 +178,16 @@ Future<bool?> showTemplateGenerationConfirmSheet({
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _ConfirmMeta(label: 'Шаблон', value: template.title),
                         _ConfirmMeta(
-                          label: 'Стоимость',
+                          label: text.templateFlowTemplateLabel,
+                          value: template.title,
+                        ),
+                        _ConfirmMeta(
+                          label: text.templateFlowCostLabel,
                           value: '${template.tokenCost} PawSpark',
                         ),
                         _ConfirmMeta(
-                          label: 'Ваш баланс',
+                          label: text.templateFlowBalanceLabel,
                           value: '${gate.balance} PawSpark',
                         ),
                       ],
@@ -210,7 +216,7 @@ Future<bool?> showTemplateGenerationConfirmSheet({
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Создание может занять от 10 секунд до 1 минуты.',
+                          text.templateFlowDurationHint,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: colors.textSoft, height: 1.35),
                         ),
@@ -223,12 +229,12 @@ Future<bool?> showTemplateGenerationConfirmSheet({
               FilledButton.icon(
                 onPressed: () => Navigator.of(sheetContext).pop(true),
                 icon: const Icon(Icons.auto_awesome_rounded),
-                label: const Text('Создать магию'),
+                label: Text(text.templateFlowCreateMagicAction),
               ),
               const SizedBox(height: 10),
               OutlinedButton(
                 onPressed: () => Navigator.of(sheetContext).pop(false),
-                child: const Text('Изменить фото'),
+                child: Text(text.templateFlowChangePhotoAction),
               ),
             ],
           ),
@@ -243,16 +249,22 @@ Future<TemplateBlockedAction?> showTemplateBlockedSheet({
   required TemplateItem template,
   required TemplateGenerationGate gate,
 }) {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   final isPremiumBlock =
       gate.kind == TemplateGenerationGateKind.premiumRequired;
-  final title = isPremiumBlock ? 'Premium template' : 'Недостаточно PawSpark';
+  final title = isPremiumBlock
+      ? text.templateFlowPremiumTemplateTitle
+      : text.templateFlowInsufficientBalanceTitle;
   final message = isPremiumBlock
-      ? 'Этот шаблон доступен с Premium.'
-      : 'Шаблон стоит ${template.tokenCost} PawSpark. Ваш баланс: ${gate.balance} PawSpark.';
+      ? text.templateFlowPremiumTemplateMessage
+      : text.templateFlowInsufficientBalanceMessage(
+          template.tokenCost,
+          gate.balance,
+        );
   final primaryLabel = isPremiumBlock
-      ? 'Перейти на Premium'
-      : 'Пополнить баланс';
+      ? text.premiumContinueAction
+      : text.templateFlowTopUpBalanceAction;
   final primaryAction = isPremiumBlock
       ? TemplateBlockedAction.premium
       : TemplateBlockedAction.wallet;
@@ -314,7 +326,7 @@ Future<TemplateBlockedAction?> showTemplateBlockedSheet({
                   onPressed: () => Navigator.of(
                     sheetContext,
                   ).pop(TemplateBlockedAction.chooseAnother),
-                  child: const Text('Выбрать другой шаблон'),
+                  child: Text(text.templateFlowChooseAnotherTemplateAction),
                 ),
               ],
             ),
@@ -364,6 +376,7 @@ class _TemplateDetailContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final duration = template.referenceVideoDurationSeconds;
 
@@ -433,7 +446,9 @@ class _TemplateDetailContent extends StatelessWidget {
                       icon: template.isVideo
                           ? Icons.videocam_rounded
                           : Icons.image_rounded,
-                      label: template.isVideo ? 'Видео' : 'Изображение',
+                      label: template.isVideo
+                          ? text.videoLabel
+                          : text.imageLabel,
                       color: colors.accent,
                     ),
                     _Pill(
@@ -451,7 +466,7 @@ class _TemplateDetailContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  'Лучшее фото для этого шаблона:',
+                  text.templateFlowBestPhotoTitle,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: colors.textStrong,
                     fontWeight: FontWeight.w800,
@@ -469,7 +484,7 @@ class _TemplateDetailContent extends StatelessWidget {
                   onPressed: () =>
                       Navigator.of(context).pop(TemplateDetailAction.upload),
                   icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: const Text('Загрузить фото питомца'),
+                  label: Text(text.templateFlowUploadPetPhotoAction),
                 ),
               ],
             ),
@@ -546,6 +561,7 @@ class _GenerationWorkingView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final progress = _progressValue(generation, isFailed);
     final isBalanceError = errorMessage == 'templates.insufficient_balance';
@@ -555,7 +571,9 @@ class _GenerationWorkingView extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          isFailed ? 'Не получилось создать магию' : 'Создаём магию...',
+          isFailed
+              ? text.templateFlowCreateFailedTitle
+              : text.magicLoadingPreparing,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: colors.textStrong,
@@ -566,9 +584,9 @@ class _GenerationWorkingView extends ConsumerWidget {
         Text(
           isFailed
               ? isBalanceError
-                    ? 'Пополните баланс и запустите создание ещё раз.'
-                    : 'Попробуйте другое фото или повторите позже.'
-              : 'Это может занять немного времени',
+                    ? text.templateFlowCreateFailedBalanceHint
+                    : text.templateFlowCreateFailedRetryHint
+              : text.templateFlowCreateHint,
           textAlign: TextAlign.center,
           style: Theme.of(
             context,
@@ -600,28 +618,31 @@ class _GenerationWorkingView extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 28),
-        _ProgressStep(label: 'Обработка фото', done: generation != null),
         _ProgressStep(
-          label: 'Анализ питомца',
+          label: text.templateFlowStepProcessPhoto,
+          done: generation != null,
+        ),
+        _ProgressStep(
+          label: text.templateFlowStepAnalyzePet,
           done:
               generation?.startedAtUtc != null ||
               generation?.preprocessingCompletedAtUtc != null,
         ),
         _ProgressStep(
-          label: 'Создание волшебства',
+          label: text.templateFlowStepCreateMagic,
           done:
               generation?.motionGenerationCompletedAtUtc != null ||
               generation?.isCompleted == true,
         ),
         _ProgressStep(
-          label: 'Финальные штрихи',
+          label: text.templateFlowStepFinalTouches,
           done: generation?.isCompleted == true,
         ),
         const SizedBox(height: 22),
         if (isFailed) ...[
           if (errorMessage != null && errorMessage!.isNotEmpty)
             Text(
-              _generationErrorText(errorMessage!),
+              _generationErrorText(text, errorMessage!),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colors.textMuted,
@@ -637,7 +658,7 @@ class _GenerationWorkingView extends ConsumerWidget {
                 router.go(WalletPage.routePath);
               },
               icon: const Icon(Icons.account_balance_wallet_rounded),
-              label: const Text('Пополнить баланс'),
+              label: Text(text.templateFlowTopUpBalanceAction),
             )
           else
             OutlinedButton.icon(
@@ -645,7 +666,7 @@ class _GenerationWorkingView extends ConsumerWidget {
                   .read(templateGenerationControllerProvider.notifier)
                   .startGeneration(template),
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Повторить'),
+              label: Text(text.retryAction),
             ),
         ] else
           DecoratedBox(
@@ -666,7 +687,7 @@ class _GenerationWorkingView extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Оставайтесь на этом экране, чтобы увидеть результат сразу после готовности.',
+                      text.templateFlowResultReadySubtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: colors.textSoft,
                         height: 1.35,
@@ -693,6 +714,7 @@ class _GenerationResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final outputUrl = generation.outputUrl ?? '';
 
@@ -700,7 +722,7 @@ class _GenerationResultView extends StatelessWidget {
       key: const ValueKey('generation-result'),
       children: [
         Text(
-          'Готово!',
+          text.templateFlowResultReadyTitle,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: colors.textStrong,
@@ -709,7 +731,7 @@ class _GenerationResultView extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Ваша магия готова',
+          text.templateFlowResultReadySubtitle,
           textAlign: TextAlign.center,
           style: Theme.of(
             context,
@@ -720,7 +742,7 @@ class _GenerationResultView extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(22),
             child: outputUrl.isEmpty
-                ? _EmptyMediaBox(label: 'Результат пока недоступен')
+                ? _EmptyMediaBox(label: text.templateFlowResultUnavailable)
                 : template.isVideo
                 ? _NetworkVideoPreview(url: outputUrl)
                 : CachedNetworkImage(
@@ -728,9 +750,9 @@ class _GenerationResultView extends StatelessWidget {
                     fit: BoxFit.cover,
                     width: double.infinity,
                     placeholder: (context, url) =>
-                        const _EmptyMediaBox(label: 'Загружаем результат...'),
-                    errorWidget: (context, url, error) => const _EmptyMediaBox(
-                      label: 'Не удалось загрузить результат',
+                        _EmptyMediaBox(label: text.templateFlowLoadingResult),
+                    errorWidget: (context, url, error) => _EmptyMediaBox(
+                      label: text.templateFlowResultLoadFailed,
                     ),
                   ),
           ),
@@ -746,7 +768,7 @@ class _GenerationResultView extends StatelessWidget {
                         ShareParams(text: '${template.title}\n$outputUrl'),
                       ),
                 icon: const Icon(Icons.ios_share_rounded),
-                label: const Text('Поделиться'),
+                label: Text(text.supportChatShareAction),
               ),
             ),
           ],
@@ -754,7 +776,7 @@ class _GenerationResultView extends StatelessWidget {
         const SizedBox(height: 10),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Создать ещё'),
+          child: Text(text.templateFlowCreateMoreAction),
         ),
       ],
     );
@@ -768,9 +790,10 @@ class _TemplateNetworkMedia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final asset = template.previewAsset;
     if (asset == null || asset.url.isEmpty) {
-      return const _EmptyMediaBox(label: 'Preview');
+      return _EmptyMediaBox(label: text.templateFlowPreviewFallback);
     }
 
     if (template.isVideo && isVideoPreview(asset)) {
@@ -781,9 +804,9 @@ class _TemplateNetworkMedia extends StatelessWidget {
       imageUrl: asset.url,
       fit: BoxFit.cover,
       placeholder: (context, url) =>
-          const _EmptyMediaBox(label: 'Загружаем preview...'),
+          _EmptyMediaBox(label: text.templateFlowLoadingPreview),
       errorWidget: (context, url, error) =>
-          const _EmptyMediaBox(label: 'Preview недоступен'),
+          _EmptyMediaBox(label: text.templateFlowPreviewUnavailable),
     );
   }
 }
@@ -845,9 +868,10 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) {
-      return const _EmptyMediaBox(label: 'Загружаем видео...');
+      return _EmptyMediaBox(label: text.templateFlowLoadingVideo);
     }
 
     return Stack(
@@ -1103,21 +1127,21 @@ double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
   };
 }
 
-String _generationErrorText(String raw) {
+String _generationErrorText(AppLocalizations text, String raw) {
   if (raw == 'templates.insufficient_balance') {
-    return 'Недостаточно PawSpark для создания по этому шаблону.';
+    return text.templateFlowInsufficientBalanceError;
   }
 
   if (raw.contains('templates.network_unavailable')) {
-    return 'Нет подключения. Проверьте сеть и попробуйте снова.';
+    return text.templateFlowNetworkError;
   }
 
   if (raw.contains('templates.server_unavailable')) {
-    return 'Сервер временно недоступен. Попробуйте немного позже.';
+    return text.templateFlowServerError;
   }
 
   if (raw.contains('templates.generation_failed')) {
-    return 'Не удалось запустить создание. Попробуйте снова.';
+    return text.templateFlowStartFailedError;
   }
 
   return raw;

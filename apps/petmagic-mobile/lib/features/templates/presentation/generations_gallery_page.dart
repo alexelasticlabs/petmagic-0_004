@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -35,6 +39,7 @@ class _GenerationsGalleryPageState
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(generationHistoryControllerProvider);
 
@@ -72,7 +77,7 @@ class _GenerationsGalleryPageState
                               children: [
                                 Expanded(
                                   child: Text(
-                                    'Галерея',
+                                    text.navCreations,
                                     style: Theme.of(context)
                                         .textTheme
                                         .headlineSmall
@@ -88,7 +93,7 @@ class _GenerationsGalleryPageState
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              _subtitleForFilter(state.filter),
+                              _subtitleForFilter(text, state.filter),
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: colors.textSoft,
@@ -101,7 +106,7 @@ class _GenerationsGalleryPageState
                         ),
                       ),
                     ),
-                    ..._buildContentSlivers(context, state),
+                    ..._buildContentSlivers(context, text, state),
                   ],
                 ),
               ),
@@ -114,9 +119,12 @@ class _GenerationsGalleryPageState
 
   List<Widget> _buildContentSlivers(
     BuildContext context,
+    AppLocalizations text,
     GenerationHistoryState state,
   ) {
-    if (state.isLoading && state.items.isEmpty) {
+    final filteredItems = _itemsForSelectedFilter(state.items, state.filter);
+
+    if (state.isLoading && filteredItems.isEmpty) {
       return const [
         SliverFillRemaining(
           hasScrollBody: false,
@@ -124,7 +132,7 @@ class _GenerationsGalleryPageState
         ),
       ];
     }
-    if (state.errorMessage != null && state.items.isEmpty) {
+    if (state.errorMessage != null && filteredItems.isEmpty) {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
@@ -132,7 +140,7 @@ class _GenerationsGalleryPageState
         ),
       ];
     }
-    if (state.items.isEmpty) {
+    if (filteredItems.isEmpty) {
       return const [
         SliverFillRemaining(hasScrollBody: false, child: _EmptyState()),
       ];
@@ -153,15 +161,30 @@ class _GenerationsGalleryPageState
 
       final slivers = <Widget>[];
       if (activeItems.isNotEmpty) {
-        slivers.add(_sectionHeaderSliver('В процессе', activeItems.length));
+        slivers.add(
+          _sectionHeaderSliver(
+            text.generationStatusSectionActive,
+            activeItems.length,
+          ),
+        );
         slivers.add(_activeListSliver(activeItems));
       }
       if (readyItems.isNotEmpty) {
-        slivers.add(_sectionHeaderSliver('Готово', readyItems.length));
+        slivers.add(
+          _sectionHeaderSliver(
+            text.generationStatusSectionReady,
+            readyItems.length,
+          ),
+        );
         slivers.add(_readyGridSliver(readyItems));
       }
       if (failedItems.isNotEmpty) {
-        slivers.add(_sectionHeaderSliver('Ошибка', failedItems.length));
+        slivers.add(
+          _sectionHeaderSliver(
+            text.generationStatusSectionFailed,
+            failedItems.length,
+          ),
+        );
         slivers.add(_failedListSliver(failedItems));
       }
       slivers.add(SliverToBoxAdapter(child: SizedBox(height: bottomInset)));
@@ -173,7 +196,7 @@ class _GenerationsGalleryPageState
         SliverPadding(
           padding: EdgeInsets.fromLTRB(18, 8, 18, bottomInset),
           sliver: SliverGrid.builder(
-            itemCount: state.items.length,
+            itemCount: filteredItems.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 10,
@@ -181,7 +204,7 @@ class _GenerationsGalleryPageState
               childAspectRatio: 0.82,
             ),
             itemBuilder: (context, index) =>
-                _ReadyGridCard(generation: state.items[index]),
+                _ReadyGridCard(generation: filteredItems[index]),
           ),
         ),
       ];
@@ -196,10 +219,10 @@ class _GenerationsGalleryPageState
         SliverPadding(
           padding: EdgeInsets.fromLTRB(18, 0, 18, bottomInset),
           sliver: SliverList.separated(
-            itemCount: state.items.length,
+            itemCount: filteredItems.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) =>
-                _ActiveCard(generation: state.items[index]),
+                _ActiveCard(generation: filteredItems[index]),
           ),
         ),
       ];
@@ -210,10 +233,10 @@ class _GenerationsGalleryPageState
         SliverPadding(
           padding: EdgeInsets.fromLTRB(18, 8, 18, bottomInset),
           sliver: SliverList.separated(
-            itemCount: state.items.length,
+            itemCount: filteredItems.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) =>
-                _FailedCard(generation: state.items[index]),
+                _FailedCard(generation: filteredItems[index]),
           ),
         ),
       ];
@@ -223,10 +246,10 @@ class _GenerationsGalleryPageState
       SliverPadding(
         padding: EdgeInsets.fromLTRB(18, 8, 18, bottomInset),
         sliver: SliverList.separated(
-          itemCount: state.items.length,
+          itemCount: filteredItems.length,
           separatorBuilder: (context, index) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            final generation = state.items[index];
+            final generation = filteredItems[index];
             if (generation.isFailed) {
               return _FailedCard(generation: generation);
             }
@@ -235,6 +258,21 @@ class _GenerationsGalleryPageState
         ),
       ),
     ];
+  }
+
+  List<TemplateGenerationResult> _itemsForSelectedFilter(
+    List<TemplateGenerationResult> items,
+    GenerationHistoryFilter filter,
+  ) {
+    return switch (filter) {
+      GenerationHistoryFilter.all => items,
+      GenerationHistoryFilter.active =>
+        items.where((item) => !item.isTerminal).toList(growable: false),
+      GenerationHistoryFilter.ready =>
+        items.where((item) => item.isCompleted).toList(growable: false),
+      GenerationHistoryFilter.failed =>
+        items.where((item) => item.isFailed).toList(growable: false),
+    };
   }
 
   Widget _sectionHeaderSliver(String title, int count) {
@@ -315,12 +353,13 @@ class _FilterBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final filters = <(GenerationHistoryFilter, String)>[
-      (GenerationHistoryFilter.all, 'Все'),
-      (GenerationHistoryFilter.active, 'В процессе'),
-      (GenerationHistoryFilter.ready, 'Готово'),
-      (GenerationHistoryFilter.failed, 'Ошибка'),
+      (GenerationHistoryFilter.all, text.allFilter),
+      (GenerationHistoryFilter.active, text.generationStatusFilterActive),
+      (GenerationHistoryFilter.ready, text.generationStatusFilterReady),
+      (GenerationHistoryFilter.failed, text.generationStatusFilterFailed),
     ];
 
     return SingleChildScrollView(
@@ -473,6 +512,7 @@ class _ShowMoreButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
     return InkWell(
@@ -487,7 +527,9 @@ class _ShowMoreButton extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            expanded ? 'Свернуть ▲' : 'Показать еще ($hiddenCount) ▾',
+            expanded
+                ? text.generationStatusCollapseAction
+                : text.generationStatusShowMoreAction(hiddenCount),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: colors.textSoft,
               fontWeight: FontWeight.w800,
@@ -504,6 +546,7 @@ class _ActiveInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -519,7 +562,7 @@ class _ActiveInfoCard extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.',
+                text.generationStatusActiveInfoHint,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: colors.textSoft,
                   fontWeight: FontWeight.w600,
@@ -540,6 +583,7 @@ class _ActiveCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final previewUrl = _previewUrl(generation);
 
@@ -614,7 +658,8 @@ class _ActiveCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        generation.templateTitle ?? 'PetMagic result',
+                        generation.templateTitle ??
+                            text.generationStatusResultTitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium
@@ -625,7 +670,7 @@ class _ActiveCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${_typeLabel(generation)} · ${generation.tokenCost} токенов',
+                        '${_typeLabel(text, generation)} · ${generation.tokenCost} PawSpark',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelMedium
@@ -636,7 +681,7 @@ class _ActiveCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _stageStatusLabel(generation),
+                        _stageStatusLabel(text, generation),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -674,7 +719,7 @@ class _ActiveCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 7),
                       Text(
-                        _estimatedTimeLabel(generation),
+                        _estimatedTimeLabel(text, generation),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelMedium
@@ -699,7 +744,7 @@ class _ActiveCard extends ConsumerWidget {
                             ),
                             visualDensity: VisualDensity.compact,
                           ),
-                          child: const Text('Открыть'),
+                          child: Text(text.generationStatusOpenStatusAction),
                         ),
                       ),
                     ],
@@ -721,6 +766,7 @@ class _ReadyGridCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final previewUrl = _previewUrl(generation);
 
@@ -805,7 +851,8 @@ class _ReadyGridCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            generation.templateTitle ?? 'PetMagic result',
+                            generation.templateTitle ??
+                                text.generationStatusResultTitle,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleSmall
@@ -817,7 +864,7 @@ class _ReadyGridCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${_typeLabel(generation)} · ${generation.tokenCost} 🐾',
+                            '${_typeLabel(text, generation)} · ${generation.tokenCost} PawSpark',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelMedium
@@ -828,7 +875,7 @@ class _ReadyGridCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            _formattedDate(generation.updatedAtUtc),
+                            _formattedDate(text, generation.updatedAtUtc),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelSmall
@@ -843,7 +890,7 @@ class _ReadyGridCard extends ConsumerWidget {
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       onPressed: () =>
-                          _showReadyCardActions(context, ref, generation),
+                          _showReadyCardActions(context, text, ref, generation),
                       icon: Icon(
                         Icons.more_vert_rounded,
                         color: colors.textMuted,
@@ -867,9 +914,10 @@ class _FailedCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final previewUrl = _previewUrl(generation);
-    final failureReason = _failureReasonMessage(generation);
+    final failureReason = _failureReasonMessage(text, generation);
 
     void openGeneration() {
       if (generation.isUnread) {
@@ -946,7 +994,8 @@ class _FailedCard extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          generation.templateTitle ?? 'PetMagic result',
+                          generation.templateTitle ??
+                              text.generationStatusResultTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleMedium
@@ -957,7 +1006,7 @@ class _FailedCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${_typeLabel(generation)} · ${generation.tokenCost} токенов',
+                          '${_typeLabel(text, generation)} · ${generation.tokenCost} PawSpark',
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(
                                 color: colors.textMuted,
@@ -966,7 +1015,7 @@ class _FailedCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Не удалось создать',
+                          text.generationStatusFailedTitle,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: colors.danger,
@@ -976,7 +1025,7 @@ class _FailedCard extends ConsumerWidget {
                         if (generation.refundedAtUtc != null ||
                             generation.tokenCost > 0)
                           Text(
-                            'Токены возвращены',
+                            text.generationStatusTokensRefundedShort,
                             style: Theme.of(context).textTheme.labelMedium
                                 ?.copyWith(
                                   color: colors.textMuted,
@@ -988,7 +1037,7 @@ class _FailedCard extends ConsumerWidget {
                   ),
                   IconButton(
                     onPressed: () =>
-                        _showFailedCardActions(context, ref, generation),
+                        _showFailedCardActions(context, text, ref, generation),
                     icon: Icon(
                       Icons.more_vert_rounded,
                       color: colors.textMuted,
@@ -1034,18 +1083,18 @@ class _FailedCard extends ConsumerWidget {
                   backgroundColor: colors.accent,
                   foregroundColor: colors.backgroundBottom,
                 ),
-                child: const Text('Выбрать другое фото'),
+                child: Text(text.generationStatusPickAnotherPhotoAction),
               ),
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: openSupport,
-                child: const Text('Сообщить в поддержку'),
+                child: Text(text.generationStatusContactSupportAction),
               ),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: openGeneration,
-                  child: const Text('Открыть статус'),
+                  child: Text(text.generationStatusOpenStatusAction),
                 ),
               ),
             ],
@@ -1088,6 +1137,7 @@ class _UnreadPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1098,7 +1148,7 @@ class _UnreadPill extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Text(
-          '$count новых',
+          text.generationStatusUnreadCount(count),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: colors.accent,
             fontWeight: FontWeight.w900,
@@ -1132,6 +1182,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -1141,7 +1192,7 @@ class _EmptyState extends StatelessWidget {
           Icon(Icons.photo_library_outlined, size: 42, color: colors.textMuted),
           const SizedBox(height: 12),
           Text(
-            'Здесь появятся ваши результаты',
+            text.generationStatusEmptyTitle,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: colors.textStrong,
@@ -1150,7 +1201,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Выберите шаблон, загрузите фото питомца и создайте первый магический арт.',
+            text.generationStatusEmptyMessage,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colors.textSoft,
@@ -1163,12 +1214,15 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-String _subtitleForFilter(GenerationHistoryFilter filter) {
+String _subtitleForFilter(
+  AppLocalizations text,
+  GenerationHistoryFilter filter,
+) {
   return switch (filter) {
-    GenerationHistoryFilter.all => 'Ваши магические создания',
-    GenerationHistoryFilter.active => 'Активные генерации',
-    GenerationHistoryFilter.ready => 'Ваши готовые результаты',
-    GenerationHistoryFilter.failed => 'Проблемы с генерацией',
+    GenerationHistoryFilter.all => text.generationStatusSubtitleAll,
+    GenerationHistoryFilter.active => text.generationStatusSubtitleActive,
+    GenerationHistoryFilter.ready => text.generationStatusSubtitleReady,
+    GenerationHistoryFilter.failed => text.generationStatusSubtitleFailed,
   };
 }
 
@@ -1179,6 +1233,7 @@ class _ErrorState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -1200,7 +1255,7 @@ class _ErrorState extends ConsumerWidget {
             onPressed: () => ref
                 .read(generationHistoryControllerProvider.notifier)
                 .load(refresh: true),
-            child: const Text('Повторить'),
+            child: Text(text.retryAction),
           ),
         ],
       ),
@@ -1215,6 +1270,7 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isVideo = _isVideoGeneration(generation);
     final background = isVideo
@@ -1229,7 +1285,7 @@ class _TypeBadge extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          isVideo ? 'Видео' : 'Изображение',
+          isVideo ? text.videoLabel : text.imageLabel,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w800,
@@ -1273,37 +1329,48 @@ class _DurationBadge extends StatelessWidget {
   }
 }
 
-String _typeLabel(TemplateGenerationResult generation) {
-  return _isVideoGeneration(generation) ? 'Видео' : 'Изображение';
+String _typeLabel(AppLocalizations text, TemplateGenerationResult generation) {
+  return _isVideoGeneration(generation) ? text.videoLabel : text.imageLabel;
 }
 
-String _stageStatusLabel(TemplateGenerationResult generation) {
+String _stageStatusLabel(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
   if (generation.effectiveProgressPercent >= 95) {
-    return 'Почти готово';
+    return text.generationStatusEtaFinalizing;
   }
 
   return switch (generation.stage) {
-    'queued' => 'В очереди',
-    'uploading' => 'Подготавливаем фото',
-    'preprocessing' => 'Подготавливаем фото',
-    'processing' => 'Создаем результат',
-    'generating' => 'Создаем результат',
-    'finalizing' => 'Сохраняем файл',
-    _ => 'Создаем результат',
+    'queued' => text.generationStatusStageQueued,
+    'uploading' => text.templateFlowStepProcessPhoto,
+    'preprocessing' => text.templateFlowStepProcessPhoto,
+    'processing' => text.templateFlowStepCreateMagic,
+    'generating' => text.templateFlowStepCreateMagic,
+    'finalizing' => text.templateFlowStepFinalTouches,
+    _ => text.templateFlowStepCreateMagic,
   };
 }
 
-String _estimatedTimeLabel(TemplateGenerationResult generation) {
+String _estimatedTimeLabel(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
   if (generation.stage == 'queued') {
-    return 'Начнем через несколько минут';
+    return text.generationStatusEtaStartsSoon;
   }
   if ((generation.estimatedDurationLabel ?? '').isNotEmpty) {
-    return 'Осталось примерно ${generation.estimatedDurationLabel}';
+    return text.generationStatusEtaEstimated(
+      generation.estimatedDurationLabel!,
+    );
   }
-  return 'Мы сообщим, когда результат будет готов.';
+  return text.generationStatusEtaNotifyHint;
 }
 
-String _failureReasonMessage(TemplateGenerationResult generation) {
+String _failureReasonMessage(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
   final code = (generation.failureCode ?? '').toLowerCase();
   final message = (generation.failureMessage ?? '').toLowerCase();
   final combined = '$code $message';
@@ -1312,27 +1379,13 @@ String _failureReasonMessage(TemplateGenerationResult generation) {
       combined.contains('face') ||
       combined.contains('pet') ||
       combined.contains('quality')) {
-    return 'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
+    return text.generationStatusFailurePhotoHint;
   }
 
-  return 'Не удалось создать результат из-за технической ошибки. Мы вернули токены на ваш баланс.';
+  return text.generationStatusFailureTechnicalHint;
 }
 
-String _formattedDate(DateTime value) {
-  const months = <String>[
-    'янв',
-    'фев',
-    'мар',
-    'апр',
-    'мая',
-    'июн',
-    'июл',
-    'авг',
-    'сен',
-    'окт',
-    'ноя',
-    'дек',
-  ];
+String _formattedDate(AppLocalizations text, DateTime value) {
   final local = value.toLocal();
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -1342,12 +1395,15 @@ String _formattedDate(DateTime value) {
   final minute = local.minute.toString().padLeft(2, '0');
 
   if (dayDiff == 0) {
-    return 'Сегодня, $hour:$minute';
+    return text.generationStatusDateToday('$hour:$minute');
   }
   if (dayDiff == 1) {
-    return 'Вчера, $hour:$minute';
+    return text.generationStatusDateYesterday('$hour:$minute');
   }
-  return '${local.day} ${months[local.month - 1]}, $hour:$minute';
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final year = local.year;
+  return '$day.$month.$year, $hour:$minute';
 }
 
 IconData _statusIcon(TemplateGenerationResult generation) {
@@ -1395,6 +1451,7 @@ bool _isVideoGeneration(TemplateGenerationResult generation) {
 
 Future<void> _showReadyCardActions(
   BuildContext context,
+  AppLocalizations text,
   WidgetRef ref,
   TemplateGenerationResult generation,
 ) async {
@@ -1411,7 +1468,7 @@ Future<void> _showReadyCardActions(
           children: [
             ListTile(
               leading: const Icon(Icons.open_in_new_rounded),
-              title: const Text('Открыть'),
+              title: Text(text.generationStatusOpenStatusAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 if (generation.isUnread) {
@@ -1426,23 +1483,23 @@ Future<void> _showReadyCardActions(
             ),
             ListTile(
               leading: const Icon(Icons.download_rounded),
-              title: const Text('Сохранить'),
+              title: Text(text.generationStatusSaveAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                _notifySoon(
-                  context,
-                  'Сохранение появится в следующем обновлении',
-                );
+                unawaited(_saveGenerationToDevice(context, text, generation));
               },
             ),
             ListTile(
               leading: const Icon(Icons.share_rounded),
-              title: const Text('Поделиться'),
+              title: Text(text.supportChatShareAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 final outputUrl = generation.outputUrl;
                 if (outputUrl == null || outputUrl.isEmpty) {
-                  _notifySoon(context, 'Результат еще недоступен для шаринга');
+                  _notifySoon(
+                    context,
+                    text.generationStatusResultUnavailableForShare,
+                  );
                   return;
                 }
                 SharePlus.instance.share(ShareParams(text: outputUrl));
@@ -1450,15 +1507,15 @@ Future<void> _showReadyCardActions(
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline_rounded),
-              title: const Text('Удалить'),
+              title: Text(text.generationStatusDeleteAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                _notifySoon(context, 'Удаление из галереи скоро добавим');
+                _notifySoon(context, text.generationStatusDeleteSoonMessage);
               },
             ),
             ListTile(
               leading: const Icon(Icons.flag_outlined),
-              title: const Text('Сообщить о проблеме'),
+              title: Text(text.generationStatusReportProblemAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 context.go(SupportChatPage.routePath);
@@ -1473,6 +1530,7 @@ Future<void> _showReadyCardActions(
 
 Future<void> _showFailedCardActions(
   BuildContext context,
+  AppLocalizations text,
   WidgetRef ref,
   TemplateGenerationResult generation,
 ) async {
@@ -1488,7 +1546,7 @@ Future<void> _showFailedCardActions(
           children: [
             ListTile(
               leading: const Icon(Icons.open_in_new_rounded),
-              title: const Text('Открыть статус'),
+              title: Text(text.generationStatusOpenStatusAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 if (generation.isUnread) {
@@ -1503,7 +1561,7 @@ Future<void> _showFailedCardActions(
             ),
             ListTile(
               leading: const Icon(Icons.image_search_rounded),
-              title: const Text('Выбрать другое фото'),
+              title: Text(text.generationStatusPickAnotherPhotoAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 context.go(TemplatesPage.routePath);
@@ -1511,7 +1569,7 @@ Future<void> _showFailedCardActions(
             ),
             ListTile(
               leading: const Icon(Icons.support_agent_rounded),
-              title: const Text('Сообщить в поддержку'),
+              title: Text(text.generationStatusContactSupportAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 context.go(SupportChatPage.routePath);
@@ -1522,6 +1580,63 @@ Future<void> _showFailedCardActions(
       );
     },
   );
+}
+
+Future<void> _saveGenerationToDevice(
+  BuildContext context,
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) async {
+  final outputUrl = generation.outputUrl;
+  if (outputUrl == null || outputUrl.isEmpty) {
+    _notifySoon(context, text.generationStatusResultUnavailableForSave);
+    return;
+  }
+
+  final fileName = _buildGenerationFileName(generation, outputUrl);
+  final extension = extractFileExtension(fileName);
+  final allowedExtensions = extension == null ? null : <String>[extension];
+
+  try {
+    final bytes = await downloadFileBytes(outputUrl);
+    final wasSaved = await saveBytesToDevice(
+      bytes: bytes,
+      dialogTitle: text.generationStatusSaveFileDialogTitle,
+      fileName: fileName,
+      allowedExtensions: allowedExtensions,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (!wasSaved) {
+      return;
+    }
+
+    _notifySoon(context, text.generationStatusFileSavedMessage);
+  } on Object {
+    if (!context.mounted) {
+      return;
+    }
+
+    _notifySoon(context, text.generationStatusFileSaveFailedMessage);
+  }
+}
+
+String _buildGenerationFileName(
+  TemplateGenerationResult generation,
+  String outputUrl,
+) {
+  final normalizedTitle = sanitizeFileName(
+    generation.templateTitle,
+    fallback: 'petmagic_result',
+  );
+  final extensionFromRemote = extensionFromUrl(outputUrl);
+  final extension = extensionFromRemote.isEmpty
+      ? (_isVideoGeneration(generation) ? 'mp4' : 'jpg')
+      : extensionFromRemote;
+  return '${normalizedTitle}_${generation.generationId}.$extension';
 }
 
 void _notifySoon(BuildContext context, String message) {

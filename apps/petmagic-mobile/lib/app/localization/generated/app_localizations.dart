@@ -3587,6 +3587,777 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rewards center is coming soon.'**
   String get rewardsActionComingSoon;
+
+  /// No description provided for @templateFlowPhotoSourceGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get templateFlowPhotoSourceGallery;
+
+  /// No description provided for @templateFlowPhotoSourceCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get templateFlowPhotoSourceCamera;
+
+  /// No description provided for @templateFlowReadyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to create!'**
+  String get templateFlowReadyTitle;
+
+  /// No description provided for @templateFlowCheckDetailsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the details before creating'**
+  String get templateFlowCheckDetailsSubtitle;
+
+  /// No description provided for @templateFlowTemplateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Template'**
+  String get templateFlowTemplateLabel;
+
+  /// No description provided for @templateFlowCostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get templateFlowCostLabel;
+
+  /// No description provided for @templateFlowBalanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your balance'**
+  String get templateFlowBalanceLabel;
+
+  /// No description provided for @templateFlowDurationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Creation can take from 10 seconds to 1 minute.'**
+  String get templateFlowDurationHint;
+
+  /// No description provided for @templateFlowCreateMagicAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create magic'**
+  String get templateFlowCreateMagicAction;
+
+  /// No description provided for @templateFlowChangePhotoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change photo'**
+  String get templateFlowChangePhotoAction;
+
+  /// No description provided for @templateFlowPremiumTemplateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium template'**
+  String get templateFlowPremiumTemplateTitle;
+
+  /// No description provided for @templateFlowPremiumTemplateMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This template is available with Premium.'**
+  String get templateFlowPremiumTemplateMessage;
+
+  /// No description provided for @templateFlowInsufficientBalanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough PawSpark'**
+  String get templateFlowInsufficientBalanceTitle;
+
+  /// No description provided for @templateFlowInsufficientBalanceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This template costs {tokenCost} PawSpark. Your balance: {balance} PawSpark.'**
+  String templateFlowInsufficientBalanceMessage(
+    Object tokenCost,
+    Object balance,
+  );
+
+  /// No description provided for @templateFlowChooseAnotherTemplateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another template'**
+  String get templateFlowChooseAnotherTemplateAction;
+
+  /// No description provided for @templateFlowCreateFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create magic'**
+  String get templateFlowCreateFailedTitle;
+
+  /// No description provided for @templateFlowCreateFailedBalanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up your balance and try creating again.'**
+  String get templateFlowCreateFailedBalanceHint;
+
+  /// No description provided for @templateFlowCreateFailedRetryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try another photo or retry later.'**
+  String get templateFlowCreateFailedRetryHint;
+
+  /// No description provided for @templateFlowCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This may take a little time'**
+  String get templateFlowCreateHint;
+
+  /// No description provided for @templateFlowStepProcessPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing photo'**
+  String get templateFlowStepProcessPhoto;
+
+  /// No description provided for @templateFlowStepAnalyzePet.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzing pet'**
+  String get templateFlowStepAnalyzePet;
+
+  /// No description provided for @templateFlowStepCreateMagic.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating magic'**
+  String get templateFlowStepCreateMagic;
+
+  /// No description provided for @templateFlowStepFinalTouches.
+  ///
+  /// In en, this message translates to:
+  /// **'Final touches'**
+  String get templateFlowStepFinalTouches;
+
+  /// No description provided for @templateFlowTopUpBalanceAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up balance'**
+  String get templateFlowTopUpBalanceAction;
+
+  /// No description provided for @templateFlowResultReadyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Done!'**
+  String get templateFlowResultReadyTitle;
+
+  /// No description provided for @templateFlowResultReadySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your magic is ready'**
+  String get templateFlowResultReadySubtitle;
+
+  /// No description provided for @templateFlowResultUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Result is not available yet'**
+  String get templateFlowResultUnavailable;
+
+  /// No description provided for @templateFlowLoadingResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading result...'**
+  String get templateFlowLoadingResult;
+
+  /// No description provided for @templateFlowResultLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load result'**
+  String get templateFlowResultLoadFailed;
+
+  /// No description provided for @templateFlowCreateMoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create more'**
+  String get templateFlowCreateMoreAction;
+
+  /// No description provided for @templateFlowPreviewFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get templateFlowPreviewFallback;
+
+  /// No description provided for @templateFlowLoadingPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading preview...'**
+  String get templateFlowLoadingPreview;
+
+  /// No description provided for @templateFlowPreviewUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview unavailable'**
+  String get templateFlowPreviewUnavailable;
+
+  /// No description provided for @templateFlowLoadingVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading video...'**
+  String get templateFlowLoadingVideo;
+
+  /// No description provided for @templateFlowBestPhotoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Best photo for this template:'**
+  String get templateFlowBestPhotoTitle;
+
+  /// No description provided for @templateFlowUploadPetPhotoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a pet photo'**
+  String get templateFlowUploadPetPhotoAction;
+
+  /// No description provided for @templateFlowPremiumRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'This template is available only with Premium.'**
+  String get templateFlowPremiumRequiredError;
+
+  /// No description provided for @templateFlowInsufficientBalanceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough PawSpark to start generation.'**
+  String get templateFlowInsufficientBalanceError;
+
+  /// No description provided for @templateFlowNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Check your network and try again.'**
+  String get templateFlowNetworkError;
+
+  /// No description provided for @templateFlowServerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Service is temporarily unavailable. Please try again later.'**
+  String get templateFlowServerError;
+
+  /// No description provided for @templateFlowStartFailedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start generation. Please try again.'**
+  String get templateFlowStartFailedError;
+
+  /// No description provided for @generationStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation status'**
+  String get generationStatusTitle;
+
+  /// No description provided for @generationStatusCreatedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get generationStatusCreatedLabel;
+
+  /// No description provided for @generationStatusStartedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get generationStatusStartedLabel;
+
+  /// No description provided for @generationStatusTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get generationStatusTypeLabel;
+
+  /// No description provided for @generationStatusAttemptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempt'**
+  String get generationStatusAttemptLabel;
+
+  /// No description provided for @generationStatusUntitledFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled'**
+  String get generationStatusUntitledFallback;
+
+  /// No description provided for @generationStatusDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get generationStatusDetailsTitle;
+
+  /// No description provided for @generationStatusFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How is the result?'**
+  String get generationStatusFeedbackTitle;
+
+  /// No description provided for @generationStatusFeedbackExcellent.
+  ///
+  /// In en, this message translates to:
+  /// **'Excellent'**
+  String get generationStatusFeedbackExcellent;
+
+  /// No description provided for @generationStatusFeedbackOkay.
+  ///
+  /// In en, this message translates to:
+  /// **'Okay'**
+  String get generationStatusFeedbackOkay;
+
+  /// No description provided for @generationStatusFeedbackBad.
+  ///
+  /// In en, this message translates to:
+  /// **'Not great'**
+  String get generationStatusFeedbackBad;
+
+  /// No description provided for @generationStatusSaveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get generationStatusSaveAction;
+
+  /// No description provided for @generationStatusDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get generationStatusDeleteAction;
+
+  /// No description provided for @generationStatusReportProblemAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Report a problem'**
+  String get generationStatusReportProblemAction;
+
+  /// No description provided for @generationStatusPickAnotherPhotoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another photo'**
+  String get generationStatusPickAnotherPhotoAction;
+
+  /// No description provided for @generationStatusRetryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get generationStatusRetryAction;
+
+  /// No description provided for @generationStatusContactSupportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get generationStatusContactSupportAction;
+
+  /// No description provided for @generationStatusOpenGalleryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open gallery'**
+  String get generationStatusOpenGalleryAction;
+
+  /// No description provided for @generationStatusOpenStatusAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open status'**
+  String get generationStatusOpenStatusAction;
+
+  /// No description provided for @generationStatusCancelGenerationAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel generation'**
+  String get generationStatusCancelGenerationAction;
+
+  /// No description provided for @generationStatusResultUnavailableForSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Result is not available for saving yet.'**
+  String get generationStatusResultUnavailableForSave;
+
+  /// No description provided for @generationStatusResultUnavailableForShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Result is not available for sharing yet.'**
+  String get generationStatusResultUnavailableForShare;
+
+  /// No description provided for @generationStatusSaveFileDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save file'**
+  String get generationStatusSaveFileDialogTitle;
+
+  /// No description provided for @generationStatusFileSavedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved to device.'**
+  String get generationStatusFileSavedMessage;
+
+  /// No description provided for @generationStatusFileSaveFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save file. Please try again.'**
+  String get generationStatusFileSaveFailedMessage;
+
+  /// No description provided for @generationStatusDeleteSoonMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Deletion will be available soon.'**
+  String get generationStatusDeleteSoonMessage;
+
+  /// No description provided for @generationStatusCancelSoonMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation cancellation is coming soon.'**
+  String get generationStatusCancelSoonMessage;
+
+  /// No description provided for @generationStatusRetrySoonMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another photo and start generation again.'**
+  String get generationStatusRetrySoonMessage;
+
+  /// No description provided for @generationStatusFeedbackThanksMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks! Your feedback helps improve PetMagic.'**
+  String get generationStatusFeedbackThanksMessage;
+
+  /// No description provided for @generationStatusResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic result'**
+  String get generationStatusResultTitle;
+
+  /// No description provided for @generationStatusNonTerminalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This usually takes a few minutes. You can keep using the app.'**
+  String get generationStatusNonTerminalHint;
+
+  /// No description provided for @generationStatusStageQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'In queue'**
+  String get generationStatusStageQueued;
+
+  /// No description provided for @generationStatusStageDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get generationStatusStageDone;
+
+  /// No description provided for @generationStatusVideoReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Video is ready'**
+  String get generationStatusVideoReady;
+
+  /// No description provided for @generationStatusShareVideoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Share video'**
+  String get generationStatusShareVideoAction;
+
+  /// No description provided for @generationStatusFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create result'**
+  String get generationStatusFailedTitle;
+
+  /// No description provided for @generationStatusTokensRefundedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens were returned to your balance.'**
+  String get generationStatusTokensRefundedHint;
+
+  /// No description provided for @generationStatusTokensRefundedShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens refunded'**
+  String get generationStatusTokensRefundedShort;
+
+  /// No description provided for @generationStatusSupportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If this repeats, contact support.'**
+  String get generationStatusSupportHint;
+
+  /// No description provided for @generationStatusBackgroundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation continues on the server. We will show the result in Gallery when it is ready.'**
+  String get generationStatusBackgroundHint;
+
+  /// No description provided for @generationStatusDownloadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get generationStatusDownloadAction;
+
+  /// No description provided for @generationStatusContinueInAppAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue in app'**
+  String get generationStatusContinueInAppAction;
+
+  /// No description provided for @generationStatusFeedbackImproveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What can we improve?'**
+  String get generationStatusFeedbackImproveTitle;
+
+  /// No description provided for @generationStatusFeedbackCommentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get generationStatusFeedbackCommentLabel;
+
+  /// No description provided for @generationStatusFeedbackCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Briefly tell us what was wrong'**
+  String get generationStatusFeedbackCommentHint;
+
+  /// No description provided for @generationStatusFeedbackSubmitAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit feedback'**
+  String get generationStatusFeedbackSubmitAction;
+
+  /// No description provided for @generationStatusFeedbackReasonPetNotSimilar.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet does not look like itself'**
+  String get generationStatusFeedbackReasonPetNotSimilar;
+
+  /// No description provided for @generationStatusFeedbackReasonFaceDistorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Face or muzzle is distorted'**
+  String get generationStatusFeedbackReasonFaceDistorted;
+
+  /// No description provided for @generationStatusFeedbackReasonStrangeMotion.
+  ///
+  /// In en, this message translates to:
+  /// **'Motion looks strange'**
+  String get generationStatusFeedbackReasonStrangeMotion;
+
+  /// No description provided for @generationStatusFeedbackReasonPreviewMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Result differs from preview'**
+  String get generationStatusFeedbackReasonPreviewMismatch;
+
+  /// No description provided for @generationStatusFeedbackReasonLowQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality is too low'**
+  String get generationStatusFeedbackReasonLowQuality;
+
+  /// No description provided for @generationStatusFeedbackReasonStyleDisliked.
+  ///
+  /// In en, this message translates to:
+  /// **'Did not like the style'**
+  String get generationStatusFeedbackReasonStyleDisliked;
+
+  /// No description provided for @generationStatusFeedbackReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get generationStatusFeedbackReasonOther;
+
+  /// No description provided for @generationStatusEtaEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'About {value} left'**
+  String generationStatusEtaEstimated(Object value);
+
+  /// No description provided for @generationStatusEtaQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting in queue'**
+  String get generationStatusEtaQueued;
+
+  /// No description provided for @generationStatusEtaFinalizing.
+  ///
+  /// In en, this message translates to:
+  /// **'Almost ready'**
+  String get generationStatusEtaFinalizing;
+
+  /// No description provided for @generationStatusEtaDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'About 1-2 min left'**
+  String get generationStatusEtaDefault;
+
+  /// No description provided for @generationStatusEtaStartsSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Will start in a few minutes'**
+  String get generationStatusEtaStartsSoon;
+
+  /// No description provided for @generationStatusEtaNotifyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'We will notify you when the result is ready.'**
+  String get generationStatusEtaNotifyHint;
+
+  /// No description provided for @generationStatusFailurePhotoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo is not suitable for this template. Try a photo where the pet is clearly visible.'**
+  String get generationStatusFailurePhotoHint;
+
+  /// No description provided for @generationStatusFailureTechnicalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create the result due to a technical issue. Tokens were returned to your balance.'**
+  String get generationStatusFailureTechnicalHint;
+
+  /// No description provided for @generationStatusStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your result is ready'**
+  String get generationStatusStatusCompleted;
+
+  /// No description provided for @generationStatusStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create result'**
+  String get generationStatusStatusFailed;
+
+  /// No description provided for @generationStatusStatusCreatingMagic.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating magic...'**
+  String get generationStatusStatusCreatingMagic;
+
+  /// No description provided for @generationStatusTerminalRefundedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens were refunded automatically.'**
+  String get generationStatusTerminalRefundedHint;
+
+  /// No description provided for @generationStatusTerminalFailureHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A technical issue has been recorded.'**
+  String get generationStatusTerminalFailureHint;
+
+  /// No description provided for @generationStatusTerminalSuccessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open result, share it, or leave feedback.'**
+  String get generationStatusTerminalSuccessHint;
+
+  /// No description provided for @generationStatusSectionActive.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get generationStatusSectionActive;
+
+  /// No description provided for @generationStatusSectionReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get generationStatusSectionReady;
+
+  /// No description provided for @generationStatusSectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get generationStatusSectionFailed;
+
+  /// No description provided for @generationStatusFilterActive.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get generationStatusFilterActive;
+
+  /// No description provided for @generationStatusFilterReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get generationStatusFilterReady;
+
+  /// No description provided for @generationStatusFilterFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get generationStatusFilterFailed;
+
+  /// No description provided for @generationStatusShowMoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more ({hiddenCount}) ▾'**
+  String generationStatusShowMoreAction(int hiddenCount);
+
+  /// No description provided for @generationStatusCollapseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse ▲'**
+  String get generationStatusCollapseAction;
+
+  /// No description provided for @generationStatusActiveInfoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can close the app. We will notify you when the result is ready.'**
+  String get generationStatusActiveInfoHint;
+
+  /// No description provided for @generationStatusUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new'**
+  String generationStatusUnreadCount(int count);
+
+  /// No description provided for @generationStatusEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your results will appear here'**
+  String get generationStatusEmptyTitle;
+
+  /// No description provided for @generationStatusEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a template, upload your pet photo and create your first magic art.'**
+  String get generationStatusEmptyMessage;
+
+  /// No description provided for @generationStatusSubtitleAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Your magical creations'**
+  String get generationStatusSubtitleAll;
+
+  /// No description provided for @generationStatusSubtitleActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active generations'**
+  String get generationStatusSubtitleActive;
+
+  /// No description provided for @generationStatusSubtitleReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Your ready results'**
+  String get generationStatusSubtitleReady;
+
+  /// No description provided for @generationStatusSubtitleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation issues'**
+  String get generationStatusSubtitleFailed;
+
+  /// No description provided for @generationStatusDateToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today, {time}'**
+  String generationStatusDateToday(Object time);
+
+  /// No description provided for @generationStatusDateYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday, {time}'**
+  String generationStatusDateYesterday(Object time);
+
+  /// No description provided for @shellActiveGenerationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'✨ Creating {templateTitle}'**
+  String shellActiveGenerationLabel(Object templateTitle);
+
+  /// No description provided for @shellActiveGenerationFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'result'**
+  String get shellActiveGenerationFallback;
 }
 
 class _AppLocalizationsDelegate
