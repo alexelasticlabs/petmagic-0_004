@@ -6,13 +6,13 @@ internal static class SupportChatAutoReplyLocalizer
     {
         return NormalizeLanguage(locale) switch
         {
-            "ru" => "Сообщение получено. Команда поддержки уже получила ваш запрос и ответит в ближайшее время.",
-            "de" => "Nachricht erhalten. Unser Support-Team hat Ihre Anfrage bereits erhalten und wird bald antworten.",
-            "pl" => "Wiadomosc otrzymana. Nasz zespol wsparcia otrzymal Twoje zgloszenie i odpowie w najblizszym czasie.",
-            "it" => "Messaggio ricevuto. Il nostro team di supporto ha gia ricevuto la tua richiesta e rispondera al piu presto.",
-            "fr" => "Message recu. Notre equipe de support a bien recu votre demande et vous repondra bientot.",
-            "es" => "Mensaje recibido. Nuestro equipo de soporte ya recibio tu solicitud y respondera pronto.",
-            _ => "Message received. Our support team has your request and will reply soon.",
+            "ru" => "Спасибо, мы получили ваше сообщение. Поддержка ответит в этом чате.",
+            "de" => "Nachricht erhalten. Der Support antwortet in diesem Chat.",
+            "pl" => "Wiadomosc otrzymana. Wsparcie odpowie w tym czacie.",
+            "it" => "Messaggio ricevuto. Il supporto rispondera in questa chat.",
+            "fr" => "Message recu. Le support repondra dans ce chat.",
+            "es" => "Mensaje recibido. Soporte respondera en este chat.",
+            _ => "Message received. Support will reply in this chat.",
         };
     }
 

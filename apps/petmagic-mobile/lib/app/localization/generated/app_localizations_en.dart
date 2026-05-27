@@ -1508,7 +1508,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Message the PetMagic team directly from your profile.';
 
   @override
-  String get supportChatSecureTitle => 'Your conversation is secure';
+  String get supportChatSecureTitle =>
+      'Your conversation is protected. We use it only for support.';
 
   @override
   String get supportChatSecureSubtitle =>
@@ -1518,14 +1519,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportChatTeamTitle => 'PetMagic Support';
 
   @override
-  String get supportChatTeamStatus => 'Average response time: under 24 hours';
+  String get supportChatTeamStatus => 'We usually reply within 24 hours';
 
   @override
   String get supportChatTodayLabel => 'Today';
 
   @override
-  String get supportChatInputHint =>
-      'Describe the issue, question or request...';
+  String get supportChatInputHint => 'Describe the issue...';
 
   @override
   String get supportChatSendAction => 'Send';
@@ -1538,11 +1538,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your support chat is ready. Send the first message and the team will respond here.';
 
   @override
-  String get supportChatWelcomeTitle => 'Welcome to PetMagic support';
+  String get supportChatWelcomeTitle =>
+      'Hello! Describe your issue and we will help.';
 
   @override
   String get supportChatWelcomeBody =>
-      'Choose a common topic below or write your message right away. We will route it to the right team without making the chat feel empty.';
+      'You can also choose one of the common topics below.';
 
   @override
   String get supportChatQuickActionGeneration => 'Issue with image generation';
@@ -1609,11 +1610,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'The request is open. Support will see the new message.';
 
   @override
+  String get supportChatInProgressStatusHint =>
+      'Support is reviewing your issue.';
+
+  @override
   String get supportChatAwaitingYourReplyStatus => 'Awaiting your reply';
 
   @override
   String get supportChatSupportRepliedStatusHint =>
-      'Support replied. Check the message above.';
+      'Support replied. Did this help?';
 
   @override
   String get supportChatResolvedStatusHint =>
@@ -1621,7 +1626,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatClosedStatusHint =>
-      'The conversation is archived and read-only.';
+      'Conversation is closed. Send a new message to reopen it.';
 
   @override
   String get supportChatMessageDelivered => 'Delivered';
@@ -1693,7 +1698,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatSystemNoticeBody =>
-      'We received your message. The support team will reply here.';
+      'Thanks, we received your message. Support will reply in this chat.';
 
   @override
   String get supportChatComposerAttachmentChip =>
@@ -1706,20 +1711,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportChatAddPhotoTitle => 'Add photo';
 
   @override
+  String get supportChatAddAttachmentTitle => 'Add attachment';
+
+  @override
   String get supportChatTakePhotoAction => 'Take photo';
 
   @override
   String get supportChatChooseGalleryAction => 'Choose from gallery';
 
   @override
+  String get supportChatChoosePhotosAction => 'Choose photos';
+
+  @override
+  String get supportChatRecordVideoAction => 'Record video';
+
+  @override
+  String get supportChatChooseVideoAction => 'Choose video';
+
+  @override
   String get supportChatPhotoAttachedLabel => 'Photo attached';
+
+  @override
+  String get supportChatVideoAttachedLabel => 'Video attached';
+
+  @override
+  String get supportChatVideoLabel => 'Support video';
+
+  @override
+  String get supportChatAssistantBadge => 'Assistant';
 
   @override
   String get supportChatTooManyAttachmentsError =>
       'You can attach up to 5 photos.';
 
   @override
-  String get supportChatMarkResolvedAction => 'Resolved';
+  String get supportChatMarkResolvedAction => 'Yes, close request';
+
+  @override
+  String get supportChatKeepOpenAction => 'No, write more';
 
   @override
   String get supportChatReopenAction => 'Reopen';

@@ -29,19 +29,20 @@ public sealed class SupportChatServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("WaitingForSupport", result.Value.Status);
+        Assert.Equal("New", result.Value.Status);
         Assert.Equal("High", result.Value.Priority);
-        Assert.Single(result.Value.Messages);
-        Assert.Equal("Help, please", result.Value.Messages[0].Body);
-        Assert.False(result.Value.Messages[0].IsFromAdmin);
+        var userMessage = Assert.Single(result.Value.Messages.Where(message => message.SenderType == "User"));
+        Assert.Equal("Help, please", userMessage.Body);
+        Assert.False(userMessage.IsFromAdmin);
+        Assert.Equal(2, result.Value.Messages.Count(message => message.SenderType == "System"));
         Assert.Equal(1, result.Value.AdminUnreadCount);
         Assert.Equal(0, result.Value.UserUnreadCount);
 
         var conversation = await scope.SupportDbContext.SupportConversations.Include(x => x.Messages).SingleAsync();
         Assert.Equal(userId, conversation.InitiatorUserId);
-        Assert.Equal(SupportConversationStatus.WaitingForSupport, conversation.Status);
+        Assert.Equal(SupportConversationStatus.New, conversation.Status);
         Assert.Equal(SupportConversationPriority.High, conversation.Priority);
-        Assert.Single(conversation.Messages);
+        Assert.Equal(3, conversation.Messages.Count);
     }
 
     [Fact]
@@ -60,11 +61,11 @@ public sealed class SupportChatServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("WaitingForSupport", result.Value.Status);
+        Assert.Equal("New", result.Value.Status);
 
         var conversation = await scope.SupportDbContext.SupportConversations.Include(x => x.Messages).SingleAsync();
         Assert.Equal(userId, conversation.InitiatorUserId);
-        Assert.Single(conversation.Messages);
+        Assert.Equal(3, conversation.Messages.Count);
     }
 
     [Fact]
@@ -107,7 +108,8 @@ public sealed class SupportChatServiceTests
         Assert.Equal("Support Admin", detail.Value.AssignedAdminDisplayName);
         Assert.Equal(1, detail.Value.UserUnreadCount);
         Assert.Equal(1, detail.Value.AdminUnreadCount);
-        Assert.Equal(2, detail.Value.Messages.Count);
+        Assert.Equal(1, detail.Value.Messages.Count(message => message.SenderType == "SupportAgent"));
+        Assert.Contains(detail.Value.Messages, message => message.SenderType == "System" && message.Body == "Operator replied to user.");
         Assert.Contains(store.Notifications, x => x.ConversationId == conversationId);
     }
 
@@ -274,7 +276,7 @@ public sealed class SupportChatServiceTests
         Assert.True(detail.IsSuccess);
         Assert.Equal(0, detail.Value.UserUnreadCount);
         Assert.Equal(1, detail.Value.AdminUnreadCount);
-        Assert.True(detail.Value.Messages.Single(x => x.IsFromAdmin).IsRead);
+        Assert.True(detail.Value.Messages.Single(x => x.SenderType == "SupportAgent").IsRead);
         Assert.False(detail.Value.Messages.Single(x => !x.IsFromAdmin).IsRead);
     }
 
@@ -302,11 +304,11 @@ public sealed class SupportChatServiceTests
         await using (var updateScope = await store.CreateScopeAsync())
         {
             var updateResult = await updateScope.CreateService().UpdateConversationStatusAsync(
-                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Resolved),
+                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Closed),
                 CancellationToken.None);
 
             Assert.True(updateResult.IsSuccess);
-            Assert.Equal("Resolved", updateResult.Value.Status);
+            Assert.Equal("Closed", updateResult.Value.Status);
         }
 
         await using (var reopenScope = await store.CreateScopeAsync())
@@ -320,7 +322,7 @@ public sealed class SupportChatServiceTests
 
         await using var verificationScope = await store.CreateScopeAsync();
         var conversation = await verificationScope.SupportDbContext.SupportConversations.SingleAsync();
-        Assert.Equal(SupportConversationStatus.WaitingForSupport, conversation.Status);
+        Assert.Equal(SupportConversationStatus.New, conversation.Status);
         Assert.Null(conversation.ResolvedAtUtc);
 
         var forbiddenResult = await verificationScope.CreateService().SendMessageAsync(
@@ -372,13 +374,13 @@ public sealed class SupportChatServiceTests
 
         await using var verificationScope = await store.CreateScopeAsync();
         var conversation = await verificationScope.SupportDbContext.SupportConversations.SingleAsync();
-        Assert.Equal(SupportConversationStatus.WaitingForSupport, conversation.Status);
+        Assert.Equal(SupportConversationStatus.New, conversation.Status);
         Assert.Null(conversation.ClosedAtUtc);
         Assert.Null(conversation.ResolvedAtUtc);
     }
 
     [Fact]
-    public async Task SendMessageAsync_AfterReopenWindowExpired_ShouldFail()
+    public async Task SendMessageAsync_AfterClosed_ShouldSucceed()
     {
         var store = CreateStore();
 
@@ -399,14 +401,10 @@ public sealed class SupportChatServiceTests
         await using (var resolveScope = await store.CreateScopeAsync())
         {
             var resolveResult = await resolveScope.CreateService().UpdateConversationStatusAsync(
-                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Resolved),
+                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Closed),
                 CancellationToken.None);
 
             Assert.True(resolveResult.IsSuccess);
-
-            var conversation = await resolveScope.SupportDbContext.SupportConversations.SingleAsync(x => x.Id == conversationId);
-            conversation.ReopenUntilUtc = DateTime.UtcNow.AddDays(-1);
-            await resolveScope.SupportDbContext.SaveChangesAsync();
         }
 
         await using var sendScope = await store.CreateScopeAsync();
@@ -414,12 +412,11 @@ public sealed class SupportChatServiceTests
             new SendSupportMessageCommand(conversationId, userId, "Issue is back", false),
             CancellationToken.None);
 
-        Assert.True(sendResult.IsFailure);
-        Assert.Equal("support.reopen_window_expired", sendResult.Error.Code);
+        Assert.True(sendResult.IsSuccess);
     }
 
     [Fact]
-    public async Task SubmitConversationFeedbackAsync_AfterResolved_ShouldPersistRating()
+    public async Task SubmitConversationFeedbackAsync_AfterClosed_ShouldPersistRating()
     {
         var store = CreateStore();
 
@@ -444,10 +441,10 @@ public sealed class SupportChatServiceTests
                 CancellationToken.None);
 
             Assert.True(resolveResult.IsSuccess);
-            Assert.Equal("Resolved", resolveResult.Value.Status);
+            Assert.Equal("Closed", resolveResult.Value.Status);
             Assert.True(resolveResult.Value.CanReopen);
-            Assert.False(resolveResult.Value.IsReadOnly);
-            Assert.NotNull(resolveResult.Value.ReopenUntilUtc);
+            Assert.True(resolveResult.Value.IsReadOnly);
+            Assert.Null(resolveResult.Value.ReopenUntilUtc);
         }
 
         await using var feedbackScope = await store.CreateScopeAsync();
@@ -462,7 +459,7 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
-    public async Task UpdateConversationStatusAsync_FromClosedToResolved_ShouldFail()
+    public async Task UpdateConversationStatusAsync_FromClosedToWaitingForUser_ShouldFail()
     {
         var store = CreateStore();
 
@@ -489,7 +486,7 @@ public sealed class SupportChatServiceTests
 
         await using var invalidScope = await store.CreateScopeAsync();
         var invalidResult = await invalidScope.CreateService().UpdateConversationStatusAsync(
-            new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Resolved),
+            new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.WaitingForUser),
             CancellationToken.None);
 
         Assert.True(invalidResult.IsFailure);
@@ -530,15 +527,16 @@ public sealed class SupportChatServiceTests
         var detail = await verificationScope.CreateService().GetUserConversationAsync(userId, CancellationToken.None);
 
         Assert.True(detail.IsSuccess);
-        Assert.Equal("WaitingForSupport", detail.Value.Status);
+        Assert.Equal("New", detail.Value.Status);
         Assert.Null(detail.Value.AssignedAdminId);
-        Assert.Equal(2, detail.Value.Messages.Count);
-        Assert.Equal("Necesito ayuda", detail.Value.Messages[0].Body);
+        var userMessage = Assert.Single(detail.Value.Messages.Where(message => message.SenderType == "User"));
+        Assert.Equal("Necesito ayuda", userMessage.Body);
+        var botReply = Assert.Single(detail.Value.Messages.Where(message => message.SenderType == "Bot"));
         Assert.Equal(
-            "Mensaje recibido. Nuestro equipo de soporte ya recibio tu solicitud y respondera pronto.",
-            detail.Value.Messages[1].Body);
-        Assert.True(detail.Value.Messages[1].IsFromAdmin);
-        Assert.True(detail.Value.Messages[1].IsRead);
+            "Mensaje recibido. Soporte respondera en este chat.",
+            botReply.Body);
+        Assert.True(botReply.IsFromAdmin);
+        Assert.True(botReply.IsRead);
         Assert.Equal(1, detail.Value.AdminUnreadCount);
         Assert.Equal(0, detail.Value.UserUnreadCount);
     }

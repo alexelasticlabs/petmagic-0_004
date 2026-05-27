@@ -24,6 +24,7 @@ import { SupportOptionGroup } from "@/components/support/support-option-group";
 import styles from "@/components/support/support-page.module.css";
 import {
   priorityLabel,
+  sourceLabel,
   statusHint,
   statusLabel,
 } from "@/components/support/support-status-helpers";
@@ -130,9 +131,9 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
   const isConversationClosed = conversation?.status === "Closed";
   const reopenStatusAction =
-    primaryStatusAction?.status === "Open"
+    primaryStatusAction?.status === "New"
       ? primaryStatusAction
-      : (secondaryStatusActions.find((action) => action.status === "Open") ?? null);
+      : (secondaryStatusActions.find((action) => action.status === "New") ?? null);
   const readOnlyComposerTitle = isConversationClosed
     ? locale === "ru"
       ? "Диалог закрыт. Чтобы продолжить, переоткройте обращение."
@@ -169,7 +170,13 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       const tag = (event.target as HTMLElement).tagName;
-      if (event.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA" && !event.metaKey && !event.ctrlKey) {
+      if (
+        event.key === "/" &&
+        tag !== "INPUT" &&
+        tag !== "TEXTAREA" &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
         event.preventDefault();
         searchInputRef.current?.focus();
       }
@@ -396,10 +403,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                       >
                         <div className={styles.rowHeader}>
                           <div className={styles.rowIdentity}>
-                            <span
-                              className={styles.avatar}
-                              aria-hidden="true"
-                            >
+                            <span className={styles.avatar} aria-hidden="true">
                               {initialsFor(item.userDisplayName?.trim() || item.userEmail)}
                             </span>
                             <div className={styles.rowTextStack}>
@@ -433,10 +437,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             <span className={styles.rowSecondaryMeta}>
                               {priorityLabel(item.priority, text)}
                             </span>
-                            <span
-                              className={styles.rowSecondaryMeta}
-                              title={assignedName}
-                            >
+                            <span className={styles.rowSecondaryMeta}>
+                              {sourceLabel(item.source, text)}
+                            </span>
+                            <span className={styles.rowSecondaryMeta} title={assignedName}>
                               {assignedName}
                             </span>
                           </div>
@@ -510,6 +514,8 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                       <span>{statusLabel(conversation.status, text)}</span>
                       <span>•</span>
                       <span>{priorityLabel(conversation.priority, text)}</span>
+                      <span>•</span>
+                      <span>{sourceLabel(conversation.source, text)}</span>
                       <span>•</span>
                       <span>
                         {locale === "ru" ? "Назначен:" : "Assigned:"}{" "}
@@ -658,9 +664,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                   >
                                     <div className={styles.messageAttachmentIcon}>FILE</div>
                                     <div className={styles.messageAttachmentMeta}>
-                                      <strong>
-                                        {message.attachmentFileName ?? message.body}
-                                      </strong>
+                                      <strong>{message.attachmentFileName ?? message.body}</strong>
                                       <span>
                                         {formatFileSize(message.attachmentFileSizeBytes, locale)}
                                       </span>
@@ -671,7 +675,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                   <div className={styles.messageBody}>{message.body}</div>
                                 ) : null}
                                 {message.attachmentUploadStatus &&
-                                  message.attachmentUploadStatus.toLowerCase() !== "uploaded" ? (
+                                message.attachmentUploadStatus.toLowerCase() !== "uploaded" ? (
                                   <div className={styles.messageAttachmentStatusRow}>
                                     <span
                                       className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${message.attachmentUploadStatus.toLowerCase()}`] ?? ""}`}

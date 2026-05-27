@@ -5,11 +5,11 @@ import { adminQueryKeys } from "./admin-query-keys";
 describe("admin-query-keys", () => {
   it("provides stable support inbox root key", () => {
     expect(adminQueryKeys.supportInboxRoot).toEqual(["admin", "support", "inbox"]);
-    expect(adminQueryKeys.supportInbox("Open", "mine")).toEqual([
+    expect(adminQueryKeys.supportInbox("New", "mine")).toEqual([
       "admin",
       "support",
       "inbox",
-      "Open",
+      "New",
       "mine",
     ]);
   });

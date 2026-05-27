@@ -13,6 +13,7 @@ class _SupportConversationViewport extends StatelessWidget {
     required this.onRetryInitialize,
     required this.onQuickActionSelected,
     required this.onOpenImage,
+    required this.onOpenVideo,
     required this.onRetryAttachment,
     required this.formatDayLabel,
     required this.isSameDay,
@@ -30,6 +31,8 @@ class _SupportConversationViewport extends StatelessWidget {
   final ValueChanged<String> onQuickActionSelected;
   final Future<void> Function({required String imageUrl, String? fileName})
   onOpenImage;
+  final Future<void> Function({required String videoUrl, String? fileName})
+  onOpenVideo;
   final Future<void> Function(SupportChatMessage message) onRetryAttachment;
   final String Function(DateTime day) formatDayLabel;
   final bool Function(DateTime a, DateTime b) isSameDay;
@@ -42,51 +45,28 @@ class _SupportConversationViewport extends StatelessWidget {
     final quickActions = [
       _SupportQuickActionData(
         icon: Icons.auto_awesome_rounded,
-        label: text.supportChatQuickActionGeneration,
-        prompt: text.supportChatQuickActionGeneration,
+        label: text.supportHomeTopicGenerationIssue,
+        prompt: text.supportHomeTopicGenerationIssue,
       ),
       _SupportQuickActionData(
-        icon: Icons.credit_card_rounded,
-        label: text.supportChatQuickActionPayment,
-        prompt: text.supportChatQuickActionPayment,
-      ),
-      _SupportQuickActionData(
-        icon: Icons.reply_all_rounded,
-        label: text.supportChatQuickActionRefund,
-        prompt: text.supportChatQuickActionRefund,
+        icon: Icons.token_outlined,
+        label: text.supportHomeTopicTokensNotArrived,
+        prompt: text.supportHomeTopicTokensNotArrived,
       ),
       _SupportQuickActionData(
         icon: Icons.workspace_premium_rounded,
-        label: text.supportChatQuickActionSubscription,
-        prompt: text.supportChatQuickActionSubscription,
+        label: text.supportHomeTopicPremiumIssue,
+        prompt: text.supportHomeTopicPremiumIssue,
       ),
       _SupportQuickActionData(
-        icon: Icons.videocam_rounded,
-        label: text.supportChatQuickActionVideo,
-        prompt: text.supportChatQuickActionVideo,
+        icon: Icons.credit_card_rounded,
+        label: text.supportHomeTopicPaymentRefund,
+        prompt: text.supportHomeTopicPaymentRefund,
       ),
       _SupportQuickActionData(
-        icon: Icons.support_agent_rounded,
-        label: text.supportChatQuickActionTokens,
-        prompt: text.supportChatQuickActionTokens,
-      ),
-    ];
-
-    final faqItems = [
-      _SupportFaqItemData(
-        icon: Icons.image_search_rounded,
-        title: text.supportChatFaqGenerationTitle,
-        body: text.supportChatFaqGenerationBody,
-      ),
-      _SupportFaqItemData(
-        icon: Icons.schedule_rounded,
-        title: text.supportChatFaqResponseTitle,
-        body: text.supportChatFaqResponseBody,
-      ),
-      _SupportFaqItemData(
-        icon: Icons.receipt_long_rounded,
-        title: text.supportChatFaqRefundTitle,
-        body: text.supportChatFaqRefundBody,
+        icon: Icons.help_outline_rounded,
+        label: text.supportHomeTopicOther,
+        prompt: text.supportHomeTopicOther,
       ),
     ];
 
@@ -95,6 +75,31 @@ class _SupportConversationViewport extends StatelessWidget {
     }
 
     if (conversation == null) {
+      if (state.errorMessage == null && !showLoadingFallback) {
+        return RefreshIndicator(
+          onRefresh: onRefresh,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 24),
+                    child: _SupportStarterState(
+                      title: text.supportChatWelcomeTitle,
+                      description: text.supportChatWelcomeBody,
+                      quickActions: quickActions,
+                      onQuickActionSelected: onQuickActionSelected,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }
+
       return LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
@@ -134,9 +139,7 @@ class _SupportConversationViewport extends StatelessWidget {
                   child: _SupportStarterState(
                     title: text.supportChatWelcomeTitle,
                     description: text.supportChatWelcomeBody,
-                    faqTitle: text.supportChatFaqTitle,
                     quickActions: quickActions,
-                    faqItems: faqItems,
                     onQuickActionSelected: onQuickActionSelected,
                   ),
                 ),
@@ -186,13 +189,16 @@ class _SupportConversationViewport extends StatelessWidget {
                   ),
                 if (_isSupportSystemMessage(message))
                   _SupportSystemMessageCard(
-                    message: text.supportChatSystemNoticeBody,
+                    message: message.body.trim().isEmpty
+                        ? text.supportChatSystemNoticeBody
+                        : message.body,
                     createdAtUtc: message.createdAtUtc,
                   )
                 else
                   _MessageBubble(
                     message: message,
                     onOpenImage: onOpenImage,
+                    onOpenVideo: onOpenVideo,
                     onRetryAttachment: () => onRetryAttachment(message),
                   ),
               ],
@@ -217,9 +223,6 @@ class _SupportComposerPanel extends StatelessWidget {
     required this.onShowAttachmentOptions,
     required this.onSendMessage,
     required this.onResolveConversation,
-    required this.onReopenConversation,
-    required this.onCloseConversation,
-    required this.onSubmitFeedback,
   });
 
   final SupportChatState state;
@@ -233,9 +236,6 @@ class _SupportComposerPanel extends StatelessWidget {
   final VoidCallback onShowAttachmentOptions;
   final Future<void> Function() onSendMessage;
   final Future<void> Function() onResolveConversation;
-  final Future<void> Function() onReopenConversation;
-  final Future<void> Function() onCloseConversation;
-  final Future<void> Function(int rating) onSubmitFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -247,19 +247,27 @@ class _SupportComposerPanel extends StatelessWidget {
     final sendingIndex = state.sendingAttachmentIndex;
     final sendingTotal = state.sendingAttachmentTotal;
     final conversation = state.conversation;
-    final isReadOnly = conversation?.isReadOnly ?? false;
+    final normalizedStatus = conversation?.status.trim().toLowerCase();
+    final isReadOnly =
+        (conversation?.isReadOnly ?? false) && normalizedStatus != 'closed';
     final effectiveCanSend = composerCanSend && !isReadOnly;
+    final showResolvePrompt =
+        conversation != null &&
+        normalizedStatus == 'waitingforuser' &&
+        conversation.messages.any(
+          (message) => message.isFromAdmin && !_isSupportSystemMessage(message),
+        );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 6, 16, isKeyboardVisible ? 4 : 8),
+      padding: EdgeInsets.fromLTRB(16, 4, 16, isKeyboardVisible ? 4 : 8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
-        constraints: const BoxConstraints(minHeight: 62),
-        padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+        constraints: const BoxConstraints(minHeight: 54),
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
         decoration: BoxDecoration(
           color: colors.surfaceStrong.withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: colors.accent.withValues(
               alpha: composerHasFocus ? 0.2 : 0.08,
@@ -269,14 +277,17 @@ class _SupportComposerPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (conversation != null)
-              _SupportLifecycleActionBar(
-                conversation: conversation,
-                isBusy: state.isSending,
-                onResolve: onResolveConversation,
-                onReopen: onReopenConversation,
-                onClose: onCloseConversation,
-                onSubmitFeedback: onSubmitFeedback,
+            if (showResolvePrompt)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
+                child: _SupportResolutionPrompt(
+                  title: text.supportChatSupportRepliedStatusHint,
+                  resolveLabel: text.supportChatMarkResolvedAction,
+                  keepOpenLabel: text.supportChatKeepOpenAction,
+                  isBusy: state.isSending,
+                  onResolve: onResolveConversation,
+                  onKeepOpen: messageFocusNode.requestFocus,
+                ),
               ),
             if (pendingAttachments.isNotEmpty) ...[
               Padding(
@@ -295,8 +306,8 @@ class _SupportComposerPanel extends StatelessWidget {
                   padding: EdgeInsets.zero,
                   splashRadius: 18,
                   constraints: const BoxConstraints.tightFor(
-                    width: 36,
-                    height: 36,
+                    width: 34,
+                    height: 34,
                   ),
                   onPressed: state.isSending || isReadOnly
                       ? null
@@ -318,7 +329,7 @@ class _SupportComposerPanel extends StatelessWidget {
                     textInputAction: TextInputAction.newline,
                     style: TextStyle(
                       color: colors.textStrong,
-                      fontSize: 15.5,
+                      fontSize: 14,
                       height: 1.28,
                       fontWeight: FontWeight.w400,
                     ),
@@ -328,7 +339,7 @@ class _SupportComposerPanel extends StatelessWidget {
                           : text.supportChatInputHint,
                       hintStyle: const TextStyle(
                         color: _supportComposerHintColor,
-                        fontSize: 15.5,
+                        fontSize: 14,
                         height: 1.3,
                         fontWeight: FontWeight.w400,
                       ),
@@ -337,7 +348,7 @@ class _SupportComposerPanel extends StatelessWidget {
                       focusedBorder: InputBorder.none,
                       disabledBorder: InputBorder.none,
                       isDense: true,
-                      contentPadding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
+                      contentPadding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
                       filled: false,
                     ),
                     textAlignVertical: TextAlignVertical.center,
@@ -366,13 +377,13 @@ class _SupportComposerPanel extends StatelessWidget {
                               ? null
                               : onSendMessage,
                           child: SizedBox(
-                            width: 42,
-                            height: 42,
+                            width: 38,
+                            height: 38,
                             child: Center(
                               child: state.isSending
                                   ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
+                                      width: 16,
+                                      height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         valueColor:
@@ -383,7 +394,7 @@ class _SupportComposerPanel extends StatelessWidget {
                                     )
                                   : const Icon(
                                       Icons.send_rounded,
-                                      size: 19,
+                                      size: 17,
                                       color: Colors.white,
                                     ),
                             ),
@@ -431,19 +442,6 @@ class _SupportComposerPanel extends StatelessWidget {
                 ),
               ),
             ],
-            Padding(
-              padding: const EdgeInsets.fromLTRB(6, 0, 8, 0),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  _SupportComposerInfoChip(
-                    icon: Icons.photo_library_outlined,
-                    label: text.supportChatComposerAttachmentChip,
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -451,11 +449,22 @@ class _SupportComposerPanel extends StatelessWidget {
   }
 }
 
-class _SupportComposerInfoChip extends StatelessWidget {
-  const _SupportComposerInfoChip({required this.icon, required this.label});
+class _SupportResolutionPrompt extends StatelessWidget {
+  const _SupportResolutionPrompt({
+    required this.title,
+    required this.resolveLabel,
+    required this.keepOpenLabel,
+    required this.isBusy,
+    required this.onResolve,
+    required this.onKeepOpen,
+  });
 
-  final IconData icon;
-  final String label;
+  final String title;
+  final String resolveLabel;
+  final String keepOpenLabel;
+  final bool isBusy;
+  final Future<void> Function() onResolve;
+  final VoidCallback onKeepOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -464,23 +473,42 @@ class _SupportComposerInfoChip extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.surface.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colors.border.withValues(alpha: 0.72)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 12, color: colors.textMuted),
-            const SizedBox(width: 4),
             Text(
-              label,
+              title,
               style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 10.5,
+                color: colors.textSoft,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w700,
               ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _SupportPromptButton(
+                  icon: Icons.check_rounded,
+                  label: resolveLabel,
+                  isBusy: isBusy,
+                  onPressed: onResolve,
+                ),
+                _SupportPromptButton(
+                  icon: Icons.edit_outlined,
+                  label: keepOpenLabel,
+                  isBusy: isBusy,
+                  onPressed: () async {
+                    onKeepOpen();
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -489,137 +517,8 @@ class _SupportComposerInfoChip extends StatelessWidget {
   }
 }
 
-class _SupportLifecycleActionBar extends StatelessWidget {
-  const _SupportLifecycleActionBar({
-    required this.conversation,
-    required this.isBusy,
-    required this.onResolve,
-    required this.onReopen,
-    required this.onClose,
-    required this.onSubmitFeedback,
-  });
-
-  final SupportChatConversation conversation;
-  final bool isBusy;
-  final Future<void> Function() onResolve;
-  final Future<void> Function() onReopen;
-  final Future<void> Function() onClose;
-  final Future<void> Function(int rating) onSubmitFeedback;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final normalizedStatus = conversation.status.trim().toLowerCase();
-    final isResolved = normalizedStatus == 'resolved';
-    final isClosed = normalizedStatus == 'closed';
-    final canResolve =
-        !conversation.isReadOnly &&
-        !isResolved &&
-        !isClosed &&
-        conversation.messages.isNotEmpty;
-    final canReopen = conversation.canReopen;
-    final canClose = isResolved && conversation.closedAtUtc == null;
-    final showRating = isResolved && conversation.feedbackRating == null;
-    final hasActions = canResolve || canReopen || canClose || showRating;
-
-    if (!hasActions) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surface.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (showRating) ...[
-                Text(
-                  text.supportChatRateTitle,
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 2,
-                  children: List.generate(5, (index) {
-                    final rating = index + 1;
-                    return IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 32,
-                        height: 32,
-                      ),
-                      onPressed: isBusy ? null : () => onSubmitFeedback(rating),
-                      icon: const Icon(
-                        Icons.star_rounded,
-                        size: 22,
-                        color: Color(0xFFFFB84D),
-                      ),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 4),
-              ] else if (conversation.feedbackRating != null) ...[
-                Text(
-                  text.supportChatRatedLabel(conversation.feedbackRating!),
-                  style: TextStyle(
-                    color: colors.textSoft,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  if (canResolve)
-                    _SupportLifecycleButton(
-                      icon: Icons.check_rounded,
-                      label: text.supportChatMarkResolvedAction,
-                      isBusy: isBusy,
-                      onPressed: onResolve,
-                    ),
-                  if (canReopen)
-                    _SupportLifecycleButton(
-                      icon: Icons.refresh_rounded,
-                      label: text.supportChatReopenAction,
-                      isBusy: isBusy,
-                      onPressed: onReopen,
-                    ),
-                  if (canClose)
-                    _SupportLifecycleButton(
-                      icon: Icons.archive_outlined,
-                      label: text.supportChatArchiveAction,
-                      isBusy: isBusy,
-                      onPressed: onClose,
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportLifecycleButton extends StatelessWidget {
-  const _SupportLifecycleButton({
+class _SupportPromptButton extends StatelessWidget {
+  const _SupportPromptButton({
     required this.icon,
     required this.label,
     required this.isBusy,
@@ -638,6 +537,7 @@ class _SupportLifecycleButton extends StatelessWidget {
     return TextButton.icon(
       style: TextButton.styleFrom(
         visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         foregroundColor: _supportSecondaryGreen,
         textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
@@ -645,7 +545,7 @@ class _SupportLifecycleButton extends StatelessWidget {
         backgroundColor: colors.surfaceStrong.withValues(alpha: 0.72),
       ),
       onPressed: isBusy ? null : onPressed,
-      icon: Icon(icon, size: 15),
+      icon: Icon(icon, size: 14),
       label: Text(label, overflow: TextOverflow.ellipsis),
     );
   }

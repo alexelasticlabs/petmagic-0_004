@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,14 +10,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 part 'widgets/support_chat_actions.part.dart';
 part 'widgets/support_chat_composer.part.dart';
@@ -47,7 +49,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   late final SupportChatController _controller;
   Timer? _loadingFallbackTimer;
   bool _showLoadingFallback = false;
-  bool _showSecurityBanner = true;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
   List<_PendingSupportAttachment> _pendingAttachments = const [];
@@ -97,7 +98,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     _scheduleLoadingFallbackIfNeeded();
     _messageController.addListener(_handleComposerChanged);
     _messageFocusNode.addListener(_handleComposerFocusChanged);
-    _scrollController.addListener(_handleMessageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -112,27 +112,11 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     _clearLoadingFallback();
     _messageController.removeListener(_handleComposerChanged);
     _messageFocusNode.removeListener(_handleComposerFocusChanged);
-    _scrollController.removeListener(_handleMessageScroll);
     _controller.stop();
     _messageController.dispose();
     _scrollController.dispose();
     _messageFocusNode.dispose();
     super.dispose();
-  }
-
-  void _handleMessageScroll() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
-
-    final shouldShow = _scrollController.offset < 24;
-    if (shouldShow == _showSecurityBanner || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _showSecurityBanner = shouldShow;
-    });
   }
 
   void _prefillComposer(String value) {
@@ -200,6 +184,15 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     )._openImageFullscreenImpl(imageUrl: imageUrl, fileName: fileName);
   }
 
+  Future<void> _openVideoFullscreen({
+    required String videoUrl,
+    String? fileName,
+  }) {
+    return _SupportChatPageActions(
+      this,
+    )._openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
@@ -246,7 +239,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     _keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomNavInset = _keyboardInset > 0
         ? 0.0
-        : petMagicScrollableBottomInset(context);
+        : MediaQuery.viewPaddingOf(context).bottom;
     final isWaitingForInitialConversation = _isWaitingForInitialConversation(
       state,
     );
@@ -263,37 +256,28 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
               child: Column(
                 children: [
                   _SupportHeader(
-                    title:
-                        conversation?.assignedAdminDisplayName
-                                ?.trim()
-                                .isNotEmpty ==
-                            true
-                        ? conversation!.assignedAdminDisplayName!
-                        : text.supportChatTeamTitle,
+                    title: text.supportChatTeamTitle,
                     subtitle: text.supportChatTeamStatus,
-                    onBack: () => context.pop(),
+                    onBack: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go(ProfilePage.routePath);
+                      }
+                    },
                   ),
                   if (conversation != null)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: _SupportConversationStatusStrip(
                         conversation: conversation,
-                        messages: messages,
                       ),
                     ),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: messages.isEmpty || _showSecurityBanner
-                        ? Padding(
-                            key: const ValueKey('security-banner-visible'),
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                            child: _SupportSecurityCard(
-                              title: text.supportChatSecureTitle,
-                            ),
-                          )
-                        : const SizedBox(
-                            key: ValueKey('security-banner-hidden'),
-                          ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                    child: _SupportSecurityCard(
+                      title: text.supportChatSecureTitle,
+                    ),
                   ),
                   Expanded(
                     child: Padding(
@@ -314,6 +298,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                         },
                         onQuickActionSelected: _prefillComposer,
                         onOpenImage: _openImageFullscreen,
+                        onOpenVideo: _openVideoFullscreen,
                         onRetryAttachment: _retryAttachmentForMessage,
                         formatDayLabel: _formatDayLabel,
                         isSameDay: _isSameDay,
@@ -332,9 +317,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     onShowAttachmentOptions: _showAttachmentOptions,
                     onSendMessage: () => _sendCurrentMessage(localeTag),
                     onResolveConversation: _controller.resolveConversation,
-                    onReopenConversation: _controller.reopenConversation,
-                    onCloseConversation: _controller.closeConversation,
-                    onSubmitFeedback: _controller.submitFeedback,
                   ),
                 ],
               ),

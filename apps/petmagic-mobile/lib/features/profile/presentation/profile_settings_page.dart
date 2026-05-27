@@ -11,7 +11,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart'
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_home_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 class ProfileSettingsPage extends ConsumerWidget {
@@ -201,7 +201,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                     title: text.profileSettingsSupportTitle,
                     subtitle: text.profileSettingsSupportSubtitle,
                     showDivider: false,
-                    onTap: () => context.push(SupportHomePage.routePath),
+                    onTap: () => context.push(SupportChatPage.routePath),
                   ),
                 ],
               ),

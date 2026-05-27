@@ -343,13 +343,14 @@ export type AdminRedeemCode = {
   redemptions: AdminRedeemCodeRedemption[];
 };
 
-export type SupportConversationStatus =
-  | "Open"
-  | "InProgress"
-  | "WaitingForSupport"
-  | "WaitingForUser"
-  | "Resolved"
-  | "Closed";
+export type SupportConversationStatus = "New" | "InProgress" | "WaitingForUser" | "Closed";
+
+export type SupportConversationSource =
+  | "MobileChat"
+  | "MobileAssistant"
+  | "AdminCreated"
+  | "System"
+  | "Direct";
 
 export type SupportConversationPriority = "Low" | "Normal" | "High";
 
@@ -383,7 +384,7 @@ export type AdminSupportConversationSummary = {
   assignedAdminDisplayName?: string | null;
   status: SupportConversationStatus;
   priority: SupportConversationPriority;
-  source: string;
+  source: SupportConversationSource;
   assistantScenario?: string | null;
   lastMessagePreview?: string | null;
   lastMessageAtUtc?: string | null;
@@ -408,7 +409,7 @@ export type AdminSupportConversation = {
   assignedAdminDisplayName?: string | null;
   status: SupportConversationStatus;
   priority: SupportConversationPriority;
-  source: string;
+  source: SupportConversationSource;
   assistantScenario?: string | null;
   relatedGenerationId?: string | null;
   relatedPaymentId?: string | null;

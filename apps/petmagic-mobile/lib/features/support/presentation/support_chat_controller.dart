@@ -116,7 +116,7 @@ class SupportChatController extends Notifier<SupportChatState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      final conversation = await _repository.openConversation();
+      final conversation = await _repository.getConversation();
       state = state.copyWith(
         isLoading: false,
         conversation: conversation,
@@ -125,7 +125,16 @@ class SupportChatController extends Notifier<SupportChatState> {
       await _markReadIfNeeded(conversation);
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
-      state = state.copyWith(isLoading: false, errorMessage: error.message);
+      if (_isConversationNotFound(error.message)) {
+        state = state.copyWith(
+          isLoading: false,
+          clearConversation: true,
+          clearError: true,
+        );
+        _resumePendingRealtimeRefreshIfNeeded();
+      } else {
+        state = state.copyWith(isLoading: false, errorMessage: error.message);
+      }
     } on Object {
       state = state.copyWith(
         isLoading: false,
@@ -141,10 +150,11 @@ class SupportChatController extends Notifier<SupportChatState> {
   Future<void> sendMessage(String value, {required String localeTag}) async {
     final body = value.trim();
     final conversation = state.conversation;
-    if (body.isEmpty ||
-        conversation == null ||
-        conversation.isReadOnly ||
-        state.isSending) {
+    if (body.isEmpty || state.isSending) {
+      return;
+    }
+
+    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
       return;
     }
 
@@ -155,18 +165,32 @@ class SupportChatController extends Notifier<SupportChatState> {
     );
 
     try {
-      final message = await _repository.sendMessage(
-        conversationId: conversation.conversationId,
-        body: body,
-        localeTag: localeTag,
-      );
+      if (conversation == null) {
+        final createdConversation = await _repository.openConversation(
+          initialMessage: body,
+          source: 'MobileChat',
+        );
+        state = state.copyWith(
+          isSending: false,
+          conversation: createdConversation,
+          clearError: true,
+          clearSendProgress: true,
+        );
+        await _markReadIfNeeded(createdConversation);
+      } else {
+        final message = await _repository.sendMessage(
+          conversationId: conversation.conversationId,
+          body: body,
+          localeTag: localeTag,
+        );
 
-      state = state.copyWith(
-        isSending: false,
-        conversation: _appendOutgoingMessage(conversation, message),
-        clearError: true,
-        clearSendProgress: true,
-      );
+        state = state.copyWith(
+          isSending: false,
+          conversation: _appendOutgoingMessage(conversation, message),
+          clearError: true,
+          clearSendProgress: true,
+        );
+      }
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
       state = state.copyWith(
@@ -204,8 +228,12 @@ class SupportChatController extends Notifier<SupportChatState> {
     int? attachmentBatchIndex,
     int? attachmentBatchTotal,
   }) async {
-    final conversation = state.conversation;
-    if (conversation == null || conversation.isReadOnly || state.isSending) {
+    var conversation = state.conversation;
+    if (state.isSending) {
+      return false;
+    }
+
+    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
       return false;
     }
 
@@ -218,6 +246,11 @@ class SupportChatController extends Notifier<SupportChatState> {
     );
 
     try {
+      if (conversation == null) {
+        conversation = await _repository.openConversation(source: 'MobileChat');
+        state = state.copyWith(conversation: conversation);
+      }
+
       final message = await _repository.sendAttachment(
         conversationId: conversation.conversationId,
         filePath: filePath,
@@ -353,7 +386,7 @@ class SupportChatController extends Notifier<SupportChatState> {
     SupportChatMessage message,
   ) {
     return conversation.copyWith(
-      status: 'WaitingForSupport',
+      status: 'New',
       userUnreadCount: 0,
       adminUnreadCount: conversation.adminUnreadCount + 1,
       updatedAtUtc: message.createdAtUtc,
@@ -443,11 +476,20 @@ class SupportChatController extends Notifier<SupportChatState> {
       }
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        errorMessage: error.message,
-      );
+      if (_isConversationNotFound(error.message)) {
+        state = state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          clearConversation: true,
+          clearError: true,
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          errorMessage: error.message,
+        );
+      }
     }
   }
 
@@ -523,6 +565,31 @@ class SupportChatController extends Notifier<SupportChatState> {
       return 'image/webp';
     }
 
+    if (lowerPath.endsWith('.mp4') || lowerPath.endsWith('.m4v')) {
+      return 'video/mp4';
+    }
+
+    if (lowerPath.endsWith('.mov') || lowerPath.endsWith('.qt')) {
+      return 'video/quicktime';
+    }
+
+    if (lowerPath.endsWith('.webm')) {
+      return 'video/webm';
+    }
+
     return 'application/octet-stream';
+  }
+
+  bool _isConversationNotFound(String message) {
+    return message.toLowerCase().contains('support.conversation_not_found');
+  }
+
+  bool _isConversationReadOnlyForUser(SupportChatConversation conversation) {
+    final normalizedStatus = conversation.status.trim().toLowerCase();
+    if (normalizedStatus == 'closed') {
+      return false;
+    }
+
+    return conversation.isReadOnly;
   }
 }

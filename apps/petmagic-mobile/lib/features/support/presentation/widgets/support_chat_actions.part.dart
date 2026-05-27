@@ -1,7 +1,7 @@
 part of '../support_chat_page.dart';
 
 extension _SupportChatPageActions on _SupportChatPageState {
-  Future<void> _pickCameraAttachmentImpl() async {
+  Future<void> _pickCameraPhotoAttachmentImpl() async {
     if (!_canAddMoreAttachments()) {
       return;
     }
@@ -15,7 +15,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
-    final attachment = await _validatePickedImageAttachmentImpl(picked);
+    final attachment = await _validatePickedAttachmentImpl(picked);
     if (attachment == null || !mounted) {
       return;
     }
@@ -25,7 +25,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
     });
   }
 
-  Future<void> _pickGalleryAttachmentsImpl() async {
+  Future<void> _pickGalleryPhotoAttachmentsImpl() async {
     if (!_canAddMoreAttachments()) {
       return;
     }
@@ -42,7 +42,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
 
     final nextAttachments = <_PendingSupportAttachment>[];
     for (final picked in pickedImages.take(remainingSlots)) {
-      final attachment = await _validatePickedImageAttachmentImpl(picked);
+      final attachment = await _validatePickedAttachmentImpl(picked);
       if (attachment != null) {
         nextAttachments.add(attachment);
       }
@@ -61,6 +61,49 @@ extension _SupportChatPageActions on _SupportChatPageState {
     });
   }
 
+  Future<void> _pickCameraVideoAttachmentImpl() async {
+    if (!_canAddMoreAttachments()) {
+      return;
+    }
+
+    final picked = await _imagePicker.pickVideo(
+      source: ImageSource.camera,
+      maxDuration: const Duration(seconds: 60),
+    );
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    final attachment = await _validatePickedAttachmentImpl(picked);
+    if (attachment == null || !mounted) {
+      return;
+    }
+
+    _applyState(() {
+      _pendingAttachments = [..._pendingAttachments, attachment];
+    });
+  }
+
+  Future<void> _pickGalleryVideoAttachmentImpl() async {
+    if (!_canAddMoreAttachments()) {
+      return;
+    }
+
+    final picked = await _imagePicker.pickVideo(source: ImageSource.gallery);
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    final attachment = await _validatePickedAttachmentImpl(picked);
+    if (attachment == null || !mounted) {
+      return;
+    }
+
+    _applyState(() {
+      _pendingAttachments = [..._pendingAttachments, attachment];
+    });
+  }
+
   bool _canAddMoreAttachments() {
     if (_pendingAttachments.length < _supportAttachmentMaxCount) {
       return true;
@@ -76,14 +119,21 @@ extension _SupportChatPageActions on _SupportChatPageState {
     return false;
   }
 
-  Future<_PendingSupportAttachment?> _validatePickedImageAttachmentImpl(
+  Future<_PendingSupportAttachment?> _validatePickedAttachmentImpl(
     XFile picked,
   ) async {
     final contentType = _controller.resolveContentTypeForUpload(picked.path);
     final normalizedType = contentType.toLowerCase();
-    if (normalizedType != 'image/jpeg' &&
-        normalizedType != 'image/png' &&
-        normalizedType != 'image/webp') {
+    final isAllowedImage =
+        normalizedType == 'image/jpeg' ||
+        normalizedType == 'image/png' ||
+        normalizedType == 'image/webp';
+    final isAllowedVideo =
+        normalizedType == 'video/mp4' ||
+        normalizedType == 'video/quicktime' ||
+        normalizedType == 'video/webm';
+
+    if (!isAllowedImage && !isAllowedVideo) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -122,6 +172,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
       filePath: picked.path,
       fileName: picked.name,
       contentType: contentType,
+      isVideo: isAllowedVideo,
     );
   }
 
@@ -165,7 +216,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        text.supportChatAddPhotoTitle,
+                        text.supportChatAddAttachmentTitle,
                         style: TextStyle(
                           color: colors.textStrong,
                           fontSize: 15,
@@ -185,7 +236,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
                     ),
                     onTap: () => Navigator.of(
                       sheetContext,
-                    ).pop(_SupportAttachmentAction.camera),
+                    ).pop(_SupportAttachmentAction.cameraPhoto),
                   ),
                   ListTile(
                     leading: const Icon(
@@ -193,12 +244,38 @@ extension _SupportChatPageActions on _SupportChatPageState {
                       color: _supportComposerIconColor,
                     ),
                     title: Text(
-                      text.supportChatChooseGalleryAction,
+                      text.supportChatChoosePhotosAction,
                       style: TextStyle(color: colors.textStrong),
                     ),
                     onTap: () => Navigator.of(
                       sheetContext,
-                    ).pop(_SupportAttachmentAction.gallery),
+                    ).pop(_SupportAttachmentAction.galleryPhotos),
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.videocam_outlined,
+                      color: _supportComposerIconColor,
+                    ),
+                    title: Text(
+                      text.supportChatRecordVideoAction,
+                      style: TextStyle(color: colors.textStrong),
+                    ),
+                    onTap: () => Navigator.of(
+                      sheetContext,
+                    ).pop(_SupportAttachmentAction.cameraVideo),
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.video_library_outlined,
+                      color: _supportComposerIconColor,
+                    ),
+                    title: Text(
+                      text.supportChatChooseVideoAction,
+                      style: TextStyle(color: colors.textStrong),
+                    ),
+                    onTap: () => Navigator.of(
+                      sheetContext,
+                    ).pop(_SupportAttachmentAction.galleryVideo),
                   ),
                   ListTile(
                     leading: Icon(Icons.close_rounded, color: colors.textMuted),
@@ -222,10 +299,14 @@ extension _SupportChatPageActions on _SupportChatPageState {
     }
 
     switch (action) {
-      case _SupportAttachmentAction.camera:
-        await _pickCameraAttachmentImpl();
-      case _SupportAttachmentAction.gallery:
-        await _pickGalleryAttachmentsImpl();
+      case _SupportAttachmentAction.cameraPhoto:
+        await _pickCameraPhotoAttachmentImpl();
+      case _SupportAttachmentAction.galleryPhotos:
+        await _pickGalleryPhotoAttachmentsImpl();
+      case _SupportAttachmentAction.cameraVideo:
+        await _pickCameraVideoAttachmentImpl();
+      case _SupportAttachmentAction.galleryVideo:
+        await _pickGalleryVideoAttachmentImpl();
     }
   }
 
@@ -304,20 +385,57 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 92,
-      maxWidth: 1800,
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: false,
+      allowedExtensions: const [
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'mp4',
+        'm4v',
+        'mov',
+        'webm',
+      ],
     );
-    if (picked == null || !mounted) {
+    final files = picked?.files;
+    if (files == null ||
+        files.isEmpty ||
+        files.first.path == null ||
+        !mounted) {
+      return;
+    }
+    final pickedFile = files.first;
+
+    final filePath = pickedFile.path!;
+    final fileName = pickedFile.name;
+    final contentType = _controller.resolveContentTypeForUpload(filePath);
+    final normalizedType = contentType.toLowerCase();
+    if (normalizedType != 'image/jpeg' &&
+        normalizedType != 'image/png' &&
+        normalizedType != 'image/webp' &&
+        normalizedType != 'video/mp4' &&
+        normalizedType != 'video/quicktime' &&
+        normalizedType != 'video/webm') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _mapSupportError(
+              AppLocalizations.of(context),
+              'support.attachment_content_type_not_allowed',
+            ),
+          ),
+        ),
+      );
       return;
     }
 
     await _controller.retryAttachment(
       messageId: message.messageId,
-      filePath: picked.path,
-      fileName: picked.name,
-      contentType: _controller.resolveContentTypeForUpload(picked.path),
+      filePath: filePath,
+      fileName: fileName,
+      contentType: contentType,
     );
   }
 
@@ -336,6 +454,22 @@ extension _SupportChatPageActions on _SupportChatPageState {
           onShareImage: () =>
               _shareImageImpl(imageUrl: imageUrl, fileName: fileName),
           onOpenOriginal: () => _openAttachmentExternallyImpl(imageUrl),
+        );
+      },
+    );
+  }
+
+  Future<void> _openVideoFullscreenImpl({
+    required String videoUrl,
+    String? fileName,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return _SupportVideoPreviewDialog(
+          videoUrl: videoUrl,
+          fileName: fileName,
+          onOpenOriginal: () => _openAttachmentExternallyImpl(videoUrl),
         );
       },
     );

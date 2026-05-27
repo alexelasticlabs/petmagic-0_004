@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 
 import { AdminStateCard } from "@/components/admin/admin-primitives";
 import styles from "@/components/support/support-page.module.css";
+import { Button } from "@/components/ui/button";
 
 type TimelineCardProps = {
   title: string;
@@ -21,6 +22,8 @@ type SidePanelAsyncStateProps = {
   hasContent: boolean;
   loadingTitle: string;
   errorTitle: string;
+  retryLabel?: string;
+  onRetry?: () => void;
   emptyTitle: string;
   children: ReactNode;
 };
@@ -55,6 +58,8 @@ export function SidePanelAsyncState({
   hasContent,
   loadingTitle,
   errorTitle,
+  retryLabel,
+  onRetry,
   emptyTitle,
   children,
 }: SidePanelAsyncStateProps) {
@@ -63,7 +68,19 @@ export function SidePanelAsyncState({
   }
 
   if (isError) {
-    return <AdminStateCard tone="danger" title={errorTitle} />;
+    return (
+      <AdminStateCard
+        tone="danger"
+        title={errorTitle}
+        action={
+          onRetry && retryLabel ? (
+            <Button variant="secondary" size="sm" onClick={onRetry}>
+              {retryLabel}
+            </Button>
+          ) : null
+        }
+      />
+    );
   }
 
   if (!hasContent) {

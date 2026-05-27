@@ -18,12 +18,15 @@ internal sealed class LocalSupportAttachmentStorage(
     SupportAttachmentStorageOptions options,
     IHostEnvironment hostEnvironment) : ISupportAttachmentStorage
 {
-    private static readonly Dictionary<string, string> AllowedImageContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> AllowedContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ["image/jpeg"] = ".jpg",
         ["image/jpg"] = ".jpg",
         ["image/png"] = ".png",
-        ["image/webp"] = ".webp"
+        ["image/webp"] = ".webp",
+        ["video/mp4"] = ".mp4",
+        ["video/quicktime"] = ".mov",
+        ["video/webm"] = ".webm"
     };
 
     private static readonly Dictionary<string, string> ExtensionContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -31,7 +34,12 @@ internal sealed class LocalSupportAttachmentStorage(
         [".jpg"] = "image/jpeg",
         [".jpeg"] = "image/jpeg",
         [".png"] = "image/png",
-        [".webp"] = "image/webp"
+        [".webp"] = "image/webp",
+        [".mp4"] = "video/mp4",
+        [".m4v"] = "video/mp4",
+        [".mov"] = "video/quicktime",
+        [".qt"] = "video/quicktime",
+        [".webm"] = "video/webm"
     };
 
     public async Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
@@ -198,7 +206,7 @@ internal sealed class LocalSupportAttachmentStorage(
         }
         else
         {
-            if (!AllowedImageContentTypeExtensions.TryGetValue(normalizedContentType, out var mappedExtension)
+            if (!AllowedContentTypeExtensions.TryGetValue(normalizedContentType, out var mappedExtension)
                 || string.IsNullOrWhiteSpace(mappedExtension))
             {
                 return false;
@@ -211,7 +219,7 @@ internal sealed class LocalSupportAttachmentStorage(
             }
         }
 
-        if (!MatchesImageSignature(normalizedContentType, attachmentContent))
+        if (!MatchesFileSignature(normalizedContentType, attachmentContent))
         {
             signatureMismatch = true;
             return false;
@@ -220,9 +228,9 @@ internal sealed class LocalSupportAttachmentStorage(
         return true;
     }
 
-    private static bool MatchesImageSignature(string normalizedContentType, byte[]? attachmentContent)
+    private static bool MatchesFileSignature(string normalizedContentType, byte[]? attachmentContent)
     {
-        if (attachmentContent is null || attachmentContent.Length < 12)
+        if (attachmentContent is null || attachmentContent.Length < 4)
         {
             return false;
         }
@@ -251,6 +259,16 @@ internal sealed class LocalSupportAttachmentStorage(
                 && attachmentContent[9] == 0x45
                 && attachmentContent[10] == 0x42
                 && attachmentContent[11] == 0x50,
+            "video/mp4" or "video/quicktime" => attachmentContent.Length >= 12
+                && attachmentContent[4] == 0x66
+                && attachmentContent[5] == 0x74
+                && attachmentContent[6] == 0x79
+                && attachmentContent[7] == 0x70,
+            "video/webm" => attachmentContent.Length >= 4
+                && attachmentContent[0] == 0x1A
+                && attachmentContent[1] == 0x45
+                && attachmentContent[2] == 0xDF
+                && attachmentContent[3] == 0xA3,
             _ => false,
         };
     }

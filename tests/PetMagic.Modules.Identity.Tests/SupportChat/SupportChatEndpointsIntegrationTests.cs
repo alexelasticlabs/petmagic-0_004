@@ -54,16 +54,20 @@ public sealed class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Need help with premium", SupportConversationPriority.High));
 
-        Assert.Equal("WaitingForSupport", openResponse.Status);
+        Assert.Equal("New", openResponse.Status);
         Assert.Equal("High", openResponse.Priority);
-        Assert.Single(openResponse.Messages);
+        Assert.Contains(
+            openResponse.Messages,
+            message => message.SenderType == "User" && message.Body == "Need help with premium");
 
         var fetched = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(UserId, "User"),
             "/api/support/conversation");
 
         Assert.Equal(openResponse.ConversationId, fetched.ConversationId);
-        Assert.Equal("Need help with premium", fetched.Messages[0].Body);
+        Assert.Contains(
+            fetched.Messages,
+            message => message.SenderType == "User" && message.Body == "Need help with premium");
 
         using var forbiddenResponse = await application.CreateClient(OtherUserId, "User").PostAsJsonAsync(
             $"/api/support/conversation/{openResponse.ConversationId}/messages",
@@ -91,7 +95,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var conversation = Assert.Single(moderatorInbox);
         Assert.Equal(created.ConversationId, conversation.ConversationId);
-        Assert.Equal("WaitingForSupport", conversation.Status);
+        Assert.Equal("New", conversation.Status);
         Assert.Equal("user@petmagic.test", conversation.UserEmail);
     }
 
@@ -163,9 +167,9 @@ public sealed class SupportChatEndpointsIntegrationTests
         var updated = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
             $"/api/admin/support/conversations/{created.ConversationId}/status",
-            new UpdateSupportConversationStatusRequest("Resolved"));
+            new UpdateSupportConversationStatusRequest("Closed"));
 
-        Assert.Equal("Resolved", updated.Status);
+        Assert.Equal("Closed", updated.Status);
         Assert.Equal(AdminId, updated.AssignedAdminId);
 
         using var markAdminReadResponse = await adminClient.PostAsync($"/api/admin/support/conversations/{created.ConversationId}/read", content: null);
@@ -192,10 +196,12 @@ public sealed class SupportChatEndpointsIntegrationTests
             adminClient,
             $"/api/admin/support/conversations/{created.ConversationId}");
 
-        Assert.Equal("WaitingForSupport", afterReopen.Status);
+        Assert.Equal("New", afterReopen.Status);
         Assert.Equal(1, afterReopen.AdminUnreadCount);
         Assert.Equal(0, afterReopen.UserUnreadCount);
-        Assert.Equal(3, afterReopen.Messages.Count);
+        Assert.Contains(
+            afterReopen.Messages,
+            message => message.SenderType == "System" && message.Body == "Ticket reopened by user message.");
     }
 
     [Fact]
@@ -220,12 +226,51 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         using var invalidTransitionResponse = await adminClient.PutAsJsonAsync(
             $"/api/admin/support/conversations/{created.ConversationId}/status",
-            new UpdateSupportConversationStatusRequest("Resolved"));
+            new UpdateSupportConversationStatusRequest("WaitingForUser"));
 
         Assert.Equal(HttpStatusCode.BadRequest, invalidTransitionResponse.StatusCode);
 
         var body = await invalidTransitionResponse.Content.ReadAsStringAsync();
         Assert.Contains("support.status_transition_invalid", body);
+    }
+
+    [Fact]
+    public async Task UserMessageEndpoint_ShouldReopenClosedConversation_AndAppendSystemEvent()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var adminClient = application.CreateClient(AdminId, "Admin");
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need help", SupportConversationPriority.Normal));
+
+        var closed = await PutAsJsonAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            new UpdateSupportConversationStatusRequest("Closed"));
+
+        Assert.Equal("Closed", closed.Status);
+
+        var reopenedMessage = await PostAsJsonAsync<SupportMessageResponse>(
+            userClient,
+            $"/api/support/conversation/{created.ConversationId}/messages",
+            new SendSupportMessageRequest("Still broken after the last update"));
+
+        Assert.False(reopenedMessage.IsFromAdmin);
+        Assert.Equal("User", reopenedMessage.SenderType);
+
+        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/conversations/{created.ConversationId}");
+
+        Assert.Equal("New", conversation.Status);
+        var reopenedEvent = Assert.Single(
+            conversation.Messages.Where(message =>
+                message.SenderType == "System" && message.Body == "Ticket reopened by user message."));
+        Assert.Equal("Ticket reopened by user message.", reopenedEvent.Body);
     }
 
     [Fact]
@@ -270,6 +315,48 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task UserAttachmentEndpoint_ShouldUploadVideoAndExposeAttachmentMetadata()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need help with uploaded video", SupportConversationPriority.Normal));
+
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("video/mp4");
+        form.Add(fileContent, "file", "issue.mp4");
+        form.Add(new StringContent("Video of the issue"), "body");
+
+        using var response = await userClient.PostAsync(
+            $"/api/support/conversation/{created.ConversationId}/attachments",
+            form);
+
+        await AssertSuccessAsync(response);
+
+        var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
+        Assert.False(message.IsFromAdmin);
+        Assert.Equal("Video of the issue", message.Body);
+        Assert.Equal("issue.mp4", message.AttachmentFileName);
+        Assert.Equal("video/mp4", message.AttachmentContentType);
+        Assert.NotNull(message.AttachmentUrl);
+        Assert.Equal("Uploaded", message.AttachmentUploadStatus);
+        Assert.Null(message.AttachmentUploadErrorCode);
+
+        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(AdminId, "Admin"),
+            $"/api/admin/support/conversations/{created.ConversationId}");
+
+        var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
+        Assert.Equal("issue.mp4", attachmentMessage.AttachmentFileName);
+        Assert.Equal("video/mp4", attachmentMessage.AttachmentContentType);
+        Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
+    }
+
+    [Fact]
     public async Task UserMessageEndpoint_ShouldAppendLocalizedAutomaticReply_ForFirstMessage()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -291,13 +378,14 @@ public sealed class SupportChatEndpointsIntegrationTests
             userClient,
             "/api/support/conversation");
 
-        Assert.Equal(2, conversation.Messages.Count);
-        Assert.Equal("Bonjour", conversation.Messages[0].Body);
+        var userMessage = Assert.Single(conversation.Messages.Where(message => message.SenderType == "User"));
+        Assert.Equal("Bonjour", userMessage.Body);
+        var botMessage = Assert.Single(conversation.Messages.Where(message => message.SenderType == "Bot"));
         Assert.Equal(
-            "Message recu. Notre equipe de support a bien recu votre demande et vous repondra bientot.",
-            conversation.Messages[1].Body);
-        Assert.True(conversation.Messages[1].IsFromAdmin);
-        Assert.True(conversation.Messages[1].IsRead);
+            "Message recu. Le support repondra dans ce chat.",
+            botMessage.Body);
+        Assert.True(botMessage.IsFromAdmin);
+        Assert.True(botMessage.IsRead);
     }
 
     [Fact]
@@ -798,12 +886,15 @@ public sealed class SupportChatEndpointsIntegrationTests
 
     private sealed class FakeSupportAttachmentStorage : ISupportAttachmentStorage
     {
-        private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
         {
             "image/jpeg",
             "image/jpg",
             "image/png",
-            "image/webp"
+            "image/webp",
+            "video/mp4",
+            "video/quicktime",
+            "video/webm"
         };
 
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
@@ -816,13 +907,13 @@ public sealed class SupportChatEndpointsIntegrationTests
             CancellationToken cancellationToken)
         {
             var normalizedContentType = NormalizeContentType(attachment.ContentType);
-            if (!AllowedImageContentTypes.Contains(normalizedContentType))
+            if (!AllowedContentTypes.Contains(normalizedContentType))
             {
                 return Task.FromResult(Result.Failure<StoredSupportAttachmentResponse>(
                     new Error("support.attachment_content_type_not_allowed", "Content type is not allowed.")));
             }
 
-            if (!MatchesImageSignature(normalizedContentType, attachment.Content))
+            if (!MatchesFileSignature(normalizedContentType, attachment.Content))
             {
                 return Task.FromResult(Result.Failure<StoredSupportAttachmentResponse>(
                     new Error("support.attachment_mime_mismatch", "MIME type does not match file signature.")));
@@ -854,7 +945,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             return (separatorIndex >= 0 ? contentType[..separatorIndex] : contentType).Trim();
         }
 
-        private static bool MatchesImageSignature(string normalizedContentType, byte[] payload)
+        private static bool MatchesFileSignature(string normalizedContentType, byte[] payload)
         {
             return normalizedContentType switch
             {
@@ -880,6 +971,16 @@ public sealed class SupportChatEndpointsIntegrationTests
                     && payload[9] == 0x45
                     && payload[10] == 0x42
                     && payload[11] == 0x50,
+                "video/mp4" or "video/quicktime" => payload.Length >= 12
+                    && payload[4] == 0x66
+                    && payload[5] == 0x74
+                    && payload[6] == 0x79
+                    && payload[7] == 0x70,
+                "video/webm" => payload.Length >= 4
+                    && payload[0] == 0x1A
+                    && payload[1] == 0x45
+                    && payload[2] == 0xDF
+                    && payload[3] == 0xA3,
                 _ => false,
             };
         }

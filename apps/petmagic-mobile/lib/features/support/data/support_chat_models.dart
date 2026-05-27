@@ -44,6 +44,9 @@ class SupportChatMessage {
   bool get hasImageAttachment =>
       hasAttachment && (attachmentContentType?.startsWith('image/') ?? false);
 
+  bool get hasVideoAttachment =>
+      hasAttachment && (attachmentContentType?.startsWith('video/') ?? false);
+
   String? get normalizedAttachmentUploadStatus {
     final value = attachmentUploadStatus?.trim();
     if (value == null || value.isEmpty) {
@@ -265,9 +268,9 @@ class SupportChatConversation {
       userDisplayName: json['userDisplayName'] as String?,
       assignedAdminId: json['assignedAdminId'] as String?,
       assignedAdminDisplayName: json['assignedAdminDisplayName'] as String?,
-      status: json['status'] as String? ?? 'Open',
+      status: json['status'] as String? ?? 'New',
       priority: json['priority'] as String? ?? 'Normal',
-      source: json['source'] as String? ?? 'Direct',
+      source: json['source'] as String? ?? 'MobileChat',
       assistantScenario: json['assistantScenario'] as String?,
       relatedGenerationId: json['relatedGenerationId'] as String?,
       relatedPaymentId: json['relatedPaymentId'] as String?,

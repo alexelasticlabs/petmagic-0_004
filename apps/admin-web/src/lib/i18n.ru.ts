@@ -389,26 +389,22 @@ export const ruDictionary: Dictionary = {
   supportAssignmentAll: "Все диалоги",
   supportAssignmentMine: "Только мои",
   supportAssignmentUnassigned: "Без ответственного",
-  supportStatusOpen: "Открыт",
+  supportStatusOpen: "Новый",
   supportStatusInProgress: "В работе",
-  supportStatusWaitingForSupport: "Ждет поддержку",
+  supportStatusWaitingForSupport: "Новый",
   supportStatusWaitingForUser: "Ждет пользователя",
-  supportStatusResolved: "Решен",
+  supportStatusResolved: "Закрыт",
   supportStatusClosed: "Закрыт",
   supportStatusOpenHint:
-    "Диалог ждёт первой реакции поддержки или нового действия со стороны пользователя.",
-  supportStatusInProgressHint:
-    "Диалог взят в работу, оператор ведёт переписку и собирает детали решения.",
-  supportStatusWaitingForSupportHint:
-    "Пользователь написал последним. Диалог требует ответа поддержки.",
+    "Новый тикет из мобильного чата ожидает, пока оператор возьмет его в работу.",
+  supportStatusInProgressHint: "Оператор взял тикет и ведет обработку.",
+  supportStatusWaitingForSupportHint: "Тикет ожидает ответа оператора.",
   supportStatusWaitingForUserHint:
-    "Поддержка ответила. Сейчас ожидается действие или подтверждение от пользователя.",
-  supportStatusResolvedHint:
-    "Решение предложено. Пользователь может переоткрыть диалог в течение 7 дней.",
-  supportStatusClosedHint:
-    "Диалог архивирован и доступен только для просмотра, пока администратор не переоткроет его.",
+    "Оператор ответил. Ждём сообщение пользователя в мобильном чате.",
+  supportStatusResolvedHint: "Тикет закрыт и будет открыт снова новым сообщением пользователя.",
+  supportStatusClosedHint: "Диалог закрыт. Переоткройте, чтобы снова отвечать.",
   supportStatusAutomationHint:
-    "Ответ поддержки переводит диалог в «Ждет пользователя» и назначает текущего администратора, если диалог ещё не закреплён. Сообщение пользователя переводит активный диалог в «Ждет поддержку». После «Решен» пользователь может переоткрыть обращение 7 дней.",
+    "Первое сообщение пользователя в мобильном чате создает тикет со статусом «Новый». «Взять в работу» переводит его в «В работе». Ответ оператора переводит в «Ждет пользователя». Новое сообщение пользователя возвращает «В работе», а закрытый тикет открывается как «Новый».",
   supportBackToInbox: "К очереди",
   supportOpenConversation: "Открыть диалог",
   supportAssignedTo: "Ответственный",
@@ -459,6 +455,11 @@ export const ruDictionary: Dictionary = {
   supportAssistantSourceLabel: "Источник",
   supportAssistantScenarioLabel: "Сценарий",
   supportAssistantMobileLabel: "Мобильный ассистент поддержки",
+  supportSourceMobileChat: "Mobile Chat",
+  supportSourceMobileAssistant: "Mobile Support Assistant",
+  supportSourceAdminCreated: "Создан в админке",
+  supportSourceSystem: "Система",
+  supportSourceUnknown: "Неизвестный источник",
   supportMessagesCount: "Сообщений",
   supportUpdatedLabel: "Обновлен",
   supportPriorityLabel: "Приоритет",
@@ -522,6 +523,8 @@ export const ruDictionary: Dictionary = {
   supportLastPaymentLabel: "Последний платеж",
   supportCountryLabel: "Страна",
   supportLastSeenLabel: "Последняя активность",
-  supportAiContextTitle: "PetMagic AI context",
+  supportAiContextTitle: "Контекст PetMagic",
+  supportContextLoadError: "Не удалось загрузить контекст пользователя.",
+  supportRetryAction: "Повторить",
   supportSearchKeyboardHint: "Нажмите / для поиска",
 };

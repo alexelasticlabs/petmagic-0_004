@@ -19,6 +19,7 @@ import styles from "@/components/support/support-page.module.css";
 import {
   priorityLabel,
   priorityTone,
+  sourceLabel,
   statusLabel,
   toneForStatus,
 } from "@/components/support/support-status-helpers";
@@ -150,9 +151,13 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
                     <AdminBadge tone={priorityTone(conversation.priority)}>
                       {priorityLabel(conversation.priority, text)}
                     </AdminBadge>
+                    <AdminBadge tone="neutral">{sourceLabel(conversation.source, text)}</AdminBadge>
                     {conversation.adminUnreadCount > 0 ? (
                       <span className={styles.unreadDot}>{conversation.adminUnreadCount}</span>
                     ) : null}
+                    <span className={styles.rowSecondaryMeta}>
+                      {statusLabel(conversation.status, text)}
+                    </span>
                     <span className={styles.rowDetailValue}>
                       {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
                     </span>

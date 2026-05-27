@@ -428,6 +428,11 @@ export type Dictionary = {
   supportAssistantSourceLabel: string;
   supportAssistantScenarioLabel: string;
   supportAssistantMobileLabel: string;
+  supportSourceMobileChat: string;
+  supportSourceMobileAssistant: string;
+  supportSourceAdminCreated: string;
+  supportSourceSystem: string;
+  supportSourceUnknown: string;
   supportMessagesCount: string;
   supportUpdatedLabel: string;
   supportPriorityLabel: string;
@@ -492,5 +497,7 @@ export type Dictionary = {
   supportCountryLabel: string;
   supportLastSeenLabel: string;
   supportAiContextTitle: string;
+  supportContextLoadError: string;
+  supportRetryAction: string;
   supportSearchKeyboardHint: string;
 };

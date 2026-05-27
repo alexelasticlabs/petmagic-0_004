@@ -154,4 +154,228 @@ class _SupportImagePreviewDialogState
   }
 }
 
+class _SupportVideoPreviewDialog extends StatefulWidget {
+  const _SupportVideoPreviewDialog({
+    required this.videoUrl,
+    required this.fileName,
+    required this.onOpenOriginal,
+  });
+
+  final String videoUrl;
+  final String? fileName;
+  final Future<void> Function() onOpenOriginal;
+
+  @override
+  State<_SupportVideoPreviewDialog> createState() =>
+      _SupportVideoPreviewDialogState();
+}
+
+class _SupportVideoPreviewDialogState
+    extends State<_SupportVideoPreviewDialog> {
+  VideoPlayerController? _controller;
+  bool _failedToLoad = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  @override
+  void dispose() {
+    unawaited(_controller?.dispose());
+    super.dispose();
+  }
+
+  Future<void> _initialize() async {
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(widget.videoUrl),
+    );
+    _controller = controller;
+    try {
+      await controller.initialize();
+      await controller.seekTo(Duration.zero);
+      if (!mounted || _controller != controller) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {});
+    } on Object {
+      await controller.dispose();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _controller = null;
+        _failedToLoad = true;
+      });
+    }
+  }
+
+  String _formatDuration(Duration value) {
+    final totalSeconds = value.inSeconds;
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final controller = _controller;
+    final isInitialized = controller?.value.isInitialized == true;
+    final duration = isInitialized ? controller!.value.duration : Duration.zero;
+    final position = isInitialized ? controller!.value.position : Duration.zero;
+    final safePosition = position > duration ? duration : position;
+    final isPlaying = isInitialized && controller!.value.isPlaying;
+
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.fileName?.trim().isNotEmpty == true
+                          ? widget.fileName!
+                          : text.supportChatVideoLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => unawaited(widget.onOpenOriginal()),
+                    icon: const Icon(
+                      Icons.open_in_new_rounded,
+                      color: Colors.white,
+                    ),
+                    tooltip: text.supportChatOpenOriginalAction,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: isInitialized
+                      ? controller!.value.aspectRatio
+                      : 16 / 9,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ColoredBox(
+                      color: Colors.black,
+                      child: _failedToLoad
+                          ? const Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.white70,
+                                size: 48,
+                              ),
+                            )
+                          : !isInitialized
+                          ? const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : VideoPlayer(controller!),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (isInitialized)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                child: Column(
+                  children: [
+                    VideoProgressIndicator(
+                      controller!,
+                      allowScrubbing: true,
+                      colors: const VideoProgressColors(
+                        playedColor: Colors.white,
+                        bufferedColor: Colors.white54,
+                        backgroundColor: Colors.white24,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text(
+                          _formatDuration(safePosition),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () async {
+                            if (!isInitialized) {
+                              return;
+                            }
+                            if (controller!.value.position >=
+                                controller.value.duration) {
+                              await controller.seekTo(Duration.zero);
+                            }
+                            if (controller.value.isPlaying) {
+                              await controller.pause();
+                            } else {
+                              await controller.play();
+                            }
+                            if (mounted) {
+                              setState(() {});
+                            }
+                          },
+                          icon: Icon(
+                            isPlaying
+                                ? Icons.pause_circle_filled_rounded
+                                : Icons.play_circle_fill_rounded,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          _formatDuration(duration),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 enum _SupportImagePreviewAction { save, share, openOriginal }

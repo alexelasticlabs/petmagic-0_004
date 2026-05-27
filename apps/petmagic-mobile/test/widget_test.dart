@@ -689,6 +689,49 @@ void main() {
   });
 
   test(
+    'support chat controller creates conversation on first message',
+    () async {
+      final supportRepository = _FakeSupportChatRepository(
+        hasConversation: false,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWith(
+            (ref) => supportRepository,
+          ),
+          supportChatRealtimeClientProvider.overrideWith(
+            (ref) => const _FakeSupportChatRealtimeClient(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+      await controller.initialize();
+      expect(
+        container.read(supportChatControllerProvider).conversation,
+        isNull,
+      );
+
+      await controller.sendMessage('Need help with tokens', localeTag: 'en');
+
+      final state = container.read(supportChatControllerProvider);
+      expect(supportRepository.openConversationCalls, 1);
+      expect(
+        supportRepository.lastOpenedInitialMessage,
+        'Need help with tokens',
+      );
+      expect(state.conversation, isNotNull);
+      expect(
+        state.conversation?.messages.any(
+          (message) => message.body == 'Need help with tokens',
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
     'support chat controller clears loading state on unexpected error',
     () async {
       final supportRepository = _ThrowingSupportChatRepository();
@@ -794,10 +837,13 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('Your conversation is secure'), findsOneWidget);
+    expect(
+      find.text('Your conversation is protected. We use it only for support.'),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.shield_rounded), findsOneWidget);
     expect(find.text('PetMagic Support'), findsWidgets);
-    expect(find.text('Average response time: under 24 hours'), findsWidgets);
+    expect(find.text('We usually reply within 24 hours'), findsWidgets);
     expect(find.byIcon(Icons.attach_file_rounded), findsOneWidget);
   });
 
@@ -837,10 +883,13 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to PetMagic support'), findsOneWidget);
+    expect(
+      find.text('Hello! Describe your issue and we will help.'),
+      findsOneWidget,
+    );
     expect(find.text('Issue with image generation'), findsOneWidget);
-    expect(find.text('Payment problem'), findsOneWidget);
-    expect(find.text('FAQ'), findsOneWidget);
+    expect(find.text('Payment / Refund'), findsOneWidget);
+    expect(find.text('Tokens did not arrive'), findsOneWidget);
   });
 
   test('app preferences controller persists theme and locale', () async {
@@ -1379,11 +1428,17 @@ class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
 }
 
 class _FakeSupportChatRepository extends SupportChatRepository {
-  _FakeSupportChatRepository({this.emptyConversation = false})
-    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+  _FakeSupportChatRepository({
+    this.emptyConversation = false,
+    bool hasConversation = true,
+  }) : _hasConversation = hasConversation,
+       super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   final bool emptyConversation;
+  bool _hasConversation;
   String? lastSentBody;
+  int openConversationCalls = 0;
+  String? lastOpenedInitialMessage;
   late SupportChatConversation _conversation = SupportChatConversation(
     conversationId: 'conversation-1',
     initiatorUserId: 'user-1',
@@ -1393,6 +1448,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
     assignedAdminDisplayName: 'PetMagic Support',
     status: 'Open',
     priority: 'Normal',
+    source: 'Direct',
     userUnreadCount: 1,
     adminUnreadCount: 0,
     createdAtUtc: DateTime.utc(2026, 1, 1, 10),
@@ -1407,6 +1463,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
               senderUserId: 'admin-1',
               senderDisplayName: 'PetMagic Support',
               isFromAdmin: true,
+              senderType: 'Admin',
               body: 'How can we help today?',
               isRead: false,
               createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
@@ -1416,13 +1473,67 @@ class _FakeSupportChatRepository extends SupportChatRepository {
 
   @override
   Future<SupportChatConversation> openConversation({
+    String source = 'Direct',
+    String? assistantScenario,
     String? initialMessage,
+    String? relatedGenerationId,
+    String? relatedPaymentId,
+    String? relatedSubscriptionId,
   }) async {
+    openConversationCalls += 1;
+    lastOpenedInitialMessage = initialMessage;
+    if (!_hasConversation) {
+      _hasConversation = true;
+      final now = DateTime.utc(2026, 1, 1, 10, 10);
+      final initialMessages = <SupportChatMessage>[];
+      final trimmedInitial = initialMessage?.trim() ?? '';
+      if (trimmedInitial.isNotEmpty) {
+        initialMessages.add(
+          SupportChatMessage(
+            messageId: 'message-2',
+            conversationId: 'conversation-1',
+            senderUserId: 'user-1',
+            senderDisplayName: 'Pet Parent',
+            isFromAdmin: false,
+            senderType: 'User',
+            body: trimmedInitial,
+            isRead: false,
+            createdAtUtc: now,
+          ),
+        );
+      }
+
+      _conversation = SupportChatConversation(
+        conversationId: 'conversation-1',
+        initiatorUserId: 'user-1',
+        userEmail: 'pet@example.com',
+        userDisplayName: 'Pet Parent',
+        assignedAdminId: 'admin-1',
+        assignedAdminDisplayName: 'PetMagic Support',
+        status: initialMessages.isEmpty ? 'Open' : 'WaitingForSupport',
+        priority: 'Normal',
+        source: source,
+        userUnreadCount: 0,
+        adminUnreadCount: initialMessages.isEmpty ? 0 : 1,
+        createdAtUtc: DateTime.utc(2026, 1, 1, 10),
+        updatedAtUtc: now,
+        lastMessageAtUtc: initialMessages.isEmpty ? null : now,
+        messages: initialMessages,
+      );
+      return _conversation;
+    }
+
     return _conversation;
   }
 
   @override
   Future<SupportChatConversation> getConversation() async {
+    if (!_hasConversation) {
+      throw const AppException(
+        'support.conversation_not_found',
+        statusCode: 404,
+      );
+    }
     return _conversation;
   }
 
@@ -1432,6 +1543,13 @@ class _FakeSupportChatRepository extends SupportChatRepository {
     required String body,
     required String localeTag,
   }) async {
+    if (!_hasConversation) {
+      throw const AppException(
+        'support.conversation_not_found',
+        statusCode: 404,
+      );
+    }
+
     lastSentBody = body;
     final message = SupportChatMessage(
       messageId: 'message-2',
@@ -1439,6 +1557,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
       senderUserId: 'user-1',
       senderDisplayName: 'Pet Parent',
       isFromAdmin: false,
+      senderType: 'User',
       body: body,
       isRead: false,
       createdAtUtc: DateTime.utc(2026, 1, 1, 10, 10),
@@ -1477,9 +1596,7 @@ class _ThrowingSupportChatRepository extends SupportChatRepository {
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   @override
-  Future<SupportChatConversation> openConversation({
-    String? initialMessage,
-  }) async {
+  Future<SupportChatConversation> getConversation() async {
     throw Exception('unexpected support failure');
   }
 }
@@ -1489,9 +1606,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   @override
-  Future<SupportChatConversation> openConversation({
-    String? initialMessage,
-  }) async {
+  Future<SupportChatConversation> getConversation() async {
     return Completer<SupportChatConversation>().future;
   }
 }

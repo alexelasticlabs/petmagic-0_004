@@ -2745,7 +2745,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatSecureTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your conversation is secure'**
+  /// **'Your conversation is protected. We use it only for support.'**
   String get supportChatSecureTitle;
 
   /// No description provided for @supportChatSecureSubtitle.
@@ -2763,7 +2763,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatTeamStatus.
   ///
   /// In en, this message translates to:
-  /// **'Average response time: under 24 hours'**
+  /// **'We usually reply within 24 hours'**
   String get supportChatTeamStatus;
 
   /// No description provided for @supportChatTodayLabel.
@@ -2775,7 +2775,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Describe the issue, question or request...'**
+  /// **'Describe the issue...'**
   String get supportChatInputHint;
 
   /// No description provided for @supportChatSendAction.
@@ -2799,13 +2799,13 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatWelcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Welcome to PetMagic support'**
+  /// **'Hello! Describe your issue and we will help.'**
   String get supportChatWelcomeTitle;
 
   /// No description provided for @supportChatWelcomeBody.
   ///
   /// In en, this message translates to:
-  /// **'Choose a common topic below or write your message right away. We will route it to the right team without making the chat feel empty.'**
+  /// **'You can also choose one of the common topics below.'**
   String get supportChatWelcomeBody;
 
   /// No description provided for @supportChatQuickActionGeneration.
@@ -2928,6 +2928,12 @@ abstract class AppLocalizations {
   /// **'The request is open. Support will see the new message.'**
   String get supportChatWaitingForSupportStatusHint;
 
+  /// No description provided for @supportChatInProgressStatusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Support is reviewing your issue.'**
+  String get supportChatInProgressStatusHint;
+
   /// No description provided for @supportChatAwaitingYourReplyStatus.
   ///
   /// In en, this message translates to:
@@ -2937,7 +2943,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatSupportRepliedStatusHint.
   ///
   /// In en, this message translates to:
-  /// **'Support replied. Check the message above.'**
+  /// **'Support replied. Did this help?'**
   String get supportChatSupportRepliedStatusHint;
 
   /// No description provided for @supportChatResolvedStatusHint.
@@ -2949,7 +2955,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatClosedStatusHint.
   ///
   /// In en, this message translates to:
-  /// **'The conversation is archived and read-only.'**
+  /// **'Conversation is closed. Send a new message to reopen it.'**
   String get supportChatClosedStatusHint;
 
   /// No description provided for @supportChatMessageDelivered.
@@ -3081,7 +3087,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatSystemNoticeBody.
   ///
   /// In en, this message translates to:
-  /// **'We received your message. The support team will reply here.'**
+  /// **'Thanks, we received your message. Support will reply in this chat.'**
   String get supportChatSystemNoticeBody;
 
   /// No description provided for @supportChatComposerAttachmentChip.
@@ -3102,6 +3108,12 @@ abstract class AppLocalizations {
   /// **'Add photo'**
   String get supportChatAddPhotoTitle;
 
+  /// No description provided for @supportChatAddAttachmentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add attachment'**
+  String get supportChatAddAttachmentTitle;
+
   /// No description provided for @supportChatTakePhotoAction.
   ///
   /// In en, this message translates to:
@@ -3114,11 +3126,47 @@ abstract class AppLocalizations {
   /// **'Choose from gallery'**
   String get supportChatChooseGalleryAction;
 
+  /// No description provided for @supportChatChoosePhotosAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose photos'**
+  String get supportChatChoosePhotosAction;
+
+  /// No description provided for @supportChatRecordVideoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Record video'**
+  String get supportChatRecordVideoAction;
+
+  /// No description provided for @supportChatChooseVideoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose video'**
+  String get supportChatChooseVideoAction;
+
   /// No description provided for @supportChatPhotoAttachedLabel.
   ///
   /// In en, this message translates to:
   /// **'Photo attached'**
   String get supportChatPhotoAttachedLabel;
+
+  /// No description provided for @supportChatVideoAttachedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Video attached'**
+  String get supportChatVideoAttachedLabel;
+
+  /// No description provided for @supportChatVideoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Support video'**
+  String get supportChatVideoLabel;
+
+  /// No description provided for @supportChatAssistantBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get supportChatAssistantBadge;
 
   /// No description provided for @supportChatTooManyAttachmentsError.
   ///
@@ -3129,8 +3177,14 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatMarkResolvedAction.
   ///
   /// In en, this message translates to:
-  /// **'Resolved'**
+  /// **'Yes, close request'**
   String get supportChatMarkResolvedAction;
+
+  /// No description provided for @supportChatKeepOpenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'No, write more'**
+  String get supportChatKeepOpenAction;
 
   /// No description provided for @supportChatReopenAction.
   ///

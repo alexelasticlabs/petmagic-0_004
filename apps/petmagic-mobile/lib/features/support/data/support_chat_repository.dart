@@ -34,7 +34,7 @@ class SupportChatRepository {
 
   Future<SupportChatConversation> openConversation({
     String? initialMessage,
-    String source = 'Direct',
+    String source = 'MobileChat',
     String? assistantScenario,
     String? relatedGenerationId,
     String? relatedPaymentId,

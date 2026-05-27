@@ -35,22 +35,45 @@ class _PendingAttachmentPreviewList extends StatelessWidget {
                       child: SizedBox(
                         width: 66,
                         height: 66,
-                        child: Image.file(
-                          File(attachment.filePath),
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return ColoredBox(
-                              color: colors.surface,
-                              child: Center(
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  color: colors.textMuted,
-                                  size: 20,
+                        child: attachment.isVideo
+                            ? ColoredBox(
+                                color: colors.surface,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Center(
+                                      child: Icon(
+                                        Icons.videocam_outlined,
+                                        color: colors.textMuted,
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const Center(
+                                      child: Icon(
+                                        Icons.play_circle_fill_rounded,
+                                        color: Colors.white,
+                                        size: 26,
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                              )
+                            : Image.file(
+                                File(attachment.filePath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return ColoredBox(
+                                    color: colors.surface,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.broken_image_outlined,
+                                        color: colors.textMuted,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
                       ),
                     ),
                     Positioned(
@@ -80,7 +103,9 @@ class _PendingAttachmentPreviewList extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  text.supportChatPhotoAttachedLabel,
+                  attachment.isVideo
+                      ? text.supportChatVideoAttachedLabel
+                      : text.supportChatPhotoAttachedLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

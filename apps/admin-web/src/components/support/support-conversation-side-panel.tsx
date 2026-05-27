@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AdminBadge, AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
 import {
@@ -22,6 +22,7 @@ import {
 import styles from "@/components/support/support-page.module.css";
 import {
   priorityLabel,
+  sourceLabel,
   statusLabel,
   toneForGeneration,
   toneForStatus,
@@ -58,6 +59,7 @@ export function SupportConversationSidePanel({
     analyticsQuery,
     assignmentMutation,
     conversation,
+    conversationSla,
     conversationTimeline,
     destructiveStatusAction,
     failedGenerations,
@@ -93,6 +95,33 @@ export function SupportConversationSidePanel({
         .reverse(),
     [conversation?.messages]
   );
+
+  const contextLoadFailed =
+    analyticsQuery.isError || purchasesQuery.isError || subscriptionQuery.isError;
+
+  useEffect(() => {
+    if (!contextLoadFailed || !conversation) {
+      return;
+    }
+
+    console.error("Failed to load support user context", {
+      analyticsError: analyticsQuery.error,
+      purchasesError: purchasesQuery.error,
+      subscriptionError: subscriptionQuery.error,
+      conversationId: conversation.conversationId,
+      initiatorUserId: conversation.initiatorUserId,
+    });
+  }, [
+    analyticsQuery.error,
+    analyticsQuery.isError,
+    contextLoadFailed,
+    conversation?.conversationId,
+    conversation?.initiatorUserId,
+    purchasesQuery.error,
+    purchasesQuery.isError,
+    subscriptionQuery.error,
+    subscriptionQuery.isError,
+  ]);
 
   if (!isSidePanelOpen || !conversation) {
     return null;
@@ -184,7 +213,6 @@ export function SupportConversationSidePanel({
                       className={styles.workflowPrimaryButton}
                       onClick={() => {
                         const isDestructive =
-                          primaryStatusAction.status === "Resolved" ||
                           primaryStatusAction.status === "Closed";
                         if (isDestructive) {
                           setShowResolveConfirm(true);
@@ -251,20 +279,24 @@ export function SupportConversationSidePanel({
               ) : null}
             </div>
 
-            {conversation.source === "MobileAssistant" ? (
-              <div className={styles.metricsGrid}>
-                <div className={styles.metricTile}>
-                  <span>{text.supportAssistantSourceLabel}</span>
-                  <strong>{text.supportAssistantMobileLabel}</strong>
-                </div>
-                {conversation.assistantScenario ? (
-                  <div className={styles.metricTile}>
-                    <span>{text.supportAssistantScenarioLabel}</span>
-                    <strong>{conversation.assistantScenario}</strong>
-                  </div>
-                ) : null}
+            <div className={styles.metricsGrid}>
+              <div className={styles.metricTile}>
+                <span>{text.supportAssistantSourceLabel}</span>
+                <strong>{sourceLabel(conversation.source, text)}</strong>
               </div>
-            ) : null}
+              {conversation.assistantScenario ? (
+                <div className={styles.metricTile}>
+                  <span>{text.supportAssistantScenarioLabel}</span>
+                  <strong>{conversation.assistantScenario}</strong>
+                </div>
+              ) : null}
+              {conversation.relatedGenerationId ? (
+                <div className={styles.metricTile}>
+                  <span>{locale === "ru" ? "Связанная генерация" : "Related generation"}</span>
+                  <strong>{shortId(conversation.relatedGenerationId)}</strong>
+                </div>
+              ) : null}
+            </div>
 
             <div className={styles.userSummaryHeader}>
               <div className={styles.userCard}>
@@ -353,14 +385,22 @@ export function SupportConversationSidePanel({
             <SectionBlock title={text.supportAiContextTitle}>
               <SidePanelAsyncState
                 isLoading={
-                  analyticsQuery.isLoading || purchasesQuery.isLoading || subscriptionQuery.isLoading
+                  analyticsQuery.isLoading ||
+                  purchasesQuery.isLoading ||
+                  subscriptionQuery.isLoading
                 }
-                isError={
-                  analyticsQuery.isError || purchasesQuery.isError || subscriptionQuery.isError
-                }
+                isError={contextLoadFailed}
                 hasContent={Boolean(analyticsQuery.data)}
                 loadingTitle={text.loading}
-                errorTitle={text.supportLoadError}
+                errorTitle={text.supportContextLoadError}
+                retryLabel={text.supportRetryAction}
+                onRetry={() => {
+                  void Promise.all([
+                    analyticsQuery.refetch(),
+                    purchasesQuery.refetch(),
+                    subscriptionQuery.refetch(),
+                  ]);
+                }}
                 emptyTitle={text.supportHistoryEmpty}
               >
                 <div className={styles.detailGrid}>
@@ -392,6 +432,14 @@ export function SupportConversationSidePanel({
             <SectionBlock title={text.supportConversationMetaTitle}>
               <div className={styles.detailGrid}>
                 <div className={styles.detailRow}>
+                  <span>{text.statusLabel}</span>
+                  <strong>{statusLabel(conversation.status, text)}</strong>
+                </div>
+                <div className={styles.detailRow}>
+                  <span>{text.supportAssistantSourceLabel}</span>
+                  <strong>{sourceLabel(conversation.source, text)}</strong>
+                </div>
+                <div className={styles.detailRow}>
                   <span>{text.supportAssignedTo}</span>
                   <strong>
                     {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
@@ -400,6 +448,17 @@ export function SupportConversationSidePanel({
                 <div className={styles.detailRow}>
                   <span>{text.createdAtLabel}</span>
                   <strong>{formatDateTime(conversation.createdAtUtc, locale)}</strong>
+                </div>
+                <div className={styles.detailRow}>
+                  <span>{text.supportLastMessage}</span>
+                  <strong>
+                    {conversation.messages[conversation.messages.length - 1]?.body?.trim() ||
+                      text.supportNoMessages}
+                  </strong>
+                </div>
+                <div className={styles.detailRow}>
+                  <span>{text.supportWaitingLabel}</span>
+                  <strong>{conversationSla.waitLabel}</strong>
                 </div>
                 <div className={styles.detailRow}>
                   <span>{locale === "ru" ? "Дата регистрации" : "Registration date"}</span>
@@ -679,19 +738,29 @@ function purchaseStatusTone(status: string) {
 function getResponderState(status: string, locale: Locale): ResponderState {
   const isRu = locale === "ru";
   switch (status) {
-    case "WaitingForSupport":
+    case "New":
       return {
-        label: isRu ? "Требуется ответ администратора" : "Admin reply required",
+        label: isRu ? "Нужен ответ оператора" : "Operator reply required",
         tone: "danger",
+      };
+    case "InProgress":
+      return {
+        label: isRu ? "Диалог в работе" : "Conversation in progress",
+        tone: "neutral",
       };
     case "WaitingForUser":
       return {
         label: isRu ? "Ожидаем пользователя" : "Waiting for user",
         tone: "success",
       };
+    case "Closed":
+      return {
+        label: isRu ? "Диалог закрыт" : "Conversation closed",
+        tone: "neutral",
+      };
     default:
       return {
-        label: isRu ? "Диалог в обработке" : "Conversation in progress",
+        label: isRu ? "Требуется ответ оператора" : "Operator reply required",
         tone: "neutral",
       };
   }

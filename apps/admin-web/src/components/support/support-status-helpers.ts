@@ -1,4 +1,4 @@
-import type { SupportConversationStatus } from "@/lib/api-client";
+import type { SupportConversationSource, SupportConversationStatus } from "@/lib/api-client";
 import type { Dictionary } from "@/lib/i18n";
 
 export type StatusActionDescriptor = {
@@ -8,17 +8,13 @@ export type StatusActionDescriptor = {
 };
 
 export function statusLabel(status: string, text: Dictionary) {
-  switch (status.toLowerCase()) {
-    case "open":
+  switch (normalizeStatus(status).toLowerCase()) {
+    case "new":
       return text.supportStatusOpen;
     case "inprogress":
       return text.supportStatusInProgress;
-    case "waitingforsupport":
-      return text.supportStatusWaitingForSupport;
     case "waitingforuser":
       return text.supportStatusWaitingForUser;
-    case "resolved":
-      return text.supportStatusResolved;
     case "closed":
       return text.supportStatusClosed;
     default:
@@ -27,17 +23,13 @@ export function statusLabel(status: string, text: Dictionary) {
 }
 
 export function toneForStatus(status: string) {
-  switch (status.toLowerCase()) {
-    case "open":
-      return "warning" as const;
-    case "waitingforsupport":
+  switch (normalizeStatus(status).toLowerCase()) {
+    case "new":
       return "warning" as const;
     case "waitingforuser":
       return "primary" as const;
     case "inprogress":
       return "primary" as const;
-    case "resolved":
-      return "success" as const;
     case "closed":
       return "neutral" as const;
     default:
@@ -46,17 +38,13 @@ export function toneForStatus(status: string) {
 }
 
 export function statusHint(status: SupportConversationStatus, text: Dictionary) {
-  switch (status) {
-    case "Open":
+  switch (normalizeStatus(status)) {
+    case "New":
       return text.supportStatusOpenHint;
     case "InProgress":
       return text.supportStatusInProgressHint;
-    case "WaitingForSupport":
-      return text.supportStatusWaitingForSupportHint;
     case "WaitingForUser":
       return text.supportStatusWaitingForUserHint;
-    case "Resolved":
-      return text.supportStatusResolvedHint;
     case "Closed":
       return text.supportStatusClosedHint;
     default:
@@ -68,53 +56,55 @@ export function getAvailableStatusActions(
   status: SupportConversationStatus,
   text: Dictionary
 ): StatusActionDescriptor[] {
-  switch (status) {
-    case "Open":
+  switch (normalizeStatus(status)) {
+    case "New":
       return [
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
-        {
-          status: "WaitingForSupport",
-          label: text.supportMarkWaitingForSupportAction,
-          variant: "secondary",
-        },
-        {
-          status: "WaitingForUser",
-          label: text.supportMarkWaitingForUserAction,
-          variant: "secondary",
-        },
-        { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
+        { status: "InProgress", label: text.supportMarkInProgressAction, variant: "primary" },
+        { status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" },
       ];
     case "InProgress":
-    case "WaitingForUser":
       return [
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
-        { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
-        {
-          status: "WaitingForSupport",
-          label: text.supportMarkWaitingForSupportAction,
-          variant: "secondary",
-        },
-        { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
-      ];
-    case "WaitingForSupport":
-      return [
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
         {
           status: "WaitingForUser",
           label: text.supportMarkWaitingForUserAction,
+          variant: "primary",
+        },
+        {
+          status: "New",
+          label: text.supportReopenConversationAction,
           variant: "secondary",
         },
-        { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
+        { status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" },
       ];
-    case "Resolved":
+    case "WaitingForUser":
       return [
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
-        { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
+        { status: "InProgress", label: text.supportMarkInProgressAction, variant: "primary" },
+        {
+          status: "Closed",
+          label: text.supportCloseConversationAction,
+          variant: "secondary",
+        },
       ];
     case "Closed":
-      return [{ status: "Open", label: text.supportReopenConversationAction, variant: "primary" }];
+      return [{ status: "New", label: text.supportReopenConversationAction, variant: "primary" }];
     default:
       return [];
+  }
+}
+
+export function sourceLabel(source: SupportConversationSource | string, text: Dictionary) {
+  switch (source.toLowerCase()) {
+    case "mobilechat":
+    case "direct":
+      return text.supportSourceMobileChat;
+    case "mobileassistant":
+      return text.supportSourceMobileAssistant;
+    case "admincreated":
+      return text.supportSourceAdminCreated;
+    case "system":
+      return text.supportSourceSystem;
+    default:
+      return text.supportSourceUnknown;
   }
 }
 
@@ -154,5 +144,25 @@ export function toneForGeneration(status: string) {
       return "warning" as const;
     default:
       return "info" as const;
+  }
+}
+
+function normalizeStatus(status: SupportConversationStatus | string): string {
+  switch (status.toLowerCase()) {
+    case "open":
+    case "waitingforsupport":
+      return "New";
+    case "resolved":
+      return "Closed";
+    case "new":
+      return "New";
+    case "inprogress":
+      return "InProgress";
+    case "waitingforuser":
+      return "WaitingForUser";
+    case "closed":
+      return "Closed";
+    default:
+      return status;
   }
 }

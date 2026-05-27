@@ -111,34 +111,29 @@ class _SupportSecurityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return ProfileGlassCard(
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border.withValues(alpha: 0.65)),
+      ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  colors.accent.withValues(alpha: 0.24),
-                  colors.accent.withValues(alpha: 0.08),
-                ],
-              ),
-            ),
-            child: Icon(Icons.shield_rounded, color: colors.accent, size: 16),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
+          Icon(Icons.shield_rounded, color: colors.textMuted, size: 13),
+          const SizedBox(width: 6),
+          Flexible(
             child: Text(
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
+                color: colors.textMuted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -149,13 +144,9 @@ class _SupportSecurityCard extends StatelessWidget {
 }
 
 class _SupportConversationStatusStrip extends StatelessWidget {
-  const _SupportConversationStatusStrip({
-    required this.conversation,
-    required this.messages,
-  });
+  const _SupportConversationStatusStrip({required this.conversation});
 
   final SupportChatConversation conversation;
-  final List<SupportChatMessage> messages;
 
   @override
   Widget build(BuildContext context) {
@@ -164,42 +155,27 @@ class _SupportConversationStatusStrip extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.68),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+        color: colors.surfaceStrong.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: descriptor.color.withValues(alpha: 0.35)),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(descriptor.icon, color: descriptor.color, size: 17),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    descriptor.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    descriptor.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+            Icon(descriptor.icon, color: descriptor.color, size: 14),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                descriptor.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -212,18 +188,13 @@ class _SupportConversationStatusStrip extends StatelessWidget {
   _resolveConversationStatusDescriptor(BuildContext context) {
     final text = AppLocalizations.of(context);
     final normalizedStatus = conversation.status.trim().toLowerCase();
-    SupportChatMessage? lastHumanMessage;
-    for (final message in messages.reversed) {
-      if (!_isSupportSystemMessage(message)) {
-        lastHumanMessage = message;
-        break;
-      }
-    }
+    const mutedColor = Color(0xFF8A94A6);
+    const activeColor = _supportSecondaryGreen;
 
     if (normalizedStatus == 'resolved') {
       return (
         icon: Icons.check_circle_rounded,
-        color: const Color(0xFF37B16A),
+        color: activeColor,
         title: text.supportChatStatusResolved,
         subtitle: text.supportChatResolvedStatusHint,
       );
@@ -232,25 +203,45 @@ class _SupportConversationStatusStrip extends StatelessWidget {
     if (normalizedStatus == 'closed') {
       return (
         icon: Icons.archive_rounded,
-        color: const Color(0xFF8A94A6),
+        color: mutedColor,
         title: text.supportChatStatusClosed,
         subtitle: text.supportChatClosedStatusHint,
       );
     }
 
-    if (lastHumanMessage?.isFromAdmin == true) {
+    if (normalizedStatus == 'waitingforuser') {
       return (
         icon: Icons.mark_chat_unread_rounded,
-        color: _supportSecondaryGreen,
+        color: activeColor,
         title: text.supportChatAwaitingYourReplyStatus,
         subtitle: text.supportChatSupportRepliedStatusHint,
       );
     }
 
+    if (normalizedStatus == 'inprogress') {
+      return (
+        icon: Icons.hourglass_top_rounded,
+        color: activeColor,
+        title: text.supportChatStatusInProgress,
+        subtitle: text.supportChatInProgressStatusHint,
+      );
+    }
+
+    if (normalizedStatus == 'new' ||
+        normalizedStatus == 'open' ||
+        normalizedStatus == 'waitingforsupport') {
+      return (
+        icon: Icons.mark_email_unread_rounded,
+        color: activeColor,
+        title: text.supportChatSystemNoticeTitle,
+        subtitle: text.supportChatSystemNoticeBody,
+      );
+    }
+
     return (
       icon: Icons.support_agent_rounded,
-      color: _supportSecondaryGreen,
-      title: text.supportChatWaitingForSupportStatus,
+      color: activeColor,
+      title: text.supportChatSystemNoticeTitle,
       subtitle: text.supportChatWaitingForSupportStatusHint,
     );
   }

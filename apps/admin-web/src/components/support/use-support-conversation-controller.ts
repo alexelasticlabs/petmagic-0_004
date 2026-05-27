@@ -59,11 +59,7 @@ export type ToastState = {
   message: string;
 };
 
-export type SupportQueueFilter =
-  | "all"
-  | SupportConversationStatus
-  | "mine"
-  | "unassigned";
+export type SupportQueueFilter = "all" | SupportConversationStatus | "mine" | "unassigned";
 
 function resolveQueueFilter(filter: SupportQueueFilter): {
   status?: SupportConversationStatus;
@@ -92,10 +88,9 @@ export type TemplateDraft = {
 };
 
 export const statusOptions: SupportConversationStatus[] = [
-  "Open",
-  "WaitingForSupport",
+  "New",
+  "InProgress",
   "WaitingForUser",
-  "Resolved",
   "Closed",
 ];
 
@@ -301,7 +296,9 @@ export function useSupportConversationController({
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportConversation(conversationId) }),
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.supportConversation(conversationId),
+        }),
       ]);
     },
     onError: () => {
@@ -672,4 +669,3 @@ export function useSupportConversationController({
     visibleTemplates,
   };
 }
-

@@ -10,11 +10,11 @@ public sealed class SupportConversation
 
     public Guid? AssignedAdminId { get; set; }
 
-    public SupportConversationStatus Status { get; set; } = SupportConversationStatus.Open;
+    public SupportConversationStatus Status { get; set; } = SupportConversationStatus.New;
 
     public SupportConversationPriority Priority { get; set; } = SupportConversationPriority.Normal;
 
-    public SupportConversationSource Source { get; set; } = SupportConversationSource.Direct;
+    public SupportConversationSource Source { get; set; } = SupportConversationSource.MobileChat;
 
     public string? AssistantScenario { get; set; }
 

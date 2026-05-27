@@ -10,6 +10,10 @@ const _supportAttachmentMaxFileSizeBytes = 10 * 1024 * 1024;
 const _supportAttachmentMaxCount = 5;
 
 bool _isSupportSystemMessage(SupportChatMessage message) {
+  if (message.isSystemMessage) {
+    return true;
+  }
+
   if (!message.isFromAdmin) {
     return false;
   }
@@ -61,7 +65,12 @@ String _mapSupportError(AppLocalizations text, String raw) {
   return raw;
 }
 
-enum _SupportAttachmentAction { camera, gallery }
+enum _SupportAttachmentAction {
+  cameraPhoto,
+  galleryPhotos,
+  cameraVideo,
+  galleryVideo,
+}
 
 class _SupportQuickActionData {
   const _SupportQuickActionData({
@@ -92,9 +101,11 @@ class _PendingSupportAttachment {
     required this.filePath,
     required this.fileName,
     required this.contentType,
+    required this.isVideo,
   });
 
   final String filePath;
   final String fileName;
   final String contentType;
+  final bool isVideo;
 }

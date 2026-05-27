@@ -201,6 +201,6 @@ class _PushNotificationsBootstrapState
   }
 
   bool _isSupportRoute(String route) {
-    return route == SupportChatPage.routePath;
+    return route == SupportChatPage.routePath || route == '/profile/support';
   }
 }

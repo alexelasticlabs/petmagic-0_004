@@ -25,7 +25,6 @@
 }
 
 @keyframes pulseSlaRing {
-
   0%,
   100% {
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
@@ -162,7 +161,7 @@
 }
 
 .inboxShellCompact {
-  gap: 14px;
+  gap: 10px;
   width: min(100%, 96rem);
   margin-inline: auto;
 }
@@ -170,7 +169,7 @@
 .inboxControlClusterCompact,
 .supportControlStack {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -219,7 +218,7 @@
   border-radius: 999px;
   background: var(--surface-2);
   color: #90a2b7;
-  padding: 0.52rem 0.78rem;
+  padding: 0.44rem 0.68rem;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
@@ -325,7 +324,7 @@
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-strong);
-  padding: 0.85rem 0.95rem;
+  padding: 0.68rem 0.8rem;
   font: inherit;
   outline: none;
   transition:
@@ -342,8 +341,8 @@
 
 .inboxQueueGrid {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .list {
@@ -354,9 +353,9 @@
 
 .conversationRow {
   display: grid;
-  gap: 8px;
-  padding: 10px 11px;
-  border-radius: 1.05rem;
+  gap: 6px;
+  padding: 8px 9px;
+  border-radius: 0.9rem;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-strong);
@@ -421,7 +420,7 @@
   min-width: 0;
 }
 
-.rowIdentity>div,
+.rowIdentity > div,
 .chatIdentityCompact,
 .templateRowActions,
 .templateTitleStack,
@@ -460,15 +459,15 @@
 .rowPreview span {
   overflow: hidden;
   display: -webkit-box;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
+  line-clamp: 1;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
 
 .rowSlaLine {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
 }
 
@@ -1597,7 +1596,6 @@
 }
 
 @media (max-width: 1320px) {
-
   .workspace,
   .workspaceCompact,
   .workspaceWithSidebar {
@@ -1615,7 +1613,6 @@
 }
 
 @media (max-width: 1180px) {
-
   .workspace,
   .workspaceCompact,
   .workspaceWithSidebar {
@@ -1633,7 +1630,6 @@
 }
 
 @media (max-width: 1080px) {
-
   .workspace,
   .workspaceCompact,
   .workspaceWithSidebar,
@@ -1993,7 +1989,6 @@
 /* ── prefers-reduced-motion ── */
 
 @media (prefers-reduced-motion: reduce) {
-
   .messageItem,
   .sidePane {
     animation: none !important;

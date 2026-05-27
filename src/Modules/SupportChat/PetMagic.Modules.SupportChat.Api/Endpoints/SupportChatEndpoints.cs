@@ -85,7 +85,7 @@ public static class SupportChatEndpoints
             userId,
             request?.InitialMessage,
             request?.Priority ?? SupportConversationPriority.Normal,
-            request?.Source ?? SupportConversationSource.Direct,
+            request?.Source ?? SupportConversationSource.MobileChat,
             request?.AssistantScenario,
             request?.RelatedGenerationId,
             request?.RelatedPaymentId,
@@ -1160,7 +1160,7 @@ public static class SupportChatEndpoints
     public sealed record OpenConversationRequest(
         string? InitialMessage,
         SupportConversationPriority Priority = SupportConversationPriority.Normal,
-        SupportConversationSource Source = SupportConversationSource.Direct,
+        SupportConversationSource Source = SupportConversationSource.MobileChat,
         string? AssistantScenario = null,
         Guid? RelatedGenerationId = null,
         Guid? RelatedPaymentId = null,

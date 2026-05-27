@@ -67,8 +67,10 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
   Widget build(BuildContext context) {
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
-    final showBottomNav = !hasKeyboard && isCurrentRoute;
     final location = widget.location;
+    final hideBottomNavForRoute = location.startsWith('/profile/support');
+    final showBottomNav =
+        !hasKeyboard && isCurrentRoute && !hideBottomNavForRoute;
     final activeGeneration = ref.watch(
       generationHistoryControllerProvider.select(
         (state) => state.activeGeneration,

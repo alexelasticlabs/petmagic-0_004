@@ -6,7 +6,7 @@ public sealed record OpenSupportConversationCommand(
     Guid UserId,
     string? InitialMessage,
     SupportConversationPriority Priority,
-    SupportConversationSource Source = SupportConversationSource.Direct,
+    SupportConversationSource Source = SupportConversationSource.MobileChat,
     string? AssistantScenario = null,
     Guid? RelatedGenerationId = null,
     Guid? RelatedPaymentId = null,

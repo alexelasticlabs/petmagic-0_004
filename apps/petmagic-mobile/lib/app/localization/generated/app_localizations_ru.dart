@@ -1509,7 +1509,8 @@ class AppLocalizationsRu extends AppLocalizations {
       'Пишите команде PetMagic напрямую из своего профиля.';
 
   @override
-  String get supportChatSecureTitle => 'Ваш диалог защищен';
+  String get supportChatSecureTitle =>
+      'Ваш диалог защищен. Мы используем его только для поддержки.';
 
   @override
   String get supportChatSecureSubtitle =>
@@ -1519,13 +1520,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatTeamTitle => 'PetMagic Support';
 
   @override
-  String get supportChatTeamStatus => 'Среднее время ответа: до 24 часов';
+  String get supportChatTeamStatus => 'Обычно отвечаем в течение 24 часов';
 
   @override
   String get supportChatTodayLabel => 'Сегодня';
 
   @override
-  String get supportChatInputHint => 'Опишите проблему, вопрос или запрос...';
+  String get supportChatInputHint => 'Опишите проблему...';
 
   @override
   String get supportChatSendAction => 'Отправить';
@@ -1538,11 +1539,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Чат поддержки уже готов. Отправьте первое сообщение, и команда ответит здесь.';
 
   @override
-  String get supportChatWelcomeTitle => 'Добро пожаловать в поддержку PetMagic';
+  String get supportChatWelcomeTitle =>
+      'Здравствуйте! Опишите проблему, и мы поможем.';
 
   @override
   String get supportChatWelcomeBody =>
-      'Выберите частую тему ниже или сразу напишите сообщение. Так экран выглядит живым даже до первого ответа оператора.';
+      'Вы также можете выбрать одну из частых тем ниже.';
 
   @override
   String get supportChatQuickActionGeneration =>
@@ -1610,11 +1612,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Запрос открыт. Команда поддержки увидит новое сообщение.';
 
   @override
+  String get supportChatInProgressStatusHint => 'Поддержка изучает ваш вопрос.';
+
+  @override
   String get supportChatAwaitingYourReplyStatus => 'Ожидает ваш ответ';
 
   @override
   String get supportChatSupportRepliedStatusHint =>
-      'Поддержка ответила. Проверьте сообщение выше.';
+      'Поддержка ответила. Помогло ли это?';
 
   @override
   String get supportChatResolvedStatusHint =>
@@ -1622,7 +1627,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatClosedStatusHint =>
-      'Диалог архивирован и доступен только для просмотра.';
+      'Обращение закрыто. Если вопрос остался, напишите сообщение — мы откроем его снова.';
 
   @override
   String get supportChatMessageDelivered => 'Доставлено';
@@ -1697,7 +1702,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatSystemNoticeBody =>
-      'Мы получили ваше сообщение. Команда поддержки ответит здесь.';
+      'Спасибо, мы получили ваше сообщение. Поддержка ответит в этом чате.';
 
   @override
   String get supportChatComposerAttachmentChip =>
@@ -1711,20 +1716,44 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatAddPhotoTitle => 'Добавить фото';
 
   @override
+  String get supportChatAddAttachmentTitle => 'Добавить вложение';
+
+  @override
   String get supportChatTakePhotoAction => 'Сделать фото';
 
   @override
   String get supportChatChooseGalleryAction => 'Выбрать из галереи';
 
   @override
+  String get supportChatChoosePhotosAction => 'Выбрать фото';
+
+  @override
+  String get supportChatRecordVideoAction => 'Записать видео';
+
+  @override
+  String get supportChatChooseVideoAction => 'Выбрать видео';
+
+  @override
   String get supportChatPhotoAttachedLabel => 'Фото прикреплено';
+
+  @override
+  String get supportChatVideoAttachedLabel => 'Видео прикреплено';
+
+  @override
+  String get supportChatVideoLabel => 'Видео';
+
+  @override
+  String get supportChatAssistantBadge => 'Ассистент';
 
   @override
   String get supportChatTooManyAttachmentsError =>
       'Можно прикрепить до 5 фото.';
 
   @override
-  String get supportChatMarkResolvedAction => 'Решено';
+  String get supportChatMarkResolvedAction => 'Да, закрыть обращение';
+
+  @override
+  String get supportChatKeepOpenAction => 'Нет, написать ещё';
 
   @override
   String get supportChatReopenAction => 'Переоткрыть';

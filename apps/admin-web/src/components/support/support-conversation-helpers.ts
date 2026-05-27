@@ -268,12 +268,7 @@ export function shortId(value: string) {
 
 type SupportQueueItem = Pick<
   AdminSupportConversationSummary,
-  | "adminUnreadCount"
-  | "createdAtUtc"
-  | "lastMessageAtUtc"
-  | "priority"
-  | "status"
-  | "updatedAtUtc"
+  "adminUnreadCount" | "createdAtUtc" | "lastMessageAtUtc" | "priority" | "status" | "updatedAtUtc"
 >;
 
 export function sortSupportQueueItems<T extends SupportQueueItem>(items: readonly T[]) {
@@ -289,12 +284,13 @@ export function sortSupportQueueItems<T extends SupportQueueItem>(items: readonl
 
 function getSupportQueueUrgency(item: SupportQueueItem) {
   const statusWeight: Record<string, number> = {
-    WaitingForSupport: 700,
-    Open: 520,
+    New: 700,
     InProgress: 420,
     WaitingForUser: 260,
-    Resolved: 60,
     Closed: 0,
+    Open: 700,
+    WaitingForSupport: 700,
+    Resolved: 0,
   };
   const priorityWeight: Record<string, number> = {
     High: 120,
@@ -371,7 +367,7 @@ export function groupSupportConversationFeed(
     });
   }
 
-  if (conversation.resolvedAtUtc) {
+  if (conversation.resolvedAtUtc && conversation.status !== "Closed") {
     items.push({
       kind: "system",
       id: `system:resolved:${conversation.resolvedAtUtc}`,
@@ -388,21 +384,6 @@ export function groupSupportConversationFeed(
       occurredAtUtc: conversation.closedAtUtc,
       label: labels.ticketClosed,
       tone: "neutral",
-    });
-  }
-
-  if (
-    conversation.reopenUntilUtc &&
-    conversation.status !== "Closed" &&
-    conversation.resolvedAtUtc &&
-    Date.parse(conversation.reopenUntilUtc) > Date.parse(conversation.resolvedAtUtc)
-  ) {
-    items.push({
-      kind: "system",
-      id: `system:reopened:${conversation.reopenUntilUtc}`,
-      occurredAtUtc: conversation.reopenUntilUtc,
-      label: labels.ticketReopened,
-      tone: "warning",
     });
   }
 
