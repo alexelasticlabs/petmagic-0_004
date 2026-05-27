@@ -224,7 +224,7 @@ Future<void> _showReadyCardActions(
               title: Text(text.generationStatusSaveAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                unawaited(_saveGenerationToDevice(context, text, generation));
+                unawaited(_saveGenerationToGallery(context, text, generation));
               },
             ),
             ListTile(
@@ -232,15 +232,15 @@ Future<void> _showReadyCardActions(
               title: Text(text.supportChatShareAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                final outputUrl = generation.outputUrl;
-                if (outputUrl == null || outputUrl.isEmpty) {
-                  _notifySoon(
-                    context,
-                    text.generationStatusResultUnavailableForShare,
-                  );
-                  return;
-                }
-                SharePlus.instance.share(ShareParams(text: outputUrl));
+                unawaited(_shareGenerationFile(context, text, generation));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link_rounded),
+              title: const Text('Copy link'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                unawaited(_copyGenerationLink(context, text, generation));
               },
             ),
             ListTile(
@@ -248,7 +248,7 @@ Future<void> _showReadyCardActions(
               title: Text(text.generationStatusDeleteAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                _notifySoon(context, text.generationStatusDeleteSoonMessage);
+                unawaited(_deleteGeneration(context, text, ref, generation));
               },
             ),
             ListTile(
@@ -320,7 +320,7 @@ Future<void> _showFailedCardActions(
   );
 }
 
-Future<void> _saveGenerationToDevice(
+Future<void> _saveGenerationToGallery(
   BuildContext context,
   AppLocalizations text,
   TemplateGenerationResult generation,
@@ -332,16 +332,12 @@ Future<void> _saveGenerationToDevice(
   }
 
   final fileName = _buildGenerationFileName(generation, outputUrl);
-  final extension = extractFileExtension(fileName);
-  final allowedExtensions = extension == null ? null : <String>[extension];
-
   try {
-    final bytes = await downloadFileBytes(outputUrl);
-    final wasSaved = await saveBytesToDevice(
-      bytes: bytes,
-      dialogTitle: text.generationStatusSaveFileDialogTitle,
+    final wasSaved = await saveRemoteMediaToGallery(
+      mediaUrl: outputUrl,
       fileName: fileName,
-      allowedExtensions: allowedExtensions,
+      isVideo: isVideoGeneration(generation),
+      albumName: 'PetMagic',
     );
 
     if (!context.mounted) {
@@ -349,16 +345,87 @@ Future<void> _saveGenerationToDevice(
     }
 
     if (!wasSaved) {
+      _notifySoon(context, text.generationStatusFileSaveFailedMessage);
       return;
     }
 
-    _notifySoon(context, text.generationStatusFileSavedMessage);
+    _notifySoon(context, text.generationStatusSavedToGalleryMessage);
   } on Object {
     if (!context.mounted) {
       return;
     }
 
     _notifySoon(context, text.generationStatusFileSaveFailedMessage);
+  }
+}
+
+Future<void> _shareGenerationFile(
+  BuildContext context,
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) async {
+  final outputUrl = generation.outputUrl;
+  if (outputUrl == null || outputUrl.isEmpty) {
+    _notifySoon(context, text.generationStatusResultUnavailableForShare);
+    return;
+  }
+
+  try {
+    await shareRemoteMediaFile(
+      mediaUrl: outputUrl,
+      fileName: _buildGenerationFileName(generation, outputUrl),
+      title: generation.templateTitle ?? text.generationStatusResultTitle,
+    );
+  } on Object {
+    if (!context.mounted) {
+      return;
+    }
+
+    _notifySoon(context, 'Failed to share result. Please try again.');
+  }
+}
+
+Future<void> _copyGenerationLink(
+  BuildContext context,
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) async {
+  final outputUrl = generation.outputUrl;
+  if (outputUrl == null || outputUrl.isEmpty) {
+    _notifySoon(context, text.generationStatusResultUnavailableForShare);
+    return;
+  }
+
+  await Clipboard.setData(ClipboardData(text: outputUrl));
+  if (!context.mounted) {
+    return;
+  }
+
+  _notifySoon(context, text.generationStatusLinkCopiedMessage);
+}
+
+Future<void> _deleteGeneration(
+  BuildContext context,
+  AppLocalizations text,
+  WidgetRef ref,
+  TemplateGenerationResult generation,
+) async {
+  try {
+    await ref
+        .read(generationHistoryControllerProvider.notifier)
+        .deleteGeneration(generation.generationId);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    _notifySoon(context, text.generationStatusDeletedMessage);
+  } on Object {
+    if (!context.mounted) {
+      return;
+    }
+
+    _notifySoon(context, 'Failed to delete result. Please try again.');
   }
 }
 

@@ -49,6 +49,39 @@ public sealed record MarkSupportConversationReadCommand(
     Guid UserId,
     bool IsAdmin);
 
+public sealed record ResolveSupportConversationCommand(
+    Guid ConversationId,
+    Guid UserId,
+    bool IsAdmin);
+
+public sealed record CloseSupportConversationCommand(
+    Guid ConversationId,
+    Guid UserId,
+    bool IsAdmin);
+
+public sealed record ReopenSupportConversationCommand(
+    Guid ConversationId,
+    Guid UserId,
+    bool IsAdmin);
+
+public sealed record SubmitSupportConversationFeedbackCommand(
+    Guid ConversationId,
+    Guid UserId,
+    int Rating,
+    string? Comment);
+
+public sealed record RegisterSupportPushTokenCommand(
+    Guid UserId,
+    string Token,
+    string? Platform,
+    string? DeviceId,
+    string? AppVersion,
+    string? Locale);
+
+public sealed record UnregisterSupportPushTokenCommand(
+    Guid UserId,
+    string Token);
+
 public sealed record UpdateSupportConversationStatusCommand(
     Guid ConversationId,
     Guid AdminUserId,
@@ -85,7 +118,13 @@ public sealed record SupportConversationSummaryResponse(
     int UserUnreadCount,
     int AdminUnreadCount,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    DateTime? ResolvedAtUtc,
+    DateTime? ReopenUntilUtc,
+    DateTime? ClosedAtUtc,
+    int? FeedbackRating,
+    bool IsReadOnly,
+    bool CanReopen);
 
 public sealed record SupportMessageResponse(
     Guid MessageId,
@@ -118,6 +157,14 @@ public sealed record SupportConversationDetailResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     DateTime? LastMessageAtUtc,
+    DateTime? ResolvedAtUtc,
+    DateTime? ReopenUntilUtc,
+    DateTime? ClosedAtUtc,
+    int? FeedbackRating,
+    string? FeedbackComment,
+    DateTime? FeedbackSubmittedAtUtc,
+    bool IsReadOnly,
+    bool CanReopen,
     IReadOnlyList<SupportMessageResponse> Messages);
 
 public sealed record SupportReplyTemplateResponse(

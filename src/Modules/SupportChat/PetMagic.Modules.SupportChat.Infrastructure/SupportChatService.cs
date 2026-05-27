@@ -13,9 +13,11 @@ namespace PetMagic.Modules.SupportChat.Infrastructure;
 public sealed class SupportChatService(
     SupportChatDbContext supportChatDbContext,
     IIdentityUserLookupService identityUserLookupService,
-    ISupportChatRealtimeNotifier realtimeNotifier) : ISupportChatService
+    ISupportChatRealtimeNotifier realtimeNotifier,
+    ISupportChatPushNotificationSender pushNotificationSender) : ISupportChatService
 {
     private static readonly Guid AutomatedAssistantUserId = Guid.Parse("2F1E3B3B-8A2E-4A8E-9EE5-97BF31B33218");
+    private static readonly TimeSpan ReopenWindow = TimeSpan.FromDays(7);
     private static readonly Error ConversationNotFound = new("support.conversation_not_found", "Support conversation was not found.");
     private static readonly Error MessageNotFound = new("support.message_not_found", "Support message was not found.");
     private static readonly Error Forbidden = new("support.forbidden", "You do not have access to this support conversation.");
@@ -49,6 +51,12 @@ public sealed class SupportChatService(
 
         if (!string.IsNullOrWhiteSpace(command.InitialMessage))
         {
+            var canAppendError = ValidateConversationCanAcceptMessage(conversation, isAdmin: false, DateTime.UtcNow);
+            if (canAppendError is not null)
+            {
+                return Result.Failure<SupportConversationDetailResponse>(canAppendError);
+            }
+
             await AppendMessageAsync(
                 conversation,
                 command.UserId,
@@ -127,6 +135,10 @@ public sealed class SupportChatService(
                 conversation.LastMessageAtUtc,
                 conversation.CreatedAtUtc,
                 conversation.UpdatedAtUtc,
+                conversation.ResolvedAtUtc,
+                conversation.ReopenUntilUtc,
+                conversation.ClosedAtUtc,
+                conversation.FeedbackRating,
                 LastMessage = conversation.Messages
                     .OrderByDescending(message => message.CreatedAtUtc)
                     .Select(message => new
@@ -147,6 +159,7 @@ public sealed class SupportChatService(
             .ToList();
 
         var users = await identityUserLookupService.GetUsersByIdsAsync(relatedUserIds, cancellationToken);
+        var now = DateTime.UtcNow;
 
         var summaries = conversationRows.Select(conversation =>
         {
@@ -171,7 +184,13 @@ public sealed class SupportChatService(
                 conversation.UnreadUserCount,
                 conversation.UnreadAdminCount,
                 conversation.CreatedAtUtc,
-                conversation.UpdatedAtUtc);
+                conversation.UpdatedAtUtc,
+                conversation.ResolvedAtUtc,
+                ResolveReopenUntil(conversation.Status, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc),
+                conversation.ClosedAtUtc,
+                conversation.FeedbackRating,
+                IsConversationReadOnly(conversation.Status, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, conversation.ClosedAtUtc, now),
+                CanReopenConversation(conversation.Status, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, now));
         }).ToList();
 
         return Result.Success<IReadOnlyList<SupportConversationSummaryResponse>>(summaries);
@@ -203,6 +222,12 @@ public sealed class SupportChatService(
         if (!command.IsAdmin && conversation.InitiatorUserId != command.SenderUserId)
         {
             return Result.Failure<SupportMessageResponse>(Forbidden);
+        }
+
+        var canAppendError = ValidateConversationCanAcceptMessage(conversation, command.IsAdmin, DateTime.UtcNow);
+        if (canAppendError is not null)
+        {
+            return Result.Failure<SupportMessageResponse>(canAppendError);
         }
 
         var shouldAppendAutomaticReply = !command.IsAdmin && conversation.Messages.Count == 0;
@@ -240,7 +265,13 @@ public sealed class SupportChatService(
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
-        return Result.Success(await BuildMessageResponseAsync(message, cancellationToken));
+        var response = await BuildMessageResponseAsync(message, cancellationToken);
+        if (command.IsAdmin)
+        {
+            await NotifyUserMessageAsync(conversation, response, cancellationToken);
+        }
+
+        return Result.Success(response);
     }
 
     public async Task<Result<SupportMessageResponse>> CreateAttachmentMessageAsync(CreateSupportAttachmentMessageCommand command, CancellationToken cancellationToken)
@@ -256,6 +287,12 @@ public sealed class SupportChatService(
         if (!command.IsAdmin && conversation.InitiatorUserId != command.SenderUserId)
         {
             return Result.Failure<SupportMessageResponse>(Forbidden);
+        }
+
+        var canAppendError = ValidateConversationCanAcceptMessage(conversation, command.IsAdmin, DateTime.UtcNow);
+        if (canAppendError is not null)
+        {
+            return Result.Failure<SupportMessageResponse>(canAppendError);
         }
 
         var message = await AppendMessageAsync(
@@ -381,7 +418,13 @@ public sealed class SupportChatService(
         conversation.UpdatedAtUtc = DateTime.UtcNow;
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
-        return Result.Success(await BuildMessageResponseAsync(message, cancellationToken));
+        var response = await BuildMessageResponseAsync(message, cancellationToken);
+        if (command.IsAdmin && command.AttachmentUploadStatus == SupportAttachmentUploadStatus.Uploaded)
+        {
+            await NotifyUserMessageAsync(conversation, response, cancellationToken);
+        }
+
+        return Result.Success(response);
     }
 
     public async Task<Result> MarkConversationReadAsync(MarkSupportConversationReadCommand command, CancellationToken cancellationToken)
@@ -419,6 +462,129 @@ public sealed class SupportChatService(
         return Result.Success();
     }
 
+    public async Task<Result<SupportConversationDetailResponse>> ResolveConversationAsync(ResolveSupportConversationCommand command, CancellationToken cancellationToken)
+    {
+        var conversation = await supportChatDbContext.SupportConversations
+            .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+
+        if (!command.IsAdmin && conversation.InitiatorUserId != command.UserId)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(Forbidden);
+        }
+
+        if (conversation.Status == SupportConversationStatus.Closed)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.ConversationReadOnly);
+        }
+
+        var now = DateTime.UtcNow;
+        MarkResolved(conversation, now);
+
+        await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        await NotifyConversationUpdatedAsync(conversation, cancellationToken);
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
+    public async Task<Result<SupportConversationDetailResponse>> CloseConversationAsync(CloseSupportConversationCommand command, CancellationToken cancellationToken)
+    {
+        var conversation = await supportChatDbContext.SupportConversations
+            .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+
+        if (!command.IsAdmin && conversation.InitiatorUserId != command.UserId)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(Forbidden);
+        }
+
+        var now = DateTime.UtcNow;
+        MarkClosed(conversation, now);
+
+        await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        await NotifyConversationUpdatedAsync(conversation, cancellationToken);
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
+    public async Task<Result<SupportConversationDetailResponse>> ReopenConversationAsync(ReopenSupportConversationCommand command, CancellationToken cancellationToken)
+    {
+        var conversation = await supportChatDbContext.SupportConversations
+            .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+
+        if (!command.IsAdmin && conversation.InitiatorUserId != command.UserId)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(Forbidden);
+        }
+
+        var now = DateTime.UtcNow;
+        if (conversation.Status == SupportConversationStatus.Closed && !command.IsAdmin)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.ConversationReadOnly);
+        }
+
+        if (conversation.Status == SupportConversationStatus.Resolved
+            && !command.IsAdmin
+            && !CanReopenConversation(conversation, now))
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.ReopenWindowExpired);
+        }
+
+        if (conversation.Status is SupportConversationStatus.Resolved or SupportConversationStatus.Closed)
+        {
+            MarkActive(conversation, command.IsAdmin ? SupportConversationStatus.Open : SupportConversationStatus.WaitingForSupport, now);
+            await supportChatDbContext.SaveChangesAsync(cancellationToken);
+            await NotifyConversationUpdatedAsync(conversation, cancellationToken);
+        }
+
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
+    public async Task<Result<SupportConversationDetailResponse>> SubmitConversationFeedbackAsync(SubmitSupportConversationFeedbackCommand command, CancellationToken cancellationToken)
+    {
+        var conversation = await supportChatDbContext.SupportConversations
+            .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+
+        if (conversation.InitiatorUserId != command.UserId)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(Forbidden);
+        }
+
+        if (conversation.Status is not (SupportConversationStatus.Resolved or SupportConversationStatus.Closed))
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.FeedbackNotAllowed);
+        }
+
+        if (command.Rating is < 1 or > 5)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(SupportChatErrors.InvalidFeedbackRating);
+        }
+
+        var now = DateTime.UtcNow;
+        conversation.FeedbackRating = command.Rating;
+        conversation.FeedbackComment = string.IsNullOrWhiteSpace(command.Comment)
+            ? null
+            : command.Comment.Trim();
+        conversation.FeedbackSubmittedAtUtc = now;
+        conversation.UpdatedAtUtc = now;
+
+        await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        await NotifyConversationUpdatedAsync(conversation, cancellationToken);
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
     public async Task<Result<SupportConversationDetailResponse>> UpdateConversationStatusAsync(UpdateSupportConversationStatusCommand command, CancellationToken cancellationToken)
     {
         var conversation = await supportChatDbContext.SupportConversations
@@ -435,12 +601,19 @@ public sealed class SupportChatService(
             return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
         }
 
-        conversation.Status = command.Status;
         conversation.AssignedAdminId ??= command.AdminUserId;
-        conversation.UpdatedAtUtc = now;
-        conversation.ResolvedAtUtc = command.Status is SupportConversationStatus.Resolved or SupportConversationStatus.Closed
-            ? now
-            : null;
+        if (command.Status == SupportConversationStatus.Resolved)
+        {
+            MarkResolved(conversation, now);
+        }
+        else if (command.Status == SupportConversationStatus.Closed)
+        {
+            MarkClosed(conversation, now);
+        }
+        else
+        {
+            MarkActive(conversation, command.Status, now);
+        }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
@@ -451,9 +624,11 @@ public sealed class SupportChatService(
     {
         return currentStatus switch
         {
-            SupportConversationStatus.Open => nextStatus is SupportConversationStatus.InProgress or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
-            SupportConversationStatus.InProgress => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
-            SupportConversationStatus.Resolved => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.Closed,
+            SupportConversationStatus.Open => nextStatus is SupportConversationStatus.WaitingForSupport or SupportConversationStatus.WaitingForUser or SupportConversationStatus.InProgress or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
+            SupportConversationStatus.WaitingForSupport => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.WaitingForUser or SupportConversationStatus.InProgress or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
+            SupportConversationStatus.WaitingForUser => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.WaitingForSupport or SupportConversationStatus.InProgress or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
+            SupportConversationStatus.InProgress => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.WaitingForSupport or SupportConversationStatus.WaitingForUser or SupportConversationStatus.Resolved or SupportConversationStatus.Closed,
+            SupportConversationStatus.Resolved => nextStatus is SupportConversationStatus.Open or SupportConversationStatus.WaitingForSupport or SupportConversationStatus.WaitingForUser or SupportConversationStatus.Closed,
             SupportConversationStatus.Closed => nextStatus is SupportConversationStatus.Open,
             _ => false
         };
@@ -499,6 +674,33 @@ public sealed class SupportChatService(
         }
     }
 
+    private async Task NotifyUserMessageAsync(
+        SupportConversation conversation,
+        SupportMessageResponse message,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await pushNotificationSender.NotifyUserAsync(
+                new SupportChatPushNotification(
+                    conversation.Id,
+                    conversation.InitiatorUserId,
+                    message.MessageId,
+                    message.SenderDisplayName,
+                    message.Body,
+                    message.AttachmentUrl is not null),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Push delivery is best-effort and must not block support replies.
+        }
+    }
+
     private Task<ConversationMessage> AppendMessageAsync(
         SupportConversation conversation,
         Guid senderUserId,
@@ -535,17 +737,14 @@ public sealed class SupportChatService(
         if (isAdmin && updateAssignmentAndStatus)
         {
             conversation.AssignedAdminId ??= senderUserId;
-            conversation.Status = SupportConversationStatus.InProgress;
+            MarkActive(conversation, SupportConversationStatus.WaitingForUser, now);
         }
-        else if (!isAdmin && (conversation.Status is SupportConversationStatus.Resolved or SupportConversationStatus.Closed))
+        else if (!isAdmin && updateAssignmentAndStatus)
         {
-            conversation.Status = SupportConversationStatus.Open;
-            conversation.ResolvedAtUtc = null;
+            MarkActive(conversation, SupportConversationStatus.WaitingForSupport, now);
         }
 
         conversation.LastMessageAtUtc = now;
-
-        conversation.UpdatedAtUtc = now;
         supportChatDbContext.ConversationMessages.Add(message);
         return Task.FromResult(message);
     }
@@ -599,6 +798,7 @@ public sealed class SupportChatService(
 
         var userUnreadCount = conversation.Messages.Count(x => x.IsFromAdmin && x.ReadAtUtc is null);
         var adminUnreadCount = conversation.Messages.Count(x => !x.IsFromAdmin && x.ReadAtUtc is null);
+        var now = DateTime.UtcNow;
 
         return new SupportConversationDetailResponse(
             conversation.Id,
@@ -614,6 +814,14 @@ public sealed class SupportChatService(
             conversation.CreatedAtUtc,
             conversation.UpdatedAtUtc,
             conversation.LastMessageAtUtc ?? visibleMessages.LastOrDefault()?.CreatedAtUtc,
+            conversation.ResolvedAtUtc,
+            ResolveReopenUntil(conversation),
+            conversation.ClosedAtUtc,
+            conversation.FeedbackRating,
+            conversation.FeedbackComment,
+            conversation.FeedbackSubmittedAtUtc,
+            IsConversationReadOnly(conversation, now),
+            CanReopenConversation(conversation, now),
             messages);
     }
 
@@ -649,6 +857,112 @@ public sealed class SupportChatService(
         return Enum.IsDefined(typeof(SupportAttachmentUploadStatus), rawValue.Value)
             ? (SupportAttachmentUploadStatus)rawValue.Value
             : null;
+    }
+
+    private static Error? ValidateConversationCanAcceptMessage(SupportConversation conversation, bool isAdmin, DateTime now)
+    {
+        if (conversation.Status == SupportConversationStatus.Closed)
+        {
+            return SupportChatErrors.ConversationReadOnly;
+        }
+
+        if (conversation.Status != SupportConversationStatus.Resolved)
+        {
+            return null;
+        }
+
+        if (isAdmin)
+        {
+            return SupportChatErrors.ConversationReadOnly;
+        }
+
+        return CanReopenConversation(conversation, now)
+            ? null
+            : SupportChatErrors.ReopenWindowExpired;
+    }
+
+    private static void MarkResolved(SupportConversation conversation, DateTime now)
+    {
+        conversation.Status = SupportConversationStatus.Resolved;
+        conversation.ResolvedAtUtc = now;
+        conversation.ReopenUntilUtc = now.Add(ReopenWindow);
+        conversation.ClosedAtUtc = null;
+        conversation.UpdatedAtUtc = now;
+    }
+
+    private static void MarkClosed(SupportConversation conversation, DateTime now)
+    {
+        conversation.Status = SupportConversationStatus.Closed;
+        conversation.ResolvedAtUtc ??= now;
+        conversation.ReopenUntilUtc ??= conversation.ResolvedAtUtc?.Add(ReopenWindow);
+        conversation.ClosedAtUtc = now;
+        conversation.UpdatedAtUtc = now;
+    }
+
+    private static void MarkActive(SupportConversation conversation, SupportConversationStatus status, DateTime now)
+    {
+        conversation.Status = status;
+        conversation.ResolvedAtUtc = null;
+        conversation.ReopenUntilUtc = null;
+        conversation.ClosedAtUtc = null;
+        conversation.UpdatedAtUtc = now;
+    }
+
+    private static DateTime? ResolveReopenUntil(SupportConversation conversation)
+    {
+        return ResolveReopenUntil(conversation.Status, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc);
+    }
+
+    private static DateTime? ResolveReopenUntil(
+        SupportConversationStatus status,
+        DateTime? resolvedAtUtc,
+        DateTime? reopenUntilUtc)
+    {
+        if (status is not (SupportConversationStatus.Resolved or SupportConversationStatus.Closed))
+        {
+            return null;
+        }
+
+        return reopenUntilUtc ?? resolvedAtUtc?.Add(ReopenWindow);
+    }
+
+    private static bool CanReopenConversation(SupportConversation conversation, DateTime now)
+    {
+        return CanReopenConversation(conversation.Status, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, now);
+    }
+
+    private static bool CanReopenConversation(
+        SupportConversationStatus status,
+        DateTime? resolvedAtUtc,
+        DateTime? reopenUntilUtc,
+        DateTime now)
+    {
+        var reopenUntil = ResolveReopenUntil(status, resolvedAtUtc, reopenUntilUtc);
+        return status == SupportConversationStatus.Resolved
+            && reopenUntil.HasValue
+            && reopenUntil.Value >= now;
+    }
+
+    private static bool IsConversationReadOnly(SupportConversation conversation, DateTime now)
+    {
+        return IsConversationReadOnly(
+            conversation.Status,
+            conversation.ResolvedAtUtc,
+            conversation.ReopenUntilUtc,
+            conversation.ClosedAtUtc,
+            now);
+    }
+
+    private static bool IsConversationReadOnly(
+        SupportConversationStatus status,
+        DateTime? resolvedAtUtc,
+        DateTime? reopenUntilUtc,
+        DateTime? closedAtUtc,
+        DateTime now)
+    {
+        return closedAtUtc.HasValue
+            || status == SupportConversationStatus.Closed
+            || (status == SupportConversationStatus.Resolved && !CanReopenConversation(status, resolvedAtUtc, reopenUntilUtc, now));
     }
 
     private static string ResolveDisplayName(string? email, string? displayName, bool isAdminSender = false)

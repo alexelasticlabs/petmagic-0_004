@@ -50,10 +50,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   bool _showSecurityBanner = true;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
-  _PendingSupportAttachment? _pendingAttachment;
+  List<_PendingSupportAttachment> _pendingAttachments = const [];
   double _keyboardInset = 0;
 
-  bool get _hasPendingAttachment => _pendingAttachment != null;
+  bool get _hasPendingAttachment => _pendingAttachments.isNotEmpty;
 
   bool get _composerCanSend => _composerHasText || _hasPendingAttachment;
 
@@ -181,8 +181,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     return _SupportChatPageActions(this)._sendCurrentMessageImpl(localeTag);
   }
 
-  void _removePendingAttachment() {
-    _SupportChatPageActions(this)._removePendingAttachmentImpl();
+  void _removePendingAttachment(int index) {
+    _SupportChatPageActions(this)._removePendingAttachmentImpl(index);
   }
 
   Future<void> _retryAttachmentForMessage(SupportChatMessage message) {
@@ -243,8 +243,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     final conversation = state.conversation;
     final messages = conversation?.messages ?? const <SupportChatMessage>[];
     final localeTag = Localizations.localeOf(context).toLanguageTag();
-    final bottomNavInset = petMagicScrollableBottomInset(context);
     _keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomNavInset = _keyboardInset > 0
+        ? 0.0
+        : petMagicScrollableBottomInset(context);
     final isWaitingForInitialConversation = _isWaitingForInitialConversation(
       state,
     );
@@ -252,6 +254,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     return ProfileScreenBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: true,
         body: SafeArea(
           bottom: false,
           child: Padding(
@@ -270,6 +273,14 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     subtitle: text.supportChatTeamStatus,
                     onBack: () => context.pop(),
                   ),
+                  if (conversation != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: _SupportConversationStatusStrip(
+                        conversation: conversation,
+                        messages: messages,
+                      ),
+                    ),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     child: messages.isEmpty || _showSecurityBanner
@@ -313,13 +324,17 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     state: state,
                     messageController: _messageController,
                     messageFocusNode: _messageFocusNode,
-                    pendingAttachment: _pendingAttachment,
+                    pendingAttachments: _pendingAttachments,
                     composerHasFocus: _composerHasFocus,
                     composerCanSend: _composerCanSend,
                     keyboardInset: _keyboardInset,
                     onRemovePendingAttachment: _removePendingAttachment,
                     onShowAttachmentOptions: _showAttachmentOptions,
                     onSendMessage: () => _sendCurrentMessage(localeTag),
+                    onResolveConversation: _controller.resolveConversation,
+                    onReopenConversation: _controller.reopenConversation,
+                    onCloseConversation: _controller.closeConversation,
+                    onSubmitFeedback: _controller.submitFeedback,
                   ),
                 ],
               ),

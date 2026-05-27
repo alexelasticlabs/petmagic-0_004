@@ -163,6 +163,29 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     );
   }
 
+  Future<void> deleteGeneration(String generationId) async {
+    await _repository.deleteGeneration(generationId);
+
+    final wasUnread = state.items.any(
+      (item) => item.generationId == generationId && item.isUnread,
+    );
+
+    final updatedItems = _removeGenerationFromList(state.items, generationId);
+    final updatedCache = _removeGenerationFromCaches(
+      state.cachedItemsByFilter,
+      generationId,
+    );
+
+    state = state.copyWith(
+      items: updatedItems,
+      cachedItemsByFilter: updatedCache,
+      unreadCount: wasUnread && state.unreadCount > 0
+          ? state.unreadCount - 1
+          : state.unreadCount,
+      clearError: true,
+    );
+  }
+
   Future<void> submitFeedback({
     required String generationId,
     required int rating,
@@ -264,6 +287,28 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           _copyWithUnread(item, isUnread: false)
         else
           item,
+    ];
+  }
+
+  Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
+  _removeGenerationFromCaches(
+    Map<GenerationHistoryFilter, List<TemplateGenerationResult>> caches,
+    String generationId,
+  ) {
+    final updated = <GenerationHistoryFilter, List<TemplateGenerationResult>>{};
+    for (final entry in caches.entries) {
+      updated[entry.key] = _removeGenerationFromList(entry.value, generationId);
+    }
+    return updated;
+  }
+
+  List<TemplateGenerationResult> _removeGenerationFromList(
+    List<TemplateGenerationResult> source,
+    String generationId,
+  ) {
+    return [
+      for (final item in source)
+        if (item.generationId != generationId) item,
     ];
   }
 

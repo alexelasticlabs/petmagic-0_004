@@ -127,6 +127,15 @@ class TemplateGenerationRepository {
     );
   }
 
+  Future<void> deleteGeneration(String generationId) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.delete<void>(
+        '/api/templates/generations/$generationId',
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
   Future<void> submitGenerationFeedback({
     required String generationId,
     required int rating,

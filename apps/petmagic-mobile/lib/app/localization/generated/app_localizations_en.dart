@@ -1518,7 +1518,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportChatTeamTitle => 'PetMagic Support';
 
   @override
-  String get supportChatTeamStatus => 'Online • typical reply under 5 min';
+  String get supportChatTeamStatus => 'Average response time: under 24 hours';
 
   @override
   String get supportChatTodayLabel => 'Today';
@@ -1580,7 +1580,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatFaqResponseBody =>
-      'Active chats are normally answered within a few minutes during support hours. We keep the thread here so you do not lose context.';
+      'The support team will reply in this chat. We usually respond within 24 hours.';
 
   @override
   String get supportChatFaqRefundTitle => 'How do refunds work?';
@@ -1600,6 +1600,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatStatusClosed => 'Closed';
+
+  @override
+  String get supportChatWaitingForSupportStatus => 'Waiting for support';
+
+  @override
+  String get supportChatWaitingForSupportStatusHint =>
+      'The request is open. Support will see the new message.';
+
+  @override
+  String get supportChatAwaitingYourReplyStatus => 'Awaiting your reply';
+
+  @override
+  String get supportChatSupportRepliedStatusHint =>
+      'Support replied. Check the message above.';
+
+  @override
+  String get supportChatResolvedStatusHint =>
+      'This request was marked as resolved. You can reopen it for 7 days.';
+
+  @override
+  String get supportChatClosedStatusHint =>
+      'The conversation is archived and read-only.';
 
   @override
   String get supportChatMessageDelivered => 'Delivered';
@@ -1656,6 +1678,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportChatAttachmentStatusRetry => 'Retry';
 
   @override
+  String supportChatAttachmentUploadingWithCount(Object current, Object total) {
+    return 'Uploading photo $current of $total';
+  }
+
+  @override
   String get supportChatImageUploadFailedLabel => 'Image upload failed';
 
   @override
@@ -1666,14 +1693,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatSystemNoticeBody =>
-      'We received your request and will reply soon. Average response time: up to 24 hours.';
+      'We received your message. The support team will reply here.';
 
   @override
   String get supportChatComposerAttachmentChip =>
-      '1 photo: JPG/PNG/WebP, up to 10 MB';
+      'Up to 5 photos: JPG/PNG/WebP, 10 MB each';
 
   @override
   String get supportChatComposerResponseChip => 'Typical reply in a few hours';
+
+  @override
+  String get supportChatAddPhotoTitle => 'Add photo';
+
+  @override
+  String get supportChatTakePhotoAction => 'Take photo';
+
+  @override
+  String get supportChatChooseGalleryAction => 'Choose from gallery';
+
+  @override
+  String get supportChatPhotoAttachedLabel => 'Photo attached';
+
+  @override
+  String get supportChatTooManyAttachmentsError =>
+      'You can attach up to 5 photos.';
+
+  @override
+  String get supportChatMarkResolvedAction => 'Resolved';
+
+  @override
+  String get supportChatReopenAction => 'Reopen';
+
+  @override
+  String get supportChatArchiveAction => 'Archive';
+
+  @override
+  String get supportChatRateTitle => 'Rate the support reply';
+
+  @override
+  String supportChatRatedLabel(Object rating) {
+    return 'Your rating: $rating/5';
+  }
+
+  @override
+  String get supportChatReadOnlyHint => 'This conversation is read-only';
 
   @override
   String get profileSettingsThemeSystem => 'System';
@@ -2307,6 +2370,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get generationStatusFileSaveFailedMessage =>
       'Could not save file. Please try again.';
+
+  @override
+  String get generationStatusSavedToGalleryMessage => 'Saved to Gallery';
+
+  @override
+  String get generationStatusLinkCopiedMessage => 'Link copied';
+
+  @override
+  String get generationStatusDeletedMessage => 'Deleted';
+
+  @override
+  String get generationStatusFullscreenControlsHint =>
+      'Tap to hide/show controls';
 
   @override
   String get generationStatusDeleteSoonMessage =>

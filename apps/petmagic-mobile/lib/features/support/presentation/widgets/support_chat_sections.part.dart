@@ -187,6 +187,7 @@ class _SupportConversationViewport extends StatelessWidget {
                 if (_isSupportSystemMessage(message))
                   _SupportSystemMessageCard(
                     message: text.supportChatSystemNoticeBody,
+                    createdAtUtc: message.createdAtUtc,
                   )
                 else
                   _MessageBubble(
@@ -208,25 +209,33 @@ class _SupportComposerPanel extends StatelessWidget {
     required this.state,
     required this.messageController,
     required this.messageFocusNode,
-    required this.pendingAttachment,
+    required this.pendingAttachments,
     required this.composerHasFocus,
     required this.composerCanSend,
     required this.keyboardInset,
     required this.onRemovePendingAttachment,
     required this.onShowAttachmentOptions,
     required this.onSendMessage,
+    required this.onResolveConversation,
+    required this.onReopenConversation,
+    required this.onCloseConversation,
+    required this.onSubmitFeedback,
   });
 
   final SupportChatState state;
   final TextEditingController messageController;
   final FocusNode messageFocusNode;
-  final _PendingSupportAttachment? pendingAttachment;
+  final List<_PendingSupportAttachment> pendingAttachments;
   final bool composerHasFocus;
   final bool composerCanSend;
   final double keyboardInset;
-  final VoidCallback onRemovePendingAttachment;
+  final ValueChanged<int> onRemovePendingAttachment;
   final VoidCallback onShowAttachmentOptions;
   final Future<void> Function() onSendMessage;
+  final Future<void> Function() onResolveConversation;
+  final Future<void> Function() onReopenConversation;
+  final Future<void> Function() onCloseConversation;
+  final Future<void> Function(int rating) onSubmitFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -234,9 +243,15 @@ class _SupportComposerPanel extends StatelessWidget {
     final colors = context.petMagicColors;
 
     final isKeyboardVisible = keyboardInset > 0;
+    final sendProgress = state.sendProgress;
+    final sendingIndex = state.sendingAttachmentIndex;
+    final sendingTotal = state.sendingAttachmentTotal;
+    final conversation = state.conversation;
+    final isReadOnly = conversation?.isReadOnly ?? false;
+    final effectiveCanSend = composerCanSend && !isReadOnly;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, isKeyboardVisible ? 12 : 8),
+      padding: EdgeInsets.fromLTRB(16, 6, 16, isKeyboardVisible ? 4 : 8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
@@ -254,11 +269,20 @@ class _SupportComposerPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (pendingAttachment != null) ...[
+            if (conversation != null)
+              _SupportLifecycleActionBar(
+                conversation: conversation,
+                isBusy: state.isSending,
+                onResolve: onResolveConversation,
+                onReopen: onReopenConversation,
+                onClose: onCloseConversation,
+                onSubmitFeedback: onSubmitFeedback,
+              ),
+            if (pendingAttachments.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
-                child: _PendingAttachmentPreview(
-                  attachment: pendingAttachment!,
+                child: _PendingAttachmentPreviewList(
+                  attachments: pendingAttachments,
                   onRemove: state.isSending ? null : onRemovePendingAttachment,
                 ),
               ),
@@ -274,7 +298,9 @@ class _SupportComposerPanel extends StatelessWidget {
                     width: 36,
                     height: 36,
                   ),
-                  onPressed: state.isSending ? null : onShowAttachmentOptions,
+                  onPressed: state.isSending || isReadOnly
+                      ? null
+                      : onShowAttachmentOptions,
                   icon: const Icon(
                     Icons.attach_file_rounded,
                     size: 23,
@@ -286,6 +312,7 @@ class _SupportComposerPanel extends StatelessWidget {
                   child: TextField(
                     controller: messageController,
                     focusNode: messageFocusNode,
+                    enabled: !isReadOnly,
                     minLines: 1,
                     maxLines: 5,
                     textInputAction: TextInputAction.newline,
@@ -296,7 +323,9 @@ class _SupportComposerPanel extends StatelessWidget {
                       fontWeight: FontWeight.w400,
                     ),
                     decoration: InputDecoration(
-                      hintText: text.supportChatInputHint,
+                      hintText: isReadOnly
+                          ? text.supportChatReadOnlyHint
+                          : text.supportChatInputHint,
                       hintStyle: const TextStyle(
                         color: _supportComposerHintColor,
                         fontSize: 15.5,
@@ -316,24 +345,24 @@ class _SupportComposerPanel extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 AnimatedScale(
-                  scale: composerCanSend ? 1 : 0.9,
+                  scale: effectiveCanSend ? 1 : 0.9,
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
                   child: IgnorePointer(
-                    ignoring: !composerCanSend || state.isSending,
+                    ignoring: !effectiveCanSend || state.isSending,
                     child: AnimatedOpacity(
                       duration: const Duration(milliseconds: 150),
-                      opacity: composerCanSend || state.isSending ? 1 : 0.72,
+                      opacity: effectiveCanSend || state.isSending ? 1 : 0.72,
                       child: Material(
                         color: state.isSending
                             ? _supportComposerSendGreen.withValues(alpha: 0.85)
-                            : composerCanSend
+                            : effectiveCanSend
                             ? _supportComposerSendGreen
                             : _supportComposerSendGreen.withValues(alpha: 0.3),
                         shape: const CircleBorder(),
                         child: InkWell(
                           customBorder: const CircleBorder(),
-                          onTap: state.isSending || !composerCanSend
+                          onTap: state.isSending || !effectiveCanSend
                               ? null
                               : onSendMessage,
                           child: SizedBox(
@@ -367,6 +396,41 @@ class _SupportComposerPanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 2),
+            if (state.isSending && sendProgress != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: sendProgress,
+                    minHeight: 4,
+                    backgroundColor: colors.surface.withValues(alpha: 0.7),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      _supportComposerSendGreen,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    sendingIndex != null && sendingTotal != null
+                        ? text.supportChatAttachmentUploadingWithCount(
+                            sendingIndex,
+                            sendingTotal,
+                          )
+                        : text.supportChatAttachmentStatusUploading,
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             Padding(
               padding: const EdgeInsets.fromLTRB(6, 0, 8, 0),
               child: Wrap(
@@ -376,10 +440,6 @@ class _SupportComposerPanel extends StatelessWidget {
                   _SupportComposerInfoChip(
                     icon: Icons.photo_library_outlined,
                     label: text.supportChatComposerAttachmentChip,
-                  ),
-                  _SupportComposerInfoChip(
-                    icon: Icons.schedule_rounded,
-                    label: text.supportChatComposerResponseChip,
                   ),
                 ],
               ),
@@ -425,6 +485,168 @@ class _SupportComposerInfoChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SupportLifecycleActionBar extends StatelessWidget {
+  const _SupportLifecycleActionBar({
+    required this.conversation,
+    required this.isBusy,
+    required this.onResolve,
+    required this.onReopen,
+    required this.onClose,
+    required this.onSubmitFeedback,
+  });
+
+  final SupportChatConversation conversation;
+  final bool isBusy;
+  final Future<void> Function() onResolve;
+  final Future<void> Function() onReopen;
+  final Future<void> Function() onClose;
+  final Future<void> Function(int rating) onSubmitFeedback;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final normalizedStatus = conversation.status.trim().toLowerCase();
+    final isResolved = normalizedStatus == 'resolved';
+    final isClosed = normalizedStatus == 'closed';
+    final canResolve =
+        !conversation.isReadOnly &&
+        !isResolved &&
+        !isClosed &&
+        conversation.messages.isNotEmpty;
+    final canReopen = conversation.canReopen;
+    final canClose = isResolved && conversation.closedAtUtc == null;
+    final showRating = isResolved && conversation.feedbackRating == null;
+    final hasActions = canResolve || canReopen || canClose || showRating;
+
+    if (!hasActions) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surface.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showRating) ...[
+                Text(
+                  text.supportChatRateTitle,
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 2,
+                  children: List.generate(5, (index) {
+                    final rating = index + 1;
+                    return IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 32,
+                      ),
+                      onPressed: isBusy ? null : () => onSubmitFeedback(rating),
+                      icon: const Icon(
+                        Icons.star_rounded,
+                        size: 22,
+                        color: Color(0xFFFFB84D),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 4),
+              ] else if (conversation.feedbackRating != null) ...[
+                Text(
+                  text.supportChatRatedLabel(conversation.feedbackRating!),
+                  style: TextStyle(
+                    color: colors.textSoft,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (canResolve)
+                    _SupportLifecycleButton(
+                      icon: Icons.check_rounded,
+                      label: text.supportChatMarkResolvedAction,
+                      isBusy: isBusy,
+                      onPressed: onResolve,
+                    ),
+                  if (canReopen)
+                    _SupportLifecycleButton(
+                      icon: Icons.refresh_rounded,
+                      label: text.supportChatReopenAction,
+                      isBusy: isBusy,
+                      onPressed: onReopen,
+                    ),
+                  if (canClose)
+                    _SupportLifecycleButton(
+                      icon: Icons.archive_outlined,
+                      label: text.supportChatArchiveAction,
+                      isBusy: isBusy,
+                      onPressed: onClose,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportLifecycleButton extends StatelessWidget {
+  const _SupportLifecycleButton({
+    required this.icon,
+    required this.label,
+    required this.isBusy,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isBusy;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        foregroundColor: _supportSecondaryGreen,
+        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        backgroundColor: colors.surfaceStrong.withValues(alpha: 0.72),
+      ),
+      onPressed: isBusy ? null : onPressed,
+      icon: Icon(icon, size: 15),
+      label: Text(label, overflow: TextOverflow.ellipsis),
     );
   }
 }

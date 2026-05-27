@@ -8,6 +8,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
@@ -114,6 +116,16 @@ class _PushNotificationsBootstrapState
             locale: Platform.localeName,
           );
     } catch (_) {}
+
+    try {
+      await ref
+          .read(supportChatRepositoryProvider)
+          .registerPushToken(
+            token: token,
+            platform: Platform.operatingSystem,
+            locale: Platform.localeName,
+          );
+    } catch (_) {}
   }
 
   void _openMessageRoute(RemoteMessage message) {
@@ -123,14 +135,29 @@ class _PushNotificationsBootstrapState
       return;
     }
 
+    if (route is String && _isSupportRoute(route)) {
+      widget.router.go(route);
+      return;
+    }
+
     final generationId = message.data['generationId'];
     if (generationId is String && generationId.isNotEmpty) {
       widget.router.go('${GenerationStatusPage.routePrefix}/$generationId');
+      return;
+    }
+
+    if (message.data['type'] == 'support_chat') {
+      widget.router.go(SupportChatPage.routePath);
     }
   }
 
   void _openDeepLink(Uri uri) {
     if (uri.scheme != 'petmagic') {
+      return;
+    }
+
+    if (uri.host == 'support') {
+      widget.router.go(SupportChatPage.routePath);
       return;
     }
 
@@ -171,5 +198,9 @@ class _PushNotificationsBootstrapState
 
   bool _isGenerationRoute(String route) {
     return route.startsWith('${GenerationStatusPage.routePrefix}/');
+  }
+
+  bool _isSupportRoute(String route) {
+    return route == SupportChatPage.routePath;
   }
 }

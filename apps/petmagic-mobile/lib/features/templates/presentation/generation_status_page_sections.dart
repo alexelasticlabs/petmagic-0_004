@@ -244,9 +244,10 @@ class _StageRow extends StatelessWidget {
 }
 
 class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.generation});
+  const _ResultCard({required this.generation, required this.onOpenViewer});
 
   final TemplateGenerationResult generation;
+  final VoidCallback onOpenViewer;
 
   @override
   Widget build(BuildContext context) {
@@ -257,34 +258,75 @@ class _ResultCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
               borderRadius: BorderRadius.circular(20),
-              child: outputUrl.isEmpty
-                  ? _MediaPlaceholder(label: text.templateFlowResultUnavailable)
-                  : isVideoGeneration(generation)
-                  ? _MediaPlaceholder(label: text.generationStatusVideoReady)
-                  : CachedNetworkImage(
-                      imageUrl: outputUrl,
-                      fit: BoxFit.cover,
-                      errorWidget: (context, url, error) => _MediaPlaceholder(
-                        label: text.templateFlowResultLoadFailed,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: outputUrl.isEmpty
-                ? null
-                : () => SharePlus.instance.share(ShareParams(text: outputUrl)),
-            icon: const Icon(Icons.ios_share_rounded),
-            label: Text(
-              isVideoGeneration(generation)
-                  ? text.generationStatusShareVideoAction
-                  : text.supportChatShareAction,
-              style: TextStyle(color: colors.textStrong),
+              onTap: outputUrl.isEmpty ? null : onOpenViewer,
+              child: AspectRatio(
+                aspectRatio: 9 / 16,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: outputUrl.isEmpty
+                      ? _MediaPlaceholder(
+                          label: text.templateFlowResultUnavailable,
+                        )
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ColoredBox(
+                              color: colors.surfaceStrong,
+                              child: isVideoGeneration(generation)
+                                  ? _InlineVideoPreview(url: outputUrl)
+                                  : CachedNetworkImage(
+                                      imageUrl: outputUrl,
+                                      fit: BoxFit.contain,
+                                      errorWidget: (context, url, error) =>
+                                          _MediaPlaceholder(
+                                            label: text
+                                                .templateFlowResultLoadFailed,
+                                          ),
+                                    ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.56),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.fullscreen_rounded,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        text.templateFlowPreviewFallback,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
             ),
           ),
         ],
@@ -374,15 +416,10 @@ class _BackgroundHintCard extends StatelessWidget {
 }
 
 class _ReadyActionsRow extends StatelessWidget {
-  const _ReadyActionsRow({
-    required this.onSave,
-    required this.onShare,
-    required this.onDelete,
-  });
+  const _ReadyActionsRow({required this.onSave, required this.onShare});
 
   final VoidCallback onSave;
   final VoidCallback onShare;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -399,12 +436,6 @@ class _ReadyActionsRow extends StatelessWidget {
           icon: Icons.share_rounded,
           label: text.supportChatShareAction,
           onTap: onShare,
-        ),
-        const SizedBox(width: 8),
-        _ActionTile(
-          icon: Icons.delete_outline_rounded,
-          label: text.generationStatusDeleteAction,
-          onTap: onDelete,
         ),
       ],
     );
@@ -531,47 +562,433 @@ class _DetailsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(top: 4),
+          initiallyExpanded: false,
+          iconColor: colors.textSoft,
+          collapsedIconColor: colors.textMuted,
+          title: Text(
             title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: colors.textStrong,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 8),
-          for (final row in rows)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      row.$1,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: colors.textMuted),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      row.$2,
-                      textAlign: TextAlign.right,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.textStrong,
-                        fontWeight: FontWeight.w700,
+          children: [
+            for (final row in rows)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        row.$1,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.textMuted,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        row.$2,
+                        textAlign: TextAlign.right,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.textStrong,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+}
+
+class _InlineVideoPreview extends StatefulWidget {
+  const _InlineVideoPreview({required this.url});
+
+  final String url;
+
+  @override
+  State<_InlineVideoPreview> createState() => _InlineVideoPreviewState();
+}
+
+class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
+  VideoPlayerController? _controller;
+  bool _failedToLoad = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_initialize());
+  }
+
+  @override
+  void didUpdateWidget(covariant _InlineVideoPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _controller?.dispose();
+      _controller = null;
+      unawaited(_initialize());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initialize() async {
+    setState(() => _failedToLoad = false);
+    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _controller = controller;
+    controller.setLooping(true);
+    controller.setVolume(0);
+
+    try {
+      await controller.initialize();
+      if (!mounted || _controller != controller) {
+        await controller.dispose();
+        return;
+      }
+
+      await controller.play();
+      setState(() {});
+    } catch (_) {
+      await controller.dispose();
+      if (mounted) {
+        setState(() {
+          _controller = null;
+          _failedToLoad = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final controller = _controller;
+
+    if (_failedToLoad) {
+      return _MediaPlaceholder(label: text.templateFlowResultLoadFailed);
+    }
+
+    if (controller == null || !controller.value.isInitialized) {
+      return const Center(child: CircularProgressIndicator.adaptive());
+    }
+
+    return FittedBox(
+      fit: BoxFit.contain,
+      child: SizedBox(
+        width: controller.value.size.width,
+        height: controller.value.size.height,
+        child: VideoPlayer(controller),
+      ),
+    );
+  }
+}
+
+class _FullscreenResultViewer extends StatefulWidget {
+  const _FullscreenResultViewer({
+    required this.generation,
+    required this.mediaUrl,
+  });
+
+  final TemplateGenerationResult generation;
+  final String mediaUrl;
+
+  @override
+  State<_FullscreenResultViewer> createState() =>
+      _FullscreenResultViewerState();
+}
+
+class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
+  VideoPlayerController? _videoController;
+  bool _videoFailed = false;
+  bool _showControls = true;
+  Timer? _controlsTimer;
+
+  bool get _isVideo => isVideoGeneration(widget.generation);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isVideo) {
+      unawaited(_initializeVideo());
+    }
+    _startControlsTimer();
+  }
+
+  @override
+  void dispose() {
+    _controlsTimer?.cancel();
+    _videoController?.removeListener(_onVideoTick);
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeVideo() async {
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(widget.mediaUrl),
+    );
+    _videoController = controller;
+    controller.setLooping(true);
+
+    try {
+      await controller.initialize();
+      if (!mounted || _videoController != controller) {
+        await controller.dispose();
+        return;
+      }
+
+      controller.addListener(_onVideoTick);
+      await controller.play();
+      setState(() {});
+    } catch (_) {
+      await controller.dispose();
+      if (mounted) {
+        setState(() {
+          _videoController = null;
+          _videoFailed = true;
+        });
+      }
+    }
+  }
+
+  void _onVideoTick() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+    if (_showControls) {
+      _startControlsTimer();
+    } else {
+      _controlsTimer?.cancel();
+    }
+  }
+
+  void _startControlsTimer() {
+    _controlsTimer?.cancel();
+    _controlsTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _showControls = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    final controller = _videoController;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        onTap: _toggleControls,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: _isVideo
+                  ? _buildVideoMedia(text, controller)
+                  : InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: CachedNetworkImage(
+                        imageUrl: widget.mediaUrl,
+                        fit: BoxFit.contain,
+                        errorWidget: (context, url, error) => _MediaPlaceholder(
+                          label: text.templateFlowResultLoadFailed,
+                        ),
+                      ),
+                    ),
+            ),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: _showControls ? 1 : 0,
+              child: IgnorePointer(
+                ignoring: !_showControls,
+                child: Column(
+                  children: [
+                    SafeArea(
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.arrow_back_rounded),
+                            color: Colors.white,
+                          ),
+                          Expanded(
+                            child: Text(
+                              widget.generation.templateTitle ??
+                                  text.generationStatusResultTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_isVideo &&
+                        controller != null &&
+                        controller.value.isInitialized)
+                      SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.64),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: colors.border.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () async {
+                                      if (controller.value.isPlaying) {
+                                        await controller.pause();
+                                      } else {
+                                        await controller.play();
+                                      }
+                                      if (mounted) {
+                                        setState(() {});
+                                        _startControlsTimer();
+                                      }
+                                    },
+                                    icon: Icon(
+                                      controller.value.isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Slider(
+                                      value: controller
+                                          .value
+                                          .position
+                                          .inMilliseconds
+                                          .toDouble()
+                                          .clamp(
+                                            0,
+                                            controller
+                                                .value
+                                                .duration
+                                                .inMilliseconds
+                                                .toDouble(),
+                                          ),
+                                      max: controller
+                                          .value
+                                          .duration
+                                          .inMilliseconds
+                                          .toDouble()
+                                          .clamp(1, double.infinity),
+                                      onChanged: (value) async {
+                                        await controller.seekTo(
+                                          Duration(milliseconds: value.round()),
+                                        );
+                                        if (mounted) {
+                                          setState(() {});
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  Text(
+                                    '${_formatVideoTime(controller.value.position)} / ${_formatVideoTime(controller.value.duration)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: Text(
+                            text.generationStatusFullscreenControlsHint,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoMedia(
+    AppLocalizations text,
+    VideoPlayerController? controller,
+  ) {
+    if (_videoFailed) {
+      return _MediaPlaceholder(label: text.templateFlowResultLoadFailed);
+    }
+
+    if (controller == null || !controller.value.isInitialized) {
+      return const CircularProgressIndicator.adaptive();
+    }
+
+    return FittedBox(
+      fit: BoxFit.contain,
+      child: SizedBox(
+        width: controller.value.size.width,
+        height: controller.value.size.height,
+        child: VideoPlayer(controller),
+      ),
+    );
+  }
+
+  String _formatVideoTime(Duration value) {
+    final totalSeconds = value.inSeconds;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 }
 

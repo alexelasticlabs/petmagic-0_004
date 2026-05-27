@@ -84,6 +84,7 @@ class SupportChatRepository {
     required String contentType,
     required String localeTag,
     String? body,
+    ProgressCallback? onSendProgress,
   }) async {
     final trimmedBody = body?.trim() ?? '';
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -101,6 +102,7 @@ class SupportChatRepository {
         options: _authorizedOptions(
           session,
         ).copyWith(contentType: 'multipart/form-data'),
+        onSendProgress: onSendProgress,
       ),
     );
 
@@ -137,6 +139,98 @@ class SupportChatRepository {
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
         '/api/support/conversation/$conversationId/read',
+        options: _authorizedOptions(session),
+      ),
+    );
+  }
+
+  Future<SupportChatConversation> resolveConversation(
+    String conversationId,
+  ) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/support/conversation/$conversationId/resolve',
+        options: _authorizedOptions(session),
+      ),
+    );
+
+    return SupportChatConversation.fromJson(response.data ?? const {});
+  }
+
+  Future<SupportChatConversation> reopenConversation(
+    String conversationId,
+  ) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/support/conversation/$conversationId/reopen',
+        options: _authorizedOptions(session),
+      ),
+    );
+
+    return SupportChatConversation.fromJson(response.data ?? const {});
+  }
+
+  Future<SupportChatConversation> closeConversation(
+    String conversationId,
+  ) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/support/conversation/$conversationId/close',
+        options: _authorizedOptions(session),
+      ),
+    );
+
+    return SupportChatConversation.fromJson(response.data ?? const {});
+  }
+
+  Future<SupportChatConversation> submitFeedback({
+    required String conversationId,
+    required int rating,
+    String? comment,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/support/conversation/$conversationId/feedback',
+        data: {
+          'rating': rating,
+          if (comment != null && comment.trim().isNotEmpty)
+            'comment': comment.trim(),
+        },
+        options: _authorizedOptions(session),
+      ),
+    );
+
+    return SupportChatConversation.fromJson(response.data ?? const {});
+  }
+
+  Future<void> registerPushToken({
+    required String token,
+    required String platform,
+    String? deviceId,
+    String? appVersion,
+    String? locale,
+  }) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.put<void>(
+        '/api/support/notifications/push-token',
+        data: {
+          'token': token,
+          'platform': platform,
+          if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+          if (appVersion != null && appVersion.isNotEmpty)
+            'appVersion': appVersion,
+          if (locale != null && locale.isNotEmpty) 'locale': locale,
+        },
+        options: _authorizedOptions(session),
+      ),
+    );
+  }
+
+  Future<void> unregisterPushToken(String token) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.delete<void>(
+        '/api/support/notifications/push-token',
+        data: {'token': token},
         options: _authorizedOptions(session),
       ),
     );

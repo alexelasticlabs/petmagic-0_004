@@ -391,18 +391,24 @@ export const ruDictionary: Dictionary = {
   supportAssignmentUnassigned: "Без ответственного",
   supportStatusOpen: "Открыт",
   supportStatusInProgress: "В работе",
+  supportStatusWaitingForSupport: "Ждет поддержку",
+  supportStatusWaitingForUser: "Ждет пользователя",
   supportStatusResolved: "Решен",
   supportStatusClosed: "Закрыт",
   supportStatusOpenHint:
     "Диалог ждёт первой реакции поддержки или нового действия со стороны пользователя.",
   supportStatusInProgressHint:
     "Диалог взят в работу, оператор ведёт переписку и собирает детали решения.",
+  supportStatusWaitingForSupportHint:
+    "Пользователь написал последним. Диалог требует ответа поддержки.",
+  supportStatusWaitingForUserHint:
+    "Поддержка ответила. Сейчас ожидается действие или подтверждение от пользователя.",
   supportStatusResolvedHint:
-    "Решение уже предложено. Если пользователь ответит снова, диалог автоматически вернётся в статус «Открыт».",
+    "Решение предложено. Пользователь может переоткрыть диалог в течение 7 дней.",
   supportStatusClosedHint:
-    "Диалог завершён вручную и исключён из активной очереди, пока пользователь не напишет заново.",
+    "Диалог архивирован и доступен только для просмотра, пока администратор не переоткроет его.",
   supportStatusAutomationHint:
-    "Ответ поддержки автоматически переводит диалог в «В работе» и назначает текущего администратора, если диалог ещё не закреплён. Сообщение пользователя после «Решен» или «Закрыт» автоматически снова открывает диалог.",
+    "Ответ поддержки переводит диалог в «Ждет пользователя» и назначает текущего администратора, если диалог ещё не закреплён. Сообщение пользователя переводит активный диалог в «Ждет поддержку». После «Решен» пользователь может переоткрыть обращение 7 дней.",
   supportBackToInbox: "К очереди",
   supportOpenConversation: "Открыть диалог",
   supportAssignedTo: "Ответственный",
@@ -457,6 +463,8 @@ export const ruDictionary: Dictionary = {
   supportPriorityHigh: "Высокий",
   supportWaitingLabel: "Ожидает",
   supportMarkInProgressAction: "Взять в работу",
+  supportMarkWaitingForSupportAction: "Ждет поддержку",
+  supportMarkWaitingForUserAction: "Ждет пользователя",
   supportResolveConversationAction: "Отметить решенным",
   supportReopenConversationAction: "Переоткрыть",
   supportCloseConversationAction: "Закрыть диалог",

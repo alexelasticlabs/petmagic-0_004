@@ -16,10 +16,10 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
-    final maxBubbleWidth = math.min(
-      MediaQuery.sizeOf(context).width * 0.68,
-      288.0,
-    );
+    final hasImageAttachment = message.hasImageAttachment;
+    final maxBubbleWidth = hasImageAttachment
+        ? math.min(MediaQuery.sizeOf(context).width * 0.52, 196.0)
+        : math.min(MediaQuery.sizeOf(context).width * 0.68, 288.0);
     final attachmentCacheWidth =
         (maxBubbleWidth * MediaQuery.devicePixelRatioOf(context)).round();
     final attachmentCacheHeight = (attachmentCacheWidth / 1.05).round();
@@ -43,7 +43,6 @@ class _MessageBubble extends StatelessWidget {
         ? text.supportChatMessageRead
         : text.supportChatMessageDelivered;
     final attachmentUploadStatus = message.normalizedAttachmentUploadStatus;
-    final hasImageAttachment = message.hasImageAttachment;
     final hasFileAttachment = message.hasAttachment && !hasImageAttachment;
     final hasFailedAttachment =
         message.isAttachmentFailed && !message.hasAttachment;
@@ -113,7 +112,7 @@ class _MessageBubble extends StatelessWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(14),
                           child: AspectRatio(
-                            aspectRatio: 1.05,
+                            aspectRatio: 1,
                             child: Image.network(
                               message.attachmentUrl!,
                               fit: BoxFit.cover,
@@ -152,32 +151,29 @@ class _MessageBubble extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (attachmentFileName != null &&
-                          attachmentFileName.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.image_outlined,
-                              size: 13,
-                              color: metaColor,
-                            ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                attachmentFileName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: metaColor,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.image_outlined,
+                            size: 13,
+                            color: metaColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              text.supportChatPhotoAttachedLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: metaColor,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                       if (shouldShowBody) const SizedBox(height: 8),
                     ],
                     if (hasFailedAttachment) ...[
@@ -473,15 +469,20 @@ class _AttachmentStatusRow extends StatelessWidget {
 }
 
 class _SupportSystemMessageCard extends StatelessWidget {
-  const _SupportSystemMessageCard({required this.message});
+  const _SupportSystemMessageCard({
+    required this.message,
+    required this.createdAtUtc,
+  });
 
   final String message;
+  final DateTime createdAtUtc;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
     final title = text.supportChatSystemNoticeTitle;
+    final timeLabel = DateFormat('HH:mm').format(createdAtUtc.toLocal());
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -512,6 +513,18 @@ class _SupportSystemMessageCard extends StatelessWidget {
                   fontSize: 12,
                   height: 1.35,
                   fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  timeLabel,
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],

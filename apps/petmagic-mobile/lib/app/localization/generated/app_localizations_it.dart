@@ -1518,7 +1518,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get supportChatTeamTitle => 'PetMagic Support';
 
   @override
-  String get supportChatTeamStatus => 'Online • typical reply under 5 min';
+  String get supportChatTeamStatus => 'Average response time: under 24 hours';
 
   @override
   String get supportChatTodayLabel => 'Today';
@@ -1582,7 +1582,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get supportChatFaqResponseBody =>
-      'Active chats are normally answered within a few minutes during support hours. We keep the thread here so you do not lose context.';
+      'The support team will reply in this chat. We usually respond within 24 hours.';
 
   @override
   String get supportChatFaqRefundTitle => 'How do refunds work?';
@@ -1602,6 +1602,28 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get supportChatStatusClosed => 'Chiuso';
+
+  @override
+  String get supportChatWaitingForSupportStatus => 'Waiting for support';
+
+  @override
+  String get supportChatWaitingForSupportStatusHint =>
+      'The request is open. Support will see the new message.';
+
+  @override
+  String get supportChatAwaitingYourReplyStatus => 'Awaiting your reply';
+
+  @override
+  String get supportChatSupportRepliedStatusHint =>
+      'Support replied. Check the message above.';
+
+  @override
+  String get supportChatResolvedStatusHint =>
+      'This request was marked as resolved. You can reopen it for 7 days.';
+
+  @override
+  String get supportChatClosedStatusHint =>
+      'The conversation is archived and read-only.';
 
   @override
   String get supportChatMessageDelivered => 'Consegnato';
@@ -1660,6 +1682,11 @@ class AppLocalizationsIt extends AppLocalizations {
   String get supportChatAttachmentStatusRetry => 'Riprova';
 
   @override
+  String supportChatAttachmentUploadingWithCount(Object current, Object total) {
+    return 'Uploading photo $current of $total';
+  }
+
+  @override
   String get supportChatImageUploadFailedLabel =>
       'Caricamento immagine non riuscito';
 
@@ -1680,6 +1707,42 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get supportChatComposerResponseChip =>
       'Di solito rispondiamo entro poche ore';
+
+  @override
+  String get supportChatAddPhotoTitle => 'Add photo';
+
+  @override
+  String get supportChatTakePhotoAction => 'Take photo';
+
+  @override
+  String get supportChatChooseGalleryAction => 'Choose from gallery';
+
+  @override
+  String get supportChatPhotoAttachedLabel => 'Photo attached';
+
+  @override
+  String get supportChatTooManyAttachmentsError =>
+      'You can attach up to 5 photos.';
+
+  @override
+  String get supportChatMarkResolvedAction => 'Resolved';
+
+  @override
+  String get supportChatReopenAction => 'Reopen';
+
+  @override
+  String get supportChatArchiveAction => 'Archive';
+
+  @override
+  String get supportChatRateTitle => 'Rate the support reply';
+
+  @override
+  String supportChatRatedLabel(Object rating) {
+    return 'Your rating: $rating/5';
+  }
+
+  @override
+  String get supportChatReadOnlyHint => 'This conversation is read-only';
 
   @override
   String get profileSettingsThemeSystem => 'Sistema';
@@ -2330,6 +2393,19 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get generationStatusFileSaveFailedMessage =>
       'Impossibile salvare il file. Riprova.';
+
+  @override
+  String get generationStatusSavedToGalleryMessage => 'Salvato nella galleria';
+
+  @override
+  String get generationStatusLinkCopiedMessage => 'Link copiato';
+
+  @override
+  String get generationStatusDeletedMessage => 'Eliminato';
+
+  @override
+  String get generationStatusFullscreenControlsHint =>
+      'Tocca per mostrare/nascondere i controlli';
 
   @override
   String get generationStatusDeleteSoonMessage =>

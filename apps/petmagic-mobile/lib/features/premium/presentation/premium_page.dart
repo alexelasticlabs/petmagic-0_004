@@ -517,6 +517,10 @@ String _friendlyPremiumMessage(AppLocalizations text, String raw) {
     return text.premiumCheckoutFailed;
   }
 
+  if (raw.contains('economy.payment_provider_unavailable')) {
+    return text.premiumCheckoutFailed;
+  }
+
   if (raw.contains('premium_billing_unavailable')) {
     return text.premiumManageFailed;
   }

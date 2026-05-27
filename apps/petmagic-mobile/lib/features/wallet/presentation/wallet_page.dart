@@ -82,6 +82,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
         : MediaQuery.viewPaddingOf(context).bottom +
               kPetMagicBottomContentInsetCompact;
     final checkoutStatusMessage = _checkoutStatusMessage(text, state);
+    final checkoutCheckingMessage = _checkoutCheckingMessage(text, state);
 
     return ProfileScreenBackground(
       child: SafeArea(
@@ -103,7 +104,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       const SizedBox(height: 16),
                       ProfileProgressCard(
                         title: text.externalCheckoutCheckingTitle,
-                        message: text.externalCheckoutCheckingMessage,
+                        message: checkoutCheckingMessage,
                         tone: colors.accent,
                         isLoading: true,
                       ),
@@ -148,9 +149,11 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         isBuying: state.isBuying,
                         onSelect: (pack) => _showPackDetailSheet(
                           context,
-                          pack,
+                          state.packs,
+                          initialPack: pack,
                           isBuying: state.isBuying,
-                          onBuy: () => controller.buyPack(pack),
+                          onBuy: (selectedPack) =>
+                              controller.buyPack(selectedPack),
                           onCheckoutReady: (checkout) async {
                             controller.resetCheckoutVerification();
                             controller.consumeCheckoutUrl();
@@ -262,14 +265,14 @@ class _WalletPageState extends ConsumerState<WalletPage>
       }
 
       final controller = ref.read(walletControllerProvider.notifier);
-      await controller.verifyCheckoutStatus();
+      await controller.verifyStripeCheckout(checkout.externalPaymentId);
 
-      // Webhook is canonical, but keep a resilience fallback for delayed/failed webhook delivery.
+      // Fallback polling keeps UX resilient when direct verification is delayed.
       final verificationState = ref
           .read(walletControllerProvider)
           .checkoutVerificationState;
       if (verificationState != WalletCheckoutVerificationState.succeeded) {
-        await controller.verifyStripeCheckout(checkout.externalPaymentId);
+        await controller.verifyCheckoutStatus();
       }
     } on StripeException catch (error) {
       developer.log(
@@ -395,15 +398,38 @@ Uri? _checkoutUri(String rawUrl) {
 
 Future<void> _showPackDetailSheet(
   BuildContext context,
-  CurrencyPackModel pack, {
+  List<CurrencyPackModel> packs, {
+  required CurrencyPackModel initialPack,
   required bool isBuying,
-  required Future<PurchaseCheckoutModel?> Function() onBuy,
+  required Future<PurchaseCheckoutModel?> Function(CurrencyPackModel pack)
+  onBuy,
   required Future<void> Function(PurchaseCheckoutModel checkout)
   onCheckoutReady,
 }) async {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
-  final price = _formatPrice(pack);
+  final sortedPacks = packs.toList(growable: false)
+    ..sort((left, right) {
+      final bySpark = left.totalSpark.compareTo(right.totalSpark);
+      if (bySpark != 0) {
+        return bySpark;
+      }
+
+      return left.priceAmount.compareTo(right.priceAmount);
+    });
+
+  if (sortedPacks.isEmpty) {
+    return;
+  }
+
+  final bestOfferPack = sortedPacks.last;
+  final popularPack = sortedPacks.length >= 3
+      ? sortedPacks[(sortedPacks.length - 1) ~/ 2]
+      : null;
+  var selectedPack = sortedPacks.firstWhere(
+    (pack) => pack.packId == initialPack.packId,
+    orElse: () => sortedPacks.first,
+  );
 
   await showPetMagicModalBottomSheet<void>(
     context: context,
@@ -414,172 +440,430 @@ Future<void> _showPackDetailSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
     ),
-    builder: (sheetContext, bottomInset) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: colors.accent.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(Icons.bolt_rounded, color: colors.accent),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        pack.displayName,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        text.walletPackDetailSubtitle,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 12.5,
-                          height: 1.35,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: colors.surfaceStrong.withValues(alpha: 0.58),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: colors.border),
+    builder: (sheetContext, _) {
+      final safeBottom = MediaQuery.viewPaddingOf(sheetContext).bottom;
+      return StatefulBuilder(
+        builder: (modalContext, setModalState) {
+          final selectedPrice = _formatPrice(selectedPack);
+          final photosApprox = (selectedPack.totalSpark / _kPhotoCostSpark)
+              .floor();
+          final videosApprox = (selectedPack.totalSpark / _kVideoCostSpark)
+              .floor();
+          final usageSummary = videosApprox > 0
+              ? '${text.walletApproxPhotos(photosApprox)} • ${text.walletApproxVideos(videosApprox)}'
+              : text.walletApproxPhotos(photosApprox);
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 18, 20, safeBottom + 12),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.88,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          text.walletPackTotalSpark(pack.totalSpark),
-                          style: TextStyle(
-                            color: colors.textStrong,
-                            fontSize: 23,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: colors.accent.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            Icons.lock_outline_rounded,
+                            color: colors.accent,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          text.walletPackBreakdown(
-                            pack.grantedSpark,
-                            pack.bonusSpark,
-                          ),
-                          style: TextStyle(
-                            color: colors.textSoft,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Pay with Stripe',
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Secure card payment. Balance updates automatically.',
+                                style: TextStyle(
+                                  color: colors.textSoft,
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    price,
-                    style: TextStyle(
-                      color: colors.accent,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: const [
+                        _CheckoutTrustPill(
+                          icon: Icons.verified_user_rounded,
+                          label: 'Secure Payment',
+                        ),
+                        _CheckoutTrustPill(
+                          icon: Icons.credit_card_rounded,
+                          label: 'Stripe',
+                        ),
+                        _CheckoutTrustPill(
+                          icon: Icons.payment_rounded,
+                          label: 'Visa • Mastercard',
+                        ),
+                        _CheckoutTrustPill(
+                          icon: Icons.phone_iphone_rounded,
+                          label: 'Apple Pay • Google Pay',
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (pack.bonusSpark > 0) ...[
-              const SizedBox(height: 12),
-              _PackDetailRow(
-                icon: Icons.add_circle_outline_rounded,
-                label: text.walletPackBonusPill(pack.bonusSpark),
-                accent: colors.gold,
-              ),
-            ],
-            const SizedBox(height: 12),
-            ProfileProgressCard(
-              title: text.externalCheckoutStripeTitle,
-              message: text.externalCheckoutStripeMessage,
-              tone: colors.gold,
-              icon: Icons.lock_outline_rounded,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: isBuying
-                    ? null
-                    : () async {
-                        debugPrint(
-                          'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${pack.code}',
-                        );
-                        final checkout = await onBuy();
-                        if (!sheetContext.mounted) {
-                          return;
-                        }
-
-                        if (checkout == null) {
-                          debugPrint(
-                            'PETMAGIC_WALLET_CHECKOUT buy_result empty_checkout',
-                          );
-                          ScaffoldMessenger.of(sheetContext).showSnackBar(
-                            SnackBar(
-                              content: Text(text.walletPaymentUnavailableError),
+                    const SizedBox(height: 16),
+                    for (
+                      var index = 0;
+                      index < sortedPacks.length;
+                      index++
+                    ) ...[
+                      _CheckoutPackOptionTile(
+                        pack: sortedPacks[index],
+                        price: _formatPrice(sortedPacks[index]),
+                        isSelected:
+                            sortedPacks[index].packId == selectedPack.packId,
+                        isBestValue:
+                            bestOfferPack.packId == sortedPacks[index].packId,
+                        isPopular:
+                            popularPack?.packId == sortedPacks[index].packId &&
+                            bestOfferPack.packId != sortedPacks[index].packId,
+                        onTap: () => setModalState(
+                          () => selectedPack = sortedPacks[index],
+                        ),
+                      ),
+                      if (index != sortedPacks.length - 1)
+                        const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${selectedPack.totalSpark} PawSpark Tokens',
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
                             ),
-                          );
-                          return;
-                        }
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedPack.bonusSpark > 0
+                                ? text.walletPackBreakdown(
+                                    selectedPack.grantedSpark,
+                                    selectedPack.bonusSpark,
+                                  )
+                                : 'Used for photo and video generations',
+                            style: TextStyle(
+                              color: colors.textSoft,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${text.walletWhatYouCanCreateTitle} $usageSummary',
+                            style: TextStyle(
+                              color: colors.textMuted,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.44),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Column(
+                        children: [
+                          _CheckoutSummaryRow(
+                            label: '${selectedPack.totalSpark} PawSpark',
+                            value: selectedPrice,
+                          ),
+                          const SizedBox(height: 6),
+                          const _CheckoutSummaryRow(
+                            label: 'Tax',
+                            value: 'Included',
+                          ),
+                          const Divider(height: 16),
+                          _CheckoutSummaryRow(
+                            label: 'Total',
+                            value: selectedPrice,
+                            isEmphasized: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: isBuying
+                            ? null
+                            : () async {
+                                debugPrint(
+                                  'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${selectedPack.code}',
+                                );
+                                final checkout = await onBuy(selectedPack);
+                                if (!sheetContext.mounted) {
+                                  return;
+                                }
 
-                        Navigator.of(sheetContext).pop();
-                        await onCheckoutReady(checkout);
-                      },
-                icon: Icon(
-                  isBuying
-                      ? Icons.hourglass_top_rounded
-                      : Icons.credit_card_rounded,
+                                if (checkout == null) {
+                                  debugPrint(
+                                    'PETMAGIC_WALLET_CHECKOUT buy_result empty_checkout',
+                                  );
+                                  ScaffoldMessenger.of(
+                                    sheetContext,
+                                  ).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        text.walletPaymentUnavailableError,
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                Navigator.of(sheetContext).pop();
+                                await onCheckoutReady(checkout);
+                              },
+                        icon: Icon(
+                          isBuying
+                              ? Icons.hourglass_top_rounded
+                              : Icons.credit_card_rounded,
+                        ),
+                        label: Text('Pay $selectedPrice'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      text.walletCheckoutHint,
+                      style: TextStyle(
+                        color: colors.textMuted,
+                        fontSize: 11.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                label: Text(text.externalCheckoutContinueAction),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              text.walletCheckoutHint,
-              style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 11.5,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       );
     },
   );
+}
+
+class _CheckoutPackOptionTile extends StatelessWidget {
+  const _CheckoutPackOptionTile({
+    required this.pack,
+    required this.price,
+    required this.isSelected,
+    required this.isBestValue,
+    required this.isPopular,
+    required this.onTap,
+  });
+
+  final CurrencyPackModel pack;
+  final String price;
+  final bool isSelected;
+  final bool isBestValue;
+  final bool isPopular;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final borderColor = isSelected ? colors.accent : colors.border;
+    final badgeLabel = isBestValue
+        ? text.walletBestValueBadge
+        : (isPopular ? text.walletPopularBadge : null);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isSelected
+                ? colors.accent.withValues(alpha: 0.12)
+                : colors.surfaceStrong.withValues(alpha: 0.34),
+            border: Border.all(color: borderColor, width: isSelected ? 1.8 : 1),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isSelected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: isSelected ? colors.accent : colors.textMuted,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${pack.totalSpark} PawSpark Tokens',
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (badgeLabel != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        badgeLabel,
+                        style: TextStyle(
+                          color: isBestValue ? colors.gold : colors.accent,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                price,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckoutTrustPill extends StatelessWidget {
+  const _CheckoutTrustPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: colors.surfaceStrong.withValues(alpha: 0.46),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: colors.accent),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.textSoft,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckoutSummaryRow extends StatelessWidget {
+  const _CheckoutSummaryRow({
+    required this.label,
+    required this.value,
+    this.isEmphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isEmphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final valueColor = isEmphasized ? colors.accent : colors.textStrong;
+    final valueWeight = isEmphasized ? FontWeight.w900 : FontWeight.w800;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: colors.textSoft,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: 13,
+            fontWeight: valueWeight,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 String _formatPrice(CurrencyPackModel pack) {
@@ -676,6 +960,31 @@ String? _checkoutStatusMessage(AppLocalizations text, WalletState state) {
           text.walletDataUnavailableFallback,
     ),
   };
+}
+
+String _checkoutCheckingMessage(AppLocalizations text, WalletState state) {
+  final progressMessage = state.checkoutProgressMessage;
+  final startedAt = state.checkoutVerificationStartedAt;
+  final elapsed = startedAt == null
+      ? null
+      : DateTime.now().toUtc().difference(startedAt);
+  final elapsedLabel = elapsed == null
+      ? null
+      : '${elapsed.isNegative ? 0 : elapsed.inSeconds}s';
+
+  if (progressMessage == null || progressMessage.isEmpty) {
+    if (elapsedLabel == null) {
+      return text.externalCheckoutCheckingMessage;
+    }
+
+    return '${text.externalCheckoutCheckingMessage} ($elapsedLabel)';
+  }
+
+  if (elapsedLabel == null) {
+    return progressMessage;
+  }
+
+  return '$progressMessage ($elapsedLabel)';
 }
 
 String _friendlyError(AppLocalizations text, String value) {

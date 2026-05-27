@@ -145,6 +145,9 @@ class _FakeTemplateGenerationRepository
   Future<void> markGenerationRead(String generationId) async {}
 
   @override
+  Future<void> deleteGeneration(String generationId) async {}
+
+  @override
   Future<void> submitGenerationFeedback({
     required String generationId,
     required int rating,

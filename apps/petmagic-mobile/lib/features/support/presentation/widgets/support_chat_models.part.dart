@@ -7,6 +7,7 @@ const _supportComposerSendGreen = Color(0xFF34B77A);
 const _supportComposerIconColor = Color(0xFFA0AEC0);
 const _supportComposerHintColor = Color(0xFF7B8794);
 const _supportAttachmentMaxFileSizeBytes = 10 * 1024 * 1024;
+const _supportAttachmentMaxCount = 5;
 
 bool _isSupportSystemMessage(SupportChatMessage message) {
   if (!message.isFromAdmin) {
@@ -60,7 +61,7 @@ String _mapSupportError(AppLocalizations text, String raw) {
   return raw;
 }
 
-enum _SupportAttachmentAction { gallery }
+enum _SupportAttachmentAction { camera, gallery }
 
 class _SupportQuickActionData {
   const _SupportQuickActionData({

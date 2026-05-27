@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
@@ -519,12 +520,12 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
+        child: MaterialApp.router(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: const [Locale('en')],
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
-          home: const ProfileSettingsPage(),
+          routerConfig: _testRouter(const ProfileSettingsPage()),
         ),
       ),
     );
@@ -559,12 +560,12 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
+        child: MaterialApp.router(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: const [Locale('en')],
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
-          home: const ProfileAccountInfoPage(),
+          routerConfig: _testRouter(const ProfileAccountInfoPage()),
         ),
       ),
     );
@@ -610,13 +611,15 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
+        child: MaterialApp.router(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: [Locale('en')],
+          supportedLocales: const [Locale('en')],
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
-          home: ProfileSettingsDetailPage(
-            kind: ProfileSettingsDetailKind.deleteAccount,
+          routerConfig: _testRouter(
+            const ProfileSettingsDetailPage(
+              kind: ProfileSettingsDetailKind.deleteAccount,
+            ),
           ),
         ),
       ),
@@ -794,7 +797,7 @@ void main() {
     expect(find.text('Your conversation is secure'), findsOneWidget);
     expect(find.byIcon(Icons.shield_rounded), findsOneWidget);
     expect(find.text('PetMagic Support'), findsWidgets);
-    expect(find.text('Online • typical reply under 5 min'), findsWidgets);
+    expect(find.text('Average response time: under 24 hours'), findsWidgets);
     expect(find.byIcon(Icons.attach_file_rounded), findsOneWidget);
   });
 
@@ -883,6 +886,12 @@ void main() {
     final state = container.read(appPreferencesControllerProvider);
     expect(state.locale, const Locale('en'));
   });
+}
+
+GoRouter _testRouter(Widget home) {
+  return GoRouter(
+    routes: [GoRoute(path: '/', builder: (context, state) => home)],
+  );
 }
 
 Future<void> _pumpApp(

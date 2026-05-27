@@ -44,6 +44,9 @@ public static class TemplateGenerationEndpoints
         group.MapPost("/generations/{generationId:guid}/mark-read", MarkReadAsync)
             .RequireAuthorization();
 
+        group.MapDelete("/generations/{generationId:guid}", DeleteGenerationAsync)
+            .RequireAuthorization();
+
         group.MapPost("/generations/{generationId:guid}/feedback", RecordFeedbackAsync)
             .RequireAuthorization();
 
@@ -220,6 +223,32 @@ public static class TemplateGenerationEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteGenerationAsync(
+        HttpContext context,
+        Guid generationId,
+        ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await generationService.DeleteAsync(userId!.Value, generationId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: result.Error.Code == "templates.not_found"
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();

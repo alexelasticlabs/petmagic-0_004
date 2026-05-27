@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
@@ -39,8 +40,6 @@ void main() {
       expect(find.textContaining('Недельная награда'), findsNothing);
       expect(find.text('Способы оплаты'), findsNothing);
 
-      expect(find.text(text.walletAdRewardCompactTitle), findsWidgets);
-
       expect(find.text(text.walletPromoTitle), findsNothing);
 
       await tester.drag(find.byType(ListView).first, const Offset(0, -520));
@@ -53,7 +52,7 @@ void main() {
       await tester.tap(find.text(text.walletPackDetailsAction).first);
       await tester.pumpAndSettle();
 
-      expect(find.text(text.walletPackDetailSubtitle), findsOneWidget);
+      expect(find.text('Pay with Stripe'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -79,15 +78,11 @@ void main() {
 
     expect(
       find.byWidgetPredicate((widget) {
-        if (widget is! DecoratedBox || widget.decoration is! BoxDecoration) {
-          return false;
-        }
-
-        final decoration = widget.decoration as BoxDecoration;
-        return decoration.color ==
-            const Color(0xFFD7A44A).withValues(alpha: 0.12);
+        return widget is ProfileMessageCard &&
+            widget.message == text.walletPartialActivityUnavailable &&
+            widget.tone == const Color(0xFFFFC107);
       }),
-      findsWidgets,
+      findsOneWidget,
     );
   });
 
@@ -400,7 +395,7 @@ Future<void> _pumpWalletPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      child: MaterialApp(
+      child: MaterialApp.router(
         theme: AppTheme.dark(),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -413,7 +408,14 @@ Future<void> _pumpWalletPage(
           Locale('it'),
           Locale('pl'),
         ],
-        home: const Material(child: WalletPage()),
+        routerConfig: GoRouter(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (context, state) => const Material(child: WalletPage()),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -430,7 +432,7 @@ Future<void> _pumpRewardsPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [walletRepositoryProvider.overrideWithValue(repository)],
-      child: MaterialApp(
+      child: MaterialApp.router(
         theme: AppTheme.dark(),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -443,7 +445,14 @@ Future<void> _pumpRewardsPage(
           Locale('it'),
           Locale('pl'),
         ],
-        home: const Material(child: RewardsPage()),
+        routerConfig: GoRouter(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (context, state) => const Material(child: RewardsPage()),
+            ),
+          ],
+        ),
       ),
     ),
   );

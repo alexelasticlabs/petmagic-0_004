@@ -264,55 +264,6 @@ String _packImageAsset(String code) {
   };
 }
 
-class _PackDetailRow extends StatelessWidget {
-  const _PackDetailRow({
-    required this.icon,
-    required this.label,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Icon(icon, size: 15, color: accent),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _LedgerSection extends StatelessWidget {
   const _LedgerSection({required this.items, required this.onViewAll});
 

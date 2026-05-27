@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -60,7 +61,9 @@ void main() {
       320,
       scrollable: find.byType(Scrollable),
     );
-    await tester.tap(deleteRow, warnIfMissed: false);
+    await tester.ensureVisible(deleteRow);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteRow);
     await tester.pumpAndSettle();
 
     final deleteButton = find.widgetWithText(
@@ -89,7 +92,7 @@ Future<void> _pumpSettingsPage(WidgetTester tester) async {
           _FakePreferencesController.new,
         ),
       ],
-      child: MaterialApp(
+      child: MaterialApp.router(
         theme: AppTheme.dark(),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -102,7 +105,15 @@ Future<void> _pumpSettingsPage(WidgetTester tester) async {
           Locale('it'),
           Locale('pl'),
         ],
-        home: const Scaffold(body: ProfileSettingsPage()),
+        routerConfig: GoRouter(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (context, state) =>
+                  const Scaffold(body: ProfileSettingsPage()),
+            ),
+          ],
+        ),
       ),
     ),
   );

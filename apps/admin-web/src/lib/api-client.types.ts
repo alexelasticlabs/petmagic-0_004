@@ -328,7 +328,13 @@ export type AdminRedeemCode = {
   redemptions: AdminRedeemCodeRedemption[];
 };
 
-export type SupportConversationStatus = "Open" | "InProgress" | "Resolved" | "Closed";
+export type SupportConversationStatus =
+  | "Open"
+  | "InProgress"
+  | "WaitingForSupport"
+  | "WaitingForUser"
+  | "Resolved"
+  | "Closed";
 
 export type SupportConversationPriority = "Low" | "Normal" | "High";
 
@@ -367,6 +373,12 @@ export type AdminSupportConversationSummary = {
   adminUnreadCount: number;
   createdAtUtc: string;
   updatedAtUtc: string;
+  resolvedAtUtc?: string | null;
+  reopenUntilUtc?: string | null;
+  closedAtUtc?: string | null;
+  feedbackRating?: number | null;
+  isReadOnly: boolean;
+  canReopen: boolean;
 };
 
 export type AdminSupportConversation = {
@@ -383,6 +395,14 @@ export type AdminSupportConversation = {
   createdAtUtc: string;
   updatedAtUtc: string;
   lastMessageAtUtc?: string | null;
+  resolvedAtUtc?: string | null;
+  reopenUntilUtc?: string | null;
+  closedAtUtc?: string | null;
+  feedbackRating?: number | null;
+  feedbackComment?: string | null;
+  feedbackSubmittedAtUtc?: string | null;
+  isReadOnly: boolean;
+  canReopen: boolean;
   messages: AdminSupportMessage[];
 };
 

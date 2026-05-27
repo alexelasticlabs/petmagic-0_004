@@ -19,6 +19,9 @@ class SupportChatState {
     required this.isSending,
     this.conversation,
     this.errorMessage,
+    this.sendProgress,
+    this.sendingAttachmentIndex,
+    this.sendingAttachmentTotal,
   });
 
   const SupportChatState.initial()
@@ -29,6 +32,9 @@ class SupportChatState {
   final bool isSending;
   final SupportChatConversation? conversation;
   final String? errorMessage;
+  final double? sendProgress;
+  final int? sendingAttachmentIndex;
+  final int? sendingAttachmentTotal;
 
   SupportChatState copyWith({
     bool? isLoading,
@@ -38,6 +44,10 @@ class SupportChatState {
     String? errorMessage,
     bool clearConversation = false,
     bool clearError = false,
+    double? sendProgress,
+    int? sendingAttachmentIndex,
+    int? sendingAttachmentTotal,
+    bool clearSendProgress = false,
   }) {
     return SupportChatState(
       isLoading: isLoading ?? this.isLoading,
@@ -47,6 +57,15 @@ class SupportChatState {
           ? null
           : (conversation ?? this.conversation),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      sendProgress: clearSendProgress
+          ? null
+          : (sendProgress ?? this.sendProgress),
+      sendingAttachmentIndex: clearSendProgress
+          ? null
+          : (sendingAttachmentIndex ?? this.sendingAttachmentIndex),
+      sendingAttachmentTotal: clearSendProgress
+          ? null
+          : (sendingAttachmentTotal ?? this.sendingAttachmentTotal),
     );
   }
 }
@@ -122,11 +141,18 @@ class SupportChatController extends Notifier<SupportChatState> {
   Future<void> sendMessage(String value, {required String localeTag}) async {
     final body = value.trim();
     final conversation = state.conversation;
-    if (body.isEmpty || conversation == null || state.isSending) {
+    if (body.isEmpty ||
+        conversation == null ||
+        conversation.isReadOnly ||
+        state.isSending) {
       return;
     }
 
-    state = state.copyWith(isSending: true, clearError: true);
+    state = state.copyWith(
+      isSending: true,
+      clearError: true,
+      clearSendProgress: true,
+    );
 
     try {
       final message = await _repository.sendMessage(
@@ -139,10 +165,15 @@ class SupportChatController extends Notifier<SupportChatState> {
         isSending: false,
         conversation: _appendOutgoingMessage(conversation, message),
         clearError: true,
+        clearSendProgress: true,
       );
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
-      state = state.copyWith(isSending: false, errorMessage: error.message);
+      state = state.copyWith(
+        isSending: false,
+        errorMessage: error.message,
+        clearSendProgress: true,
+      );
     }
   }
 
@@ -170,13 +201,21 @@ class SupportChatController extends Notifier<SupportChatState> {
     required String contentType,
     required String localeTag,
     String? body,
+    int? attachmentBatchIndex,
+    int? attachmentBatchTotal,
   }) async {
     final conversation = state.conversation;
-    if (conversation == null || state.isSending) {
+    if (conversation == null || conversation.isReadOnly || state.isSending) {
       return false;
     }
 
-    state = state.copyWith(isSending: true, clearError: true);
+    state = state.copyWith(
+      isSending: true,
+      clearError: true,
+      sendProgress: 0,
+      sendingAttachmentIndex: attachmentBatchIndex,
+      sendingAttachmentTotal: attachmentBatchTotal,
+    );
 
     try {
       final message = await _repository.sendAttachment(
@@ -186,6 +225,15 @@ class SupportChatController extends Notifier<SupportChatState> {
         contentType: contentType,
         localeTag: localeTag,
         body: body,
+        onSendProgress: (sent, total) {
+          if (total <= 0) {
+            return;
+          }
+
+          state = state.copyWith(
+            sendProgress: (sent / total).clamp(0.0, 1.0).toDouble(),
+          );
+        },
       );
 
       final attachmentFailure = _messageFromAttachmentFailure(message);
@@ -195,16 +243,22 @@ class SupportChatController extends Notifier<SupportChatState> {
         conversation: _appendOutgoingMessage(conversation, message),
         errorMessage: attachmentFailure,
         clearError: attachmentFailure == null,
+        clearSendProgress: true,
       );
       _resumePendingRealtimeRefreshIfNeeded();
       return message.isAttachmentUploaded;
     } on AppException catch (error) {
-      state = state.copyWith(isSending: false, errorMessage: error.message);
+      state = state.copyWith(
+        isSending: false,
+        errorMessage: error.message,
+        clearSendProgress: true,
+      );
       return false;
     } on Object {
       state = state.copyWith(
         isSending: false,
         errorMessage: 'support.attachment_unavailable',
+        clearSendProgress: true,
       );
       return false;
     }
@@ -217,7 +271,7 @@ class SupportChatController extends Notifier<SupportChatState> {
     required String contentType,
   }) async {
     final conversation = state.conversation;
-    if (conversation == null || state.isSending) {
+    if (conversation == null || conversation.isReadOnly || state.isSending) {
       return false;
     }
 
@@ -253,6 +307,36 @@ class SupportChatController extends Notifier<SupportChatState> {
     }
   }
 
+  Future<void> resolveConversation() async {
+    await _runConversationLifecycleAction(
+      (conversation) =>
+          _repository.resolveConversation(conversation.conversationId),
+    );
+  }
+
+  Future<void> reopenConversation() async {
+    await _runConversationLifecycleAction(
+      (conversation) =>
+          _repository.reopenConversation(conversation.conversationId),
+    );
+  }
+
+  Future<void> closeConversation() async {
+    await _runConversationLifecycleAction(
+      (conversation) =>
+          _repository.closeConversation(conversation.conversationId),
+    );
+  }
+
+  Future<void> submitFeedback(int rating) async {
+    await _runConversationLifecycleAction(
+      (conversation) => _repository.submitFeedback(
+        conversationId: conversation.conversationId,
+        rating: rating,
+      ),
+    );
+  }
+
   void _handleRealtimeUpdate(SupportChatRealtimeUpdate event) {
     final activeConversationId = state.conversation?.conversationId;
     if (activeConversationId != null &&
@@ -269,16 +353,48 @@ class SupportChatController extends Notifier<SupportChatState> {
     SupportChatMessage message,
   ) {
     return conversation.copyWith(
-      status:
-          conversation.status == 'Resolved' || conversation.status == 'Closed'
-          ? 'Open'
-          : conversation.status,
+      status: 'WaitingForSupport',
       userUnreadCount: 0,
       adminUnreadCount: conversation.adminUnreadCount + 1,
       updatedAtUtc: message.createdAtUtc,
       lastMessageAtUtc: message.createdAtUtc,
+      isReadOnly: false,
+      canReopen: false,
+      clearResolvedAt: true,
+      clearReopenUntil: true,
+      clearClosedAt: true,
       messages: [...conversation.messages, message],
     );
+  }
+
+  Future<void> _runConversationLifecycleAction(
+    Future<SupportChatConversation> Function(
+      SupportChatConversation conversation,
+    )
+    action,
+  ) async {
+    final conversation = state.conversation;
+    if (conversation == null || state.isSending) {
+      return;
+    }
+
+    state = state.copyWith(isSending: true, clearError: true);
+    try {
+      final updatedConversation = await action(conversation);
+      state = state.copyWith(
+        isSending: false,
+        conversation: updatedConversation,
+        clearError: true,
+      );
+      _resumePendingRealtimeRefreshIfNeeded();
+    } on AppException catch (error) {
+      state = state.copyWith(isSending: false, errorMessage: error.message);
+    } on Object {
+      state = state.copyWith(
+        isSending: false,
+        errorMessage: 'support.unavailable',
+      );
+    }
   }
 
   SupportChatConversation _upsertMessage(

@@ -54,7 +54,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Need help with premium", SupportConversationPriority.High));
 
-        Assert.Equal("Open", openResponse.Status);
+        Assert.Equal("WaitingForSupport", openResponse.Status);
         Assert.Equal("High", openResponse.Priority);
         Assert.Single(openResponse.Messages);
 
@@ -91,7 +91,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var conversation = Assert.Single(moderatorInbox);
         Assert.Equal(created.ConversationId, conversation.ConversationId);
-        Assert.Equal("Open", conversation.Status);
+        Assert.Equal("WaitingForSupport", conversation.Status);
         Assert.Equal("user@petmagic.test", conversation.UserEmail);
     }
 
@@ -192,7 +192,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             adminClient,
             $"/api/admin/support/conversations/{created.ConversationId}");
 
-        Assert.Equal("Open", afterReopen.Status);
+        Assert.Equal("WaitingForSupport", afterReopen.Status);
         Assert.Equal(1, afterReopen.AdminUnreadCount);
         Assert.Equal(0, afterReopen.UserUnreadCount);
         Assert.Equal(3, afterReopen.Messages.Count);
@@ -577,6 +577,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
             builder.Services.AddScoped<IIdentityUserLookupService, TestIdentityUserLookupService>();
             builder.Services.AddSingleton<ISupportAttachmentStorage, FakeSupportAttachmentStorage>();
+            builder.Services.AddSingleton<ISupportChatPushNotificationSender, NoopSupportChatPushNotificationSender>();
             builder.Services.AddScoped<ISupportChatService, SupportChatService>();
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
             builder.Services.AddSupportChatApiModule();
@@ -881,6 +882,14 @@ public sealed class SupportChatEndpointsIntegrationTests
                     && payload[11] == 0x50,
                 _ => false,
             };
+        }
+    }
+
+    private sealed class NoopSupportChatPushNotificationSender : ISupportChatPushNotificationSender
+    {
+        public Task NotifyUserAsync(SupportChatPushNotification notification, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
     }
 

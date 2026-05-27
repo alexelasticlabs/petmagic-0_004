@@ -52,6 +52,44 @@ public sealed class MarkSupportConversationReadCommandValidator : AbstractValida
     }
 }
 
+public sealed class ResolveSupportConversationCommandValidator : AbstractValidator<ResolveSupportConversationCommand>
+{
+    public ResolveSupportConversationCommandValidator()
+    {
+        RuleFor(x => x.ConversationId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty();
+    }
+}
+
+public sealed class CloseSupportConversationCommandValidator : AbstractValidator<CloseSupportConversationCommand>
+{
+    public CloseSupportConversationCommandValidator()
+    {
+        RuleFor(x => x.ConversationId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty();
+    }
+}
+
+public sealed class ReopenSupportConversationCommandValidator : AbstractValidator<ReopenSupportConversationCommand>
+{
+    public ReopenSupportConversationCommandValidator()
+    {
+        RuleFor(x => x.ConversationId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty();
+    }
+}
+
+public sealed class SubmitSupportConversationFeedbackCommandValidator : AbstractValidator<SubmitSupportConversationFeedbackCommand>
+{
+    public SubmitSupportConversationFeedbackCommandValidator()
+    {
+        RuleFor(x => x.ConversationId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Rating).InclusiveBetween(1, 5);
+        RuleFor(x => x.Comment).MaximumLength(1000);
+    }
+}
+
 public sealed class UpdateSupportConversationStatusCommandValidator : AbstractValidator<UpdateSupportConversationStatusCommand>
 {
     public UpdateSupportConversationStatusCommandValidator()

@@ -34,6 +34,15 @@ public static class SupportChatEndpoints
             .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
         userGroup.MapPost("/conversation/{conversationId:guid}/read", MarkUserReadAsync);
+        userGroup.MapPost("/conversation/{conversationId:guid}/resolve", ResolveUserConversationAsync);
+        userGroup.MapPost("/conversation/{conversationId:guid}/close", CloseUserConversationAsync);
+        userGroup.MapPost("/conversation/{conversationId:guid}/reopen", ReopenUserConversationAsync);
+        userGroup.MapPost("/conversation/{conversationId:guid}/feedback", SubmitUserConversationFeedbackAsync)
+            .RequireRateLimiting("support-chat");
+        userGroup.MapPut("/notifications/push-token", RegisterPushTokenAsync)
+            .RequireRateLimiting("support-chat");
+        userGroup.MapDelete("/notifications/push-token", UnregisterPushTokenAsync)
+            .RequireRateLimiting("support-chat");
 
         var adminGroup = endpoints.MapGroup("/api/admin/support")
             .WithTags("Admin.Support")
@@ -648,6 +657,171 @@ public static class SupportChatEndpoints
         return TypedResults.NoContent();
     }
 
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> ResolveUserConversationAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] IValidator<ResolveSupportConversationCommand> validator,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var command = new ResolveSupportConversationCommand(conversationId, userId, IsAdmin: false);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ResolveConversationAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> CloseUserConversationAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] IValidator<CloseSupportConversationCommand> validator,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var command = new CloseSupportConversationCommand(conversationId, userId, IsAdmin: false);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.CloseConversationAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> ReopenUserConversationAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] IValidator<ReopenSupportConversationCommand> validator,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var command = new ReopenSupportConversationCommand(conversationId, userId, IsAdmin: false);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ReopenConversationAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> SubmitUserConversationFeedbackAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromBody] SubmitSupportConversationFeedbackRequest request,
+        [FromServices] IValidator<SubmitSupportConversationFeedbackCommand> validator,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var command = new SubmitSupportConversationFeedbackCommand(conversationId, userId, request.Rating, request.Comment);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.SubmitConversationFeedbackAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> RegisterPushTokenAsync(
+        HttpContext httpContext,
+        [FromBody] RegisterPushTokenRequest request,
+        [FromServices] ISupportPushTokenService pushTokenService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var result = await pushTokenService.RegisterAsync(
+            new RegisterSupportPushTokenCommand(
+                userId,
+                request.Token,
+                request.Platform,
+                request.DeviceId,
+                request.AppVersion,
+                request.Locale),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> UnregisterPushTokenAsync(
+        HttpContext httpContext,
+        [FromBody] UnregisterPushTokenRequest request,
+        [FromServices] ISupportPushTokenService pushTokenService,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var result = await pushTokenService.UnregisterAsync(
+            new UnregisterSupportPushTokenCommand(userId, request.Token),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.NoContent();
+    }
+
     private static async Task<Results<Ok<IReadOnlyList<SupportConversationSummaryResponse>>, ProblemHttpResult>> ListAdminInboxAsync(
         HttpContext httpContext,
         [FromQuery] string? status,
@@ -935,6 +1109,11 @@ public static class SupportChatEndpoints
             "support.attachment_file_too_large" => StatusCodes.Status400BadRequest,
             "support.attachment_storage_failed" => StatusCodes.Status400BadRequest,
             "support.attachment_retry_not_allowed" => StatusCodes.Status409Conflict,
+            "support.conversation_read_only" => StatusCodes.Status409Conflict,
+            "support.reopen_window_expired" => StatusCodes.Status409Conflict,
+            "support.feedback_not_allowed" => StatusCodes.Status409Conflict,
+            "support.feedback_rating_invalid" => StatusCodes.Status400BadRequest,
+            "support.push_token_invalid" => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status400BadRequest,
         };
 
@@ -980,6 +1159,12 @@ public static class SupportChatEndpoints
     public sealed record UpdateSupportConversationStatusRequest(string Status);
 
     public sealed record AssignSupportConversationRequest(Guid? AssignedAdminId);
+
+    public sealed record SubmitSupportConversationFeedbackRequest(int Rating, string? Comment = null);
+
+    public sealed record RegisterPushTokenRequest(string Token, string? Platform, string? DeviceId, string? AppVersion, string? Locale);
+
+    public sealed record UnregisterPushTokenRequest(string Token);
 
     public sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, bool IsEnabled = true, int SortOrder = 0);
 }

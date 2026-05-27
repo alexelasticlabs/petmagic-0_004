@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -84,14 +85,16 @@ Future<void> _pumpLinkedAccountsPage(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
+      child: MaterialApp.router(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('en'),
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        home: const ProfileSettingsDetailPage(
-          kind: ProfileSettingsDetailKind.linkedAccounts,
+        routerConfig: _testRouter(
+          const ProfileSettingsDetailPage(
+            kind: ProfileSettingsDetailKind.linkedAccounts,
+          ),
         ),
       ),
     ),
@@ -115,20 +118,28 @@ Future<void> _pumpLinkedAccountsPageWithError(WidgetTester tester) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
+      child: MaterialApp.router(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('en'),
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        home: const ProfileSettingsDetailPage(
-          kind: ProfileSettingsDetailKind.linkedAccounts,
+        routerConfig: _testRouter(
+          const ProfileSettingsDetailPage(
+            kind: ProfileSettingsDetailKind.linkedAccounts,
+          ),
         ),
       ),
     ),
   );
 
   await tester.pumpAndSettle();
+}
+
+GoRouter _testRouter(Widget home) {
+  return GoRouter(
+    routes: [GoRoute(path: '/', builder: (context, state) => home)],
+  );
 }
 
 class _FakeProfileController extends ProfileController {

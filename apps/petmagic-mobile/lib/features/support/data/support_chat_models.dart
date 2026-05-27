@@ -133,6 +133,14 @@ class SupportChatConversation {
     required this.updatedAtUtc,
     required this.lastMessageAtUtc,
     required this.messages,
+    this.resolvedAtUtc,
+    this.reopenUntilUtc,
+    this.closedAtUtc,
+    this.feedbackRating,
+    this.feedbackComment,
+    this.feedbackSubmittedAtUtc,
+    this.isReadOnly = false,
+    this.canReopen = false,
   });
 
   final String conversationId;
@@ -148,6 +156,14 @@ class SupportChatConversation {
   final DateTime createdAtUtc;
   final DateTime updatedAtUtc;
   final DateTime? lastMessageAtUtc;
+  final DateTime? resolvedAtUtc;
+  final DateTime? reopenUntilUtc;
+  final DateTime? closedAtUtc;
+  final int? feedbackRating;
+  final String? feedbackComment;
+  final DateTime? feedbackSubmittedAtUtc;
+  final bool isReadOnly;
+  final bool canReopen;
   final List<SupportChatMessage> messages;
 
   SupportChatConversation copyWith({
@@ -158,9 +174,21 @@ class SupportChatConversation {
     int? adminUnreadCount,
     DateTime? updatedAtUtc,
     DateTime? lastMessageAtUtc,
+    DateTime? resolvedAtUtc,
+    DateTime? reopenUntilUtc,
+    DateTime? closedAtUtc,
+    int? feedbackRating,
+    String? feedbackComment,
+    DateTime? feedbackSubmittedAtUtc,
+    bool? isReadOnly,
+    bool? canReopen,
     List<SupportChatMessage>? messages,
     bool clearAssignedAdmin = false,
     bool clearLastMessageAt = false,
+    bool clearResolvedAt = false,
+    bool clearReopenUntil = false,
+    bool clearClosedAt = false,
+    bool clearFeedback = false,
   }) {
     return SupportChatConversation(
       conversationId: conversationId,
@@ -182,6 +210,24 @@ class SupportChatConversation {
       lastMessageAtUtc: clearLastMessageAt
           ? null
           : (lastMessageAtUtc ?? this.lastMessageAtUtc),
+      resolvedAtUtc: clearResolvedAt
+          ? null
+          : (resolvedAtUtc ?? this.resolvedAtUtc),
+      reopenUntilUtc: clearReopenUntil
+          ? null
+          : (reopenUntilUtc ?? this.reopenUntilUtc),
+      closedAtUtc: clearClosedAt ? null : (closedAtUtc ?? this.closedAtUtc),
+      feedbackRating: clearFeedback
+          ? null
+          : (feedbackRating ?? this.feedbackRating),
+      feedbackComment: clearFeedback
+          ? null
+          : (feedbackComment ?? this.feedbackComment),
+      feedbackSubmittedAtUtc: clearFeedback
+          ? null
+          : (feedbackSubmittedAtUtc ?? this.feedbackSubmittedAtUtc),
+      isReadOnly: isReadOnly ?? this.isReadOnly,
+      canReopen: canReopen ?? this.canReopen,
       messages: messages ?? this.messages,
     );
   }
@@ -207,6 +253,18 @@ class SupportChatConversation {
       lastMessageAtUtc: DateTime.tryParse(
         json['lastMessageAtUtc'] as String? ?? '',
       ),
+      resolvedAtUtc: DateTime.tryParse(json['resolvedAtUtc'] as String? ?? ''),
+      reopenUntilUtc: DateTime.tryParse(
+        json['reopenUntilUtc'] as String? ?? '',
+      ),
+      closedAtUtc: DateTime.tryParse(json['closedAtUtc'] as String? ?? ''),
+      feedbackRating: json['feedbackRating'] as int?,
+      feedbackComment: json['feedbackComment'] as String?,
+      feedbackSubmittedAtUtc: DateTime.tryParse(
+        json['feedbackSubmittedAtUtc'] as String? ?? '',
+      ),
+      isReadOnly: json['isReadOnly'] as bool? ?? false,
+      canReopen: json['canReopen'] as bool? ?? false,
       messages: (json['messages'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
           .map(SupportChatMessage.fromJson)

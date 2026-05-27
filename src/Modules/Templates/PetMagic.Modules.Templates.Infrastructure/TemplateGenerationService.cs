@@ -122,7 +122,11 @@ internal sealed class TemplateGenerationService(
         var job = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Include(x => x.Template)
-            .FirstOrDefaultAsync(x => x.Id == generationId && x.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.Id == generationId
+                    && x.UserId == userId
+                    && x.HiddenByUserAtUtc == null,
+                cancellationToken);
 
         return job is null
             ? Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound)
@@ -137,7 +141,7 @@ internal sealed class TemplateGenerationService(
         var generationsQuery = dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Include(x => x.Template)
-            .Where(x => x.UserId == userId);
+            .Where(x => x.UserId == userId && x.HiddenByUserAtUtc == null);
 
         generationsQuery = ApplyStatusFilter(generationsQuery, query.Status);
 
@@ -156,6 +160,7 @@ internal sealed class TemplateGenerationService(
         var count = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .CountAsync(x => x.UserId == userId
+                && x.HiddenByUserAtUtc == null
                 && x.Status == TemplateGenerationStatus.Completed
                 && x.ResultViewedAtUtc == null,
                 cancellationToken);
@@ -166,7 +171,11 @@ internal sealed class TemplateGenerationService(
     public async Task<Result> MarkReadAsync(Guid userId, Guid generationId, CancellationToken cancellationToken)
     {
         var job = await dbContext.TemplateGenerationJobs
-            .FirstOrDefaultAsync(x => x.Id == generationId && x.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.Id == generationId
+                    && x.UserId == userId
+                    && x.HiddenByUserAtUtc == null,
+                cancellationToken);
 
         if (job is null)
         {
@@ -175,6 +184,25 @@ internal sealed class TemplateGenerationService(
 
         job.ResultViewedAtUtc ??= DateTime.UtcNow;
         job.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> DeleteAsync(Guid userId, Guid generationId, CancellationToken cancellationToken)
+    {
+        var job = await dbContext.TemplateGenerationJobs
+            .FirstOrDefaultAsync(x => x.Id == generationId && x.UserId == userId, cancellationToken);
+
+        if (job is null || job.HiddenByUserAtUtc != null)
+        {
+            return Result.Failure(TemplatesErrors.NotFound);
+        }
+
+        var now = DateTime.UtcNow;
+        job.HiddenByUserAtUtc = now;
+        job.UpdatedAtUtc = now;
+        job.ResultViewedAtUtc ??= now;
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

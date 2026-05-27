@@ -1,9 +1,13 @@
 part of '../support_chat_page.dart';
 
 extension _SupportChatPageActions on _SupportChatPageState {
-  Future<void> _pickImageAttachmentImpl() async {
+  Future<void> _pickCameraAttachmentImpl() async {
+    if (!_canAddMoreAttachments()) {
+      return;
+    }
+
     final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+      source: ImageSource.camera,
       imageQuality: 92,
       maxWidth: 1800,
     );
@@ -11,6 +15,70 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
+    final attachment = await _validatePickedImageAttachmentImpl(picked);
+    if (attachment == null || !mounted) {
+      return;
+    }
+
+    _applyState(() {
+      _pendingAttachments = [..._pendingAttachments, attachment];
+    });
+  }
+
+  Future<void> _pickGalleryAttachmentsImpl() async {
+    if (!_canAddMoreAttachments()) {
+      return;
+    }
+
+    final remainingSlots =
+        _supportAttachmentMaxCount - _pendingAttachments.length;
+    final pickedImages = await _imagePicker.pickMultiImage(
+      imageQuality: 92,
+      maxWidth: 1800,
+    );
+    if (pickedImages.isEmpty || !mounted) {
+      return;
+    }
+
+    final nextAttachments = <_PendingSupportAttachment>[];
+    for (final picked in pickedImages.take(remainingSlots)) {
+      final attachment = await _validatePickedImageAttachmentImpl(picked);
+      if (attachment != null) {
+        nextAttachments.add(attachment);
+      }
+
+      if (!mounted) {
+        return;
+      }
+    }
+
+    if (nextAttachments.isEmpty) {
+      return;
+    }
+
+    _applyState(() {
+      _pendingAttachments = [..._pendingAttachments, ...nextAttachments];
+    });
+  }
+
+  bool _canAddMoreAttachments() {
+    if (_pendingAttachments.length < _supportAttachmentMaxCount) {
+      return true;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppLocalizations.of(context).supportChatTooManyAttachmentsError,
+        ),
+      ),
+    );
+    return false;
+  }
+
+  Future<_PendingSupportAttachment?> _validatePickedImageAttachmentImpl(
+    XFile picked,
+  ) async {
     final contentType = _controller.resolveContentTypeForUpload(picked.path);
     final normalizedType = contentType.toLowerCase();
     if (normalizedType != 'image/jpeg' &&
@@ -26,13 +94,13 @@ extension _SupportChatPageActions on _SupportChatPageState {
           ),
         ),
       );
-      return;
+      return null;
     }
 
     try {
       final fileSizeBytes = await File(picked.path).length();
       if (!mounted) {
-        return;
+        return null;
       }
 
       if (fileSizeBytes > _supportAttachmentMaxFileSizeBytes) {
@@ -44,19 +112,17 @@ extension _SupportChatPageActions on _SupportChatPageState {
             ),
           ),
         );
-        return;
+        return null;
       }
     } on Object {
       // If file size cannot be resolved on this platform, rely on backend validation.
     }
 
-    _applyState(() {
-      _pendingAttachment = _PendingSupportAttachment(
-        filePath: picked.path,
-        fileName: picked.name,
-        contentType: contentType,
-      );
-    });
+    return _PendingSupportAttachment(
+      filePath: picked.path,
+      fileName: picked.name,
+      contentType: contentType,
+    );
   }
 
   Future<void> _showAttachmentOptionsImpl() async {
@@ -94,18 +160,53 @@ extension _SupportChatPageActions on _SupportChatPageState {
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        text.supportChatAddPhotoTitle,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.photo_camera_outlined,
+                      color: _supportComposerIconColor,
+                    ),
+                    title: Text(
+                      text.supportChatTakePhotoAction,
+                      style: TextStyle(color: colors.textStrong),
+                    ),
+                    onTap: () => Navigator.of(
+                      sheetContext,
+                    ).pop(_SupportAttachmentAction.camera),
+                  ),
                   ListTile(
                     leading: const Icon(
                       Icons.photo_library_outlined,
                       color: _supportComposerIconColor,
                     ),
                     title: Text(
-                      text.imageLabel,
+                      text.supportChatChooseGalleryAction,
                       style: TextStyle(color: colors.textStrong),
                     ),
                     onTap: () => Navigator.of(
                       sheetContext,
                     ).pop(_SupportAttachmentAction.gallery),
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.close_rounded, color: colors.textMuted),
+                    title: Text(
+                      text.walletRedeemCancelAction,
+                      style: TextStyle(color: colors.textSoft),
+                    ),
+                    onTap: () => Navigator.of(sheetContext).pop(),
                   ),
                   const SizedBox(height: 6),
                 ],
@@ -121,14 +222,16 @@ extension _SupportChatPageActions on _SupportChatPageState {
     }
 
     switch (action) {
+      case _SupportAttachmentAction.camera:
+        await _pickCameraAttachmentImpl();
       case _SupportAttachmentAction.gallery:
-        await _pickImageAttachmentImpl();
+        await _pickGalleryAttachmentsImpl();
     }
   }
 
   Future<void> _sendCurrentMessageImpl(String localeTag) async {
     if (_hasPendingAttachment) {
-      await _sendPendingAttachmentImpl(localeTag);
+      await _sendPendingAttachmentsImpl(localeTag);
       return;
     }
 
@@ -143,58 +246,54 @@ extension _SupportChatPageActions on _SupportChatPageState {
     }
   }
 
-  Future<void> _sendPendingAttachmentImpl(String localeTag) async {
-    final pendingAttachment = _pendingAttachment;
-    if (pendingAttachment == null) {
+  Future<void> _sendPendingAttachmentsImpl(String localeTag) async {
+    final pendingAttachments = [..._pendingAttachments];
+    if (pendingAttachments.isEmpty) {
       return;
     }
 
-    final previousConversation = ref
-        .read(supportChatControllerProvider)
-        .conversation;
-    final previousMessageCount = previousConversation?.messages.length ?? 0;
+    final body = _messageController.text;
+    for (var index = 0; index < pendingAttachments.length; index++) {
+      final pendingAttachment = pendingAttachments[index];
+      await _controller.sendAttachment(
+        filePath: pendingAttachment.filePath,
+        fileName: pendingAttachment.fileName,
+        contentType: pendingAttachment.contentType,
+        localeTag: localeTag,
+        body: index == 0 ? body : null,
+        attachmentBatchIndex: index + 1,
+        attachmentBatchTotal: pendingAttachments.length,
+      );
 
-    final wasSent = await _controller.sendAttachment(
-      filePath: pendingAttachment.filePath,
-      fileName: pendingAttachment.fileName,
-      contentType: pendingAttachment.contentType,
-      localeTag: localeTag,
-      body: _messageController.text,
-    );
+      if (!mounted) {
+        return;
+      }
 
-    if (!mounted) {
-      return;
+      final errorValue = ref.read(supportChatControllerProvider).errorMessage;
+      final isTransportFailure =
+          errorValue?.contains('support.unavailable') == true ||
+          errorValue?.contains('support.request_failed') == true;
+      if (isTransportFailure) {
+        return;
+      }
     }
 
-    final currentState = ref.read(supportChatControllerProvider);
-    final currentConversation = currentState.conversation;
-    final latestMessage = currentConversation?.messages.isNotEmpty == true
-        ? currentConversation!.messages.last
-        : null;
-
-    final attachmentResultPersisted =
-        (currentConversation?.messages.length ?? 0) > previousMessageCount &&
-        latestMessage != null &&
-        latestMessage.attachmentFileName == pendingAttachment.fileName &&
-        (latestMessage.isAttachmentUploaded ||
-            latestMessage.isAttachmentFailed);
-
-    final errorValue = ref.read(supportChatControllerProvider).errorMessage;
-    final isTransportFailure =
-        errorValue?.contains('support.unavailable') == true ||
-        errorValue?.contains('support.request_failed') == true;
-
-    if (wasSent || attachmentResultPersisted || !isTransportFailure) {
-      _messageController.clear();
-      _applyState(() {
-        _pendingAttachment = null;
-      });
-    }
+    _messageController.clear();
+    _applyState(() {
+      _pendingAttachments = const [];
+    });
   }
 
-  void _removePendingAttachmentImpl() {
+  void _removePendingAttachmentImpl(int index) {
+    if (index < 0 || index >= _pendingAttachments.length) {
+      return;
+    }
+
     _applyState(() {
-      _pendingAttachment = null;
+      _pendingAttachments = [
+        for (var i = 0; i < _pendingAttachments.length; i++)
+          if (i != index) _pendingAttachments[i],
+      ];
     });
   }
 

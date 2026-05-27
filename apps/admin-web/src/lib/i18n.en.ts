@@ -390,18 +390,22 @@ export const enDictionary: Dictionary = {
   supportAssignmentUnassigned: "Unassigned only",
   supportStatusOpen: "Open",
   supportStatusInProgress: "In progress",
+  supportStatusWaitingForSupport: "Waiting for support",
+  supportStatusWaitingForUser: "Waiting for user",
   supportStatusResolved: "Resolved",
   supportStatusClosed: "Closed",
   supportStatusOpenHint:
     "The conversation is waiting for the first support action or for a new user update.",
   supportStatusInProgressHint:
     "An operator is actively handling the case and working through the resolution.",
+  supportStatusWaitingForSupportHint: "The user sent the latest message. Support needs to reply.",
+  supportStatusWaitingForUserHint:
+    "Support replied. The conversation is waiting for the user to confirm or act.",
   supportStatusResolvedHint:
-    "A solution has been given. If the user replies again, the conversation automatically returns to Open.",
-  supportStatusClosedHint:
-    "The conversation was manually finished and removed from the active queue until the user writes again.",
+    "A solution has been given. The user can reopen the conversation for 7 days.",
+  supportStatusClosedHint: "The conversation is archived and read-only until an admin reopens it.",
   supportStatusAutomationHint:
-    "A support reply automatically moves the conversation to In progress and assigns the current admin when the chat is still unassigned. A user reply after Resolved or Closed automatically reopens the conversation.",
+    "A support reply moves the conversation to Waiting for user and assigns the current admin when the chat is unassigned. A user message moves an active conversation to Waiting for support. After Resolved, the user can reopen it for 7 days.",
   supportBackToInbox: "Back to inbox",
   supportOpenConversation: "Open conversation",
   supportAssignedTo: "Assigned to",
@@ -456,6 +460,8 @@ export const enDictionary: Dictionary = {
   supportPriorityHigh: "High",
   supportWaitingLabel: "Waiting",
   supportMarkInProgressAction: "Mark as in progress",
+  supportMarkWaitingForSupportAction: "Waiting for support",
+  supportMarkWaitingForUserAction: "Waiting for user",
   supportResolveConversationAction: "Mark resolved",
   supportReopenConversationAction: "Reopen",
   supportCloseConversationAction: "Close conversation",

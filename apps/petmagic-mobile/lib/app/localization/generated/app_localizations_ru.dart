@@ -1519,8 +1519,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatTeamTitle => 'PetMagic Support';
 
   @override
-  String get supportChatTeamStatus =>
-      'Онлайн • обычно отвечаем меньше чем за 5 минут';
+  String get supportChatTeamStatus => 'Среднее время ответа: до 24 часов';
 
   @override
   String get supportChatTodayLabel => 'Сегодня';
@@ -1582,7 +1581,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatFaqResponseBody =>
-      'В активное время команда обычно отвечает за несколько минут. Весь контекст останется в этом же чате.';
+      'Команда поддержки ответит в этом же чате. Обычно мы возвращаемся с ответом в течение 24 часов.';
 
   @override
   String get supportChatFaqRefundTitle => 'Как работает возврат?';
@@ -1602,6 +1601,28 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatStatusClosed => 'Закрыт';
+
+  @override
+  String get supportChatWaitingForSupportStatus => 'Ожидает поддержку';
+
+  @override
+  String get supportChatWaitingForSupportStatusHint =>
+      'Запрос открыт. Команда поддержки увидит новое сообщение.';
+
+  @override
+  String get supportChatAwaitingYourReplyStatus => 'Ожидает ваш ответ';
+
+  @override
+  String get supportChatSupportRepliedStatusHint =>
+      'Поддержка ответила. Проверьте сообщение выше.';
+
+  @override
+  String get supportChatResolvedStatusHint =>
+      'Обращение отмечено решенным. Его можно переоткрыть в течение 7 дней.';
+
+  @override
+  String get supportChatClosedStatusHint =>
+      'Диалог архивирован и доступен только для просмотра.';
 
   @override
   String get supportChatMessageDelivered => 'Доставлено';
@@ -1660,6 +1681,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatAttachmentStatusRetry => 'Повтор';
 
   @override
+  String supportChatAttachmentUploadingWithCount(Object current, Object total) {
+    return 'Загружаем фото $current из $total';
+  }
+
+  @override
   String get supportChatImageUploadFailedLabel =>
       'Не удалось загрузить изображение';
 
@@ -1671,15 +1697,51 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatSystemNoticeBody =>
-      'Мы получили ваше сообщение и ответим в ближайшее время. Среднее время ответа: до 24 часов.';
+      'Мы получили ваше сообщение. Команда поддержки ответит здесь.';
 
   @override
   String get supportChatComposerAttachmentChip =>
-      '1 фото: JPG/PNG/WebP, до 10 МБ';
+      'До 5 фото: JPG/PNG/WebP, до 10 МБ каждое';
 
   @override
   String get supportChatComposerResponseChip =>
       'Обычно отвечаем в течение нескольких часов';
+
+  @override
+  String get supportChatAddPhotoTitle => 'Добавить фото';
+
+  @override
+  String get supportChatTakePhotoAction => 'Сделать фото';
+
+  @override
+  String get supportChatChooseGalleryAction => 'Выбрать из галереи';
+
+  @override
+  String get supportChatPhotoAttachedLabel => 'Фото прикреплено';
+
+  @override
+  String get supportChatTooManyAttachmentsError =>
+      'Можно прикрепить до 5 фото.';
+
+  @override
+  String get supportChatMarkResolvedAction => 'Решено';
+
+  @override
+  String get supportChatReopenAction => 'Переоткрыть';
+
+  @override
+  String get supportChatArchiveAction => 'В архив';
+
+  @override
+  String get supportChatRateTitle => 'Оцените ответ поддержки';
+
+  @override
+  String supportChatRatedLabel(Object rating) {
+    return 'Ваша оценка: $rating/5';
+  }
+
+  @override
+  String get supportChatReadOnlyHint => 'Диалог доступен только для просмотра';
 
   @override
   String get profileSettingsThemeSystem => 'Системная';
@@ -2314,6 +2376,19 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get generationStatusFileSaveFailedMessage =>
       'Не удалось сохранить файл. Попробуйте снова.';
+
+  @override
+  String get generationStatusSavedToGalleryMessage => 'Сохранено в галерею';
+
+  @override
+  String get generationStatusLinkCopiedMessage => 'Ссылка скопирована';
+
+  @override
+  String get generationStatusDeletedMessage => 'Удалено';
+
+  @override
+  String get generationStatusFullscreenControlsHint =>
+      'Нажмите, чтобы скрыть/показать элементы управления';
 
   @override
   String get generationStatusDeleteSoonMessage => 'Удаление скоро добавим.';

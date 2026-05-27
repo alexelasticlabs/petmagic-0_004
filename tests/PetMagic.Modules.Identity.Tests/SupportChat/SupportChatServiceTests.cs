@@ -29,7 +29,7 @@ public sealed class SupportChatServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Open", result.Value.Status);
+        Assert.Equal("WaitingForSupport", result.Value.Status);
         Assert.Equal("High", result.Value.Priority);
         Assert.Single(result.Value.Messages);
         Assert.Equal("Help, please", result.Value.Messages[0].Body);
@@ -39,7 +39,7 @@ public sealed class SupportChatServiceTests
 
         var conversation = await scope.SupportDbContext.SupportConversations.Include(x => x.Messages).SingleAsync();
         Assert.Equal(userId, conversation.InitiatorUserId);
-        Assert.Equal(SupportConversationStatus.Open, conversation.Status);
+        Assert.Equal(SupportConversationStatus.WaitingForSupport, conversation.Status);
         Assert.Equal(SupportConversationPriority.High, conversation.Priority);
         Assert.Single(conversation.Messages);
     }
@@ -60,7 +60,7 @@ public sealed class SupportChatServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Open", result.Value.Status);
+        Assert.Equal("WaitingForSupport", result.Value.Status);
 
         var conversation = await scope.SupportDbContext.SupportConversations.Include(x => x.Messages).SingleAsync();
         Assert.Equal(userId, conversation.InitiatorUserId);
@@ -68,7 +68,7 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
-    public async Task SendMessageAsync_ByAdmin_ShouldAssignConversationAndMoveToInProgress()
+    public async Task SendMessageAsync_ByAdmin_ShouldAssignConversationAndMoveToWaitingForUser()
     {
         var store = CreateStore();
 
@@ -102,7 +102,7 @@ public sealed class SupportChatServiceTests
         var detail = await detailScope.CreateService().GetAdminConversationAsync(conversationId, CancellationToken.None);
 
         Assert.True(detail.IsSuccess);
-        Assert.Equal("InProgress", detail.Value.Status);
+        Assert.Equal("WaitingForUser", detail.Value.Status);
         Assert.Equal(adminId, detail.Value.AssignedAdminId);
         Assert.Equal("Support Admin", detail.Value.AssignedAdminDisplayName);
         Assert.Equal(1, detail.Value.UserUnreadCount);
@@ -320,7 +320,7 @@ public sealed class SupportChatServiceTests
 
         await using var verificationScope = await store.CreateScopeAsync();
         var conversation = await verificationScope.SupportDbContext.SupportConversations.SingleAsync();
-        Assert.Equal(SupportConversationStatus.Open, conversation.Status);
+        Assert.Equal(SupportConversationStatus.WaitingForSupport, conversation.Status);
         Assert.Null(conversation.ResolvedAtUtc);
 
         var forbiddenResult = await verificationScope.CreateService().SendMessageAsync(
@@ -329,6 +329,90 @@ public sealed class SupportChatServiceTests
 
         Assert.True(forbiddenResult.IsFailure);
         Assert.Equal("support.forbidden", forbiddenResult.Error.Code);
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_AfterReopenWindowExpired_ShouldFail()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using (var resolveScope = await store.CreateScopeAsync())
+        {
+            var resolveResult = await resolveScope.CreateService().UpdateConversationStatusAsync(
+                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Resolved),
+                CancellationToken.None);
+
+            Assert.True(resolveResult.IsSuccess);
+
+            var conversation = await resolveScope.SupportDbContext.SupportConversations.SingleAsync(x => x.Id == conversationId);
+            conversation.ReopenUntilUtc = DateTime.UtcNow.AddDays(-1);
+            await resolveScope.SupportDbContext.SaveChangesAsync();
+        }
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageAsync(
+            new SendSupportMessageCommand(conversationId, userId, "Issue is back", false),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsFailure);
+        Assert.Equal("support.reopen_window_expired", sendResult.Error.Code);
+    }
+
+    [Fact]
+    public async Task SubmitConversationFeedbackAsync_AfterResolved_ShouldPersistRating()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using (var resolveScope = await store.CreateScopeAsync())
+        {
+            var resolveResult = await resolveScope.CreateService().ResolveConversationAsync(
+                new ResolveSupportConversationCommand(conversationId, userId, IsAdmin: false),
+                CancellationToken.None);
+
+            Assert.True(resolveResult.IsSuccess);
+            Assert.Equal("Resolved", resolveResult.Value.Status);
+            Assert.True(resolveResult.Value.CanReopen);
+            Assert.False(resolveResult.Value.IsReadOnly);
+            Assert.NotNull(resolveResult.Value.ReopenUntilUtc);
+        }
+
+        await using var feedbackScope = await store.CreateScopeAsync();
+        var feedbackResult = await feedbackScope.CreateService().SubmitConversationFeedbackAsync(
+            new SubmitSupportConversationFeedbackCommand(conversationId, userId, 5, "Thanks"),
+            CancellationToken.None);
+
+        Assert.True(feedbackResult.IsSuccess);
+        Assert.Equal(5, feedbackResult.Value.FeedbackRating);
+        Assert.Equal("Thanks", feedbackResult.Value.FeedbackComment);
+        Assert.NotNull(feedbackResult.Value.FeedbackSubmittedAtUtc);
     }
 
     [Fact]
@@ -400,7 +484,7 @@ public sealed class SupportChatServiceTests
         var detail = await verificationScope.CreateService().GetUserConversationAsync(userId, CancellationToken.None);
 
         Assert.True(detail.IsSuccess);
-        Assert.Equal("Open", detail.Value.Status);
+        Assert.Equal("WaitingForSupport", detail.Value.Status);
         Assert.Null(detail.Value.AssignedAdminId);
         Assert.Equal(2, detail.Value.Messages.Count);
         Assert.Equal("Necesito ayuda", detail.Value.Messages[0].Body);
@@ -481,7 +565,8 @@ public sealed class SupportChatServiceTests
             return new SupportChatService(
                 SupportDbContext,
                 new IdentityUserLookupService(IdentityDbContext),
-                realtimeNotifier);
+                realtimeNotifier,
+                new NoopSupportChatPushNotificationSender());
         }
 
         public async ValueTask DisposeAsync()
@@ -509,6 +594,14 @@ public sealed class SupportChatServiceTests
         public Task NotifyConversationUpdatedAsync(SupportConversationRealtimeEvent notification, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("realtime hub is unavailable");
+        }
+    }
+
+    private sealed class NoopSupportChatPushNotificationSender : ISupportChatPushNotificationSender
+    {
+        public Task NotifyUserAsync(SupportChatPushNotification notification, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
     }
 }

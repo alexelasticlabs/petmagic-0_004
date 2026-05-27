@@ -451,10 +451,16 @@ class PremiumController extends Notifier<PremiumState> {
           return checkout;
         }
 
-        state = state.copyWith(
-          isBuying: false,
-          externalUrl: checkout.checkoutUrl,
-        );
+        final checkoutUrl = checkout.checkoutUrl.trim();
+        if (checkoutUrl.isEmpty) {
+          state = state.copyWith(
+            isBuying: false,
+            errorMessage: 'premium.checkout_failed',
+          );
+          return null;
+        }
+
+        state = state.copyWith(isBuying: false, externalUrl: checkoutUrl);
         return null;
       }
 

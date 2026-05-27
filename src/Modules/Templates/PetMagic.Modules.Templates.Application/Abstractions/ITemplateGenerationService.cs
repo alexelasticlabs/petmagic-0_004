@@ -17,6 +17,8 @@ public interface ITemplateGenerationService
 
     Task<Result> MarkReadAsync(Guid userId, Guid generationId, CancellationToken cancellationToken);
 
+    Task<Result> DeleteAsync(Guid userId, Guid generationId, CancellationToken cancellationToken);
+
     Task<Result> RecordFeedbackAsync(RecordTemplateGenerationFeedbackCommand command, CancellationToken cancellationToken);
 
     Task<Result<TemplateGenerationResponse>> GetAdminAsync(Guid generationId, CancellationToken cancellationToken);

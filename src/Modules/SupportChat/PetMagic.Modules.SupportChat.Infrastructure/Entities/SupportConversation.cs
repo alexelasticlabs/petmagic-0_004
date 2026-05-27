@@ -22,5 +22,15 @@ public sealed class SupportConversation
 
     public DateTime? ResolvedAtUtc { get; set; }
 
+    public DateTime? ReopenUntilUtc { get; set; }
+
+    public DateTime? ClosedAtUtc { get; set; }
+
+    public int? FeedbackRating { get; set; }
+
+    public string? FeedbackComment { get; set; }
+
+    public DateTime? FeedbackSubmittedAtUtc { get; set; }
+
     public List<ConversationMessage> Messages { get; set; } = [];
 }

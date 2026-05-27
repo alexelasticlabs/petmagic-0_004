@@ -88,7 +88,20 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     b.Property<Guid?>("AssignedAdminId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FeedbackComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("FeedbackRating")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("FeedbackSubmittedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("InitiatorUserId")
@@ -99,6 +112,9 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReopenUntilUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("ResolvedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -116,11 +132,66 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.HasIndex("LastMessageAtUtc");
 
+                    b.HasIndex("ReopenUntilUtc");
+
                     b.HasIndex("AssignedAdminId", "Status");
 
                     b.HasIndex("Status", "UpdatedAtUtc");
 
                     b.ToTable("support_conversations", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportPushDeviceToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("DisabledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Locale")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "DisabledAtUtc");
+
+                    b.ToTable("support_push_device_tokens", (string)null);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportReplyTemplate", b =>

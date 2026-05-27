@@ -124,6 +124,17 @@ class WalletRepository {
     );
   }
 
+  Future<PurchaseHistoryItem> fetchPurchase(String orderId) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.get<Map<String, dynamic>>(
+        '/api/economy/purchases/$orderId',
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return PurchaseHistoryItem.fromJson(response.data ?? const {});
+  }
+
   Future<PurchaseCheckoutModel> createPurchase(
     CurrencyPackModel pack,
     WalletPaymentMethodModel paymentMethod,

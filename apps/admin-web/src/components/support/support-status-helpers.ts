@@ -13,6 +13,10 @@ export function statusLabel(status: string, text: Dictionary) {
       return text.supportStatusOpen;
     case "inprogress":
       return text.supportStatusInProgress;
+    case "waitingforsupport":
+      return text.supportStatusWaitingForSupport;
+    case "waitingforuser":
+      return text.supportStatusWaitingForUser;
     case "resolved":
       return text.supportStatusResolved;
     case "closed":
@@ -26,6 +30,10 @@ export function toneForStatus(status: string) {
   switch (status.toLowerCase()) {
     case "open":
       return "warning" as const;
+    case "waitingforsupport":
+      return "warning" as const;
+    case "waitingforuser":
+      return "primary" as const;
     case "inprogress":
       return "primary" as const;
     case "resolved":
@@ -43,6 +51,10 @@ export function statusHint(status: SupportConversationStatus, text: Dictionary) 
       return text.supportStatusOpenHint;
     case "InProgress":
       return text.supportStatusInProgressHint;
+    case "WaitingForSupport":
+      return text.supportStatusWaitingForSupportHint;
+    case "WaitingForUser":
+      return text.supportStatusWaitingForUserHint;
     case "Resolved":
       return text.supportStatusResolvedHint;
     case "Closed":
@@ -59,14 +71,39 @@ export function getAvailableStatusActions(
   switch (status) {
     case "Open":
       return [
-        { status: "InProgress", label: text.supportMarkInProgressAction, variant: "primary" },
+        {
+          status: "WaitingForSupport",
+          label: text.supportMarkWaitingForSupportAction,
+          variant: "secondary",
+        },
+        {
+          status: "WaitingForUser",
+          label: text.supportMarkWaitingForUserAction,
+          variant: "primary",
+        },
         { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
         { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
       ];
     case "InProgress":
+    case "WaitingForUser":
       return [
         { status: "Resolved", label: text.supportResolveConversationAction, variant: "primary" },
+        {
+          status: "WaitingForSupport",
+          label: text.supportMarkWaitingForSupportAction,
+          variant: "secondary",
+        },
         { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
+        { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
+      ];
+    case "WaitingForSupport":
+      return [
+        {
+          status: "WaitingForUser",
+          label: text.supportMarkWaitingForUserAction,
+          variant: "primary",
+        },
+        { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
         { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
       ];
     case "Resolved":

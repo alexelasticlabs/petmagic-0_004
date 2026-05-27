@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -13,9 +14,10 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
+import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 
 part 'generation_status_page_sections.dart';
 part 'generation_status_page_common_sections.dart';
@@ -37,6 +39,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
   TemplateGenerationResult? _generation;
   bool _isLoading = true;
   bool _isSubmittingFeedback = false;
+  bool _isDeleting = false;
   String? _errorMessage;
 
   @override
@@ -108,12 +111,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                   _StatusHero(generation: generation),
                   const SizedBox(height: 14),
                   if (generation.isCompleted) ...[
-                    _ResultCard(generation: generation),
+                    _ResultCard(
+                      generation: generation,
+                      onOpenViewer: () => _openFullscreenPreview(generation),
+                    ),
                     const SizedBox(height: 14),
                     _ReadyActionsRow(
-                      onSave: () => unawaited(_saveToDevice(generation)),
-                      onShare: () => _shareResult(generation),
-                      onDelete: _deleteSoon,
+                      onSave: () => unawaited(_saveToGallery(generation)),
+                      onShare: () => unawaited(_shareResult(generation)),
                     ),
                     const SizedBox(height: 14),
                     _DetailsCard(
@@ -238,28 +243,22 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
             children: [
               if (generation.isCompleted) ...[
                 ListTile(
-                  leading: const Icon(Icons.download_rounded),
-                  title: Text(text.generationStatusSaveAction),
+                  leading: const Icon(Icons.link_rounded),
+                  title: const Text('Copy link'),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    unawaited(_saveToDevice(generation));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.share_rounded),
-                  title: Text(text.supportChatShareAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _shareResult(generation);
+                    unawaited(_copyResultLink(generation));
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded),
                   title: Text(text.generationStatusDeleteAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _deleteSoon();
-                  },
+                  onTap: _isDeleting
+                      ? null
+                      : () {
+                          Navigator.of(sheetContext).pop();
+                          unawaited(_deleteGeneration(generation));
+                        },
                 ),
                 ListTile(
                   leading: const Icon(Icons.flag_outlined),
@@ -319,7 +318,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
     );
   }
 
-  Future<void> _saveToDevice(TemplateGenerationResult generation) async {
+  Future<void> _saveToGallery(TemplateGenerationResult generation) async {
     final text = AppLocalizations.of(context);
     final outputUrl = generation.outputUrl;
     if (outputUrl == null || outputUrl.isEmpty) {
@@ -328,16 +327,13 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
     }
 
     final fileName = _buildOutputFileName(generation, outputUrl);
-    final extension = extractFileExtension(fileName);
-    final allowedExtensions = extension == null ? null : <String>[extension];
 
     try {
-      final bytes = await downloadFileBytes(outputUrl);
-      final wasSaved = await saveBytesToDevice(
-        bytes: bytes,
-        dialogTitle: text.generationStatusSaveFileDialogTitle,
+      final wasSaved = await saveRemoteMediaToGallery(
+        mediaUrl: outputUrl,
         fileName: fileName,
-        allowedExtensions: allowedExtensions,
+        isVideo: isVideoGeneration(generation),
+        albumName: 'PetMagic',
       );
 
       if (!mounted) {
@@ -345,10 +341,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
       }
 
       if (!wasSaved) {
+        _showInfo(text.generationStatusFileSaveFailedMessage);
         return;
       }
 
-      _showInfo(text.generationStatusFileSavedMessage);
+      _showInfo(text.generationStatusSavedToGalleryMessage);
     } on Object {
       if (!mounted) {
         return;
@@ -358,8 +355,36 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
     }
   }
 
-  void _deleteSoon() {
-    _showInfo(AppLocalizations.of(context).generationStatusDeleteSoonMessage);
+  Future<void> _deleteGeneration(TemplateGenerationResult generation) async {
+    if (_isDeleting) {
+      return;
+    }
+
+    final text = AppLocalizations.of(context);
+
+    setState(() => _isDeleting = true);
+    try {
+      await ref
+          .read(generationHistoryControllerProvider.notifier)
+          .deleteGeneration(generation.generationId);
+
+      if (!mounted) {
+        return;
+      }
+
+      _showInfo(text.generationStatusDeletedMessage);
+      context.go('/creations');
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      _showInfo('Failed to delete result. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
   }
 
   void _cancelSoon() {
@@ -371,7 +396,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
     context.go(TemplatesPage.routePath);
   }
 
-  void _shareResult(TemplateGenerationResult generation) {
+  Future<void> _shareResult(TemplateGenerationResult generation) async {
     final text = AppLocalizations.of(context);
     final outputUrl = generation.outputUrl;
     if (outputUrl == null || outputUrl.isEmpty) {
@@ -379,7 +404,54 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
       return;
     }
 
-    SharePlus.instance.share(ShareParams(text: outputUrl));
+    try {
+      await shareRemoteMediaFile(
+        mediaUrl: outputUrl,
+        fileName: _buildOutputFileName(generation, outputUrl),
+        title: generation.templateTitle ?? text.generationStatusResultTitle,
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      _showInfo('Failed to share result. Please try again.');
+    }
+  }
+
+  Future<void> _copyResultLink(TemplateGenerationResult generation) async {
+    final text = AppLocalizations.of(context);
+    final outputUrl = generation.outputUrl;
+    if (outputUrl == null || outputUrl.isEmpty) {
+      _showInfo(text.generationStatusResultUnavailableForShare);
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: outputUrl));
+    if (!mounted) {
+      return;
+    }
+
+    _showInfo(text.generationStatusLinkCopiedMessage);
+  }
+
+  Future<void> _openFullscreenPreview(
+    TemplateGenerationResult generation,
+  ) async {
+    final outputUrl = generation.outputUrl;
+    if (outputUrl == null || outputUrl.isEmpty) {
+      _showInfo(AppLocalizations.of(context).templateFlowResultUnavailable);
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FullscreenResultViewer(
+          generation: generation,
+          mediaUrl: outputUrl,
+        ),
+      ),
+    );
   }
 
   void _showInfo(String message) {

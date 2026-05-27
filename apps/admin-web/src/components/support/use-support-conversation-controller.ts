@@ -71,7 +71,8 @@ export type TemplateDraft = {
 
 export const statusOptions: SupportConversationStatus[] = [
   "Open",
-  "InProgress",
+  "WaitingForSupport",
+  "WaitingForUser",
   "Resolved",
   "Closed",
 ];

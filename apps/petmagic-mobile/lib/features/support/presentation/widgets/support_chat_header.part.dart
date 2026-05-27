@@ -148,6 +148,114 @@ class _SupportSecurityCard extends StatelessWidget {
   }
 }
 
+class _SupportConversationStatusStrip extends StatelessWidget {
+  const _SupportConversationStatusStrip({
+    required this.conversation,
+    required this.messages,
+  });
+
+  final SupportChatConversation conversation;
+  final List<SupportChatMessage> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final descriptor = _resolveConversationStatusDescriptor(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+        child: Row(
+          children: [
+            Icon(descriptor.icon, color: descriptor.color, size: 17),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    descriptor.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    descriptor.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ({IconData icon, Color color, String title, String subtitle})
+  _resolveConversationStatusDescriptor(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final normalizedStatus = conversation.status.trim().toLowerCase();
+    SupportChatMessage? lastHumanMessage;
+    for (final message in messages.reversed) {
+      if (!_isSupportSystemMessage(message)) {
+        lastHumanMessage = message;
+        break;
+      }
+    }
+
+    if (normalizedStatus == 'resolved') {
+      return (
+        icon: Icons.check_circle_rounded,
+        color: const Color(0xFF37B16A),
+        title: text.supportChatStatusResolved,
+        subtitle: text.supportChatResolvedStatusHint,
+      );
+    }
+
+    if (normalizedStatus == 'closed') {
+      return (
+        icon: Icons.archive_rounded,
+        color: const Color(0xFF8A94A6),
+        title: text.supportChatStatusClosed,
+        subtitle: text.supportChatClosedStatusHint,
+      );
+    }
+
+    if (lastHumanMessage?.isFromAdmin == true) {
+      return (
+        icon: Icons.mark_chat_unread_rounded,
+        color: _supportSecondaryGreen,
+        title: text.supportChatAwaitingYourReplyStatus,
+        subtitle: text.supportChatSupportRepliedStatusHint,
+      );
+    }
+
+    return (
+      icon: Icons.support_agent_rounded,
+      color: _supportSecondaryGreen,
+      title: text.supportChatWaitingForSupportStatus,
+      subtitle: text.supportChatWaitingForSupportStatusHint,
+    );
+  }
+}
+
 class _DayDivider extends StatelessWidget {
   const _DayDivider({required this.label});
 

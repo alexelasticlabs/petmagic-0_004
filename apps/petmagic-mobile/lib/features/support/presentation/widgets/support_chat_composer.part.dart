@@ -1,83 +1,99 @@
 part of 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
-class _PendingAttachmentPreview extends StatelessWidget {
-  const _PendingAttachmentPreview({
-    required this.attachment,
+class _PendingAttachmentPreviewList extends StatelessWidget {
+  const _PendingAttachmentPreviewList({
+    required this.attachments,
     required this.onRemove,
   });
 
-  final _PendingSupportAttachment attachment;
-  final VoidCallback? onRemove;
+  final List<_PendingSupportAttachment> attachments;
+  final ValueChanged<int>? onRemove;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
 
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: AspectRatio(
-            aspectRatio: 1.55,
-            child: Image.file(
-              File(attachment.filePath),
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return ColoredBox(
-                  color: colors.surface,
-                  child: Center(
-                    child: Icon(
-                      Icons.broken_image_outlined,
-                      color: colors.textMuted,
+    return SizedBox(
+      height: 88,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: attachments.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final attachment = attachments[index];
+          return SizedBox(
+            width: 78,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        width: 66,
+                        height: 66,
+                        child: Image.file(
+                          File(attachment.filePath),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return ColoredBox(
+                              color: colors.surface,
+                              child: Center(
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  color: colors.textMuted,
+                                  size: 20,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Material(
-            color: Colors.black.withValues(alpha: 0.56),
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onRemove,
-              child: const SizedBox(
-                width: 28,
-                height: 28,
-                child: Icon(Icons.close_rounded, color: Colors.white, size: 18),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 10,
-          right: 10,
-          bottom: 10,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Text(
-                attachment.fileName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                    Positioned(
+                      top: -7,
+                      right: -7,
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.62),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: onRemove == null
+                              ? null
+                              : () => onRemove!(index),
+                          child: const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 5),
+                Text(
+                  text.supportChatPhotoAttachedLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ),
-      ],
+          );
+        },
+      ),
     );
   }
 }

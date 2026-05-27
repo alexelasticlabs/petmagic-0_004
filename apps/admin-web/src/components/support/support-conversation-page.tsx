@@ -115,6 +115,8 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     visibleTemplates,
   } = useSupportConversationController({ locale, conversationId });
 
+  const isConversationReadOnly = conversation?.isReadOnly ?? false;
+
   const closeFullscreenImage = () => {
     setFullscreenImage(null);
   };
@@ -363,7 +365,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                   <div className={styles.chatIdentityCompact}>
                     <div className={styles.chatTitleRow}>
                       <strong className={styles.chatUserName}>{userDisplayName}</strong>
-                      <span className={styles.onlineDot} />
                     </div>
                     <div className={styles.chatFacts}>
                       {chatFacts.map((fact) => (
@@ -494,6 +495,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             size="sm"
                             variant="ghost"
                             className={styles.quickTemplateButton}
+                            disabled={isConversationReadOnly}
                             onClick={() => applyTemplate(template)}
                           >
                             {`✓ ${template.title}`}
@@ -518,7 +520,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                       variant="secondary"
                       size="sm"
                       onClick={() => attachmentInputRef.current?.click()}
-                      disabled={sendMutation.isPending}
+                      disabled={sendMutation.isPending || isConversationReadOnly}
                     >
                       {text.chooseFile}
                     </Button>
@@ -583,7 +585,12 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     className={styles.textarea}
                     value={composerValue}
                     onChange={(event) => setReply(event.target.value)}
-                    placeholder={composerPlaceholder}
+                    placeholder={
+                      isConversationReadOnly
+                        ? statusHint(conversation.status, text)
+                        : composerPlaceholder
+                    }
+                    disabled={isConversationReadOnly}
                   />
 
                   <div className={styles.composerActions}>
@@ -603,7 +610,9 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                         variant="primary"
                         onClick={() => sendMutation.mutate()}
                         disabled={
-                          sendMutation.isPending || (!reply.trim() && !hasComposerAttachment)
+                          isConversationReadOnly ||
+                          sendMutation.isPending ||
+                          (!reply.trim() && !hasComposerAttachment)
                         }
                       >
                         {sendMutation.isPending

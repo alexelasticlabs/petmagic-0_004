@@ -89,6 +89,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.FailureMessage).HasMaxLength(1000);
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
             entity.Property(x => x.UserMediaCleanupFailureCode).HasMaxLength(128);
+            entity.HasIndex(x => x.HiddenByUserAtUtc);
             entity.HasIndex(x => x.UserMediaDeletedAtUtc);
             entity.HasIndex(x => new { x.UserId, x.Status, x.ResultViewedAtUtc });
             entity.HasIndex(x => x.LastUserMediaCleanupAttemptAtUtc);

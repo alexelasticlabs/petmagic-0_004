@@ -31,29 +31,24 @@ Future<TemplateDetailAction?> showTemplateDetailSheet(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext, bottomInset) => Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.96,
-        minChildSize: 0.72,
-        maxChildSize: 0.98,
-        expand: false,
-        builder: (context, scrollController) {
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.backgroundBottom,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
-              border: Border.all(color: colors.border.withValues(alpha: 0.72)),
-            ),
-            child: _TemplateDetailContent(
-              template: template,
-              scrollController: scrollController,
-            ),
-          );
-        },
-      ),
+    builder: (sheetContext, bottomInset) => DraggableScrollableSheet(
+      initialChildSize: 0.96,
+      minChildSize: 0.72,
+      maxChildSize: 0.98,
+      expand: false,
+      builder: (context, scrollController) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.backgroundBottom,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+          ),
+          child: _TemplateDetailContent(
+            template: template,
+            scrollController: scrollController,
+          ),
+        );
+      },
     ),
   );
 }
@@ -420,7 +415,7 @@ class _TemplateDetailContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 AspectRatio(
-                  aspectRatio: 1.3,
+                  aspectRatio: 9 / 16,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: _TemplateNetworkMedia(template: template),
@@ -898,7 +893,8 @@ class _TemplateNetworkMedia extends StatelessWidget {
 
     return CachedNetworkImage(
       imageUrl: asset.url,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
+      alignment: Alignment.center,
       placeholder: (context, url) =>
           _EmptyMediaBox(label: text.templateFlowLoadingPreview),
       errorWidget: (context, url, error) => _TemplatePreviewPlaceholder(
@@ -995,7 +991,7 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
       fit: StackFit.expand,
       children: [
         FittedBox(
-          fit: BoxFit.cover,
+          fit: BoxFit.contain,
           child: SizedBox(
             width: controller.value.size.width,
             height: controller.value.size.height,

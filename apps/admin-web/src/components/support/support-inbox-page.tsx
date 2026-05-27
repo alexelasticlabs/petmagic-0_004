@@ -51,16 +51,18 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     () => [
       { value: "all", label: text.supportStatusAll },
       { value: "Open", label: text.supportStatusOpen },
-      { value: "InProgress", label: text.supportStatusInProgress },
+      { value: "WaitingForSupport", label: text.supportStatusWaitingForSupport },
+      { value: "WaitingForUser", label: text.supportStatusWaitingForUser },
       { value: "Resolved", label: text.supportStatusResolved },
       { value: "Closed", label: text.supportStatusClosed },
     ],
     [
       text.supportStatusAll,
       text.supportStatusClosed,
-      text.supportStatusInProgress,
       text.supportStatusOpen,
       text.supportStatusResolved,
+      text.supportStatusWaitingForSupport,
+      text.supportStatusWaitingForUser,
     ]
   );
 

@@ -2763,7 +2763,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatTeamStatus.
   ///
   /// In en, this message translates to:
-  /// **'Online • typical reply under 5 min'**
+  /// **'Average response time: under 24 hours'**
   String get supportChatTeamStatus;
 
   /// No description provided for @supportChatTodayLabel.
@@ -2877,7 +2877,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatFaqResponseBody.
   ///
   /// In en, this message translates to:
-  /// **'Active chats are normally answered within a few minutes during support hours. We keep the thread here so you do not lose context.'**
+  /// **'The support team will reply in this chat. We usually respond within 24 hours.'**
   String get supportChatFaqResponseBody;
 
   /// No description provided for @supportChatFaqRefundTitle.
@@ -2915,6 +2915,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Closed'**
   String get supportChatStatusClosed;
+
+  /// No description provided for @supportChatWaitingForSupportStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for support'**
+  String get supportChatWaitingForSupportStatus;
+
+  /// No description provided for @supportChatWaitingForSupportStatusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The request is open. Support will see the new message.'**
+  String get supportChatWaitingForSupportStatusHint;
+
+  /// No description provided for @supportChatAwaitingYourReplyStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting your reply'**
+  String get supportChatAwaitingYourReplyStatus;
+
+  /// No description provided for @supportChatSupportRepliedStatusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Support replied. Check the message above.'**
+  String get supportChatSupportRepliedStatusHint;
+
+  /// No description provided for @supportChatResolvedStatusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This request was marked as resolved. You can reopen it for 7 days.'**
+  String get supportChatResolvedStatusHint;
+
+  /// No description provided for @supportChatClosedStatusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation is archived and read-only.'**
+  String get supportChatClosedStatusHint;
 
   /// No description provided for @supportChatMessageDelivered.
   ///
@@ -3018,6 +3054,12 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get supportChatAttachmentStatusRetry;
 
+  /// No description provided for @supportChatAttachmentUploadingWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading photo {current} of {total}'**
+  String supportChatAttachmentUploadingWithCount(Object current, Object total);
+
   /// No description provided for @supportChatImageUploadFailedLabel.
   ///
   /// In en, this message translates to:
@@ -3039,13 +3081,13 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatSystemNoticeBody.
   ///
   /// In en, this message translates to:
-  /// **'We received your request and will reply soon. Average response time: up to 24 hours.'**
+  /// **'We received your message. The support team will reply here.'**
   String get supportChatSystemNoticeBody;
 
   /// No description provided for @supportChatComposerAttachmentChip.
   ///
   /// In en, this message translates to:
-  /// **'1 photo: JPG/PNG/WebP, up to 10 MB'**
+  /// **'Up to 5 photos: JPG/PNG/WebP, 10 MB each'**
   String get supportChatComposerAttachmentChip;
 
   /// No description provided for @supportChatComposerResponseChip.
@@ -3053,6 +3095,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Typical reply in a few hours'**
   String get supportChatComposerResponseChip;
+
+  /// No description provided for @supportChatAddPhotoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get supportChatAddPhotoTitle;
+
+  /// No description provided for @supportChatTakePhotoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get supportChatTakePhotoAction;
+
+  /// No description provided for @supportChatChooseGalleryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get supportChatChooseGalleryAction;
+
+  /// No description provided for @supportChatPhotoAttachedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo attached'**
+  String get supportChatPhotoAttachedLabel;
+
+  /// No description provided for @supportChatTooManyAttachmentsError.
+  ///
+  /// In en, this message translates to:
+  /// **'You can attach up to 5 photos.'**
+  String get supportChatTooManyAttachmentsError;
+
+  /// No description provided for @supportChatMarkResolvedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get supportChatMarkResolvedAction;
+
+  /// No description provided for @supportChatReopenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get supportChatReopenAction;
+
+  /// No description provided for @supportChatArchiveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get supportChatArchiveAction;
+
+  /// No description provided for @supportChatRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate the support reply'**
+  String get supportChatRateTitle;
+
+  /// No description provided for @supportChatRatedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating: {rating}/5'**
+  String supportChatRatedLabel(Object rating);
+
+  /// No description provided for @supportChatReadOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation is read-only'**
+  String get supportChatReadOnlyHint;
 
   /// No description provided for @profileSettingsThemeSystem.
   ///
@@ -4214,6 +4322,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not save file. Please try again.'**
   String get generationStatusFileSaveFailedMessage;
+
+  /// No description provided for @generationStatusSavedToGalleryMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to Gallery'**
+  String get generationStatusSavedToGalleryMessage;
+
+  /// No description provided for @generationStatusLinkCopiedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get generationStatusLinkCopiedMessage;
+
+  /// No description provided for @generationStatusDeletedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get generationStatusDeletedMessage;
+
+  /// No description provided for @generationStatusFullscreenControlsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to hide/show controls'**
+  String get generationStatusFullscreenControlsHint;
 
   /// No description provided for @generationStatusDeleteSoonMessage.
   ///

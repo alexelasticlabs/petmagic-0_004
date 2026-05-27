@@ -367,10 +367,14 @@ export type Dictionary = {
   supportAssignmentUnassigned: string;
   supportStatusOpen: string;
   supportStatusInProgress: string;
+  supportStatusWaitingForSupport: string;
+  supportStatusWaitingForUser: string;
   supportStatusResolved: string;
   supportStatusClosed: string;
   supportStatusOpenHint: string;
   supportStatusInProgressHint: string;
+  supportStatusWaitingForSupportHint: string;
+  supportStatusWaitingForUserHint: string;
   supportStatusResolvedHint: string;
   supportStatusClosedHint: string;
   supportStatusAutomationHint: string;
@@ -428,6 +432,8 @@ export type Dictionary = {
   supportPriorityHigh: string;
   supportWaitingLabel: string;
   supportMarkInProgressAction: string;
+  supportMarkWaitingForSupportAction: string;
+  supportMarkWaitingForUserAction: string;
   supportResolveConversationAction: string;
   supportReopenConversationAction: string;
   supportCloseConversationAction: string;

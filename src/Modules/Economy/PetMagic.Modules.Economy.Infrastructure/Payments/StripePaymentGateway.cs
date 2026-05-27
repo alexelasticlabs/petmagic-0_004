@@ -242,7 +242,35 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
                     .FirstOrDefault()?
                     .Payment?
                     .PaymentIntent?
-                    .ClientSecret ?? subscription.LatestInvoice?.ConfirmationSecret?.ClientSecret;
+                    .ClientSecret
+                    ?? subscription.LatestInvoice?.ConfirmationSecret?.ClientSecret;
+
+                // Stripe invoice shape differs across API versions/SDKs; explicitly re-fetch invoice as fallback.
+                if (string.IsNullOrWhiteSpace(clientSecret))
+                {
+                    var latestInvoiceId = subscription.LatestInvoice?.Id ?? subscription.LatestInvoiceId;
+                    if (!string.IsNullOrWhiteSpace(latestInvoiceId))
+                    {
+                        var invoice = await new InvoiceService().GetAsync(
+                            latestInvoiceId,
+                            new InvoiceGetOptions
+                            {
+                                Expand = ["payment_intent", "confirmation_secret", "payments.data.payment.payment_intent"]
+                            },
+                            requestOptions: null,
+                            cancellationToken);
+
+                        clientSecret = invoice.ConfirmationSecret?.ClientSecret
+                            ?? invoice.Payments?
+                                .Data?
+                                .FirstOrDefault()?
+                                .Payment?
+                                .PaymentIntent?
+                                .ClientSecret;
+
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(clientSecret))
                 {
                     return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);

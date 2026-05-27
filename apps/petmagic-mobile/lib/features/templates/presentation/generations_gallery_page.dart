@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -13,8 +14,8 @@ import 'package:petmagic_mobile/features/templates/presentation/mappers/generati
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
+import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
-import 'package:share_plus/share_plus.dart';
 
 part 'generations_gallery_page_filters_and_chrome.dart';
 part 'generations_gallery_page_cards.dart';
