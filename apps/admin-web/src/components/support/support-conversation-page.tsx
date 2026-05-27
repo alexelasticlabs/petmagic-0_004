@@ -51,19 +51,21 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned">("all");
-  const [composerTab, setComposerTab] = useState<"reply" | "attachments">("reply");
+  const [composerTab, setComposerTab] = useState<"reply" | "templates" | "attachments">("reply");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const controller = useSupportConversationController({ locale, conversationId });
   const {
     attachmentInputRef,
     attachmentPreviewUrl,
+    applyTemplate,
     composerPlaceholder,
     composerValue,
     conversation,
     conversationQuery,
     conversationSla,
     filteredInboxItems,
+    filteredTemplates,
     hasComposerAttachment,
     inboxQuery,
     isSidePanelOpen,
@@ -84,6 +86,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     toast,
     queueFilter,
     userDisplayName,
+    visibleTemplates,
   } = controller;
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
@@ -131,6 +134,14 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
 
   const submitReply = () => {
     sendMutation.mutate();
+  };
+
+  const avatarColorFor = (name: string): string => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = (hash + name.charCodeAt(i)) % 8;
+    }
+    return styles[`avatarColor${hash}` as keyof typeof styles] ?? styles.avatarColor6;
   };
 
   const closeFullscreenImage = () => {
@@ -401,7 +412,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                       >
                         <div className={styles.rowHeader}>
                           <div className={styles.rowIdentity}>
-                            <span className={styles.avatar} aria-hidden="true">
+                            <span
+                              className={`${styles.avatar} ${avatarColorFor(item.userDisplayName?.trim() || item.userEmail || "")}`}
+                              aria-hidden="true"
+                            >
                               {initialsFor(item.userDisplayName?.trim() || item.userEmail)}
                             </span>
                             <div className={styles.rowTextStack}>
@@ -443,6 +457,15 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                   })}
                 </div>
               )}
+              {!inboxQuery.isLoading && !inboxQuery.isError && displayedInboxItems.length > 0 ? (
+                <div className={styles.queueFooter}>
+                  <span className={styles.queueFooterCount}>
+                    {locale === "ru"
+                      ? `Показано ${displayedInboxItems.length} из ${filteredInboxItems.length}`
+                      : `Showing ${displayedInboxItems.length} of ${filteredInboxItems.length}`}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             <div
@@ -496,7 +519,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 <div className={styles.chatTopbar}>
                   <div className={styles.chatHeaderTop}>
                     <div className={styles.chatHeaderIdentity}>
-                      <span className={styles.avatarSm} aria-hidden="true">
+                      <span
+                        className={`${styles.avatarSm} ${avatarColorFor(userDisplayName)}`}
+                        aria-hidden="true"
+                      >
                         {initialsFor(userDisplayName)}
                       </span>
                       <div>
@@ -523,8 +549,14 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     </button>
                   </div>
                   <div className={styles.chatMetaRow}>
+                    <span className={styles.chatMetaLabelPrefix}>
+                      {locale === "ru" ? "Источник:" : "Source:"}
+                    </span>
                     <span>{sourceLabel(conversation.source, text)}</span>
                     <span className={styles.chatMetaDivider}>·</span>
+                    <span className={styles.chatMetaLabelPrefix}>
+                      {locale === "ru" ? "Ответственный:" : "Assigned:"}
+                    </span>
                     <span>
                       {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
                     </span>
@@ -758,6 +790,17 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                         <button
                           type="button"
                           className={
+                            composerTab === "templates"
+                              ? styles.composerTabActive
+                              : styles.composerTab
+                          }
+                          onClick={() => setComposerTab("templates")}
+                        >
+                          {locale === "ru" ? "⚡ Шаблоны" : "⚡ Templates"}
+                        </button>
+                        <button
+                          type="button"
+                          className={
                             composerTab === "attachments"
                               ? styles.composerTabActive
                               : styles.composerTab
@@ -869,11 +912,61 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                         />
                       ) : null}
 
-                      <div className={styles.composerActions}>
-                        <div className={styles.rowMetaGroup}>
+                      {composerTab === "templates" ? (
+                        <div className={styles.composerTemplateRail}>
+                          {filteredTemplates.length === 0 ? (
+                            <span className={styles.subtle}>{text.supportTemplateNoTemplates}</span>
+                          ) : (
+                            filteredTemplates.slice(0, 8).map((template) => (
+                              <button
+                                key={template.templateId}
+                                type="button"
+                                className={styles.templateListItem}
+                                onClick={() => {
+                                  applyTemplate(template);
+                                  setComposerTab("reply");
+                                }}
+                              >
+                                <strong>{template.title}</strong>
+                                <span className={styles.templateSnippet}>{template.body}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      ) : null}
+
+                      <div className={styles.composerBottomBar}>
+                        <button
+                          type="button"
+                          className={styles.composerIconBtn}
+                          onClick={() => attachmentInputRef.current?.click()}
+                          disabled={isConversationReadOnly}
+                          title={locale === "ru" ? "Прикрепить файл" : "Attach file"}
+                        >
+                          📎
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.composerIconBtn}
+                          disabled={isConversationReadOnly}
+                          title={locale === "ru" ? "Эмодзи" : "Emoji"}
+                        >
+                          😊
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.composerIconBtn}
+                          disabled={isConversationReadOnly}
+                          title={locale === "ru" ? "Внутренняя заметка" : "Internal note"}
+                        >
+                          🔒
+                        </button>
+                        <div className={styles.composerSendGroup}>
                           <Button
                             variant="primary"
+                            size="sm"
                             onClick={submitReply}
+                            className={styles.composerSendPrimary}
                             disabled={
                               isConversationReadOnly ||
                               sendMutation.isPending ||
@@ -882,8 +975,20 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                           >
                             {sendMutation.isPending
                               ? text.supportReplySending
-                              : text.supportReplyAction}
+                              : `✈ ${text.supportReplyAction}`}
                           </Button>
+                          <button
+                            type="button"
+                            className={styles.composerSendChevron}
+                            disabled={
+                              isConversationReadOnly ||
+                              sendMutation.isPending ||
+                              (!reply.trim() && !hasComposerAttachment)
+                            }
+                            title={locale === "ru" ? "Ещё действия" : "More actions"}
+                          >
+                            ▾
+                          </button>
                         </div>
                       </div>
                     </>

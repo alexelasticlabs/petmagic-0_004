@@ -2773,7 +2773,7 @@
 
 .infoPanelStatsGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
 }
 
@@ -3168,3 +3168,218 @@
 :global(:root[data-theme="light"]) .dropOverlayContent {
   color: rgba(22, 163, 74, 0.9);
 }
+
+/* ── Avatar Color Variants (hash-based per user) ── */
+
+.avatarColor0,
+.avatarColor1,
+.avatarColor2,
+.avatarColor3,
+.avatarColor4,
+.avatarColor5,
+.avatarColor6,
+.avatarColor7 {
+  color: #fff;
+}
+
+.avatarColor0 {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.82), rgba(22, 163, 74, 0.58));
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.avatarColor1 {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.82), rgba(124, 58, 237, 0.58));
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.avatarColor2 {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.82), rgba(234, 88, 12, 0.58));
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.avatarColor3 {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.82), rgba(219, 39, 119, 0.58));
+  border-color: rgba(236, 72, 153, 0.3);
+}
+
+.avatarColor4 {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.82), rgba(13, 148, 136, 0.58));
+  border-color: rgba(20, 184, 166, 0.3);
+}
+
+.avatarColor5 {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.82), rgba(139, 92, 246, 0.58));
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+.avatarColor6 {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.82), rgba(37, 99, 235, 0.58));
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.avatarColor7 {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.82), rgba(180, 83, 9, 0.58));
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+/* ── Queue Footer ── */
+
+.queueFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px 0;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-soft);
+  margin-top: auto;
+}
+
+.queueFooterCount {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ── Composer Bottom Toolbar ── */
+
+.composerBottomBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.composerIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+  flex-shrink: 0;
+}
+
+.composerIconBtn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+.composerIconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.composerSendGroup {
+  margin-left: auto;
+  display: flex;
+  align-items: stretch;
+}
+
+.composerSendPrimary {
+  border-radius: 6px 0 0 6px !important;
+}
+
+.composerSendChevron {
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  width: 26px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #60a5fa;
+  cursor: pointer;
+  font-size: 0.72rem;
+  transition: background 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composerSendChevron:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+.composerSendChevron:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Info Panel Full-width Stat Tile ── */
+
+.infoPanelStatTileFull {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+}
+
+.infoPanelStatTileFull > span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.infoPanelStatTileFull > strong {
+  color: var(--text-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+/* ── Danger Accordion ── */
+
+.dangerAccordionToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  cursor: pointer;
+  font: inherit;
+  color: #f87171;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.dangerAccordionChevron {
+  font-size: 0.82rem;
+  font-style: normal;
+  opacity: 0.7;
+  transition: transform 180ms ease;
+  display: inline-block;
+}
+
+.dangerAccordionChevronOpen {
+  transform: rotate(180deg);
+}
+
+/* ── Chat Meta Label Prefixes ── */
+
+.chatMetaLabelPrefix {
+  opacity: 0.65;
+  font-size: 0.75rem;
+}
+
+/* ── Actions Panel Button Width Helpers ── */
+
+.actionsPanelBtn {
+  width: 100%;
+  justify-content: center;
+}
+

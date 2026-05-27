@@ -119,10 +119,10 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
               <span>{text.supportAccountAgeLabel}</span>
               <strong>{formatAccountAge(accountCreatedAt, locale)}</strong>
             </div>
-            <div className={styles.infoPanelStatTile}>
-              <span>{locale === "ru" ? "Покупки" : "Purchases"}</span>
-              <strong>{String(totalPurchases)}</strong>
-            </div>
+          </div>
+          <div className={styles.infoPanelStatTileFull}>
+            <span>{locale === "ru" ? "Покупки" : "Purchases"}</span>
+            <strong>{String(totalPurchases)}</strong>
           </div>
         </div>
 
@@ -149,44 +149,57 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
             }}
             emptyTitle={text.supportHistoryEmpty}
           >
-            <div className={styles.infoPanelKvRow}>
-              <span>{locale === "ru" ? "Связанная генерация" : "Related generation"}</span>
-              <strong>
-                {conversation.relatedGenerationId
-                  ? shortId(conversation.relatedGenerationId)
-                  : "—"}
-              </strong>
-            </div>
-            <div className={styles.infoPanelKvRow}>
-              <span>{text.supportLastGenerationLabel}</span>
-              <strong>
-                {formatDateTime(analyticsQuery.data?.summary.lastGenerationAtUtc, locale)}
-              </strong>
-            </div>
-            <div className={styles.infoPanelKvRow}>
-              <span>{text.supportGenerationErrorsTitle}</span>
-              <strong>{String(analyticsQuery.data?.summary.failedGenerations ?? 0)}</strong>
-            </div>
-            <div className={styles.infoPanelKvRow}>
-              <span>{text.supportLastPaymentLabel}</span>
-              <strong>{formatDateTime(lastUserPurchaseAtUtc, locale)}</strong>
-            </div>
-            <div className={styles.infoPanelKvRow}>
-              <span>Premium</span>
-              <AdminBadge tone={isUserPremium ? "success" : "neutral"}>
-                {isUserPremium
-                  ? locale === "ru"
-                    ? "Активен"
-                    : "Active"
-                  : locale === "ru"
-                    ? "Неактивен"
-                    : "Inactive"}
-              </AdminBadge>
-            </div>
-            <div className={styles.infoPanelKvRow}>
-              <span>{locale === "ru" ? "Провайдер подписки" : "Subscription provider"}</span>
-              <strong>{subscriptionQuery.data?.planName ?? "—"}</strong>
-            </div>
+            {(() => {
+              const none = locale === "ru" ? "Нет" : "—";
+              return (
+                <>
+                  <div className={styles.infoPanelKvRow}>
+                    <span>{locale === "ru" ? "Связанная генерация" : "Related generation"}</span>
+                    <strong>
+                      {conversation.relatedGenerationId
+                        ? shortId(conversation.relatedGenerationId)
+                        : none}
+                    </strong>
+                  </div>
+                  <div className={styles.infoPanelKvRow}>
+                    <span>{text.supportLastGenerationLabel}</span>
+                    <strong>
+                      {analyticsQuery.data?.summary.lastGenerationAtUtc
+                        ? formatDateTime(analyticsQuery.data.summary.lastGenerationAtUtc, locale)
+                        : none}
+                    </strong>
+                  </div>
+                  <div className={styles.infoPanelKvRow}>
+                    <span>{text.supportGenerationErrorsTitle}</span>
+                    <strong>{String(analyticsQuery.data?.summary.failedGenerations ?? 0)}</strong>
+                  </div>
+                  <div className={styles.infoPanelKvRow}>
+                    <span>{text.supportLastPaymentLabel}</span>
+                    <strong>
+                      {lastUserPurchaseAtUtc ? formatDateTime(lastUserPurchaseAtUtc, locale) : none}
+                    </strong>
+                  </div>
+                  <div className={styles.infoPanelKvRow}>
+                    <span>Premium</span>
+                    <AdminBadge tone={isUserPremium ? "success" : "neutral"}>
+                      {isUserPremium
+                        ? locale === "ru"
+                          ? "Активен"
+                          : "Active"
+                        : locale === "ru"
+                          ? "Неактивен"
+                          : "Inactive"}
+                    </AdminBadge>
+                  </div>
+                  <div className={styles.infoPanelKvRow}>
+                    <span>
+                      {locale === "ru" ? "Провайдер подписки" : "Subscription provider"}
+                    </span>
+                    <strong>{subscriptionQuery.data?.planName ?? none}</strong>
+                  </div>
+                </>
+              );
+            })()}
           </SidePanelAsyncState>
         </div>
 

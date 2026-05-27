@@ -14,6 +14,7 @@ type SupportActionsPanelProps = {
 
 export function SupportActionsPanel({ locale, controller }: SupportActionsPanelProps) {
   const [showResolveConfirm, setShowResolveConfirm] = useState(false);
+  const [dangerOpen, setDangerOpen] = useState(false);
 
   const {
     assignmentMutation,
@@ -45,21 +46,8 @@ export function SupportActionsPanel({ locale, controller }: SupportActionsPanelP
           {locale === "ru" ? "Действия" : "Actions"}
         </span>
 
+        {/* ── Status actions ── */}
         <div className={styles.actionsPanelGroup}>
-          {/* Assignment */}
-          <button
-            type="button"
-            className="ui-button ui-button--secondary ui-button--md"
-            style={{ width: "100%", justifyContent: "center" }}
-            onClick={() =>
-              assignmentMutation.mutate(isAssignedToCurrentAdmin ? null : sessionUserId)
-            }
-            disabled={assignmentMutation.isPending || !sessionUserId}
-          >
-            {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
-          </button>
-
-          {/* Resolve confirm or primary action */}
           {showResolveConfirm ? (
             <div className={styles.spConfirmBox}>
               <span className={styles.spConfirmText}>
@@ -85,8 +73,9 @@ export function SupportActionsPanel({ locale, controller }: SupportActionsPanelP
               </div>
             </div>
           ) : primaryStatusAction ? (
-            <Button
-              variant="primary"
+            <button
+              type="button"
+              className={`ui-button ui-button--primary ui-button--md ${styles.actionsPanelBtn}`}
               onClick={() => {
                 if (primaryStatusAction.status === "Closed") {
                   setShowResolveConfirm(true);
@@ -95,27 +84,39 @@ export function SupportActionsPanel({ locale, controller }: SupportActionsPanelP
                 }
               }}
               disabled={
-                statusMutation.isPending ||
-                conversation.status === primaryStatusAction.status
+                statusMutation.isPending || conversation.status === primaryStatusAction.status
               }
             >
+              {primaryStatusAction.status === "InProgress"
+                ? "▶ "
+                : primaryStatusAction.status === "WaitingForUser"
+                  ? "⏳ "
+                  : primaryStatusAction.status === "Closed"
+                    ? "✕ "
+                    : ""}
               {primaryStatusAction.label}
-            </Button>
+            </button>
           ) : null}
 
-          {/* Secondary actions */}
           {secondaryStatusActions.map((action) => (
-            <Button
+            <button
               key={action.status}
-              variant="secondary"
-              onClick={() => statusMutation.mutate(action.status)}
+              type="button"
+              className={`ui-button ui-button--secondary ui-button--md ${styles.actionsPanelBtn}`}
+              onClick={() => {
+                if (action.status === "Closed") {
+                  setShowResolveConfirm(true);
+                } else {
+                  statusMutation.mutate(action.status);
+                }
+              }}
               disabled={statusMutation.isPending || conversation.status === action.status}
             >
+              {action.status === "Closed" ? "✕ " : action.status === "InProgress" ? "↩ " : ""}
               {action.label}
-            </Button>
+            </button>
           ))}
 
-          {/* Destructive status action */}
           {destructiveStatusAction ? (
             <Button
               variant="danger"
@@ -130,29 +131,57 @@ export function SupportActionsPanel({ locale, controller }: SupportActionsPanelP
           ) : null}
         </div>
 
-        {/* ── Опасные действия ── */}
+        {/* ── Assignment ── */}
         <div className={styles.actionsPanelGroup}>
-          <span className={styles.actionsPanelDangerTitle}>
+          <button
+            type="button"
+            className={`ui-button ui-button--secondary ui-button--md ${styles.actionsPanelBtn}`}
+            onClick={() =>
+              assignmentMutation.mutate(isAssignedToCurrentAdmin ? null : sessionUserId)
+            }
+            disabled={assignmentMutation.isPending || !sessionUserId}
+          >
+            👤 {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
+          </button>
+        </div>
+
+        {/* ── Опасные действия (accordion) ── */}
+        <div className={styles.actionsPanelGroup}>
+          <button
+            type="button"
+            className={styles.dangerAccordionToggle}
+            onClick={() => setDangerOpen((prev) => !prev)}
+          >
             {locale === "ru" ? "Опасные действия" : "Dangerous actions"}
-          </span>
-          <button
-            type="button"
-            className={styles.actionsPanelDangerBtn}
-            onClick={() => setUserActiveMutation.mutate(!isUserActive)}
-            disabled={isModerationPending}
-          >
-            🔒 {isUserActive ? text.deactivate : text.activate}
+            <span
+              className={`${styles.dangerAccordionChevron} ${dangerOpen ? styles.dangerAccordionChevronOpen : ""}`}
+            >
+              ▾
+            </span>
           </button>
-          <button
-            type="button"
-            className={styles.actionsPanelDangerBtn}
-            onClick={() => setUserPremiumMutation.mutate(!isUserPremium)}
-            disabled={isModerationPending}
-          >
-            👑 {isUserPremium ? text.removePremium : text.makePremium}
-          </button>
+          {dangerOpen ? (
+            <>
+              <button
+                type="button"
+                className={styles.actionsPanelDangerBtn}
+                onClick={() => setUserActiveMutation.mutate(!isUserActive)}
+                disabled={isModerationPending}
+              >
+                🔒 {isUserActive ? text.deactivate : text.activate}
+              </button>
+              <button
+                type="button"
+                className={styles.actionsPanelDangerBtn}
+                onClick={() => setUserPremiumMutation.mutate(!isUserPremium)}
+                disabled={isModerationPending}
+              >
+                👑 {isUserPremium ? text.removePremium : text.makePremium}
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
+
