@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
@@ -177,6 +179,11 @@ class _WalletPageState extends ConsumerState<WalletPage>
   }
 
   Future<void> _handleCheckout(PurchaseCheckoutModel checkout) async {
+    developer.log(
+      'Checkout dispatch (order=${checkout.orderId}, usesPaymentSheet=${checkout.usesPaymentSheet}, provider=${checkout.paymentProvider}, urlLength=${checkout.checkoutUrl.length}, hasClientSecret=${(checkout.paymentIntentClientSecret?.isNotEmpty ?? false)}, hasPublishableKey=${(checkout.publishableKey?.isNotEmpty ?? false)})',
+      name: 'PetMagic.Wallet.Checkout',
+    );
+
     if (checkout.usesPaymentSheet) {
       await _presentStripePaymentSheet(checkout);
       return;
@@ -206,9 +213,20 @@ class _WalletPageState extends ConsumerState<WalletPage>
     }
 
     try {
+      developer.log(
+        'PaymentSheet init start (order=${checkout.orderId})',
+        name: 'PetMagic.Wallet.Checkout',
+      );
+
       Stripe.publishableKey = publishableKey;
       Stripe.urlScheme = 'petmagicstripe';
       await Stripe.instance.applySettings();
+
+      developer.log(
+        'PaymentSheet settings applied (order=${checkout.orderId})',
+        name: 'PetMagic.Wallet.Checkout',
+      );
+
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
@@ -218,7 +236,19 @@ class _WalletPageState extends ConsumerState<WalletPage>
           returnURL: 'petmagicstripe://redirect',
         ),
       );
+
+      developer.log(
+        'PaymentSheet initialized (order=${checkout.orderId})',
+        name: 'PetMagic.Wallet.Checkout',
+      );
+
       await Stripe.instance.presentPaymentSheet();
+
+      developer.log(
+        'PaymentSheet completed (order=${checkout.orderId})',
+        name: 'PetMagic.Wallet.Checkout',
+      );
+
       if (!mounted) {
         return;
       }
@@ -227,25 +257,52 @@ class _WalletPageState extends ConsumerState<WalletPage>
           .read(walletControllerProvider.notifier)
           .verifyStripeCheckout(checkout.externalPaymentId);
     } on StripeException catch (error) {
+      developer.log(
+        'PaymentSheet StripeException (order=${checkout.orderId})',
+        name: 'PetMagic.Wallet.Checkout',
+        error: error,
+      );
+
       if (!mounted) {
         return;
       }
 
       final message = error.error.localizedMessage;
-      if (message == null || message.isEmpty) {
-        return;
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (message == null || message.isEmpty)
+                ? text.walletPaymentGatewayUnavailableError
+                : message,
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      developer.log(
+        'PaymentSheet unexpected error (order=${checkout.orderId})',
+        name: 'PetMagic.Wallet.Checkout',
+        error: error,
+        stackTrace: stackTrace,
+      );
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (_) {
       if (!mounted) {
         return;
       }
 
+      final platformMessage = switch (error) {
+        PlatformException(:final message) => message,
+        Exception() => error.toString(),
+        _ => null,
+      };
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
+        SnackBar(
+          content: Text(
+            (platformMessage == null || platformMessage.isEmpty)
+                ? text.walletPaymentGatewayUnavailableError
+                : platformMessage,
+          ),
+        ),
       );
     }
   }
