@@ -1,3 +1,6 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Options;
@@ -10,6 +13,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGateway
 {
     private const string Provider = "stripe";
+    private const string MobileEphemeralKeyStripeVersion = "2020-03-02";
+    private static readonly HttpClient StripeHttpClient = new();
 
     public async Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
     {
@@ -31,11 +36,28 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
         {
             try
             {
+                string? customerEphemeralKeySecret = null;
+                if (!string.IsNullOrWhiteSpace(request.ExternalCustomerId))
+                {
+                    var ephemeralKeyResult = await CreateCustomerEphemeralKeySecretAsync(
+                        apiKey,
+                        request.ExternalCustomerId,
+                        cancellationToken);
+
+                    if (ephemeralKeyResult.IsFailure)
+                    {
+                        return Result.Failure<PaymentCreateResponse>(ephemeralKeyResult.Error);
+                    }
+
+                    customerEphemeralKeySecret = ephemeralKeyResult.Value;
+                }
+
                 var paymentIntent = await new PaymentIntentService().CreateAsync(
                     new PaymentIntentCreateOptions
                     {
                         Amount = amountInMinorUnits,
                         Currency = request.CurrencyCode.Trim().ToLowerInvariant(),
+                        Customer = request.ExternalCustomerId,
                         AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
                         {
                             Enabled = true,
@@ -57,8 +79,8 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
                     paymentIntent.Id,
                     string.Empty,
                     paymentIntent.ClientSecret,
-                    null,
-                    null,
+                        request.ExternalCustomerId,
+                        customerEphemeralKeySecret,
                     request.PublishableKey));
             }
             catch (StripeException)
@@ -156,6 +178,93 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             ["user_id"] = request.UserId.ToString("D"),
             ["plan_code"] = request.PlanCode
         };
+
+        if (request.UsePaymentSheet)
+        {
+            try
+            {
+                var ephemeralKeyResult = await CreateCustomerEphemeralKeySecretAsync(
+                    apiKey,
+                    request.ExternalCustomerId,
+                    cancellationToken);
+
+                if (ephemeralKeyResult.IsFailure)
+                {
+                    return Result.Failure<SubscriptionCheckoutCreateResponse>(ephemeralKeyResult.Error);
+                }
+
+                var item = new SubscriptionItemOptions();
+                if (!string.IsNullOrWhiteSpace(request.StripePriceId))
+                {
+                    item.Price = request.StripePriceId;
+                }
+                else
+                {
+                    var product = await new ProductService().CreateAsync(
+                        new ProductCreateOptions
+                        {
+                            Name = request.ProductName,
+                            Metadata = metadata
+                        },
+                        cancellationToken: cancellationToken);
+
+                    item.PriceData = new SubscriptionItemPriceDataOptions
+                    {
+                        Currency = request.CurrencyCode.Trim().ToLowerInvariant(),
+                        UnitAmount = amountInMinorUnits,
+                        Recurring = new SubscriptionItemPriceDataRecurringOptions
+                        {
+                            Interval = request.BillingInterval.Trim().ToLowerInvariant()
+                        },
+                        Product = product.Id
+                    };
+                }
+
+                var subscription = await new SubscriptionService().CreateAsync(
+                    new SubscriptionCreateOptions
+                    {
+                        Customer = request.ExternalCustomerId,
+                        Items = [item],
+                        PaymentBehavior = "default_incomplete",
+                        PaymentSettings = new SubscriptionPaymentSettingsOptions
+                        {
+                            SaveDefaultPaymentMethod = "on_subscription"
+                        },
+                        Metadata = metadata,
+                        Expand = ["latest_invoice.payments.data.payment.payment_intent"]
+                    },
+                    requestOptions: null,
+                    cancellationToken);
+
+                var clientSecret = subscription.LatestInvoice?
+                    .Payments?
+                    .Data?
+                    .FirstOrDefault()?
+                    .Payment?
+                    .PaymentIntent?
+                    .ClientSecret ?? subscription.LatestInvoice?.ConfirmationSecret?.ClientSecret;
+                if (string.IsNullOrWhiteSpace(clientSecret))
+                {
+                    return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+                }
+
+                return Result.Success(new SubscriptionCheckoutCreateResponse(
+                    subscription.Id,
+                    string.Empty,
+                    clientSecret,
+                    request.ExternalCustomerId,
+                    ephemeralKeyResult.Value,
+                    request.PublishableKey));
+            }
+            catch (StripeException)
+            {
+                return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+            catch
+            {
+                return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+        }
 
         try
         {
@@ -476,6 +585,46 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
     private static void ConfigureStripe(string? apiKey)
     {
         StripeConfiguration.ApiKey = apiKey;
+    }
+
+    private static async Task<Result<string>> CreateCustomerEphemeralKeySecretAsync(
+        string apiKey,
+        string customerId,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.stripe.com/v1/ephemeral_keys");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        request.Headers.Add("Stripe-Version", MobileEphemeralKeyStripeVersion);
+        request.Content = new FormUrlEncodedContent([
+            new KeyValuePair<string, string>("customer", customerId)
+        ]);
+
+        try
+        {
+            using var response = await StripeHttpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Result.Failure<string>(EconomyErrors.PaymentGatewayFailed);
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            if (document.RootElement.TryGetProperty("secret", out var secretElement)
+                && secretElement.ValueKind == JsonValueKind.String)
+            {
+                var secret = secretElement.GetString();
+                if (!string.IsNullOrWhiteSpace(secret))
+                {
+                    return Result.Success(secret);
+                }
+            }
+
+            return Result.Failure<string>(EconomyErrors.PaymentGatewayFailed);
+        }
+        catch
+        {
+            return Result.Failure<string>(EconomyErrors.PaymentGatewayFailed);
+        }
     }
 
     private string ResolveApiKey(string? apiKey = null)

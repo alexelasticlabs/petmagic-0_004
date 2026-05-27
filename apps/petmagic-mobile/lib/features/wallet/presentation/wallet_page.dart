@@ -52,9 +52,17 @@ class _WalletPageState extends ConsumerState<WalletPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
       _shouldReloadOnResume = false;
-      unawaited(
-        ref.read(walletControllerProvider.notifier).verifyCheckoutStatus(),
-      );
+      unawaited(() async {
+        final controller = ref.read(walletControllerProvider.notifier);
+        await controller.verifyCheckoutStatus();
+
+        final verificationState = ref
+            .read(walletControllerProvider)
+            .checkoutVerificationState;
+        if (verificationState != WalletCheckoutVerificationState.succeeded) {
+          await controller.verifyStripeCheckout(null);
+        }
+      }());
     }
   }
 
@@ -253,9 +261,16 @@ class _WalletPageState extends ConsumerState<WalletPage>
         return;
       }
 
-      await ref
-          .read(walletControllerProvider.notifier)
-          .verifyStripeCheckout(checkout.externalPaymentId);
+      final controller = ref.read(walletControllerProvider.notifier);
+      await controller.verifyCheckoutStatus();
+
+      // Webhook is canonical, but keep a resilience fallback for delayed/failed webhook delivery.
+      final verificationState = ref
+          .read(walletControllerProvider)
+          .checkoutVerificationState;
+      if (verificationState != WalletCheckoutVerificationState.succeeded) {
+        await controller.verifyStripeCheckout(checkout.externalPaymentId);
+      }
     } on StripeException catch (error) {
       developer.log(
         'PaymentSheet StripeException (order=${checkout.orderId})',

@@ -204,6 +204,68 @@ public sealed partial class EconomyService
             manageAction));
     }
 
+    public async Task<Result<StripeDiagnosticsResponse>> GetStripeDiagnosticsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var summaryResult = await GetSubscriptionSummaryAsync(userId, cancellationToken);
+        if (summaryResult.IsFailure)
+        {
+            return Result.Failure<StripeDiagnosticsResponse>(summaryResult.Error);
+        }
+
+        var externalCustomerId = await dbContext.PaymentCustomers
+            .AsNoTracking()
+            .Where(x => x.UserId == userId && x.Provider == "stripe")
+            .Select(x => x.ExternalCustomerId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var recentWebhookEvents = await dbContext.ProcessedWebhookEvents
+            .AsNoTracking()
+            .Where(x => x.Provider == "stripe")
+            .OrderByDescending(x => x.ProcessedAtUtc)
+            .Take(30)
+            .Select(x => new StripeWebhookEventSnapshotResponse(
+                x.EventId,
+                x.EventType,
+                x.ProcessedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var recentSubscriptionEvents = await dbContext.SubscriptionEventLogs
+            .AsNoTracking()
+            .Where(x => x.Provider == "stripe" && x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(20)
+            .Select(x => new StripeSubscriptionEventSnapshotResponse(
+                x.EventType,
+                x.Status,
+                x.ExternalEventId,
+                x.ExternalSubscriptionId,
+                x.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var recentStripePurchases = await dbContext.PurchaseOrders
+            .AsNoTracking()
+            .Where(x => x.UserId == userId && x.PaymentProvider == "stripe")
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(20)
+            .Select(x => new StripePurchaseSnapshotResponse(
+                x.Id,
+                x.Status,
+                x.ExternalPaymentId,
+                x.PriceAmount,
+                x.CurrencyCode,
+                x.CreatedAtUtc,
+                x.ConfirmedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        return Result.Success(new StripeDiagnosticsResponse(
+            summaryResult.Value,
+            externalCustomerId,
+            recentWebhookEvents,
+            recentSubscriptionEvents,
+            recentStripePurchases,
+            DateTime.UtcNow));
+    }
+
     public async Task<Result<IReadOnlyList<PaymentMethodResponse>>> ListPaymentMethodsAsync(Guid userId, CancellationToken cancellationToken)
     {
         var methods = await dbContext.SavedPaymentMethods
@@ -253,6 +315,18 @@ public sealed partial class EconomyService
             return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
 
+        var usePaymentSheet = string.Equals(command.Platform, "android", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(command.Platform, "ios", StringComparison.OrdinalIgnoreCase);
+        string? stripePublishableKey = null;
+        if (usePaymentSheet)
+        {
+            stripePublishableKey = ResolveStripePublishableKey(providerConfig.Mode);
+            if (string.IsNullOrWhiteSpace(stripePublishableKey))
+            {
+                return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+            }
+        }
+
         var plan = await ResolveConfiguredPremiumPlanAsync(command.PlanCode, cancellationToken);
         if (plan is null)
         {
@@ -275,7 +349,10 @@ public sealed partial class EconomyService
                 plan.PriceAmount,
                 plan.CurrencyCode,
                 plan.BillingInterval,
-                stripeApiKey),
+                stripeApiKey,
+                stripePublishableKey,
+                usePaymentSheet,
+                plan.StripePriceId),
             cancellationToken);
 
         if (checkout.IsFailure)
@@ -286,7 +363,12 @@ public sealed partial class EconomyService
         return Result.Success(new PremiumCheckoutResponse(
             provider,
             checkout.Value.CheckoutUrl,
-            "pending"));
+            "pending",
+            checkout.Value.ExternalCheckoutId,
+            checkout.Value.PaymentIntentClientSecret,
+            checkout.Value.CustomerId,
+            checkout.Value.CustomerEphemeralKeySecret,
+            checkout.Value.PublishableKey));
     }
 
     public async Task<Result<BillingPortalSessionResponse>> CreatePremiumBillingPortalAsync(
@@ -642,6 +724,7 @@ public sealed partial class EconomyService
         var usePaymentSheet = string.Equals(command.Platform, "android", StringComparison.OrdinalIgnoreCase)
             || string.Equals(command.Platform, "ios", StringComparison.OrdinalIgnoreCase);
         string? stripePublishableKey = null;
+        string? orderCustomerId = null;
 
         if (usePaymentSheet)
         {
@@ -650,6 +733,14 @@ public sealed partial class EconomyService
             {
                 return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
             }
+
+            var customer = await GetOrCreatePaymentCustomerAsync(command.UserId, provider, providerConfig.Mode, cancellationToken);
+            if (customer.IsFailure)
+            {
+                return Result.Failure<PurchaseCheckoutResponse>(customer.Error);
+            }
+
+            orderCustomerId = customer.Value.ExternalCustomerId;
         }
 
         var paymentResult = await paymentGateway.CreatePaymentAsync(
@@ -663,7 +754,7 @@ public sealed partial class EconomyService
                 pack.DisplayName,
                 stripeApiKey,
                 stripePublishableKey,
-                null,
+                orderCustomerId,
                 usePaymentSheet),
             cancellationToken);
 
@@ -782,9 +873,28 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
         }
 
-        if (!string.Equals(order.ExternalPaymentId, command.StripeReferenceId, StringComparison.Ordinal))
+        var normalizedRequestedReference = command.StripeReferenceId?.Trim();
+        var stripeReferenceId = !string.IsNullOrWhiteSpace(normalizedRequestedReference)
+            ? normalizedRequestedReference
+            : order.ExternalPaymentId;
+
+        if (!string.IsNullOrWhiteSpace(normalizedRequestedReference)
+            && !string.IsNullOrWhiteSpace(order.ExternalPaymentId)
+            && !string.Equals(order.ExternalPaymentId, normalizedRequestedReference, StringComparison.Ordinal))
         {
-            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
+            logger?.LogWarning(
+                "Stripe reference mismatch for order verification. OrderId={OrderId} UserId={UserId} RequestedReference={RequestedReference} StoredReference={StoredReference}",
+                order.Id,
+                order.UserId,
+                normalizedRequestedReference,
+                order.ExternalPaymentId);
+
+            stripeReferenceId = order.ExternalPaymentId;
+        }
+
+        if (string.IsNullOrWhiteSpace(stripeReferenceId))
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
         if (string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal))
@@ -802,10 +912,10 @@ public sealed partial class EconomyService
 
         try
         {
-            if (command.StripeReferenceId.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
+            if (stripeReferenceId.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
             {
                 var sessionService = new Stripe.Checkout.SessionService();
-                var session = await sessionService.GetAsync(command.StripeReferenceId, cancellationToken: cancellationToken);
+                var session = await sessionService.GetAsync(stripeReferenceId, cancellationToken: cancellationToken);
 
                 if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(session.Status, "complete", StringComparison.OrdinalIgnoreCase))
@@ -813,10 +923,10 @@ public sealed partial class EconomyService
                     return Result.Success(ToPurchaseOrderResponse(order));
                 }
             }
-            else if (command.StripeReferenceId.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
+            else if (stripeReferenceId.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
             {
                 var paymentIntentService = new PaymentIntentService();
-                var paymentIntent = await paymentIntentService.GetAsync(command.StripeReferenceId, cancellationToken: cancellationToken);
+                var paymentIntent = await paymentIntentService.GetAsync(stripeReferenceId, cancellationToken: cancellationToken);
 
                 if (!string.Equals(paymentIntent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
                 {
@@ -830,7 +940,7 @@ public sealed partial class EconomyService
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "Stripe payment verification failed for reference {StripeReferenceId}", command.StripeReferenceId);
+            logger?.LogWarning(ex, "Stripe payment verification failed for reference {StripeReferenceId}", stripeReferenceId);
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 

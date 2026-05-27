@@ -424,34 +424,42 @@ class WalletController extends Notifier<WalletState> {
       clearHighlightedPurchaseOrderId: true,
     );
 
-    await load(refresh: true);
+    const maxAttempts = 4;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      await load(refresh: true);
 
-    final refreshedState = state;
-    if (refreshedState.wallet == null && refreshedState.errorMessage != null) {
-      state = state.copyWith(
-        checkoutVerificationState: WalletCheckoutVerificationState.error,
-        checkoutErrorMessage: refreshedState.errorMessage,
-      );
-      return;
-    }
-
-    PurchaseHistoryItem? purchase;
-    for (final item in refreshedState.purchases) {
-      if (item.orderId == pendingOrderId) {
-        purchase = item;
-        break;
+      final refreshedState = state;
+      if (refreshedState.wallet == null &&
+          refreshedState.errorMessage != null) {
+        state = state.copyWith(
+          checkoutVerificationState: WalletCheckoutVerificationState.error,
+          checkoutErrorMessage: refreshedState.errorMessage,
+        );
+        return;
       }
-    }
 
-    if (purchase != null && purchase.status == 'succeeded') {
-      state = state.copyWith(
-        checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
-        checkoutGrantedSpark: purchase.sparkToGrant,
-        highlightedPurchaseOrderId: purchase.orderId,
-        clearPendingCheckout: true,
-        clearCheckoutError: true,
-      );
-      return;
+      PurchaseHistoryItem? purchase;
+      for (final item in refreshedState.purchases) {
+        if (item.orderId == pendingOrderId) {
+          purchase = item;
+          break;
+        }
+      }
+
+      if (purchase != null && purchase.status == 'succeeded') {
+        state = state.copyWith(
+          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+          checkoutGrantedSpark: purchase.sparkToGrant,
+          highlightedPurchaseOrderId: purchase.orderId,
+          clearPendingCheckout: true,
+          clearCheckoutError: true,
+        );
+        return;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
     }
 
     state = state.copyWith(
@@ -460,7 +468,7 @@ class WalletController extends Notifier<WalletState> {
     );
   }
 
-  Future<void> verifyStripeCheckout(String stripeReferenceId) async {
+  Future<void> verifyStripeCheckout(String? stripeReferenceId) async {
     final pendingOrderId = state.pendingCheckoutOrderId;
     if (pendingOrderId == null || pendingOrderId.isEmpty) {
       return;
@@ -473,14 +481,46 @@ class WalletController extends Notifier<WalletState> {
       clearHighlightedPurchaseOrderId: true,
     );
 
-    try {
-      final purchase = await _repository.verifyStripeCheckoutSession(
-        orderId: pendingOrderId,
-        stripeReferenceId: stripeReferenceId,
-      );
+    const maxAttempts = 8;
+    final normalizedReference = stripeReferenceId?.trim();
 
-      if (purchase.status == 'succeeded') {
-        await load(refresh: true);
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final purchase = await _repository.verifyStripeCheckoutSession(
+          orderId: pendingOrderId,
+          stripeReferenceId: normalizedReference,
+        );
+
+        if (purchase.status == 'succeeded') {
+          await load(refresh: true);
+          state = state.copyWith(
+            checkoutVerificationState:
+                WalletCheckoutVerificationState.succeeded,
+            checkoutGrantedSpark: purchase.sparkToGrant,
+            highlightedPurchaseOrderId: purchase.orderId,
+            clearPendingCheckout: true,
+            clearCheckoutError: true,
+          );
+          return;
+        }
+      } catch (error) {
+        developer.log(
+          'Stripe verify attempt failed (order=$pendingOrderId, attempt=${attempt + 1}, reference=${normalizedReference ?? ''})',
+          name: 'PetMagic.Wallet.Checkout',
+          error: error,
+        );
+      }
+
+      await load(refresh: true);
+      PurchaseHistoryItem? purchase;
+      for (final item in state.purchases) {
+        if (item.orderId == pendingOrderId) {
+          purchase = item;
+          break;
+        }
+      }
+
+      if (purchase != null && purchase.status == 'succeeded') {
         state = state.copyWith(
           checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
           checkoutGrantedSpark: purchase.sparkToGrant,
@@ -490,10 +530,15 @@ class WalletController extends Notifier<WalletState> {
         );
         return;
       }
-    } catch (_) {
-      // Fall through to polling-based verification
+
+      if (attempt < maxAttempts - 1) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
     }
 
-    await verifyCheckoutStatus();
+    state = state.copyWith(
+      checkoutVerificationState: WalletCheckoutVerificationState.pending,
+      clearCheckoutError: true,
+    );
   }
 }

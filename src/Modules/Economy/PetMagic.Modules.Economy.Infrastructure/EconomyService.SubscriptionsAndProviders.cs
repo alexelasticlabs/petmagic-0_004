@@ -179,7 +179,8 @@ public sealed partial class EconomyService
                 configuredPlan.CurrencyCode,
                 configuredPlan.MonthlyTokenLimit,
                 configuredPlan.GoogleProductId,
-                configuredPlan.AppleProductId);
+                configuredPlan.AppleProductId,
+                configuredPlan.StripePriceId);
         }
 
         var catalogPlan = PremiumPlanCatalog.Find(normalizedPlanCode);
@@ -197,7 +198,8 @@ public sealed partial class EconomyService
             catalogPlan.CurrencyCode,
             catalogPlan.TokenAllowance,
             catalogPlan.GooglePlayProductId,
-            catalogPlan.AppStoreProductId);
+            catalogPlan.AppStoreProductId,
+            null);
     }
 
     private async Task<(ResolvedPremiumPlan? Plan, UserSubscription? ExistingSubscription)> ResolveStripePlanContextAsync(
@@ -297,7 +299,8 @@ public sealed partial class EconomyService
             configuredPlan.CurrencyCode,
             configuredPlan.MonthlyTokenLimit,
             configuredPlan.GoogleProductId,
-            configuredPlan.AppleProductId);
+            configuredPlan.AppleProductId,
+            configuredPlan.StripePriceId);
     }
 
     private static ResolvedPremiumPlan ToResolvedPremiumPlan(PremiumPlanDefinition catalogPlan)
@@ -311,7 +314,8 @@ public sealed partial class EconomyService
             catalogPlan.CurrencyCode,
             catalogPlan.TokenAllowance,
             catalogPlan.GooglePlayProductId,
-            catalogPlan.AppStoreProductId);
+            catalogPlan.AppStoreProductId,
+            null);
     }
 
     private static string ToStripeBillingInterval(string billingPeriod)
@@ -512,5 +516,6 @@ public sealed partial class EconomyService
         string CurrencyCode,
         int MonthlyTokenLimit,
         string? GoogleProductId,
-        string? AppleProductId);
+        string? AppleProductId,
+        string? StripePriceId);
 }

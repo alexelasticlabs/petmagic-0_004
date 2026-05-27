@@ -119,94 +119,43 @@ public sealed partial class EconomyService
         if (parsedEvent.UserId.HasValue
             && string.Equals(parsedEvent.Purpose, "premium_subscription", StringComparison.Ordinal))
         {
-            if (string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal)
-                || string.Equals(eventType, "customer.subscription.created", StringComparison.Ordinal))
+            var isCheckoutCompleted = string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal);
+            var isInvoiceSucceeded = string.Equals(eventType, "invoice.payment_succeeded", StringComparison.Ordinal);
+            var isInvoiceFailed = string.Equals(eventType, "invoice.payment_failed", StringComparison.Ordinal);
+            var isSubscriptionCreated = string.Equals(eventType, "customer.subscription.created", StringComparison.Ordinal);
+            var isSubscriptionUpdated = string.Equals(eventType, "customer.subscription.updated", StringComparison.Ordinal);
+            var isSubscriptionDeleted = string.Equals(eventType, "customer.subscription.deleted", StringComparison.Ordinal);
+            var subscriptionStatusIsActive = string.Equals(parsedEvent.Status, "active", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsedEvent.Status, "trialing", StringComparison.OrdinalIgnoreCase);
+
+            if (isCheckoutCompleted
+                || isInvoiceSucceeded
+                || isInvoiceFailed
+                || isSubscriptionCreated
+                || isSubscriptionUpdated
+                || isSubscriptionDeleted)
             {
-                if (identityService is null)
+                var shouldActivatePremium = isCheckoutCompleted
+                    || isInvoiceSucceeded
+                    || ((isSubscriptionCreated || isSubscriptionUpdated) && subscriptionStatusIsActive);
+                var shouldDeactivatePremium = isInvoiceFailed || isSubscriptionDeleted;
+                var shouldUpdateIdentity = shouldActivatePremium || shouldDeactivatePremium || isSubscriptionUpdated;
+
+                if (shouldUpdateIdentity)
                 {
-                    return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
-                }
-
-                var premiumResult = await identityService.SetPremiumStatusAsync(
-                    new SetPremiumStatusCommand(parsedEvent.UserId.Value, true),
-                    cancellationToken);
-
-                if (premiumResult.IsFailure)
-                {
-                    return Result.Failure<StripeWebhookResultResponse>(premiumResult.Error);
-                }
-
-                if (!string.IsNullOrWhiteSpace(parsedEvent.PlanCode))
-                {
-                    var (resolvedPlan, existingSubscription) = await ResolveStripePlanContextAsync(
-                        parsedEvent.UserId.Value,
-                        parsedEvent.PlanCode,
-                        parsedEvent.SubscriptionId,
-                        cancellationToken);
-
-                    if (resolvedPlan is null)
+                    if (identityService is null)
                     {
-                        return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.PremiumPlanNotFound);
+                        return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
                     }
 
-                    var subscription = await UpsertUserSubscriptionAsync(
-                        parsedEvent.UserId.Value,
-                        "stripe",
-                        "web",
-                        string.Empty,
-                        resolvedPlan.PlanCode,
-                        "Active",
-                        parsedEvent.CustomerId,
-                        parsedEvent.SubscriptionId,
-                        parsedEvent.ObjectId,
-                        parsedEvent.CurrentPeriodStartUtc ?? existingSubscription?.CurrentPeriodStartUtc ?? DateTime.UtcNow,
-                        parsedEvent.CurrentPeriodEndUtc,
-                        parsedEvent.CancelAtPeriodEnd,
-                        resolvedPlan.MonthlyTokenLimit,
+                    var premiumResult = await identityService.SetPremiumStatusAsync(
+                        new SetPremiumStatusCommand(parsedEvent.UserId.Value, shouldActivatePremium),
                         cancellationToken);
 
-                    await AppendSubscriptionEventAsync(
-                        parsedEvent.UserId.Value,
-                        subscription.Id,
-                        "stripe",
-                        "SubscriptionActivated",
-                        subscription.Status,
-                        eventId,
-                        subscription.ExternalSubscriptionId,
-                        command.RawBody,
-                        cancellationToken);
-
-                    await SettlePendingReferralBonusAsync(
-                        parsedEvent.UserId.Value,
-                        $"premium:stripe:{subscription.PlanId}",
-                        DateTime.UtcNow,
-                        cancellationToken);
-                }
-            }
-
-            if (string.Equals(eventType, "customer.subscription.updated", StringComparison.Ordinal)
-                || string.Equals(eventType, "customer.subscription.deleted", StringComparison.Ordinal))
-            {
-                var isActive = string.Equals(parsedEvent.Status, "active", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(parsedEvent.Status, "trialing", StringComparison.OrdinalIgnoreCase);
-
-                if (string.Equals(eventType, "customer.subscription.deleted", StringComparison.Ordinal))
-                {
-                    isActive = false;
-                }
-
-                if (identityService is null)
-                {
-                    return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
-                }
-
-                var premiumResult = await identityService.SetPremiumStatusAsync(
-                    new SetPremiumStatusCommand(parsedEvent.UserId.Value, isActive),
-                    cancellationToken);
-
-                if (premiumResult.IsFailure)
-                {
-                    return Result.Failure<StripeWebhookResultResponse>(premiumResult.Error);
+                    if (premiumResult.IsFailure)
+                    {
+                        return Result.Failure<StripeWebhookResultResponse>(premiumResult.Error);
+                    }
                 }
 
                 if (!string.IsNullOrWhiteSpace(parsedEvent.PlanCode) || !string.IsNullOrWhiteSpace(parsedEvent.SubscriptionId))
@@ -224,21 +173,33 @@ public sealed partial class EconomyService
 
                     var resolvedPlanId = resolvedPlan?.PlanCode ?? existingSubscription!.PlanId;
                     var monthlyTokenLimit = resolvedPlan?.MonthlyTokenLimit ?? existingSubscription!.MonthlyTokenLimit;
-                    var subscriptionStatus = isActive
-                        ? (parsedEvent.CancelAtPeriodEnd ? "Canceled" : EconomyWebhookParser.MapStripeSubscriptionStatus(parsedEvent.Status))
-                        : "Expired";
+                    var subscriptionStatus = "Pending";
+                    if (shouldActivatePremium)
+                    {
+                        subscriptionStatus = parsedEvent.CancelAtPeriodEnd
+                            ? "Canceled"
+                            : EconomyWebhookParser.MapStripeSubscriptionStatus(parsedEvent.Status);
+                    }
+                    else if (isInvoiceFailed)
+                    {
+                        subscriptionStatus = "PastDue";
+                    }
+                    else if (isSubscriptionDeleted)
+                    {
+                        subscriptionStatus = "Expired";
+                    }
 
                     var subscription = await UpsertUserSubscriptionAsync(
                         parsedEvent.UserId.Value,
                         "stripe",
-                        "web",
+                        isCheckoutCompleted ? "web" : "payment_sheet",
                         string.Empty,
                         resolvedPlanId,
                         subscriptionStatus,
                         parsedEvent.CustomerId,
                         parsedEvent.SubscriptionId,
                         parsedEvent.ObjectId,
-                        parsedEvent.CurrentPeriodStartUtc ?? existingSubscription?.CurrentPeriodStartUtc,
+                        parsedEvent.CurrentPeriodStartUtc ?? existingSubscription?.CurrentPeriodStartUtc ?? DateTime.UtcNow,
                         parsedEvent.CurrentPeriodEndUtc,
                         parsedEvent.CancelAtPeriodEnd,
                         monthlyTokenLimit,
@@ -248,14 +209,27 @@ public sealed partial class EconomyService
                         parsedEvent.UserId.Value,
                         subscription.Id,
                         "stripe",
-                        string.Equals(eventType, "customer.subscription.deleted", StringComparison.Ordinal)
-                            ? "SubscriptionExpired"
-                            : "SubscriptionRenewed",
+                        shouldActivatePremium
+                            ? "SubscriptionActivated"
+                            : isInvoiceFailed
+                                ? "SubscriptionPaymentFailed"
+                                : isSubscriptionDeleted
+                                    ? "SubscriptionExpired"
+                                    : "SubscriptionPending",
                         subscription.Status,
                         eventId,
                         subscription.ExternalSubscriptionId,
                         command.RawBody,
                         cancellationToken);
+
+                    if (shouldActivatePremium)
+                    {
+                        await SettlePendingReferralBonusAsync(
+                            parsedEvent.UserId.Value,
+                            $"premium:stripe:{subscription.PlanId}",
+                            DateTime.UtcNow,
+                            cancellationToken);
+                    }
                 }
             }
         }

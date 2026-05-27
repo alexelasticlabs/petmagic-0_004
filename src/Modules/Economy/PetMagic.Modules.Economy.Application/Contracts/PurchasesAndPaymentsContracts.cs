@@ -16,7 +16,7 @@ public sealed record PurchaseCheckoutResponse(
     int SparkToGrant,
     DateTime CreatedAtUtc);
 
-public sealed record VerifyStripeCheckoutSessionCommand(Guid UserId, Guid OrderId, string StripeReferenceId);
+public sealed record VerifyStripeCheckoutSessionCommand(Guid UserId, Guid OrderId, string? StripeReferenceId);
 
 public sealed record PurchaseOrderResponse(
     Guid OrderId,
@@ -64,7 +64,12 @@ public sealed record PaymentMethodSetupResponse(
 public sealed record PremiumCheckoutResponse(
     string PaymentProvider,
     string CheckoutUrl,
-    string Status);
+    string Status,
+    string? ExternalSubscriptionId = null,
+    string? PaymentIntentClientSecret = null,
+    string? CustomerId = null,
+    string? CustomerEphemeralKeySecret = null,
+    string? PublishableKey = null);
 
 public sealed record BillingPortalSessionResponse(
     string PaymentProvider,

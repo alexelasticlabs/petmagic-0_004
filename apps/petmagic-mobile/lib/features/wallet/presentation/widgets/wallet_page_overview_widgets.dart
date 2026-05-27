@@ -75,7 +75,17 @@ class _WalletHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final canPop = Navigator.of(context).canPop();
+    final router = GoRouter.of(context);
+    final canPop = router.canPop();
+
+    void handleBack() {
+      if (router.canPop()) {
+        router.pop();
+        return;
+      }
+
+      router.go('/profile');
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -89,7 +99,7 @@ class _WalletHeader extends StatelessWidget {
                 children: [
                   if (canPop)
                     IconButton.filledTonal(
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: handleBack,
                       icon: const Icon(Icons.arrow_back_rounded),
                       tooltip: MaterialLocalizations.of(
                         context,
@@ -127,7 +137,7 @@ class _WalletHeader extends StatelessWidget {
           children: [
             if (canPop)
               IconButton.filledTonal(
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: handleBack,
                 icon: const Icon(Icons.arrow_back_rounded),
                 tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               )

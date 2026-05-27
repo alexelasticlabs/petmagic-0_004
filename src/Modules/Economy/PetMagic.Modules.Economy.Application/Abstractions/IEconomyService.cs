@@ -33,6 +33,8 @@ public interface IEconomyService
 
     Task<Result<SubscriptionSummaryResponse>> GetSubscriptionSummaryAsync(Guid userId, CancellationToken cancellationToken);
 
+    Task<Result<StripeDiagnosticsResponse>> GetStripeDiagnosticsAsync(Guid userId, CancellationToken cancellationToken);
+
     Task<Result<IReadOnlyList<PaymentMethodResponse>>> ListPaymentMethodsAsync(Guid userId, CancellationToken cancellationToken);
 
     Task<Result<PaymentMethodSetupResponse>> CreatePaymentMethodSetupAsync(CreatePaymentMethodSetupCommand command, CancellationToken cancellationToken);

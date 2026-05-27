@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -261,7 +263,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     PremiumState state,
     PremiumController controller,
   ) async {
-    if (state.selectedProvider == PremiumPaymentProvider.stripe && mounted) {
+    if (state.showsExternalCheckoutWarning && mounted) {
       final confirmed = await showPetMagicModalBottomSheet<bool>(
         context: context,
         backgroundColor: Colors.transparent,
@@ -277,7 +279,101 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       }
     }
 
-    await controller.startCheckout();
+    final checkout = await controller.startCheckout();
+    if (checkout != null && mounted) {
+      await _presentStripeSubscriptionPaymentSheet(
+        checkout,
+        wasPremiumBeforeCheckout: state.isPremium,
+      );
+    }
+  }
+
+  Future<void> _presentStripeSubscriptionPaymentSheet(
+    PremiumCheckoutModel checkout, {
+    required bool wasPremiumBeforeCheckout,
+  }) async {
+    final text = AppLocalizations.of(context);
+    final clientSecret = checkout.paymentIntentClientSecret;
+    final publishableKey = checkout.publishableKey;
+    if (clientSecret == null ||
+        clientSecret.isEmpty ||
+        publishableKey == null ||
+        publishableKey.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(text.premiumCheckoutFailed)));
+      return;
+    }
+
+    try {
+      Stripe.publishableKey = publishableKey;
+      Stripe.urlScheme = 'petmagicstripe';
+      await Stripe.instance.applySettings();
+
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'PetMagic',
+          customerId: checkout.customerId,
+          customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
+          returnURL: 'petmagicstripe://redirect',
+        ),
+      );
+
+      await Stripe.instance.presentPaymentSheet();
+
+      if (!mounted) {
+        return;
+      }
+
+      final controller = ref.read(premiumControllerProvider.notifier);
+      controller.markCheckoutOpened(
+        wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
+      );
+      await controller.verifyCheckoutStatus();
+    } on StripeException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      if (_isStripePaymentCanceled(error)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(text.premiumPurchaseCancelled)));
+        return;
+      }
+
+      final message = error.error.localizedMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (message == null || message.isEmpty)
+                ? text.premiumCheckoutFailed
+                : message,
+          ),
+        ),
+      );
+    } on PlatformException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? text.premiumCheckoutFailed)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(text.premiumCheckoutFailed)));
+    }
   }
 
   Future<void> _startCheckoutForProvider(
@@ -426,4 +522,9 @@ String _friendlyPremiumMessage(AppLocalizations text, String raw) {
   }
 
   return raw;
+}
+
+bool _isStripePaymentCanceled(StripeException error) {
+  final message = (error.error.localizedMessage ?? '').toLowerCase();
+  return message.contains('canceled') || message.contains('cancelled');
 }

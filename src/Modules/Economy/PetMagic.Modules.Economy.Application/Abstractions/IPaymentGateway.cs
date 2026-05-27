@@ -55,9 +55,18 @@ public sealed record SubscriptionCheckoutCreateRequest(
     decimal PriceAmount,
     string CurrencyCode,
     string BillingInterval,
-    string? ApiSecretKey = null);
+    string? ApiSecretKey = null,
+    string? PublishableKey = null,
+    bool UsePaymentSheet = false,
+    string? StripePriceId = null);
 
-public sealed record SubscriptionCheckoutCreateResponse(string ExternalCheckoutId, string CheckoutUrl);
+public sealed record SubscriptionCheckoutCreateResponse(
+    string ExternalCheckoutId,
+    string CheckoutUrl,
+    string? PaymentIntentClientSecret = null,
+    string? CustomerId = null,
+    string? CustomerEphemeralKeySecret = null,
+    string? PublishableKey = null);
 
 public sealed record PaymentCustomerCreateRequest(string Provider, Guid UserId, string? ApiSecretKey = null);
 

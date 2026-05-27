@@ -880,11 +880,19 @@ class _DetailHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final router = GoRouter.of(context);
 
     return Row(
       children: [
         IconButton(
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (router.canPop()) {
+              router.pop();
+              return;
+            }
+
+            router.go('/profile/settings');
+          },
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
             color: colors.textStrong,

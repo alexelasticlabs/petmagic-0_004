@@ -229,6 +229,7 @@ class PremiumState {
   }
 
   bool get showsExternalCheckoutWarning =>
+      selectedProvider != PremiumPaymentProvider.stripe &&
       selectedPaymentMethod?.requiresExternalWarning == true;
 
   String get legalNotice {
@@ -422,10 +423,10 @@ class PremiumController extends Notifier<PremiumState> {
     );
   }
 
-  Future<void> startCheckout() async {
+  Future<PremiumCheckoutModel?> startCheckout() async {
     final plan = state.selectedPlan;
     if (plan == null) {
-      return;
+      return null;
     }
 
     state = state.copyWith(
@@ -445,11 +446,16 @@ class PremiumController extends Notifier<PremiumState> {
           plan,
           WidgetsBinding.instance.platformDispatcher.locale,
         );
+        if (checkout.usesPaymentSheet) {
+          state = state.copyWith(isBuying: false);
+          return checkout;
+        }
+
         state = state.copyWith(
           isBuying: false,
           externalUrl: checkout.checkoutUrl,
         );
-        return;
+        return null;
       }
 
       if (!state.canStartCheckout) {
@@ -457,13 +463,15 @@ class PremiumController extends Notifier<PremiumState> {
           isBuying: false,
           errorMessage: 'premium.store_product_unavailable',
         );
-        return;
+        return null;
       }
 
       await _repository.startStoreCheckout(plan, state.selectedProvider);
     } catch (error) {
       state = state.copyWith(isBuying: false, errorMessage: error.toString());
     }
+
+    return null;
   }
 
   Future<void> manageBilling() async {
@@ -555,28 +563,43 @@ class PremiumController extends Notifier<PremiumState> {
       recentlyActivatedPremium: false,
     );
 
-    await ref.read(profileControllerProvider.notifier).initialize();
-    await load(refresh: true);
+    const maxAttempts = 4;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      await ref.read(profileControllerProvider.notifier).initialize();
+      await load(refresh: true);
 
-    final updatedState = state;
-    if (updatedState.errorMessage != null) {
-      state = state.copyWith(
-        checkoutVerificationState: PremiumCheckoutVerificationState.error,
-        checkoutErrorMessage: updatedState.errorMessage,
-        isAwaitingCheckoutVerification: false,
-        recentlyActivatedPremium: false,
-      );
-      return;
+      final updatedState = state;
+      if (updatedState.errorMessage != null) {
+        state = state.copyWith(
+          checkoutVerificationState: PremiumCheckoutVerificationState.error,
+          checkoutErrorMessage: updatedState.errorMessage,
+          isAwaitingCheckoutVerification: false,
+          recentlyActivatedPremium: false,
+        );
+        return;
+      }
+
+      final recentlyActivated =
+          !updatedState.wasPremiumBeforeCheckout && updatedState.isPremium;
+      if (recentlyActivated) {
+        state = state.copyWith(
+          checkoutVerificationState: PremiumCheckoutVerificationState.activated,
+          isAwaitingCheckoutVerification: false,
+          recentlyActivatedPremium: true,
+          clearCheckoutError: true,
+        );
+        return;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
     }
 
-    final recentlyActivated =
-        !updatedState.wasPremiumBeforeCheckout && updatedState.isPremium;
     state = state.copyWith(
-      checkoutVerificationState: recentlyActivated
-          ? PremiumCheckoutVerificationState.activated
-          : PremiumCheckoutVerificationState.pending,
+      checkoutVerificationState: PremiumCheckoutVerificationState.pending,
       isAwaitingCheckoutVerification: false,
-      recentlyActivatedPremium: recentlyActivated,
+      recentlyActivatedPremium: false,
       clearCheckoutError: true,
     );
   }

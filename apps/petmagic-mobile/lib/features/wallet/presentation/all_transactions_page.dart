@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 class AllTransactionsPage extends ConsumerStatefulWidget {
@@ -41,6 +42,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
     final colors = context.petMagicColors;
     final state = ref.watch(walletControllerProvider);
     final controller = ref.read(walletControllerProvider.notifier);
+    final router = GoRouter.of(context);
     final errorToShow = state.errorMessage != null && state.ledger.isEmpty
         ? _friendlyTransactionsError(text, state.errorMessage!)
         : null;
@@ -68,7 +70,14 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                     Row(
                       children: [
                         IconButton.filledTonal(
-                          onPressed: () => context.pop(),
+                          onPressed: () {
+                            if (router.canPop()) {
+                              router.pop();
+                              return;
+                            }
+
+                            router.go(WalletPage.routePath);
+                          },
                           icon: const Icon(Icons.arrow_back_rounded),
                           tooltip: MaterialLocalizations.of(
                             context,

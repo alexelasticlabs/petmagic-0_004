@@ -71,6 +71,9 @@ public static class EconomyEndpoints
         group.MapGet("/me/subscription", GetSubscriptionSummaryAsync)
             .RequireAuthorization();
 
+        group.MapGet("/premium/stripe-diagnostics", GetStripeDiagnosticsAsync)
+            .RequireAuthorization();
+
         group.MapPost("/premium/checkout", CreatePremiumCheckoutAsync)
             .RequireAuthorization();
 
@@ -111,6 +114,29 @@ public static class EconomyEndpoints
             .AllowAnonymous();
 
         group.MapPost("/webhooks/google-play", GooglePlayDeveloperNotificationAsync)
+            .AllowAnonymous();
+
+        var stripePaymentsGroup = endpoints.MapGroup("/api/payments/stripe")
+            .WithTags("Stripe Payments")
+            .RequireRateLimiting("economy");
+
+        stripePaymentsGroup.MapPost("/token-purchase", CreateStripeTokenPurchaseAsync)
+            .RequireAuthorization();
+
+        stripePaymentsGroup.MapPost("/subscription", CreateStripeSubscriptionAsync)
+            .RequireAuthorization();
+
+        stripePaymentsGroup.MapPost("/customer-portal", CreateStripeCustomerPortalAsync)
+            .RequireAuthorization();
+
+        stripePaymentsGroup.MapGet("/diagnostics", GetStripeDiagnosticsAsync)
+            .RequireAuthorization();
+
+        var webhooksGroup = endpoints.MapGroup("/api/webhooks")
+            .WithTags("Webhooks")
+            .RequireRateLimiting("economy");
+
+        webhooksGroup.MapPost("/stripe", StripeWebhookAsync)
             .AllowAnonymous();
 
         return endpoints;
@@ -428,6 +454,26 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<StripeDiagnosticsResponse>, ProblemHttpResult>> GetStripeDiagnosticsAsync(
+        HttpContext context,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.GetStripeDiagnosticsAsync(userId!.Value, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<IReadOnlyList<PaymentMethodResponse>>, ProblemHttpResult>> ListPaymentMethodsAsync(
         HttpContext context,
         IEconomyService service,
@@ -576,6 +622,60 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<PurchaseCheckoutResponse>, ValidationProblem, ProblemHttpResult>> CreateStripeTokenPurchaseAsync(
+        HttpContext context,
+        CreateStripeTokenPurchaseRequest request,
+        IValidator<CreatePackPurchaseCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var packsResult = await service.ListPacksAsync(cancellationToken);
+        if (packsResult.IsFailure)
+        {
+            return TypedResults.Problem(title: packsResult.Error.Code, detail: packsResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var pack = ResolveCurrencyPack(request.TokenPackId, packsResult.Value);
+        if (pack is null)
+        {
+            return TypedResults.Problem(title: "economy.pack_not_found", detail: "Currency pack was not found.", statusCode: StatusCodes.Status404NotFound);
+        }
+
+        var command = new CreatePackPurchaseCommand(
+            userId!.Value,
+            pack.PackId,
+            string.IsNullOrWhiteSpace(request.CurrencyCode) ? pack.CurrencyCode : request.CurrencyCode,
+            "stripe",
+            request.Platform,
+            request.AppVersion,
+            request.Country,
+            request.Locale,
+            null);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.CreatePackPurchaseAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "economy.pack_not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<PurchaseOrderResponse>, ValidationProblem, ProblemHttpResult>> ConfirmPurchaseAsync(
         HttpContext context,
         Guid orderId,
@@ -648,6 +748,46 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<PremiumCheckoutResponse>, ValidationProblem, ProblemHttpResult>> CreateStripeSubscriptionAsync(
+        HttpContext context,
+        CreateStripeSubscriptionRequest request,
+        IValidator<CreatePremiumCheckoutCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new CreatePremiumCheckoutCommand(
+            userId!.Value,
+            request.PlanId,
+            "stripe",
+            request.Platform,
+            request.AppVersion,
+            request.Country,
+            request.Locale);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.CreatePremiumCheckoutAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "economy.premium_plan_not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<BillingPortalSessionResponse>, ValidationProblem, ProblemHttpResult>> CreatePremiumBillingPortalAsync(
         HttpContext context,
         CreatePremiumBillingPortalRequest request,
@@ -678,6 +818,35 @@ public static class EconomyEndpoints
                 ? StatusCodes.Status404NotFound
                 : StatusCodes.Status400BadRequest;
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BillingPortalSessionResponse>, ValidationProblem, ProblemHttpResult>> CreateStripeCustomerPortalAsync(
+        HttpContext context,
+        CreateStripeCustomerPortalRequest request,
+        IValidator<CreatePremiumBillingPortalCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new CreatePremiumBillingPortalCommand(userId!.Value, "stripe");
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.CreatePremiumBillingPortalAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -741,11 +910,6 @@ public static class EconomyEndpoints
         if (subjectError is not null)
         {
             return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.StripeReferenceId))
-        {
-            return TypedResults.Problem(title: "economy.invalid_request", detail: "Stripe reference ID is required.", statusCode: StatusCodes.Status400BadRequest);
         }
 
         var command = new VerifyStripeCheckoutSessionCommand(userId!.Value, orderId, request.StripeReferenceId);
@@ -913,6 +1077,33 @@ public static class EconomyEndpoints
         return (userId, isPremium, null);
     }
 
+    private static CurrencyPackResponse? ResolveCurrencyPack(
+        string tokenPackId,
+        IReadOnlyList<CurrencyPackResponse> packs)
+    {
+        var normalized = tokenPackId.Trim();
+        if (Guid.TryParse(normalized, out var packId))
+        {
+            return packs.FirstOrDefault(x => x.PackId == packId);
+        }
+
+        var code = normalized.ToLowerInvariant();
+        var pack = packs.FirstOrDefault(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
+        if (pack is not null)
+        {
+            return pack;
+        }
+
+        if (code.StartsWith("pack_", StringComparison.Ordinal))
+        {
+            code = code[5..];
+        }
+
+        return int.TryParse(code, out var totalSpark)
+            ? packs.FirstOrDefault(x => x.TotalSpark == totalSpark || x.GrantedSpark == totalSpark)
+            : null;
+    }
+
     public sealed record SpendRequest(int Amount, string Reason);
 
     public sealed record RedeemCodeRequest(string Code);
@@ -921,7 +1112,7 @@ public static class EconomyEndpoints
 
     public sealed record PaymentMethodSetupRequest(string PaymentProvider = "stripe");
 
-    public sealed record VerifyStripeCheckoutRequest(string StripeReferenceId);
+    public sealed record VerifyStripeCheckoutRequest(string? StripeReferenceId);
 
     public sealed record CreatePurchaseRequest(
         Guid PackId,
@@ -942,6 +1133,23 @@ public static class EconomyEndpoints
         string Locale = "en");
 
     public sealed record CreatePremiumBillingPortalRequest(string PaymentProvider = "stripe");
+
+    public sealed record CreateStripeTokenPurchaseRequest(
+        string TokenPackId,
+        string? CurrencyCode = null,
+        string Platform = "android",
+        string AppVersion = "1.0.0",
+        string Country = "*",
+        string Locale = "en");
+
+    public sealed record CreateStripeSubscriptionRequest(
+        string PlanId,
+        string Platform = "android",
+        string AppVersion = "1.0.0",
+        string Country = "*",
+        string Locale = "en");
+
+    public sealed record CreateStripeCustomerPortalRequest;
 
     public sealed record VerifyPremiumStorePurchaseRequest(
         string PlanCode,

@@ -239,7 +239,15 @@ internal static partial class EconomyWebhookParser
             {
                 subscriptionId = subscriptionElement.GetString();
             }
-            else if (string.Equals(objectElement.GetProperty("object").GetString(), "subscription", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(objectId))
+            else if (subscriptionElement.ValueKind == JsonValueKind.Object
+                && subscriptionElement.TryGetProperty("id", out var nestedSubscriptionIdElement)
+                && nestedSubscriptionIdElement.ValueKind == JsonValueKind.String)
+            {
+                subscriptionId = nestedSubscriptionIdElement.GetString();
+            }
+            else if (objectElement.TryGetProperty("object", out var objectTypeElement)
+                && string.Equals(objectTypeElement.GetString(), "subscription", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(objectId))
             {
                 subscriptionId = objectId;
             }
@@ -272,37 +280,15 @@ internal static partial class EconomyWebhookParser
             if (objectElement.TryGetProperty("metadata", out var metadataElement)
                 && metadataElement.ValueKind == JsonValueKind.Object)
             {
-                if (metadataElement.TryGetProperty("order_id", out var orderIdElement)
-                    && orderIdElement.ValueKind == JsonValueKind.String)
-                {
-                    var rawOrderId = orderIdElement.GetString();
-                    if (Guid.TryParse(rawOrderId, out var parsedOrderId))
-                    {
-                        orderId = parsedOrderId;
-                    }
-                }
+                ApplyStripeMetadata(metadataElement, ref orderId, ref userId, ref purpose, ref planCode);
+            }
 
-                if (metadataElement.TryGetProperty("user_id", out var userIdElement)
-                    && userIdElement.ValueKind == JsonValueKind.String)
-                {
-                    var rawUserId = userIdElement.GetString();
-                    if (Guid.TryParse(rawUserId, out var parsedUserId))
-                    {
-                        userId = parsedUserId;
-                    }
-                }
-
-                if (metadataElement.TryGetProperty("purpose", out var purposeElement)
-                    && purposeElement.ValueKind == JsonValueKind.String)
-                {
-                    purpose = purposeElement.GetString();
-                }
-
-                if (metadataElement.TryGetProperty("plan_code", out var planCodeElement)
-                    && planCodeElement.ValueKind == JsonValueKind.String)
-                {
-                    planCode = planCodeElement.GetString();
-                }
+            if (objectElement.TryGetProperty("subscription_details", out var subscriptionDetailsElement)
+                && subscriptionDetailsElement.ValueKind == JsonValueKind.Object
+                && subscriptionDetailsElement.TryGetProperty("metadata", out var subscriptionMetadataElement)
+                && subscriptionMetadataElement.ValueKind == JsonValueKind.Object)
+            {
+                ApplyStripeMetadata(subscriptionMetadataElement, ref orderId, ref userId, ref purpose, ref planCode);
             }
 
             return (true, orderId, userId, objectId, purpose, setupIntentId, status, planCode, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd);
@@ -334,6 +320,50 @@ internal static partial class EconomyWebhookParser
             }
 
             return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, false);
+        }
+    }
+
+    private static void ApplyStripeMetadata(
+        JsonElement metadataElement,
+        ref Guid? orderId,
+        ref Guid? userId,
+        ref string? purpose,
+        ref string? planCode)
+    {
+        if (!orderId.HasValue
+            && metadataElement.TryGetProperty("order_id", out var orderIdElement)
+            && orderIdElement.ValueKind == JsonValueKind.String)
+        {
+            var rawOrderId = orderIdElement.GetString();
+            if (Guid.TryParse(rawOrderId, out var parsedOrderId))
+            {
+                orderId = parsedOrderId;
+            }
+        }
+
+        if (!userId.HasValue
+            && metadataElement.TryGetProperty("user_id", out var userIdElement)
+            && userIdElement.ValueKind == JsonValueKind.String)
+        {
+            var rawUserId = userIdElement.GetString();
+            if (Guid.TryParse(rawUserId, out var parsedUserId))
+            {
+                userId = parsedUserId;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(purpose)
+            && metadataElement.TryGetProperty("purpose", out var purposeElement)
+            && purposeElement.ValueKind == JsonValueKind.String)
+        {
+            purpose = purposeElement.GetString();
+        }
+
+        if (string.IsNullOrWhiteSpace(planCode)
+            && metadataElement.TryGetProperty("plan_code", out var planCodeElement)
+            && planCodeElement.ValueKind == JsonValueKind.String)
+        {
+            planCode = planCodeElement.GetString();
         }
     }
 

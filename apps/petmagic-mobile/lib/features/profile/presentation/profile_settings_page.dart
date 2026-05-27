@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
@@ -31,6 +32,7 @@ class ProfileSettingsPage extends ConsumerWidget {
       appPreferencesControllerProvider.notifier,
     );
     final profileController = ref.read(profileControllerProvider.notifier);
+    final router = GoRouter.of(context);
 
     return ProfileScreenBackground(
       child: SafeArea(
@@ -40,7 +42,14 @@ class ProfileSettingsPage extends ConsumerWidget {
             Row(
               children: [
                 IconButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () {
+                    if (router.canPop()) {
+                      router.pop();
+                      return;
+                    }
+
+                    router.go(ProfilePage.routePath);
+                  },
                   icon: Icon(
                     Icons.arrow_back_ios_new_rounded,
                     color: colors.textStrong,
