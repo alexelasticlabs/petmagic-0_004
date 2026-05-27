@@ -11,7 +11,10 @@ import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart'
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_assistant_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_home_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_ticket_form_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
@@ -173,6 +176,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 kind: ProfileSettingsDetailKind.fromSlug(
                   state.pathParameters['kind'] ?? 'help-center',
                 ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: SupportHomePage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: SupportHomePage()),
+          ),
+          GoRoute(
+            path: SupportAssistantPage.routePath,
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: SupportAssistantPage(
+                scenario: state.uri.queryParameters['scenario'] ?? 'Other',
+              ),
+            ),
+          ),
+          GoRoute(
+            path: SupportTicketFormPage.routePath,
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: SupportTicketFormPage(
+                scenario: state.uri.queryParameters['scenario'] ?? 'Other',
               ),
             ),
           ),

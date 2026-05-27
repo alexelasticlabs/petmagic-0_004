@@ -21,16 +21,34 @@ type UseSupportInboxControllerParams = {
   locale: Locale;
 };
 
-export type SupportFilter = "all" | SupportConversationStatus;
-export type AssignmentFilter = SupportInboxAssignmentScope;
+export type SupportQueueFilter =
+  | "all"
+  | SupportConversationStatus
+  | "mine"
+  | "unassigned";
+
+function resolveQueueFilter(filter: SupportQueueFilter): {
+  status?: SupportConversationStatus;
+  assignment: SupportInboxAssignmentScope;
+} {
+  if (filter === "all") {
+    return { status: undefined, assignment: "all" };
+  }
+  if (filter === "mine") {
+    return { status: undefined, assignment: "mine" };
+  }
+  if (filter === "unassigned") {
+    return { status: undefined, assignment: "unassigned" };
+  }
+  return { status: filter, assignment: "all" };
+}
 
 export function useSupportInboxController({ locale }: UseSupportInboxControllerParams) {
   const text = getDictionary(locale);
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<SupportFilter>("all");
-  const [assignment, setAssignment] = useState<AssignmentFilter>("all");
+  const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -39,9 +57,11 @@ export function useSupportInboxController({ locale }: UseSupportInboxControllerP
     }
   }, [locale, router, session]);
 
+  const { status, assignment } = resolveQueueFilter(queueFilter);
+
   const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
-    queryKey: adminQueryKeys.supportInbox(status, assignment),
-    queryFn: () => fetchSupportInbox(status === "all" ? undefined : status, assignment),
+    queryKey: adminQueryKeys.supportInbox(status ?? "all", assignment),
+    queryFn: () => fetchSupportInbox(status, assignment),
     enabled: Boolean(session),
   });
 
@@ -72,14 +92,12 @@ export function useSupportInboxController({ locale }: UseSupportInboxControllerP
   }, [inboxQuery.data, searchQuery]);
 
   return {
-    assignment,
     filteredConversations,
     inboxQuery,
+    queueFilter,
     searchQuery,
-    setAssignment,
+    setQueueFilter,
     setSearchQuery,
-    setStatus,
-    status,
     text,
   };
 }

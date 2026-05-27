@@ -11,6 +11,15 @@ export const adminQueryKeys = {
   economyPurchases: (status: string) => ["admin", "economy", "purchases", status] as const,
   economySubscriptions: (status: string, provider: string) =>
     ["admin", "economy", "subscriptions", status, provider] as const,
+  economyUserSubscriptionSummary: (userId: string) =>
+    ["admin", "economy", "users", userId, "subscription-summary"] as const,
+  economyUserSubscriptionSummaryDisabled: [
+    "admin",
+    "economy",
+    "users",
+    "subscription-summary",
+    "disabled",
+  ] as const,
   economySubscriptionPlans: ["admin", "economy", "subscription-plans"] as const,
   economyPaymentProviderConfigs: ["admin", "economy", "payment-provider-configs"] as const,
   economySubscriptionEvents: (provider: string, status: string) =>

@@ -61,7 +61,12 @@ public interface IEconomyService
 
     Task<Result<OffsetPagedResponse<WalletLedgerItemResponse>>> GetAdminWalletLedgerAsync(int skip, int take, string? source, Guid? userId, CancellationToken cancellationToken);
 
-    Task<Result<OffsetPagedResponse<PurchaseHistoryItemResponse>>> GetAdminPurchaseHistoryAsync(int skip, int take, string? status, CancellationToken cancellationToken);
+    Task<Result<OffsetPagedResponse<PurchaseHistoryItemResponse>>> GetAdminPurchaseHistoryAsync(
+        int skip,
+        int take,
+        string? status,
+        Guid? userId,
+        CancellationToken cancellationToken);
 
     Task<Result<OffsetPagedResponse<AdminUserSubscriptionResponse>>> GetAdminSubscriptionsAsync(int skip, int take, string? status, string? provider, CancellationToken cancellationToken);
 

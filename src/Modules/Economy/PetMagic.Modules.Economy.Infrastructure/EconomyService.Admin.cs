@@ -58,6 +58,7 @@ public sealed partial class EconomyService
         int skip,
         int take,
         string? status,
+        Guid? userId,
         CancellationToken cancellationToken)
     {
         var normalizedSkip = Math.Max(0, skip);
@@ -73,6 +74,11 @@ public sealed partial class EconomyService
         if (!string.IsNullOrWhiteSpace(normalizedStatus))
         {
             query = query.Where(x => x.Status == normalizedStatus);
+        }
+
+        if (userId.HasValue)
+        {
+            query = query.Where(x => x.UserId == userId.Value);
         }
 
         var items = await query

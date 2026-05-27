@@ -22,6 +22,8 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Status).HasConversion<int>().IsRequired();
             entity.Property(x => x.Priority).HasConversion<int>().IsRequired();
+            entity.Property(x => x.Source).HasConversion<int>().IsRequired();
+            entity.Property(x => x.AssistantScenario).HasMaxLength(64);
             entity.Property(x => x.FeedbackComment).HasMaxLength(1000);
             entity.HasIndex(x => x.InitiatorUserId).IsUnique();
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
@@ -35,6 +37,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.ToTable("support_messages");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.SenderType).HasConversion<int>().IsRequired();
             entity.Property(x => x.AttachmentUrl).HasMaxLength(2048);
             entity.Property(x => x.AttachmentFileName).HasMaxLength(256);
             entity.Property(x => x.AttachmentContentType).HasMaxLength(128);

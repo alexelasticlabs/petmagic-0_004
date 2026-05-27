@@ -67,9 +67,13 @@ export function SupportConversationSidePanel({
     primaryStatusAction,
     recentFailures,
     recentUserPurchases,
+    lastUserPurchaseAtUtc,
     lastActivityAtUtc,
     sessionUserId,
     secondaryStatusActions,
+    setUserActiveMutation,
+    setUserPremiumMutation,
+    subscriptionQuery,
     setActiveSidePanelTab,
     sidePanelDescription,
     sidePanelTabs,
@@ -96,6 +100,12 @@ export function SupportConversationSidePanel({
 
   const responderState = getResponderState(conversation.status, locale);
   const hasAdvancedActions = secondaryStatusActions.length > 0 || Boolean(destructiveStatusAction);
+  const isUserActive = userQuery.data?.isActive ?? true;
+  const isUserPremium = userQuery.data?.isPremium ?? false;
+  const isModerationPending = setUserActiveMutation.isPending || setUserPremiumMutation.isPending;
+  const subscriptionStatusLabel =
+    subscriptionQuery.data?.status ?? (locale === "ru" ? "Нет подписки" : "No subscription");
+  const tokenBalanceLabel = locale === "ru" ? "Баланс токенов" : "Token balance";
 
   return (
     <div className={styles.sidePane}>
@@ -241,6 +251,21 @@ export function SupportConversationSidePanel({
               ) : null}
             </div>
 
+            {conversation.source === "MobileAssistant" ? (
+              <div className={styles.metricsGrid}>
+                <div className={styles.metricTile}>
+                  <span>{text.supportAssistantSourceLabel}</span>
+                  <strong>{text.supportAssistantMobileLabel}</strong>
+                </div>
+                {conversation.assistantScenario ? (
+                  <div className={styles.metricTile}>
+                    <span>{text.supportAssistantScenarioLabel}</span>
+                    <strong>{conversation.assistantScenario}</strong>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className={styles.userSummaryHeader}>
               <div className={styles.userCard}>
                 <span className={styles.avatarHero}>{initialsFor(userDisplayName)}</span>
@@ -278,9 +303,24 @@ export function SupportConversationSidePanel({
 
             <div className={styles.dangerActionBlock}>
               <span>{locale === "ru" ? "Опасные действия" : "Danger zone"}</span>
-              <button type="button" className="ui-button ui-button--danger ui-button--sm" disabled>
-                {locale === "ru" ? "Заблокировать пользователя" : "Block user"}
-              </button>
+              <div className={styles.quickLinksRow}>
+                <button
+                  type="button"
+                  className="ui-button ui-button--danger ui-button--sm"
+                  onClick={() => setUserActiveMutation.mutate(!isUserActive)}
+                  disabled={isModerationPending}
+                >
+                  {isUserActive ? text.deactivate : text.activate}
+                </button>
+                <button
+                  type="button"
+                  className="ui-button ui-button--secondary ui-button--sm"
+                  onClick={() => setUserPremiumMutation.mutate(!isUserPremium)}
+                  disabled={isModerationPending}
+                >
+                  {isUserPremium ? text.removePremium : text.makePremium}
+                </button>
+              </div>
             </div>
 
             <div className={styles.metricsGrid}>
@@ -300,7 +340,54 @@ export function SupportConversationSidePanel({
                 <span>{text.supportPurchasesLabel}</span>
                 <strong>{String(totalPurchases)}</strong>
               </div>
+              <div className={styles.metricTile}>
+                <span>{tokenBalanceLabel}</span>
+                <strong>{String(analyticsQuery.data?.summary.walletBalance ?? 0)}</strong>
+              </div>
+              <div className={styles.metricTile}>
+                <span>{text.supportGenerationErrorsTitle}</span>
+                <strong>{String(analyticsQuery.data?.summary.failedGenerations ?? 0)}</strong>
+              </div>
             </div>
+
+            <SectionBlock title={text.supportAiContextTitle}>
+              <SidePanelAsyncState
+                isLoading={
+                  analyticsQuery.isLoading || purchasesQuery.isLoading || subscriptionQuery.isLoading
+                }
+                isError={
+                  analyticsQuery.isError || purchasesQuery.isError || subscriptionQuery.isError
+                }
+                hasContent={Boolean(analyticsQuery.data)}
+                loadingTitle={text.loading}
+                errorTitle={text.supportLoadError}
+                emptyTitle={text.supportHistoryEmpty}
+              >
+                <div className={styles.detailGrid}>
+                  <div className={styles.detailRow}>
+                    <span>{text.supportLastPaymentLabel}</span>
+                    <strong>{formatDateTime(lastUserPurchaseAtUtc, locale)}</strong>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>{text.supportLastGenerationLabel}</span>
+                    <strong>
+                      {formatDateTime(analyticsQuery.data?.summary.lastGenerationAtUtc, locale)}
+                    </strong>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>{locale === "ru" ? "Статус подписки" : "Subscription status"}</span>
+                    <strong>{subscriptionStatusLabel}</strong>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>{locale === "ru" ? "План подписки" : "Subscription plan"}</span>
+                    <strong>
+                      {subscriptionQuery.data?.planName ??
+                        (userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel)}
+                    </strong>
+                  </div>
+                </div>
+              </SidePanelAsyncState>
+            </SectionBlock>
 
             <SectionBlock title={text.supportConversationMetaTitle}>
               <div className={styles.detailGrid}>
@@ -328,7 +415,7 @@ export function SupportConversationSidePanel({
             <SectionBlock title={text.supportRecentGenerationsTitle}>
               <SidePanelAsyncState
                 isLoading={analyticsQuery.isLoading}
-                isError={false}
+                isError={analyticsQuery.isError}
                 hasContent={Boolean(analyticsQuery.data?.recentGenerations.length)}
                 loadingTitle={text.loading}
                 errorTitle={text.supportLoadError}
@@ -361,7 +448,7 @@ export function SupportConversationSidePanel({
             <SectionBlock title={text.supportGenerationErrorsTitle}>
               <SidePanelAsyncState
                 isLoading={analyticsQuery.isLoading}
-                isError={false}
+                isError={analyticsQuery.isError}
                 hasContent={recentFailures.length > 0 || failedGenerations.length > 0}
                 loadingTitle={text.loading}
                 errorTitle={text.supportLoadError}
@@ -401,7 +488,7 @@ export function SupportConversationSidePanel({
             <SectionBlock title={text.supportRecentPurchasesTitle}>
               <SidePanelAsyncState
                 isLoading={purchasesQuery.isLoading}
-                isError={false}
+                isError={purchasesQuery.isError}
                 hasContent={recentUserPurchases.length > 0}
                 loadingTitle={text.loading}
                 errorTitle={text.supportLoadError}

@@ -14,6 +14,16 @@ public sealed class SupportConversation
 
     public SupportConversationPriority Priority { get; set; } = SupportConversationPriority.Normal;
 
+    public SupportConversationSource Source { get; set; } = SupportConversationSource.Direct;
+
+    public string? AssistantScenario { get; set; }
+
+    public Guid? RelatedGenerationId { get; set; }
+
+    public Guid? RelatedPaymentId { get; set; }
+
+    public Guid? RelatedSubscriptionId { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;

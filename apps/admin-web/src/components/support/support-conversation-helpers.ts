@@ -206,6 +206,15 @@ export function hasImageAttachment(
   return hasAttachment(message) && Boolean(message.attachmentContentType?.startsWith("image/"));
 }
 
+export function hasVideoAttachment(
+  message: Pick<
+    AdminSupportConversation["messages"][number],
+    "attachmentUrl" | "attachmentContentType"
+  >
+) {
+  return hasAttachment(message) && Boolean(message.attachmentContentType?.startsWith("video/"));
+}
+
 export function shouldRenderMessageBody(
   message: Pick<
     AdminSupportConversation["messages"][number],
@@ -303,6 +312,129 @@ function getSupportQueueUrgency(item: SupportQueueItem) {
     item.adminUnreadCount * 800 +
     Math.min(waitingMinutes, 1440) / 4
   );
+}
+
+export type SupportConversationFeedItem =
+  | {
+      kind: "message";
+      id: string;
+      occurredAtUtc: string;
+      message: AdminSupportConversation["messages"][number];
+    }
+  | {
+      kind: "system";
+      id: string;
+      occurredAtUtc: string;
+      label: string;
+      tone: "neutral" | "info" | "warning" | "success";
+    };
+
+export type SupportConversationFeedGroup = {
+  key: "today" | "yesterday" | "earlier";
+  label: string;
+  items: SupportConversationFeedItem[];
+};
+
+export function groupSupportConversationFeed(
+  conversation: Pick<
+    AdminSupportConversation,
+    "messages" | "createdAtUtc" | "resolvedAtUtc" | "closedAtUtc" | "reopenUntilUtc" | "status"
+  >,
+  labels: {
+    today: string;
+    yesterday: string;
+    earlier: string;
+    ticketCreated: string;
+    ticketResolved: string;
+    ticketReopened: string;
+    ticketClosed: string;
+  }
+): SupportConversationFeedGroup[] {
+  const items: SupportConversationFeedItem[] = [];
+
+  if (conversation.createdAtUtc) {
+    items.push({
+      kind: "system",
+      id: `system:created:${conversation.createdAtUtc}`,
+      occurredAtUtc: conversation.createdAtUtc,
+      label: labels.ticketCreated,
+      tone: "info",
+    });
+  }
+
+  for (const message of conversation.messages) {
+    items.push({
+      kind: "message",
+      id: message.messageId,
+      occurredAtUtc: message.createdAtUtc,
+      message,
+    });
+  }
+
+  if (conversation.resolvedAtUtc) {
+    items.push({
+      kind: "system",
+      id: `system:resolved:${conversation.resolvedAtUtc}`,
+      occurredAtUtc: conversation.resolvedAtUtc,
+      label: labels.ticketResolved,
+      tone: "success",
+    });
+  }
+
+  if (conversation.closedAtUtc) {
+    items.push({
+      kind: "system",
+      id: `system:closed:${conversation.closedAtUtc}`,
+      occurredAtUtc: conversation.closedAtUtc,
+      label: labels.ticketClosed,
+      tone: "neutral",
+    });
+  }
+
+  if (
+    conversation.reopenUntilUtc &&
+    conversation.status !== "Closed" &&
+    conversation.resolvedAtUtc &&
+    Date.parse(conversation.reopenUntilUtc) > Date.parse(conversation.resolvedAtUtc)
+  ) {
+    items.push({
+      kind: "system",
+      id: `system:reopened:${conversation.reopenUntilUtc}`,
+      occurredAtUtc: conversation.reopenUntilUtc,
+      label: labels.ticketReopened,
+      tone: "warning",
+    });
+  }
+
+  items.sort((left, right) => Date.parse(left.occurredAtUtc) - Date.parse(right.occurredAtUtc));
+
+  const groups: SupportConversationFeedGroup[] = [
+    { key: "earlier", label: labels.earlier, items: [] },
+    { key: "yesterday", label: labels.yesterday, items: [] },
+    { key: "today", label: labels.today, items: [] },
+  ];
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+  for (const item of items) {
+    const timestamp = Date.parse(item.occurredAtUtc);
+    if (Number.isNaN(timestamp)) {
+      groups[0].items.push(item);
+      continue;
+    }
+    if (timestamp >= startOfToday.getTime()) {
+      groups[2].items.push(item);
+    } else if (timestamp >= startOfYesterday.getTime()) {
+      groups[1].items.push(item);
+    } else {
+      groups[0].items.push(item);
+    }
+  }
+
+  return groups.filter((group) => group.items.length > 0);
 }
 
 export function buildActivityTimeline(

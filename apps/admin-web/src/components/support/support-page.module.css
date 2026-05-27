@@ -1,3 +1,53 @@
+/* ── Keyframe animations ── */
+
+@keyframes fadeInMessage {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInPanel {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseSlaRing {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
+  }
+}
+
+@keyframes shimmerSkeleton {
+  from {
+    background-position: -200% center;
+  }
+
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* ─────────────────────────────────────────── */
+
 .page {
   --support-page-max: 90rem;
   display: grid;
@@ -103,6 +153,7 @@
 
 .sidePane {
   width: 100%;
+  animation: slideInPanel 220ms ease both;
 }
 
 .inboxToolbar {
@@ -339,6 +390,16 @@
   opacity: 0.72;
 }
 
+.conversationRowUnread {
+  border-color: rgba(34, 197, 94, 0.36);
+  background: color-mix(in srgb, var(--surface-2) 88%, rgba(34, 197, 94, 0.18) 12%);
+}
+
+.rowTitleUnread {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
 .rowHeader,
 .rowFooter,
 .messageHeader,
@@ -360,7 +421,7 @@
   min-width: 0;
 }
 
-.rowIdentity > div,
+.rowIdentity>div,
 .chatIdentityCompact,
 .templateRowActions,
 .templateTitleStack,
@@ -454,6 +515,7 @@
   color: #ffd6db;
   background: rgba(239, 68, 68, 0.18);
   border-color: rgba(239, 68, 68, 0.32);
+  animation: pulseSlaRing 2s ease-in-out infinite;
 }
 
 .rowFooter {
@@ -686,6 +748,68 @@
   letter-spacing: 0.08em;
 }
 
+.dayGroup {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.systemEventCard {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-1) 86%, transparent 14%);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.systemEventDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.systemEventCard_info .systemEventDot {
+  background: rgba(56, 189, 248, 0.85);
+}
+
+.systemEventCard_success .systemEventDot {
+  background: rgba(34, 197, 94, 0.85);
+}
+
+.systemEventCard_warning .systemEventDot {
+  background: rgba(250, 204, 21, 0.85);
+}
+
+.systemEventTime {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.messageVideoButton {
+  display: block;
+  width: 100%;
+  max-width: 18rem;
+  border-radius: 0.95rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.messageVideo {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 14rem;
+  object-fit: cover;
+}
+
 .messages {
   display: grid;
   gap: 14px;
@@ -703,6 +827,7 @@
   border-radius: 0.95rem;
   border: 1px solid var(--border-soft);
   background: var(--surface-1);
+  animation: fadeInMessage 180ms ease both;
 }
 
 .messageAdmin {
@@ -711,9 +836,28 @@
   border-color: rgba(34, 197, 94, 0.34);
 }
 
+.messageBot {
+  border-color: rgba(14, 165, 233, 0.34);
+  background: rgba(14, 165, 233, 0.18);
+}
+
 .messageUser {
   justify-self: start;
   background: color-mix(in srgb, var(--surface-1) 84%, #0f172a 16%);
+}
+
+.inlineSystemLabel {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.38);
+  background: rgba(14, 116, 144, 0.16);
+  color: #d9f6ff;
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
 }
 
 .messageImageButton,
@@ -862,6 +1006,11 @@
 .avatarTinyAdmin {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.28), rgba(30, 64, 175, 0.82));
   border-color: rgba(59, 130, 246, 0.38);
+}
+
+.avatarTinyBot {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.35), rgba(2, 132, 199, 0.78));
+  border-color: rgba(14, 165, 233, 0.5);
 }
 
 .messageAdmin .messageBody,
@@ -1448,6 +1597,7 @@
 }
 
 @media (max-width: 1320px) {
+
   .workspace,
   .workspaceCompact,
   .workspaceWithSidebar {
@@ -1465,6 +1615,7 @@
 }
 
 @media (max-width: 1180px) {
+
   .workspace,
   .workspaceCompact,
   .workspaceWithSidebar {
@@ -1482,6 +1633,7 @@
 }
 
 @media (max-width: 1080px) {
+
   .workspace,
   .workspaceCompact,
   .workspaceWithSidebar,
@@ -1760,6 +1912,105 @@
   gap: 8px;
 }
 
+/* ── Focus-visible styles ── */
+
+.conversationRow:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline-offset: 1px;
+  border-color: rgba(34, 197, 94, 0.72);
+}
+
+.optionChip:focus-visible,
+.sidePanelTab:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline-offset: 1px;
+}
+
+.messageImageButton:focus-visible,
+.attachmentListThumbButton:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline-offset: 2px;
+  border-radius: 0.9rem;
+}
+
+.quickTemplateButton:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline-offset: 1px;
+}
+
+.attachmentActionButton:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.6);
+  outline-offset: 2px;
+  border-radius: 0.3rem;
+}
+
+/* ── Custom scrollbars ── */
+
+.messages {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 197, 94, 0.22) transparent;
+}
+
+.messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+.messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages::-webkit-scrollbar-thumb {
+  background: rgba(34, 197, 94, 0.22);
+  border-radius: 999px;
+}
+
+.messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 197, 94, 0.38);
+}
+
+.templateCatalogList,
+.attachmentList {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+.templateCatalogList::-webkit-scrollbar,
+.attachmentList::-webkit-scrollbar {
+  width: 4px;
+}
+
+.templateCatalogList::-webkit-scrollbar-track,
+.attachmentList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.templateCatalogList::-webkit-scrollbar-thumb,
+.attachmentList::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 999px;
+}
+
+/* ── prefers-reduced-motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .messageItem,
+  .sidePane {
+    animation: none !important;
+  }
+
+  .slaPill_critical {
+    animation: none !important;
+  }
+
+  .conversationRow,
+  .optionChip,
+  .messageImageButton,
+  .templateListItem {
+    transition: none !important;
+  }
+}
+
 :global(:root[data-theme="light"]) .inboxPane,
 :global(:root[data-theme="light"]) .chatShell,
 :global(:root[data-theme="light"]) .sideCard {
@@ -1950,4 +2201,75 @@
 :global(:root[data-theme="light"]) .templatePreviewBody {
   font-size: 0.92rem;
   line-height: 1.56;
+}
+
+:global(:root[data-theme="light"]) .dangerActionBlock {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.22);
+}
+
+:global(:root[data-theme="light"]) .dangerActionBlock span {
+  color: #b91c1c;
+}
+
+:global(:root[data-theme="light"]) .metricTile {
+  background: var(--surface-1);
+  border-color: var(--border-soft);
+}
+
+:global(:root[data-theme="light"]) .metricTile span {
+  color: var(--text-muted);
+}
+
+:global(:root[data-theme="light"]) .metricTile strong {
+  color: var(--text-strong);
+}
+
+:global(:root[data-theme="light"]) .systemEventCard {
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent 18%);
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .conversationRowUnread {
+  background: color-mix(in srgb, var(--surface-1) 88%, rgba(22, 163, 74, 0.18) 12%);
+  border-color: rgba(22, 163, 74, 0.36);
+}
+
+:global(:root[data-theme="light"]) .messageBot {
+  background: rgba(14, 165, 233, 0.09);
+  border-color: rgba(14, 165, 233, 0.34);
+}
+
+:global(:root[data-theme="light"]) .inlineSystemLabel {
+  background: rgba(14, 116, 144, 0.08);
+  border-color: rgba(14, 116, 144, 0.25);
+  color: #0b5263;
+}
+
+:global(:root[data-theme="light"]) .closedConversationPill {
+  border-color: rgba(100, 116, 139, 0.38);
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .closedComposerNotice {
+  background: color-mix(in srgb, var(--surface-1) 88%, #94a3b8 12%);
+  border-color: rgba(100, 116, 139, 0.28);
+}
+
+:global(:root[data-theme="light"]) .imageViewerOverlay {
+  background: color-mix(in srgb, rgba(240, 245, 255, 0.94) 100%, transparent);
+}
+
+:global(:root[data-theme="light"]) .imageViewerPanel {
+  background: var(--surface-0);
+  border-color: rgba(22, 163, 74, 0.3);
+}
+
+:global(:root[data-theme="light"]) .dropOverlay {
+  background: rgba(22, 163, 74, 0.06);
+}
+
+:global(:root[data-theme="light"]) .dropOverlayContent {
+  color: rgba(22, 163, 74, 0.9);
 }

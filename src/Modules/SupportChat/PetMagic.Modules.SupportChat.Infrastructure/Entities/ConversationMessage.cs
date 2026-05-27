@@ -1,3 +1,5 @@
+using PetMagic.Modules.SupportChat.Domain.Enums;
+
 namespace PetMagic.Modules.SupportChat.Infrastructure.Entities;
 
 public sealed class ConversationMessage
@@ -9,6 +11,8 @@ public sealed class ConversationMessage
     public Guid SenderUserId { get; set; }
 
     public bool IsFromAdmin { get; set; }
+
+    public SupportMessageSenderType SenderType { get; set; } = SupportMessageSenderType.User;
 
     public string Body { get; set; } = string.Empty;
 

@@ -5,6 +5,7 @@ import type {
   AdminEconomyLedgerItem,
   AdminEconomyPurchase,
   AdminEconomySubscription,
+  AdminEconomyUserSubscriptionSummary,
   AdminPaymentProviderConfiguration,
   AdminPaymentProviderConfigurationMatch,
   AdminRedeemCode,
@@ -38,15 +39,26 @@ export async function fetchAdminEconomyPurchases(params?: {
   skip?: number;
   take?: number;
   status?: string;
+  userId?: string;
 }): Promise<OffsetPagedResponse<AdminEconomyPurchase>> {
   const search = new URLSearchParams();
   if (params?.skip) search.set("skip", String(params.skip));
   if (params?.take) search.set("take", String(params.take));
   if (params?.status) search.set("status", params.status);
+  if (params?.userId) search.set("userId", params.userId);
 
   const query = search.size ? `?${search.toString()}` : "";
   return apiRequest<OffsetPagedResponse<AdminEconomyPurchase>>(
     `/api/admin/economy/purchases${query}`,
+    { method: "GET" }
+  );
+}
+
+export async function fetchAdminEconomyUserSubscriptionSummary(
+  userId: string
+): Promise<AdminEconomyUserSubscriptionSummary> {
+  return apiRequest<AdminEconomyUserSubscriptionSummary>(
+    `/api/admin/economy/users/${userId}/subscription-summary`,
     { method: "GET" }
   );
 }

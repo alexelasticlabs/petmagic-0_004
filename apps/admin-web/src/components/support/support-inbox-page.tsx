@@ -22,9 +22,9 @@ import {
   statusLabel,
   toneForStatus,
 } from "@/components/support/support-status-helpers";
+import { statusOptions } from "@/components/support/use-support-conversation-controller";
 import {
-  type AssignmentFilter,
-  type SupportFilter,
+  type SupportQueueFilter,
   useSupportInboxController,
 } from "@/components/support/use-support-inbox-controller";
 import { Button } from "@/components/ui/button";
@@ -36,43 +36,26 @@ type SupportInboxPageProps = {
 
 export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   const {
-    assignment,
     filteredConversations,
     inboxQuery,
+    queueFilter,
     searchQuery,
-    setAssignment,
+    setQueueFilter,
     setSearchQuery,
-    setStatus,
-    status,
     text,
   } = useSupportInboxController({ locale });
 
-  const statusOptions = useMemo(
+  const queueFilterOptions = useMemo(
     () => [
       { value: "all", label: text.supportStatusAll },
-      { value: "Open", label: text.supportStatusOpen },
-      { value: "WaitingForSupport", label: text.supportStatusWaitingForSupport },
-      { value: "WaitingForUser", label: text.supportStatusWaitingForUser },
-      { value: "Resolved", label: text.supportStatusResolved },
-      { value: "Closed", label: text.supportStatusClosed },
-    ],
-    [
-      text.supportStatusAll,
-      text.supportStatusClosed,
-      text.supportStatusOpen,
-      text.supportStatusResolved,
-      text.supportStatusWaitingForSupport,
-      text.supportStatusWaitingForUser,
-    ]
-  );
-
-  const assignmentOptions = useMemo(
-    () => [
-      { value: "all", label: text.supportAssignmentAll },
+      ...statusOptions.map((status) => ({
+        value: status,
+        label: statusLabel(status, text),
+      })),
       { value: "mine", label: text.supportAssignmentMine },
       { value: "unassigned", label: text.supportAssignmentUnassigned },
     ],
-    [text.supportAssignmentAll, text.supportAssignmentMine, text.supportAssignmentUnassigned]
+    [text]
   );
 
   return (
@@ -94,16 +77,10 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
           </label>
           <div className={styles.supportControlStack}>
             <SupportOptionGroup
-              label={text.statusLabel}
-              value={status}
-              options={statusOptions}
-              onChange={(value) => setStatus(value as SupportFilter)}
-            />
-            <SupportOptionGroup
-              label={text.supportAssignedTo}
-              value={assignment}
-              options={assignmentOptions}
-              onChange={(value) => setAssignment(value as AssignmentFilter)}
+              label={text.supportQueueFilterLabel}
+              value={queueFilter}
+              options={queueFilterOptions}
+              onChange={(value) => setQueueFilter(value as SupportQueueFilter)}
             />
           </div>
           <div className={styles.toolbarCompactEnd}>

@@ -5,6 +5,7 @@ class SupportChatMessage {
     required this.senderUserId,
     required this.senderDisplayName,
     required this.isFromAdmin,
+    required this.senderType,
     required this.body,
     required this.isRead,
     required this.createdAtUtc,
@@ -22,6 +23,7 @@ class SupportChatMessage {
   final String senderUserId;
   final String senderDisplayName;
   final bool isFromAdmin;
+  final String senderType;
   final String body;
   final bool isRead;
   final DateTime createdAtUtc;
@@ -32,6 +34,10 @@ class SupportChatMessage {
   final String? attachmentUploadStatus;
   final String? attachmentUploadErrorCode;
   final DateTime? readAtUtc;
+
+  bool get isSystemMessage => senderType == 'System';
+  bool get isBotMessage => senderType == 'Bot';
+  bool get isUserMessage => senderType == 'User';
 
   bool get hasAttachment => attachmentUrl?.isNotEmpty == true;
 
@@ -76,6 +82,7 @@ class SupportChatMessage {
       senderUserId: senderUserId,
       senderDisplayName: senderDisplayName,
       isFromAdmin: isFromAdmin,
+      senderType: senderType,
       body: body,
       isRead: isRead ?? this.isRead,
       createdAtUtc: createdAtUtc,
@@ -101,6 +108,7 @@ class SupportChatMessage {
       senderUserId: json['senderUserId'] as String? ?? '',
       senderDisplayName: json['senderDisplayName'] as String? ?? '',
       isFromAdmin: json['isFromAdmin'] as bool? ?? false,
+      senderType: json['senderType'] as String? ?? 'User',
       body: json['body'] as String? ?? '',
       isRead: json['isRead'] as bool? ?? false,
       attachmentUrl: json['attachmentUrl'] as String?,
@@ -127,12 +135,17 @@ class SupportChatConversation {
     required this.assignedAdminDisplayName,
     required this.status,
     required this.priority,
+    required this.source,
     required this.userUnreadCount,
     required this.adminUnreadCount,
     required this.createdAtUtc,
     required this.updatedAtUtc,
     required this.lastMessageAtUtc,
     required this.messages,
+    this.assistantScenario,
+    this.relatedGenerationId,
+    this.relatedPaymentId,
+    this.relatedSubscriptionId,
     this.resolvedAtUtc,
     this.reopenUntilUtc,
     this.closedAtUtc,
@@ -151,6 +164,11 @@ class SupportChatConversation {
   final String? assignedAdminDisplayName;
   final String status;
   final String priority;
+  final String source;
+  final String? assistantScenario;
+  final String? relatedGenerationId;
+  final String? relatedPaymentId;
+  final String? relatedSubscriptionId;
   final int userUnreadCount;
   final int adminUnreadCount;
   final DateTime createdAtUtc;
@@ -165,6 +183,8 @@ class SupportChatConversation {
   final bool isReadOnly;
   final bool canReopen;
   final List<SupportChatMessage> messages;
+
+  bool get isFromMobileAssistant => source == 'MobileAssistant';
 
   SupportChatConversation copyWith({
     String? assignedAdminId,
@@ -203,6 +223,11 @@ class SupportChatConversation {
           : (assignedAdminDisplayName ?? this.assignedAdminDisplayName),
       status: status ?? this.status,
       priority: priority,
+      source: source,
+      assistantScenario: assistantScenario,
+      relatedGenerationId: relatedGenerationId,
+      relatedPaymentId: relatedPaymentId,
+      relatedSubscriptionId: relatedSubscriptionId,
       userUnreadCount: userUnreadCount ?? this.userUnreadCount,
       adminUnreadCount: adminUnreadCount ?? this.adminUnreadCount,
       createdAtUtc: createdAtUtc,
@@ -242,6 +267,11 @@ class SupportChatConversation {
       assignedAdminDisplayName: json['assignedAdminDisplayName'] as String?,
       status: json['status'] as String? ?? 'Open',
       priority: json['priority'] as String? ?? 'Normal',
+      source: json['source'] as String? ?? 'Direct',
+      assistantScenario: json['assistantScenario'] as String?,
+      relatedGenerationId: json['relatedGenerationId'] as String?,
+      relatedPaymentId: json['relatedPaymentId'] as String?,
+      relatedSubscriptionId: json['relatedSubscriptionId'] as String?,
       userUnreadCount: json['userUnreadCount'] as int? ?? 0,
       adminUnreadCount: json['adminUnreadCount'] as int? ?? 0,
       createdAtUtc:

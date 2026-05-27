@@ -84,7 +84,12 @@ public static class SupportChatEndpoints
         var command = new OpenSupportConversationCommand(
             userId,
             request?.InitialMessage,
-            request?.Priority ?? SupportConversationPriority.Normal);
+            request?.Priority ?? SupportConversationPriority.Normal,
+            request?.Source ?? SupportConversationSource.Direct,
+            request?.AssistantScenario,
+            request?.RelatedGenerationId,
+            request?.RelatedPaymentId,
+            request?.RelatedSubscriptionId);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -1152,7 +1157,14 @@ public static class SupportChatEndpoints
         return acceptLanguage.Split(',', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
     }
 
-    public sealed record OpenConversationRequest(string? InitialMessage, SupportConversationPriority Priority = SupportConversationPriority.Normal);
+    public sealed record OpenConversationRequest(
+        string? InitialMessage,
+        SupportConversationPriority Priority = SupportConversationPriority.Normal,
+        SupportConversationSource Source = SupportConversationSource.Direct,
+        string? AssistantScenario = null,
+        Guid? RelatedGenerationId = null,
+        Guid? RelatedPaymentId = null,
+        Guid? RelatedSubscriptionId = null);
 
     public sealed record SendSupportMessageRequest(string Body, string? Locale = null);
 

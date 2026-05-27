@@ -1744,6 +1744,108 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportChatReadOnlyHint => 'This conversation is read-only';
 
   @override
+  String get supportHomeTitle => 'Help & Support';
+
+  @override
+  String get supportHomeSubtitle => 'What can we help you with?';
+
+  @override
+  String get supportHomeTopicGenerationIssue => 'Issue with image generation';
+
+  @override
+  String get supportHomeTopicGenerationTooLong => 'Generation takes too long';
+
+  @override
+  String get supportHomeTopicTokensNotArrived => 'Tokens did not arrive';
+
+  @override
+  String get supportHomeTopicPremiumIssue => 'Premium issue';
+
+  @override
+  String get supportHomeTopicPaymentRefund => 'Payment / Refund';
+
+  @override
+  String get supportHomeTopicOther => 'Other';
+
+  @override
+  String get supportAssistantTitle => 'Support Assistant';
+
+  @override
+  String get supportAssistantThisHelpedAction => 'This helped';
+
+  @override
+  String get supportAssistantCreateTicketAction => 'Create support ticket';
+
+  @override
+  String get supportAssistantCheckLaterAction => 'Check later';
+
+  @override
+  String get supportAssistantRecommendationGeneration =>
+      'For better results, please use a photo where the pet is clearly visible, not cropped, not blurry, and well lit.';
+
+  @override
+  String get supportAssistantRecommendationGenerationTooLong =>
+      'Video generation may take several minutes. It usually takes around 2–10 minutes. If it has taken too long, we can send this issue to support.';
+
+  @override
+  String get supportAssistantRecommendationTokensNotArrived =>
+      'Sometimes token delivery after payment may take a few minutes. If the tokens still do not appear, create a support ticket and we will check the purchase.';
+
+  @override
+  String get supportAssistantRecommendationPremiumIssue =>
+      'If Premium has already been paid for but is not visible in the app, please try restarting the app. If the problem remains, we will check your subscription status.';
+
+  @override
+  String get supportAssistantRecommendationPaymentRefund =>
+      'We can check your payment or forward your refund request to support. Create a support ticket and we will attach the relevant purchase information if available.';
+
+  @override
+  String get supportAssistantRecommendationOther =>
+      'Please describe what happened. You can also attach a screenshot to help support understand the situation faster.';
+
+  @override
+  String get supportTicketFormTitle => 'Create support ticket';
+
+  @override
+  String get supportTicketFormTopicLabel => 'Topic';
+
+  @override
+  String get supportTicketFormDescriptionLabel => 'Problem description';
+
+  @override
+  String get supportTicketFormDescriptionHint => 'Describe what happened...';
+
+  @override
+  String get supportTicketFormRelatedGenerationLabel => 'Related generation';
+
+  @override
+  String get supportTicketFormRelatedPaymentLabel => 'Related payment';
+
+  @override
+  String get supportTicketFormRelatedSubscriptionLabel =>
+      'Related subscription';
+
+  @override
+  String get supportTicketFormAttachmentsLabel => 'Attachments';
+
+  @override
+  String get supportTicketFormAddScreenshotAction => 'Add screenshot';
+
+  @override
+  String get supportTicketFormSubmitAction => 'Send to support';
+
+  @override
+  String get supportTicketFormSubmittingLabel => 'Creating ticket...';
+
+  @override
+  String get supportTicketFormSuccessMessage =>
+      'Your ticket has been created. We will reply in this chat.';
+
+  @override
+  String get supportTicketFormErrorMessage =>
+      'Failed to create ticket. Please try again.';
+
+  @override
   String get profileSettingsThemeSystem => 'System';
 
   @override

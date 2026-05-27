@@ -41,12 +41,26 @@ public sealed class SupportChatService(
                 InitiatorUserId = command.UserId,
                 Priority = command.Priority,
                 Status = SupportConversationStatus.Open,
+                Source = command.Source,
+                AssistantScenario = command.AssistantScenario?.Trim(),
+                RelatedGenerationId = command.RelatedGenerationId,
+                RelatedPaymentId = command.RelatedPaymentId,
+                RelatedSubscriptionId = command.RelatedSubscriptionId,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             };
 
             supportChatDbContext.SupportConversations.Add(conversation);
             createdConversation = true;
+
+            if (command.Source == SupportConversationSource.MobileAssistant
+                && !string.IsNullOrWhiteSpace(command.AssistantScenario))
+            {
+                var scenarioLabel = ResolveScenarioLabel(command.AssistantScenario);
+                await AppendSystemEventAsync(
+                    conversation,
+                    $"User completed the \"{scenarioLabel}\" assistant flow and created a support ticket.");
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(command.InitialMessage))
@@ -62,6 +76,7 @@ public sealed class SupportChatService(
                 command.UserId,
                 command.InitialMessage,
                 isAdmin: false,
+                senderType: SupportMessageSenderType.User,
                 attachmentUrl: null,
                 attachmentFileName: null,
                 attachmentContentType: null,
@@ -132,6 +147,8 @@ public sealed class SupportChatService(
                 conversation.AssignedAdminId,
                 conversation.Status,
                 conversation.Priority,
+                conversation.Source,
+                conversation.AssistantScenario,
                 conversation.LastMessageAtUtc,
                 conversation.CreatedAtUtc,
                 conversation.UpdatedAtUtc,
@@ -179,6 +196,8 @@ public sealed class SupportChatService(
                 ResolveDisplayName(assignedAdmin?.Email, assignedAdmin?.DisplayName),
                 conversation.Status.ToString(),
                 conversation.Priority.ToString(),
+                conversation.Source.ToString(),
+                conversation.AssistantScenario,
                 conversation.LastMessage is null ? null : Truncate(conversation.LastMessage.Body, 140),
                 conversation.LastMessage?.CreatedAtUtc ?? conversation.LastMessageAtUtc,
                 conversation.UnreadUserCount,
@@ -237,6 +256,7 @@ public sealed class SupportChatService(
             command.SenderUserId,
             command.Body,
             command.IsAdmin,
+            senderType: command.IsAdmin ? SupportMessageSenderType.SupportAgent : SupportMessageSenderType.User,
             command.AttachmentUrl,
             command.AttachmentFileName,
             command.AttachmentContentType,
@@ -253,6 +273,7 @@ public sealed class SupportChatService(
                 AutomatedAssistantUserId,
                 SupportChatAutoReplyLocalizer.BuildFirstReplyAcknowledgement(command.Locale),
                 isAdmin: true,
+                senderType: SupportMessageSenderType.Bot,
                 attachmentUrl: null,
                 attachmentFileName: null,
                 attachmentContentType: null,
@@ -300,6 +321,7 @@ public sealed class SupportChatService(
             command.SenderUserId,
             command.Body,
             command.IsAdmin,
+            senderType: command.IsAdmin ? SupportMessageSenderType.SupportAgent : SupportMessageSenderType.User,
             attachmentUrl: null,
             attachmentFileName: command.AttachmentFileName,
             attachmentContentType: command.AttachmentContentType,
@@ -706,6 +728,7 @@ public sealed class SupportChatService(
         Guid senderUserId,
         string body,
         bool isAdmin,
+        SupportMessageSenderType senderType,
         string? attachmentUrl,
         string? attachmentFileName,
         string? attachmentContentType,
@@ -724,6 +747,7 @@ public sealed class SupportChatService(
             SenderUserId = senderUserId,
             Body = trimmedBody,
             IsFromAdmin = isAdmin,
+            SenderType = senderType,
             AttachmentUrl = attachmentUrl,
             AttachmentFileName = attachmentFileName,
             AttachmentContentType = attachmentContentType,
@@ -748,6 +772,36 @@ public sealed class SupportChatService(
         supportChatDbContext.ConversationMessages.Add(message);
         return Task.FromResult(message);
     }
+
+    private Task AppendSystemEventAsync(SupportConversation conversation, string body)
+    {
+        var now = DateTime.UtcNow;
+        var message = new ConversationMessage
+        {
+            Id = Guid.NewGuid(),
+            ConversationId = conversation.Id,
+            SenderUserId = AutomatedAssistantUserId,
+            Body = body,
+            IsFromAdmin = true,
+            SenderType = SupportMessageSenderType.System,
+            ReadAtUtc = now,
+            CreatedAtUtc = now
+        };
+
+        supportChatDbContext.ConversationMessages.Add(message);
+        return Task.CompletedTask;
+    }
+
+    private static string ResolveScenarioLabel(string scenario) => scenario switch
+    {
+        "GenerationIssue" => "Generation issue",
+        "GenerationTooLong" => "Generation takes too long",
+        "TokensNotArrived" => "Tokens did not arrive",
+        "PremiumIssue" => "Premium issue",
+        "PaymentRefund" => "Payment / Refund",
+        "Other" => "Other",
+        _ => scenario,
+    };
 
     private async Task<SupportConversationDetailResponse> BuildConversationDetailAsync(Guid conversationId, CancellationToken cancellationToken)
     {
@@ -778,12 +832,14 @@ public sealed class SupportChatService(
         foreach (var message in visibleMessages)
         {
             users.TryGetValue(message.SenderUserId, out var sender);
+            var resolvedSenderType = ResolveSenderDisplayType(message.SenderType, message.IsFromAdmin);
             messages.Add(new SupportMessageResponse(
                 message.Id,
                 message.ConversationId,
                 message.SenderUserId,
-                ResolveDisplayName(sender?.Email, sender?.DisplayName, message.IsFromAdmin),
+                ResolveMessageSenderDisplayName(message.SenderType, sender?.Email, sender?.DisplayName, message.IsFromAdmin),
                 message.IsFromAdmin,
+                resolvedSenderType,
                 message.Body,
                 message.AttachmentUrl,
                 message.AttachmentFileName,
@@ -809,6 +865,11 @@ public sealed class SupportChatService(
             ResolveDisplayName(assignedAdmin?.Email, assignedAdmin?.DisplayName, isAdminSender: true),
             conversation.Status.ToString(),
             conversation.Priority.ToString(),
+            conversation.Source.ToString(),
+            conversation.AssistantScenario,
+            conversation.RelatedGenerationId,
+            conversation.RelatedPaymentId,
+            conversation.RelatedSubscriptionId,
             userUnreadCount,
             adminUnreadCount,
             conversation.CreatedAtUtc,
@@ -833,8 +894,9 @@ public sealed class SupportChatService(
             message.Id,
             message.ConversationId,
             message.SenderUserId,
-            ResolveDisplayName(sender?.Email, sender?.DisplayName, message.IsFromAdmin),
+            ResolveMessageSenderDisplayName(message.SenderType, sender?.Email, sender?.DisplayName, message.IsFromAdmin),
             message.IsFromAdmin,
+            ResolveSenderDisplayType(message.SenderType, message.IsFromAdmin),
             message.Body,
             message.AttachmentUrl,
             message.AttachmentFileName,
@@ -964,6 +1026,20 @@ public sealed class SupportChatService(
             || status == SupportConversationStatus.Closed
             || (status == SupportConversationStatus.Resolved && !CanReopenConversation(status, resolvedAtUtc, reopenUntilUtc, now));
     }
+
+    private static string ResolveSenderDisplayType(SupportMessageSenderType senderType, bool isFromAdmin) =>
+        senderType.ToString();
+
+    private static string ResolveMessageSenderDisplayName(
+        SupportMessageSenderType senderType,
+        string? email,
+        string? displayName,
+        bool isFromAdmin) => senderType switch
+        {
+            SupportMessageSenderType.System => "System",
+            SupportMessageSenderType.Bot => "PetMagic Support",
+            _ => ResolveDisplayName(email, displayName, isFromAdmin),
+        };
 
     private static string ResolveDisplayName(string? email, string? displayName, bool isAdminSender = false)
     {

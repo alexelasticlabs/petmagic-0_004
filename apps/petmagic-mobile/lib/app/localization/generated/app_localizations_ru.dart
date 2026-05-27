@@ -1744,6 +1744,109 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatReadOnlyHint => 'Диалог доступен только для просмотра';
 
   @override
+  String get supportHomeTitle => 'Помощь и поддержка';
+
+  @override
+  String get supportHomeSubtitle => 'Чем мы можем помочь?';
+
+  @override
+  String get supportHomeTopicGenerationIssue =>
+      'Проблема с генерацией изображения';
+
+  @override
+  String get supportHomeTopicGenerationTooLong =>
+      'Генерация занимает слишком долго';
+
+  @override
+  String get supportHomeTopicTokensNotArrived => 'Токены не пришли';
+
+  @override
+  String get supportHomeTopicPremiumIssue => 'Проблема с Premium';
+
+  @override
+  String get supportHomeTopicPaymentRefund => 'Оплата / Возврат';
+
+  @override
+  String get supportHomeTopicOther => 'Другое';
+
+  @override
+  String get supportAssistantTitle => 'Ассистент поддержки';
+
+  @override
+  String get supportAssistantThisHelpedAction => 'Это помогло';
+
+  @override
+  String get supportAssistantCreateTicketAction => 'Создать обращение';
+
+  @override
+  String get supportAssistantCheckLaterAction => 'Проверить позже';
+
+  @override
+  String get supportAssistantRecommendationGeneration =>
+      'Для лучшего результата используйте фото, где питомец хорошо виден, не обрезан, не размыт и при хорошем освещении.';
+
+  @override
+  String get supportAssistantRecommendationGenerationTooLong =>
+      'Генерация видео может занять несколько минут — обычно от 2 до 10 минут. Если прошло слишком много времени, мы можем передать этот вопрос в поддержку.';
+
+  @override
+  String get supportAssistantRecommendationTokensNotArrived =>
+      'Иногда токены после оплаты поступают с задержкой в несколько минут. Если токены так и не появились, создайте обращение, и мы проверим платёж.';
+
+  @override
+  String get supportAssistantRecommendationPremiumIssue =>
+      'Если Premium уже оплачен, но не отображается в приложении, попробуйте перезапустить приложение. Если проблема сохраняется, мы проверим статус подписки.';
+
+  @override
+  String get supportAssistantRecommendationPaymentRefund =>
+      'Мы можем проверить ваш платёж или передать запрос на возврат в поддержку. Создайте обращение, и мы прикрепим информацию о покупке, если она доступна.';
+
+  @override
+  String get supportAssistantRecommendationOther =>
+      'Опишите, что произошло. Вы также можете приложить скриншот, чтобы поддержка быстрее разобралась в ситуации.';
+
+  @override
+  String get supportTicketFormTitle => 'Создать обращение';
+
+  @override
+  String get supportTicketFormTopicLabel => 'Тема';
+
+  @override
+  String get supportTicketFormDescriptionLabel => 'Описание проблемы';
+
+  @override
+  String get supportTicketFormDescriptionHint => 'Опишите, что произошло...';
+
+  @override
+  String get supportTicketFormRelatedGenerationLabel => 'Связанная генерация';
+
+  @override
+  String get supportTicketFormRelatedPaymentLabel => 'Связанный платёж';
+
+  @override
+  String get supportTicketFormRelatedSubscriptionLabel => 'Связанная подписка';
+
+  @override
+  String get supportTicketFormAttachmentsLabel => 'Вложения';
+
+  @override
+  String get supportTicketFormAddScreenshotAction => 'Добавить скриншот';
+
+  @override
+  String get supportTicketFormSubmitAction => 'Отправить в поддержку';
+
+  @override
+  String get supportTicketFormSubmittingLabel => 'Создание обращения...';
+
+  @override
+  String get supportTicketFormSuccessMessage =>
+      'Ваше обращение создано. Мы ответим в этом чате.';
+
+  @override
+  String get supportTicketFormErrorMessage =>
+      'Не удалось создать обращение. Попробуйте ещё раз.';
+
+  @override
   String get profileSettingsThemeSystem => 'Системная';
 
   @override

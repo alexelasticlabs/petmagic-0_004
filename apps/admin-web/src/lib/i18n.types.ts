@@ -381,6 +381,7 @@ export type Dictionary = {
   supportBackToInbox: string;
   supportOpenConversation: string;
   supportAssignedTo: string;
+  supportQueueFilterLabel: string;
   supportUnassigned: string;
   supportLastMessage: string;
   supportNoMessages: string;
@@ -424,6 +425,9 @@ export type Dictionary = {
   supportUserInformationTitle: string;
   supportConversationDetailsTitle: string;
   supportActionsTitle: string;
+  supportAssistantSourceLabel: string;
+  supportAssistantScenarioLabel: string;
+  supportAssistantMobileLabel: string;
   supportMessagesCount: string;
   supportUpdatedLabel: string;
   supportPriorityLabel: string;
@@ -439,6 +443,16 @@ export type Dictionary = {
   supportReopenConversationAction: string;
   supportCloseConversationAction: string;
   supportTodayLabel: string;
+  supportYesterdayLabel: string;
+  supportEarlierLabel: string;
+  supportSystemTicketCreated: string;
+  supportSystemTicketResolved: string;
+  supportSystemTicketReopened: string;
+  supportSystemTicketClosed: string;
+  supportSystemAssignedTo: string;
+  supportSystemUnassigned: string;
+  supportAttachmentUploadingLabel: string;
+  supportAttachmentFailedLabel: string;
   supportViewProfileTab: string;
   supportViewPurchasesTab: string;
   supportViewGenerationsTab: string;
@@ -478,4 +492,5 @@ export type Dictionary = {
   supportCountryLabel: string;
   supportLastSeenLabel: string;
   supportAiContextTitle: string;
+  supportSearchKeyboardHint: string;
 };

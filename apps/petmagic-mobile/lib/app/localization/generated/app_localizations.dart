@@ -3162,6 +3162,192 @@ abstract class AppLocalizations {
   /// **'This conversation is read-only'**
   String get supportChatReadOnlyHint;
 
+  /// No description provided for @supportHomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & Support'**
+  String get supportHomeTitle;
+
+  /// No description provided for @supportHomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What can we help you with?'**
+  String get supportHomeSubtitle;
+
+  /// No description provided for @supportHomeTopicGenerationIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue with image generation'**
+  String get supportHomeTopicGenerationIssue;
+
+  /// No description provided for @supportHomeTopicGenerationTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation takes too long'**
+  String get supportHomeTopicGenerationTooLong;
+
+  /// No description provided for @supportHomeTopicTokensNotArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens did not arrive'**
+  String get supportHomeTopicTokensNotArrived;
+
+  /// No description provided for @supportHomeTopicPremiumIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium issue'**
+  String get supportHomeTopicPremiumIssue;
+
+  /// No description provided for @supportHomeTopicPaymentRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment / Refund'**
+  String get supportHomeTopicPaymentRefund;
+
+  /// No description provided for @supportHomeTopicOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get supportHomeTopicOther;
+
+  /// No description provided for @supportAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Support Assistant'**
+  String get supportAssistantTitle;
+
+  /// No description provided for @supportAssistantThisHelpedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'This helped'**
+  String get supportAssistantThisHelpedAction;
+
+  /// No description provided for @supportAssistantCreateTicketAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create support ticket'**
+  String get supportAssistantCreateTicketAction;
+
+  /// No description provided for @supportAssistantCheckLaterAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Check later'**
+  String get supportAssistantCheckLaterAction;
+
+  /// No description provided for @supportAssistantRecommendationGeneration.
+  ///
+  /// In en, this message translates to:
+  /// **'For better results, please use a photo where the pet is clearly visible, not cropped, not blurry, and well lit.'**
+  String get supportAssistantRecommendationGeneration;
+
+  /// No description provided for @supportAssistantRecommendationGenerationTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Video generation may take several minutes. It usually takes around 2–10 minutes. If it has taken too long, we can send this issue to support.'**
+  String get supportAssistantRecommendationGenerationTooLong;
+
+  /// No description provided for @supportAssistantRecommendationTokensNotArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Sometimes token delivery after payment may take a few minutes. If the tokens still do not appear, create a support ticket and we will check the purchase.'**
+  String get supportAssistantRecommendationTokensNotArrived;
+
+  /// No description provided for @supportAssistantRecommendationPremiumIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'If Premium has already been paid for but is not visible in the app, please try restarting the app. If the problem remains, we will check your subscription status.'**
+  String get supportAssistantRecommendationPremiumIssue;
+
+  /// No description provided for @supportAssistantRecommendationPaymentRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'We can check your payment or forward your refund request to support. Create a support ticket and we will attach the relevant purchase information if available.'**
+  String get supportAssistantRecommendationPaymentRefund;
+
+  /// No description provided for @supportAssistantRecommendationOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Please describe what happened. You can also attach a screenshot to help support understand the situation faster.'**
+  String get supportAssistantRecommendationOther;
+
+  /// No description provided for @supportTicketFormTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create support ticket'**
+  String get supportTicketFormTitle;
+
+  /// No description provided for @supportTicketFormTopicLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic'**
+  String get supportTicketFormTopicLabel;
+
+  /// No description provided for @supportTicketFormDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem description'**
+  String get supportTicketFormDescriptionLabel;
+
+  /// No description provided for @supportTicketFormDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe what happened...'**
+  String get supportTicketFormDescriptionHint;
+
+  /// No description provided for @supportTicketFormRelatedGenerationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Related generation'**
+  String get supportTicketFormRelatedGenerationLabel;
+
+  /// No description provided for @supportTicketFormRelatedPaymentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Related payment'**
+  String get supportTicketFormRelatedPaymentLabel;
+
+  /// No description provided for @supportTicketFormRelatedSubscriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Related subscription'**
+  String get supportTicketFormRelatedSubscriptionLabel;
+
+  /// No description provided for @supportTicketFormAttachmentsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments'**
+  String get supportTicketFormAttachmentsLabel;
+
+  /// No description provided for @supportTicketFormAddScreenshotAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add screenshot'**
+  String get supportTicketFormAddScreenshotAction;
+
+  /// No description provided for @supportTicketFormSubmitAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to support'**
+  String get supportTicketFormSubmitAction;
+
+  /// No description provided for @supportTicketFormSubmittingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating ticket...'**
+  String get supportTicketFormSubmittingLabel;
+
+  /// No description provided for @supportTicketFormSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your ticket has been created. We will reply in this chat.'**
+  String get supportTicketFormSuccessMessage;
+
+  /// No description provided for @supportTicketFormErrorMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create ticket. Please try again.'**
+  String get supportTicketFormErrorMessage;
+
   /// No description provided for @profileSettingsThemeSystem.
   ///
   /// In en, this message translates to:

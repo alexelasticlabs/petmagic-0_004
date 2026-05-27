@@ -5,7 +5,12 @@ namespace PetMagic.Modules.SupportChat.Application.Contracts;
 public sealed record OpenSupportConversationCommand(
     Guid UserId,
     string? InitialMessage,
-    SupportConversationPriority Priority);
+    SupportConversationPriority Priority,
+    SupportConversationSource Source = SupportConversationSource.Direct,
+    string? AssistantScenario = null,
+    Guid? RelatedGenerationId = null,
+    Guid? RelatedPaymentId = null,
+    Guid? RelatedSubscriptionId = null);
 
 public sealed record ListAdminSupportInboxQuery(
     string? Status,
@@ -113,6 +118,8 @@ public sealed record SupportConversationSummaryResponse(
     string? AssignedAdminDisplayName,
     string Status,
     string Priority,
+    string Source,
+    string? AssistantScenario,
     string? LastMessagePreview,
     DateTime? LastMessageAtUtc,
     int UserUnreadCount,
@@ -132,6 +139,7 @@ public sealed record SupportMessageResponse(
     Guid SenderUserId,
     string SenderDisplayName,
     bool IsFromAdmin,
+    string SenderType,
     string Body,
     string? AttachmentUrl,
     string? AttachmentFileName,
@@ -152,6 +160,11 @@ public sealed record SupportConversationDetailResponse(
     string? AssignedAdminDisplayName,
     string Status,
     string Priority,
+    string Source,
+    string? AssistantScenario,
+    Guid? RelatedGenerationId,
+    Guid? RelatedPaymentId,
+    Guid? RelatedSubscriptionId,
     int UserUnreadCount,
     int AdminUnreadCount,
     DateTime CreatedAtUtc,

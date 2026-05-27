@@ -34,6 +34,11 @@ class SupportChatRepository {
 
   Future<SupportChatConversation> openConversation({
     String? initialMessage,
+    String source = 'Direct',
+    String? assistantScenario,
+    String? relatedGenerationId,
+    String? relatedPaymentId,
+    String? relatedSubscriptionId,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
@@ -42,6 +47,19 @@ class SupportChatRepository {
           'initialMessage': initialMessage?.trim().isEmpty ?? true
               ? null
               : initialMessage?.trim(),
+          'source': source,
+          ...?assistantScenario == null
+              ? null
+              : {'assistantScenario': assistantScenario},
+          ...?relatedGenerationId == null
+              ? null
+              : {'relatedGenerationId': relatedGenerationId},
+          ...?relatedPaymentId == null
+              ? null
+              : {'relatedPaymentId': relatedPaymentId},
+          ...?relatedSubscriptionId == null
+              ? null
+              : {'relatedSubscriptionId': relatedSubscriptionId},
         },
         options: _authorizedOptions(session),
       ),

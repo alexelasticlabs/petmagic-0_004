@@ -22,6 +22,7 @@ import {
   createSupportReplyTemplate,
   deleteSupportReplyTemplate,
   fetchAdminEconomyPurchases,
+  fetchAdminEconomyUserSubscriptionSummary,
   fetchAdminUser,
   fetchAdminUserAnalytics,
   fetchSupportConversation,
@@ -30,10 +31,13 @@ import {
   markSupportConversationRead,
   sendSupportAttachment,
   sendSupportMessage,
+  setActive,
+  setPremium,
   updateSupportConversationStatus,
   updateSupportReplyTemplate,
   useAuthSession,
   type AdminEconomyPurchase,
+  type AdminEconomyUserSubscriptionSummary,
   type AdminSupportConversation,
   type AdminSupportConversationSummary,
   type AdminSupportReplyTemplate,
@@ -55,8 +59,27 @@ export type ToastState = {
   message: string;
 };
 
-export type SupportFilter = "all" | SupportConversationStatus;
-export type AssignmentFilter = SupportInboxAssignmentScope;
+export type SupportQueueFilter =
+  | "all"
+  | SupportConversationStatus
+  | "mine"
+  | "unassigned";
+
+function resolveQueueFilter(filter: SupportQueueFilter): {
+  status?: SupportConversationStatus;
+  assignment: SupportInboxAssignmentScope;
+} {
+  if (filter === "all") {
+    return { status: undefined, assignment: "all" };
+  }
+  if (filter === "mine") {
+    return { status: undefined, assignment: "mine" };
+  }
+  if (filter === "unassigned") {
+    return { status: undefined, assignment: "unassigned" };
+  }
+  return { status: filter, assignment: "all" };
+}
 
 export type SidePanelTab = "user" | "activity" | "dialog" | "attachments";
 
@@ -92,8 +115,7 @@ export function useSupportConversationController({
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState<SupportFilter>("all");
-  const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>("all");
+  const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [reply, setReply] = useState("");
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft>(emptyTemplateDraft);
@@ -168,9 +190,14 @@ export function useSupportConversationController({
   });
 
   const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
-    queryKey: adminQueryKeys.supportInbox(statusFilter, assignmentFilter),
-    queryFn: () =>
-      fetchSupportInbox(statusFilter === "all" ? undefined : statusFilter, assignmentFilter),
+    queryKey: adminQueryKeys.supportInbox(
+      resolveQueueFilter(queueFilter).status ?? "all",
+      resolveQueueFilter(queueFilter).assignment
+    ),
+    queryFn: () => {
+      const { status, assignment } = resolveQueueFilter(queueFilter);
+      return fetchSupportInbox(status, assignment);
+    },
     enabled: Boolean(session),
   });
 
@@ -179,6 +206,13 @@ export function useSupportConversationController({
     queryFn: () => fetchSupportReplyTemplates(),
     enabled: Boolean(session),
   });
+
+  const conversation = conversationQuery.data;
+  const sessionUserId = session?.user.userId ?? null;
+  const isAssignedToCurrentAdmin = Boolean(
+    sessionUserId && conversation?.assignedAdminId === sessionUserId
+  );
+  const subjectUserId = conversation?.initiatorUserId ?? null;
 
   useSupportRealtime(session?.accessToken, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
@@ -244,6 +278,71 @@ export function useSupportConversationController({
     },
   });
 
+  const setUserActiveMutation = useMutation({
+    mutationFn: async (isActive: boolean) => {
+      if (!subjectUserId) {
+        throw new Error("support.subject_user_missing");
+      }
+
+      await setActive(subjectUserId, isActive);
+      return isActive;
+    },
+    onSuccess: async (isActive) => {
+      setToast({
+        type: "success",
+        message: isActive
+          ? locale === "ru"
+            ? "Пользователь активирован"
+            : "User activated"
+          : locale === "ru"
+            ? "Пользователь заблокирован"
+            : "User blocked",
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportConversation(conversationId) }),
+      ]);
+    },
+    onError: () => {
+      setToast({ type: "error", message: text.supportLoadError });
+    },
+  });
+
+  const setUserPremiumMutation = useMutation({
+    mutationFn: async (isPremium: boolean) => {
+      if (!subjectUserId) {
+        throw new Error("support.subject_user_missing");
+      }
+
+      await setPremium(subjectUserId, isPremium);
+      return isPremium;
+    },
+    onSuccess: async (isPremium) => {
+      setToast({
+        type: "success",
+        message: isPremium
+          ? locale === "ru"
+            ? "Премиум включен"
+            : "Premium granted"
+          : locale === "ru"
+            ? "Премиум отключен"
+            : "Premium revoked",
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(subjectUserId!) }),
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.economyUserSubscriptionSummary(subjectUserId!),
+        }),
+      ]);
+    },
+    onError: () => {
+      setToast({ type: "error", message: text.supportLoadError });
+    },
+  });
+
   const templateSaveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -283,13 +382,6 @@ export function useSupportConversationController({
     },
   });
 
-  const conversation = conversationQuery.data;
-  const sessionUserId = session?.user.userId ?? null;
-  const isAssignedToCurrentAdmin = Boolean(
-    sessionUserId && conversation?.assignedAdminId === sessionUserId
-  );
-  const subjectUserId = conversation?.initiatorUserId ?? null;
-
   const userQuery = useQuery<AdminUserDetail>({
     queryKey: subjectUserId
       ? adminQueryKeys.userDetail(subjectUserId)
@@ -308,7 +400,23 @@ export function useSupportConversationController({
 
   const purchasesQuery = useQuery<AdminEconomyPurchase[]>({
     queryKey: ["admin", "support", "conversation", subjectUserId ?? "none", "purchases"],
-    queryFn: () => fetchAdminEconomyPurchasesForUser(subjectUserId!),
+    queryFn: async () => {
+      const response = await fetchAdminEconomyPurchases({
+        skip: 0,
+        take: 8,
+        userId: subjectUserId!,
+      });
+
+      return response.items;
+    },
+    enabled: Boolean(session && subjectUserId),
+  });
+
+  const subscriptionQuery = useQuery<AdminEconomyUserSubscriptionSummary>({
+    queryKey: subjectUserId
+      ? adminQueryKeys.economyUserSubscriptionSummary(subjectUserId)
+      : adminQueryKeys.economyUserSubscriptionSummaryDisabled,
+    queryFn: () => fetchAdminEconomyUserSubscriptionSummary(subjectUserId!),
     enabled: Boolean(session && subjectUserId),
   });
 
@@ -533,22 +641,23 @@ export function useSupportConversationController({
     secondaryStatusActions,
     sendMutation,
     sessionUserId,
+    setUserActiveMutation,
+    setUserPremiumMutation,
     setActiveSidePanelTab,
     setIsSidePanelOpen,
     setIsTemplateEditorOpen,
     setReply,
     setSearchQuery,
-    setAssignmentFilter,
+    setQueueFilter,
     setSelectedAttachment,
     setSelectedTemplateId,
-    setStatusFilter,
     setTemplateDraft,
     setTemplateSearchQuery,
     sidePanelDescription,
     sidePanelTabs,
     sidePanelTitle,
-    statusFilter,
-    assignmentFilter,
+    queueFilter,
+    subscriptionQuery,
     statusMutation,
     templateDeleteMutation,
     templateDraft,
@@ -564,23 +673,3 @@ export function useSupportConversationController({
   };
 }
 
-async function fetchAdminEconomyPurchasesForUser(userId: string): Promise<AdminEconomyPurchase[]> {
-  const take = 100;
-  const maxPages = 8;
-  const matches: AdminEconomyPurchase[] = [];
-
-  for (let page = 0; page < maxPages; page += 1) {
-    const response = await fetchAdminEconomyPurchases({ skip: page * take, take });
-    matches.push(...response.items.filter((item) => item.userId === userId));
-
-    if (!response.hasMore) {
-      break;
-    }
-  }
-
-  return matches.sort((left, right) => {
-    const leftTime = Date.parse(left.confirmedAtUtc ?? left.createdAtUtc);
-    const rightTime = Date.parse(right.confirmedAtUtc ?? right.createdAtUtc);
-    return rightTime - leftTime;
-  });
-}

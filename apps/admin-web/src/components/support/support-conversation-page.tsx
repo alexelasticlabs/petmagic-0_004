@@ -11,8 +11,10 @@ import {
   formatFileSize,
   formatRelativeTime,
   getConversationSla,
+  groupSupportConversationFeed,
   hasAttachment,
   hasImageAttachment,
+  hasVideoAttachment,
   initialsFor,
   shortId,
   shouldRenderMessageBody,
@@ -26,9 +28,8 @@ import {
   statusLabel,
 } from "@/components/support/support-status-helpers";
 import {
-  type AssignmentFilter,
   statusOptions,
-  type SupportFilter,
+  type SupportQueueFilter,
   useSupportConversationController,
 } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
@@ -54,13 +55,13 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
   const [showTemplates, setShowTemplates] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const {
     activeSidePanelTab,
     accountCreatedAt,
     activityTimeline,
     analyticsQuery,
     applyTemplate,
-    assignmentFilter,
     assignmentMutation,
     attachmentInputRef,
     attachmentPreviewUrl,
@@ -95,21 +96,23 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     secondaryStatusActions,
     sendMutation,
     sessionUserId,
+    setUserActiveMutation,
+    setUserPremiumMutation,
     setActiveSidePanelTab,
     setIsSidePanelOpen,
     setIsTemplateEditorOpen,
-    setAssignmentFilter,
+    setQueueFilter,
     setReply,
     setSearchQuery,
     setSelectedAttachment,
     setSelectedTemplateId,
-    setStatusFilter,
     setTemplateDraft,
     setTemplateSearchQuery,
     sidePanelDescription,
     sidePanelTabs,
     sidePanelTitle,
-    statusFilter,
+    queueFilter,
+    subscriptionQuery,
     statusMutation,
     templateDeleteMutation,
     templateDraft,
@@ -161,6 +164,19 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
   const closeFullscreenImage = () => {
     setFullscreenImage(null);
   };
+
+  // Keyboard shortcut: "/" focuses the inbox search input
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      const tag = (event.target as HTMLElement).tagName;
+      if (event.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA" && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!fullscreenImage || typeof document === "undefined") {
@@ -292,7 +308,13 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
             </div>
             <div className={styles.compactHeaderMeta}>
               {conversation.adminUnreadCount > 0 ? (
-                <span className={styles.unreadDot}>{conversation.adminUnreadCount}</span>
+                <span
+                  className={styles.unreadDot}
+                  aria-live="polite"
+                  aria-label={`${conversation.adminUnreadCount} ${locale === "ru" ? "непрочитанных" : "unread"}`}
+                >
+                  {conversation.adminUnreadCount}
+                </span>
               ) : null}
               <Button
                 variant="secondary"
@@ -318,36 +340,30 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
               </div>
               <div className={styles.inboxToolbar}>
                 <SupportOptionGroup
-                  label={text.statusLabel}
-                  value={statusFilter}
+                  label={text.supportQueueFilterLabel}
+                  value={queueFilter}
                   options={[
                     { value: "all", label: text.supportStatusAll },
                     ...statusOptions.map((status) => ({
                       value: status,
                       label: statusLabel(status, text),
                     })),
-                  ]}
-                  onChange={(value) => setStatusFilter(value as SupportFilter)}
-                  compact
-                />
-                <SupportOptionGroup
-                  label={text.supportAssignedTo}
-                  value={assignmentFilter}
-                  options={[
-                    { value: "all", label: text.supportAssignmentAll },
                     { value: "mine", label: text.supportAssignmentMine },
                     { value: "unassigned", label: text.supportAssignmentUnassigned },
                   ]}
-                  onChange={(value) => setAssignmentFilter(value as AssignmentFilter)}
+                  onChange={(value) => setQueueFilter(value as SupportQueueFilter)}
                   compact
                 />
                 <label className={styles.searchField}>
                   <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
                   <input
+                    ref={searchInputRef}
                     className={styles.searchInput}
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder={text.supportSearchPlaceholder}
+                    aria-label={text.supportSearchPlaceholder}
+                    title={text.supportSearchKeyboardHint}
                   />
                 </label>
               </div>
@@ -359,27 +375,37 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
               ) : filteredInboxItems.length === 0 ? (
                 <AdminStateCard tone="info" title={text.supportEmpty} />
               ) : (
-                <div className={styles.list}>
+                <div className={styles.list} role="list">
                   {filteredInboxItems.map((item) => {
                     const itemSla = getConversationSla(
                       item.lastMessageAtUtc ?? item.createdAtUtc,
                       locale,
                       item.adminUnreadCount
                     );
+                    const hasUnread = item.adminUnreadCount > 0;
+                    const assignedName =
+                      item.assignedAdminDisplayName?.trim() || text.supportUnassigned;
 
                     return (
                       <Link
                         key={item.conversationId}
                         href={`/${locale}/support/${item.conversationId}`}
-                        className={`${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""}`}
+                        role="listitem"
+                        aria-current={item.conversationId === conversationId ? "page" : undefined}
+                        className={`${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""} ${hasUnread ? styles.conversationRowUnread : ""}`}
                       >
                         <div className={styles.rowHeader}>
                           <div className={styles.rowIdentity}>
-                            <span className={styles.avatar}>
+                            <span
+                              className={styles.avatar}
+                              aria-hidden="true"
+                            >
                               {initialsFor(item.userDisplayName?.trim() || item.userEmail)}
                             </span>
                             <div className={styles.rowTextStack}>
-                              <div className={styles.rowTitle}>
+                              <div
+                                className={`${styles.rowTitle} ${hasUnread ? styles.rowTitleUnread : ""}`}
+                              >
                                 {item.userDisplayName?.trim() || item.userEmail}
                               </div>
                               <div className={styles.rowPreview}>
@@ -398,16 +424,20 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             {itemSla.primaryLabel}
                           </span>
                           <div className={styles.rowMetaGroup}>
-                            {item.adminUnreadCount > 0 ? (
+                            {hasUnread ? (
                               <span className={styles.unreadDot}>{item.adminUnreadCount}</span>
                             ) : null}
-                            {item.status !== "Open" ? (
-                              <span className={styles.rowSecondaryMeta}>
-                                {statusLabel(item.status, text)}
-                              </span>
-                            ) : null}
+                            <span className={styles.rowSecondaryMeta}>
+                              {statusLabel(item.status, text)}
+                            </span>
                             <span className={styles.rowSecondaryMeta}>
                               {priorityLabel(item.priority, text)}
+                            </span>
+                            <span
+                              className={styles.rowSecondaryMeta}
+                              title={assignedName}
+                            >
+                              {assignedName}
                             </span>
                           </div>
                         </div>
@@ -438,12 +468,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 setIsDragging(false);
                 if (isConversationReadOnly) return;
                 const droppedFile = event.dataTransfer.files[0];
-                if (
-                  droppedFile &&
-                  (droppedFile.type === "image/jpeg" ||
-                    droppedFile.type === "image/png" ||
-                    droppedFile.type === "image/webp")
-                ) {
+                if (droppedFile) {
                   setSelectedAttachment(droppedFile);
                 }
               }}
@@ -505,91 +530,169 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
 
                 {conversation.messages.length > 0 ? (
                   <div className={styles.messagesWrap}>
-                    <div className={styles.dayDivider}>{text.supportTodayLabel}</div>
                     <div className={styles.messages}>
-                      {conversation.messages.map((message) => (
-                        <article
-                          key={message.messageId}
-                          id={`message-${message.messageId}`}
-                          className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser}`}
-                        >
-                          <div className={styles.messageHeader}>
-                            <div className={styles.messageSenderWrap}>
-                              {message.isFromAdmin ? (
-                                <span className={`${styles.avatarTiny} ${styles.avatarTinyAdmin}`}>
-                                  PM
-                                </span>
-                              ) : (
-                                <span className={styles.avatarTiny}>
-                                  {initialsFor(message.senderDisplayName)}
-                                </span>
-                              )}
-                              <strong>{message.senderDisplayName}</strong>
-                            </div>
-                            <span>{formatClockTime(message.createdAtUtc, locale)}</span>
-                          </div>
-                          {hasImageAttachment(message) ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFullscreenImage({
-                                  url: message.attachmentUrl!,
-                                  fileName: message.attachmentFileName,
-                                  messageId: message.messageId,
-                                  senderDisplayName: message.senderDisplayName,
-                                  createdAtUtc: message.createdAtUtc,
-                                  fileSizeBytes: message.attachmentFileSizeBytes,
-                                })
-                              }
-                              className={styles.messageImageButton}
-                            >
-                              <Image
-                                src={message.attachmentUrl!}
-                                alt={message.attachmentFileName ?? message.body}
-                                width={152}
-                                height={120}
-                                sizes="(max-width: 860px) 100vw, 152px"
-                                className={styles.messageImage}
-                                loading="lazy"
-                                unoptimized
-                              />
-                            </button>
-                          ) : hasAttachment(message) ? (
-                            <a
-                              href={message.attachmentUrl!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download={message.attachmentFileName ?? "attachment"}
-                              className={styles.messageAttachmentCard}
-                            >
-                              <div className={styles.messageAttachmentIcon}>FILE</div>
-                              <div className={styles.messageAttachmentMeta}>
-                                <strong>{message.attachmentFileName ?? message.body}</strong>
-                                <span>
-                                  {formatFileSize(message.attachmentFileSizeBytes, locale)}
-                                </span>
-                              </div>
-                            </a>
-                          ) : null}
-                          {shouldRenderMessageBody(message) ? (
-                            <div className={styles.messageBody}>{message.body}</div>
-                          ) : null}
-                          {message.attachmentUploadStatus &&
-                          message.attachmentUploadStatus.toLowerCase() !== "uploaded" ? (
-                            <div className={styles.messageAttachmentStatusRow}>
-                              <span
-                                className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${message.attachmentUploadStatus.toLowerCase()}`] ?? ""}`}
+                      {groupSupportConversationFeed(conversation, {
+                        today: text.supportTodayLabel,
+                        yesterday: text.supportYesterdayLabel,
+                        earlier: text.supportEarlierLabel,
+                        ticketCreated: text.supportSystemTicketCreated,
+                        ticketResolved: text.supportSystemTicketResolved,
+                        ticketReopened: text.supportSystemTicketReopened,
+                        ticketClosed: text.supportSystemTicketClosed,
+                      }).map((group) => (
+                        <div key={group.key} className={styles.dayGroup}>
+                          <div className={styles.dayDivider}>{group.label}</div>
+                          {group.items.map((item) => {
+                            if (item.kind === "system") {
+                              return (
+                                <div
+                                  key={item.id}
+                                  className={`${styles.systemEventCard} ${styles[`systemEventCard_${item.tone}`] ?? ""}`}
+                                >
+                                  <span className={styles.systemEventDot} />
+                                  <span>{item.label}</span>
+                                  <span className={styles.systemEventTime}>
+                                    {formatClockTime(item.occurredAtUtc, locale)}
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            const message = item.message;
+                            const senderType = message.senderType?.toLowerCase() ?? "";
+                            const isSystemMessage = senderType === "system";
+                            const isBotMessage = senderType === "bot";
+
+                            if (isSystemMessage) {
+                              return (
+                                <div
+                                  key={message.messageId}
+                                  id={`message-${message.messageId}`}
+                                  className={styles.inlineSystemLabel}
+                                >
+                                  <span>{message.body}</span>
+                                  <span className={styles.systemEventTime}>
+                                    {formatClockTime(message.createdAtUtc, locale)}
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <article
+                                key={message.messageId}
+                                id={`message-${message.messageId}`}
+                                className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser} ${isBotMessage ? styles.messageBot : ""}`}
                               >
-                                {message.attachmentUploadStatus}
-                              </span>
-                              {message.attachmentUploadErrorCode ? (
-                                <span className={styles.messageAttachmentStatusErrorCode}>
-                                  {message.attachmentUploadErrorCode}
-                                </span>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </article>
+                                <div className={styles.messageHeader}>
+                                  <div className={styles.messageSenderWrap}>
+                                    {message.isFromAdmin ? (
+                                      <span
+                                        className={`${styles.avatarTiny} ${styles.avatarTinyAdmin}`}
+                                        aria-hidden="true"
+                                      >
+                                        PM
+                                      </span>
+                                    ) : isBotMessage ? (
+                                      <span
+                                        className={`${styles.avatarTiny} ${styles.avatarTinyBot}`}
+                                        aria-hidden="true"
+                                      >
+                                        AI
+                                      </span>
+                                    ) : (
+                                      <span className={styles.avatarTiny} aria-hidden="true">
+                                        {initialsFor(message.senderDisplayName)}
+                                      </span>
+                                    )}
+                                    <strong>
+                                      {isBotMessage
+                                        ? text.supportAssistantMobileLabel
+                                        : message.senderDisplayName}
+                                    </strong>
+                                  </div>
+                                  <span>{formatClockTime(message.createdAtUtc, locale)}</span>
+                                </div>
+                                {hasImageAttachment(message) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setFullscreenImage({
+                                        url: message.attachmentUrl!,
+                                        fileName: message.attachmentFileName,
+                                        messageId: message.messageId,
+                                        senderDisplayName: message.senderDisplayName,
+                                        createdAtUtc: message.createdAtUtc,
+                                        fileSizeBytes: message.attachmentFileSizeBytes,
+                                      })
+                                    }
+                                    className={styles.messageImageButton}
+                                  >
+                                    <Image
+                                      src={message.attachmentUrl!}
+                                      alt={message.attachmentFileName ?? message.body}
+                                      width={152}
+                                      height={120}
+                                      sizes="(max-width: 860px) 100vw, 152px"
+                                      className={styles.messageImage}
+                                      loading="lazy"
+                                      unoptimized
+                                    />
+                                  </button>
+                                ) : hasVideoAttachment(message) ? (
+                                  <div className={styles.messageVideoButton}>
+                                    <video
+                                      controls
+                                      preload="metadata"
+                                      src={message.attachmentUrl!}
+                                      className={styles.messageVideo}
+                                    />
+                                  </div>
+                                ) : hasAttachment(message) ? (
+                                  <a
+                                    href={message.attachmentUrl!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={message.attachmentFileName ?? "attachment"}
+                                    className={styles.messageAttachmentCard}
+                                  >
+                                    <div className={styles.messageAttachmentIcon}>FILE</div>
+                                    <div className={styles.messageAttachmentMeta}>
+                                      <strong>
+                                        {message.attachmentFileName ?? message.body}
+                                      </strong>
+                                      <span>
+                                        {formatFileSize(message.attachmentFileSizeBytes, locale)}
+                                      </span>
+                                    </div>
+                                  </a>
+                                ) : null}
+                                {shouldRenderMessageBody(message) ? (
+                                  <div className={styles.messageBody}>{message.body}</div>
+                                ) : null}
+                                {message.attachmentUploadStatus &&
+                                  message.attachmentUploadStatus.toLowerCase() !== "uploaded" ? (
+                                  <div className={styles.messageAttachmentStatusRow}>
+                                    <span
+                                      className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${message.attachmentUploadStatus.toLowerCase()}`] ?? ""}`}
+                                    >
+                                      {message.attachmentUploadStatus.toLowerCase() === "pending"
+                                        ? text.supportAttachmentUploadingLabel
+                                        : message.attachmentUploadStatus.toLowerCase() === "failed"
+                                          ? text.supportAttachmentFailedLabel
+                                          : message.attachmentUploadStatus}
+                                    </span>
+                                    {message.attachmentUploadErrorCode ? (
+                                      <span className={styles.messageAttachmentStatusErrorCode}>
+                                        {message.attachmentUploadErrorCode}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </article>
+                            );
+                          })}
+                        </div>
                       ))}
                       <div ref={messagesEndRef} />
                     </div>
@@ -624,161 +727,161 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     </div>
                   ) : (
                     <>
-                  {showTemplates && visibleTemplates.length > 0 ? (
-                    <div className={styles.composerTemplateRail}>
-                      <span className={styles.subtle}>{text.supportQuickRepliesLabel}</span>
-                      <div className={`${styles.templateList} ${styles.templateListCompact}`}>
-                        {visibleTemplates.map((template) => (
-                          <Button
-                            key={template.templateId}
-                            size="sm"
-                            variant="ghost"
-                            className={styles.quickTemplateButton}
-                            disabled={isConversationReadOnly}
-                            onClick={() => applyTemplate(template)}
-                          >
-                            {`✓ ${template.title}`}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+                      {showTemplates && visibleTemplates.length > 0 ? (
+                        <div className={styles.composerTemplateRail}>
+                          <span className={styles.subtle}>{text.supportQuickRepliesLabel}</span>
+                          <div className={`${styles.templateList} ${styles.templateListCompact}`}>
+                            {visibleTemplates.map((template) => (
+                              <Button
+                                key={template.templateId}
+                                size="sm"
+                                variant="ghost"
+                                className={styles.quickTemplateButton}
+                                disabled={isConversationReadOnly}
+                                onClick={() => applyTemplate(template)}
+                              >
+                                {`✓ ${template.title}`}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
 
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    className={styles.hiddenFileInput}
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(event) => {
-                      const nextFile = event.target.files?.[0] ?? null;
-                      setSelectedAttachment(nextFile);
-                    }}
-                  />
-                  <div className={styles.composerAttachmentBar}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => attachmentInputRef.current?.click()}
-                      disabled={sendMutation.isPending || isConversationReadOnly}
-                    >
-                      {text.chooseFile}
-                    </Button>
-                    {visibleTemplates.length > 0 ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowTemplates((v) => !v)}
-                        disabled={isConversationReadOnly}
-                      >
-                        {showTemplates
-                          ? locale === "ru"
-                            ? "⚡ Скрыть"
-                            : "⚡ Hide"
-                          : locale === "ru"
-                            ? "⚡ Шаблоны"
-                            : "⚡ Templates"}
-                      </Button>
-                    ) : null}
-                    <span className={styles.subtle}>{text.supportAttachmentHint}</span>
-                  </div>
-                  {selectedAttachment ? (
-                    <div className={styles.attachmentPreviewCard}>
-                      {attachmentPreviewUrl ? (
-                        <button
-                          type="button"
-                          className={styles.attachmentPreviewImageButton}
-                          onClick={() =>
-                            setFullscreenImage({
-                              url: attachmentPreviewUrl,
-                              fileName: selectedAttachment.name,
-                              fileSizeBytes: selectedAttachment.size,
-                            })
-                          }
+                      <input
+                        ref={attachmentInputRef}
+                        type="file"
+                        className={styles.hiddenFileInput}
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const nextFile = event.target.files?.[0] ?? null;
+                          setSelectedAttachment(nextFile);
+                        }}
+                      />
+                      <div className={styles.composerAttachmentBar}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => attachmentInputRef.current?.click()}
+                          disabled={sendMutation.isPending || isConversationReadOnly}
                         >
-                          <Image
-                            src={attachmentPreviewUrl}
-                            alt={selectedAttachment.name}
-                            width={72}
-                            height={72}
-                            sizes="72px"
-                            className={styles.attachmentPreviewImage}
-                            unoptimized
-                          />
-                        </button>
-                      ) : (
-                        <div className={styles.attachmentPreviewFileIcon}>FILE</div>
-                      )}
-                      <div className={styles.attachmentPreviewMeta}>
-                        <span className={styles.subtle}>{text.selectedFileLabel}</span>
-                        <strong>{selectedAttachment.name}</strong>
-                        <span className={styles.subtle}>
-                          {formatFileSize(selectedAttachment.size, locale)}
-                        </span>
+                          {text.chooseFile}
+                        </Button>
+                        {visibleTemplates.length > 0 ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowTemplates((v) => !v)}
+                            disabled={isConversationReadOnly}
+                          >
+                            {showTemplates
+                              ? locale === "ru"
+                                ? "⚡ Скрыть"
+                                : "⚡ Hide"
+                              : locale === "ru"
+                                ? "⚡ Шаблоны"
+                                : "⚡ Templates"}
+                          </Button>
+                        ) : null}
+                        <span className={styles.subtle}>{text.supportAttachmentHint}</span>
                       </div>
-                      <div className={styles.attachmentPreviewActions}>
-                        {attachmentPreviewUrl ? (
-                          <button
-                            type="button"
-                            className={styles.attachmentActionButton}
-                            onClick={() =>
-                              setFullscreenImage({
-                                url: attachmentPreviewUrl,
-                                fileName: selectedAttachment.name,
-                                fileSizeBytes: selectedAttachment.size,
-                              })
+                      {selectedAttachment ? (
+                        <div className={styles.attachmentPreviewCard}>
+                          {attachmentPreviewUrl ? (
+                            <button
+                              type="button"
+                              className={styles.attachmentPreviewImageButton}
+                              onClick={() =>
+                                setFullscreenImage({
+                                  url: attachmentPreviewUrl,
+                                  fileName: selectedAttachment.name,
+                                  fileSizeBytes: selectedAttachment.size,
+                                })
+                              }
+                            >
+                              <Image
+                                src={attachmentPreviewUrl}
+                                alt={selectedAttachment.name}
+                                width={72}
+                                height={72}
+                                sizes="72px"
+                                className={styles.attachmentPreviewImage}
+                                unoptimized
+                              />
+                            </button>
+                          ) : (
+                            <div className={styles.attachmentPreviewFileIcon}>FILE</div>
+                          )}
+                          <div className={styles.attachmentPreviewMeta}>
+                            <span className={styles.subtle}>{text.selectedFileLabel}</span>
+                            <strong>{selectedAttachment.name}</strong>
+                            <span className={styles.subtle}>
+                              {formatFileSize(selectedAttachment.size, locale)}
+                            </span>
+                          </div>
+                          <div className={styles.attachmentPreviewActions}>
+                            {attachmentPreviewUrl ? (
+                              <button
+                                type="button"
+                                className={styles.attachmentActionButton}
+                                onClick={() =>
+                                  setFullscreenImage({
+                                    url: attachmentPreviewUrl,
+                                    fileName: selectedAttachment.name,
+                                    fileSizeBytes: selectedAttachment.size,
+                                  })
+                                }
+                              >
+                                {text.supportAttachmentOpenAction}
+                              </button>
+                            ) : null}
+                            <Button variant="ghost" size="sm" onClick={resetSelectedAttachment}>
+                              {text.supportAttachmentRemoveAction}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <textarea
+                        className={styles.textarea}
+                        value={composerValue}
+                        onChange={(event) => setReply(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === "Enter" &&
+                            !event.shiftKey &&
+                            !isConversationReadOnly &&
+                            !sendMutation.isPending &&
+                            (reply.trim() || hasComposerAttachment)
+                          ) {
+                            event.preventDefault();
+                            submitReply();
+                          }
+                        }}
+                        placeholder={
+                          isConversationReadOnly
+                            ? statusHint(conversation.status, text)
+                            : composerPlaceholder
+                        }
+                        disabled={isConversationReadOnly}
+                      />
+
+                      <div className={styles.composerActions}>
+                        <div className={styles.rowMetaGroup}>
+                          <Button
+                            variant="primary"
+                            onClick={submitReply}
+                            disabled={
+                              isConversationReadOnly ||
+                              sendMutation.isPending ||
+                              (!reply.trim() && !hasComposerAttachment)
                             }
                           >
-                            {text.supportAttachmentOpenAction}
-                          </button>
-                        ) : null}
-                        <Button variant="ghost" size="sm" onClick={resetSelectedAttachment}>
-                          {text.supportAttachmentRemoveAction}
-                        </Button>
+                            {sendMutation.isPending
+                              ? text.supportReplySending
+                              : text.supportReplyAction}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ) : null}
-
-                  <textarea
-                    className={styles.textarea}
-                    value={composerValue}
-                    onChange={(event) => setReply(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter" &&
-                        !event.shiftKey &&
-                        !isConversationReadOnly &&
-                        !sendMutation.isPending &&
-                        (reply.trim() || hasComposerAttachment)
-                      ) {
-                        event.preventDefault();
-                        submitReply();
-                      }
-                    }}
-                    placeholder={
-                      isConversationReadOnly
-                        ? statusHint(conversation.status, text)
-                        : composerPlaceholder
-                    }
-                    disabled={isConversationReadOnly}
-                  />
-
-                  <div className={styles.composerActions}>
-                    <div className={styles.rowMetaGroup}>
-                      <Button
-                        variant="primary"
-                        onClick={submitReply}
-                        disabled={
-                          isConversationReadOnly ||
-                          sendMutation.isPending ||
-                          (!reply.trim() && !hasComposerAttachment)
-                        }
-                      >
-                        {sendMutation.isPending
-                          ? text.supportReplySending
-                          : text.supportReplyAction}
-                      </Button>
-                    </div>
-                  </div>
                     </>
                   )}
                 </div>
@@ -804,7 +907,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 activityTimeline,
                 analyticsQuery,
                 applyTemplate,
-                assignmentFilter,
                 assignmentMutation,
                 attachmentInputRef,
                 attachmentPreviewUrl,
@@ -839,21 +941,23 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 secondaryStatusActions,
                 sendMutation,
                 sessionUserId,
+                setUserActiveMutation,
+                setUserPremiumMutation,
                 setActiveSidePanelTab,
                 setIsSidePanelOpen,
                 setIsTemplateEditorOpen,
-                setAssignmentFilter,
+                setQueueFilter,
                 setReply,
                 setSearchQuery,
                 setSelectedAttachment,
                 setSelectedTemplateId,
-                setStatusFilter,
                 setTemplateDraft,
                 setTemplateSearchQuery,
                 sidePanelDescription,
                 sidePanelTabs,
                 sidePanelTitle,
-                statusFilter,
+                queueFilter,
+                subscriptionQuery,
                 statusMutation,
                 templateDeleteMutation,
                 templateDraft,

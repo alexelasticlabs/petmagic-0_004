@@ -30,7 +30,7 @@ part 'widgets/support_chat_states.part.dart';
 class SupportChatPage extends ConsumerStatefulWidget {
   const SupportChatPage({super.key});
 
-  static const routePath = '/profile/support';
+  static const routePath = '/profile/support/chat';
 
   @override
   ConsumerState<SupportChatPage> createState() => _SupportChatPageState();

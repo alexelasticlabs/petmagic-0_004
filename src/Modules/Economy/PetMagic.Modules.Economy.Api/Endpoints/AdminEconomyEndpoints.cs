@@ -21,6 +21,7 @@ public static class AdminEconomyEndpoints
 
         group.MapGet("/ledger", GetWalletLedgerAsync);
         group.MapGet("/purchases", GetPurchasesAsync);
+        group.MapGet("/users/{userId:guid}/subscription-summary", GetUserSubscriptionSummaryAsync);
         group.MapGet("/subscriptions", GetSubscriptionsAsync);
         group.MapGet("/packs", ListPacksAsync);
         group.MapGet("/subscription-plans", ListSubscriptionPlansAsync);
@@ -71,13 +72,34 @@ public static class AdminEconomyEndpoints
         [FromQuery] int skip,
         [FromQuery] int take,
         [FromQuery] string? status,
+        [FromQuery] Guid? userId,
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminPurchaseHistoryAsync(skip, take, status, cancellationToken);
+        var result = await service.GetAdminPurchaseHistoryAsync(skip, take, status, userId, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SubscriptionSummaryResponse>, ProblemHttpResult>> GetUserSubscriptionSummaryAsync(
+        [FromRoute] Guid userId,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetSubscriptionSummaryAsync(userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                "users.not_found" => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
         return TypedResults.Ok(result.Value);

@@ -211,6 +211,21 @@ export type AdminEconomySubscription = {
   updatedAtUtc: string;
 };
 
+export type AdminEconomyUserSubscriptionSummary = {
+  isPremium: boolean;
+  provider?: string | null;
+  purchaseChannel?: string | null;
+  status: string;
+  planName?: string | null;
+  billingPeriod?: string | null;
+  currentPeriodEndUtc?: string | null;
+  cancelAtPeriodEnd: boolean;
+  monthlyTokenLimit: number;
+  tokensAvailable: number;
+  canManageSubscription: boolean;
+  manageSubscriptionAction: string;
+};
+
 export type AdminSubscriptionPlan = {
   planId: string;
   name: string;
@@ -346,6 +361,7 @@ export type AdminSupportMessage = {
   senderUserId: string;
   senderDisplayName: string;
   isFromAdmin: boolean;
+  senderType: string;
   body: string;
   attachmentUrl?: string | null;
   attachmentFileName?: string | null;
@@ -367,6 +383,8 @@ export type AdminSupportConversationSummary = {
   assignedAdminDisplayName?: string | null;
   status: SupportConversationStatus;
   priority: SupportConversationPriority;
+  source: string;
+  assistantScenario?: string | null;
   lastMessagePreview?: string | null;
   lastMessageAtUtc?: string | null;
   userUnreadCount: number;
@@ -390,6 +408,11 @@ export type AdminSupportConversation = {
   assignedAdminDisplayName?: string | null;
   status: SupportConversationStatus;
   priority: SupportConversationPriority;
+  source: string;
+  assistantScenario?: string | null;
+  relatedGenerationId?: string | null;
+  relatedPaymentId?: string | null;
+  relatedSubscriptionId?: string | null;
   userUnreadCount: number;
   adminUnreadCount: number;
   createdAtUtc: string;

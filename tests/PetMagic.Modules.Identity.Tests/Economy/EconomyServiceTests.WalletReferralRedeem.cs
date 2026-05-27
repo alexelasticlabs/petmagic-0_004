@@ -280,6 +280,48 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task GetAdminPurchaseHistoryAsync_ShouldFilterByUserId()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "starter",
+            DisplayName = "Starter PawSpark",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(firstUserId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+        await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(secondUserId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+
+        var allPurchases = await service.GetAdminPurchaseHistoryAsync(0, 10, null, null, CancellationToken.None);
+        var filteredPurchases = await service.GetAdminPurchaseHistoryAsync(0, 10, null, firstUserId, CancellationToken.None);
+
+        Assert.True(allPurchases.IsSuccess);
+        Assert.True(filteredPurchases.IsSuccess);
+        Assert.Equal(2, allPurchases.Value.Items.Count);
+        var filtered = Assert.Single(filteredPurchases.Value.Items);
+        Assert.Equal(firstUserId, filtered.UserId);
+    }
+
+    [Fact]
     public async Task CreatePackPurchaseAsync_ShouldRejectStripe_WhenProviderConfigUnavailable()
     {
         await using var dbContext = CreateDbContext();

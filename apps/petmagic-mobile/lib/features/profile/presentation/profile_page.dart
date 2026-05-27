@@ -13,7 +13,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_m
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_home_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
@@ -174,7 +174,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               subtitle: text.profileSupportCompactSubtitle,
                               iconColor: colors.blue,
                               onTap: () =>
-                                  context.push(SupportChatPage.routePath),
+                                  context.push(SupportHomePage.routePath),
                             ),
                             ProfileSettingsRow(
                               icon: Icons.settings_outlined,
