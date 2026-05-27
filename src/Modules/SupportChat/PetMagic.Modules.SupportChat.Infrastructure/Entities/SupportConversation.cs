@@ -30,11 +30,23 @@ public sealed class SupportConversation
 
     public DateTime? LastMessageAtUtc { get; set; }
 
+    public string? LastMessagePreview { get; set; }
+
+    public SupportMessageSenderType? LastMessageSenderType { get; set; }
+
+    public DateTime? WaitingSinceUtc { get; set; }
+
     public DateTime? ResolvedAtUtc { get; set; }
 
     public DateTime? ReopenUntilUtc { get; set; }
 
     public DateTime? ClosedAtUtc { get; set; }
+
+    public Guid? ClosedByUserId { get; set; }
+
+    public DateTime? ReopenedAtUtc { get; set; }
+
+    public Guid? ReopenedByUserId { get; set; }
 
     public int? FeedbackRating { get; set; }
 

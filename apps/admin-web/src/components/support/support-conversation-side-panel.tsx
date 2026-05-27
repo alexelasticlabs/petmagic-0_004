@@ -50,7 +50,7 @@ export function SupportConversationSidePanel({
   onJumpToMessage,
   onOpenAttachmentPreview,
 }: SupportConversationSidePanelProps) {
-  const [showAdvancedActions, setShowAdvancedActions] = useState(false);
+  const [showDangerousActions, setShowDangerousActions] = useState(false);
   const [showResolveConfirm, setShowResolveConfirm] = useState(false);
 
   const {
@@ -77,9 +77,7 @@ export function SupportConversationSidePanel({
     setUserPremiumMutation,
     subscriptionQuery,
     setActiveSidePanelTab,
-    sidePanelDescription,
     sidePanelTabs,
-    sidePanelTitle,
     statusMutation,
     text,
     totalPurchases,
@@ -128,261 +126,274 @@ export function SupportConversationSidePanel({
   }
 
   const responderState = getResponderState(conversation.status, locale);
-  const hasAdvancedActions = secondaryStatusActions.length > 0 || Boolean(destructiveStatusAction);
   const isUserActive = userQuery.data?.isActive ?? true;
   const isUserPremium = userQuery.data?.isPremium ?? false;
   const isModerationPending = setUserActiveMutation.isPending || setUserPremiumMutation.isPending;
   const subscriptionStatusLabel =
     subscriptionQuery.data?.status ?? (locale === "ru" ? "Нет подписки" : "No subscription");
   const tokenBalanceLabel = locale === "ru" ? "Баланс токенов" : "Token balance";
+  const hasTopMetrics = Boolean(
+    conversation.assistantScenario || conversation.relatedGenerationId
+  );
 
   return (
     <div className={styles.sidePane}>
       <AdminCard className={`${styles.sideCard} ${styles.sidePanelCard}`}>
-        <div className={styles.sidePanelTopbar}>
-          <div className={styles.paneTitleGroup}>
-            <span className={styles.paneEyebrow}>{text.supportConversationDetailsTitle}</span>
-            <h2 className={styles.paneTitle}>{sidePanelTitle}</h2>
-            {sidePanelDescription ? (
-              <p className={styles.paneDescription}>{sidePanelDescription}</p>
-            ) : null}
-          </div>
-          <div className={styles.sidePanelTabs}>
-            {sidePanelTabs.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                className={`${styles.sidePanelTab} ${activeSidePanelTab === value ? styles.sidePanelTabActive : ""}`}
-                onClick={() => setActiveSidePanelTab(value)}
-              >
-                {label}
-              </button>
-            ))}
+
+        {/* ── User identity ─────────────────────────────────── */}
+        <div className={styles.spIdentity}>
+          <span className={styles.spAvatarMd}>{initialsFor(userDisplayName)}</span>
+          <div className={styles.spIdentityInfo}>
+            <div className={styles.spNameRow}>
+              <strong className={styles.spNameText}>{userDisplayName}</strong>
+              <span className={`${styles.spPlanChip} ${isUserPremium ? styles.spPlanChipPremium : ""}`}>
+                {isUserPremium ? text.premiumLabel : text.freeLabel}
+              </span>
+            </div>
+            <span className={styles.spUserEmail}>{conversation.userEmail}</span>
           </div>
         </div>
 
-        {activeSidePanelTab === "user" ? (
-          <div className={styles.sidePanelContent}>
-            <div className={styles.statusOverviewCard}>
-              <div className={styles.statusOverviewHeader}>
-                <AdminBadge tone={toneForStatus(conversation.status)}>
-                  {statusLabel(conversation.status, text)}
-                </AdminBadge>
-              </div>
-              <div className={styles.workflowPrimaryRow}>
+        {/* ── Status strip ─────────────────────────────────── */}
+        <div className={styles.spStatusStrip}>
+          <AdminBadge tone={toneForStatus(conversation.status)}>
+            {statusLabel(conversation.status, text)}
+          </AdminBadge>
+          <span className={styles.spStatusDivider}>·</span>
+          <span className={styles.spStatusMeta}>{sourceLabel(conversation.source, text)}</span>
+          {conversationSla.waitLabel ? (
+            <>
+              <span className={styles.spStatusDivider}>·</span>
+              <span className={`${styles.spStatusMeta} ${conversationSla.level === "critical" || conversationSla.level === "risk" ? styles.spStatusMetaUrgent : ""}`}>
+                ⏱ {conversationSla.waitLabel}
+              </span>
+            </>
+          ) : null}
+        </div>
+
+        {/* ── Workflow actions ─────────────────────────────── */}
+        <div className={styles.spActionsBlock}>
+          {showResolveConfirm ? (
+            <div className={styles.spConfirmBox}>
+              <span className={styles.spConfirmText}>
+                {locale === "ru" ? "Закрыть обращение?" : "Close conversation?"}
+              </span>
+              <div className={styles.spConfirmActions}>
                 <Button
-                  variant="secondary"
-                  className={styles.workflowSecondaryButton}
-                  onClick={() =>
-                    assignmentMutation.mutate(isAssignedToCurrentAdmin ? null : sessionUserId)
-                  }
-                  disabled={assignmentMutation.isPending || !sessionUserId}
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setShowResolveConfirm(false);
+                    if (primaryStatusAction) statusMutation.mutate(primaryStatusAction.status);
+                  }}
+                  disabled={statusMutation.isPending}
                 >
-                  {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
+                  {locale === "ru" ? "Закрыть" : "Close"}
                 </Button>
-                {primaryStatusAction ? (
-                  showResolveConfirm ? (
-                    <div className={styles.resolveConfirmBox}>
-                      <span className={styles.resolveConfirmText}>
-                        {locale === "ru" ? "Закрыть обращение?" : "Close conversation?"}
-                      </span>
-                      <div className={styles.resolveConfirmActions}>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => {
-                            setShowResolveConfirm(false);
-                            statusMutation.mutate(primaryStatusAction.status);
-                          }}
-                          disabled={statusMutation.isPending}
-                        >
-                          {locale === "ru" ? "Закрыть" : "Close"}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setShowResolveConfirm(false)}
-                        >
-                          {locale === "ru" ? "Отмена" : "Cancel"}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      className={styles.workflowPrimaryButton}
-                      onClick={() => {
-                        const isDestructive =
-                          primaryStatusAction.status === "Closed";
-                        if (isDestructive) {
-                          setShowResolveConfirm(true);
-                        } else {
-                          statusMutation.mutate(primaryStatusAction.status);
-                        }
-                      }}
-                      disabled={
-                        statusMutation.isPending ||
-                        conversation.status === primaryStatusAction.status
-                      }
-                    >
-                      {primaryStatusAction.label}
-                    </Button>
-                  )
-                ) : null}
+                <Button variant="secondary" size="sm" onClick={() => setShowResolveConfirm(false)}>
+                  {locale === "ru" ? "Отмена" : "Cancel"}
+                </Button>
               </div>
-              {hasAdvancedActions ? (
-                <div className={styles.workflowSecondaryGrid}>
-                  <Button
-                    variant="ghost"
-                    className={styles.workflowSecondaryButton}
-                    onClick={() => setShowAdvancedActions((current) => !current)}
-                  >
-                    {showAdvancedActions
-                      ? locale === "ru"
-                        ? "Скрыть дополнительные действия"
-                        : "Hide additional actions"
-                      : locale === "ru"
-                        ? "Показать дополнительные действия"
-                        : "Show additional actions"}
-                  </Button>
-                </div>
-              ) : null}
-              {showAdvancedActions && secondaryStatusActions.length ? (
-                <div className={styles.workflowSecondaryGrid}>
-                  {secondaryStatusActions.map((action) => (
-                    <Button
-                      key={action.status}
-                      variant="secondary"
-                      className={styles.workflowSecondaryButton}
-                      onClick={() => statusMutation.mutate(action.status)}
-                      disabled={statusMutation.isPending || conversation.status === action.status}
-                    >
-                      {action.label}
-                    </Button>
-                  ))}
-                </div>
-              ) : null}
-              {showAdvancedActions && destructiveStatusAction ? (
-                <div className={styles.workflowDangerZone}>
-                  <Button
-                    variant="danger"
-                    className={styles.workflowDangerButton}
-                    onClick={() => statusMutation.mutate(destructiveStatusAction.status)}
-                    disabled={
-                      statusMutation.isPending ||
-                      conversation.status === destructiveStatusAction.status
+            </div>
+          ) : (
+            <div className={styles.spActionGrid}>
+              <Button
+                variant="secondary"
+                size="sm"
+                className={styles.spActionFull}
+                onClick={() =>
+                  assignmentMutation.mutate(isAssignedToCurrentAdmin ? null : sessionUserId)
+                }
+                disabled={assignmentMutation.isPending || !sessionUserId}
+              >
+                {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
+              </Button>
+              {primaryStatusAction ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className={styles.spActionFull}
+                  onClick={() => {
+                    if (primaryStatusAction.status === "Closed") {
+                      setShowResolveConfirm(true);
+                    } else {
+                      statusMutation.mutate(primaryStatusAction.status);
                     }
-                  >
-                    {destructiveStatusAction.label}
-                  </Button>
-                </div>
+                  }}
+                  disabled={
+                    statusMutation.isPending ||
+                    conversation.status === primaryStatusAction.status
+                  }
+                >
+                  {primaryStatusAction.label}
+                </Button>
               ) : null}
             </div>
+          )}
+          {secondaryStatusActions.length ? (
+            <div className={styles.spActionGrid}>
+              {secondaryStatusActions.map((action) => (
+                <Button
+                  key={action.status}
+                  variant="secondary"
+                  size="sm"
+                  className={styles.spActionFull}
+                  onClick={() => statusMutation.mutate(action.status)}
+                  disabled={statusMutation.isPending || conversation.status === action.status}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          {destructiveStatusAction ? (
+            <Button
+              variant="danger"
+              size="sm"
+              className={styles.spActionFull}
+              onClick={() => statusMutation.mutate(destructiveStatusAction.status)}
+              disabled={
+                statusMutation.isPending ||
+                conversation.status === destructiveStatusAction.status
+              }
+            >
+              {destructiveStatusAction.label}
+            </Button>
+          ) : null}
+        </div>
 
-            <div className={styles.metricsGrid}>
-              <div className={styles.metricTile}>
-                <span>{text.supportAssistantSourceLabel}</span>
-                <strong>{sourceLabel(conversation.source, text)}</strong>
+        {/* ── Tab navigation ───────────────────────────────── */}
+        <div className={styles.spTabNav} role="tablist">
+          {sidePanelTabs.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={activeSidePanelTab === tab.value}
+              className={`${styles.spTabBtn} ${activeSidePanelTab === tab.value ? styles.spTabBtnActive : ""}`}
+              onClick={() => setActiveSidePanelTab(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Overview tab ─────────────────────────────────── */}
+        {activeSidePanelTab === "user" ? (
+          <div className={styles.spContent}>
+
+            {/* Scenario / generation context pills */}
+            {hasTopMetrics ? (
+              <div className={styles.spSection}>
+                <span className={styles.spSectionLabel}>
+                  {text.supportAiContextTitle}
+                </span>
+                <div className={styles.spKvList}>
+                  {conversation.assistantScenario ? (
+                    <div className={styles.spKvRow}>
+                      <span>{text.supportAssistantScenarioLabel}</span>
+                      <strong>{conversation.assistantScenario}</strong>
+                    </div>
+                  ) : null}
+                  {conversation.relatedGenerationId ? (
+                    <div className={styles.spKvRow}>
+                      <span>{locale === "ru" ? "Генерация" : "Generation"}</span>
+                      <strong>{shortId(conversation.relatedGenerationId)}</strong>
+                    </div>
+                  ) : null}
+                </div>
               </div>
-              {conversation.assistantScenario ? (
-                <div className={styles.metricTile}>
-                  <span>{text.supportAssistantScenarioLabel}</span>
-                  <strong>{conversation.assistantScenario}</strong>
-                </div>
-              ) : null}
-              {conversation.relatedGenerationId ? (
-                <div className={styles.metricTile}>
-                  <span>{locale === "ru" ? "Связанная генерация" : "Related generation"}</span>
-                  <strong>{shortId(conversation.relatedGenerationId)}</strong>
-                </div>
-              ) : null}
-            </div>
+            ) : null}
 
-            <div className={styles.userSummaryHeader}>
-              <div className={styles.userCard}>
-                <span className={styles.avatarHero}>{initialsFor(userDisplayName)}</span>
-                <div className={styles.userCardBody}>
-                  <strong>{userDisplayName}</strong>
-                  <span>{conversation.userEmail}</span>
-                  <span>{`User ID: ${shortId(conversation.initiatorUserId)}`}</span>
+            {/* User stats */}
+            <div className={styles.spSection}>
+              <span className={styles.spSectionLabel}>
+                {locale === "ru" ? "Пользователь" : "User"}
+              </span>
+              <div className={styles.spKvList}>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportPlanLabel}</span>
+                  <strong>{isUserPremium ? text.premiumLabel : text.freeLabel}</strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportAccountAgeLabel}</span>
+                  <strong>{formatAccountAge(accountCreatedAt, locale)}</strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportMessagesCount}</span>
+                  <strong>{String(conversation.messages.length)}</strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportPurchasesLabel}</span>
+                  <strong>{String(totalPurchases)}</strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{tokenBalanceLabel}</span>
+                  <strong>{String(analyticsQuery.data?.summary.walletBalance ?? 0)}</strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportGenerationErrorsTitle}</span>
+                  <strong>{String(analyticsQuery.data?.summary.failedGenerations ?? 0)}</strong>
                 </div>
               </div>
             </div>
 
-            <div className={styles.quickLinksRow}>
+            {/* Quick links */}
+            <div className={styles.spLinksRow}>
               <Link
                 href={`/${locale}/users/${conversation.initiatorUserId}`}
-                className="ui-button ui-button--secondary ui-button--sm"
+                className={styles.spLinkBtn}
               >
-                {locale === "ru" ? "Открыть профиль" : "Open profile"}
+                ↗ {locale === "ru" ? "Профиль" : "Profile"}
               </Link>
-              <Link
-                href={`/${locale}/economy`}
-                className="ui-button ui-button--secondary ui-button--sm"
-              >
-                {locale === "ru" ? "Открыть платежи" : "Open payments"}
+              <Link href={`/${locale}/economy`} className={styles.spLinkBtn}>
+                ↗ {locale === "ru" ? "Платежи" : "Payments"}
               </Link>
               <button
                 type="button"
-                className="ui-button ui-button--ghost ui-button--sm"
+                className={styles.spLinkBtn}
                 onClick={() => setActiveSidePanelTab("activity")}
               >
-                {locale === "ru"
-                  ? "Покупки / Генерации / Ошибки"
-                  : "Purchases / Generations / Errors"}
+                {locale === "ru" ? "Активность →" : "Activity →"}
               </button>
             </div>
 
-            <div className={styles.dangerActionBlock}>
-              <span>{locale === "ru" ? "Опасные действия" : "Danger zone"}</span>
-              <div className={styles.quickLinksRow}>
-                <button
-                  type="button"
-                  className="ui-button ui-button--danger ui-button--sm"
-                  onClick={() => setUserActiveMutation.mutate(!isUserActive)}
-                  disabled={isModerationPending}
-                >
-                  {isUserActive ? text.deactivate : text.activate}
-                </button>
-                <button
-                  type="button"
-                  className="ui-button ui-button--secondary ui-button--sm"
-                  onClick={() => setUserPremiumMutation.mutate(!isUserPremium)}
-                  disabled={isModerationPending}
-                >
-                  {isUserPremium ? text.removePremium : text.makePremium}
-                </button>
+            {/* Conversation meta */}
+            <div className={styles.spSection}>
+              <span className={styles.spSectionLabel}>
+                {text.supportConversationMetaTitle}
+              </span>
+              <div className={styles.spKvList}>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportAssistantSourceLabel}</span>
+                  <strong>{sourceLabel(conversation.source, text)}</strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportAssignedTo}</span>
+                  <strong>
+                    {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
+                  </strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{text.createdAtLabel}</span>
+                  <strong>{formatDateTime(conversation.createdAtUtc, locale)}</strong>
+                </div>
+                <div className={styles.spKvRow}>
+                  <span>{text.supportWaitingLabel}</span>
+                  <strong>{conversationSla.waitLabel}</strong>
+                </div>
+                {accountCreatedAt ? (
+                  <div className={styles.spKvRow}>
+                    <span>{locale === "ru" ? "Дата регистрации" : "Registered"}</span>
+                    <strong>{formatDateTime(accountCreatedAt, locale)}</strong>
+                  </div>
+                ) : null}
               </div>
             </div>
 
-            <div className={styles.metricsGrid}>
-              <div className={styles.metricTile}>
-                <span>{text.supportPlanLabel}</span>
-                <strong>{userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel}</strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{text.supportAccountAgeLabel}</span>
-                <strong>{formatAccountAge(accountCreatedAt, locale)}</strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{text.supportMessagesCount}</span>
-                <strong>{String(conversation.messages.length)}</strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{text.supportPurchasesLabel}</span>
-                <strong>{String(totalPurchases)}</strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{tokenBalanceLabel}</span>
-                <strong>{String(analyticsQuery.data?.summary.walletBalance ?? 0)}</strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{text.supportGenerationErrorsTitle}</span>
-                <strong>{String(analyticsQuery.data?.summary.failedGenerations ?? 0)}</strong>
-              </div>
-            </div>
-
-            <SectionBlock title={text.supportAiContextTitle}>
+            {/* PetMagic context */}
+            <div className={styles.spSection}>
+              <span className={styles.spSectionLabel}>{text.supportAiContextTitle}</span>
               <SidePanelAsyncState
                 isLoading={
                   analyticsQuery.isLoading ||
@@ -403,69 +414,64 @@ export function SupportConversationSidePanel({
                 }}
                 emptyTitle={text.supportHistoryEmpty}
               >
-                <div className={styles.detailGrid}>
-                  <div className={styles.detailRow}>
+                <div className={styles.spKvList}>
+                  <div className={styles.spKvRow}>
                     <span>{text.supportLastPaymentLabel}</span>
                     <strong>{formatDateTime(lastUserPurchaseAtUtc, locale)}</strong>
                   </div>
-                  <div className={styles.detailRow}>
+                  <div className={styles.spKvRow}>
                     <span>{text.supportLastGenerationLabel}</span>
                     <strong>
                       {formatDateTime(analyticsQuery.data?.summary.lastGenerationAtUtc, locale)}
                     </strong>
                   </div>
-                  <div className={styles.detailRow}>
-                    <span>{locale === "ru" ? "Статус подписки" : "Subscription status"}</span>
+                  <div className={styles.spKvRow}>
+                    <span>{locale === "ru" ? "Статус подписки" : "Subscription"}</span>
                     <strong>{subscriptionStatusLabel}</strong>
                   </div>
-                  <div className={styles.detailRow}>
-                    <span>{locale === "ru" ? "План подписки" : "Subscription plan"}</span>
+                  <div className={styles.spKvRow}>
+                    <span>{locale === "ru" ? "Тариф" : "Plan"}</span>
                     <strong>
                       {subscriptionQuery.data?.planName ??
-                        (userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel)}
+                        (isUserPremium ? text.premiumLabel : text.freeLabel)}
                     </strong>
                   </div>
                 </div>
               </SidePanelAsyncState>
-            </SectionBlock>
+            </div>
 
-            <SectionBlock title={text.supportConversationMetaTitle}>
-              <div className={styles.detailGrid}>
-                <div className={styles.detailRow}>
-                  <span>{text.statusLabel}</span>
-                  <strong>{statusLabel(conversation.status, text)}</strong>
+            {/* Dangerous actions */}
+            <div className={styles.spDangerDisclosure}>
+              <button
+                type="button"
+                className={styles.spDangerTrigger}
+                onClick={() => setShowDangerousActions((v) => !v)}
+              >
+                <span>{showDangerousActions ? "▾" : "▸"}</span>
+                {locale === "ru" ? "Опасные действия" : "Dangerous actions"}
+              </button>
+              {showDangerousActions ? (
+                <div className={styles.spDangerActions}>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--danger ui-button--sm"
+                    onClick={() => setUserActiveMutation.mutate(!isUserActive)}
+                    disabled={isModerationPending}
+                  >
+                    {isUserActive ? text.deactivate : text.activate}
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--secondary ui-button--sm"
+                    onClick={() => setUserPremiumMutation.mutate(!isUserPremium)}
+                    disabled={isModerationPending}
+                  >
+                    {isUserPremium ? text.removePremium : text.makePremium}
+                  </button>
                 </div>
-                <div className={styles.detailRow}>
-                  <span>{text.supportAssistantSourceLabel}</span>
-                  <strong>{sourceLabel(conversation.source, text)}</strong>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>{text.supportAssignedTo}</span>
-                  <strong>
-                    {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
-                  </strong>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>{text.createdAtLabel}</span>
-                  <strong>{formatDateTime(conversation.createdAtUtc, locale)}</strong>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>{text.supportLastMessage}</span>
-                  <strong>
-                    {conversation.messages[conversation.messages.length - 1]?.body?.trim() ||
-                      text.supportNoMessages}
-                  </strong>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>{text.supportWaitingLabel}</span>
-                  <strong>{conversationSla.waitLabel}</strong>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>{locale === "ru" ? "Дата регистрации" : "Registration date"}</span>
-                  <strong>{formatDateTime(accountCreatedAt, locale)}</strong>
-                </div>
-              </div>
-            </SectionBlock>
+              ) : null}
+            </div>
+
           </div>
         ) : null}
 

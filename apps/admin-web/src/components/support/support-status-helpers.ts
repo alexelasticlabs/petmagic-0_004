@@ -69,11 +69,6 @@ export function getAvailableStatusActions(
           label: text.supportMarkWaitingForUserAction,
           variant: "primary",
         },
-        {
-          status: "New",
-          label: text.supportReopenConversationAction,
-          variant: "secondary",
-        },
         { status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" },
       ];
     case "WaitingForUser":
@@ -86,7 +81,7 @@ export function getAvailableStatusActions(
         },
       ];
     case "Closed":
-      return [{ status: "New", label: text.supportReopenConversationAction, variant: "primary" }];
+      return [{ status: "InProgress", label: text.supportReopenConversationAction, variant: "primary" }];
     default:
       return [];
   }

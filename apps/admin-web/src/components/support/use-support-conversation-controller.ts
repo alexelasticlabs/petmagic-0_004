@@ -517,7 +517,7 @@ export function useSupportConversationController({
 
   const accountCreatedAt = userQuery.data?.createdAtUtc ?? conversation?.createdAtUtc ?? null;
   const conversationWaitingSince =
-    conversation?.lastMessageAtUtc ?? conversation?.createdAtUtc ?? null;
+    conversation?.waitingSinceUtc ?? conversation?.lastMessageAtUtc ?? conversation?.createdAtUtc ?? null;
   const conversationSla = getConversationSla(
     conversationWaitingSince,
     locale,

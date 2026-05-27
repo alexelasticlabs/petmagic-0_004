@@ -372,6 +372,8 @@ export type AdminSupportMessage = {
   attachmentUploadErrorCode?: string | null;
   isRead: boolean;
   readAtUtc?: string | null;
+  deliveredAtUtc?: string | null;
+  isInternalNote: boolean;
   createdAtUtc: string;
 };
 
@@ -388,6 +390,10 @@ export type AdminSupportConversationSummary = {
   assistantScenario?: string | null;
   lastMessagePreview?: string | null;
   lastMessageAtUtc?: string | null;
+  lastMessageSenderType?: string | null;
+  waitingSinceUtc?: string | null;
+  waitingMinutes: number;
+  unreadForAdmin: boolean;
   userUnreadCount: number;
   adminUnreadCount: number;
   createdAtUtc: string;
@@ -395,6 +401,9 @@ export type AdminSupportConversationSummary = {
   resolvedAtUtc?: string | null;
   reopenUntilUtc?: string | null;
   closedAtUtc?: string | null;
+  closedByUserId?: string | null;
+  reopenedAtUtc?: string | null;
+  reopenedByUserId?: string | null;
   feedbackRating?: number | null;
   isReadOnly: boolean;
   canReopen: boolean;
@@ -419,14 +428,22 @@ export type AdminSupportConversation = {
   createdAtUtc: string;
   updatedAtUtc: string;
   lastMessageAtUtc?: string | null;
+  lastMessagePreview?: string | null;
+  lastMessageSenderType?: string | null;
+  waitingSinceUtc?: string | null;
+  waitingMinutes: number;
   resolvedAtUtc?: string | null;
   reopenUntilUtc?: string | null;
   closedAtUtc?: string | null;
+  closedByUserId?: string | null;
+  reopenedAtUtc?: string | null;
+  reopenedByUserId?: string | null;
   feedbackRating?: number | null;
   feedbackComment?: string | null;
   feedbackSubmittedAtUtc?: string | null;
   isReadOnly: boolean;
   canReopen: boolean;
+  availableActions: string[];
   messages: AdminSupportMessage[];
 };
 

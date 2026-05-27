@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import {
   formatClockTime,
   formatDateTime,
@@ -19,15 +19,11 @@ import {
   shortId,
   shouldRenderMessageBody,
 } from "@/components/support/support-conversation-helpers";
-import { SupportConversationSidePanel } from "@/components/support/support-conversation-side-panel";
+import { SupportActionsPanel } from "@/components/support/support-actions-panel";
+import { SupportInfoPanel } from "@/components/support/support-info-panel";
 import { SupportOptionGroup } from "@/components/support/support-option-group";
 import styles from "@/components/support/support-page.module.css";
-import {
-  priorityLabel,
-  sourceLabel,
-  statusHint,
-  statusLabel,
-} from "@/components/support/support-status-helpers";
+import { sourceLabel, statusHint, statusLabel, toneForStatus } from "@/components/support/support-status-helpers";
 import {
   statusOptions,
   type SupportQueueFilter,
@@ -53,87 +49,63 @@ type FullscreenImage = {
 
 export function SupportConversationPage({ locale, conversationId }: SupportConversationPageProps) {
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
-  const [showTemplates, setShowTemplates] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned">("all");
+  const [composerTab, setComposerTab] = useState<"reply" | "attachments">("reply");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const controller = useSupportConversationController({ locale, conversationId });
   const {
-    activeSidePanelTab,
-    accountCreatedAt,
-    activityTimeline,
-    analyticsQuery,
-    applyTemplate,
-    assignmentMutation,
     attachmentInputRef,
     attachmentPreviewUrl,
-    chatFacts,
     composerPlaceholder,
     composerValue,
     conversation,
     conversationQuery,
     conversationSla,
-    conversationTimeline,
-    destructiveStatusAction,
-    failedGenerations,
     filteredInboxItems,
-    filteredTemplates,
     hasComposerAttachment,
     inboxQuery,
-    isAssignedToCurrentAdmin,
     isSidePanelOpen,
-    isTemplateEditorOpen,
-    openTemplateEditor,
-    purchasesQuery,
     primaryStatusAction,
-    recentFailures,
-    recentUserPurchases,
-    lastActivityAtUtc,
-    lastUserPurchaseAtUtc,
     reply,
     resetSelectedAttachment,
     searchQuery,
-    selectedAttachment,
-    selectedTemplate,
     secondaryStatusActions,
+    selectedAttachment,
     sendMutation,
-    sessionUserId,
-    setUserActiveMutation,
-    setUserPremiumMutation,
-    setActiveSidePanelTab,
     setIsSidePanelOpen,
-    setIsTemplateEditorOpen,
     setQueueFilter,
     setReply,
     setSearchQuery,
     setSelectedAttachment,
-    setSelectedTemplateId,
-    setTemplateDraft,
-    setTemplateSearchQuery,
-    sidePanelDescription,
-    sidePanelTabs,
-    sidePanelTitle,
-    queueFilter,
-    subscriptionQuery,
     statusMutation,
-    templateDeleteMutation,
-    templateDraft,
-    templateSaveMutation,
-    templateSearchQuery,
-    templatesQuery,
     text,
     toast,
-    totalPurchases,
+    queueFilter,
     userDisplayName,
-    userQuery,
-    visibleTemplates,
-  } = useSupportConversationController({ locale, conversationId });
+  } = controller;
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
   const isConversationClosed = conversation?.status === "Closed";
+
+  const waitingCount = filteredInboxItems.filter(
+    (item) => item.status === "New" || item.status === "WaitingForUser"
+  ).length;
+  const unassignedCount = filteredInboxItems.filter((item) => !item.assignedAdminId).length;
+  const displayedInboxItems = filteredInboxItems.filter((item) => {
+    if (subFilter === "waiting") {
+      return item.status === "New" || item.status === "WaitingForUser";
+    }
+    if (subFilter === "unassigned") {
+      return !item.assignedAdminId;
+    }
+    return true;
+  });
   const reopenStatusAction =
-    primaryStatusAction?.status === "New"
+    primaryStatusAction?.status === "InProgress"
       ? primaryStatusAction
-      : (secondaryStatusActions.find((action) => action.status === "New") ?? null);
+      : (secondaryStatusActions.find((action) => action.status === "InProgress") ?? null);
   const readOnlyComposerTitle = isConversationClosed
     ? locale === "ru"
       ? "Диалог закрыт. Чтобы продолжить, переоткройте обращение."
@@ -158,7 +130,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
   }, [conversation?.messages.length]);
 
   const submitReply = () => {
-    setShowTemplates(false);
     sendMutation.mutate();
   };
 
@@ -334,14 +305,13 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
           </div>
 
           <div
-            className={`${styles.workspace} ${isSidePanelOpen ? styles.workspaceWithSidebar : styles.workspaceCompact}`}
+            className={`${styles.workspace} ${isSidePanelOpen ? styles.workspaceFullView : styles.workspaceCompact}`}
           >
-            <AdminCard className={styles.inboxPane}>
+            <div className={styles.inboxPaneFlat}>
               <div className={styles.paneTopbar}>
                 <div className={styles.paneTitleGroup}>
                   <span className={styles.paneEyebrow}>{text.supportTitle}</span>
                   <h2 className={styles.paneTitle}>{text.supportInboxTitle}</h2>
-                  <p className={styles.paneDescription}>{text.supportInboxDescription}</p>
                 </div>
                 <div className={styles.paneCountBadge}>{filteredInboxItems.length}</div>
               </div>
@@ -375,23 +345,51 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 </label>
               </div>
 
+              <div className={styles.queueSubFilters}>
+                <button
+                  type="button"
+                  className={
+                    subFilter === "all" ? styles.queueSubFilterActive : styles.queueSubFilter
+                  }
+                  onClick={() => setSubFilter("all")}
+                >
+                  {locale === "ru" ? "Все" : "All"} {filteredInboxItems.length}
+                </button>
+                <button
+                  type="button"
+                  className={
+                    subFilter === "waiting" ? styles.queueSubFilterActive : styles.queueSubFilter
+                  }
+                  onClick={() => setSubFilter("waiting")}
+                >
+                  {locale === "ru" ? "Ожидают" : "Waiting"} {waitingCount}
+                </button>
+                <button
+                  type="button"
+                  className={
+                    subFilter === "unassigned" ? styles.queueSubFilterActive : styles.queueSubFilter
+                  }
+                  onClick={() => setSubFilter("unassigned")}
+                >
+                  {locale === "ru" ? "Без ответств." : "Unassigned"} {unassignedCount}
+                </button>
+              </div>
+
               {inboxQuery.isLoading ? (
                 <AdminStateCard tone="info" title={text.loading} />
               ) : inboxQuery.isError ? (
                 <AdminStateCard tone="danger" title={text.supportLoadError} />
-              ) : filteredInboxItems.length === 0 ? (
+              ) : displayedInboxItems.length === 0 ? (
                 <AdminStateCard tone="info" title={text.supportEmpty} />
               ) : (
                 <div className={styles.list} role="list">
-                  {filteredInboxItems.map((item) => {
+                  {displayedInboxItems.map((item) => {
                     const itemSla = getConversationSla(
-                      item.lastMessageAtUtc ?? item.createdAtUtc,
+                      item.waitingSinceUtc ?? item.lastMessageAtUtc ?? item.createdAtUtc,
                       locale,
                       item.adminUnreadCount
                     );
                     const hasUnread = item.adminUnreadCount > 0;
-                    const assignedName =
-                      item.assignedAdminDisplayName?.trim() || text.supportUnassigned;
 
                     return (
                       <Link
@@ -411,46 +409,41 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                 className={`${styles.rowTitle} ${hasUnread ? styles.rowTitleUnread : ""}`}
                               >
                                 {item.userDisplayName?.trim() || item.userEmail}
+                                {hasUnread ? (
+                                  <span className={styles.unreadDotInline} aria-hidden="true" />
+                                ) : null}
                               </div>
                               <div className={styles.rowPreview}>
                                 <span>{item.lastMessagePreview || text.supportNoMessages}</span>
                               </div>
                             </div>
                           </div>
-                          <span className={styles.timePill}>
-                            {formatRelativeTime(item.lastMessageAtUtc ?? item.updatedAtUtc, locale)}
+                          <span className={styles.rowTime}>
+                            {item.lastMessageAtUtc
+                              ? formatClockTime(item.lastMessageAtUtc, locale)
+                              : formatRelativeTime(item.updatedAtUtc, locale)}
                           </span>
                         </div>
                         <div className={styles.rowSlaLine}>
                           <span
+                            className={styles[`statusDot_${item.status}` as keyof typeof styles]}
+                          />
+                          <span className={styles.rowStatusLabel}>
+                            {statusLabel(item.status, text)}
+                          </span>
+                          <span className={styles.rowSlaSep}>·</span>
+                          <span
                             className={`${styles.slaPill} ${styles[`slaPill_${itemSla.level}`]}`}
                           >
-                            {itemSla.primaryLabel}
+                            {itemSla.waitLabel}
                           </span>
-                          <div className={styles.rowMetaGroup}>
-                            {hasUnread ? (
-                              <span className={styles.unreadDot}>{item.adminUnreadCount}</span>
-                            ) : null}
-                            <span className={styles.rowSecondaryMeta}>
-                              {statusLabel(item.status, text)}
-                            </span>
-                            <span className={styles.rowSecondaryMeta}>
-                              {priorityLabel(item.priority, text)}
-                            </span>
-                            <span className={styles.rowSecondaryMeta}>
-                              {sourceLabel(item.source, text)}
-                            </span>
-                            <span className={styles.rowSecondaryMeta} title={assignedName}>
-                              {assignedName}
-                            </span>
-                          </div>
                         </div>
                       </Link>
                     );
                   })}
                 </div>
               )}
-            </AdminCard>
+            </div>
 
             <div
               className={styles.chatPane}
@@ -501,36 +494,55 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                   </div>
                 ) : null}
                 <div className={styles.chatTopbar}>
-                  <div className={styles.chatIdentityCompact}>
-                    <div className={styles.chatTitleRow}>
-                      <strong className={styles.chatUserName}>{userDisplayName}</strong>
-                    </div>
-                    <div className={styles.chatMetaLine}>
-                      <span>{conversation.userEmail}</span>
-                      <span>•</span>
-                      <span>{shortId(conversation.initiatorUserId)}</span>
-                    </div>
-                    <div className={styles.chatStatusLine}>
-                      <span>{statusLabel(conversation.status, text)}</span>
-                      <span>•</span>
-                      <span>{priorityLabel(conversation.priority, text)}</span>
-                      <span>•</span>
-                      <span>{sourceLabel(conversation.source, text)}</span>
-                      <span>•</span>
-                      <span>
-                        {locale === "ru" ? "Назначен:" : "Assigned:"}{" "}
-                        {conversation.assignedAdminDisplayName?.trim() ||
-                          (locale === "ru" ? "Не назначен" : "Unassigned")}
+                  <div className={styles.chatHeaderTop}>
+                    <div className={styles.chatHeaderIdentity}>
+                      <span className={styles.avatarSm} aria-hidden="true">
+                        {initialsFor(userDisplayName)}
                       </span>
+                      <div>
+                        <div className={styles.chatHeaderNameRow}>
+                          <strong>{userDisplayName}</strong>
+                          <AdminBadge tone={toneForStatus(conversation.status)}>
+                            {statusLabel(conversation.status, text)}
+                          </AdminBadge>
+                        </div>
+                        <span className={styles.chatHeaderSubtext}>
+                          {conversation.userEmail} · #{shortId(conversation.initiatorUserId)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className={styles.chatHeaderAside}>
-                    <span
-                      className={`${styles.slaPill} ${styles[`slaPill_${conversationSla.level}`]}`}
+                    <button
+                      type="button"
+                      className={styles.chatHeaderMoreBtn}
+                      onClick={() => setIsSidePanelOpen((current) => !current)}
+                      title={
+                        isSidePanelOpen ? text.supportClosePanelAction : text.supportOpenPanelAction
+                      }
                     >
-                      {conversationSla.waitLabel}
+                      ···
+                    </button>
+                  </div>
+                  <div className={styles.chatMetaRow}>
+                    <span>{sourceLabel(conversation.source, text)}</span>
+                    <span className={styles.chatMetaDivider}>·</span>
+                    <span>
+                      {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
                     </span>
+                    {conversationSla.waitLabel ? (
+                      <>
+                        <span className={styles.chatMetaDivider}>·</span>
+                        <span
+                          className={`${styles.chatMetaSla} ${
+                            conversationSla.level === "critical" ||
+                            conversationSla.level === "risk"
+                              ? styles.chatMetaSlaUrgent
+                              : ""
+                          }`}
+                        >
+                          ⏱ {conversationSla.waitLabel}
+                        </span>
+                      </>
+                    ) : null}
                   </div>
                 </div>
 
@@ -731,26 +743,30 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     </div>
                   ) : (
                     <>
-                      {showTemplates && visibleTemplates.length > 0 ? (
-                        <div className={styles.composerTemplateRail}>
-                          <span className={styles.subtle}>{text.supportQuickRepliesLabel}</span>
-                          <div className={`${styles.templateList} ${styles.templateListCompact}`}>
-                            {visibleTemplates.map((template) => (
-                              <Button
-                                key={template.templateId}
-                                size="sm"
-                                variant="ghost"
-                                className={styles.quickTemplateButton}
-                                disabled={isConversationReadOnly}
-                                onClick={() => applyTemplate(template)}
-                              >
-                                {`✓ ${template.title}`}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
+                      <div className={styles.composerTabBar}>
+                        <button
+                          type="button"
+                          className={
+                            composerTab === "reply"
+                              ? styles.composerTabActive
+                              : styles.composerTab
+                          }
+                          onClick={() => setComposerTab("reply")}
+                        >
+                          {locale === "ru" ? "⤵ Ответ" : "⤵ Reply"}
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            composerTab === "attachments"
+                              ? styles.composerTabActive
+                              : styles.composerTab
+                          }
+                          onClick={() => setComposerTab("attachments")}
+                        >
+                          {locale === "ru" ? "📎 Вложения" : "📎 Attachments"}
+                        </button>
+                      </div>
                       <input
                         ref={attachmentInputRef}
                         type="file"
@@ -761,33 +777,19 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                           setSelectedAttachment(nextFile);
                         }}
                       />
-                      <div className={styles.composerAttachmentBar}>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => attachmentInputRef.current?.click()}
-                          disabled={sendMutation.isPending || isConversationReadOnly}
-                        >
-                          {text.chooseFile}
-                        </Button>
-                        {visibleTemplates.length > 0 ? (
+                      {composerTab === "attachments" ? (
+                        <div className={styles.composerAttachmentBar}>
                           <Button
-                            variant="ghost"
+                            variant="secondary"
                             size="sm"
-                            onClick={() => setShowTemplates((v) => !v)}
-                            disabled={isConversationReadOnly}
+                            onClick={() => attachmentInputRef.current?.click()}
+                            disabled={sendMutation.isPending || isConversationReadOnly}
                           >
-                            {showTemplates
-                              ? locale === "ru"
-                                ? "⚡ Скрыть"
-                                : "⚡ Hide"
-                              : locale === "ru"
-                                ? "⚡ Шаблоны"
-                                : "⚡ Templates"}
+                            {text.chooseFile}
                           </Button>
-                        ) : null}
-                        <span className={styles.subtle}>{text.supportAttachmentHint}</span>
-                      </div>
+                          <span className={styles.subtle}>{text.supportAttachmentHint}</span>
+                        </div>
+                      ) : null}
                       {selectedAttachment ? (
                         <div className={styles.attachmentPreviewCard}>
                           {attachmentPreviewUrl ? (
@@ -845,29 +847,27 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                         </div>
                       ) : null}
 
-                      <textarea
-                        className={styles.textarea}
-                        value={composerValue}
-                        onChange={(event) => setReply(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (
-                            event.key === "Enter" &&
-                            !event.shiftKey &&
-                            !isConversationReadOnly &&
-                            !sendMutation.isPending &&
-                            (reply.trim() || hasComposerAttachment)
-                          ) {
-                            event.preventDefault();
-                            submitReply();
-                          }
-                        }}
-                        placeholder={
-                          isConversationReadOnly
-                            ? statusHint(conversation.status, text)
-                            : composerPlaceholder
-                        }
-                        disabled={isConversationReadOnly}
-                      />
+                      {composerTab === "reply" ? (
+                        <textarea
+                          className={styles.textarea}
+                          value={composerValue}
+                          onChange={(event) => setReply(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key === "Enter" &&
+                              !event.shiftKey &&
+                              !isConversationReadOnly &&
+                              !sendMutation.isPending &&
+                              (reply.trim() || hasComposerAttachment)
+                            ) {
+                              event.preventDefault();
+                              submitReply();
+                            }
+                          }}
+                          placeholder={composerPlaceholder}
+                          disabled={isConversationReadOnly}
+                        />
+                      ) : null}
 
                       <div className={styles.composerActions}>
                         <div className={styles.rowMetaGroup}>
@@ -892,90 +892,12 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
               </AdminCard>
             </div>
 
-            <SupportConversationSidePanel
-              locale={locale}
-              onJumpToMessage={jumpToMessage}
-              onOpenAttachmentPreview={(message) =>
-                setFullscreenImage({
-                  url: message.attachmentUrl!,
-                  fileName: message.attachmentFileName,
-                  messageId: message.messageId,
-                  senderDisplayName: message.senderDisplayName,
-                  createdAtUtc: message.createdAtUtc,
-                  fileSizeBytes: message.attachmentFileSizeBytes,
-                })
-              }
-              controller={{
-                activeSidePanelTab,
-                accountCreatedAt,
-                activityTimeline,
-                analyticsQuery,
-                applyTemplate,
-                assignmentMutation,
-                attachmentInputRef,
-                attachmentPreviewUrl,
-                chatFacts,
-                composerPlaceholder,
-                composerValue,
-                conversation,
-                conversationQuery,
-                conversationSla,
-                conversationTimeline,
-                destructiveStatusAction,
-                failedGenerations,
-                filteredInboxItems,
-                filteredTemplates,
-                hasComposerAttachment,
-                inboxQuery,
-                isAssignedToCurrentAdmin,
-                isSidePanelOpen,
-                isTemplateEditorOpen,
-                openTemplateEditor,
-                primaryStatusAction,
-                purchasesQuery,
-                recentUserPurchases,
-                lastActivityAtUtc,
-                lastUserPurchaseAtUtc,
-                recentFailures,
-                reply,
-                resetSelectedAttachment,
-                searchQuery,
-                selectedAttachment,
-                selectedTemplate,
-                secondaryStatusActions,
-                sendMutation,
-                sessionUserId,
-                setUserActiveMutation,
-                setUserPremiumMutation,
-                setActiveSidePanelTab,
-                setIsSidePanelOpen,
-                setIsTemplateEditorOpen,
-                setQueueFilter,
-                setReply,
-                setSearchQuery,
-                setSelectedAttachment,
-                setSelectedTemplateId,
-                setTemplateDraft,
-                setTemplateSearchQuery,
-                sidePanelDescription,
-                sidePanelTabs,
-                sidePanelTitle,
-                queueFilter,
-                subscriptionQuery,
-                statusMutation,
-                templateDeleteMutation,
-                templateDraft,
-                templateSaveMutation,
-                templateSearchQuery,
-                templatesQuery,
-                text,
-                toast,
-                totalPurchases,
-                userDisplayName,
-                userQuery,
-                visibleTemplates,
-              }}
-            />
+            {isSidePanelOpen ? (
+              <>
+                <SupportInfoPanel locale={locale} controller={controller} />
+                <SupportActionsPanel locale={locale} controller={controller} />
+              </>
+            ) : null}
           </div>
           {fullscreenImage ? (
             <div

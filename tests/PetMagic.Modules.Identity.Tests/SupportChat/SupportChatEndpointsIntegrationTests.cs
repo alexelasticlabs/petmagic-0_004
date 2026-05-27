@@ -137,6 +137,73 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task AdminTicketEndpoints_ShouldExposeQueueActionsAndContext()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var adminClient = application.CreateClient(AdminId, "Admin");
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Queue action case", SupportConversationPriority.High));
+
+        var tickets = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
+            adminClient,
+            "/api/admin/support/tickets?status=New&source=MobileChat&page=1&pageSize=10");
+
+        var ticket = Assert.Single(tickets);
+        Assert.Equal(created.ConversationId, ticket.ConversationId);
+        Assert.Equal("MobileChat", ticket.Source);
+        Assert.Equal("Queue action case", ticket.LastMessagePreview);
+        Assert.Equal("User", ticket.LastMessageSenderType);
+        Assert.True(ticket.UnreadForAdmin);
+
+        var assigned = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
+
+        Assert.Equal("InProgress", assigned.Status);
+        Assert.Equal(AdminId, assigned.AssignedAdminId);
+        Assert.Contains(assigned.Messages, message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
+
+        var waiting = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/mark-waiting-for-user");
+
+        Assert.Equal("WaitingForUser", waiting.Status);
+        Assert.Contains(waiting.AvailableActions, action => action == "mark-in-progress");
+
+        var closed = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/close");
+
+        Assert.Equal("Closed", closed.Status);
+        Assert.True(closed.IsReadOnly);
+        Assert.Contains(closed.AvailableActions, action => action == "reopen");
+
+        using var blockedReply = await adminClient.PostAsJsonAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/messages",
+            new SendSupportMessageRequest("Reply while closed"));
+        Assert.Equal(HttpStatusCode.Conflict, blockedReply.StatusCode);
+
+        var reopened = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/reopen");
+
+        Assert.Equal("InProgress", reopened.Status);
+        Assert.Contains(reopened.Messages, message => message.SenderType == "System" && message.Body == "Ticket reopened by operator");
+
+        var context = await GetFromJsonAsync<SupportTicketContextResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/context");
+
+        Assert.Equal("Free", context.Plan);
+        Assert.Equal("Inactive", context.PremiumStatus);
+    }
+
+    [Fact]
     public async Task AdminReplyStatusAndReadEndpoints_ShouldRoundTripConversationState()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -201,7 +268,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal(0, afterReopen.UserUnreadCount);
         Assert.Contains(
             afterReopen.Messages,
-            message => message.SenderType == "System" && message.Body == "Ticket reopened by user message.");
+            message => message.SenderType == "System" && message.Body == "Ticket reopened by user message");
     }
 
     [Fact]
@@ -269,8 +336,8 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("New", conversation.Status);
         var reopenedEvent = Assert.Single(
             conversation.Messages.Where(message =>
-                message.SenderType == "System" && message.Body == "Ticket reopened by user message."));
-        Assert.Equal("Ticket reopened by user message.", reopenedEvent.Body);
+                message.SenderType == "System" && message.Body == "Ticket reopened by user message"));
+        Assert.Equal("Ticket reopened by user message", reopenedEvent.Body);
     }
 
     [Fact]
@@ -583,6 +650,13 @@ public sealed class SupportChatEndpointsIntegrationTests
     private static async Task<TResponse> PostAsJsonAsync<TResponse>(HttpClient client, string url, object payload)
     {
         using var response = await client.PostAsJsonAsync(url, payload);
+        await AssertSuccessAsync(response);
+        return (await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions))!;
+    }
+
+    private static async Task<TResponse> PostEmptyAsync<TResponse>(HttpClient client, string url)
+    {
+        using var response = await client.PostAsync(url, content: null);
         await AssertSuccessAsync(response);
         return (await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions))!;
     }

@@ -109,7 +109,7 @@ public sealed class SupportChatServiceTests
         Assert.Equal(1, detail.Value.UserUnreadCount);
         Assert.Equal(1, detail.Value.AdminUnreadCount);
         Assert.Equal(1, detail.Value.Messages.Count(message => message.SenderType == "SupportAgent"));
-        Assert.Contains(detail.Value.Messages, message => message.SenderType == "System" && message.Body == "Operator replied to user.");
+        Assert.Contains(detail.Value.Messages, message => message.SenderType == "System" && message.Body == "Support replied");
         Assert.Contains(store.Notifications, x => x.ConversationId == conversationId);
     }
 

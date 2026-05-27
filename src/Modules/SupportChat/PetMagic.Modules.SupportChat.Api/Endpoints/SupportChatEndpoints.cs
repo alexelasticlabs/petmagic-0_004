@@ -61,6 +61,21 @@ public static class SupportChatEndpoints
         adminGroup.MapPost("/conversations/{conversationId:guid}/read", MarkAdminReadAsync);
         adminGroup.MapPut("/conversations/{conversationId:guid}/status", UpdateConversationStatusAsync);
         adminGroup.MapPut("/conversations/{conversationId:guid}/assignment", AssignConversationAsync);
+        adminGroup.MapGet("/tickets", ListAdminInboxAsync);
+        adminGroup.MapGet("/tickets/{conversationId:guid}", GetAdminConversationAsync);
+        adminGroup.MapGet("/tickets/{conversationId:guid}/context", GetAdminTicketContextAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/assign-to-me", AssignConversationToMeAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/unassign", UnassignConversationAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/mark-waiting-for-user", MarkConversationWaitingForUserAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/mark-in-progress", MarkConversationInProgressAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/close", CloseAdminConversationAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/reopen", ReopenAdminConversationAsync);
+        adminGroup.MapPost("/tickets/{conversationId:guid}/messages", SendAdminMessageAsync)
+            .RequireRateLimiting("support-chat");
+        adminGroup.MapPost("/tickets/{conversationId:guid}/attachments", SendAdminAttachmentAsync)
+            .DisableAntiforgery()
+            .RequireRateLimiting("support-chat");
+        adminGroup.MapPost("/tickets/{conversationId:guid}/read", MarkAdminReadAsync);
         adminGroup.MapGet("/templates", ListReplyTemplatesAsync);
         adminGroup.MapPost("/templates", CreateReplyTemplateAsync);
         adminGroup.MapPut("/templates/{templateId:guid}", UpdateReplyTemplateAsync);
@@ -831,6 +846,13 @@ public static class SupportChatEndpoints
         HttpContext httpContext,
         [FromQuery] string? status,
         [FromQuery] string? assignment,
+        [FromQuery] Guid? assignedTo,
+        [FromQuery] string? source,
+        [FromQuery] string? priority,
+        [FromQuery] string? search,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery] string? sort,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -848,11 +870,13 @@ public static class SupportChatEndpoints
                 detail: "Support inbox assignment filter is not supported.");
         }
 
+        var requestedPage = page is null or <= 0 ? 1 : page.Value;
+        var requestedPageSize = pageSize is null or <= 0 ? 50 : pageSize.Value;
         var query = normalizedAssignment switch
         {
-            "mine" => new ListAdminSupportInboxQuery(status, AssignedAdminId: userId),
-            "unassigned" => new ListAdminSupportInboxQuery(status, UnassignedOnly: true),
-            _ => new ListAdminSupportInboxQuery(status)
+            "mine" => new ListAdminSupportInboxQuery(status, AssignedAdminId: userId, Source: source, Priority: priority, Search: search, Page: requestedPage, PageSize: requestedPageSize, Sort: sort),
+            "unassigned" => new ListAdminSupportInboxQuery(status, UnassignedOnly: true, Source: source, Priority: priority, Search: search, Page: requestedPage, PageSize: requestedPageSize, Sort: sort),
+            _ => new ListAdminSupportInboxQuery(status, AssignedAdminId: assignedTo, Source: source, Priority: priority, Search: search, Page: requestedPage, PageSize: requestedPageSize, Sort: sort)
         };
 
         var result = await service.ListAdminInboxAsync(query, cancellationToken);
@@ -1001,6 +1025,143 @@ public static class SupportChatEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<SupportTicketContextResponse>, ProblemHttpResult>> GetAdminTicketContextAsync(
+        [FromRoute] Guid conversationId,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminTicketContextAsync(conversationId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> AssignConversationToMeAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var result = await service.AssignConversationAsync(
+            new AssignSupportConversationCommand(conversationId, userId, userId),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> UnassignConversationAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var result = await service.AssignConversationAsync(
+            new AssignSupportConversationCommand(conversationId, userId, null),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> MarkConversationWaitingForUserAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        return UpdateAdminConversationStatusAsync(
+            httpContext,
+            conversationId,
+            SupportConversationStatus.WaitingForUser,
+            service,
+            cancellationToken);
+    }
+
+    private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> MarkConversationInProgressAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        return UpdateAdminConversationStatusAsync(
+            httpContext,
+            conversationId,
+            SupportConversationStatus.InProgress,
+            service,
+            cancellationToken);
+    }
+
+    private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> CloseAdminConversationAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        return UpdateAdminConversationStatusAsync(
+            httpContext,
+            conversationId,
+            SupportConversationStatus.Closed,
+            service,
+            cancellationToken);
+    }
+
+    private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> ReopenAdminConversationAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        return UpdateAdminConversationStatusAsync(
+            httpContext,
+            conversationId,
+            SupportConversationStatus.InProgress,
+            service,
+            cancellationToken);
+    }
+
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> UpdateAdminConversationStatusAsync(
+        HttpContext httpContext,
+        Guid conversationId,
+        SupportConversationStatus status,
+        ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var result = await service.UpdateConversationStatusAsync(
+            new UpdateSupportConversationStatusCommand(conversationId, userId, status),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<IReadOnlyList<SupportReplyTemplateResponse>>, ProblemHttpResult>> ListReplyTemplatesAsync(
         [FromServices] ISupportReplyTemplateCatalogService service,
         CancellationToken cancellationToken)
@@ -1107,6 +1268,7 @@ public static class SupportChatEndpoints
             "support.message_not_found" => StatusCodes.Status404NotFound,
             "support.template_not_found" => StatusCodes.Status404NotFound,
             "support.forbidden" => StatusCodes.Status403Forbidden,
+            "support.status_transition_invalid" => StatusCodes.Status400BadRequest,
             "support.invalid_subject" => StatusCodes.Status401Unauthorized,
             "support.attachment_invalid_upload" => StatusCodes.Status400BadRequest,
             "support.attachment_content_type_not_allowed" => StatusCodes.Status400BadRequest,

@@ -15,7 +15,13 @@ public sealed record OpenSupportConversationCommand(
 public sealed record ListAdminSupportInboxQuery(
     string? Status,
     Guid? AssignedAdminId = null,
-    bool UnassignedOnly = false);
+    bool UnassignedOnly = false,
+    string? Source = null,
+    string? Priority = null,
+    string? Search = null,
+    int Page = 1,
+    int PageSize = 50,
+    string? Sort = null);
 
 public sealed record SendSupportMessageCommand(
     Guid ConversationId,
@@ -122,6 +128,10 @@ public sealed record SupportConversationSummaryResponse(
     string? AssistantScenario,
     string? LastMessagePreview,
     DateTime? LastMessageAtUtc,
+    string? LastMessageSenderType,
+    DateTime? WaitingSinceUtc,
+    int WaitingMinutes,
+    bool UnreadForAdmin,
     int UserUnreadCount,
     int AdminUnreadCount,
     DateTime CreatedAtUtc,
@@ -129,6 +139,9 @@ public sealed record SupportConversationSummaryResponse(
     DateTime? ResolvedAtUtc,
     DateTime? ReopenUntilUtc,
     DateTime? ClosedAtUtc,
+    Guid? ClosedByUserId,
+    DateTime? ReopenedAtUtc,
+    Guid? ReopenedByUserId,
     int? FeedbackRating,
     bool IsReadOnly,
     bool CanReopen);
@@ -149,6 +162,8 @@ public sealed record SupportMessageResponse(
     string? AttachmentUploadErrorCode,
     bool IsRead,
     DateTime? ReadAtUtc,
+    DateTime? DeliveredAtUtc,
+    bool IsInternalNote,
     DateTime CreatedAtUtc);
 
 public sealed record SupportConversationDetailResponse(
@@ -170,15 +185,35 @@ public sealed record SupportConversationDetailResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     DateTime? LastMessageAtUtc,
+    string? LastMessagePreview,
+    string? LastMessageSenderType,
+    DateTime? WaitingSinceUtc,
+    int WaitingMinutes,
     DateTime? ResolvedAtUtc,
     DateTime? ReopenUntilUtc,
     DateTime? ClosedAtUtc,
+    Guid? ClosedByUserId,
+    DateTime? ReopenedAtUtc,
+    Guid? ReopenedByUserId,
     int? FeedbackRating,
     string? FeedbackComment,
     DateTime? FeedbackSubmittedAtUtc,
     bool IsReadOnly,
     bool CanReopen,
+    IReadOnlyList<string> AvailableActions,
     IReadOnlyList<SupportMessageResponse> Messages);
+
+public sealed record SupportTicketContextResponse(
+    int TokenBalance,
+    string Plan,
+    string PremiumStatus,
+    object? LastPayment,
+    Guid? LinkedGeneration,
+    object? LastGeneration,
+    string? LastGenerationError,
+    int GenerationErrorsCount,
+    Guid? RelatedPaymentId,
+    Guid? RelatedSubscriptionId);
 
 public sealed record SupportReplyTemplateResponse(
     Guid TemplateId,

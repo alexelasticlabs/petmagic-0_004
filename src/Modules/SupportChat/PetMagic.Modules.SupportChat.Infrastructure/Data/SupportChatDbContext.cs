@@ -24,11 +24,14 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.Priority).HasConversion<int>().IsRequired();
             entity.Property(x => x.Source).HasConversion<int>().IsRequired();
             entity.Property(x => x.AssistantScenario).HasMaxLength(64);
+            entity.Property(x => x.LastMessagePreview).HasMaxLength(280);
+            entity.Property(x => x.LastMessageSenderType).HasConversion<int>();
             entity.Property(x => x.FeedbackComment).HasMaxLength(1000);
             entity.HasIndex(x => x.InitiatorUserId).IsUnique();
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
             entity.HasIndex(x => new { x.AssignedAdminId, x.Status });
             entity.HasIndex(x => x.LastMessageAtUtc);
+            entity.HasIndex(x => x.WaitingSinceUtc);
             entity.HasIndex(x => x.ReopenUntilUtc);
         });
 
@@ -43,6 +46,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.AttachmentContentType).HasMaxLength(128);
             entity.Property(x => x.AttachmentUploadStatus);
             entity.Property(x => x.AttachmentUploadErrorCode).HasMaxLength(128);
+            entity.Property(x => x.IsInternalNote).HasDefaultValue(false);
             entity.HasIndex(x => new { x.ConversationId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.ConversationId, x.IsFromAdmin, x.ReadAtUtc });
             entity.HasOne(x => x.Conversation)

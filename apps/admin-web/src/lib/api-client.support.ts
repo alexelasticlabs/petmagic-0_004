@@ -32,7 +32,7 @@ export async function fetchSupportInbox(
   const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
 
   return cachedGet(cacheKey, cachedSupportInbox, () =>
-    apiRequest<AdminSupportConversationSummary[]>(`/api/admin/support/conversations${query}`, {
+    apiRequest<AdminSupportConversationSummary[]>(`/api/admin/support/tickets${query}`, {
       method: "GET",
     })
   );
@@ -42,7 +42,7 @@ export async function fetchSupportConversation(
   conversationId: string
 ): Promise<AdminSupportConversation> {
   return cachedGet(`support-conversation:${conversationId}`, cachedSupportConversations, () =>
-    apiRequest<AdminSupportConversation>(`/api/admin/support/conversations/${conversationId}`, {
+    apiRequest<AdminSupportConversation>(`/api/admin/support/tickets/${conversationId}`, {
       method: "GET",
     })
   );
@@ -53,7 +53,7 @@ export async function sendSupportMessage(
   body: string
 ): Promise<AdminSupportMessage> {
   const message = await apiRequest<AdminSupportMessage>(
-    `/api/admin/support/conversations/${conversationId}/messages`,
+    `/api/admin/support/tickets/${conversationId}/messages`,
     {
       method: "POST",
       body: JSON.stringify({ body }),
@@ -78,7 +78,7 @@ export async function sendSupportAttachment(
   formData.append("file", file);
 
   const message = await apiRequest<AdminSupportMessage>(
-    `/api/admin/support/conversations/${conversationId}/attachments`,
+    `/api/admin/support/tickets/${conversationId}/attachments`,
     {
       method: "POST",
       body: formData,
@@ -90,7 +90,7 @@ export async function sendSupportAttachment(
 }
 
 export async function markSupportConversationRead(conversationId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/support/conversations/${conversationId}/read`, {
+  await apiRequest<void>(`/api/admin/support/tickets/${conversationId}/read`, {
     method: "POST",
   });
 
@@ -101,12 +101,17 @@ export async function updateSupportConversationStatus(
   conversationId: string,
   status: SupportConversationStatus
 ): Promise<AdminSupportConversation> {
+  const actionPath =
+    status === "WaitingForUser"
+      ? "mark-waiting-for-user"
+      : status === "InProgress"
+        ? "mark-in-progress"
+        : status === "Closed"
+          ? "close"
+          : "mark-in-progress";
   const conversation = await apiRequest<AdminSupportConversation>(
-    `/api/admin/support/conversations/${conversationId}/status`,
-    {
-      method: "PUT",
-      body: JSON.stringify({ status }),
-    }
+    `/api/admin/support/tickets/${conversationId}/${actionPath}`,
+    { method: "POST" }
   );
 
   clearSupportCaches(conversationId);
@@ -118,11 +123,10 @@ export async function assignSupportConversation(
   assignedAdminId?: string | null
 ): Promise<AdminSupportConversation> {
   const conversation = await apiRequest<AdminSupportConversation>(
-    `/api/admin/support/conversations/${conversationId}/assignment`,
-    {
-      method: "PUT",
-      body: JSON.stringify({ assignedAdminId: assignedAdminId ?? null }),
-    }
+    assignedAdminId
+      ? `/api/admin/support/tickets/${conversationId}/assign-to-me`
+      : `/api/admin/support/tickets/${conversationId}/unassign`,
+    { method: "POST" }
   );
 
   clearSupportCaches(conversationId);

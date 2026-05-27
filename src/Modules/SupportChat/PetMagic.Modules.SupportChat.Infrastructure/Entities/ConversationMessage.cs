@@ -30,6 +30,10 @@ public sealed class ConversationMessage
 
     public DateTime? ReadAtUtc { get; set; }
 
+    public DateTime? DeliveredAtUtc { get; set; }
+
+    public bool IsInternalNote { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public SupportConversation Conversation { get; set; } = null!;
