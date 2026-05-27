@@ -104,6 +104,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
         ),
       ),
+      GoRoute(
+        path: PremiumPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: PremiumPage()),
+      ),
       ShellRoute(
         builder: (context, state, child) =>
             PetMagicShell(location: state.uri.path, child: child),
@@ -150,11 +155,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: RewardsPage.routePath,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: RewardsPage()),
-          ),
-          GoRoute(
-            path: PremiumPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: PremiumPage()),
           ),
           GoRoute(
             path: ProfileSettingsPage.routePath,

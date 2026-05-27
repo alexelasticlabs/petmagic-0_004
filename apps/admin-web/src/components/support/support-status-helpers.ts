@@ -71,6 +71,7 @@ export function getAvailableStatusActions(
   switch (status) {
     case "Open":
       return [
+        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
         {
           status: "WaitingForSupport",
           label: text.supportMarkWaitingForSupportAction,
@@ -79,37 +80,36 @@ export function getAvailableStatusActions(
         {
           status: "WaitingForUser",
           label: text.supportMarkWaitingForUserAction,
-          variant: "primary",
+          variant: "secondary",
         },
         { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
       ];
     case "InProgress":
     case "WaitingForUser":
       return [
-        { status: "Resolved", label: text.supportResolveConversationAction, variant: "primary" },
+        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
+        { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
         {
           status: "WaitingForSupport",
           label: text.supportMarkWaitingForSupportAction,
           variant: "secondary",
         },
         { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
       ];
     case "WaitingForSupport":
       return [
+        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
         {
           status: "WaitingForUser",
           label: text.supportMarkWaitingForUserAction,
-          variant: "primary",
+          variant: "secondary",
         },
         { status: "Resolved", label: text.supportResolveConversationAction, variant: "secondary" },
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
       ];
     case "Resolved":
       return [
+        { status: "Closed", label: text.supportCloseConversationAction, variant: "primary" },
         { status: "Open", label: text.supportReopenConversationAction, variant: "secondary" },
-        { status: "Closed", label: text.supportCloseConversationAction, variant: "danger" },
       ];
     case "Closed":
       return [{ status: "Open", label: text.supportReopenConversationAction, variant: "primary" }];
@@ -120,6 +120,8 @@ export function getAvailableStatusActions(
 
 export function priorityLabel(priority: string, text: Dictionary) {
   switch (priority.toLowerCase()) {
+    case "critical":
+      return text.supportPriorityCritical;
     case "high":
       return text.supportPriorityHigh;
     case "low":
@@ -131,8 +133,10 @@ export function priorityLabel(priority: string, text: Dictionary) {
 
 export function priorityTone(priority: string) {
   switch (priority.toLowerCase()) {
-    case "high":
+    case "critical":
       return "danger" as const;
+    case "high":
+      return "warning" as const;
     case "low":
       return "neutral" as const;
     default:

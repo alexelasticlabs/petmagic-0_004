@@ -1,11 +1,16 @@
+import Image from "next/image";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { AdminBadge, AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
 import {
   formatAccountAge,
   formatDateTime,
+  formatFileSize,
   formatMoney,
   formatRelativeTime,
+  hasAttachment,
+  hasImageAttachment,
   initialsFor,
   shortId,
 } from "@/components/support/support-conversation-helpers";
@@ -16,70 +21,81 @@ import {
 } from "@/components/support/support-conversation-ui-primitives";
 import styles from "@/components/support/support-page.module.css";
 import {
-  statusHint,
+  priorityLabel,
   statusLabel,
   toneForGeneration,
   toneForStatus,
 } from "@/components/support/support-status-helpers";
-import {
-  emptyTemplateDraft,
-  useSupportConversationController,
-} from "@/components/support/use-support-conversation-controller";
+import { useSupportConversationController } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
+import { type AdminSupportMessage } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 
 type SupportConversationSidePanelProps = {
   locale: Locale;
   controller: ReturnType<typeof useSupportConversationController>;
+  onJumpToMessage?: (messageId: string) => void;
+  onOpenAttachmentPreview?: (message: AdminSupportMessage) => void;
+};
+
+type ResponderState = {
+  label: string;
+  tone: "success" | "danger" | "neutral";
 };
 
 export function SupportConversationSidePanel({
   locale,
   controller,
+  onJumpToMessage,
+  onOpenAttachmentPreview,
 }: SupportConversationSidePanelProps) {
+  const [showAdvancedActions, setShowAdvancedActions] = useState(false);
+  const [showResolveConfirm, setShowResolveConfirm] = useState(false);
+
   const {
     activeSidePanelTab,
-    activityTimeline,
+    accountCreatedAt,
     analyticsQuery,
-    applyTemplate,
     assignmentMutation,
     conversation,
     conversationTimeline,
     destructiveStatusAction,
     failedGenerations,
-    filteredTemplates,
     isAssignedToCurrentAdmin,
     isSidePanelOpen,
-    isTemplateEditorOpen,
-    openTemplateEditor,
+    purchasesQuery,
     primaryStatusAction,
     recentFailures,
-    selectedTemplate,
-    secondaryStatusActions,
+    recentUserPurchases,
+    lastActivityAtUtc,
     sessionUserId,
+    secondaryStatusActions,
     setActiveSidePanelTab,
-    setIsTemplateEditorOpen,
-    setSelectedTemplateId,
-    setTemplateDraft,
-    setTemplateSearchQuery,
     sidePanelDescription,
     sidePanelTabs,
     sidePanelTitle,
-    templateDeleteMutation,
-    templateDraft,
-    templateSaveMutation,
-    templateSearchQuery,
-    templatesQuery,
+    statusMutation,
     text,
     totalPurchases,
     userDisplayName,
     userQuery,
-    statusMutation,
   } = controller;
+
+  const attachmentItems = useMemo(
+    () =>
+      (conversation?.messages ?? [])
+        .filter((message) => hasAttachment(message))
+        .slice()
+        .reverse(),
+    [conversation?.messages]
+  );
 
   if (!isSidePanelOpen || !conversation) {
     return null;
   }
+
+  const responderState = getResponderState(conversation.status, locale);
+  const hasAdvancedActions = secondaryStatusActions.length > 0 || Boolean(destructiveStatusAction);
 
   return (
     <div className={styles.sidePane}>
@@ -106,19 +122,10 @@ export function SupportConversationSidePanel({
           </div>
         </div>
 
-        {activeSidePanelTab === "profile" ? (
+        {activeSidePanelTab === "user" ? (
           <div className={styles.sidePanelContent}>
             <div className={styles.statusOverviewCard}>
               <div className={styles.statusOverviewHeader}>
-                <div className={styles.statusOverviewCopy}>
-                  <span className={styles.paneEyebrow}>{text.supportStatusWorkflowTitle}</span>
-                  <strong className={styles.statusOverviewTitle}>
-                    {statusLabel(conversation.status, text)}
-                  </strong>
-                  <p className={styles.statusOverviewText}>
-                    {statusHint(conversation.status, text)}
-                  </p>
-                </div>
                 <AdminBadge tone={toneForStatus(conversation.status)}>
                   {statusLabel(conversation.status, text)}
                 </AdminBadge>
@@ -135,19 +142,74 @@ export function SupportConversationSidePanel({
                   {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
                 </Button>
                 {primaryStatusAction ? (
-                  <Button
-                    variant="primary"
-                    className={styles.workflowPrimaryButton}
-                    onClick={() => statusMutation.mutate(primaryStatusAction.status)}
-                    disabled={
-                      statusMutation.isPending || conversation.status === primaryStatusAction.status
-                    }
-                  >
-                    {primaryStatusAction.label}
-                  </Button>
+                  showResolveConfirm ? (
+                    <div className={styles.resolveConfirmBox}>
+                      <span className={styles.resolveConfirmText}>
+                        {locale === "ru" ? "Закрыть обращение?" : "Close conversation?"}
+                      </span>
+                      <div className={styles.resolveConfirmActions}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setShowResolveConfirm(false);
+                            statusMutation.mutate(primaryStatusAction.status);
+                          }}
+                          disabled={statusMutation.isPending}
+                        >
+                          {locale === "ru" ? "Закрыть" : "Close"}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setShowResolveConfirm(false)}
+                        >
+                          {locale === "ru" ? "Отмена" : "Cancel"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      className={styles.workflowPrimaryButton}
+                      onClick={() => {
+                        const isDestructive =
+                          primaryStatusAction.status === "Resolved" ||
+                          primaryStatusAction.status === "Closed";
+                        if (isDestructive) {
+                          setShowResolveConfirm(true);
+                        } else {
+                          statusMutation.mutate(primaryStatusAction.status);
+                        }
+                      }}
+                      disabled={
+                        statusMutation.isPending ||
+                        conversation.status === primaryStatusAction.status
+                      }
+                    >
+                      {primaryStatusAction.label}
+                    </Button>
+                  )
                 ) : null}
               </div>
-              {secondaryStatusActions.length ? (
+              {hasAdvancedActions ? (
+                <div className={styles.workflowSecondaryGrid}>
+                  <Button
+                    variant="ghost"
+                    className={styles.workflowSecondaryButton}
+                    onClick={() => setShowAdvancedActions((current) => !current)}
+                  >
+                    {showAdvancedActions
+                      ? locale === "ru"
+                        ? "Скрыть дополнительные действия"
+                        : "Hide additional actions"
+                      : locale === "ru"
+                        ? "Показать дополнительные действия"
+                        : "Show additional actions"}
+                  </Button>
+                </div>
+              ) : null}
+              {showAdvancedActions && secondaryStatusActions.length ? (
                 <div className={styles.workflowSecondaryGrid}>
                   {secondaryStatusActions.map((action) => (
                     <Button
@@ -162,11 +224,8 @@ export function SupportConversationSidePanel({
                   ))}
                 </div>
               ) : null}
-              {destructiveStatusAction ? (
+              {showAdvancedActions && destructiveStatusAction ? (
                 <div className={styles.workflowDangerZone}>
-                  <span className={styles.workflowDangerLabel}>
-                    {text.supportCloseConversationAction}
-                  </span>
                   <Button
                     variant="danger"
                     className={styles.workflowDangerButton}
@@ -180,7 +239,6 @@ export function SupportConversationSidePanel({
                   </Button>
                 </div>
               ) : null}
-              <p className={styles.statusOverviewHint}>{text.supportStatusAutomationHint}</p>
             </div>
 
             <div className={styles.userSummaryHeader}>
@@ -192,24 +250,37 @@ export function SupportConversationSidePanel({
                   <span>{`User ID: ${shortId(conversation.initiatorUserId)}`}</span>
                 </div>
               </div>
+            </div>
+
+            <div className={styles.quickLinksRow}>
               <Link
                 href={`/${locale}/users/${conversation.initiatorUserId}`}
                 className="ui-button ui-button--secondary ui-button--sm"
               >
-                {text.userOpenFullProfile}
+                {locale === "ru" ? "Открыть профиль" : "Open profile"}
               </Link>
+              <Link
+                href={`/${locale}/economy`}
+                className="ui-button ui-button--secondary ui-button--sm"
+              >
+                {locale === "ru" ? "Открыть платежи" : "Open payments"}
+              </Link>
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                onClick={() => setActiveSidePanelTab("activity")}
+              >
+                {locale === "ru"
+                  ? "Покупки / Генерации / Ошибки"
+                  : "Purchases / Generations / Errors"}
+              </button>
             </div>
 
-            <div className={styles.rowMetaGroup}>
-              <AdminBadge tone={userQuery.data?.isPremium ? "warning" : "neutral"}>
-                {userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel}
-              </AdminBadge>
-              <AdminBadge tone={userQuery.data?.isActive === false ? "danger" : "success"}>
-                {userQuery.data?.isActive === false ? text.noLabel : text.activeLabel}
-              </AdminBadge>
-              <AdminBadge tone={userQuery.data?.emailConfirmed ? "info" : "neutral"}>
-                {userQuery.data?.emailConfirmed ? text.emailConfirmedLabel : text.noLabel}
-              </AdminBadge>
+            <div className={styles.dangerActionBlock}>
+              <span>{locale === "ru" ? "Опасные действия" : "Danger zone"}</span>
+              <button type="button" className="ui-button ui-button--danger ui-button--sm" disabled>
+                {locale === "ru" ? "Заблокировать пользователя" : "Block user"}
+              </button>
             </div>
 
             <div className={styles.metricsGrid}>
@@ -219,7 +290,7 @@ export function SupportConversationSidePanel({
               </div>
               <div className={styles.metricTile}>
                 <span>{text.supportAccountAgeLabel}</span>
-                <strong>{formatAccountAge(controller.accountCreatedAt, locale)}</strong>
+                <strong>{formatAccountAge(accountCreatedAt, locale)}</strong>
               </div>
               <div className={styles.metricTile}>
                 <span>{text.supportMessagesCount}</span>
@@ -234,10 +305,6 @@ export function SupportConversationSidePanel({
             <SectionBlock title={text.supportConversationMetaTitle}>
               <div className={styles.detailGrid}>
                 <div className={styles.detailRow}>
-                  <span>{text.statusLabel}</span>
-                  <strong>{statusLabel(conversation.status, text)}</strong>
-                </div>
-                <div className={styles.detailRow}>
                   <span>{text.supportAssignedTo}</span>
                   <strong>
                     {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
@@ -248,107 +315,20 @@ export function SupportConversationSidePanel({
                   <strong>{formatDateTime(conversation.createdAtUtc, locale)}</strong>
                 </div>
                 <div className={styles.detailRow}>
-                  <span>{text.supportLastMessage}</span>
-                  <strong>
-                    {formatDateTime(
-                      conversation.lastMessageAtUtc ?? conversation.createdAtUtc,
-                      locale
-                    )}
-                  </strong>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>{text.supportLastSeenLabel}</span>
-                  <strong>
-                    {formatRelativeTime(analyticsQuery.data?.summary.lastActivityAtUtc, locale)}
-                  </strong>
+                  <span>{locale === "ru" ? "Дата регистрации" : "Registration date"}</span>
+                  <strong>{formatDateTime(accountCreatedAt, locale)}</strong>
                 </div>
               </div>
             </SectionBlock>
           </div>
         ) : null}
 
-        {activeSidePanelTab === "purchases" ? (
+        {activeSidePanelTab === "activity" ? (
           <div className={styles.sidePanelContent}>
-            <div className={styles.metricsGrid}>
-              <div className={styles.metricTile}>
-                <span>{text.supportPurchasesLabel}</span>
-                <strong>{String(totalPurchases)}</strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{text.supportLastPaymentLabel}</span>
-                <strong>
-                  {analyticsQuery.data?.summary.lastPurchaseAtUtc
-                    ? formatRelativeTime(analyticsQuery.data.summary.lastPurchaseAtUtc, locale)
-                    : "—"}
-                </strong>
-              </div>
-            </div>
-
-            <SectionBlock title={text.supportRecentPurchasesTitle}>
-              <SidePanelAsyncState
-                isLoading={analyticsQuery.isLoading}
-                isError={analyticsQuery.isError}
-                hasContent={Boolean(analyticsQuery.data?.recentPurchases.length)}
-                loadingTitle={text.loading}
-                errorTitle={text.supportLoadError}
-                emptyTitle={text.supportNoPurchases}
-              >
-                <div className={styles.timelineList}>
-                  {(analyticsQuery.data?.recentPurchases ?? []).slice(0, 4).map((purchase) => (
-                    <TimelineCard
-                      key={purchase.orderId}
-                      title={formatMoney(purchase.priceAmount, purchase.currencyCode, locale)}
-                      timestampLabel={formatRelativeTime(
-                        purchase.confirmedAtUtc ?? purchase.createdAtUtc,
-                        locale
-                      )}
-                      meta={
-                        <>
-                          <AdminBadge
-                            tone={
-                              purchase.status.toLowerCase() === "paid" ||
-                              purchase.status.toLowerCase() === "completed"
-                                ? "success"
-                                : "warning"
-                            }
-                          >
-                            {purchase.status}
-                          </AdminBadge>
-                          <span className={styles.subtle}>{`${purchase.sparkToGrant} spark`}</span>
-                        </>
-                      }
-                      details={purchase.paymentProvider}
-                    />
-                  ))}
-                </div>
-              </SidePanelAsyncState>
-            </SectionBlock>
-          </div>
-        ) : null}
-
-        {activeSidePanelTab === "generations" ? (
-          <div className={styles.sidePanelContent}>
-            <div className={styles.metricsGrid}>
-              <div className={styles.metricTile}>
-                <span>{text.completedGenerationsLabel}</span>
-                <strong>
-                  {analyticsQuery.data
-                    ? String(analyticsQuery.data.summary.completedGenerations)
-                    : "—"}
-                </strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{text.supportLastGenerationLabel}</span>
-                <strong>
-                  {formatRelativeTime(analyticsQuery.data?.summary.lastGenerationAtUtc, locale)}
-                </strong>
-              </div>
-            </div>
-
             <SectionBlock title={text.supportRecentGenerationsTitle}>
               <SidePanelAsyncState
                 isLoading={analyticsQuery.isLoading}
-                isError={analyticsQuery.isError}
+                isError={false}
                 hasContent={Boolean(analyticsQuery.data?.recentGenerations.length)}
                 loadingTitle={text.loading}
                 errorTitle={text.supportLoadError}
@@ -377,34 +357,11 @@ export function SupportConversationSidePanel({
                 </div>
               </SidePanelAsyncState>
             </SectionBlock>
-          </div>
-        ) : null}
-
-        {activeSidePanelTab === "errors" ? (
-          <div className={styles.sidePanelContent}>
-            <div className={styles.metricsGrid}>
-              <div className={styles.metricTile}>
-                <span>{text.supportGenerationErrorsTitle}</span>
-                <strong>
-                  {String(
-                    analyticsQuery.data?.summary.failedGenerations ?? failedGenerations.length
-                  )}
-                </strong>
-              </div>
-              <div className={styles.metricTile}>
-                <span>{text.supportLastSeenLabel}</span>
-                <strong>
-                  {recentFailures[0]?.lastOccurredAtUtc
-                    ? formatRelativeTime(recentFailures[0].lastOccurredAtUtc, locale)
-                    : "—"}
-                </strong>
-              </div>
-            </div>
 
             <SectionBlock title={text.supportGenerationErrorsTitle}>
               <SidePanelAsyncState
                 isLoading={analyticsQuery.isLoading}
-                isError={analyticsQuery.isError}
+                isError={false}
                 hasContent={recentFailures.length > 0 || failedGenerations.length > 0}
                 loadingTitle={text.loading}
                 errorTitle={text.supportLoadError}
@@ -440,216 +397,78 @@ export function SupportConversationSidePanel({
                 )}
               </SidePanelAsyncState>
             </SectionBlock>
+
+            <SectionBlock title={text.supportRecentPurchasesTitle}>
+              <SidePanelAsyncState
+                isLoading={purchasesQuery.isLoading}
+                isError={false}
+                hasContent={recentUserPurchases.length > 0}
+                loadingTitle={text.loading}
+                errorTitle={text.supportLoadError}
+                emptyTitle={text.supportNoPurchases}
+              >
+                <div className={styles.timelineList}>
+                  {recentUserPurchases.slice(0, 6).map((purchase) => (
+                    <TimelineCard
+                      key={purchase.orderId}
+                      title={formatMoney(purchase.priceAmount, purchase.currencyCode, locale)}
+                      timestampLabel={formatRelativeTime(
+                        purchase.confirmedAtUtc ?? purchase.createdAtUtc,
+                        locale
+                      )}
+                      meta={
+                        <>
+                          <AdminBadge tone={purchaseStatusTone(purchase.status)}>
+                            {purchase.status}
+                          </AdminBadge>
+                          <span className={styles.subtle}>{`${purchase.sparkToGrant} spark`}</span>
+                        </>
+                      }
+                      details={purchase.paymentProvider}
+                    />
+                  ))}
+                </div>
+              </SidePanelAsyncState>
+            </SectionBlock>
           </div>
         ) : null}
 
-        {activeSidePanelTab === "templates" ? (
+        {activeSidePanelTab === "dialog" ? (
           <div className={styles.sidePanelContent}>
-            <div className={styles.templateCatalogControls}>
-              <label className={styles.searchField}>
-                <span className={styles.searchLabel}>{text.supportTemplateSearchPlaceholder}</span>
-                <input
-                  className={styles.searchInput}
-                  value={templateSearchQuery}
-                  onChange={(event) => setTemplateSearchQuery(event.target.value)}
-                  placeholder={text.supportTemplateSearchPlaceholder}
-                />
-              </label>
-              <div className={styles.templateToolbarCompact}>
-                <Button size="sm" variant="secondary" onClick={() => openTemplateEditor()}>
-                  {text.supportTemplateCreateAction}
-                </Button>
+            <div className={styles.statusOverviewCard}>
+              <div className={styles.statusOverviewHeader}>
+                <AdminBadge tone={responderState.tone}>{responderState.label}</AdminBadge>
+                <AdminBadge tone="neutral">
+                  {`${text.supportPriorityLabel}: ${priorityLabel(conversation.priority, text)}`}
+                </AdminBadge>
+              </div>
+              <div className={styles.detailGrid}>
+                <div className={styles.detailRow}>
+                  <span>{text.supportAssignedTo}</span>
+                  <strong>
+                    {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
+                  </strong>
+                </div>
+                <div className={styles.detailRow}>
+                  <span>{text.createdAtLabel}</span>
+                  <strong>{formatDateTime(conversation.createdAtUtc, locale)}</strong>
+                </div>
+                <div className={styles.detailRow}>
+                  <span>{text.supportLastMessage}</span>
+                  <strong>
+                    {formatDateTime(
+                      conversation.lastMessageAtUtc ?? conversation.createdAtUtc,
+                      locale
+                    )}
+                  </strong>
+                </div>
+                <div className={styles.detailRow}>
+                  <span>{text.supportLastSeenLabel}</span>
+                  <strong>{formatRelativeTime(lastActivityAtUtc, locale)}</strong>
+                </div>
               </div>
             </div>
 
-            <SidePanelAsyncState
-              isLoading={templatesQuery.isLoading}
-              isError={templatesQuery.isError}
-              hasContent={filteredTemplates.length > 0}
-              loadingTitle={text.loading}
-              errorTitle={text.supportLoadError}
-              emptyTitle={text.supportTemplateNoTemplates}
-            >
-              <>
-                <div className={styles.templateCatalogList}>
-                  {filteredTemplates.map((template) => (
-                    <button
-                      key={template.templateId}
-                      type="button"
-                      className={`${styles.templateListItem} ${selectedTemplate?.templateId === template.templateId ? styles.templateListItemActive : ""}`}
-                      onClick={() => setSelectedTemplateId(template.templateId)}
-                    >
-                      <div className={styles.templateListItemHeader}>
-                        <div className={styles.templateTitleStack}>
-                          <strong className={styles.rowTitle}>{template.title}</strong>
-                          <span
-                            className={styles.subtle}
-                          >{`${text.supportUpdatedLabel}: ${formatRelativeTime(template.updatedAtUtc, locale)}`}</span>
-                        </div>
-                        <div className={styles.rowMetaGroup}>
-                          <AdminBadge tone="primary">{text.supportTemplateKindReply}</AdminBadge>
-                          {!template.isEnabled ? (
-                            <AdminBadge tone="neutral">
-                              {text.supportTemplateDisabledBadge}
-                            </AdminBadge>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className={styles.templateSnippet}>{template.body}</div>
-                    </button>
-                  ))}
-                </div>
-
-                {selectedTemplate ? (
-                  <div className={styles.templateDetailPane}>
-                    <div className={styles.templatePreviewHeader}>
-                      <div className={styles.templateTitleStack}>
-                        <strong className={styles.chatUserName}>{selectedTemplate.title}</strong>
-                        <span
-                          className={styles.subtle}
-                        >{`${text.supportUpdatedLabel}: ${formatDateTime(selectedTemplate.updatedAtUtc, locale)}`}</span>
-                      </div>
-                      <div className={styles.templateRowActions}>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => applyTemplate(selectedTemplate)}
-                        >
-                          {text.supportTemplateUseAction}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => openTemplateEditor(selectedTemplate)}
-                        >
-                          {text.supportTemplateEditAction}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => templateDeleteMutation.mutate(selectedTemplate.templateId)}
-                          disabled={templateDeleteMutation.isPending}
-                        >
-                          {text.supportTemplateDeleteAction}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className={styles.templatePreviewBody}>{selectedTemplate.body}</div>
-                  </div>
-                ) : null}
-
-                {isTemplateEditorOpen ? (
-                  <div className={styles.templateEditor}>
-                    <div className={styles.templateEditorHeader}>
-                      <strong className={styles.chatUserName}>
-                        {templateDraft.templateId
-                          ? text.supportTemplateUpdateAction
-                          : text.supportTemplateCreateAction}
-                      </strong>
-                      <span className={styles.subtle}>
-                        {text.supportTemplatesManagerDescription}
-                      </span>
-                    </div>
-
-                    <div className={styles.templateForm}>
-                      <label className={styles.templateSection}>
-                        <span className={styles.subtle}>{text.supportTemplateTitleLabel}</span>
-                        <input
-                          className={styles.input}
-                          value={templateDraft.title}
-                          onChange={(event) =>
-                            setTemplateDraft((current) => ({
-                              ...current,
-                              title: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-
-                      <label className={styles.templateSection}>
-                        <span className={styles.subtle}>{text.supportTemplateBodyLabel}</span>
-                        <textarea
-                          className={styles.textarea}
-                          value={templateDraft.body}
-                          onChange={(event) =>
-                            setTemplateDraft((current) => ({
-                              ...current,
-                              body: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-
-                      <div className={styles.templateFormGrid}>
-                        <label className={styles.templateSection}>
-                          <span className={styles.subtle}>
-                            {text.supportTemplateSortOrderLabel}
-                          </span>
-                          <input
-                            className={styles.input}
-                            type="number"
-                            min={0}
-                            value={String(templateDraft.sortOrder)}
-                            onChange={(event) =>
-                              setTemplateDraft((current) => ({
-                                ...current,
-                                sortOrder: Number(event.target.value) || 0,
-                              }))
-                            }
-                          />
-                        </label>
-                      </div>
-
-                      <label className={styles.checkboxRow}>
-                        <input
-                          type="checkbox"
-                          checked={templateDraft.isEnabled}
-                          onChange={(event) =>
-                            setTemplateDraft((current) => ({
-                              ...current,
-                              isEnabled: event.target.checked,
-                            }))
-                          }
-                        />
-                        <span>{text.supportTemplateEnabledLabel}</span>
-                      </label>
-
-                      <div className={styles.templateRowActions}>
-                        <Button
-                          variant="primary"
-                          onClick={() => templateSaveMutation.mutate()}
-                          disabled={
-                            templateSaveMutation.isPending ||
-                            !templateDraft.title.trim() ||
-                            !templateDraft.body.trim()
-                          }
-                        >
-                          {templateSaveMutation.isPending
-                            ? text.loading
-                            : templateDraft.templateId
-                              ? text.supportTemplateUpdateAction
-                              : text.supportTemplateCreateAction}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => setTemplateDraft(emptyTemplateDraft)}
-                        >
-                          {text.supportTemplateResetAction}
-                        </Button>
-                        <Button variant="secondary" onClick={() => setIsTemplateEditorOpen(false)}>
-                          {text.supportTemplateCancelEditAction}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            </SidePanelAsyncState>
-          </div>
-        ) : null}
-
-        {activeSidePanelTab === "history" ? (
-          <div className={styles.sidePanelContent}>
             <SectionBlock title={text.supportTimelineTitle}>
               {conversationTimeline.length ? (
                 <div className={styles.timelineList}>
@@ -671,31 +490,122 @@ export function SupportConversationSidePanel({
                 <AdminStateCard tone="info" title={text.supportHistoryEmpty} />
               )}
             </SectionBlock>
+          </div>
+        ) : null}
 
-            <SectionBlock title={text.userActivityTitle}>
-              <SidePanelAsyncState
-                isLoading={analyticsQuery.isLoading}
-                isError={analyticsQuery.isError}
-                hasContent={activityTimeline.length > 0}
-                loadingTitle={text.loading}
-                errorTitle={text.supportLoadError}
-                emptyTitle={text.supportHistoryEmpty}
-              >
-                <div className={styles.timelineList}>
-                  {activityTimeline.map((item) => (
-                    <TimelineCard
-                      key={item.id}
-                      title={item.title}
-                      timestampLabel={formatRelativeTime(item.occurredAtUtc, locale)}
-                      details={item.subtitle}
-                    />
-                  ))}
-                </div>
-              </SidePanelAsyncState>
-            </SectionBlock>
+        {activeSidePanelTab === "attachments" ? (
+          <div className={styles.sidePanelContent}>
+            {attachmentItems.length === 0 ? (
+              <AdminStateCard
+                tone="info"
+                title={locale === "ru" ? "Вложений пока нет." : "No attachments yet."}
+              />
+            ) : (
+              <div className={styles.attachmentList}>
+                {attachmentItems.map((message) => (
+                  <div key={message.messageId} className={styles.attachmentListItem}>
+                    {hasImageAttachment(message) ? (
+                      <button
+                        type="button"
+                        className={styles.attachmentListThumbButton}
+                        onClick={() => onOpenAttachmentPreview?.(message)}
+                      >
+                        <Image
+                          src={message.attachmentUrl!}
+                          alt={message.attachmentFileName ?? message.body}
+                          width={76}
+                          height={76}
+                          className={styles.attachmentListThumb}
+                          unoptimized
+                        />
+                      </button>
+                    ) : (
+                      <span className={styles.attachmentPreviewFileIcon}>FILE</span>
+                    )}
+                    <div className={styles.attachmentListMeta}>
+                      <strong>{message.attachmentFileName ?? message.body ?? "Attachment"}</strong>
+                      <span>{formatDateTime(message.createdAtUtc, locale)}</span>
+                      <span>{formatFileSize(message.attachmentFileSizeBytes, locale)}</span>
+                    </div>
+                    <div className={styles.attachmentListActions}>
+                      {hasImageAttachment(message) ? (
+                        <button
+                          type="button"
+                          className="ui-button ui-button--secondary ui-button--sm"
+                          onClick={() => onOpenAttachmentPreview?.(message)}
+                        >
+                          {locale === "ru" ? "Просмотр" : "Preview"}
+                        </button>
+                      ) : (
+                        <a
+                          href={message.attachmentUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ui-button ui-button--secondary ui-button--sm"
+                        >
+                          {locale === "ru" ? "Открыть" : "Open"}
+                        </a>
+                      )}
+                      <a
+                        href={message.attachmentUrl!}
+                        download={message.attachmentFileName ?? "attachment"}
+                        className="ui-button ui-button--ghost ui-button--sm"
+                      >
+                        {locale === "ru" ? "Скачать" : "Download"}
+                      </a>
+                      <button
+                        type="button"
+                        className="ui-button ui-button--ghost ui-button--sm"
+                        onClick={() => onJumpToMessage?.(message.messageId)}
+                      >
+                        {locale === "ru" ? "К сообщению" : "Jump"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : null}
       </AdminCard>
     </div>
   );
+}
+
+function purchaseStatusTone(status: string) {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "succeeded" || normalized === "paid" || normalized === "completed") {
+    return "success" as const;
+  }
+
+  if (normalized === "failed" || normalized === "canceled" || normalized === "cancelled") {
+    return "danger" as const;
+  }
+
+  if (normalized === "pending") {
+    return "warning" as const;
+  }
+
+  return "neutral" as const;
+}
+
+function getResponderState(status: string, locale: Locale): ResponderState {
+  const isRu = locale === "ru";
+  switch (status) {
+    case "WaitingForSupport":
+      return {
+        label: isRu ? "Требуется ответ администратора" : "Admin reply required",
+        tone: "danger",
+      };
+    case "WaitingForUser":
+      return {
+        label: isRu ? "Ожидаем пользователя" : "Waiting for user",
+        tone: "success",
+      };
+    default:
+      return {
+        label: isRu ? "Диалог в обработке" : "Conversation in progress",
+        tone: "neutral",
+      };
+  }
 }

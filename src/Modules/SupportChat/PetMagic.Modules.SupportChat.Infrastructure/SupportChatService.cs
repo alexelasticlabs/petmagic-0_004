@@ -863,7 +863,7 @@ public sealed class SupportChatService(
     {
         if (conversation.Status == SupportConversationStatus.Closed)
         {
-            return SupportChatErrors.ConversationReadOnly;
+            return isAdmin ? SupportChatErrors.ConversationReadOnly : null;
         }
 
         if (conversation.Status != SupportConversationStatus.Resolved)

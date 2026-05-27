@@ -12,6 +12,7 @@ import {
   formatCountFact,
   getConversationSla,
   mergeTemplateDraft,
+  sortSupportQueueItems,
   type SupportTimelineItem,
 } from "@/components/support/support-conversation-helpers";
 import { getAvailableStatusActions } from "@/components/support/support-status-helpers";
@@ -20,6 +21,7 @@ import {
   assignSupportConversation,
   createSupportReplyTemplate,
   deleteSupportReplyTemplate,
+  fetchAdminEconomyPurchases,
   fetchAdminUser,
   fetchAdminUserAnalytics,
   fetchSupportConversation,
@@ -31,12 +33,14 @@ import {
   updateSupportConversationStatus,
   updateSupportReplyTemplate,
   useAuthSession,
+  type AdminEconomyPurchase,
   type AdminSupportConversation,
   type AdminSupportConversationSummary,
   type AdminSupportReplyTemplate,
   type AdminUserAnalytics,
   type AdminUserDetail,
   type SupportConversationStatus,
+  type SupportInboxAssignmentScope,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { useSupportRealtime } from "@/lib/support-realtime";
@@ -52,14 +56,9 @@ export type ToastState = {
 };
 
 export type SupportFilter = "all" | SupportConversationStatus;
+export type AssignmentFilter = SupportInboxAssignmentScope;
 
-export type SidePanelTab =
-  | "profile"
-  | "purchases"
-  | "generations"
-  | "errors"
-  | "history"
-  | "templates";
+export type SidePanelTab = "user" | "activity" | "dialog" | "attachments";
 
 export type TemplateDraft = {
   templateId: string | null;
@@ -94,13 +93,14 @@ export function useSupportConversationController({
   const session = useAuthSession();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<SupportFilter>("all");
+  const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [reply, setReply] = useState("");
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft>(emptyTemplateDraft);
   const [templateSearchQuery, setTemplateSearchQuery] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
-  const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("profile");
+  const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("user");
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 1321px)").matches
   );
@@ -168,8 +168,9 @@ export function useSupportConversationController({
   });
 
   const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
-    queryKey: adminQueryKeys.supportInbox(statusFilter, "all"),
-    queryFn: () => fetchSupportInbox(statusFilter === "all" ? undefined : statusFilter, "all"),
+    queryKey: adminQueryKeys.supportInbox(statusFilter, assignmentFilter),
+    queryFn: () =>
+      fetchSupportInbox(statusFilter === "all" ? undefined : statusFilter, assignmentFilter),
     enabled: Boolean(session),
   });
 
@@ -305,7 +306,13 @@ export function useSupportConversationController({
     enabled: Boolean(session && subjectUserId),
   });
 
-  const inboxItems = useMemo(() => inboxQuery.data ?? [], [inboxQuery.data]);
+  const purchasesQuery = useQuery<AdminEconomyPurchase[]>({
+    queryKey: ["admin", "support", "conversation", subjectUserId ?? "none", "purchases"],
+    queryFn: () => fetchAdminEconomyPurchasesForUser(subjectUserId!),
+    enabled: Boolean(session && subjectUserId),
+  });
+
+  const inboxItems = useMemo(() => sortSupportQueueItems(inboxQuery.data ?? []), [inboxQuery.data]);
 
   const filteredInboxItems = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -367,42 +374,36 @@ export function useSupportConversationController({
 
   const sidePanelTabs = useMemo<ReadonlyArray<{ value: SidePanelTab; label: string }>>(
     () => [
-      { value: "profile", label: text.supportViewProfileTab },
-      { value: "purchases", label: text.supportViewPurchasesTab },
-      { value: "generations", label: text.supportViewGenerationsTab },
-      { value: "errors", label: text.supportViewErrorsTab },
-      { value: "history", label: text.supportViewHistoryTab },
-      { value: "templates", label: text.supportViewTemplatesTab },
+      { value: "user", label: text.supportViewUserTab },
+      { value: "activity", label: text.supportViewActivityTab },
+      { value: "dialog", label: text.supportViewDialogTab },
+      { value: "attachments", label: text.supportViewAttachmentsTab },
     ],
     [
-      text.supportViewErrorsTab,
-      text.supportViewGenerationsTab,
-      text.supportViewHistoryTab,
-      text.supportViewProfileTab,
-      text.supportViewPurchasesTab,
-      text.supportViewTemplatesTab,
+      text.supportViewActivityTab,
+      text.supportViewAttachmentsTab,
+      text.supportViewDialogTab,
+      text.supportViewUserTab,
     ]
   );
 
   const sidePanelTitle =
-    activeSidePanelTab === "profile"
+    activeSidePanelTab === "user"
       ? text.supportUserInformationTitle
-      : activeSidePanelTab === "purchases"
-        ? text.supportRecentPurchasesTitle
-        : activeSidePanelTab === "generations"
-          ? text.supportRecentGenerationsTitle
-          : activeSidePanelTab === "errors"
-            ? text.supportGenerationErrorsTitle
-            : activeSidePanelTab === "templates"
-              ? text.supportTemplatesManagerTitle
-              : text.supportTimelineTitle;
+      : activeSidePanelTab === "activity"
+        ? text.supportActivityTitle
+        : activeSidePanelTab === "dialog"
+          ? text.supportDialogTitle
+          : text.supportAttachmentsTitle;
 
   const sidePanelDescription =
-    activeSidePanelTab === "templates"
-      ? text.supportTemplatesManagerDescription
-      : activeSidePanelTab === "history"
-        ? text.supportConversationDescription
-        : null;
+    activeSidePanelTab === "activity"
+      ? text.supportActivityDescription
+      : activeSidePanelTab === "dialog"
+        ? text.supportDialogDescription
+        : activeSidePanelTab === "attachments"
+          ? text.supportAttachmentsDescription
+          : null;
 
   const selectedTemplate =
     filteredTemplates.find((template) => template.templateId === selectedTemplateId) ??
@@ -417,7 +418,16 @@ export function useSupportConversationController({
     locale,
     conversation?.adminUnreadCount ?? 0
   );
-  const totalPurchases = analyticsQuery.data?.summary.totalPurchases ?? 0;
+  const recentUserPurchases = purchasesQuery.data ?? [];
+  const totalPurchases = analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length;
+  const lastUserPurchaseAtUtc =
+    recentUserPurchases[0]?.confirmedAtUtc ?? recentUserPurchases[0]?.createdAtUtc ?? null;
+  const lastActivityAtUtc =
+    analyticsQuery.data?.summary.lastActivityAtUtc ??
+    conversation?.lastMessageAtUtc ??
+    conversation?.updatedAtUtc ??
+    conversation?.createdAtUtc ??
+    null;
   const failedGenerations =
     analyticsQuery.data?.recentGenerations.filter(
       (generation) => generation.status.toLowerCase() === "failed"
@@ -428,7 +438,11 @@ export function useSupportConversationController({
     userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel,
     formatAccountAgeFact(accountCreatedAt, locale),
     formatCountFact(conversation?.messages.length ?? 0, locale, "messages"),
-    formatCountFact(totalPurchases, locale, "purchases"),
+    formatCountFact(
+      analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length,
+      locale,
+      "purchases"
+    ),
   ];
 
   const activityTimeline: SupportTimelineItem[] = buildActivityTimeline(analyticsQuery.data);
@@ -506,6 +520,10 @@ export function useSupportConversationController({
     isTemplateEditorOpen,
     openTemplateEditor,
     primaryStatusAction,
+    purchasesQuery,
+    recentUserPurchases,
+    lastUserPurchaseAtUtc,
+    lastActivityAtUtc,
     recentFailures,
     reply,
     resetSelectedAttachment,
@@ -520,6 +538,7 @@ export function useSupportConversationController({
     setIsTemplateEditorOpen,
     setReply,
     setSearchQuery,
+    setAssignmentFilter,
     setSelectedAttachment,
     setSelectedTemplateId,
     setStatusFilter,
@@ -529,6 +548,7 @@ export function useSupportConversationController({
     sidePanelTabs,
     sidePanelTitle,
     statusFilter,
+    assignmentFilter,
     statusMutation,
     templateDeleteMutation,
     templateDraft,
@@ -542,4 +562,25 @@ export function useSupportConversationController({
     userQuery,
     visibleTemplates,
   };
+}
+
+async function fetchAdminEconomyPurchasesForUser(userId: string): Promise<AdminEconomyPurchase[]> {
+  const take = 100;
+  const maxPages = 8;
+  const matches: AdminEconomyPurchase[] = [];
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const response = await fetchAdminEconomyPurchases({ skip: page * take, take });
+    matches.push(...response.items.filter((item) => item.userId === userId));
+
+    if (!response.hasMore) {
+      break;
+    }
+  }
+
+  return matches.sort((left, right) => {
+    const leftTime = Date.parse(left.confirmedAtUtc ?? left.createdAtUtc);
+    const rightTime = Date.parse(right.confirmedAtUtc ?? right.createdAtUtc);
+    return rightTime - leftTime;
+  });
 }

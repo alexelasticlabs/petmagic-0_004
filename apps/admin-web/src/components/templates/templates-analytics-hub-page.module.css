@@ -672,3 +672,114 @@
   }
 }
 
+:global(:root[data-theme="light"]) .toolbar {
+  background: var(--surface-1);
+  border-color: var(--border-soft);
+}
+
+:global(:root[data-theme="light"]) .panel {
+  background: var(--surface-1);
+  border-color: var(--border-soft);
+  box-shadow: var(--shadow-soft);
+}
+
+:global(:root[data-theme="light"]) .secondaryLink,
+:global(:root[data-theme="light"]) .segmentedButton,
+:global(:root[data-theme="light"]) .chartTab,
+:global(:root[data-theme="light"]) .inlineAction {
+  background: var(--surface-1);
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .segmentedActive,
+:global(:root[data-theme="light"]) .chartTabActive {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.4);
+  color: #1e3a8a;
+}
+
+:global(:root[data-theme="light"]) .chartSummary {
+  background: var(--surface-2);
+}
+
+:global(:root[data-theme="light"]) .statusBadge {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .status_active {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.32);
+  color: #166534;
+}
+
+:global(:root[data-theme="light"]) .status_draft {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.32);
+  color: #1e40af;
+}
+
+:global(:root[data-theme="light"]) .status_archived {
+  background: #eef2f7;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+:global(:root[data-theme="light"]) .status_failed {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #b91c1c;
+}
+
+:global(:root[data-theme="light"]) .panelTitle {
+  color: var(--text-strong);
+  font-size: 1.06rem;
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .panelHeader p,
+:global(:root[data-theme="light"]) .panelHeaderRow p {
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+:global(:root[data-theme="light"]) .segmentedButton,
+:global(:root[data-theme="light"]) .segmentedActive,
+:global(:root[data-theme="light"]) .chartTab,
+:global(:root[data-theme="light"]) .chartTabActive,
+:global(:root[data-theme="light"]) .inlineAction,
+:global(:root[data-theme="light"]) .secondaryLink,
+:global(:root[data-theme="light"]) .primaryButton {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .table th {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+
+:global(:root[data-theme="light"]) .table td {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+}
+
+:global(:root[data-theme="light"]) .tickLabel,
+:global(:root[data-theme="light"]) .dateLabel {
+  fill: var(--text-soft);
+  font-size: 0.66rem;
+}
+
+:global(:root[data-theme="light"]) .chartSummary span,
+:global(:root[data-theme="light"]) .chartSummary strong,
+:global(:root[data-theme="light"]) .dimensionRow span,
+:global(:root[data-theme="light"]) .breakdownMeta span,
+:global(:root[data-theme="light"]) .topRow span,
+:global(:root[data-theme="light"]) .templateCell span,
+:global(:root[data-theme="light"]) .typeCard p,
+:global(:root[data-theme="light"]) .feedbackMeta,
+:global(:root[data-theme="light"]) .emptyState,
+:global(:root[data-theme="light"]) .emptyChart {
+  color: var(--text-soft);
+}

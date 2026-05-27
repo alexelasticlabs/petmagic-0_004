@@ -288,7 +288,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         case TemplateBlockedAction.wallet:
           context.go(WalletPage.routePath);
         case TemplateBlockedAction.premium:
-          context.go(PremiumPage.routePath);
+          context.push(PremiumPage.routePath);
         case TemplateBlockedAction.chooseAnother:
           break;
       }

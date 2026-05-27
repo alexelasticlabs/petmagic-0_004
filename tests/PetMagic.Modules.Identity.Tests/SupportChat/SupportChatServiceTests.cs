@@ -332,6 +332,52 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task SendMessageAsync_ByUserAfterClosed_ShouldReopenConversation()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using (var closeScope = await store.CreateScopeAsync())
+        {
+            var closeResult = await closeScope.CreateService().UpdateConversationStatusAsync(
+                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Closed),
+                CancellationToken.None);
+
+            Assert.True(closeResult.IsSuccess);
+            Assert.Equal("Closed", closeResult.Value.Status);
+            Assert.True(closeResult.Value.IsReadOnly);
+        }
+
+        await using (var reopenScope = await store.CreateScopeAsync())
+        {
+            var reopenResult = await reopenScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(conversationId, userId, "I still need help", false),
+                CancellationToken.None);
+
+            Assert.True(reopenResult.IsSuccess);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var conversation = await verificationScope.SupportDbContext.SupportConversations.SingleAsync();
+        Assert.Equal(SupportConversationStatus.WaitingForSupport, conversation.Status);
+        Assert.Null(conversation.ClosedAtUtc);
+        Assert.Null(conversation.ResolvedAtUtc);
+    }
+
+    [Fact]
     public async Task SendMessageAsync_AfterReopenWindowExpired_ShouldFail()
     {
         var store = CreateStore();

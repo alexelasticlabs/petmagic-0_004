@@ -132,18 +132,18 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       ),
                     ] else ...[
                       if (state.errorMessage != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         ProfileMessageCard(
                           message: _friendlyError(text, state.errorMessage!),
                           tone: colors.gold,
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       _BalanceCard(
                         wallet: state.wallet,
                         onRefresh: () => controller.load(refresh: true),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       _PacksSection(
                         packs: state.packs,
                         isBuying: state.isBuying,
@@ -161,25 +161,25 @@ class _WalletPageState extends ConsumerState<WalletPage>
                           },
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       _RewardsOverviewCard(
                         wallet: state.wallet,
                         isClaimingAd: state.isClaimingAd,
                         onClaimAd: controller.claimAdReward,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       _LedgerSection(
                         items: state.ledger,
                         onViewAll: () =>
                             context.pushNamed(AllTransactionsPage.routeName),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       _PurchasesSection(
                         items: state.purchases,
                         highlightedOrderId: state.highlightedPurchaseOrderId,
                       ),
                       if (state.purchases.isNotEmpty)
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                       const _WalletCompanionHero(),
                     ],
                   ],

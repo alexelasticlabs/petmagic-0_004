@@ -1,15 +1,36 @@
 import styles from "@/components/dashboard-view.module.css";
 
-export function RevenueChart({ xLabels, ariaLabel }: { xLabels: string[]; ariaLabel: string }) {
-  const points = "50,142 130,126 210,138 305,102 390,66 472,42 560,18";
-  const areaPoints = "50,142 130,126 210,138 305,102 390,66 472,42 560,18 560,196 50,196";
-  const yLabels = [
-    { y: 18, label: "$30k" },
-    { y: 71, label: "$20k" },
-    { y: 124, label: "$10k" },
-    { y: 196, label: "$0" },
-  ];
+type DonutChartItem = {
+  color: string;
+  count: string;
+};
+
+export function RevenueChart({
+  xLabels,
+  values,
+  currencyCode,
+  ariaLabel,
+}: {
+  xLabels: string[];
+  values: number[];
+  currencyCode: string;
+  ariaLabel: string;
+}) {
   const xPositions = [50, 130, 210, 305, 390, 472, 560];
+  const normalizedValues = xPositions.map((_, index) => values[index] ?? 0);
+  const maxValue = Math.max(...normalizedValues, 1);
+  const points = normalizedValues
+    .map((value, index) => {
+      const x = xPositions[index];
+      const y = 196 - (value / maxValue) * 178;
+      return `${x},${Math.max(18, Math.min(196, Number(y.toFixed(2))))}`;
+    })
+    .join(" ");
+  const areaPoints = `${points} 560,196 50,196`;
+  const yLabels = [1, 2 / 3, 1 / 3, 0].map((ratio) => ({
+    y: 196 - 178 * ratio,
+    label: formatCompactCurrency(maxValue * ratio, currencyCode),
+  }));
 
   return (
     <svg viewBox="0 0 610 240" className={styles.chartSvg} aria-label={ariaLabel}>
@@ -33,7 +54,7 @@ export function RevenueChart({ xLabels, ariaLabel }: { xLabels: string[]; ariaLa
       ))}
       {yLabels.map(({ y, label }) => (
         <text
-          key={label}
+          key={`y-label-${y}`}
           x="36"
           y={y + 4}
           textAnchor="end"
@@ -83,40 +104,47 @@ export function RevenueChart({ xLabels, ariaLabel }: { xLabels: string[]; ariaLa
   );
 }
 
-export function DonutChart({ label }: { label: string }) {
+export function DonutChart({
+  label,
+  total,
+  items,
+}: {
+  label: string;
+  total: string;
+  items: DonutChartItem[];
+}) {
+  const numericItems = items.map((item) => ({
+    color: item.color,
+    value: Number.parseInt(item.count.replace(/\s/g, ""), 10) || 0,
+  }));
+  const totalValue = Math.max(
+    1,
+    numericItems.reduce((sum, item) => sum + item.value, 0)
+  );
+  const circumference = 2 * Math.PI * 65;
+  let currentOffset = 0;
+
   return (
     <svg viewBox="0 0 180 180" className={styles.donutSvg} aria-hidden="true">
       <circle cx="90" cy="90" r="65" stroke="#18231f" strokeWidth="22" fill="none" />
-      <circle
-        cx="90"
-        cy="90"
-        r="65"
-        stroke="#14532d"
-        strokeWidth="22"
-        fill="none"
-        strokeDasharray="245 163.4"
-        strokeDashoffset="-61.3"
-      />
-      <circle
-        cx="90"
-        cy="90"
-        r="65"
-        stroke="#059669"
-        strokeWidth="22"
-        fill="none"
-        strokeDasharray="114.4 294"
-        strokeDashoffset="53.1"
-      />
-      <circle
-        cx="90"
-        cy="90"
-        r="65"
-        stroke="#34d399"
-        strokeWidth="22"
-        fill="none"
-        strokeDasharray="49 359.4"
-        strokeDashoffset="102.1"
-      />
+      {numericItems.map((item) => {
+        const length = (item.value / totalValue) * circumference;
+        const circle = (
+          <circle
+            key={item.color}
+            cx="90"
+            cy="90"
+            r="65"
+            stroke={item.color}
+            strokeWidth="22"
+            fill="none"
+            strokeDasharray={`${length} ${circumference - length}`}
+            strokeDashoffset={String(-currentOffset)}
+          />
+        );
+        currentOffset += length;
+        return circle;
+      })}
       <text
         x="90"
         y="86"
@@ -126,11 +154,28 @@ export function DonutChart({ label }: { label: string }) {
         fontWeight="800"
         fontFamily="system-ui"
       >
-        1 256
+        {total}
       </text>
       <text x="90" y="104" textAnchor="middle" fill="#7f938b" fontSize="10" fontFamily="system-ui">
         {label}
       </text>
     </svg>
   );
+}
+
+function formatCompactCurrency(value: number, currencyCode: string) {
+  if (value <= 0) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: 0,
+    }).format(0);
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currencyCode,
+    notation: value >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: value >= 1000 ? 1 : 0,
+  }).format(value);
 }

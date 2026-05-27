@@ -2,16 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  AdminBadge,
-  AdminCard,
-  AdminPage,
-  AdminStateCard,
-} from "@/components/admin/admin-primitives";
+import { AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import {
   formatClockTime,
+  formatDateTime,
   formatFileSize,
   formatRelativeTime,
   getConversationSla,
@@ -26,12 +22,11 @@ import { SupportOptionGroup } from "@/components/support/support-option-group";
 import styles from "@/components/support/support-page.module.css";
 import {
   priorityLabel,
-  priorityTone,
   statusHint,
   statusLabel,
-  toneForStatus,
 } from "@/components/support/support-status-helpers";
 import {
+  type AssignmentFilter,
   statusOptions,
   type SupportFilter,
   useSupportConversationController,
@@ -45,18 +40,27 @@ type SupportConversationPageProps = {
   conversationId: string;
 };
 
-export function SupportConversationPage({ locale, conversationId }: SupportConversationPageProps) {
-  const [fullscreenImage, setFullscreenImage] = useState<{
-    url: string;
-    fileName?: string | null;
-  } | null>(null);
+type FullscreenImage = {
+  url: string;
+  fileName?: string | null;
+  messageId?: string;
+  senderDisplayName?: string | null;
+  createdAtUtc?: string | null;
+  fileSizeBytes?: number | null;
+};
 
+export function SupportConversationPage({ locale, conversationId }: SupportConversationPageProps) {
+  const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const {
     activeSidePanelTab,
     accountCreatedAt,
     activityTimeline,
     analyticsQuery,
     applyTemplate,
+    assignmentFilter,
     assignmentMutation,
     attachmentInputRef,
     attachmentPreviewUrl,
@@ -77,8 +81,12 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     isSidePanelOpen,
     isTemplateEditorOpen,
     openTemplateEditor,
+    purchasesQuery,
     primaryStatusAction,
     recentFailures,
+    recentUserPurchases,
+    lastActivityAtUtc,
+    lastUserPurchaseAtUtc,
     reply,
     resetSelectedAttachment,
     searchQuery,
@@ -90,6 +98,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     setActiveSidePanelTab,
     setIsSidePanelOpen,
     setIsTemplateEditorOpen,
+    setAssignmentFilter,
     setReply,
     setSearchQuery,
     setSelectedAttachment,
@@ -116,6 +125,38 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
   } = useSupportConversationController({ locale, conversationId });
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
+  const isConversationClosed = conversation?.status === "Closed";
+  const reopenStatusAction =
+    primaryStatusAction?.status === "Open"
+      ? primaryStatusAction
+      : (secondaryStatusActions.find((action) => action.status === "Open") ?? null);
+  const readOnlyComposerTitle = isConversationClosed
+    ? locale === "ru"
+      ? "Диалог закрыт. Чтобы продолжить, переоткройте обращение."
+      : "Conversation is closed. Reopen it to continue."
+    : statusHint(conversation?.status ?? "Closed", text);
+  const imageViewerLabels = {
+    close: locale === "ru" ? "Закрыть" : "Close",
+    download: locale === "ru" ? "Скачать" : "Download",
+    jump: locale === "ru" ? "К сообщению" : "Jump to message",
+    openOriginal: locale === "ru" ? "Открыть оригинал" : "Open original",
+    share: locale === "ru" ? "Поделиться" : "Share",
+    author: locale === "ru" ? "Автор" : "Author",
+    date: locale === "ru" ? "Дата" : "Date",
+    size: locale === "ru" ? "Размер" : "Size",
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [conversation?.messages.length]);
+
+  const submitReply = () => {
+    setShowTemplates(false);
+    sendMutation.mutate();
+  };
 
   const closeFullscreenImage = () => {
     setFullscreenImage(null);
@@ -206,6 +247,15 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     window.open(fullscreenImage.url, "_blank", "noopener,noreferrer");
   };
 
+  const jumpToMessage = (messageId: string) => {
+    const target = document.getElementById(`message-${messageId}`);
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   return (
     <AdminPage className={styles.page}>
       {toast ? <Toast type={toast.type} message={toast.message} /> : null}
@@ -280,6 +330,17 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                   onChange={(value) => setStatusFilter(value as SupportFilter)}
                   compact
                 />
+                <SupportOptionGroup
+                  label={text.supportAssignedTo}
+                  value={assignmentFilter}
+                  options={[
+                    { value: "all", label: text.supportAssignmentAll },
+                    { value: "mine", label: text.supportAssignmentMine },
+                    { value: "unassigned", label: text.supportAssignmentUnassigned },
+                  ]}
+                  onChange={(value) => setAssignmentFilter(value as AssignmentFilter)}
+                  compact
+                />
                 <label className={styles.searchField}>
                   <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
                   <input
@@ -310,7 +371,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                       <Link
                         key={item.conversationId}
                         href={`/${locale}/support/${item.conversationId}`}
-                        className={`${styles.conversationRow} ${item.conversationId === conversationId ? styles.conversationRowActive : ""}`}
+                        className={`${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""}`}
                       >
                         <div className={styles.rowHeader}>
                           <div className={styles.rowIdentity}>
@@ -345,11 +406,9 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                 {statusLabel(item.status, text)}
                               </span>
                             ) : null}
-                            {item.priority.toLowerCase() === "high" ? (
-                              <span className={styles.rowSecondaryMeta}>
-                                {priorityLabel(item.priority, text)}
-                              </span>
-                            ) : null}
+                            <span className={styles.rowSecondaryMeta}>
+                              {priorityLabel(item.priority, text)}
+                            </span>
                           </div>
                         </div>
                       </Link>
@@ -359,26 +418,79 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
               )}
             </AdminCard>
 
-            <div className={styles.chatPane}>
-              <AdminCard className={styles.chatShell}>
+            <div
+              className={styles.chatPane}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (!isConversationReadOnly) setIsDragging(true);
+              }}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                if (!isConversationReadOnly) setIsDragging(true);
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                  setIsDragging(false);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setIsDragging(false);
+                if (isConversationReadOnly) return;
+                const droppedFile = event.dataTransfer.files[0];
+                if (
+                  droppedFile &&
+                  (droppedFile.type === "image/jpeg" ||
+                    droppedFile.type === "image/png" ||
+                    droppedFile.type === "image/webp")
+                ) {
+                  setSelectedAttachment(droppedFile);
+                }
+              }}
+            >
+              <AdminCard
+                className={`${styles.chatShell} ${isDragging ? styles.chatShellDragging : ""}`}
+              >
+                {isDragging ? (
+                  <div className={styles.dropOverlay}>
+                    <div className={styles.dropOverlayContent}>
+                      <svg
+                        width="40"
+                        height="40"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      <span>{locale === "ru" ? "Перетащите фото сюда" : "Drop image here"}</span>
+                    </div>
+                  </div>
+                ) : null}
                 <div className={styles.chatTopbar}>
                   <div className={styles.chatIdentityCompact}>
                     <div className={styles.chatTitleRow}>
                       <strong className={styles.chatUserName}>{userDisplayName}</strong>
                     </div>
-                    <div className={styles.chatFacts}>
-                      {chatFacts.map((fact) => (
-                        <span key={fact} className={styles.chatFactChip}>
-                          {fact}
-                        </span>
-                      ))}
-                    </div>
                     <div className={styles.chatMetaLine}>
                       <span>{conversation.userEmail}</span>
                       <span>•</span>
                       <span>{shortId(conversation.initiatorUserId)}</span>
+                    </div>
+                    <div className={styles.chatStatusLine}>
+                      <span>{statusLabel(conversation.status, text)}</span>
                       <span>•</span>
-                      <span>{`${text.supportAssignedTo}: ${conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}`}</span>
+                      <span>{priorityLabel(conversation.priority, text)}</span>
+                      <span>•</span>
+                      <span>
+                        {locale === "ru" ? "Назначен:" : "Assigned:"}{" "}
+                        {conversation.assignedAdminDisplayName?.trim() ||
+                          (locale === "ru" ? "Не назначен" : "Unassigned")}
+                      </span>
                     </div>
                   </div>
 
@@ -388,15 +500,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     >
                       {conversationSla.waitLabel}
                     </span>
-                    <div className={styles.chatStatusControls}>
-                      <AdminBadge tone={toneForStatus(conversation.status)}>
-                        {statusLabel(conversation.status, text)}
-                      </AdminBadge>
-                      <AdminBadge tone={priorityTone(conversation.priority)}>
-                        {priorityLabel(conversation.priority, text)}
-                      </AdminBadge>
-                    </div>
-                    <p className={styles.chatStatusNote}>{statusHint(conversation.status, text)}</p>
                   </div>
                 </div>
 
@@ -407,15 +510,20 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                       {conversation.messages.map((message) => (
                         <article
                           key={message.messageId}
+                          id={`message-${message.messageId}`}
                           className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser}`}
                         >
                           <div className={styles.messageHeader}>
                             <div className={styles.messageSenderWrap}>
-                              {!message.isFromAdmin ? (
+                              {message.isFromAdmin ? (
+                                <span className={`${styles.avatarTiny} ${styles.avatarTinyAdmin}`}>
+                                  PM
+                                </span>
+                              ) : (
                                 <span className={styles.avatarTiny}>
                                   {initialsFor(message.senderDisplayName)}
                                 </span>
-                              ) : null}
+                              )}
                               <strong>{message.senderDisplayName}</strong>
                             </div>
                             <span>{formatClockTime(message.createdAtUtc, locale)}</span>
@@ -427,6 +535,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                 setFullscreenImage({
                                   url: message.attachmentUrl!,
                                   fileName: message.attachmentFileName,
+                                  messageId: message.messageId,
+                                  senderDisplayName: message.senderDisplayName,
+                                  createdAtUtc: message.createdAtUtc,
+                                  fileSizeBytes: message.attachmentFileSizeBytes,
                                 })
                               }
                               className={styles.messageImageButton}
@@ -434,9 +546,9 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                               <Image
                                 src={message.attachmentUrl!}
                                 alt={message.attachmentFileName ?? message.body}
-                                width={704}
-                                height={576}
-                                sizes="(max-width: 860px) 100vw, 22rem"
+                                width={152}
+                                height={120}
+                                sizes="(max-width: 860px) 100vw, 152px"
                                 className={styles.messageImage}
                                 loading="lazy"
                                 unoptimized
@@ -462,7 +574,8 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                           {shouldRenderMessageBody(message) ? (
                             <div className={styles.messageBody}>{message.body}</div>
                           ) : null}
-                          {message.attachmentUploadStatus ? (
+                          {message.attachmentUploadStatus &&
+                          message.attachmentUploadStatus.toLowerCase() !== "uploaded" ? (
                             <div className={styles.messageAttachmentStatusRow}>
                               <span
                                 className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${message.attachmentUploadStatus.toLowerCase()}`] ?? ""}`}
@@ -478,6 +591,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                           ) : null}
                         </article>
                       ))}
+                      <div ref={messagesEndRef} />
                     </div>
                   </div>
                 ) : (
@@ -485,10 +599,35 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 )}
 
                 <div className={styles.composerShell}>
-                  {visibleTemplates.length > 0 ? (
+                  {isConversationReadOnly ? (
+                    <div className={styles.closedComposerNotice}>
+                      <div className={styles.closedComposerCopy}>
+                        <span className={styles.closedConversationPill}>
+                          {statusLabel(conversation.status, text)}
+                        </span>
+                        <strong>{readOnlyComposerTitle}</strong>
+                        {!isConversationClosed ? (
+                          <span>{statusHint(conversation.status, text)}</span>
+                        ) : null}
+                      </div>
+                      {reopenStatusAction ? (
+                        <div className={styles.closedComposerActions}>
+                          <Button
+                            variant="primary"
+                            onClick={() => statusMutation.mutate(reopenStatusAction.status)}
+                            disabled={statusMutation.isPending}
+                          >
+                            {text.supportReopenConversationAction}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <>
+                  {showTemplates && visibleTemplates.length > 0 ? (
                     <div className={styles.composerTemplateRail}>
                       <span className={styles.subtle}>{text.supportQuickRepliesLabel}</span>
-                      <div className={styles.templateList}>
+                      <div className={`${styles.templateList} ${styles.templateListCompact}`}>
                         {visibleTemplates.map((template) => (
                           <Button
                             key={template.templateId}
@@ -524,6 +663,22 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     >
                       {text.chooseFile}
                     </Button>
+                    {visibleTemplates.length > 0 ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowTemplates((v) => !v)}
+                        disabled={isConversationReadOnly}
+                      >
+                        {showTemplates
+                          ? locale === "ru"
+                            ? "⚡ Скрыть"
+                            : "⚡ Hide"
+                          : locale === "ru"
+                            ? "⚡ Шаблоны"
+                            : "⚡ Templates"}
+                      </Button>
+                    ) : null}
                     <span className={styles.subtle}>{text.supportAttachmentHint}</span>
                   </div>
                   {selectedAttachment ? (
@@ -536,6 +691,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             setFullscreenImage({
                               url: attachmentPreviewUrl,
                               fileName: selectedAttachment.name,
+                              fileSizeBytes: selectedAttachment.size,
                             })
                           }
                         >
@@ -568,6 +724,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                               setFullscreenImage({
                                 url: attachmentPreviewUrl,
                                 fileName: selectedAttachment.name,
+                                fileSizeBytes: selectedAttachment.size,
                               })
                             }
                           >
@@ -585,6 +742,18 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     className={styles.textarea}
                     value={composerValue}
                     onChange={(event) => setReply(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" &&
+                        !event.shiftKey &&
+                        !isConversationReadOnly &&
+                        !sendMutation.isPending &&
+                        (reply.trim() || hasComposerAttachment)
+                      ) {
+                        event.preventDefault();
+                        submitReply();
+                      }
+                    }}
                     placeholder={
                       isConversationReadOnly
                         ? statusHint(conversation.status, text)
@@ -594,21 +763,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                   />
 
                   <div className={styles.composerActions}>
-                    <div className={styles.composerContextHint}>
-                      <span
-                        className={styles.subtle}
-                      >{`${text.supportMessagesCount}: ${conversation.messages.length}`}</span>
-                      <span
-                        className={styles.subtle}
-                      >{`${text.supportUnreadAdmin}: ${conversation.adminUnreadCount}`}</span>
-                      <span
-                        className={styles.subtle}
-                      >{`${text.supportUnreadUser}: ${conversation.userUnreadCount}`}</span>
-                    </div>
                     <div className={styles.rowMetaGroup}>
                       <Button
                         variant="primary"
-                        onClick={() => sendMutation.mutate()}
+                        onClick={submitReply}
                         disabled={
                           isConversationReadOnly ||
                           sendMutation.isPending ||
@@ -621,18 +779,32 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                       </Button>
                     </div>
                   </div>
+                    </>
+                  )}
                 </div>
               </AdminCard>
             </div>
 
             <SupportConversationSidePanel
               locale={locale}
+              onJumpToMessage={jumpToMessage}
+              onOpenAttachmentPreview={(message) =>
+                setFullscreenImage({
+                  url: message.attachmentUrl!,
+                  fileName: message.attachmentFileName,
+                  messageId: message.messageId,
+                  senderDisplayName: message.senderDisplayName,
+                  createdAtUtc: message.createdAtUtc,
+                  fileSizeBytes: message.attachmentFileSizeBytes,
+                })
+              }
               controller={{
                 activeSidePanelTab,
                 accountCreatedAt,
                 activityTimeline,
                 analyticsQuery,
                 applyTemplate,
+                assignmentFilter,
                 assignmentMutation,
                 attachmentInputRef,
                 attachmentPreviewUrl,
@@ -654,6 +826,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 isTemplateEditorOpen,
                 openTemplateEditor,
                 primaryStatusAction,
+                purchasesQuery,
+                recentUserPurchases,
+                lastActivityAtUtc,
+                lastUserPurchaseAtUtc,
                 recentFailures,
                 reply,
                 resetSelectedAttachment,
@@ -666,6 +842,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 setActiveSidePanelTab,
                 setIsSidePanelOpen,
                 setIsTemplateEditorOpen,
+                setAssignmentFilter,
                 setReply,
                 setSearchQuery,
                 setSelectedAttachment,
@@ -704,7 +881,7 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                 <div className={styles.imageViewerHeader}>
                   <strong>{fullscreenImage.fileName?.trim() || "Image"}</strong>
                   <Button variant="ghost" size="sm" onClick={closeFullscreenImage}>
-                    Close
+                    {imageViewerLabels.close}
                   </Button>
                 </div>
                 <div className={styles.imageViewerBody}>
@@ -718,18 +895,49 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     unoptimized
                   />
                 </div>
+                <div className={styles.imageViewerMeta}>
+                  {fullscreenImage.senderDisplayName ? (
+                    <div>
+                      <span>{imageViewerLabels.author}</span>
+                      <strong>{fullscreenImage.senderDisplayName}</strong>
+                    </div>
+                  ) : null}
+                  {fullscreenImage.createdAtUtc ? (
+                    <div>
+                      <span>{imageViewerLabels.date}</span>
+                      <strong>{formatDateTime(fullscreenImage.createdAtUtc, locale)}</strong>
+                    </div>
+                  ) : null}
+                  <div>
+                    <span>{imageViewerLabels.size}</span>
+                    <strong>{formatFileSize(fullscreenImage.fileSizeBytes, locale)}</strong>
+                  </div>
+                </div>
                 <div className={styles.imageViewerActions}>
                   <Button variant="secondary" size="sm" onClick={saveFullscreenImage}>
-                    Save image
+                    {imageViewerLabels.download}
                   </Button>
                   <Button variant="secondary" size="sm" onClick={shareFullscreenImage}>
-                    Share
+                    {imageViewerLabels.share}
                   </Button>
+                  {fullscreenImage.messageId ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const messageId = fullscreenImage.messageId!;
+                        closeFullscreenImage();
+                        window.setTimeout(() => jumpToMessage(messageId), 0);
+                      }}
+                    >
+                      {imageViewerLabels.jump}
+                    </Button>
+                  ) : null}
                   <Button variant="secondary" size="sm" onClick={openFullscreenImageInNewTab}>
-                    Open original
+                    {imageViewerLabels.openOriginal}
                   </Button>
                   <Button variant="primary" size="sm" onClick={closeFullscreenImage}>
-                    Close
+                    {imageViewerLabels.close}
                   </Button>
                 </div>
               </div>

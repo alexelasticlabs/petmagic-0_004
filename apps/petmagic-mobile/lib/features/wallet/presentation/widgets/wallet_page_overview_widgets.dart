@@ -24,9 +24,8 @@ class _WalletCompanionHero extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF071A28),
-              const Color(0xFF0A2436),
-              const Color(0xFF0A1D2B),
+              colors.surfaceStrong,
+              colors.surfaceStrong.withValues(alpha: 0.75),
             ],
           ),
         ),
@@ -196,13 +195,22 @@ class _BalanceCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+          boxShadow: [
+            BoxShadow(
+              color: colors.accent.withValues(alpha: 0.07),
+              blurRadius: 28,
+              spreadRadius: 2,
+              offset: const Offset(0, 6),
+            ),
+          ],
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
+            stops: const [0.0, 0.55, 1.0],
             colors: [
-              const Color(0xFF041521),
-              const Color(0xFF08222F),
-              const Color(0xFF0A1E2D),
+              const Color(0xFF031018),
+              const Color(0xFF061C28),
+              const Color(0xFF081A26),
             ],
           ),
         ),
@@ -253,7 +261,7 @@ class _BalanceCard extends StatelessWidget {
                           NumberFormat.decimalPattern().format(balance),
                           style: TextStyle(
                             color: colors.textStrong,
-                            fontSize: 44,
+                            fontSize: 50,
                             fontWeight: FontWeight.w900,
                             height: 0.96,
                           ),

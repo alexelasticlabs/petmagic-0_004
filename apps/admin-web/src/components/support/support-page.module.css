@@ -1,5 +1,5 @@
 .page {
-  --support-page-max: 138rem;
+  --support-page-max: 90rem;
   display: grid;
   gap: 24px;
   width: min(100%, var(--support-page-max));
@@ -8,18 +8,18 @@
 
 .workspace {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   align-items: start;
   min-width: 0;
 }
 
 .workspaceCompact {
-  grid-template-columns: minmax(19rem, 22rem) minmax(0, 1.9fr);
+  grid-template-columns: minmax(16rem, 18rem) minmax(36rem, 1fr);
   justify-content: stretch;
 }
 
 .workspaceWithSidebar {
-  grid-template-columns: minmax(19rem, 22rem) minmax(0, 1.9fr) minmax(22rem, 25rem);
+  grid-template-columns: minmax(15rem, 16.75rem) minmax(36rem, 1fr) minmax(20.5rem, 22rem);
   justify-content: stretch;
 }
 
@@ -46,11 +46,19 @@
 }
 
 .sidePanelTabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 8px;
   align-items: stretch;
   min-width: 0;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidePanelTabs::-webkit-scrollbar {
+  display: none;
 }
 
 .compactHeaderMeta {
@@ -140,12 +148,22 @@
 
 .optionGroupRail {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 8px;
   min-width: 0;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.optionGroupRail::-webkit-scrollbar {
+  display: none;
 }
 
 .optionChip {
+  flex: 0 0 auto;
+  white-space: nowrap;
   border: 1px solid var(--border-soft);
   border-radius: 999px;
   background: var(--surface-2);
@@ -279,14 +297,14 @@
 
 .list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
 .conversationRow {
   display: grid;
-  gap: 10px;
-  padding: 12px 13px;
+  gap: 8px;
+  padding: 10px 11px;
   border-radius: 1.05rem;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
@@ -308,6 +326,17 @@
 .conversationRowActive {
   border-color: rgba(34, 197, 94, 0.72);
   box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
+}
+
+.conversationRowClosed {
+  border-color: rgba(100, 116, 139, 0.24);
+  background: color-mix(in srgb, var(--surface-2) 84%, #64748b 16%);
+}
+
+.conversationRowClosed .avatar,
+.conversationRowClosed .rowPreview,
+.conversationRowClosed .rowSecondaryMeta {
+  opacity: 0.72;
 }
 
 .rowHeader,
@@ -507,9 +536,43 @@
 .chatShell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 16px;
-  min-height: clamp(40rem, 70vh, 56rem);
+  gap: 14px;
+  height: clamp(38rem, calc(100vh - 10rem), 66rem);
+  max-height: clamp(38rem, calc(100vh - 10rem), 66rem);
   min-width: 0;
+  overflow: hidden;
+  position: relative;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.chatShellDragging {
+  border-color: rgba(34, 197, 94, 0.65) !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18) !important;
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: rgba(34, 197, 94, 0.06);
+  border: 2px dashed rgba(34, 197, 94, 0.55);
+  pointer-events: none;
+}
+
+.dropOverlayContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: rgba(34, 197, 94, 0.85);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .chatTitleRow {
@@ -568,12 +631,28 @@
   font-size: 0.8rem;
 }
 
+.chatStatusLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  min-width: 0;
+}
+
 .chatHeaderAside {
   min-width: min(100%, 20rem);
   display: grid;
   justify-items: end;
   align-content: start;
   gap: 10px;
+}
+
+.chatResponderPill {
+  border-color: rgba(59, 130, 246, 0.36);
+  background: rgba(59, 130, 246, 0.14);
+  color: #dbeafe;
 }
 
 .chatStatusControls {
@@ -609,7 +688,7 @@
 
 .messages {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   min-height: 0;
   max-height: 100%;
   overflow-y: auto;
@@ -619,8 +698,8 @@
 .messageItem {
   display: grid;
   gap: 10px;
-  max-width: min(88%, 46rem);
-  padding: 12px 14px;
+  max-width: min(82%, 38rem);
+  padding: 13px 15px;
   border-radius: 0.95rem;
   border: 1px solid var(--border-soft);
   background: var(--surface-1);
@@ -628,13 +707,13 @@
 
 .messageAdmin {
   justify-self: end;
-  background: rgba(19, 75, 50, 0.28);
-  border-color: rgba(34, 197, 94, 0.26);
+  background: rgba(16, 87, 57, 0.34);
+  border-color: rgba(34, 197, 94, 0.34);
 }
 
 .messageUser {
   justify-self: start;
-  background: var(--surface-1);
+  background: color-mix(in srgb, var(--surface-1) 84%, #0f172a 16%);
 }
 
 .messageImageButton,
@@ -668,10 +747,10 @@
 .messageImage {
   display: block;
   width: 100%;
-  max-width: 22rem;
-  max-height: 18rem;
+  max-width: 9.5rem;
+  max-height: 7.5rem;
   object-fit: cover;
-  border-radius: 0.95rem;
+  border-radius: 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -780,6 +859,11 @@
   font-size: 0.72rem;
 }
 
+.avatarTinyAdmin {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.28), rgba(30, 64, 175, 0.82));
+  border-color: rgba(59, 130, 246, 0.38);
+}
+
 .messageAdmin .messageBody,
 .messageAdmin .messageHeader {
   color: #f5fff8;
@@ -793,8 +877,8 @@
 
 .composerShell {
   display: grid;
-  gap: 12px;
-  padding-top: 8px;
+  gap: 10px;
+  padding-top: 6px;
   border-top: 1px solid var(--border-soft);
   min-width: 0;
 }
@@ -824,8 +908,8 @@
 
 .attachmentPreviewImage {
   display: block;
-  width: 72px;
-  height: 72px;
+  width: 88px;
+  height: 88px;
   border-radius: 0.9rem;
   object-fit: cover;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -841,7 +925,19 @@
 
 .composerTemplateRail {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+}
+
+.templateListCompact {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.templateListCompact::-webkit-scrollbar {
+  display: none;
 }
 
 .quickTemplateButton {
@@ -859,12 +955,61 @@
 }
 
 .textarea {
-  min-height: 128px;
+  min-height: 84px;
+  max-height: 180px;
   resize: vertical;
 }
 
 .composerActions {
+  justify-content: flex-end;
   align-items: center;
+}
+
+.closedComposerNotice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  background: color-mix(in srgb, var(--surface-2) 86%, #64748b 14%);
+}
+
+.closedComposerCopy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.closedComposerCopy strong {
+  color: var(--text-strong);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.closedComposerCopy span:not(.closedConversationPill) {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.closedConversationPill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.65rem;
+  padding: 0.25rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  background: rgba(100, 116, 139, 0.13);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.closedComposerActions {
+  flex: 0 0 auto;
 }
 
 .sidePanelCard {
@@ -874,6 +1019,36 @@
 .sidePanelContent {
   display: grid;
   gap: 12px;
+}
+
+.quickLinksRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quickLinksRow :global(.ui-button) {
+  flex: 1 1 calc(50% - 4px);
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+}
+
+.dangerActionBlock {
+  display: grid;
+  gap: 8px;
+  padding: 0.72rem;
+  border-radius: 0.92rem;
+  border: 1px solid rgba(248, 81, 73, 0.2);
+  background: rgba(47, 15, 19, 0.16);
+}
+
+.dangerActionBlock span {
+  color: #ffb8b1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .statusOverviewCard {
@@ -952,6 +1127,26 @@
   background: rgba(47, 15, 19, 0.22);
 }
 
+.resolveConfirmBox {
+  display: grid;
+  gap: 10px;
+  padding: 0.82rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  background: var(--surface-2);
+}
+
+.resolveConfirmText {
+  color: var(--text-strong);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.resolveConfirmActions {
+  display: flex;
+  gap: 8px;
+}
+
 .workflowDangerLabel {
   color: #ffb8b1;
   font-size: 0.72rem;
@@ -972,6 +1167,7 @@
 }
 
 .sidePanelTab {
+  flex: 0 0 auto;
   border: 1px solid var(--border-soft);
   border-radius: 0.85rem;
   background: rgba(13, 20, 33, 0.84);
@@ -981,14 +1177,20 @@
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
-  width: 100%;
+  min-width: max-content;
   justify-content: center;
+  white-space: nowrap;
 }
 
 .sidePanelTabActive {
   color: #f4fbff;
   border-color: rgba(34, 197, 94, 0.52);
   background: rgba(34, 197, 94, 0.12);
+}
+
+.sidePanelTabDisabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .userSummaryHeader,
@@ -1185,6 +1387,66 @@
   font-size: 0.95rem;
 }
 
+.attachmentList {
+  display: grid;
+  gap: 10px;
+  max-height: 40rem;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.attachmentListItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 0.9rem;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+}
+
+.attachmentListThumbButton {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 0.8rem;
+  overflow: hidden;
+}
+
+.attachmentListThumb {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.attachmentListMeta {
+  display: grid;
+  gap: 2px;
+}
+
+.attachmentListMeta strong {
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentListMeta span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.attachmentListActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 @media (max-width: 1320px) {
   .workspace,
   .workspaceCompact,
@@ -1197,16 +1459,8 @@
     grid-column: 1 / -1;
   }
 
-  .optionGroupRail {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .optionGroupRail::-webkit-scrollbar {
-    display: none;
+  .sidePanelTabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1252,17 +1506,12 @@
   }
 
   .chatShell {
-    min-height: auto;
+    height: auto;
+    max-height: none;
   }
 
   .toolbarCompactEnd {
     justify-content: flex-start;
-  }
-
-  .optionGroupRail {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    padding-bottom: 2px;
   }
 
   .sidePanelCard {
@@ -1271,6 +1520,15 @@
 
   .messages {
     max-height: none;
+  }
+
+  .attachmentListItem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .attachmentListActions {
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 
   .metricsGrid {
@@ -1284,7 +1542,6 @@
   }
 
   .rowFooter,
-  .composerActions,
   .compactHeader,
   .templateListItemHeader,
   .templatePreviewHeader,
@@ -1317,8 +1574,18 @@
     justify-items: start;
   }
 
+  .closedComposerNotice {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .closedComposerActions :global(.ui-button) {
+    width: 100%;
+  }
+
   .messageItem {
     justify-self: stretch;
+    max-width: 100%;
   }
 
   .compactHeaderTrail strong,
@@ -1356,13 +1623,14 @@
   }
 
   .optionGroupRail {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    overflow: visible;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 
   .optionChip {
-    width: 100%;
+    width: auto;
     text-align: center;
     justify-content: center;
   }
@@ -1394,15 +1662,16 @@
 
 @media (min-width: 1600px) {
   .workspaceCompact {
-    grid-template-columns: minmax(20rem, 23rem) minmax(0, 2.1fr);
+    grid-template-columns: minmax(17rem, 19rem) minmax(36rem, 1fr);
   }
 
   .workspaceWithSidebar {
-    grid-template-columns: minmax(20rem, 23rem) minmax(0, 2.15fr) minmax(23rem, 26rem);
+    grid-template-columns: minmax(15rem, 16.75rem) minmax(36rem, 1fr) minmax(20.5rem, 22rem);
   }
 
   .chatShell {
-    min-height: clamp(44rem, 74vh, 60rem);
+    height: clamp(40rem, calc(100vh - 9rem), 68rem);
+    max-height: clamp(40rem, calc(100vh - 9rem), 68rem);
   }
 }
 
@@ -1455,6 +1724,35 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.imageViewerMeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 8px;
+}
+
+.imageViewerMeta div {
+  display: grid;
+  gap: 2px;
+  padding: 0.62rem 0.72rem;
+  border-radius: 0.82rem;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+}
+
+.imageViewerMeta span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.imageViewerMeta strong {
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
 .imageViewerActions {
   display: flex;
   flex-wrap: wrap;
@@ -1462,3 +1760,194 @@
   gap: 8px;
 }
 
+:global(:root[data-theme="light"]) .inboxPane,
+:global(:root[data-theme="light"]) .chatShell,
+:global(:root[data-theme="light"]) .sideCard {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.97));
+}
+
+:global(:root[data-theme="light"]) .optionChip {
+  background: var(--surface-1);
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .optionChip:hover {
+  color: var(--text-strong);
+}
+
+:global(:root[data-theme="light"]) .optionChipActive {
+  color: #14532d;
+  background: rgba(22, 163, 74, 0.14);
+}
+
+:global(:root[data-theme="light"]) .paneCountBadge {
+  color: #14532d;
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.34);
+}
+
+:global(:root[data-theme="light"]) .chatFactChip {
+  background: var(--surface-1);
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .messageAdmin {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.3);
+}
+
+:global(:root[data-theme="light"]) .messageAdmin .messageBody,
+:global(:root[data-theme="light"]) .messageAdmin .messageHeader,
+:global(:root[data-theme="light"]) .messageHeader {
+  color: var(--text-strong);
+}
+
+:global(:root[data-theme="light"]) .messageAttachmentCard {
+  border-color: rgba(22, 163, 74, 0.22);
+  background: rgba(22, 163, 74, 0.08);
+}
+
+:global(:root[data-theme="light"]) .messageAttachmentStatusPill {
+  color: #334155;
+}
+
+:global(:root[data-theme="light"]) .statusOverviewText,
+:global(:root[data-theme="light"]) .statusOverviewHint {
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .workflowDangerZone {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.24);
+}
+
+:global(:root[data-theme="light"]) .workflowDangerLabel {
+  color: #b91c1c;
+}
+
+:global(:root[data-theme="light"]) .workflowDangerButton {
+  border-color: rgba(185, 28, 28, 0.45) !important;
+  background: rgba(185, 28, 28, 0.9) !important;
+  color: #fff5f5 !important;
+}
+
+:global(:root[data-theme="light"]) .sidePanelTab {
+  background: var(--surface-1);
+  color: var(--text-soft);
+}
+
+:global(:root[data-theme="light"]) .sidePanelTabActive {
+  color: #14532d;
+  border-color: rgba(22, 163, 74, 0.5);
+  background: rgba(22, 163, 74, 0.14);
+}
+
+:global(:root[data-theme="light"]) .slaPill_good {
+  color: #166534;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.22);
+}
+
+:global(:root[data-theme="light"]) .slaPill_warning {
+  color: #92400e;
+  background: rgba(250, 204, 21, 0.18);
+  border-color: rgba(217, 119, 6, 0.24);
+}
+
+:global(:root[data-theme="light"]) .slaPill_risk {
+  color: #c2410c;
+  background: rgba(249, 115, 22, 0.14);
+  border-color: rgba(234, 88, 12, 0.22);
+}
+
+:global(:root[data-theme="light"]) .slaPill_critical {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(220, 38, 38, 0.22);
+}
+
+:global(:root[data-theme="light"]) .templateListItem {
+  background: var(--surface-1);
+  color: var(--text-strong);
+}
+
+:global(:root[data-theme="light"]) .imageViewerImage,
+:global(:root[data-theme="light"]) .messageImage,
+:global(:root[data-theme="light"]) .attachmentPreviewImage {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+:global(:root[data-theme="light"]) .paneEyebrow,
+:global(:root[data-theme="light"]) .optionGroupLabel {
+  color: var(--text-subtle);
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .paneTitle {
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+:global(:root[data-theme="light"]) .paneDescription {
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+:global(:root[data-theme="light"]) .optionChip {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .chatUserName {
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .chatFactChip {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .chatMetaLine,
+:global(:root[data-theme="light"]) .statusOverviewText,
+:global(:root[data-theme="light"]) .statusOverviewHint,
+:global(:root[data-theme="light"]) .messageHeader {
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+:global(:root[data-theme="light"]) .messageBody {
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+:global(:root[data-theme="light"]) .metricTile span,
+:global(:root[data-theme="light"]) .timelineCardHeader span,
+:global(:root[data-theme="light"]) .timelineCardBody,
+:global(:root[data-theme="light"]) .detailRow span,
+:global(:root[data-theme="light"]) .userCardBody span {
+  color: var(--text-soft);
+  font-size: 0.83rem;
+}
+
+:global(:root[data-theme="light"]) .metricTile strong,
+:global(:root[data-theme="light"]) .timelineCardHeader strong,
+:global(:root[data-theme="light"]) .sectionHeaderCompact strong,
+:global(:root[data-theme="light"]) .detailRow strong,
+:global(:root[data-theme="light"]) .userCardBody strong {
+  color: var(--text-strong);
+  font-size: 0.95rem;
+}
+
+:global(:root[data-theme="light"]) .sidePanelTab {
+  font-size: 0.79rem;
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .templateSnippet,
+:global(:root[data-theme="light"]) .templatePreviewBody {
+  font-size: 0.92rem;
+  line-height: 1.56;
+}

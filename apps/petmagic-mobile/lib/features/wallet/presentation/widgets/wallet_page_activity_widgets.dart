@@ -91,8 +91,37 @@ class _FeaturedPackTile extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.border.withValues(alpha: 0.9)),
-        color: colors.surfaceGlass,
+        border: Border.all(
+          color: isBestOffer
+              ? badgeColor.withValues(alpha: 0.55)
+              : isPopular
+                  ? colors.accent.withValues(alpha: 0.35)
+                  : colors.border.withValues(alpha: 0.9),
+          width: isBestOffer ? 1.5 : 1.0,
+        ),
+        boxShadow: isBestOffer
+            ? [
+                BoxShadow(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+        gradient: isBestOffer
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                stops: const [0.0, 0.5, 1.0],
+                colors: [
+                  badgeColor.withValues(alpha: 0.10),
+                  colors.surfaceGlass,
+                  badgeColor.withValues(alpha: 0.05),
+                ],
+              )
+            : null,
+        color: isBestOffer ? null : colors.surfaceGlass,
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
@@ -604,29 +633,30 @@ class _SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 2, 2, 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: 4,
+            height: 22,
             decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
               color: colors.accent,
-              shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: colors.accent.withValues(alpha: 0.35),
+                  color: colors.accent.withValues(alpha: 0.45),
                   blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  spreadRadius: 1,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               title,
               style: TextStyle(
                 color: colors.textStrong,
-                fontSize: 15.5,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
               ),
             ),

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { sortSupportQueueItems } from "@/components/support/support-conversation-helpers";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchSupportInbox,
@@ -50,7 +51,7 @@ export function useSupportInboxController({ locale }: UseSupportInboxControllerP
 
   const filteredConversations = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
-    const conversations = inboxQuery.data ?? [];
+    const conversations = sortSupportQueueItems(inboxQuery.data ?? []);
     if (!normalizedQuery) {
       return conversations;
     }

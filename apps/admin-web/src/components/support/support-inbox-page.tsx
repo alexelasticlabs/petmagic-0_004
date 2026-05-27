@@ -138,7 +138,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
               <Link
                 key={conversation.conversationId}
                 href={`/${locale}/support/${conversation.conversationId}`}
-                className={styles.conversationRow}
+                className={`${styles.conversationRow} ${conversation.isReadOnly ? styles.conversationRowClosed : ""}`}
               >
                 <div className={styles.rowHeader}>
                   <div className={styles.rowIdentity}>

@@ -342,24 +342,9 @@ class PremiumController extends Notifier<PremiumState> {
 
       final config = results[0] as PremiumPaywallConfigModel;
       final status = results[1] as PremiumStatusModel;
-      final storeProvider = _platformStoreProvider();
       final plans = config.plans;
-      var storeAvailable = false;
-      var availableStoreProductIds = <String>{};
-
-      if (storeProvider != null) {
-        try {
-          final availability = await _repository.fetchStoreAvailability(
-            plans,
-            storeProvider,
-          );
-          storeAvailable = availability.isAvailable;
-          availableStoreProductIds = availability.productIds;
-        } catch (_) {
-          storeAvailable = false;
-          availableStoreProductIds = <String>{};
-        }
-      }
+      const storeAvailable = false;
+      const availableStoreProductIds = <String>{};
 
       final selectedPlanCode =
           plans.any((plan) => plan.planCode == config.recommendedPlanCode)
@@ -376,6 +361,9 @@ class PremiumController extends Notifier<PremiumState> {
       final configuredProviders = enabledMethods
           .map((method) => method.provider)
           .toList(growable: false);
+        final stripeIsEnabled = configuredProviders.contains(
+        PremiumPaymentProvider.stripe,
+        );
       final defaultProvider = enabledMethods
           .where((method) => method.isSelectedByDefault)
           .map((method) => method.provider)
@@ -383,7 +371,9 @@ class PremiumController extends Notifier<PremiumState> {
           .firstOrNull;
 
       final selectedProvider =
-          configuredProviders.contains(state.selectedProvider)
+          stripeIsEnabled
+          ? PremiumPaymentProvider.stripe
+          : configuredProviders.contains(state.selectedProvider)
           ? state.selectedProvider
           : defaultProvider ??
                 (configuredProviders.isEmpty

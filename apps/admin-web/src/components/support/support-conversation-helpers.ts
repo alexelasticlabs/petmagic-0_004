@@ -1,4 +1,8 @@
-import type { AdminSupportConversation, AdminUserAnalytics } from "@/lib/api-client";
+import type {
+  AdminSupportConversation,
+  AdminSupportConversationSummary,
+  AdminUserAnalytics,
+} from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
 
 type RelativeTimeFormat = "compact" | "verbose";
@@ -251,6 +255,54 @@ export function initialsFor(value: string) {
 
 export function shortId(value: string) {
   return value.length > 8 ? `#${value.slice(0, 8)}` : value;
+}
+
+type SupportQueueItem = Pick<
+  AdminSupportConversationSummary,
+  | "adminUnreadCount"
+  | "createdAtUtc"
+  | "lastMessageAtUtc"
+  | "priority"
+  | "status"
+  | "updatedAtUtc"
+>;
+
+export function sortSupportQueueItems<T extends SupportQueueItem>(items: readonly T[]) {
+  return items.slice().sort((left, right) => {
+    const urgencyDelta = getSupportQueueUrgency(right) - getSupportQueueUrgency(left);
+    if (urgencyDelta !== 0) {
+      return urgencyDelta;
+    }
+
+    return Date.parse(right.updatedAtUtc) - Date.parse(left.updatedAtUtc);
+  });
+}
+
+function getSupportQueueUrgency(item: SupportQueueItem) {
+  const statusWeight: Record<string, number> = {
+    WaitingForSupport: 700,
+    Open: 520,
+    InProgress: 420,
+    WaitingForUser: 260,
+    Resolved: 60,
+    Closed: 0,
+  };
+  const priorityWeight: Record<string, number> = {
+    High: 120,
+    Normal: 60,
+    Low: 0,
+  };
+  const waitingSince = Date.parse(item.lastMessageAtUtc ?? item.createdAtUtc);
+  const waitingMinutes = Number.isNaN(waitingSince)
+    ? 0
+    : Math.max(0, Math.round((Date.now() - waitingSince) / 60000));
+
+  return (
+    (statusWeight[item.status] ?? 0) +
+    (priorityWeight[item.priority] ?? 0) +
+    item.adminUnreadCount * 800 +
+    Math.min(waitingMinutes, 1440) / 4
+  );
 }
 
 export function buildActivityTimeline(

@@ -302,18 +302,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
 
   return (
     <AdminPage className={styles.page}>
-      <AdminPageHero
-        eyebrow={text.eyebrow}
-        title={text.title}
-        description={text.description}
-        metaItems={[
-          `${text.metaPacks}: ${packs.length}`,
-          `${text.metaLedger}: ${ledgerItems.length}`,
-          `${text.metaPurchases}: ${purchaseItems.length}`,
-          `${text.metaSubscriptions}: ${subscriptionItems.length}`,
-          `${text.metaRoutes}: ${providerConfigs.length}`,
-        ]}
-      />
+      <AdminPageHero eyebrow={text.eyebrow} title={text.title} description={text.description} />
 
       <AdminPageGrid columns="four">
         <AdminKpiCard

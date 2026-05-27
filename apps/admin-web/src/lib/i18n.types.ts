@@ -430,6 +430,7 @@ export type Dictionary = {
   supportPriorityLow: string;
   supportPriorityNormal: string;
   supportPriorityHigh: string;
+  supportPriorityCritical: string;
   supportWaitingLabel: string;
   supportMarkInProgressAction: string;
   supportMarkWaitingForSupportAction: string;
@@ -443,6 +444,9 @@ export type Dictionary = {
   supportViewGenerationsTab: string;
   supportViewErrorsTab: string;
   supportViewUserTab: string;
+  supportViewActivityTab: string;
+  supportViewDialogTab: string;
+  supportViewAttachmentsTab: string;
   supportViewTemplatesTab: string;
   supportViewHistoryTab: string;
   supportOpenPanelAction: string;
@@ -460,6 +464,12 @@ export type Dictionary = {
   supportRecentPurchasesTitle: string;
   supportRecentGenerationsTitle: string;
   supportGenerationErrorsTitle: string;
+  supportActivityTitle: string;
+  supportActivityDescription: string;
+  supportDialogTitle: string;
+  supportDialogDescription: string;
+  supportAttachmentsTitle: string;
+  supportAttachmentsDescription: string;
   supportNoPurchases: string;
   supportNoGenerationErrors: string;
   supportOccurrencesLabel: string;
