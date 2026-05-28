@@ -1180,6 +1180,18 @@
   gap: 4px;
 }
 
+.messageTick {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.messageTickRead {
+  color: rgba(34, 197, 94, 0.82);
+}
+
 .messageReplyAction {
   border: 1px solid var(--border-soft);
   border-radius: 999px;

@@ -940,6 +940,15 @@ export function SupportConversationPage({
                                   </div>
                                   <div className={styles.messageHeaderActions}>
                                     <span>{formatClockTime(message.createdAtUtc, locale)}</span>
+                                    {message.isFromAdmin && !isSystemMessage ? (
+                                      <span
+                                        className={`${styles.messageTick} ${message.isRead ? styles.messageTickRead : ""}`}
+                                        aria-label={message.isRead ? "Read" : "Sent"}
+                                        title={message.isRead ? (locale === "ru" ? "Прочитано" : "Read") : (locale === "ru" ? "Отправлено" : "Sent")}
+                                      >
+                                        {message.isRead ? "✓✓" : "✓"}
+                                      </span>
+                                    ) : null}
                                     <button
                                       type="button"
                                       className={styles.messageReplyAction}

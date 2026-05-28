@@ -1,15 +1,18 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { AdminLoginScreen } from "@/components/admin/admin-login-screen";
 import styles from "@/components/admin/admin-shell.module.css";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { buildLocaleSwitchPath, getAdminPageMeta, stripLocalePrefix } from "@/lib/admin-navigation";
-import { logout, useAuthSession } from "@/lib/api-client";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
+import { fetchSupportInbox, logout, useAuthSession } from "@/lib/api-client";
 import { type Locale, getDictionary } from "@/lib/i18n";
+import { useSupportRealtime } from "@/lib/support-realtime";
 import {
   type AdminTheme,
   applyAdminTheme,
@@ -32,6 +35,23 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const isLoginPage = currentPath === "/";
   const authSession = useAuthSession();
   const session = isLoginPage ? null : authSession;
+
+  /* Support unread count for nav badge */
+  const queryClient = useQueryClient();
+  const inboxQuery = useQuery({
+    queryKey: adminQueryKeys.supportInbox("all", "all"),
+    queryFn: () => fetchSupportInbox(undefined, "all"),
+    enabled: Boolean(session) && !isLoginPage,
+    staleTime: 30_000,
+    refetchInterval: 120_000,
+  });
+  useSupportRealtime(session?.accessToken, () => {
+    void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
+  });
+  const supportUnreadCount = useMemo(
+    () => inboxQuery.data?.filter((c) => c.unreadForAdmin).length ?? 0,
+    [inboxQuery.data],
+  );
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -124,6 +144,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
         onNavigate={() => setSidebarOpen(false)}
         onLogout={() => void handleLogout()}
         logoutLabel={text.navLogout}
+        supportUnreadCount={supportUnreadCount}
       />
 
       <div className={styles.main}>

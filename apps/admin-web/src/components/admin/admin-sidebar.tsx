@@ -30,6 +30,7 @@ type AdminSidebarProps = {
   onNavigate: () => void;
   onLogout: () => void;
   logoutLabel: string;
+  supportUnreadCount?: number;
 };
 
 const iconMap = {
@@ -85,6 +86,7 @@ export function AdminSidebar({
   onNavigate,
   onLogout,
   logoutLabel,
+  supportUnreadCount = 0,
 }: AdminSidebarProps) {
   const navItems = getAdminNavItems(locale);
   const navSections = buildNavSections(navItems, locale);
@@ -147,6 +149,11 @@ export function AdminSidebar({
       >
         <Icon className={styles.navIcon} />
         <span className={styles.navLabel}>{item.label}</span>
+        {item.key === "support" && supportUnreadCount > 0 ? (
+          <span className={styles.navBadge} aria-label={`${supportUnreadCount} unread`}>
+            {supportUnreadCount > 99 ? "99+" : supportUnreadCount}
+          </span>
+        ) : null}
       </Link>
     );
   }
