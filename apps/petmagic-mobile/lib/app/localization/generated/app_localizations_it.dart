@@ -1812,6 +1812,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get supportChatCancelAction => 'Annulla';
 
   @override
+  String get supportChatConversationClosedLabel => 'Richiesta chiusa';
+
+  @override
+  String get supportChatReopenAction => 'Scrivi di nuovo';
+
+  @override
   String get supportChatArchiveAction => 'Archive';
 
   @override

@@ -332,6 +332,8 @@
   "supportChatCloseRequestDialogBody": "Jeśli problem został rozwiązany, zamkniemy tę rozmowę. Możesz później utworzyć nowe zgłoszenie.",
   "supportChatCloseConfirmAction": "Zamknij",
   "supportChatCancelAction": "Anuluj",
+  "supportChatConversationClosedLabel": "Zgłoszenie zamknięte",
+  "supportChatReopenAction": "Napisz ponownie",
   "profileSettingsThemeLight": "Światło",
   "profileSettingsThemeDark": "Ciemny",
   "profileSettingsLanguageRussian": "rosyjski",

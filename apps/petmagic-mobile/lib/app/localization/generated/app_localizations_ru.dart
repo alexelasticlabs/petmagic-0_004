@@ -1811,6 +1811,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatCancelAction => 'Отмена';
 
   @override
+  String get supportChatConversationClosedLabel => 'Обращение закрыто';
+
+  @override
+  String get supportChatReopenAction => 'Написать снова';
+
+  @override
   String get supportChatArchiveAction => 'В архив';
 
   @override

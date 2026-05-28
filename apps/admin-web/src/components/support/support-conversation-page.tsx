@@ -852,13 +852,16 @@ export function SupportConversationPage({
                         ticketResolved: text.supportSystemTicketResolved,
                         ticketReopened: text.supportSystemTicketReopened,
                         ticketClosed: text.supportSystemTicketClosed,
+                        ticketClosedByUser: text.supportSystemTicketClosedByUser,
+                        ticketClosedByOperator: text.supportSystemTicketClosedByOperator,
                       }).map((group) => {
-                        const hasVisibleMessages = group.items.some(
+                        const hasVisibleItems = group.items.some(
                           (item) =>
-                            item.kind === "message" &&
-                            (item.message.senderType?.trim().toLowerCase() ?? "") !== "system"
+                            item.kind === "system" ||
+                            (item.kind === "message" &&
+                              (item.message.senderType?.trim().toLowerCase() ?? "") !== "system")
                         );
-                        if (!hasVisibleMessages) {
+                        if (!hasVisibleItems) {
                           return null;
                         }
 
@@ -866,8 +869,19 @@ export function SupportConversationPage({
                           <div key={group.key} className={styles.dayGroup}>
                             <div className={styles.dayDivider}>{group.label}</div>
                             {group.items.map((item) => {
-                              if (item.kind !== "message") {
-                                return null;
+                              if (item.kind === "system") {
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className={`${styles.systemEventCard} ${styles[`systemEventCard_${item.tone}`] ?? ""}`}
+                                  >
+                                    <span className={styles.systemEventDot} />
+                                    <span>{item.label}</span>
+                                    <span className={styles.systemEventTime}>
+                                      {formatClockTime(item.occurredAtUtc, locale)}
+                                    </span>
+                                  </div>
+                                );
                               }
 
                               const message = item.message;

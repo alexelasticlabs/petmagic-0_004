@@ -429,7 +429,7 @@ class _SupportComposerPanel extends StatelessWidget {
     required this.onRemovePendingAttachment,
     required this.onShowAttachmentOptions,
     required this.onSendMessage,
-    required this.onResolveConversation,
+    required this.onCloseConversation,
     required this.onReopenConversation,
     required this.replyToMessage,
     required this.onClearReplyToMessage,
@@ -445,7 +445,7 @@ class _SupportComposerPanel extends StatelessWidget {
   final ValueChanged<int> onRemovePendingAttachment;
   final VoidCallback onShowAttachmentOptions;
   final Future<void> Function() onSendMessage;
-  final Future<void> Function() onResolveConversation;
+  final Future<void> Function() onCloseConversation;
   final Future<void> Function() onReopenConversation;
   final SupportChatMessage? replyToMessage;
   final VoidCallback onClearReplyToMessage;
@@ -461,8 +461,9 @@ class _SupportComposerPanel extends StatelessWidget {
     final sendingTotal = state.sendingAttachmentTotal;
     final conversation = state.conversation;
     final normalizedStatus = conversation?.status.trim().toLowerCase();
+    final isConversationClosed = normalizedStatus == 'closed';
     final isReadOnly =
-        (conversation?.isReadOnly ?? false) && normalizedStatus != 'closed';
+        isConversationClosed || (conversation?.isReadOnly ?? false);
     final effectiveCanSend = composerCanSend && !isReadOnly;
     final showResolvePrompt =
         conversation != null &&
@@ -470,6 +471,16 @@ class _SupportComposerPanel extends StatelessWidget {
         conversation.messages.any(
           (message) => message.isFromAdmin && !_isSupportSystemMessage(message),
         );
+
+    if (isConversationClosed) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(10, 2, 10, isKeyboardVisible ? 3 : 7),
+        child: _SupportClosedConversationBanner(
+          isBusy: state.isSending,
+          onReopen: onReopenConversation,
+        ),
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.fromLTRB(10, 2, 10, isKeyboardVisible ? 3 : 7),
@@ -504,7 +515,7 @@ class _SupportComposerPanel extends StatelessWidget {
                   onResolve: () async {
                     final ok = await _showSupportCloseConversationDialog(context, text);
                     if (ok) {
-                      await onResolveConversation();
+                      await onCloseConversation();
                     }
                   },
                   onKeepOpen: () {
@@ -824,6 +835,70 @@ class _SupportPromptButton extends StatelessWidget {
       onPressed: isBusy ? null : onPressed,
       icon: Icon(icon, size: 14),
       label: Text(label, overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
+class _SupportClosedConversationBanner extends StatelessWidget {
+  const _SupportClosedConversationBanner({
+    required this.isBusy,
+    required this.onReopen,
+  });
+
+  final bool isBusy;
+  final Future<void> Function() onReopen;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border.withValues(alpha: 0.48)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+        child: Row(
+          children: [
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 15,
+              color: colors.textMuted,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text.supportChatConversationClosedLabel,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                foregroundColor: _supportComposerSendGreen,
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                backgroundColor: _supportComposerSendGreen.withValues(alpha: 0.1),
+              ),
+              onPressed: isBusy ? null : onReopen,
+              child: Text(text.supportChatReopenAction),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

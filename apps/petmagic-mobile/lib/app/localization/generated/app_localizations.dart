@@ -3282,6 +3282,18 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get supportChatCancelAction;
 
+  /// No description provided for @supportChatConversationClosedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Request closed'**
+  String get supportChatConversationClosedLabel;
+
+  /// No description provided for @supportChatReopenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Write again'**
+  String get supportChatReopenAction;
+
   /// No description provided for @supportChatArchiveAction.
   ///
   /// In en, this message translates to:

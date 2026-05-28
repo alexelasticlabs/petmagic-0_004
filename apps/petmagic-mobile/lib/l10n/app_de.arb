@@ -927,6 +927,8 @@
   "supportChatCloseRequestDialogBody": "Wenn das Problem gelöst ist, schließen wir dieses Gespräch. Sie können später eine neue Anfrage erstellen.",
   "supportChatCloseConfirmAction": "Schließen",
   "supportChatCancelAction": "Abbrechen",
+  "supportChatConversationClosedLabel": "Anfrage geschlossen",
+  "supportChatReopenAction": "Erneut schreiben",
   "supportChatArchiveAction": "Archivieren",
   "supportChatRateTitle": "Support-Antwort bewerten",
   "supportChatRatedLabel": "Ihre Bewertung: {rating}/5",

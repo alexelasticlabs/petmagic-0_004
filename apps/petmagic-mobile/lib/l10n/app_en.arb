@@ -685,6 +685,8 @@
   "supportChatCloseRequestDialogBody": "If the problem is resolved, we will close this conversation. You can create a new request later.",
   "supportChatCloseConfirmAction": "Close",
   "supportChatCancelAction": "Cancel",
+  "supportChatConversationClosedLabel": "Request closed",
+  "supportChatReopenAction": "Write again",
   "supportChatArchiveAction": "Archive",
   "supportChatRateTitle": "Rate the support reply",
   "supportChatRatedLabel": "Your rating: {rating}/5",

@@ -685,6 +685,8 @@
   "supportChatCloseRequestDialogBody": "Если проблема решена, мы закроем этот диалог. Вы сможете создать новое обращение позже.",
   "supportChatCloseConfirmAction": "Закрыть",
   "supportChatCancelAction": "Отмена",
+  "supportChatConversationClosedLabel": "Обращение закрыто",
+  "supportChatReopenAction": "Написать снова",
   "supportChatArchiveAction": "В архив",
   "supportChatRateTitle": "Оцените ответ поддержки",
   "supportChatRatedLabel": "Ваша оценка: {rating}/5",

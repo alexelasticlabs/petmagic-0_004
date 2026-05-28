@@ -1811,6 +1811,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get supportChatCancelAction => 'Cancelar';
 
   @override
+  String get supportChatConversationClosedLabel => 'Solicitud cerrada';
+
+  @override
+  String get supportChatReopenAction => 'Escribir de nuevo';
+
+  @override
   String get supportChatArchiveAction => 'Archive';
 
   @override

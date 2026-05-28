@@ -415,7 +415,7 @@ export type SupportConversationFeedGroup = {
 export function groupSupportConversationFeed(
   conversation: Pick<
     AdminSupportConversation,
-    "messages" | "createdAtUtc" | "resolvedAtUtc" | "closedAtUtc" | "reopenUntilUtc" | "status"
+    "messages" | "createdAtUtc" | "resolvedAtUtc" | "closedAtUtc" | "reopenUntilUtc" | "status" | "closedByUserId" | "initiatorUserId"
   >,
   labels: {
     today: string;
@@ -425,6 +425,8 @@ export function groupSupportConversationFeed(
     ticketResolved: string;
     ticketReopened: string;
     ticketClosed: string;
+    ticketClosedByUser: string;
+    ticketClosedByOperator: string;
   }
 ): SupportConversationFeedGroup[] {
   const items: SupportConversationFeedItem[] = [];
@@ -459,11 +461,14 @@ export function groupSupportConversationFeed(
   }
 
   if (conversation.closedAtUtc) {
+    const closedByUser =
+      conversation.closedByUserId != null &&
+      conversation.closedByUserId === conversation.initiatorUserId;
     items.push({
       kind: "system",
       id: `system:closed:${conversation.closedAtUtc}`,
       occurredAtUtc: conversation.closedAtUtc,
-      label: labels.ticketClosed,
+      label: closedByUser ? labels.ticketClosedByUser : labels.ticketClosedByOperator,
       tone: "neutral",
     });
   }

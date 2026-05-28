@@ -332,6 +332,8 @@
   "supportChatCloseRequestDialogBody": "Si le problème est résolu, nous fermerons cette conversation. Vous pourrez créer une nouvelle demande plus tard.",
   "supportChatCloseConfirmAction": "Fermer",
   "supportChatCancelAction": "Annuler",
+  "supportChatConversationClosedLabel": "Demande fermée",
+  "supportChatReopenAction": "Écrire à nouveau",
   "profileSettingsThemeLight": "Lumière",
   "profileSettingsThemeDark": "Sombre",
   "profileSettingsLanguageRussian": "russe",

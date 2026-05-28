@@ -820,7 +820,7 @@ public sealed class SupportChatService(
 
         var now = DateTime.UtcNow;
         MarkClosed(conversation, now, command.UserId);
-        await AppendSystemEventAsync(conversation, "Ticket closed by operator");
+        await AppendSystemEventAsync(conversation, command.IsAdmin ? "Ticket closed by operator" : "Ticket closed by user");
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
@@ -843,7 +843,7 @@ public sealed class SupportChatService(
 
         var now = DateTime.UtcNow;
         MarkClosed(conversation, now, command.UserId);
-        await AppendSystemEventAsync(conversation, "Ticket closed by operator");
+        await AppendSystemEventAsync(conversation, command.IsAdmin ? "Ticket closed by operator" : "Ticket closed by user");
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);

@@ -484,6 +484,8 @@ export const ruDictionary: Dictionary = {
   supportSystemTicketResolved: "Обращение отмечено как решённое",
   supportSystemTicketReopened: "Обращение переоткрыто",
   supportSystemTicketClosed: "Обращение закрыто",
+  supportSystemTicketClosedByUser: "Пользователь закрыл обращение",
+  supportSystemTicketClosedByOperator: "Оператор закрыл обращение",
   supportSystemAssignedTo: "Назначено: {name}",
   supportSystemUnassigned: "Назначение снято",
   supportAttachmentUploadingLabel: "Загрузка…",

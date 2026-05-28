@@ -1811,6 +1811,12 @@ class AppLocalizationsPl extends AppLocalizations {
   String get supportChatCancelAction => 'Anuluj';
 
   @override
+  String get supportChatConversationClosedLabel => 'Zgłoszenie zamknięte';
+
+  @override
+  String get supportChatReopenAction => 'Napisz ponownie';
+
+  @override
   String get supportChatArchiveAction => 'Archive';
 
   @override

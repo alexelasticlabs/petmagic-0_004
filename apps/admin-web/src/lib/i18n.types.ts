@@ -457,6 +457,8 @@ export type Dictionary = {
   supportSystemTicketResolved: string;
   supportSystemTicketReopened: string;
   supportSystemTicketClosed: string;
+  supportSystemTicketClosedByUser: string;
+  supportSystemTicketClosedByOperator: string;
   supportSystemAssignedTo: string;
   supportSystemUnassigned: string;
   supportAttachmentUploadingLabel: string;

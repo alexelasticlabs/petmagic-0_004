@@ -482,6 +482,8 @@ export const enDictionary: Dictionary = {
   supportSystemTicketResolved: "Ticket marked as resolved",
   supportSystemTicketReopened: "Ticket reopened",
   supportSystemTicketClosed: "Ticket closed",
+  supportSystemTicketClosedByUser: "User closed the request",
+  supportSystemTicketClosedByOperator: "Operator closed the request",
   supportSystemAssignedTo: "Assigned to {name}",
   supportSystemUnassigned: "Assignment removed",
   supportAttachmentUploadingLabel: "Uploading…",
