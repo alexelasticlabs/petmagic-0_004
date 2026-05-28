@@ -64,7 +64,7 @@ class _SupportHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                 const SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -83,12 +83,12 @@ class _SupportHeader extends StatelessWidget {
                         subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                         style: TextStyle(
-                           color: colors.textSoft,
-                           fontSize: 11.5,
-                           height: 1.2,
-                           fontWeight: FontWeight.w500,
-                         ),
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 11.5,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -102,42 +102,85 @@ class _SupportHeader extends StatelessWidget {
   }
 }
 
-class _SupportSecurityCard extends StatelessWidget {
+class _SupportSecurityCard extends StatefulWidget {
   const _SupportSecurityCard({required this.title});
 
   final String title;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
+  State<_SupportSecurityCard> createState() => _SupportSecurityCardState();
+}
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
-      decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.54),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.border.withValues(alpha: 0.58)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shield_rounded, color: colors.textMuted, size: 12),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: colors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+class _SupportSecurityCardState extends State<_SupportSecurityCard> {
+  bool _isExpanded = false;
+
+  void _toggleExpanded() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final borderRadius = BorderRadius.circular(_isExpanded ? 16 : 999);
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _toggleExpanded,
+          borderRadius: borderRadius,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
+            decoration: BoxDecoration(
+              color: colors.surfaceStrong.withValues(alpha: 0.54),
+              borderRadius: borderRadius,
+              border: Border.all(color: colors.border.withValues(alpha: 0.58)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.shield_rounded, color: colors.textMuted, size: 12),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    maxLines: _isExpanded ? null : 1,
+                    overflow: _isExpanded
+                        ? TextOverflow.visible
+                        : TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 8),
+                Text(
+                  text.walletPackDetailsAction,
+                  style: TextStyle(
+                    color: colors.accent,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Icon(
+                  _isExpanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 14,
+                  color: colors.accent,
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

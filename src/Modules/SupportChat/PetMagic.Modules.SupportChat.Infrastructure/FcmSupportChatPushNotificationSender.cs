@@ -73,7 +73,7 @@ internal sealed class FcmSupportChatPushNotificationSender(
                     ["route"] = route
                 },
                 new FcmAndroidConfig("high"),
-                new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default")))));
+                new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default", notification.UserUnreadCount)))));
 
         using var httpRequest = new HttpRequestMessage(
             HttpMethod.Post,
@@ -126,9 +126,11 @@ internal sealed class FcmSupportChatPushNotificationSender(
     private static string BuildBody(SupportChatPushNotification notification, bool isRussian)
     {
         var body = notification.Body.Trim();
-        if (string.IsNullOrWhiteSpace(body) && notification.HasAttachment)
+        if (string.IsNullOrWhiteSpace(body))
         {
-            body = isRussian ? "Новое вложение в диалоге поддержки." : "New attachment in your support conversation.";
+            body = notification.HasAttachment
+                ? (isRussian ? "Новое вложение в диалоге поддержки." : "New attachment in your support conversation.")
+                : (isRussian ? "Новый ответ в диалоге поддержки." : "New reply in your support conversation.");
         }
 
         if (body.Length <= 120)
@@ -176,5 +178,5 @@ internal sealed class FcmSupportChatPushNotificationSender(
 
     private sealed record FcmApnsPayload(FcmAps Aps);
 
-    private sealed record FcmAps(string Sound);
+    private sealed record FcmAps(string Sound, int Badge);
 }

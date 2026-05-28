@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -198,7 +198,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   }) {
     return _SupportChatPageActions(
       this,
-        )._openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
+    )._openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
   }
 
   void _setReplyToMessage(SupportChatMessage message) {
@@ -290,9 +290,25 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
         _clearLoadingFallback();
       }
 
-      final previousMessageCount = previous?.conversation?.messages.length ?? 0;
-      final nextMessageCount = next.conversation?.messages.length ?? 0;
-      if (nextMessageCount == 0 || nextMessageCount == previousMessageCount) {
+      final previousVisibleMessages = _visibleSupportThreadMessages(
+        previous?.conversation?.messages ?? const <SupportChatMessage>[],
+      );
+      final nextVisibleMessages = _visibleSupportThreadMessages(
+        next.conversation?.messages ?? const <SupportChatMessage>[],
+      );
+      if (nextVisibleMessages.isEmpty ||
+          nextVisibleMessages.length == previousVisibleMessages.length) {
+        return;
+      }
+
+      final latestMessage = nextVisibleMessages.last;
+      final previousLatestMessageId = previousVisibleMessages.isEmpty
+          ? null
+          : previousVisibleMessages.last.messageId;
+      final shouldAutoScroll =
+          _isPinnedToBottom() ||
+          previousLatestMessageId != latestMessage.messageId;
+      if (!shouldAutoScroll) {
         return;
       }
 
@@ -310,7 +326,9 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     });
 
     final conversation = state.conversation;
-    final messages = conversation?.messages ?? const <SupportChatMessage>[];
+    final messages = _visibleSupportThreadMessages(
+      conversation?.messages ?? const <SupportChatMessage>[],
+    );
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     _keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomNavInset = _keyboardInset > 0
@@ -375,14 +393,14 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                         onQuickActionSelected: _prefillComposer,
                         onOpenImage: _openImageFullscreen,
                         onOpenVideo: _openVideoFullscreen,
-                         onRetryAttachment: _retryAttachmentForMessage,
-                         onReplyToMessage: _setReplyToMessage,
-                         onJumpToMessage: _jumpToMessage,
-                         highlightedMessageId: _highlightedMessageId,
-                         messageItemKeyForId: _messageItemKeyForId,
-                         formatDayLabel: _formatDayLabel,
-                         isSameDay: _isSameDay,
-                       ),
+                        onRetryAttachment: _retryAttachmentForMessage,
+                        onReplyToMessage: _setReplyToMessage,
+                        onJumpToMessage: _jumpToMessage,
+                        highlightedMessageId: _highlightedMessageId,
+                        messageItemKeyForId: _messageItemKeyForId,
+                        formatDayLabel: _formatDayLabel,
+                        isSameDay: _isSameDay,
+                      ),
                     ),
                   ),
                   _SupportComposerPanel(
@@ -394,12 +412,12 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     composerCanSend: _composerCanSend,
                     keyboardInset: _keyboardInset,
                     onRemovePendingAttachment: _removePendingAttachment,
-                     onShowAttachmentOptions: _showAttachmentOptions,
-                     onSendMessage: () => _sendCurrentMessage(localeTag),
-                     onResolveConversation: _controller.resolveConversation,
-                     replyToMessage: _replyToMessage,
-                     onClearReplyToMessage: _clearReplyToMessage,
-                   ),
+                    onShowAttachmentOptions: _showAttachmentOptions,
+                    onSendMessage: () => _sendCurrentMessage(localeTag),
+                    onResolveConversation: _controller.resolveConversation,
+                    replyToMessage: _replyToMessage,
+                    onClearReplyToMessage: _clearReplyToMessage,
+                  ),
                 ],
               ),
             ),
@@ -415,5 +433,13 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
 
   bool _isSameDay(DateTime left, DateTime right) {
     return _SupportChatPageActions(this)._isSameDayImpl(left, right);
+  }
+
+  bool _isPinnedToBottom({double threshold = 72}) {
+    if (!_scrollController.hasClients) {
+      return true;
+    }
+    final position = _scrollController.position;
+    return (position.maxScrollExtent - position.pixels) <= threshold;
   }
 }

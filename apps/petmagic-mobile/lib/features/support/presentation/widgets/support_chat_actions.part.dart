@@ -61,16 +61,16 @@ extension _SupportChatPageActions on _SupportChatPageState {
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
                 title: Text(text.supportChatTakePhotoAction),
-                onTap: () => Navigator.of(dialogContext).pop(
-                  _SupportAttachmentQuickAction.camera,
-                ),
+                onTap: () => Navigator.of(
+                  dialogContext,
+                ).pop(_SupportAttachmentQuickAction.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.videocam_outlined),
                 title: Text(text.supportChatRecordVideoAction),
-                onTap: () => Navigator.of(dialogContext).pop(
-                  _SupportAttachmentQuickAction.video,
-                ),
+                onTap: () => Navigator.of(
+                  dialogContext,
+                ).pop(_SupportAttachmentQuickAction.video),
               ),
             ],
           ),
@@ -197,10 +197,8 @@ extension _SupportChatPageActions on _SupportChatPageState {
     }
 
     var resolvedVideoDuration = videoDuration;
-    final isVideoCandidate =
-        SupportAttachmentValidation.videoMimeTypes.contains(
-          contentType.toLowerCase(),
-        );
+    final isVideoCandidate = SupportAttachmentValidation.videoMimeTypes
+        .contains(contentType.toLowerCase());
     if (isVideoCandidate && resolvedVideoDuration == null) {
       resolvedVideoDuration = await _resolveVideoDurationFromFileImpl(filePath);
       if (!mounted) {
@@ -399,7 +397,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
       final attachment = await _validateAttachmentCandidateImpl(
         filePath: file.path,
         fileName: asset.title ?? file.uri.pathSegments.last,
-        videoDuration: asset.type == AssetType.video ? asset.videoDuration : null,
+        videoDuration: asset.type == AssetType.video
+            ? asset.videoDuration
+            : null,
         sourceAssetId: asset.id,
       );
       if (attachment != null) {
@@ -772,7 +772,8 @@ class _SupportAttachmentPickerSheetState
     );
     final nextAssets = fetched
         .where(
-          (asset) => asset.type == AssetType.image || asset.type == AssetType.video,
+          (asset) =>
+              asset.type == AssetType.image || asset.type == AssetType.video,
         )
         .toList(growable: false);
     if (!mounted) {
@@ -801,6 +802,7 @@ class _SupportAttachmentPickerSheetState
 
   void _toggleAsset(AssetEntity asset) {
     final wasSelected = _selectedAssetOrderById.containsKey(asset.id);
+    HapticFeedback.selectionClick();
     setState(() {
       if (wasSelected) {
         final removedOrder = _selectedAssetOrderById.remove(asset.id);
@@ -841,8 +843,9 @@ class _SupportAttachmentPickerSheetState
     setState(() {
       _isSendingSelection = true;
     });
-    final orderedEntries = _selectedAssetOrderById.entries.toList(growable: false)
-      ..sort((left, right) => left.value.compareTo(right.value));
+    final orderedEntries = _selectedAssetOrderById.entries.toList(
+      growable: false,
+    )..sort((left, right) => left.value.compareTo(right.value));
     final selectedAssets = orderedEntries
         .map((entry) => _selectedAssetsById[entry.key])
         .whereType<AssetEntity>()
@@ -872,7 +875,8 @@ class _SupportAttachmentPickerSheetState
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     final hasAccess = _permissionState?.hasAccess ?? false;
     final isLimitedAccess =
-        (_permissionState?.toString().toLowerCase().contains('limited') ?? false);
+        (_permissionState?.toString().toLowerCase().contains('limited') ??
+        false);
 
     return Container(
       decoration: BoxDecoration(
@@ -1026,73 +1030,109 @@ class _SupportAttachmentPickerSheetState
                     },
                   ),
           ),
-          if (_selectedAssetOrderById.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 170),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SizeTransition(
+                  sizeFactor: animation,
+                  axisAlignment: -1,
+                  child: child,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _captionController,
-                          enabled: !_isSendingSelection,
-                          minLines: 1,
-                          maxLines: 2,
-                          decoration: InputDecoration(
-                            hintText: text.supportChatInputHint,
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 8,
-                            ),
-                          ),
+              );
+            },
+            child: _selectedAssetOrderById.isEmpty
+                ? const SizedBox.shrink(
+                    key: ValueKey<String>('picker-send-empty'),
+                  )
+                : Padding(
+                    key: const ValueKey<String>('picker-send-active'),
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: colors.border.withValues(alpha: 0.7),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Material(
-                        color: _isSendingSelection
-                            ? _supportComposerSendGreen.withValues(alpha: 0.85)
-                            : _supportComposerSendGreen,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _isSendingSelection ? null : _sendSelected,
-                          child: SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: Center(
-                              child: _isSendingSelection
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _captionController,
+                                enabled: !_isSendingSelection,
+                                minLines: 1,
+                                maxLines: 2,
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: 14,
+                                  height: 1.32,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: text.supportChatInputHint,
+                                  hintStyle: TextStyle(
+                                    color: colors.textMuted,
+                                    fontSize: 13.5,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Material(
+                              color: _isSendingSelection
+                                  ? _supportComposerSendGreen.withValues(
+                                      alpha: 0.85,
                                     )
-                                  : const Icon(
-                                      Icons.arrow_upward_rounded,
-                                      size: 24,
-                                      color: Colors.white,
-                                    ),
+                                  : _supportComposerSendGreen,
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: _isSendingSelection
+                                    ? null
+                                    : _sendSelected,
+                                child: SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: Center(
+                                    child: _isSendingSelection
+                                        ? const SizedBox(
+                                            width: 17,
+                                            height: 17,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white,
+                                                  ),
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.arrow_upward_rounded,
+                                            size: 22,
+                                            color: Colors.white,
+                                          ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ),
+          ),
         ],
       ),
     );
@@ -1111,7 +1151,8 @@ class _SupportRecentAssetTile extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_SupportRecentAssetTile> createState() => _SupportRecentAssetTileState();
+  State<_SupportRecentAssetTile> createState() =>
+      _SupportRecentAssetTileState();
 }
 
 class _SupportRecentAssetTileState extends State<_SupportRecentAssetTile> {
@@ -1149,119 +1190,127 @@ class _SupportRecentAssetTileState extends State<_SupportRecentAssetTile> {
     final colors = context.petMagicColors;
     final isVideo = widget.asset.type == AssetType.video;
     final isSelected = widget.selectedOrder != null;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(4),
-        onTap: widget.onTap,
-        child: ClipRRect(
+    return AnimatedScale(
+      scale: isSelected ? 0.96 : 1,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(4),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              FutureBuilder<Uint8List?>(
-                future: _thumbnailFuture,
-                builder: (context, snapshot) {
-                  final bytes = snapshot.data;
-                  if (bytes == null) {
-                    return ColoredBox(
-                      color: colors.surface,
-                      child: Center(
-                        child: Icon(
-                          isVideo
-                              ? Icons.videocam_outlined
-                              : Icons.image_not_supported_outlined,
-                          color: colors.textMuted,
+          onTap: widget.onTap,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                FutureBuilder<Uint8List?>(
+                  future: _thumbnailFuture,
+                  builder: (context, snapshot) {
+                    final bytes = snapshot.data;
+                    if (bytes == null) {
+                      return ColoredBox(
+                        color: colors.surface,
+                        child: Center(
+                          child: Icon(
+                            isVideo
+                                ? Icons.videocam_outlined
+                                : Icons.image_not_supported_outlined,
+                            color: colors.textMuted,
+                          ),
                         ),
-                      ),
-                    );
-                  }
-                  return Image.memory(bytes, fit: BoxFit.cover);
-                },
-              ),
-              if (isVideo)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.12),
-                          Colors.black.withValues(alpha: 0.42),
-                        ],
-                      ),
-                    ),
-                  ),
+                      );
+                    }
+                    return Image.memory(bytes, fit: BoxFit.cover);
+                  },
                 ),
-              if (isVideo)
-                const Center(
-                  child: Icon(
-                    Icons.play_circle_fill_rounded,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
-              if (isVideo)
-                Positioned(
-                  right: 6,
-                  bottom: 6,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      child: Text(
-                        _formatDuration(widget.asset.videoDuration),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                if (isVideo)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.12),
+                            Colors.black.withValues(alpha: 0.42),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                ),
-              if (isSelected)
-                Positioned.fill(
-                  child: Container(
+                if (isVideo)
+                  const Center(
+                    child: Icon(
+                      Icons.play_circle_fill_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                if (isVideo)
+                  Positioned(
+                    right: 6,
+                    bottom: 6,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          _formatDuration(widget.asset.videoDuration),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 120),
+                  opacity: isSelected ? 1 : 0,
+                  child: ColoredBox(
                     color: Colors.black.withValues(alpha: 0.35),
                   ),
                 ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected
-                        ? _supportComposerSendGreen
-                        : Colors.black.withValues(alpha: 0.38),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
-                  ),
-                  child: isSelected
-                      ? Center(
-                          child: Text(
-                            '${widget.selectedOrder}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected
+                          ? _supportComposerSendGreen
+                          : Colors.black.withValues(alpha: 0.38),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    child: isSelected
+                        ? Center(
+                            child: Text(
+                              '${widget.selectedOrder}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                        )
-                      : null,
+                          )
+                        : null,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1292,7 +1341,11 @@ class _SupportRecentCameraTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.photo_camera_rounded, color: colors.textStrong, size: 22),
+              Icon(
+                Icons.photo_camera_rounded,
+                color: colors.textStrong,
+                size: 22,
+              ),
               const SizedBox(height: 2),
               Text(
                 text.supportChatTakePhotoAction,
@@ -1313,9 +1366,7 @@ class _SupportRecentCameraTile extends StatelessWidget {
 }
 
 class _SupportRecentFilesTile extends StatelessWidget {
-  const _SupportRecentFilesTile({
-    required this.onTap,
-  });
+  const _SupportRecentFilesTile({required this.onTap});
 
   final VoidCallback onTap;
 

@@ -13,6 +13,11 @@ public sealed class SignalRSupportChatRealtimeNotifier(IHubContext<SupportChatHu
             conversationId = notification.ConversationId,
             initiatorUserId = notification.InitiatorUserId,
             updatedAtUtc = notification.UpdatedAtUtc,
+            lastMessagePreview = notification.LastMessagePreview,
+            lastMessageAtUtc = notification.LastMessageAtUtc,
+            lastMessageSenderType = notification.LastMessageSenderType,
+            adminUnreadCount = notification.AdminUnreadCount,
+            userUnreadCount = notification.UserUnreadCount,
         };
 
         return Task.WhenAll(

@@ -77,6 +77,26 @@ function resolveQueueFilter(filter: SupportQueueFilter): {
   return { status: filter, assignment: "all" };
 }
 
+function buildSupportRealtimeToastMessage(
+  event: { lastMessagePreview?: string | null },
+  locale: Locale
+): string {
+  const fallback = locale === "ru" ? "Новое сообщение в поддержке" : "New support message";
+  const preview = event.lastMessagePreview?.trim();
+  if (!preview) {
+    return fallback;
+  }
+
+  const safePreview = preview.length > 96 ? `${preview.slice(0, 93)}...` : preview;
+  return locale === "ru" ? `Новое сообщение: ${safePreview}` : `New support message: ${safePreview}`;
+}
+
+function isUserSupportMessageEvent(event: { lastMessageSenderType?: string | null; adminUnreadCount?: number }) {
+  return (
+    (event.adminUnreadCount ?? 0) > 0 &&
+    (event.lastMessageSenderType?.toLowerCase() === "user" || !event.lastMessageSenderType)
+  );
+}
 export type SidePanelTab = "user" | "activity" | "dialog" | "attachments";
 
 export type TemplateDraft = {
@@ -127,6 +147,7 @@ export function useSupportConversationController({
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const markReadRequestRef = useRef<Promise<void> | null>(null);
+  const lastRealtimeToastRef = useRef<string | null>(null);
 
   const resetSelectedAttachment = useCallback(() => {
     setSelectedAttachment(null);
@@ -217,6 +238,13 @@ export function useSupportConversationController({
       void queryClient.invalidateQueries({
         queryKey: adminQueryKeys.supportConversation(conversationId),
       });
+      return;
+    }
+
+    const toastKey = `${event.conversationId}:${event.updatedAtUtc}`;
+    if (isUserSupportMessageEvent(event) && lastRealtimeToastRef.current !== toastKey) {
+      lastRealtimeToastRef.current = toastKey;
+      setToast({ type: "success", message: buildSupportRealtimeToastMessage(event, locale) });
     }
   });
 

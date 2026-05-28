@@ -1,12 +1,13 @@
 part of 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
-const _supportSecondaryGreen = Color(0xFF66D8A4);
-const _supportMessageGreen = Color(0xFF1B6E55);
-const _supportMessageGreenBorder = Color(0xFF205A49);
-const _supportComposerSendGreen = Color(0xFF2FBC7E);
+const _supportSecondaryGreen = Color(0xFF76DBAE);
+const _supportMessageGreen = Color(0xFF2F8068);
+const _supportMessageGreenBorder = Color(0xFF4A9D83);
+const _supportComposerSendGreen = Color(0xFF34BC81);
 const _supportComposerIconColor = Color(0xFFA0AEC0);
-const _supportComposerHintColor = Color(0xFF7B8794);
+const _supportComposerHintColor = Color(0xFF8A97A8);
 const _supportAttachmentMaxCount = 5;
+const _supportMediaGroupVisibleCellCount = 6;
 const _supportAttachmentRecentAssetCount = 48;
 const _supportAttachmentImageMaxFileSizeBytes = 10 * 1024 * 1024;
 const _supportAttachmentVideoMaxFileSizeBytes = 50 * 1024 * 1024;
@@ -21,11 +22,29 @@ bool _isSupportSystemMessage(SupportChatMessage message) {
     return false;
   }
 
-  final body = message.body.toLowerCase();
+  final body = message.body.trim().toLowerCase();
+  if (body.isEmpty) {
+    return false;
+  }
+
   return body.startsWith('сообщение получено') ||
       body.startsWith('message received') ||
       body.startsWith('сообщение доставлено') ||
-      body.startsWith('message delivered');
+      body.startsWith('message delivered') ||
+      body.startsWith('message status') ||
+      body.startsWith('delivery status') ||
+      body.startsWith('статус доставки') ||
+      body.startsWith('conversation status') ||
+      body.startsWith('system:') ||
+      body.startsWith('debug:');
+}
+
+List<SupportChatMessage> _visibleSupportThreadMessages(
+  Iterable<SupportChatMessage> messages,
+) {
+  return messages
+      .where((message) => !_isSupportSystemMessage(message))
+      .toList(growable: false);
 }
 
 String _mapSupportError(AppLocalizations text, String raw) {

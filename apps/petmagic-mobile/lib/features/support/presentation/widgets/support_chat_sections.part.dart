@@ -49,6 +49,9 @@ class _SupportConversationViewport extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final messageById = {
+      for (final message in messages) message.messageId: message,
+    };
 
     final quickActions = [
       _SupportQuickActionData(
@@ -196,27 +199,219 @@ class _SupportConversationViewport extends StatelessWidget {
                       label: formatDayLabel(message.createdAtUtc),
                     ),
                   ),
-                if (_isSupportSystemMessage(message))
-                  _SupportSystemMessageCard(
-                    message: message.body.trim().isEmpty
-                        ? text.supportChatSystemNoticeBody
-                        : message.body,
-                    createdAtUtc: message.createdAtUtc,
-                  )
-                else
-                  _MessageBubble(
-                    message: message,
-                    onOpenImage: onOpenImage,
-                    onOpenVideo: onOpenVideo,
-                    onRetryAttachment: () => onRetryAttachment(message),
-                    onReplyToMessage: () => onReplyToMessage(message),
-                    onJumpToMessage: onJumpToMessage,
-                    isHighlighted: highlightedMessageId == message.messageId,
+                _MessageEntranceAnimation(
+                  messageId: message.messageId,
+                  child: _SwipeToReplyBubble(
+                    enabled: true,
+                    onReply: () => onReplyToMessage(message),
+                    child: RepaintBoundary(
+                      child: _MessageBubble(
+                        message: message,
+                        repliedMessage:
+                            message.replyToMessageId?.trim().isNotEmpty == true
+                            ? messageById[message.replyToMessageId!.trim()]
+                            : null,
+                        onOpenImage: onOpenImage,
+                        onOpenVideo: onOpenVideo,
+                        onRetryAttachment: () => onRetryAttachment(message),
+                        onReplyToMessage: () => onReplyToMessage(message),
+                        onJumpToMessage: onJumpToMessage,
+                        isHighlighted:
+                            highlightedMessageId == message.messageId,
+                      ),
+                    ),
                   ),
+                ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _MessageEntranceAnimation extends StatelessWidget {
+  const _MessageEntranceAnimation({
+    required this.messageId,
+    required this.child,
+  });
+
+  final String messageId;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<String>('support-message-entrance-$messageId'),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, value, nestedChild) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - value) * 10),
+            child: nestedChild,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SwipeToReplyBubble extends StatefulWidget {
+  const _SwipeToReplyBubble({
+    required this.enabled,
+    required this.onReply,
+    required this.child,
+  });
+
+  final bool enabled;
+  final VoidCallback onReply;
+  final Widget child;
+
+  @override
+  State<_SwipeToReplyBubble> createState() => _SwipeToReplyBubbleState();
+}
+
+class _SwipeToReplyBubbleState extends State<_SwipeToReplyBubble>
+    with SingleTickerProviderStateMixin {
+  static const _triggerOffset = 52.0;
+  static const _maxOffset = 72.0;
+
+  late final AnimationController _animationController;
+  Animation<double>? _returnAnimation;
+  double _offset = 0;
+  bool _replyTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 220),
+        )..addListener(() {
+          final animation = _returnAnimation;
+          if (animation == null || !mounted) {
+            return;
+          }
+          setState(() {
+            _offset = animation.value;
+          });
+        });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _handleHorizontalDragUpdate(DragUpdateDetails details) {
+    if (!widget.enabled) {
+      return;
+    }
+
+    _animationController.stop();
+    _returnAnimation = null;
+    final delta = details.primaryDelta ?? 0;
+    final nextOffset = (_offset - delta).clamp(0.0, _maxOffset * 1.2);
+    if (nextOffset == _offset) {
+      return;
+    }
+
+    final shouldTrigger = nextOffset >= _triggerOffset;
+    if (shouldTrigger && !_replyTriggered) {
+      HapticFeedback.selectionClick();
+    }
+
+    setState(() {
+      _offset = nextOffset;
+      _replyTriggered = shouldTrigger;
+    });
+  }
+
+  void _handleHorizontalDragEnd(DragEndDetails details) {
+    if (!widget.enabled) {
+      return;
+    }
+
+    final shouldReply = _offset >= _triggerOffset;
+    _animateBack();
+    if (shouldReply) {
+      widget.onReply();
+    }
+  }
+
+  void _handleHorizontalDragCancel() {
+    _animateBack();
+  }
+
+  void _animateBack() {
+    final begin = _offset;
+    _replyTriggered = false;
+    if (begin <= 0) {
+      if (mounted) {
+        setState(() {
+          _offset = 0;
+        });
+      }
+      return;
+    }
+
+    _returnAnimation = Tween<double>(begin: begin, end: 0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
+    _animationController.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final revealProgress = (_offset / _triggerOffset).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: _handleHorizontalDragUpdate,
+      onHorizontalDragEnd: _handleHorizontalDragEnd,
+      onHorizontalDragCancel: _handleHorizontalDragCancel,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 90),
+                  opacity: revealProgress,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 90),
+                    curve: Curves.easeOut,
+                    width: 24 + (revealProgress * 10),
+                    height: 24 + (revealProgress * 10),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.accent.withValues(
+                        alpha: 0.08 + (revealProgress * 0.2),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.reply_rounded,
+                      size: 16 + (revealProgress * 4),
+                      color: colors.accent.withValues(alpha: 0.95),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(offset: Offset(-_offset, 0), child: widget.child),
+        ],
       ),
     );
   }
@@ -275,20 +470,23 @@ class _SupportComposerPanel extends StatelessWidget {
         );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 4, 16, isKeyboardVisible ? 4 : 8),
+      padding: EdgeInsets.fromLTRB(10, 2, 10, isKeyboardVisible ? 3 : 7),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        constraints: const BoxConstraints(minHeight: 54),
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        duration: const Duration(milliseconds: 170),
+        curve: Curves.easeOutCubic,
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
         decoration: BoxDecoration(
-          color: colors.surfaceStrong.withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: colors.accent.withValues(
-              alpha: composerHasFocus ? 0.2 : 0.08,
-            ),
-          ),
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(0),
+          boxShadow: [
+            if (composerHasFocus)
+              BoxShadow(
+                color: colors.shadow.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -305,14 +503,35 @@ class _SupportComposerPanel extends StatelessWidget {
                   onKeepOpen: messageFocusNode.requestFocus,
                 ),
               ),
-            if (replyToMessage != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
-                child: _SupportReplyComposerPreview(
-                  message: replyToMessage!,
-                  onClear: state.isSending ? null : onClearReplyToMessage,
-                ),
-              ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.08),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: replyToMessage == null
+                  ? const SizedBox.shrink(
+                      key: ValueKey<String>('reply-preview-empty'),
+                    )
+                  : Padding(
+                      key: const ValueKey<String>('reply-preview-active'),
+                      padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
+                      child: _SupportReplyComposerPreview(
+                        message: replyToMessage!,
+                        onClear: state.isSending ? null : onClearReplyToMessage,
+                      ),
+                    ),
+            ),
             if (pendingAttachments.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
@@ -323,77 +542,107 @@ class _SupportComposerPanel extends StatelessWidget {
               ),
             ],
             Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  splashRadius: 18,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 34,
-                    height: 34,
-                  ),
-                  onPressed: state.isSending || isReadOnly
-                      ? null
-                      : onShowAttachmentOptions,
-                  icon: const Icon(
-                    Icons.attach_file_rounded,
-                    size: 23,
-                    color: _supportComposerIconColor,
-                  ),
-                ),
-                const SizedBox(width: 2),
                 Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    focusNode: messageFocusNode,
-                    enabled: !isReadOnly,
-                    minLines: 1,
-                    maxLines: 5,
-                    textInputAction: TextInputAction.newline,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 14,
-                      height: 1.28,
-                      fontWeight: FontWeight.w400,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: isReadOnly
-                          ? text.supportChatReadOnlyHint
-                          : text.supportChatInputHint,
-                      hintStyle: const TextStyle(
-                        color: _supportComposerHintColor,
-                        fontSize: 14,
-                        height: 1.3,
-                        fontWeight: FontWeight.w400,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    curve: Curves.easeOut,
+                    constraints: const BoxConstraints(minHeight: 42),
+                    padding: const EdgeInsets.only(left: 2, right: 6),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceStrong.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: colors.border.withValues(
+                          alpha: composerHasFocus ? 0.74 : 0.42,
+                        ),
                       ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
-                      filled: false,
                     ),
-                    textAlignVertical: TextAlignVertical.center,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          splashRadius: 18,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 36,
+                            height: 40,
+                          ),
+                          onPressed: state.isSending || isReadOnly
+                              ? null
+                              : onShowAttachmentOptions,
+                          icon: Icon(
+                            Icons.attach_file_rounded,
+                            size: 21,
+                            color: state.isSending || isReadOnly
+                                ? colors.textMuted.withValues(alpha: 0.46)
+                                : _supportComposerIconColor,
+                          ),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: messageController,
+                            focusNode: messageFocusNode,
+                            enabled: !isReadOnly,
+                            minLines: 1,
+                            maxLines: 4,
+                            textInputAction: TextInputAction.newline,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 15,
+                              height: 1.28,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: isReadOnly
+                                  ? text.supportChatReadOnlyHint
+                                  : text.supportChatInputHint,
+                              hintStyle: TextStyle(
+                                color: _supportComposerHintColor.withValues(
+                                  alpha: 0.98,
+                                ),
+                                fontSize: 14.5,
+                                height: 1.26,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.fromLTRB(
+                                0,
+                                10,
+                                0,
+                                9,
+                              ),
+                              filled: false,
+                            ),
+                            textAlignVertical: TextAlignVertical.center,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 AnimatedScale(
-                  scale: effectiveCanSend ? 1 : 0.9,
-                  duration: const Duration(milliseconds: 150),
+                  scale: effectiveCanSend ? 1 : 0.92,
+                  duration: const Duration(milliseconds: 140),
                   curve: Curves.easeOut,
                   child: IgnorePointer(
                     ignoring: !effectiveCanSend || state.isSending,
                     child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      opacity: effectiveCanSend || state.isSending ? 1 : 0.72,
+                      duration: const Duration(milliseconds: 140),
+                      opacity: effectiveCanSend || state.isSending ? 1 : 0.66,
                       child: Material(
                         color: state.isSending
                             ? _supportComposerSendGreen.withValues(alpha: 0.85)
                             : effectiveCanSend
                             ? _supportComposerSendGreen
-                            : colors.surface,
+                            : colors.surface.withValues(alpha: 0.88),
                         shape: const CircleBorder(),
                         child: InkWell(
                           customBorder: const CircleBorder(),
@@ -401,13 +650,13 @@ class _SupportComposerPanel extends StatelessWidget {
                               ? null
                               : onSendMessage,
                           child: SizedBox(
-                            width: 48,
-                            height: 48,
+                            width: 40,
+                            height: 40,
                             child: Center(
                               child: state.isSending
                                   ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
+                                      width: 17,
+                                      height: 17,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         valueColor:
@@ -418,7 +667,7 @@ class _SupportComposerPanel extends StatelessWidget {
                                     )
                                   : Icon(
                                       Icons.arrow_upward_rounded,
-                                      size: 24,
+                                      size: 22,
                                       color: effectiveCanSend
                                           ? Colors.white
                                           : colors.textMuted,

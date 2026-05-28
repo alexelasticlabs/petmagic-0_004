@@ -1021,11 +1021,37 @@ public sealed class SupportChatService(
     {
         try
         {
+            var snapshot = await supportChatDbContext.SupportConversations
+                .AsNoTracking()
+                .Where(x => x.Id == conversation.Id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.InitiatorUserId,
+                    x.UpdatedAtUtc,
+                    x.LastMessagePreview,
+                    x.LastMessageAtUtc,
+                    x.LastMessageSenderType,
+                    AdminUnreadCount = x.Messages.Count(message => !message.IsFromAdmin && message.ReadAtUtc == null),
+                    UserUnreadCount = x.Messages.Count(message => message.IsFromAdmin && message.ReadAtUtc == null)
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (snapshot is null)
+            {
+                return;
+            }
+
             await realtimeNotifier.NotifyConversationUpdatedAsync(
                 new SupportConversationRealtimeEvent(
-                    conversation.Id,
-                    conversation.InitiatorUserId,
-                    conversation.UpdatedAtUtc),
+                    snapshot.Id,
+                    snapshot.InitiatorUserId,
+                    snapshot.UpdatedAtUtc,
+                    snapshot.LastMessagePreview,
+                    snapshot.LastMessageAtUtc,
+                    snapshot.LastMessageSenderType?.ToString(),
+                    snapshot.AdminUnreadCount,
+                    snapshot.UserUnreadCount),
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1052,7 +1078,10 @@ public sealed class SupportChatService(
                     message.MessageId,
                     message.SenderDisplayName,
                     message.Body,
-                    message.Attachments.Count > 0 || message.AttachmentUrl is not null),
+                    message.Attachments.Count > 0 || message.AttachmentUrl is not null,
+                    await supportChatDbContext.ConversationMessages.CountAsync(
+                        x => x.ConversationId == conversation.Id && x.IsFromAdmin && x.ReadAtUtc == null,
+                        cancellationToken)),
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

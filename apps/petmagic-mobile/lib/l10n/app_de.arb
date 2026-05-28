@@ -507,5 +507,510 @@
       "templateTitle": {}
     }
   },
+  "navRewards": "Belohnungen",
+  "profileEmailVerifiedShort": "E-Mail verifiziert",
+  "profileEmailPendingShort": "E-Mail bestätigen",
+  "profilePremiumPlanLabel": "Premium-Tarif",
+  "profileFreePlanLabel": "Gratis-Tarif",
+  "profilePremiumBannerTitle": "Upgrade auf Premium",
+  "profilePremiumBannerActiveTitle": "Premium aktiv",
+  "profilePremiumBenefitUnlimitedTemplates": "Unbegrenzte Vorlagen",
+  "profilePremiumBenefitPriorityGeneration": "Prioritätsgenerierung",
+  "profilePremiumBenefitNoWatermark": "Kein Wasserzeichen",
+  "profilePremiumOpenAction": "Upgrade",
+  "profileSubscriptionTitle": "Mein Abo",
+  "profileSubscriptionStatusLabel": "Status",
+  "profileSubscriptionProviderLabel": "Anbieter",
+  "profileSubscriptionNextBillingLabel": "Nächste Abrechnung",
+  "profileSubscriptionTokensLabel": "Verfügbare Token",
+  "profileWalletTitle": "Wallet",
+  "profileWalletHistoryHint": "Guthaben, Käufe und Verlauf öffnen.",
+  "walletPageTitle": "PawSpark-Wallet",
+  "walletPageSubtitle": "Guthaben, Promo-Codes, Werbebonus und PawSpark-Aufladungen.",
+  "profileWalletPreviewEyebrow": "PawSpark",
+  "profileWalletPreviewSubtitle": "In-App-Währung für Generierungen und Bonusbelohnungen.",
+  "profileWalletPreviewAction": "Öffnen",
+  "profileWalletPreviewLoadingStatus": "Status wird aktualisiert",
+  "profileWalletPreviewWeeklyReady": "Wöchentliche Belohnung bereit",
+  "profileWalletPreviewAdCount": "Werbung heute: {count}",
+  "@profileWalletPreviewAdCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "profileWalletLoadingHint": "Guthaben wird geladen...",
+  "profileWalletEmptyHint": "Guthaben und Verlauf öffnen",
+  "walletDataUnavailableFallback": "Wallet-Daten sind gerade nicht verfügbar.",
+  "walletRefreshTooltip": "Wallet aktualisieren",
+  "walletBalanceTitle": "Verfügbar für Fotos, Videos und Premium-Vorlagen.",
+  "walletBalanceEyebrow": "Ihr Guthaben",
+  "walletBalanceUnit": "PawSpark",
+  "walletBalanceExplanation": "PawSpark — interne Währung von PetMagic. Verwenden Sie es zum Erstellen von Fotos, Videos und für den Zugang zu Premium-Vorlagen.",
+  "walletPremiumStatus": "Premium-Wallet",
+  "walletFreeStatus": "Gratis-Wallet",
+  "walletAdRewardsCount": "{count} Werbeboni",
+  "@walletAdRewardsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletQuickActionsTitle": "Promo-Codes",
+  "walletRedeemAction": "Aktivieren",
+  "walletRewardsTitle": "Werbebonus",
+  "walletAdRewardAction": "Werbebonus",
+  "walletAdRewardCompactTitle": "PawSpark kostenlos erhalten",
+  "walletAdRewardCompactDescription": "Sehen Sie eine kurze Werbung und erhalten Sie +15 PawSpark.",
+  "walletAdRewardRemaining": "Heute noch: {count}",
+  "@walletAdRewardRemaining": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletWatchAdAction": "Werbung ansehen +15",
+  "walletAdDailyLimitReached": "Werbung ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",
+  "walletPromoTitle": "Haben Sie einen Promo-Code?",
+  "walletPromoSubtitle": "Geben Sie einen Code von PetMagic ein und fügen Sie PawSpark zu Ihrem Guthaben hinzu.",
+  "walletPromoInputPlaceholder": "Promo-Code eingeben",
+  "walletPromoSuccessMessage": "Promo-Code erfolgreich aktiviert!",
+  "walletBestValueBadge": "Bestes Angebot",
+  "walletPremiumUpsellTitle": "Erstellen Sie oft?",
+  "walletPremiumUpsellMessage": "Premium-Mitgliedschaft bietet günstigere Generierungen, monatliche PawSparks und exklusive Premium-Vorlagen.",
+  "walletViewPremiumAction": "Premium anzeigen",
+  "walletWhatYouCanCreateTitle": "Reicht für ungefähr:",
+  "walletApproxPhotos": "{count} Fotos",
+  "@walletApproxPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "walletApproxVideos": "{count} Videos",
+  "@walletApproxVideos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "walletSpendPhotoSubtitle": "Fotos\nab 10 Spark",
+  "walletSpendVideoSubtitle": "Videos\nab 50 Spark",
+  "walletSpendPremiumSubtitle": "Premium\nab 80 Spark",
+  "walletContactSupportAction": "Support kontaktieren",
+  "walletRetryAction": "Erneut versuchen",
+  "rewardsPageTitle": "Belohnungen",
+  "rewardsPageSubtitle": "Verdienen Sie PawSpark mit Promo-Codes und Einladungen",
+  "rewardsLastUpdatedLabel": "Aktualisiert: {value}",
+  "@rewardsLastUpdatedLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "rewardsLastUpdatedNow": "gerade eben",
+  "rewardsLastUpdatedMinutes": "vor {count} Min.",
+  "@rewardsLastUpdatedMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsLastUpdatedHours": "vor {count} Std.",
+  "@rewardsLastUpdatedHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsPromoTitle": "Promo-Code",
+  "rewardsPromoSubtitle": "Geben Sie einen Promo-Code ein und erhalten Sie einen Bonus",
+  "rewardsPromoEmptyError": "Promo-Code eingeben.",
+  "rewardsPromoCheckingStatus": "Code wird überprüft...",
+  "rewardsReferralTitle": "Einen Freund einladen",
+  "rewardsReferralSubtitle": "Teilen Sie Ihren Code mit einem Freund. Der Empfehlungsbonus wird nicht für die Anmeldung gezahlt und wird erst nach dem ersten erfolgreichen bezahlten Kauf gutgeschrieben.",
+  "rewardsReferralInvitePrefix": "Ihr Freund erhält vor seinem ersten Kauf einen Bonus, und Sie erhalten",
+  "rewardsReferralInviteSuffix": "nach ihrem ersten erfolgreichen Kauf.",
+  "rewardsYourReferralCode": "Ihr Code",
+  "rewardsCopyReferralCodeAction": "Kopieren",
+  "rewardsReferralCopiedMessage": "Code kopiert.",
+  "rewardsReferralShareCodeAction": "Code teilen",
+  "rewardsReferralUseFriendCodeAction": "Freundescode eingeben",
+  "rewardsReferralFriendCodePrompt": "Haben Sie einen Freundescode?",
+  "rewardsReferralFriendCodeHint": "Geben Sie vor Ihrem ersten Kauf einen Freundescode ein und erhalten Sie einen Bonus.",
+  "rewardsReferralInputLabel": "Freundescode",
+  "rewardsReferralInputHint": "PMABC12345",
+  "rewardsReferralActivateAction": "Code aktivieren",
+  "rewardsReferralEmptyError": "Freundescode eingeben.",
+  "rewardsReferralCheckingStatus": "Empfehlungscode wird überprüft...",
+  "rewardsReferralActivatedMessage": "Empfehlungscode aktiviert. Bonus wird nach Ihrem ersten erfolgreichen bezahlten Kauf gutgeschrieben.",
+  "rewardsReferralStatusLoading": "Empfehlungsstatus wird geladen...",
+  "rewardsReferralStatusNone": "Geben Sie vor Ihrem ersten Kauf einen Freundescode ein. Bonus wird nur nach einer erfolgreichen Zahlung gutgeschrieben.",
+  "rewardsReferralStatusPending": "Empfehlung verbunden. Bonus wird nach Ihrem ersten erfolgreichen bezahlten Kauf ausgezahlt.",
+  "rewardsReferralStatusRewarded": "Empfehlungsbonus ausgezahlt. Danke, dass Sie PetMagic wachsen lassen.",
+  "rewardsReferralEarnedLabel": "Verdient",
+  "rewardsReferralFriendsLabel": "Freunde",
+  "rewardsReferralBonusLabel": "Freundeskäufe",
+  "rewardsReferralBonusPerFriend": "+{count} PawSpark pro eingeladenem Freund",
+  "@rewardsReferralBonusPerFriend": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsReferralRulesNote": "Bonus wird nach dem ersten erfolgreichen Kauf Ihres Freundes gutgeschrieben.",
+  "rewardsReferralHowItWorksAction": "Wie funktioniert das?",
+  "rewardsReferralShareMessage": "Begleiten Sie mich bei PetMagic! Verwenden Sie meinen Empfehlungscode {code}. Bonus wird nach Ihrem ersten erfolgreichen bezahlten Kauf gutgeschrieben. Nach Ihrem ersten Kauf erhalte ich +{bonus} PawSpark.",
+  "@rewardsReferralShareMessage": {
+    "placeholders": {
+      "code": {},
+      "bonus": {
+        "type": "int"
+      }
+    }
+  },
+  "rewardsHistoryTitle": "Verlauf",
+  "rewardsHistorySubtitle": "Aktuelle Promo-, Empfehlungs-, Werbe- und Wochenbelohnungen.",
+  "rewardsHistoryEmpty": "Noch keine Boni. Promo- und Empfehlungsbelohnungen erscheinen hier.",
+  "rewardsSourcePromo": "Promo-Code",
+  "rewardsSourceReferral": "Empfehlungsbonus",
+  "rewardsSourceAd": "Werbebonus",
+  "rewardsSourceWeekly": "Wochenbonus",
+  "rewardsSourcePremium": "Premium-Zuteilung",
+  "rewardsSourceBonus": "Bonus",
+  "rewardsReferralCodeNotFoundError": "Empfehlungscode wurde nicht gefunden.",
+  "rewardsReferralSelfError": "Sie können Ihren eigenen Empfehlungscode nicht aktivieren.",
+  "rewardsReferralAlreadyLinkedError": "Für dieses Konto ist bereits ein Empfehlungscode aktiviert.",
+  "rewardsReferralPaidUserError": "Empfehlungscode muss vor Ihrem ersten erfolgreichen bezahlten Kauf aktiviert werden.",
+  "walletBuySparkTitle": "PawSpark aufladen",
+  "walletPackTotalSpark": "{count} PawSpark",
+  "@walletPackTotalSpark": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPopularBadge": "Beliebt",
+  "walletBestValueLabel": "Bestes Angebot",
+  "walletPackBonus": "+{count} Bonus",
+  "@walletPackBonus": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPackBonusPill": "Bonus +{count}",
+  "@walletPackBonusPill": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPackBaseSpark": "{count} Basis",
+  "@walletPackBaseSpark": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletBuyForPrice": "Für {price} kaufen",
+  "@walletBuyForPrice": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "walletPackDetailsAction": "Details",
+  "walletPackDetailSubtitle": "Prüfen Sie, was enthalten ist, bevor Sie zur Kasse gehen.",
+  "walletCheckoutHint": "Zahlung öffnet sich in sicherem Stripe Checkout. PetMagic speichert Ihre Kartendaten nicht.",
+  "walletCheckoutSucceeded": "Zahlung bestätigt. +{spark} PawSpark ist bereits in Ihrer Wallet.",
+  "@walletCheckoutSucceeded": {
+    "placeholders": {
+      "spark": {
+        "type": "int"
+      }
+    }
+  },
+  "walletPackBreakdown": "{base} Basis + {bonus} Bonus",
+  "@walletPackBreakdown": {
+    "placeholders": {
+      "base": {},
+      "bonus": {}
+    }
+  },
+  "walletRecentTransactionsTitle": "Aktuelle Transaktionen",
+  "walletViewAllTransactions": "Alle Transaktionen",
+  "walletNoActivity": "Noch keine Wallet-Aktivität.",
+  "walletBalanceAfter": "Gut. {count}",
+  "@walletBalanceAfter": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletPurchaseHistoryTitle": "Kaufverlauf",
+  "walletPurchaseSummary": "{count} PawSpark • {date}",
+  "@walletPurchaseSummary": {
+    "placeholders": {
+      "count": {},
+      "date": {}
+    }
+  },
+  "walletPurchaseJustConfirmed": "Gerade bestätigt",
+  "walletUnavailableTitle": "Wallet ist vorübergehend nicht verfügbar",
+  "walletTryAgainAction": "Erneut versuchen",
+  "walletPending": "Ausstehend",
+  "walletSourcePackPurchase": "Aufgeladene Mittel",
+  "walletSourceGenerationSpend": "Generierung",
+  "walletSourceGenerationRefund": "Generierungserstattung",
+  "walletSourceWeeklyGrant": "Wochenbonus",
+  "walletSourceAdReward": "Werbebonus",
+  "walletSourcePromoCode": "Promo-Code",
+  "walletSourceAdminGrant": "Support-Guthaben",
+  "walletSourceAdminDebit": "Support-Anpassung",
+  "walletPurchaseCompleted": "Abgeschlossen",
+  "walletPurchaseFailed": "Fehlgeschlagen",
+  "walletQueryFilterAll": "Alle",
+  "walletQueryFilterCredits": "Gutschriften",
+  "walletQueryFilterDebits": "Abbuchungen",
+  "walletPartialActivityUnavailable": "Ihr Guthaben ist bereits verfügbar. Verlauf und einige Wallet-Aktionen werden etwas später aktualisiert.",
+  "walletPaymentGatewayUnavailableError": "Zahlungen sind vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut oder aktualisieren Sie die App.",
+  "walletPaymentUnavailableError": "Aufladung ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",
+  "walletPackUnavailableError": "Dieses PawSpark-Paket ist nicht mehr verfügbar.",
+  "walletRedeemCodeNotFoundError": "Einlösecode wurde nicht gefunden.",
+  "walletRedeemCodeAlreadyUsedError": "Dieser Einlösecode wurde bereits verwendet.",
+  "walletRedeemCodeExpiredError": "Einlösecode ist abgelaufen.",
+  "walletRedeemCodeInactiveError": "Dieser Einlösecode ist gerade nicht verfügbar.",
+  "walletRedeemCodeExhaustedError": "Dieser Einlösecode hat sein Nutzungslimit erreicht.",
+  "walletRedeemCodeUserLimitError": "Dieser Benutzer hat das Einlöselimit für diesen Code bereits erreicht.",
+  "walletRedeemOfflineError": "Keine Internetverbindung. Überprüfen Sie Ihr Netzwerk und versuchen Sie es erneut.",
+  "walletRedeemServerError": "Der Promo-Code konnte aufgrund eines Serverfehlers nicht angewendet werden. Bitte versuchen Sie es später erneut.",
+  "walletInsufficientBalanceError": "Nicht genug PawSpark für diesen Vorgang.",
+  "walletUnavailableError": "Wallet-Daten sind vorübergehend nicht verfügbar. Bitte versuchen Sie es in einem Moment erneut.",
+  "walletRedeemSheetTitle": "Code einlösen",
+  "walletRedeemSheetSubtitle": "Ein Code kann einmal verwendet werden, solange er aktiv und nicht abgelaufen ist.",
+  "walletRedeemInputLabel": "Promo-Code",
+  "walletRedeemHint": "Promo-Code eingeben",
+  "walletRedeemCancelAction": "Abbrechen",
+  "walletApplyCode": "Code anwenden",
+  "walletRedeemSuccessMessage": "Promo-Code erfolgreich angewendet. Ihr Guthaben wurde bereits aktualisiert.",
+  "walletRedeemSuccessAction": "Fertig",
+  "profileStatsSectionTitle": "Kontostatistiken",
+  "profileStatBalanceLabel": "Guthaben",
+  "profileStatPlanLabel": "Tarif",
+  "profileStatLegalLabel": "Rechtliches",
+  "profileMagicMomentTitle": "Ihr nächster Haustier-Star-Moment",
+  "profileMagicMomentSubtitle": "Erstellen Sie in wenigen Schritten etwas Verspieltes für Ihre Haustiere.",
+  "premiumPaymentRecommendedBadge": "Empfohlen",
+  "premiumPaymentDefaultBadge": "Standard",
+  "paymentBonusPercentBadge": "+{percent}% Bonus",
+  "@paymentBonusPercentBadge": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "premiumFreeSummaryTokens": "20 Token pro Monat",
+  "premiumFreeSummaryWatermark": "Wasserzeichen auf Inhalten",
+  "premiumFreeSummaryTemplates": "Basis-Vorlagen",
+  "premiumFreeSummaryQuality": "Standardqualität",
+  "externalCheckoutStripeTitle": "Zahlung über Stripe",
+  "externalCheckoutStripeMessage": "Stripe Checkout öffnet sich in einem sicheren In-App-Browser. Wenn Sie zu PetMagic zurückkehren, prüfen wir automatisch den Zahlungsstatus, bevor Ihr Zugang aktualisiert wird.",
+  "externalCheckoutContinueAction": "Weiter",
+  "externalCheckoutCheckingTitle": "Zahlung wird überprüft",
+  "externalCheckoutCheckingMessage": "Wir warten auf die Stripe-Bestätigung. Das dauert normalerweise einige Sekunden.",
+  "externalCheckoutPendingVerificationMessage": "Zahlung noch nicht bestätigt. Wir aktualisieren Premium oder Ihre Wallet, sobald der Stripe-Webhook eintrifft.",
+  "premiumContinueWithPlan": "Weiter mit {plan} — {price} {period}",
+  "@premiumContinueWithPlan": {
+    "placeholders": {
+      "plan": {},
+      "price": {},
+      "period": {}
+    }
+  },
+  "premiumRecentlyActivatedBadge": "Gerade aktiviert",
+  "premiumRecentlyActivatedTitle": "Premium bestätigt",
+  "premiumRecentlyActivatedMessage": "Ihr Premium-Zugang ist auf diesem Gerät aktiv und einsatzbereit.",
+  "premiumPurchaseCancelled": "Kauf wurde abgebrochen.",
+  "premiumCheckoutFailed": "Premium Checkout ist vorübergehend nicht verfügbar.",
+  "premiumManageFailed": "Abrechnungsverwaltung ist für dieses Konto noch nicht verfügbar.",
+  "premiumRestoreStarted": "Premium-Status auf diesem Gerät aktualisiert.",
+  "profileLegalShortcutTitle": "Datenschutz & Rechtliches",
+  "profileLegalShortcutAccepted": "Bedingungen akzeptiert • Datenschutzeinstellungen",
+  "profileLegalShortcutPending": "Berechtigungen überprüfen",
+  "profileSupportCompactSubtitle": "Hilfe bei Abrechnung oder Kontozugang erhalten.",
+  "profileSettingsCompactSubtitle": "Sprache, Theme und Kontoeinstellungen.",
+  "profileNotificationsLoading": "Benachrichtigungseinstellungen werden geladen...",
+  "profileNotificationsPushSection": "Push-Benachrichtigungen",
+  "profileNotificationsPushPhotoReady": "Foto ist fertig",
+  "profileNotificationsPushVideoReady": "Video ist fertig",
+  "profileNotificationsPushGenerationErrors": "Generierungsfehler",
+  "profileNotificationsPushReminders": "Erinnerungen",
+  "profileNotificationsPushNewTemplates": "Neue Vorlagen",
+  "profileNotificationsPushPurchasesAndSubscriptions": "Käufe und Abonnements",
+  "profileNotificationsEmailSection": "E-Mail",
+  "profileNotificationsEmailOffers": "Angebote und Rabatte",
+  "profileNotificationsEmailNews": "PetMagic-Neuigkeiten",
+  "profileNotificationsEmailAccountAlerts": "Wichtige Kontobenachrichtigungen",
+  "profileNotificationsDeviceSection": "Gerätestatus",
+  "profileNotificationsPushPermissionLabel": "Push-Berechtigungen",
+  "profileNotificationsPushPermissionAllowed": "Erlaubt",
+  "profileNotificationsPushPermissionDenied": "In Geräteeinstellungen deaktiviert",
+  "profileNotificationsPushPermissionNotDetermined": "Noch nicht angefragt",
+  "profileNotificationsPushPermissionProvisional": "Still erlaubt",
+  "profileNotificationsPushPermissionUnknown": "Unbekannt",
+  "profileNotificationsRefreshStatus": "Status aktualisieren",
+  "profileNotificationsRequestPermission": "Push-Benachrichtigungen erlauben",
+  "profileLegalDocumentInfoSection": "Dokumentinfo",
+  "profileLegalOpenFullAction": "Vollständige Richtlinie öffnen",
+  "profilePrivacyQuickDataTitle": "Was wir sammeln",
+  "profilePrivacyQuickDataBody": "• E-Mail\n• Profilname\n• Generierungsverlauf\n• Hochgeladene Tierfotos\n• Kaufverlauf\n• Support-Anfragen",
+  "profilePrivacyQuickUsageTitle": "Warum wir es verwenden",
+  "profilePrivacyQuickUsageBody": "• App-Funktionen betreiben\n• Inhalte generieren\n• Im Support antworten\n• Konto und Zahlungen schützen",
+  "profilePrivacyQuickSharingTitle": "Teilen wir Daten?",
+  "profilePrivacyQuickSharingBody": "Wir verkaufen keine persönlichen Daten. Daten können nur mit Verarbeitern geteilt werden, die für den Betrieb des Dienstes notwendig sind (z. B. Zahlungen, Cloud-Hosting und Analysen).",
+  "profilePrivacyQuickRightsTitle": "Ihre Rechte",
+  "profilePrivacyQuickRightsBody": "• Kopie Ihrer Daten anfordern\n• Konto- und Datenlöschung anfordern\n• Einwilligung wo zutreffend widerrufen",
+  "supportChatSecureTitle": "Ihr Gespräch ist geschützt. Wir verwenden es nur für den Support.",
+  "supportChatSecureSubtitle": "Wir schützen Ihre Daten und halten Ihre Informationen privat.",
+  "supportChatTeamTitle": "PetMagic Support",
+  "supportChatTeamStatus": "Wir antworten normalerweise innerhalb von 24 Stunden",
+  "supportChatTodayLabel": "Heute",
+  "supportChatWelcomeTitle": "Hallo! Beschreiben Sie Ihr Problem und wir helfen Ihnen.",
+  "supportChatWelcomeBody": "Sie können auch eines der häufigen Themen unten auswählen.",
+  "supportChatQuickActionGeneration": "Problem mit der Bildgenerierung",
+  "supportChatQuickActionPayment": "Zahlungsproblem",
+  "supportChatQuickActionRefund": "Erstattungsanfrage",
+  "supportChatQuickActionHuman": "Mit einem Mitarbeiter sprechen",
+  "supportChatFaqTitle": "FAQ",
+  "supportChatFaqGenerationTitle": "Warum ist meine Generierung fehlgeschlagen?",
+  "supportChatFaqGenerationBody": "Senden Sie den Vorlagennamen, Ihren Haustiertyp und wenn möglich einen Screenshot. Dies gibt dem Support normalerweise beim ersten Antworten genug Kontext.",
+  "supportChatFaqResponseTitle": "Wann antwortet der Support?",
+  "supportChatFaqResponseBody": "Das Support-Team antwortet in diesem Chat. Wir antworten normalerweise innerhalb von 24 Stunden.",
+  "supportChatFaqRefundTitle": "Wie funktionieren Erstattungen?",
+  "supportChatFaqRefundBody": "Teilen Sie das Bestelldatum und den Grund für die Anfrage. Abrechnungsfälle werden im selben Chat ohne Kanalwechsel bearbeitet.",
+  "supportChatWaitingForSupportStatus": "Wartet auf Support",
+  "supportChatWaitingForSupportStatusHint": "Die Anfrage ist offen. Der Support wird die neue Nachricht sehen.",
+  "supportChatInProgressStatusHint": "Support überprüft Ihr Problem.",
+  "supportChatAwaitingYourReplyStatus": "Wartet auf Ihre Antwort",
+  "supportChatSupportRepliedStatusHint": "Support hat geantwortet. Hat das geholfen?",
+  "supportChatResolvedStatusHint": "Diese Anfrage wurde als gelöst markiert. Sie können sie 7 Tage lang wieder öffnen.",
+  "supportChatClosedStatusHint": "Gespräch ist geschlossen. Senden Sie eine neue Nachricht, um es wieder zu öffnen.",
+  "supportChatAttachmentUploadingWithCount": "Foto {current} von {total} wird hochgeladen",
+  "@supportChatAttachmentUploadingWithCount": {
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "supportChatAddPhotoTitle": "Foto hinzufügen",
+  "supportChatAddAttachmentTitle": "Anhang hinzufügen",
+  "supportChatTakePhotoAction": "Foto aufnehmen",
+  "supportChatChooseGalleryAction": "Aus Galerie wählen",
+  "supportChatChoosePhotosAction": "Fotos wählen",
+  "supportChatRecordVideoAction": "Video aufnehmen",
+  "supportChatChooseVideoAction": "Video wählen",
+  "supportChatAttachFileAction": "Dateien",
+  "supportChatRecentMediaTitle": "Aktuelle Medien",
+  "supportChatAttachmentNoRecentMedia": "Keine aktuellen Fotos oder Videos",
+  "supportChatAttachmentLimitedAccessHint": "Nicht alle Fotos sind verfügbar. Erlauben Sie in den Geräteeinstellungen vollen Galeriezugang.",
+  "supportChatOpenSettingsAction": "Einstellungen öffnen",
+  "supportChatAttachmentNoGalleryAccessError": "Galeriezugang verweigert. Erlauben Sie den Zugang in den Geräteeinstellungen.",
+  "supportChatAttachmentExpiredPlaceholder": "Anhang wurde nach 30 Tagen gelöscht",
+  "supportChatReplyLabel": "Antworten",
+  "supportChatReplyToPrefix": "Antwort auf Nachricht",
+  "supportChatReplyOriginalUnavailable": "Originalnachricht nicht verfügbar",
+  "supportChatPhotoAttachedLabel": "Foto angehängt",
+  "supportChatVideoAttachedLabel": "Video angehängt",
+  "supportChatVideoLabel": "Support-Video",
+  "supportChatAssistantBadge": "Assistent",
+  "supportChatTooManyAttachmentsError": "Sie können bis zu 5 Dateien hinzufügen",
+  "supportChatAttachmentUnsupportedFormatError": "Dieses Format wird nicht unterstützt",
+  "supportChatAttachmentVideoTooLongError": "Video muss 60 Sekunden oder kürzer sein.",
+  "supportChatMarkResolvedAction": "Ja, Anfrage schließen",
+  "supportChatKeepOpenAction": "Nein, mehr schreiben",
+  "supportChatReopenAction": "Wieder öffnen",
+  "supportChatArchiveAction": "Archivieren",
+  "supportChatRateTitle": "Support-Antwort bewerten",
+  "supportChatRatedLabel": "Ihre Bewertung: {rating}/5",
+  "@supportChatRatedLabel": {
+    "placeholders": {
+      "rating": {}
+    }
+  },
+  "supportChatReadOnlyHint": "Dieses Gespräch ist schreibgeschützt",
+  "supportHomeTitle": "Hilfe & Support",
+  "supportHomeSubtitle": "Womit können wir Ihnen helfen?",
+  "supportHomeTopicGenerationIssue": "Problem mit der Bildgenerierung",
+  "supportHomeTopicGenerationTooLong": "Generierung dauert zu lange",
+  "supportHomeTopicTokensNotArrived": "Token sind nicht angekommen",
+  "supportHomeTopicPremiumIssue": "Premium-Problem",
+  "supportHomeTopicPaymentRefund": "Zahlung / Erstattung",
+  "supportHomeTopicOther": "Sonstiges",
+  "supportAssistantTitle": "Support-Assistent",
+  "supportAssistantThisHelpedAction": "Das hat geholfen",
+  "supportAssistantCreateTicketAction": "Support-Ticket erstellen",
+  "supportAssistantCheckLaterAction": "Später prüfen",
+  "supportAssistantRecommendationGeneration": "Für bessere Ergebnisse verwenden Sie bitte ein Foto, auf dem das Haustier deutlich sichtbar ist, nicht beschnitten, nicht unscharf und gut beleuchtet.",
+  "supportAssistantRecommendationGenerationTooLong": "Die Videogenerierung kann mehrere Minuten dauern. Normalerweise etwa 2–10 Minuten. Wenn es zu lange gedauert hat, können wir dieses Problem an den Support senden.",
+  "supportAssistantRecommendationTokensNotArrived": "Manchmal kann die Token-Lieferung nach der Zahlung einige Minuten dauern. Wenn die Token noch immer nicht erscheinen, erstellen Sie ein Support-Ticket und wir prüfen den Kauf.",
+  "supportAssistantRecommendationPremiumIssue": "Wenn Premium bereits bezahlt wurde, aber in der App nicht sichtbar ist, versuchen Sie bitte, die App neu zu starten. Wenn das Problem weiterhin besteht, prüfen wir Ihren Abonnementstatus.",
+  "supportAssistantRecommendationPaymentRefund": "Wir können Ihre Zahlung prüfen oder Ihren Erstattungsantrag an den Support weiterleiten. Erstellen Sie ein Support-Ticket und wir fügen die relevanten Kaufinformationen hinzu, falls verfügbar.",
+  "supportAssistantRecommendationOther": "Bitte beschreiben Sie, was passiert ist. Sie können auch einen Screenshot anhängen, damit der Support die Situation schneller verstehen kann.",
+  "supportTicketFormTitle": "Support-Ticket erstellen",
+  "supportTicketFormTopicLabel": "Thema",
+  "supportTicketFormDescriptionLabel": "Problembeschreibung",
+  "supportTicketFormDescriptionHint": "Beschreiben Sie, was passiert ist...",
+  "supportTicketFormRelatedGenerationLabel": "Zugehörige Generierung",
+  "supportTicketFormRelatedPaymentLabel": "Zugehörige Zahlung",
+  "supportTicketFormRelatedSubscriptionLabel": "Zugehöriges Abonnement",
+  "supportTicketFormAttachmentsLabel": "Anhänge",
+  "supportTicketFormAddScreenshotAction": "Screenshot hinzufügen",
+  "supportTicketFormSubmitAction": "An Support senden",
+  "supportTicketFormSubmittingLabel": "Ticket wird erstellt...",
+  "supportTicketFormSuccessMessage": "Ihr Ticket wurde erstellt. Wir antworten in diesem Chat.",
+  "supportTicketFormErrorMessage": "Ticket konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+  "profileActionFailed": "Wir konnten diese Aktion nicht abschließen. Bitte versuchen Sie es erneut.",
+  "profileSettingsVersionLabel": "App-Version {version}",
+  "@profileSettingsVersionLabel": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "templateFlowPhotoSourceGallery": "Galerie",
+  "templateFlowPhotoSourceCamera": "Kamera",
+  "templateFlowReadyTitle": "Bereit zum Erstellen!",
+  "templateFlowCheckDetailsSubtitle": "Überprüfen Sie die Details vor dem Erstellen",
+  "templateFlowBalanceLabel": "Ihr Guthaben",
+  "templateFlowDurationHint": "Die Erstellung kann 10 Sekunden bis 1 Minute dauern.",
+  "templateFlowCreateMagicAction": "Magie erstellen",
+  "templateFlowChangePhotoAction": "Foto ändern",
+  "templateFlowPremiumTemplateTitle": "Premium-Vorlage",
+  "templateFlowPremiumTemplateMessage": "Diese Vorlage ist mit Premium verfügbar.",
+  "templateFlowInsufficientBalanceTitle": "Nicht genug PawSpark",
+  "templateFlowInsufficientBalanceMessage": "Diese Vorlage kostet {tokenCost} PawSpark. Ihr Guthaben: {balance} PawSpark.",
+  "@templateFlowInsufficientBalanceMessage": {
+    "placeholders": {
+      "tokenCost": {},
+      "balance": {}
+    }
+  },
+  "templateFlowChooseAnotherTemplateAction": "Eine andere Vorlage wählen",
+  "templateFlowCreateFailedTitle": "Magie konnte nicht erstellt werden",
+  "templateFlowCreateFailedBalanceHint": "Laden Sie Ihr Guthaben auf und versuchen Sie es erneut.",
+  "templateFlowCreateFailedRetryHint": "Versuchen Sie ein anderes Foto oder wiederholen Sie es später.",
+  "templateFlowCreateHint": "Das kann etwas Zeit dauern",
+  "templateFlowStepAnalyzePet": "Haustier analysieren",
+  "templateFlowTopUpBalanceAction": "Guthaben aufladen",
+  "templateFlowResultReadyTitle": "Fertig!",
+  "templateFlowResultReadySubtitle": "Ihre Magie ist bereit",
+  "templateFlowLoadingResult": "Ergebnis wird geladen...",
+  "templateFlowCreateMoreAction": "Mehr erstellen",
+  "templateFlowPreviewFallback": "Vorschau",
+  "templateFlowLoadingPreview": "Vorschau wird geladen...",
+  "templateFlowPreviewUnavailable": "Vorschau nicht verfügbar",
+  "templateFlowLoadingVideo": "Video wird geladen...",
+  "templateFlowBestPhotoTitle": "Bestes Foto für diese Vorlage:",
+  "templateFlowUploadPetPhotoAction": "Haustierfoto hochladen",
+  "templateFlowPremiumRequiredError": "Diese Vorlage ist nur mit Premium verfügbar.",
+  "templateFlowInsufficientBalanceError": "Nicht genug PawSpark zum Starten der Generierung.",
+  "templateFlowNetworkError": "Keine Verbindung. Überprüfen Sie Ihr Netzwerk und versuchen Sie es erneut.",
+  "templateFlowServerError": "Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",
+  "templateFlowStartFailedError": "Generierung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
+
   "shellActiveGenerationFallback": "Ergebnis"
 }

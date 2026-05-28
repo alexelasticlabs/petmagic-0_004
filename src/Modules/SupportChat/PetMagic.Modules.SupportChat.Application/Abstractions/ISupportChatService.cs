@@ -6,7 +6,12 @@ namespace PetMagic.Modules.SupportChat.Application.Abstractions;
 public sealed record SupportConversationRealtimeEvent(
     Guid ConversationId,
     Guid InitiatorUserId,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    string? LastMessagePreview,
+    DateTime? LastMessageAtUtc,
+    string? LastMessageSenderType,
+    int AdminUnreadCount,
+    int UserUnreadCount);
 
 public sealed record SupportAttachmentUploadCommand(
     string FileName,
@@ -19,7 +24,8 @@ public sealed record SupportChatPushNotification(
     Guid MessageId,
     string SenderDisplayName,
     string Body,
-    bool HasAttachment);
+    bool HasAttachment,
+    int UserUnreadCount);
 
 public sealed record StoredSupportAttachmentResponse(
     string Url,

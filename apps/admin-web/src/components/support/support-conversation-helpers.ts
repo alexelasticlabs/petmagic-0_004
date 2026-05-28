@@ -277,11 +277,41 @@ export function shouldRenderMessageBody(
     return true;
   }
 
-  if (attachments.length > 1) {
-    return true;
+  const normalizedBodyLower = normalizedBody.toLowerCase();
+  const attachmentNames = new Set(
+    attachments
+      .map((attachment) => attachment.fileName?.trim().toLowerCase())
+      .filter((value): value is string => Boolean(value))
+  );
+  const bodyParts = normalizedBodyLower
+    .split(/[\n,]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const isAttachmentNameList = bodyParts.length > 1 && bodyParts.every((part) => attachmentNames.has(part));
+  const isMimeTypeOnly = /^[a-z0-9.+-]+\/[a-z0-9.+-]+(?:\s*;.*)?$/i.test(normalizedBody);
+  const isTechnicalPrefix = /^(file name|filename|mime|content[- ]type|upload status|upload state|debug)\s*[:=-]/i.test(
+    normalizedBodyLower.replace(/\s+/g, " ")
+  );
+  const isUploadStatusOnly =
+    /^(uploaded|uploading|upload failed|retry|attachment uploaded|file uploaded)$/i.test(
+      normalizedBodyLower
+    );
+  const isAttachmentUrl =
+    /^https?:\/\/\S+$/i.test(normalizedBody) &&
+    attachments.some((attachment) => attachment.fileUrl.trim() === normalizedBody);
+
+  if (
+    attachmentNames.has(normalizedBodyLower) ||
+    isAttachmentNameList ||
+    isMimeTypeOnly ||
+    isTechnicalPrefix ||
+    isUploadStatusOnly ||
+    isAttachmentUrl
+  ) {
+    return false;
   }
 
-  return normalizedBody !== (attachments[0]?.fileName?.trim() ?? "");
+  return true;
 }
 
 export function formatFileSize(value: number | null | undefined, locale: Locale) {

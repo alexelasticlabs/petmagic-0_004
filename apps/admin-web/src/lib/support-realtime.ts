@@ -7,6 +7,11 @@ export type SupportConversationUpdatedEvent = {
   conversationId: string;
   initiatorUserId: string;
   updatedAtUtc: string;
+  lastMessagePreview?: string | null;
+  lastMessageAtUtc?: string | null;
+  lastMessageSenderType?: string | null;
+  adminUnreadCount?: number;
+  userUnreadCount?: number;
 };
 
 const supportHubUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000"}/hubs/support-chat`;
@@ -93,5 +98,10 @@ function normalizeConversationUpdated(payload: unknown): SupportConversationUpda
     conversationId: candidate.conversationId,
     initiatorUserId: candidate.initiatorUserId,
     updatedAtUtc: candidate.updatedAtUtc,
+    lastMessagePreview: typeof candidate.lastMessagePreview === "string" ? candidate.lastMessagePreview : null,
+    lastMessageAtUtc: typeof candidate.lastMessageAtUtc === "string" ? candidate.lastMessageAtUtc : null,
+    lastMessageSenderType: typeof candidate.lastMessageSenderType === "string" ? candidate.lastMessageSenderType : null,
+    adminUnreadCount: typeof candidate.adminUnreadCount === "number" ? candidate.adminUnreadCount : undefined,
+    userUnreadCount: typeof candidate.userUnreadCount === "number" ? candidate.userUnreadCount : undefined,
   };
 }

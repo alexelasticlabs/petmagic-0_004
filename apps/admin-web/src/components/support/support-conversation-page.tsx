@@ -14,7 +14,6 @@ import {
     getConversationSla,
     getMessageAttachments,
     groupSupportConversationFeed,
-    hasAttachment,
     initialsFor,
     shortId,
     shouldRenderMessageBody,
@@ -48,6 +47,9 @@ type FullscreenImage = {
   createdAtUtc?: string | null;
   fileSizeBytes?: number | null;
 };
+
+type SupportMessage = AdminSupportConversation["messages"][number];
+type SupportMessageAttachment = ReturnType<typeof getMessageAttachments>[number];
 
 export function SupportConversationPage({
   locale,
@@ -315,10 +317,19 @@ export function SupportConversationPage({
   };
 
   const resolveReplyPreview = (
-    message: Pick<AdminSupportConversation["messages"][number], "body" | "attachments" | "replyToPreview">
+    message: Pick<
+      AdminSupportConversation["messages"][number],
+      | "body"
+      | "attachments"
+      | "replyToPreview"
+      | "attachmentFileName"
+      | "attachmentUrl"
+      | "attachmentContentType"
+      | "attachmentFileSizeBytes"
+    >
   ) => {
     const body = message.body.trim();
-    if (body) {
+    if (body && shouldRenderMessageBody(message)) {
       return body;
     }
 
@@ -352,7 +363,133 @@ export function SupportConversationPage({
   const replyComposerPreview =
     replyToPreview?.trim() ||
     (replyToMessage ? resolveReplyPreview(replyToMessage) : text.supportReplyOriginalUnavailable);
+  const replyComposerAttachment = replyToMessage
+    ? getMessageAttachments(replyToMessage).find((attachment) => !attachment.isDeleted)
+    : null;
 
+  const mediaGridLayoutClass = (count: number) => {
+    const key = count >= 7 ? "messageMediaGridCount7Plus" : `messageMediaGridCount${count}`;
+    return styles[key as keyof typeof styles] ?? "";
+  };
+
+  const renderReplyThumbnail = (attachment: SupportMessageAttachment | null | undefined) => {
+    if (!attachment || attachment.isDeleted) {
+      return null;
+    }
+
+    if (attachment.mimeType.startsWith("image/")) {
+      return (
+        <Image
+          src={attachment.fileUrl}
+          alt=""
+          width={34}
+          height={34}
+          sizes="34px"
+          className={styles.replyThumbImage}
+          loading="lazy"
+          unoptimized
+        />
+      );
+    }
+
+    return (
+      <span className={styles.replyThumbIcon} aria-hidden="true">
+        {attachment.mimeType.startsWith("video/") ? "▶" : "FILE"}
+      </span>
+    );
+  };
+
+  const renderAttachmentTile = (
+    message: SupportMessage,
+    attachment: SupportMessageAttachment,
+    attachmentIndex: number,
+    options?: { overlayCount?: number; single?: boolean }
+  ) => {
+    const key = `${message.messageId}:${attachmentIndex}`;
+    const overlayCount = options?.overlayCount ?? 0;
+    const tileClassName = `${styles.messageMediaTile} ${options?.single ? styles.messageMediaTileSingle : ""}`;
+
+    if (attachment.isDeleted) {
+      return (
+        <div key={key} className={`${styles.deletedAttachmentPlaceholder} ${tileClassName}`}>
+          {text.supportAttachmentExpiredLabel}
+        </div>
+      );
+    }
+
+    const isImage = attachment.mimeType.startsWith("image/");
+    const isVideo = attachment.mimeType.startsWith("video/");
+
+    if (isImage) {
+      return (
+        <button
+          key={key}
+          type="button"
+          onClick={() =>
+            setFullscreenImage({
+              url: attachment.fileUrl,
+              fileName: attachment.fileName,
+              messageId: message.messageId,
+              senderDisplayName: message.senderDisplayName,
+              createdAtUtc: message.createdAtUtc,
+              fileSizeBytes: attachment.sizeBytes,
+            })
+          }
+          className={`${styles.messageImageButton} ${tileClassName}`}
+          aria-label={locale === "ru" ? "Открыть фото" : "Open photo"}
+        >
+          <Image
+            src={attachment.fileUrl}
+            alt={attachment.fileName || message.body || "Support attachment"}
+            width={options?.single ? 360 : 180}
+            height={options?.single ? 260 : 140}
+            sizes="(max-width: 860px) 100vw, 360px"
+            className={styles.messageImage}
+            loading="lazy"
+            unoptimized
+          />
+          {overlayCount > 0 ? <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span> : null}
+        </button>
+      );
+    }
+
+    if (isVideo) {
+      return (
+        <a
+          key={key}
+          href={attachment.fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${styles.messageVideoButton} ${tileClassName}`}
+          aria-label={locale === "ru" ? "Открыть видео" : "Open video"}
+        >
+          <video preload="metadata" src={attachment.fileUrl} className={styles.messageVideo} />
+          <span className={styles.messageVideoDurationBadge}>
+            ▶ {formatAttachmentDuration(attachment.durationSeconds)}
+          </span>
+          {overlayCount > 0 ? <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span> : null}
+        </a>
+      );
+    }
+
+    return (
+      <a
+        key={key}
+        href={attachment.fileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        download={attachment.fileName || "attachment"}
+        className={`${styles.messageAttachmentCard} ${styles.messageMediaFileTile}`}
+      >
+        <div className={styles.messageAttachmentIcon}>FILE</div>
+        <div className={styles.messageAttachmentMeta}>
+          <strong>{attachment.fileName || (locale === "ru" ? "Файл" : "File")}</strong>
+          <span>{formatFileSize(attachment.sizeBytes, locale)}</span>
+        </div>
+        {overlayCount > 0 ? <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span> : null}
+      </a>
+    );
+  };
   return (
     <AdminPage className={styles.page}>
       {toast ? <Toast type={toast.type} message={toast.message} /> : null}
@@ -715,59 +852,63 @@ export function SupportConversationPage({
                         ticketResolved: text.supportSystemTicketResolved,
                         ticketReopened: text.supportSystemTicketReopened,
                         ticketClosed: text.supportSystemTicketClosed,
-                      }).map((group) => (
-                        <div key={group.key} className={styles.dayGroup}>
-                          <div className={styles.dayDivider}>{group.label}</div>
-                          {group.items.map((item) => {
-                            if (item.kind === "system") {
-                              return (
-                                <div
-                                  key={item.id}
-                                  className={`${styles.systemEventCard} ${styles[`systemEventCard_${item.tone}`] ?? ""}`}
-                                >
-                                  <span className={styles.systemEventDot} />
-                                  <span>{item.label}</span>
-                                  <span className={styles.systemEventTime}>
-                                    {formatClockTime(item.occurredAtUtc, locale)}
-                                  </span>
-                                </div>
-                              );
-                            }
+                      }).map((group) => {
+                        const hasVisibleMessages = group.items.some(
+                          (item) =>
+                            item.kind === "message" &&
+                            (item.message.senderType?.trim().toLowerCase() ?? "") !== "system"
+                        );
+                        if (!hasVisibleMessages) {
+                          return null;
+                        }
 
-                            const message = item.message;
-                            const attachments = getMessageAttachments(message);
-                            const primaryAttachment = attachments[0];
-                            const hasAttachmentGroup = attachments.length > 1;
-                            const isSingleImageAttachment =
-                              attachments.length === 1 &&
-                              Boolean(primaryAttachment?.mimeType?.startsWith("image/"));
-                            const isSingleVideoAttachment =
-                              attachments.length === 1 &&
-                              Boolean(primaryAttachment?.mimeType?.startsWith("video/"));
-                            const senderType = message.senderType?.toLowerCase() ?? "";
-                            const isSystemMessage = senderType === "system";
-                            const isBotMessage = senderType === "bot";
+                        return (
+                          <div key={group.key} className={styles.dayGroup}>
+                            <div className={styles.dayDivider}>{group.label}</div>
+                            {group.items.map((item) => {
+                              if (item.kind !== "message") {
+                                return null;
+                              }
 
-                            if (isSystemMessage) {
-                              return (
-                                <div
-                                  key={message.messageId}
-                                  id={`message-${message.messageId}`}
-                                  className={styles.inlineSystemLabel}
-                                >
-                                  <span>{message.body}</span>
-                                  <span className={styles.systemEventTime}>
-                                    {formatClockTime(message.createdAtUtc, locale)}
-                                  </span>
-                                </div>
+                              const message = item.message;
+                              const attachments = getMessageAttachments(message);
+                              const primaryAttachment = attachments[0];
+                              const hasAttachmentGroup = attachments.length > 1;
+                              const senderType = message.senderType?.toLowerCase() ?? "";
+                              const isSystemMessage = senderType === "system";
+                              const isBotMessage = senderType === "bot";
+                              const shouldShowBody = shouldRenderMessageBody(message);
+                              const normalizedAttachmentStatus =
+                                message.attachmentUploadStatus?.trim().toLowerCase() ?? "";
+                              const shouldShowAttachmentFailure =
+                                normalizedAttachmentStatus === "failed" ||
+                                normalizedAttachmentStatus === "retry";
+                              const hasMediaMessage = attachments.some(
+                                (attachment) =>
+                                  attachment.mimeType.startsWith("image/") ||
+                                  attachment.mimeType.startsWith("video/")
                               );
-                            }
+                              const isMediaOnlyBubble = hasMediaMessage && !shouldShowBody;
+                              const repliedMessage = message.replyToMessageId
+                                ? (conversation.messages.find(
+                                    (candidate) => candidate.messageId === message.replyToMessageId
+                                  ) ?? null)
+                                : null;
+                              const repliedAttachment = repliedMessage
+                                ? getMessageAttachments(repliedMessage).find(
+                                    (attachment) => !attachment.isDeleted
+                                  )
+                                : null;
+
+                              if (isSystemMessage) {
+                                return null;
+                              }
 
                               return (
                                 <article
                                   key={message.messageId}
                                   id={`message-${message.messageId}`}
-                                  className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser} ${isBotMessage ? styles.messageBot : ""} ${highlightedMessageId === message.messageId ? styles.messageHighlighted : ""}`}
+                                  className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser} ${isBotMessage ? styles.messageBot : ""} ${highlightedMessageId === message.messageId ? styles.messageHighlighted : ""} ${hasMediaMessage ? styles.messageWithMedia : ""} ${isMediaOnlyBubble ? styles.messageMediaOnly : ""}`}
                                   onDoubleClick={() => startReplyToMessage(message)}
                                 >
                                   <div className={styles.messageHeader}>
@@ -820,219 +961,60 @@ export function SupportConversationPage({
                                     }}
                                     disabled={!message.replyToMessageId}
                                   >
-                                    <span className={styles.messageReplyBlockLabel}>
-                                      {locale === "ru" ? "Ответ" : "Reply"}
-                                    </span>
-                                    <span className={styles.messageReplyBlockPreview}>
-                                      {(message.replyToPreview?.trim() || text.supportReplyOriginalUnavailable).trim()}
+                                    {renderReplyThumbnail(repliedAttachment)}
+                                    <span className={styles.messageReplyBlockContent}>
+                                      <span className={styles.messageReplyBlockLabel}>
+                                        {locale === "ru" ? "Ответ на" : "Reply to"}
+                                      </span>
+                                      <span className={styles.messageReplyBlockPreview}>
+                                        {(message.replyToPreview?.trim() || text.supportReplyOriginalUnavailable).trim()}
+                                      </span>
                                     </span>
                                   </button>
                                 ) : null}
-                                {hasAttachmentGroup ? (
-                                  <div
-                                    style={{
-                                      display: "grid",
-                                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                                      gap: 8,
-                                      marginBottom: 8,
-                                      maxWidth: 332,
-                                    }}
-                                  >
-                                    {attachments.slice(0, 5).map((attachment, attachmentIndex) => {
-                                      if (attachment.isDeleted) {
-                                        return (
-                                          <div
-                                            key={`${message.messageId}:${attachmentIndex}`}
-                                            className={styles.deletedAttachmentPlaceholder}
-                                          >
-                                            {text.supportAttachmentExpiredLabel}
-                                          </div>
-                                        );
-                                      }
-
-                                      const isImage = attachment.mimeType.startsWith("image/");
-                                      const isVideo = attachment.mimeType.startsWith("video/");
-
-                                      if (isImage) {
-                                        return (
-                                          <button
-                                            key={`${message.messageId}:${attachmentIndex}`}
-                                            type="button"
-                                            onClick={() =>
-                                              setFullscreenImage({
-                                                url: attachment.fileUrl,
-                                                fileName: attachment.fileName,
-                                                messageId: message.messageId,
-                                                senderDisplayName: message.senderDisplayName,
-                                                createdAtUtc: message.createdAtUtc,
-                                                fileSizeBytes: attachment.sizeBytes,
-                                              })
-                                            }
-                                            className={styles.messageImageButton}
-                                          >
-                                            <Image
-                                              src={attachment.fileUrl}
-                                              alt={attachment.fileName || message.body}
-                                              width={152}
-                                              height={120}
-                                              sizes="(max-width: 860px) 100vw, 152px"
-                                              className={styles.messageImage}
-                                              loading="lazy"
-                                              unoptimized
-                                            />
-                                          </button>
-                                        );
-                                      }
-
-                                      if (isVideo) {
-                                        return (
-                                          <a
-                                            key={`${message.messageId}:${attachmentIndex}`}
-                                            href={attachment.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={styles.messageAttachmentCard}
-                                            style={{ position: "relative", overflow: "hidden" }}
-                                          >
-                                            <video
-                                              preload="metadata"
-                                              src={attachment.fileUrl}
-                                              className={styles.messageVideo}
-                                            />
-                                            <span
-                                              style={{
-                                                position: "absolute",
-                                                right: 8,
-                                                bottom: 8,
-                                                background: "rgba(17, 24, 39, 0.75)",
-                                                color: "#fff",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                                borderRadius: 999,
-                                                padding: "2px 8px",
-                                              }}
-                                            >
-                                              ▶ {formatAttachmentDuration(attachment.durationSeconds)}
-                                            </span>
-                                          </a>
-                                        );
-                                      }
-
-                                      return (
-                                        <a
-                                          key={`${message.messageId}:${attachmentIndex}`}
-                                          href={attachment.fileUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          download={attachment.fileName || "attachment"}
-                                          className={styles.messageAttachmentCard}
-                                        >
-                                          <div className={styles.messageAttachmentIcon}>FILE</div>
-                                          <div className={styles.messageAttachmentMeta}>
-                                            <strong>{attachment.fileName || message.body}</strong>
-                                            <span>{formatFileSize(attachment.sizeBytes, locale)}</span>
-                                          </div>
-                                        </a>
-                                      );
-                                    })}
-                                  </div>
-                                ) : isSingleImageAttachment && primaryAttachment ? (
-                                  primaryAttachment.isDeleted ? (
-                                    <div className={styles.deletedAttachmentPlaceholder}>
-                                      {text.supportAttachmentExpiredLabel}
-                                    </div>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setFullscreenImage({
-                                          url: primaryAttachment.fileUrl,
-                                          fileName: primaryAttachment.fileName,
-                                          messageId: message.messageId,
-                                          senderDisplayName: message.senderDisplayName,
-                                          createdAtUtc: message.createdAtUtc,
-                                          fileSizeBytes: primaryAttachment.sizeBytes,
-                                        })
-                                      }
-                                      className={styles.messageImageButton}
+                                {attachments.length > 0 ? (
+                                  hasAttachmentGroup ? (
+                                    <div
+                                      className={`${styles.messageMediaGrid} ${mediaGridLayoutClass(attachments.length)}`}
                                     >
-                                      <Image
-                                        src={primaryAttachment.fileUrl}
-                                        alt={primaryAttachment.fileName || message.body}
-                                        width={152}
-                                        height={120}
-                                        sizes="(max-width: 860px) 100vw, 152px"
-                                        className={styles.messageImage}
-                                        loading="lazy"
-                                        unoptimized
-                                      />
-                                    </button>
-                                  )
-                                ) : isSingleVideoAttachment && primaryAttachment ? (
-                                  primaryAttachment.isDeleted ? (
-                                    <div className={styles.deletedAttachmentPlaceholder}>
-                                      {text.supportAttachmentExpiredLabel}
+                                      {attachments
+                                        .slice(0, attachments.length >= 7 ? 6 : attachments.length)
+                                        .map((attachment, attachmentIndex, visibleAttachments) =>
+                                          renderAttachmentTile(message, attachment, attachmentIndex, {
+                                            overlayCount:
+                                              attachments.length >= 7 &&
+                                              attachmentIndex === visibleAttachments.length - 1
+                                                ? attachments.length - visibleAttachments.length
+                                                : 0,
+                                          })
+                                        )}
                                     </div>
-                                  ) : (
-                                    <div className={styles.messageVideoButton}>
-                                      <video
-                                        controls
-                                        preload="metadata"
-                                        src={primaryAttachment.fileUrl}
-                                        className={styles.messageVideo}
-                                      />
-                                    </div>
-                                  )
-                                ) : hasAttachment(message) ? (
-                                  primaryAttachment?.isDeleted ? (
-                                    <div className={styles.deletedAttachmentPlaceholder}>
-                                      {text.supportAttachmentExpiredLabel}
-                                    </div>
-                                  ) : (
-                                    <a
-                                      href={primaryAttachment?.fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download={primaryAttachment?.fileName ?? "attachment"}
-                                      className={styles.messageAttachmentCard}
-                                    >
-                                      <div className={styles.messageAttachmentIcon}>FILE</div>
-                                      <div className={styles.messageAttachmentMeta}>
-                                        <strong>{primaryAttachment?.fileName ?? message.body}</strong>
-                                        <span>
-                                          {formatFileSize(primaryAttachment?.sizeBytes, locale)}
-                                        </span>
-                                      </div>
-                                    </a>
-                                  )
+                                  ) : primaryAttachment ? (
+                                    renderAttachmentTile(message, primaryAttachment, 0, { single: true })
+                                  ) : null
                                 ) : null}
-                                {shouldRenderMessageBody(message) ? (
+                                {shouldShowBody ? (
                                   <div className={styles.messageBody}>{message.body}</div>
                                 ) : null}
-                                {message.attachmentUploadStatus &&
-                                message.attachmentUploadStatus.toLowerCase() !== "uploaded" ? (
+                                {shouldShowAttachmentFailure ? (
                                   <div className={styles.messageAttachmentStatusRow}>
                                     <span
-                                      className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${message.attachmentUploadStatus.toLowerCase()}`] ?? ""}`}
+                                      className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${normalizedAttachmentStatus}`] ?? ""}`}
                                     >
-                                      {message.attachmentUploadStatus.toLowerCase() === "pending"
-                                        ? text.supportAttachmentUploadingLabel
-                                        : message.attachmentUploadStatus.toLowerCase() === "failed"
-                                          ? text.supportAttachmentFailedLabel
-                                          : message.attachmentUploadStatus}
+                                      {normalizedAttachmentStatus === "retry"
+                                        ? locale === "ru"
+                                          ? "Повторить"
+                                          : "Retry"
+                                        : text.supportAttachmentFailedLabel}
                                     </span>
-                                    {message.attachmentUploadErrorCode ? (
-                                      <span className={styles.messageAttachmentStatusErrorCode}>
-                                        {message.attachmentUploadErrorCode}
-                                      </span>
-                                    ) : null}
                                   </div>
                                 ) : null}
                               </article>
                             );
-                          })}
-                        </div>
-                      ))}
+                            })}
+                          </div>
+                        );
+                      })}
                       <div ref={messagesEndRef} />
                     </div>
                   </div>
@@ -1126,28 +1108,35 @@ export function SupportConversationPage({
                       ) : null}
                       {replyToMessage || replyToPreview ? (
                         <div className={styles.composerReplyPreview}>
+                          <span className={styles.composerReplyAccent} aria-hidden="true" />
+                          <span className={styles.composerReplyIcon} aria-hidden="true">↩</span>
+                          <span className={styles.composerReplyThumbSlot}>{renderReplyThumbnail(replyComposerAttachment)}</span>
                           <div className={styles.composerReplyPreviewContent}>
                             <span className={styles.composerReplyPreviewLabel}>
                               {text.supportReplyToLabel}
                             </span>
                             <strong>{replyComposerPreview}</strong>
                           </div>
-                          {replyToMessage?.messageId ? (
+                          <div className={styles.composerReplyActions}>
+                            {replyToMessage?.messageId ? (
+                              <button
+                                type="button"
+                                className={styles.attachmentActionButton}
+                                onClick={() => jumpToMessage(replyToMessage.messageId)}
+                              >
+                                {locale === "ru" ? "К сообщению" : "Jump"}
+                              </button>
+                            ) : null}
                             <button
                               type="button"
-                              className={styles.attachmentActionButton}
-                              onClick={() => jumpToMessage(replyToMessage.messageId)}
+                              className={styles.composerReplyClose}
+                              onClick={() => selectReplyToMessage(null)}
+                              aria-label={locale === "ru" ? "Отменить ответ" : "Cancel reply"}
+                              title={locale === "ru" ? "Отменить ответ" : "Cancel reply"}
                             >
-                              {locale === "ru" ? "К сообщению" : "Jump"}
+                              ×
                             </button>
-                          ) : null}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => selectReplyToMessage(null)}
-                          >
-                            {locale === "ru" ? "Отменить" : "Cancel"}
-                          </Button>
+                          </div>
                         </div>
                       ) : null}
                       {selectedAttachment ? (
@@ -1207,28 +1196,6 @@ export function SupportConversationPage({
                         </div>
                       ) : null}
 
-                      {composerTab === "reply" ? (
-                        <textarea
-                          className={styles.textarea}
-                          value={composerValue}
-                          onChange={(event) => setReply(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (
-                              event.key === "Enter" &&
-                              !event.shiftKey &&
-                              !isConversationReadOnly &&
-                              !sendMutation.isPending &&
-                              (reply.trim() || hasComposerAttachment)
-                            ) {
-                              event.preventDefault();
-                              submitReply();
-                            }
-                          }}
-                          placeholder={composerPlaceholder}
-                          disabled={isConversationReadOnly}
-                        />
-                      ) : null}
-
                       {composerTab === "templates" ? (
                         <div className={styles.composerTemplateRail}>
                           {filteredTemplates.length === 0 ? (
@@ -1252,33 +1219,51 @@ export function SupportConversationPage({
                         </div>
                       ) : null}
 
-                      <div className={styles.composerBottomBar}>
+                      <div className={styles.composerInputBar}>
                         <button
                           type="button"
                           className={styles.composerIconBtn}
                           onClick={() => attachmentInputRef.current?.click()}
-                          disabled={isConversationReadOnly}
+                          disabled={isConversationReadOnly || sendMutation.isPending}
+                          aria-label={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                           title={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                         >
                           📎
                         </button>
-                        <div className={styles.composerSendGroup}>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={submitReply}
-                            className={styles.composerSendPrimary}
-                            disabled={
-                              isConversationReadOnly ||
-                              sendMutation.isPending ||
-                              (!reply.trim() && !hasComposerAttachment)
+                        <textarea
+                          className={`${styles.textarea} ${styles.composerTextarea}`}
+                          value={composerValue}
+                          onChange={(event) => setReply(event.target.value)}
+                          onFocus={() => setComposerTab("reply")}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key === "Enter" &&
+                              !event.shiftKey &&
+                              !isConversationReadOnly &&
+                              !sendMutation.isPending &&
+                              (reply.trim() || hasComposerAttachment)
+                            ) {
+                              event.preventDefault();
+                              submitReply();
                             }
-                          >
-                            {sendMutation.isPending
-                              ? text.supportReplySending
-                              : text.supportReplyAction}
-                          </Button>
-                        </div>
+                          }}
+                          placeholder={composerPlaceholder}
+                          disabled={isConversationReadOnly || sendMutation.isPending}
+                          rows={1}
+                        />
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={submitReply}
+                          className={styles.composerSendPrimary}
+                          disabled={
+                            isConversationReadOnly ||
+                            sendMutation.isPending ||
+                            (!reply.trim() && !hasComposerAttachment)
+                          }
+                        >
+                          {sendMutation.isPending ? text.supportReplySending : text.supportReplyAction}
+                        </Button>
                       </div>
                     </>
                   )}

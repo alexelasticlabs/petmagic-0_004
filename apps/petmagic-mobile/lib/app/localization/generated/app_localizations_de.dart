@@ -15,7 +15,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get navCreations => 'Galerie';
 
   @override
-  String get navRewards => 'Rewards';
+  String get navRewards => 'Belohnungen';
 
   @override
   String get navProfile => 'Profil';
@@ -118,10 +118,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileEmailPending => 'E-Mail nicht bestätigt';
 
   @override
-  String get profileEmailVerifiedShort => 'Email verified';
+  String get profileEmailVerifiedShort => 'E-Mail verifiziert';
 
   @override
-  String get profileEmailPendingShort => 'Verify email';
+  String get profileEmailPendingShort => 'E-Mail bestätigen';
 
   @override
   String get profileSignedOut => 'Auf diesem Gerät abgemeldet.';
@@ -169,381 +169,385 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schalten Sie alle Vorlagen und Premium-Bearbeitungsabläufe frei.';
 
   @override
-  String get profilePremiumPlanLabel => 'Premium Plan';
+  String get profilePremiumPlanLabel => 'Premium-Tarif';
 
   @override
-  String get profileFreePlanLabel => 'Free Plan';
+  String get profileFreePlanLabel => 'Gratis-Tarif';
 
   @override
-  String get profilePremiumBannerTitle => 'Upgrade to Premium';
+  String get profilePremiumBannerTitle => 'Upgrade auf Premium';
 
   @override
-  String get profilePremiumBannerActiveTitle => 'Premium active';
+  String get profilePremiumBannerActiveTitle => 'Premium aktiv';
 
   @override
-  String get profilePremiumBenefitUnlimitedTemplates => 'Unlimited templates';
+  String get profilePremiumBenefitUnlimitedTemplates => 'Unbegrenzte Vorlagen';
 
   @override
-  String get profilePremiumBenefitPriorityGeneration => 'Priority generation';
+  String get profilePremiumBenefitPriorityGeneration => 'Prioritätsgenerierung';
 
   @override
-  String get profilePremiumBenefitNoWatermark => 'No watermark';
+  String get profilePremiumBenefitNoWatermark => 'Kein Wasserzeichen';
 
   @override
   String get profilePremiumOpenAction => 'Upgrade';
 
   @override
-  String get profileSubscriptionTitle => 'My subscription';
+  String get profileSubscriptionTitle => 'Mein Abo';
 
   @override
   String get profileSubscriptionStatusLabel => 'Status';
 
   @override
-  String get profileSubscriptionProviderLabel => 'Provider';
+  String get profileSubscriptionProviderLabel => 'Anbieter';
 
   @override
-  String get profileSubscriptionNextBillingLabel => 'Next billing date';
+  String get profileSubscriptionNextBillingLabel => 'Nächste Abrechnung';
 
   @override
-  String get profileSubscriptionTokensLabel => 'Tokens available';
+  String get profileSubscriptionTokensLabel => 'Verfügbare Token';
 
   @override
   String get profileWalletTitle => 'Wallet';
 
   @override
-  String get profileWalletHistoryHint => 'Open balance, purchases and history.';
+  String get profileWalletHistoryHint => 'Guthaben, Käufe und Verlauf öffnen.';
 
   @override
-  String get walletPageTitle => 'PawSpark wallet';
+  String get walletPageTitle => 'PawSpark-Wallet';
 
   @override
   String get walletPageSubtitle =>
-      'Balance, promo codes, ad bonus, and PawSpark top-ups.';
+      'Guthaben, Promo-Codes, Werbebonus und PawSpark-Aufladungen.';
 
   @override
   String get profileWalletPreviewEyebrow => 'PawSpark';
 
   @override
   String get profileWalletPreviewSubtitle =>
-      'In-app currency for generations and bonus rewards.';
+      'In-App-Währung für Generierungen und Bonusbelohnungen.';
 
   @override
-  String get profileWalletPreviewAction => 'Open';
+  String get profileWalletPreviewAction => 'Öffnen';
 
   @override
-  String get profileWalletPreviewLoadingStatus => 'Refreshing status';
+  String get profileWalletPreviewLoadingStatus => 'Status wird aktualisiert';
 
   @override
-  String get profileWalletPreviewWeeklyReady => 'Weekly reward ready';
+  String get profileWalletPreviewWeeklyReady => 'Wöchentliche Belohnung bereit';
 
   @override
   String profileWalletPreviewAdCount(Object count) {
-    return 'Ads today: $count';
+    return 'Werbung heute: $count';
   }
 
   @override
-  String get profileWalletLoadingHint => 'Loading balance...';
+  String get profileWalletLoadingHint => 'Guthaben wird geladen...';
 
   @override
-  String get profileWalletEmptyHint => 'Open balance and history';
+  String get profileWalletEmptyHint => 'Guthaben und Verlauf öffnen';
 
   @override
   String get walletDataUnavailableFallback =>
-      'Wallet data is not available right now.';
+      'Wallet-Daten sind gerade nicht verfügbar.';
 
   @override
-  String get walletRefreshTooltip => 'Refresh wallet';
+  String get walletRefreshTooltip => 'Wallet aktualisieren';
 
   @override
   String get walletBalanceTitle =>
-      'Available for photos, videos and premium templates.';
+      'Verfügbar für Fotos, Videos und Premium-Vorlagen.';
 
   @override
-  String get walletBalanceEyebrow => 'Your balance';
+  String get walletBalanceEyebrow => 'Ihr Guthaben';
 
   @override
   String get walletBalanceUnit => 'PawSpark';
 
   @override
   String get walletBalanceExplanation =>
-      'PawSpark — internal currency of PetMagic. Use it for creating photos, videos and accessing premium templates.';
+      'PawSpark — interne Währung von PetMagic. Verwenden Sie es zum Erstellen von Fotos, Videos und für den Zugang zu Premium-Vorlagen.';
 
   @override
-  String get walletPremiumStatus => 'Premium wallet';
+  String get walletPremiumStatus => 'Premium-Wallet';
 
   @override
-  String get walletFreeStatus => 'Free wallet';
+  String get walletFreeStatus => 'Gratis-Wallet';
 
   @override
   String walletAdRewardsCount(Object count) {
-    return '$count ad rewards';
+    return '$count Werbeboni';
   }
 
   @override
-  String get walletQuickActionsTitle => 'Promo codes';
+  String get walletQuickActionsTitle => 'Promo-Codes';
 
   @override
-  String get walletRedeemAction => 'Activate';
+  String get walletRedeemAction => 'Aktivieren';
 
   @override
-  String get walletRewardsTitle => 'Ad bonus';
+  String get walletRewardsTitle => 'Werbebonus';
 
   @override
-  String get walletAdRewardAction => 'Ad reward';
+  String get walletAdRewardAction => 'Werbebonus';
 
   @override
-  String get walletAdRewardCompactTitle => 'Get PawSpark for free';
+  String get walletAdRewardCompactTitle => 'PawSpark kostenlos erhalten';
 
   @override
   String get walletAdRewardCompactDescription =>
-      'Watch a short ad and get +15 PawSpark.';
+      'Sehen Sie eine kurze Werbung und erhalten Sie +15 PawSpark.';
 
   @override
   String walletAdRewardRemaining(Object count) {
-    return 'Left today: $count';
+    return 'Heute noch: $count';
   }
 
   @override
-  String get walletWatchAdAction => 'Watch ad +15';
+  String get walletWatchAdAction => 'Werbung ansehen +15';
 
   @override
   String get walletAdDailyLimitReached =>
-      'Ads are temporarily unavailable. Please try again later.';
+      'Werbung ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.';
 
   @override
-  String get walletPromoTitle => 'Have a promo code?';
+  String get walletPromoTitle => 'Haben Sie einen Promo-Code?';
 
   @override
   String get walletPromoSubtitle =>
-      'Enter a code from PetMagic and add PawSpark to your balance.';
+      'Geben Sie einen Code von PetMagic ein und fügen Sie PawSpark zu Ihrem Guthaben hinzu.';
 
   @override
-  String get walletPromoInputPlaceholder => 'Enter promo code';
+  String get walletPromoInputPlaceholder => 'Promo-Code eingeben';
 
   @override
-  String get walletPromoSuccessMessage => 'Promo code activated successfully!';
+  String get walletPromoSuccessMessage => 'Promo-Code erfolgreich aktiviert!';
 
   @override
-  String get walletBestValueBadge => 'Best value';
+  String get walletBestValueBadge => 'Bestes Angebot';
 
   @override
-  String get walletPremiumUpsellTitle => 'Create often?';
+  String get walletPremiumUpsellTitle => 'Erstellen Sie oft?';
 
   @override
   String get walletPremiumUpsellMessage =>
-      'Premium membership gives you cheaper generations, monthly PawSparks and exclusive premium templates.';
+      'Premium-Mitgliedschaft bietet günstigere Generierungen, monatliche PawSparks und exklusive Premium-Vorlagen.';
 
   @override
-  String get walletViewPremiumAction => 'View Premium';
+  String get walletViewPremiumAction => 'Premium anzeigen';
 
   @override
-  String get walletWhatYouCanCreateTitle => 'Enough for approximately:';
+  String get walletWhatYouCanCreateTitle => 'Reicht für ungefähr:';
 
   @override
   String walletApproxPhotos(int count) {
-    return '$count photos';
+    return '$count Fotos';
   }
 
   @override
   String walletApproxVideos(int count) {
-    return '$count videos';
+    return '$count Videos';
   }
 
   @override
-  String get walletSpendPhotoSubtitle => 'Photos\nfrom 10 Spark';
+  String get walletSpendPhotoSubtitle => 'Fotos\nab 10 Spark';
 
   @override
-  String get walletSpendVideoSubtitle => 'Videos\nfrom 50 Spark';
+  String get walletSpendVideoSubtitle => 'Videos\nab 50 Spark';
 
   @override
-  String get walletSpendPremiumSubtitle => 'Premium\nfrom 80 Spark';
+  String get walletSpendPremiumSubtitle => 'Premium\nab 80 Spark';
 
   @override
-  String get walletContactSupportAction => 'Contact support';
+  String get walletContactSupportAction => 'Support kontaktieren';
 
   @override
-  String get walletRetryAction => 'Retry';
+  String get walletRetryAction => 'Erneut versuchen';
 
   @override
-  String get rewardsPageTitle => 'Rewards';
+  String get rewardsPageTitle => 'Belohnungen';
 
   @override
   String get rewardsPageSubtitle =>
-      'Earn PawSpark with promo codes and invitations';
+      'Verdienen Sie PawSpark mit Promo-Codes und Einladungen';
 
   @override
   String rewardsLastUpdatedLabel(Object value) {
-    return 'Updated: $value';
+    return 'Aktualisiert: $value';
   }
 
   @override
-  String get rewardsLastUpdatedNow => 'just now';
+  String get rewardsLastUpdatedNow => 'gerade eben';
 
   @override
   String rewardsLastUpdatedMinutes(int count) {
-    return '$count min ago';
+    return 'vor $count Min.';
   }
 
   @override
   String rewardsLastUpdatedHours(int count) {
-    return '$count h ago';
+    return 'vor $count Std.';
   }
 
   @override
-  String get rewardsPromoTitle => 'Promo code';
+  String get rewardsPromoTitle => 'Promo-Code';
 
   @override
-  String get rewardsPromoSubtitle => 'Enter a promo code and receive a bonus';
+  String get rewardsPromoSubtitle =>
+      'Geben Sie einen Promo-Code ein und erhalten Sie einen Bonus';
 
   @override
-  String get rewardsPromoEmptyError => 'Enter promo code.';
+  String get rewardsPromoEmptyError => 'Promo-Code eingeben.';
 
   @override
-  String get rewardsPromoCheckingStatus => 'Checking code...';
+  String get rewardsPromoCheckingStatus => 'Code wird überprüft...';
 
   @override
-  String get rewardsReferralTitle => 'Invite a friend';
+  String get rewardsReferralTitle => 'Einen Freund einladen';
 
   @override
   String get rewardsReferralSubtitle =>
-      'Share your code with a friend. Referral bonus is not paid for signup and is credited only after their first successful paid purchase.';
+      'Teilen Sie Ihren Code mit einem Freund. Der Empfehlungsbonus wird nicht für die Anmeldung gezahlt und wird erst nach dem ersten erfolgreichen bezahlten Kauf gutgeschrieben.';
 
   @override
   String get rewardsReferralInvitePrefix =>
-      'Your friend gets a bonus before their first purchase, and you get';
+      'Ihr Freund erhält vor seinem ersten Kauf einen Bonus, und Sie erhalten';
 
   @override
   String get rewardsReferralInviteSuffix =>
-      'after their first successful payment.';
+      'nach ihrem ersten erfolgreichen Kauf.';
 
   @override
-  String get rewardsYourReferralCode => 'Your code';
+  String get rewardsYourReferralCode => 'Ihr Code';
 
   @override
-  String get rewardsCopyReferralCodeAction => 'Copy';
+  String get rewardsCopyReferralCodeAction => 'Kopieren';
 
   @override
-  String get rewardsReferralCopiedMessage => 'Code copied.';
+  String get rewardsReferralCopiedMessage => 'Code kopiert.';
 
   @override
-  String get rewardsReferralShareCodeAction => 'Share code';
+  String get rewardsReferralShareCodeAction => 'Code teilen';
 
   @override
-  String get rewardsReferralUseFriendCodeAction => 'Enter friend code';
+  String get rewardsReferralUseFriendCodeAction => 'Freundescode eingeben';
 
   @override
-  String get rewardsReferralFriendCodePrompt => 'Have a friend\'s code?';
+  String get rewardsReferralFriendCodePrompt => 'Haben Sie einen Freundescode?';
 
   @override
   String get rewardsReferralFriendCodeHint =>
-      'Enter a friend\'s code before your first purchase and get a bonus.';
+      'Geben Sie vor Ihrem ersten Kauf einen Freundescode ein und erhalten Sie einen Bonus.';
 
   @override
-  String get rewardsReferralInputLabel => 'Friend code';
+  String get rewardsReferralInputLabel => 'Freundescode';
 
   @override
   String get rewardsReferralInputHint => 'PMABC12345';
 
   @override
-  String get rewardsReferralActivateAction => 'Activate code';
+  String get rewardsReferralActivateAction => 'Code aktivieren';
 
   @override
-  String get rewardsReferralEmptyError => 'Enter friend code.';
+  String get rewardsReferralEmptyError => 'Freundescode eingeben.';
 
   @override
-  String get rewardsReferralCheckingStatus => 'Checking referral code...';
+  String get rewardsReferralCheckingStatus =>
+      'Empfehlungscode wird überprüft...';
 
   @override
   String get rewardsReferralActivatedMessage =>
-      'Referral code activated. Bonus is credited after your first successful paid purchase.';
+      'Empfehlungscode aktiviert. Bonus wird nach Ihrem ersten erfolgreichen bezahlten Kauf gutgeschrieben.';
 
   @override
-  String get rewardsReferralStatusLoading => 'Loading referral status...';
+  String get rewardsReferralStatusLoading =>
+      'Empfehlungsstatus wird geladen...';
 
   @override
   String get rewardsReferralStatusNone =>
-      'Enter a friend\'s code before your first purchase. Bonus is credited only after a successful payment.';
+      'Geben Sie vor Ihrem ersten Kauf einen Freundescode ein. Bonus wird nur nach einer erfolgreichen Zahlung gutgeschrieben.';
 
   @override
   String get rewardsReferralStatusPending =>
-      'Referral connected. Bonus will be paid after your first successful paid purchase.';
+      'Empfehlung verbunden. Bonus wird nach Ihrem ersten erfolgreichen bezahlten Kauf ausgezahlt.';
 
   @override
   String get rewardsReferralStatusRewarded =>
-      'Referral bonus paid. Thanks for growing PetMagic.';
+      'Empfehlungsbonus ausgezahlt. Danke, dass Sie PetMagic wachsen lassen.';
 
   @override
-  String get rewardsReferralEarnedLabel => 'Earned';
+  String get rewardsReferralEarnedLabel => 'Verdient';
 
   @override
-  String get rewardsReferralFriendsLabel => 'Friends';
+  String get rewardsReferralFriendsLabel => 'Freunde';
 
   @override
-  String get rewardsReferralBonusLabel => 'Friend purchases';
+  String get rewardsReferralBonusLabel => 'Freundeskäufe';
 
   @override
   String rewardsReferralBonusPerFriend(int count) {
-    return '+$count PawSpark per invited friend';
+    return '+$count PawSpark pro eingeladenem Freund';
   }
 
   @override
   String get rewardsReferralRulesNote =>
-      'Bonus is credited after your friend\'s first successful purchase.';
+      'Bonus wird nach dem ersten erfolgreichen Kauf Ihres Freundes gutgeschrieben.';
 
   @override
-  String get rewardsReferralHowItWorksAction => 'How does it work?';
+  String get rewardsReferralHowItWorksAction => 'Wie funktioniert das?';
 
   @override
   String rewardsReferralShareMessage(Object code, int bonus) {
-    return 'Join me in PetMagic! Use my referral code $code. Bonus is credited after your first successful paid purchase. After your first purchase I\'ll receive +$bonus PawSpark.';
+    return 'Begleiten Sie mich bei PetMagic! Verwenden Sie meinen Empfehlungscode $code. Bonus wird nach Ihrem ersten erfolgreichen bezahlten Kauf gutgeschrieben. Nach Ihrem ersten Kauf erhalte ich +$bonus PawSpark.';
   }
 
   @override
-  String get rewardsHistoryTitle => 'History';
+  String get rewardsHistoryTitle => 'Verlauf';
 
   @override
   String get rewardsHistorySubtitle =>
-      'Recent promo, referral, ad and weekly rewards.';
+      'Aktuelle Promo-, Empfehlungs-, Werbe- und Wochenbelohnungen.';
 
   @override
   String get rewardsHistoryEmpty =>
-      'No bonuses yet. Promo and referral rewards will appear here.';
+      'Noch keine Boni. Promo- und Empfehlungsbelohnungen erscheinen hier.';
 
   @override
-  String get rewardsSourcePromo => 'Promo code';
+  String get rewardsSourcePromo => 'Promo-Code';
 
   @override
-  String get rewardsSourceReferral => 'Referral bonus';
+  String get rewardsSourceReferral => 'Empfehlungsbonus';
 
   @override
-  String get rewardsSourceAd => 'Ad reward';
+  String get rewardsSourceAd => 'Werbebonus';
 
   @override
-  String get rewardsSourceWeekly => 'Weekly reward';
+  String get rewardsSourceWeekly => 'Wochenbonus';
 
   @override
-  String get rewardsSourcePremium => 'Premium grant';
+  String get rewardsSourcePremium => 'Premium-Zuteilung';
 
   @override
   String get rewardsSourceBonus => 'Bonus';
 
   @override
-  String get rewardsReferralCodeNotFoundError => 'Referral code was not found.';
+  String get rewardsReferralCodeNotFoundError =>
+      'Empfehlungscode wurde nicht gefunden.';
 
   @override
   String get rewardsReferralSelfError =>
-      'You cannot activate your own referral code.';
+      'Sie können Ihren eigenen Empfehlungscode nicht aktivieren.';
 
   @override
   String get rewardsReferralAlreadyLinkedError =>
-      'A referral code is already activated for this account.';
+      'Für dieses Konto ist bereits ein Empfehlungscode aktiviert.';
 
   @override
   String get rewardsReferralPaidUserError =>
-      'Referral code must be activated before your first successful paid purchase.';
+      'Empfehlungscode muss vor Ihrem ersten erfolgreichen bezahlten Kauf aktiviert werden.';
 
   @override
-  String get walletBuySparkTitle => 'Top up PawSpark';
+  String get walletBuySparkTitle => 'PawSpark aufladen';
 
   @override
   String walletPackTotalSpark(Object count) {
@@ -551,14 +555,14 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get walletPopularBadge => 'Popular';
+  String get walletPopularBadge => 'Beliebt';
 
   @override
-  String get walletBestValueLabel => 'Best value';
+  String get walletBestValueLabel => 'Bestes Angebot';
 
   @override
   String walletPackBonus(Object count) {
-    return '+$count bonus';
+    return '+$count Bonus';
   }
 
   @override
@@ -568,12 +572,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String walletPackBaseSpark(Object count) {
-    return '$count base';
+    return '$count Basis';
   }
 
   @override
   String walletBuyForPrice(Object price) {
-    return 'Buy for $price';
+    return 'Für $price kaufen';
   }
 
   @override
@@ -581,38 +585,38 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get walletPackDetailSubtitle =>
-      'Check what is included before opening checkout.';
+      'Prüfen Sie, was enthalten ist, bevor Sie zur Kasse gehen.';
 
   @override
   String get walletCheckoutHint =>
-      'Payment opens in secure Stripe Checkout. PetMagic does not store your card details.';
+      'Zahlung öffnet sich in sicherem Stripe Checkout. PetMagic speichert Ihre Kartendaten nicht.';
 
   @override
   String walletCheckoutSucceeded(int spark) {
-    return 'Payment confirmed. +$spark PawSpark is already in your wallet.';
+    return 'Zahlung bestätigt. +$spark PawSpark ist bereits in Ihrer Wallet.';
   }
 
   @override
   String walletPackBreakdown(Object base, Object bonus) {
-    return '$base base + $bonus bonus';
+    return '$base Basis + $bonus Bonus';
   }
 
   @override
-  String get walletRecentTransactionsTitle => 'Recent transactions';
+  String get walletRecentTransactionsTitle => 'Aktuelle Transaktionen';
 
   @override
-  String get walletViewAllTransactions => 'All transactions';
+  String get walletViewAllTransactions => 'Alle Transaktionen';
 
   @override
-  String get walletNoActivity => 'No wallet activity yet.';
+  String get walletNoActivity => 'Noch keine Wallet-Aktivität.';
 
   @override
   String walletBalanceAfter(Object count) {
-    return 'Bal. $count';
+    return 'Gut. $count';
   }
 
   @override
-  String get walletPurchaseHistoryTitle => 'Purchase history';
+  String get walletPurchaseHistoryTitle => 'Kaufverlauf';
 
   @override
   String walletPurchaseSummary(Object count, Object date) {
@@ -620,154 +624,156 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get walletPurchaseJustConfirmed => 'Just confirmed';
+  String get walletPurchaseJustConfirmed => 'Gerade bestätigt';
 
   @override
-  String get walletUnavailableTitle => 'Wallet is temporarily unavailable';
+  String get walletUnavailableTitle =>
+      'Wallet ist vorübergehend nicht verfügbar';
 
   @override
-  String get walletTryAgainAction => 'Try again';
+  String get walletTryAgainAction => 'Erneut versuchen';
 
   @override
-  String get walletPending => 'Pending';
+  String get walletPending => 'Ausstehend';
 
   @override
-  String get walletSourcePackPurchase => 'Added funds';
+  String get walletSourcePackPurchase => 'Aufgeladene Mittel';
 
   @override
-  String get walletSourceGenerationSpend => 'Generation';
+  String get walletSourceGenerationSpend => 'Generierung';
 
   @override
-  String get walletSourceGenerationRefund => 'Generation refund';
+  String get walletSourceGenerationRefund => 'Generierungserstattung';
 
   @override
-  String get walletSourceWeeklyGrant => 'Weekly bonus';
+  String get walletSourceWeeklyGrant => 'Wochenbonus';
 
   @override
-  String get walletSourceAdReward => 'Ad bonus';
+  String get walletSourceAdReward => 'Werbebonus';
 
   @override
-  String get walletSourcePromoCode => 'Promo code';
+  String get walletSourcePromoCode => 'Promo-Code';
 
   @override
-  String get walletSourceAdminGrant => 'Support credit';
+  String get walletSourceAdminGrant => 'Support-Guthaben';
 
   @override
-  String get walletSourceAdminDebit => 'Support adjustment';
+  String get walletSourceAdminDebit => 'Support-Anpassung';
 
   @override
-  String get walletPurchaseCompleted => 'Completed';
+  String get walletPurchaseCompleted => 'Abgeschlossen';
 
   @override
-  String get walletPurchaseFailed => 'Failed';
+  String get walletPurchaseFailed => 'Fehlgeschlagen';
 
   @override
-  String get walletQueryFilterAll => 'All';
+  String get walletQueryFilterAll => 'Alle';
 
   @override
-  String get walletQueryFilterCredits => 'Credits';
+  String get walletQueryFilterCredits => 'Gutschriften';
 
   @override
-  String get walletQueryFilterDebits => 'Debits';
+  String get walletQueryFilterDebits => 'Abbuchungen';
 
   @override
   String get walletPartialActivityUnavailable =>
-      'Your balance is already available. History and some wallet actions will refresh a bit later.';
+      'Ihr Guthaben ist bereits verfügbar. Verlauf und einige Wallet-Aktionen werden etwas später aktualisiert.';
 
   @override
   String get walletPaymentGatewayUnavailableError =>
-      'Payments are temporarily unavailable. Please try again later or update the app.';
+      'Zahlungen sind vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut oder aktualisieren Sie die App.';
 
   @override
   String get walletPaymentUnavailableError =>
-      'Top-up is temporarily unavailable. Please try again later.';
+      'Aufladung ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.';
 
   @override
   String get walletPackUnavailableError =>
-      'This PawSpark pack is no longer available.';
+      'Dieses PawSpark-Paket ist nicht mehr verfügbar.';
 
   @override
-  String get walletRedeemCodeNotFoundError => 'Redeem code was not found.';
+  String get walletRedeemCodeNotFoundError =>
+      'Einlösecode wurde nicht gefunden.';
 
   @override
   String get walletRedeemCodeAlreadyUsedError =>
-      'This redeem code was already used.';
+      'Dieser Einlösecode wurde bereits verwendet.';
 
   @override
-  String get walletRedeemCodeExpiredError => 'Redeem code has expired.';
+  String get walletRedeemCodeExpiredError => 'Einlösecode ist abgelaufen.';
 
   @override
   String get walletRedeemCodeInactiveError =>
-      'This redeem code is not available right now.';
+      'Dieser Einlösecode ist gerade nicht verfügbar.';
 
   @override
   String get walletRedeemCodeExhaustedError =>
-      'This redeem code has reached its usage limit.';
+      'Dieser Einlösecode hat sein Nutzungslimit erreicht.';
 
   @override
   String get walletRedeemCodeUserLimitError =>
-      'This user has already reached the redeem limit for this code.';
+      'Dieser Benutzer hat das Einlöselimit für diesen Code bereits erreicht.';
 
   @override
   String get walletRedeemOfflineError =>
-      'No internet connection. Check your network and try again.';
+      'Keine Internetverbindung. Überprüfen Sie Ihr Netzwerk und versuchen Sie es erneut.';
 
   @override
   String get walletRedeemServerError =>
-      'The promo code could not be applied because of a server error. Please try again later.';
+      'Der Promo-Code konnte aufgrund eines Serverfehlers nicht angewendet werden. Bitte versuchen Sie es später erneut.';
 
   @override
   String get walletInsufficientBalanceError =>
-      'Not enough PawSpark for this operation.';
+      'Nicht genug PawSpark für diesen Vorgang.';
 
   @override
   String get walletUnavailableError =>
-      'Wallet data is temporarily unavailable. Please try again in a moment.';
+      'Wallet-Daten sind vorübergehend nicht verfügbar. Bitte versuchen Sie es in einem Moment erneut.';
 
   @override
-  String get walletRedeemSheetTitle => 'Redeem code';
+  String get walletRedeemSheetTitle => 'Code einlösen';
 
   @override
   String get walletRedeemSheetSubtitle =>
-      'A code can be used once while it is active and not expired.';
+      'Ein Code kann einmal verwendet werden, solange er aktiv und nicht abgelaufen ist.';
 
   @override
-  String get walletRedeemInputLabel => 'Promo code';
+  String get walletRedeemInputLabel => 'Promo-Code';
 
   @override
-  String get walletRedeemHint => 'Enter promo code';
+  String get walletRedeemHint => 'Promo-Code eingeben';
 
   @override
-  String get walletRedeemCancelAction => 'Cancel';
+  String get walletRedeemCancelAction => 'Abbrechen';
 
   @override
-  String get walletApplyCode => 'Apply code';
+  String get walletApplyCode => 'Code anwenden';
 
   @override
   String get walletRedeemSuccessMessage =>
-      'Promo code applied successfully. Your balance is already updated.';
+      'Promo-Code erfolgreich angewendet. Ihr Guthaben wurde bereits aktualisiert.';
 
   @override
-  String get walletRedeemSuccessAction => 'Done';
+  String get walletRedeemSuccessAction => 'Fertig';
 
   @override
-  String get profileStatsSectionTitle => 'Account stats';
+  String get profileStatsSectionTitle => 'Kontostatistiken';
 
   @override
-  String get profileStatBalanceLabel => 'Balance';
+  String get profileStatBalanceLabel => 'Guthaben';
 
   @override
-  String get profileStatPlanLabel => 'Plan';
+  String get profileStatPlanLabel => 'Tarif';
 
   @override
-  String get profileStatLegalLabel => 'Legal';
+  String get profileStatLegalLabel => 'Rechtliches';
 
   @override
-  String get profileMagicMomentTitle => 'Your next pet star moment';
+  String get profileMagicMomentTitle => 'Ihr nächster Haustier-Star-Moment';
 
   @override
   String get profileMagicMomentSubtitle =>
-      'Create something playful for your pets in just a few taps.';
+      'Erstellen Sie in wenigen Schritten etwas Verspieltes für Ihre Haustiere.';
 
   @override
   String get premiumPageTitle => 'PetMagic Premium';
@@ -868,14 +874,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
-  String get premiumPaymentRecommendedBadge => 'Recommended';
+  String get premiumPaymentRecommendedBadge => 'Empfohlen';
 
   @override
-  String get premiumPaymentDefaultBadge => 'Default';
+  String get premiumPaymentDefaultBadge => 'Standard';
 
   @override
   String paymentBonusPercentBadge(Object percent) {
-    return '+$percent% bonus';
+    return '+$percent% Bonus';
   }
 
   @override
@@ -917,16 +923,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumComparisonPrioritySupport => 'Priorisierter Support';
 
   @override
-  String get premiumFreeSummaryTokens => '20 tokens per month';
+  String get premiumFreeSummaryTokens => '20 Token pro Monat';
 
   @override
-  String get premiumFreeSummaryWatermark => 'Watermark on content';
+  String get premiumFreeSummaryWatermark => 'Wasserzeichen auf Inhalten';
 
   @override
-  String get premiumFreeSummaryTemplates => 'Basic templates';
+  String get premiumFreeSummaryTemplates => 'Basis-Vorlagen';
 
   @override
-  String get premiumFreeSummaryQuality => 'Standard quality';
+  String get premiumFreeSummaryQuality => 'Standardqualität';
 
   @override
   String get premiumSecurePaymentTitle => 'Sichere Zahlung';
@@ -939,29 +945,29 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumContinueAction => 'Weiter';
 
   @override
-  String get externalCheckoutStripeTitle => 'Payment via Stripe';
+  String get externalCheckoutStripeTitle => 'Zahlung über Stripe';
 
   @override
   String get externalCheckoutStripeMessage =>
-      'Stripe Checkout opens in a secure in-app browser. After you return to PetMagic, we automatically check the payment status before updating your access.';
+      'Stripe Checkout öffnet sich in einem sicheren In-App-Browser. Wenn Sie zu PetMagic zurückkehren, prüfen wir automatisch den Zahlungsstatus, bevor Ihr Zugang aktualisiert wird.';
 
   @override
-  String get externalCheckoutContinueAction => 'Continue';
+  String get externalCheckoutContinueAction => 'Weiter';
 
   @override
-  String get externalCheckoutCheckingTitle => 'Checking payment';
+  String get externalCheckoutCheckingTitle => 'Zahlung wird überprüft';
 
   @override
   String get externalCheckoutCheckingMessage =>
-      'We are waiting for Stripe confirmation. This usually takes a few seconds.';
+      'Wir warten auf die Stripe-Bestätigung. Das dauert normalerweise einige Sekunden.';
 
   @override
   String get externalCheckoutPendingVerificationMessage =>
-      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.';
+      'Zahlung noch nicht bestätigt. Wir aktualisieren Premium oder Ihre Wallet, sobald der Stripe-Webhook eintrifft.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
-    return 'Mit $plan fortfahren — $price $period';
+    return 'Weiter mit $plan — $price $period';
   }
 
   @override
@@ -997,17 +1003,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumPurchaseActivated => 'Premium ist jetzt aktiv.';
 
   @override
-  String get premiumRecentlyActivatedBadge => 'Just activated';
+  String get premiumRecentlyActivatedBadge => 'Gerade aktiviert';
 
   @override
-  String get premiumRecentlyActivatedTitle => 'Premium confirmed';
+  String get premiumRecentlyActivatedTitle => 'Premium bestätigt';
 
   @override
   String get premiumRecentlyActivatedMessage =>
-      'Your Premium access is active on this device and ready to use.';
+      'Ihr Premium-Zugang ist auf diesem Gerät aktiv und einsatzbereit.';
 
   @override
-  String get premiumPurchaseCancelled => 'Der Kauf wurde abgebrochen.';
+  String get premiumPurchaseCancelled => 'Kauf wurde abgebrochen.';
 
   @override
   String get premiumCheckoutFailed =>
@@ -1015,11 +1021,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get premiumManageFailed =>
-      'Die Abrechnungsverwaltung ist für dieses Konto noch nicht verfügbar.';
+      'Abrechnungsverwaltung ist für dieses Konto noch nicht verfügbar.';
 
   @override
   String get premiumRestoreStarted =>
-      'Der Premium-Status wurde auf diesem Gerät aktualisiert.';
+      'Premium-Status auf diesem Gerät aktualisiert.';
 
   @override
   String get profileCommunicationsTitle => 'PetMagic-Updates';
@@ -1044,14 +1050,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Vollständige Einwilligungsüberprüfung in den Kontoeinstellungen.';
 
   @override
-  String get profileLegalShortcutTitle => 'Privacy & Legal';
+  String get profileLegalShortcutTitle => 'Datenschutz & Rechtliches';
 
   @override
   String get profileLegalShortcutAccepted =>
-      'Terms accepted • Privacy settings';
+      'Bedingungen akzeptiert • Datenschutzeinstellungen';
 
   @override
-  String get profileLegalShortcutPending => 'Review permissions';
+  String get profileLegalShortcutPending => 'Berechtigungen überprüfen';
 
   @override
   String get profileSupportTitle => 'Kontaktieren Sie den Support';
@@ -1062,7 +1068,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileSupportCompactSubtitle =>
-      'Get help with billing or account access.';
+      'Hilfe bei Abrechnung oder Kontozugang erhalten.';
 
   @override
   String get profileSettingsShortcutTitle => 'Einstellungen';
@@ -1073,7 +1079,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileSettingsCompactSubtitle =>
-      'Language, theme and account settings.';
+      'Sprache, Theme und Kontoeinstellungen.';
 
   @override
   String get profilePreferenceEnabled => 'Ermöglicht';
@@ -1287,72 +1293,73 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die aktuellen E-Mail-Einstellungen können Sie hier bereits einsehen. Dedizierte Druckschalter werden in einem späteren Produktabschnitt hinzugefügt.';
 
   @override
-  String get profileNotificationsLoading => 'Loading notification settings...';
+  String get profileNotificationsLoading =>
+      'Benachrichtigungseinstellungen werden geladen...';
 
   @override
-  String get profileNotificationsPushSection => 'Push notifications';
+  String get profileNotificationsPushSection => 'Push-Benachrichtigungen';
 
   @override
-  String get profileNotificationsPushPhotoReady => 'Photo is ready';
+  String get profileNotificationsPushPhotoReady => 'Foto ist fertig';
 
   @override
-  String get profileNotificationsPushVideoReady => 'Video is ready';
+  String get profileNotificationsPushVideoReady => 'Video ist fertig';
 
   @override
-  String get profileNotificationsPushGenerationErrors => 'Generation errors';
+  String get profileNotificationsPushGenerationErrors => 'Generierungsfehler';
 
   @override
-  String get profileNotificationsPushReminders => 'Reminders';
+  String get profileNotificationsPushReminders => 'Erinnerungen';
 
   @override
-  String get profileNotificationsPushNewTemplates => 'New templates';
+  String get profileNotificationsPushNewTemplates => 'Neue Vorlagen';
 
   @override
   String get profileNotificationsPushPurchasesAndSubscriptions =>
-      'Purchases and subscriptions';
+      'Käufe und Abonnements';
 
   @override
-  String get profileNotificationsEmailSection => 'Email';
+  String get profileNotificationsEmailSection => 'E-Mail';
 
   @override
-  String get profileNotificationsEmailOffers => 'Offers and discounts';
+  String get profileNotificationsEmailOffers => 'Angebote und Rabatte';
 
   @override
-  String get profileNotificationsEmailNews => 'PetMagic news';
+  String get profileNotificationsEmailNews => 'PetMagic-Neuigkeiten';
 
   @override
   String get profileNotificationsEmailAccountAlerts =>
-      'Important account alerts';
+      'Wichtige Kontobenachrichtigungen';
 
   @override
-  String get profileNotificationsDeviceSection => 'Device status';
+  String get profileNotificationsDeviceSection => 'Gerätestatus';
 
   @override
-  String get profileNotificationsPushPermissionLabel => 'Push permissions';
+  String get profileNotificationsPushPermissionLabel => 'Push-Berechtigungen';
 
   @override
-  String get profileNotificationsPushPermissionAllowed => 'Allowed';
+  String get profileNotificationsPushPermissionAllowed => 'Erlaubt';
 
   @override
   String get profileNotificationsPushPermissionDenied =>
-      'Disabled in device settings';
+      'In Geräteeinstellungen deaktiviert';
 
   @override
   String get profileNotificationsPushPermissionNotDetermined =>
-      'Not requested yet';
+      'Noch nicht angefragt';
 
   @override
-  String get profileNotificationsPushPermissionProvisional => 'Allowed quietly';
+  String get profileNotificationsPushPermissionProvisional => 'Still erlaubt';
 
   @override
-  String get profileNotificationsPushPermissionUnknown => 'Unknown';
+  String get profileNotificationsPushPermissionUnknown => 'Unbekannt';
 
   @override
-  String get profileNotificationsRefreshStatus => 'Refresh status';
+  String get profileNotificationsRefreshStatus => 'Status aktualisieren';
 
   @override
   String get profileNotificationsRequestPermission =>
-      'Allow push notifications';
+      'Push-Benachrichtigungen erlauben';
 
   @override
   String get profileDetailsHelpBody =>
@@ -1445,10 +1452,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileLegalDocumentSection => 'Dokument';
 
   @override
-  String get profileLegalDocumentInfoSection => 'Document info';
+  String get profileLegalDocumentInfoSection => 'Dokumentinfo';
 
   @override
-  String get profileLegalOpenFullAction => 'Open full policy';
+  String get profileLegalOpenFullAction => 'Vollständige Richtlinie öffnen';
 
   @override
   String get profileLegalCompactHint =>
@@ -1462,32 +1469,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileLegalCompactSectionLabel => 'Zum Aufklappen tippen';
 
   @override
-  String get profilePrivacyQuickDataTitle => 'What we collect';
+  String get profilePrivacyQuickDataTitle => 'Was wir sammeln';
 
   @override
   String get profilePrivacyQuickDataBody =>
-      '• Email\n• Profile name\n• Generation history\n• Uploaded pet photos\n• Purchase history\n• Support requests';
+      '• E-Mail\n• Profilname\n• Generierungsverlauf\n• Hochgeladene Tierfotos\n• Kaufverlauf\n• Support-Anfragen';
 
   @override
-  String get profilePrivacyQuickUsageTitle => 'Why we use it';
+  String get profilePrivacyQuickUsageTitle => 'Warum wir es verwenden';
 
   @override
   String get profilePrivacyQuickUsageBody =>
-      '• Run app features\n• Generate content\n• Respond in support\n• Protect account and payments';
+      '• App-Funktionen betreiben\n• Inhalte generieren\n• Im Support antworten\n• Konto und Zahlungen schützen';
 
   @override
-  String get profilePrivacyQuickSharingTitle => 'Do we share data?';
+  String get profilePrivacyQuickSharingTitle => 'Teilen wir Daten?';
 
   @override
   String get profilePrivacyQuickSharingBody =>
-      'We do not sell personal data. Data may be shared only with processors needed to operate the service (for example payments, cloud hosting, and analytics).';
+      'Wir verkaufen keine persönlichen Daten. Daten können nur mit Verarbeitern geteilt werden, die für den Betrieb des Dienstes notwendig sind (z. B. Zahlungen, Cloud-Hosting und Analysen).';
 
   @override
-  String get profilePrivacyQuickRightsTitle => 'Your rights';
+  String get profilePrivacyQuickRightsTitle => 'Ihre Rechte';
 
   @override
   String get profilePrivacyQuickRightsBody =>
-      '• Request a copy of your data\n• Request account and data deletion\n• Withdraw consent where applicable';
+      '• Kopie Ihrer Daten anfordern\n• Konto- und Datenlöschung anfordern\n• Einwilligung wo zutreffend widerrufen';
 
   @override
   String get profileDetailsDeleteBody =>
@@ -1510,20 +1517,21 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get supportChatSecureTitle =>
-      'Your conversation is protected. We use it only for support.';
+      'Ihr Gespräch ist geschützt. Wir verwenden es nur für den Support.';
 
   @override
   String get supportChatSecureSubtitle =>
-      'We protect your data and keep your information private.';
+      'Wir schützen Ihre Daten und halten Ihre Informationen privat.';
 
   @override
   String get supportChatTeamTitle => 'PetMagic Support';
 
   @override
-  String get supportChatTeamStatus => 'We usually reply within 24 hours';
+  String get supportChatTeamStatus =>
+      'Wir antworten normalerweise innerhalb von 24 Stunden';
 
   @override
-  String get supportChatTodayLabel => 'Today';
+  String get supportChatTodayLabel => 'Heute';
 
   @override
   String get supportChatInputHint =>
@@ -1541,23 +1549,24 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get supportChatWelcomeTitle =>
-      'Hello! Describe your issue and we will help.';
+      'Hallo! Beschreiben Sie Ihr Problem und wir helfen Ihnen.';
 
   @override
   String get supportChatWelcomeBody =>
-      'You can also choose one of the common topics below.';
+      'Sie können auch eines der häufigen Themen unten auswählen.';
 
   @override
-  String get supportChatQuickActionGeneration => 'Issue with image generation';
+  String get supportChatQuickActionGeneration =>
+      'Problem mit der Bildgenerierung';
 
   @override
-  String get supportChatQuickActionPayment => 'Payment problem';
+  String get supportChatQuickActionPayment => 'Zahlungsproblem';
 
   @override
-  String get supportChatQuickActionRefund => 'Refund request';
+  String get supportChatQuickActionRefund => 'Erstattungsanfrage';
 
   @override
-  String get supportChatQuickActionHuman => 'Talk to an operator';
+  String get supportChatQuickActionHuman => 'Mit einem Mitarbeiter sprechen';
 
   @override
   String get supportChatQuickActionSubscription => 'Problem mit dem Abo';
@@ -1573,25 +1582,26 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportChatFaqTitle => 'FAQ';
 
   @override
-  String get supportChatFaqGenerationTitle => 'Why did my generation fail?';
+  String get supportChatFaqGenerationTitle =>
+      'Warum ist meine Generierung fehlgeschlagen?';
 
   @override
   String get supportChatFaqGenerationBody =>
-      'Send the template name, your pet type and a screenshot if possible. This usually gives support enough context on the first reply.';
+      'Senden Sie den Vorlagennamen, Ihren Haustiertyp und wenn möglich einen Screenshot. Dies gibt dem Support normalerweise beim ersten Antworten genug Kontext.';
 
   @override
-  String get supportChatFaqResponseTitle => 'When will support reply?';
+  String get supportChatFaqResponseTitle => 'Wann antwortet der Support?';
 
   @override
   String get supportChatFaqResponseBody =>
-      'The support team will reply in this chat. We usually respond within 24 hours.';
+      'Das Support-Team antwortet in diesem Chat. Wir antworten normalerweise innerhalb von 24 Stunden.';
 
   @override
-  String get supportChatFaqRefundTitle => 'How do refunds work?';
+  String get supportChatFaqRefundTitle => 'Wie funktionieren Erstattungen?';
 
   @override
   String get supportChatFaqRefundBody =>
-      'Share the order date and the reason for the request. Billing cases are reviewed in the same chat without switching channels.';
+      'Teilen Sie das Bestelldatum und den Grund für die Anfrage. Abrechnungsfälle werden im selben Chat ohne Kanalwechsel bearbeitet.';
 
   @override
   String get supportChatStatusOpen => 'Offen';
@@ -1606,30 +1616,30 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportChatStatusClosed => 'Geschlossen';
 
   @override
-  String get supportChatWaitingForSupportStatus => 'Waiting for support';
+  String get supportChatWaitingForSupportStatus => 'Wartet auf Support';
 
   @override
   String get supportChatWaitingForSupportStatusHint =>
-      'The request is open. Support will see the new message.';
+      'Die Anfrage ist offen. Der Support wird die neue Nachricht sehen.';
 
   @override
   String get supportChatInProgressStatusHint =>
-      'Support is reviewing your issue.';
+      'Support überprüft Ihr Problem.';
 
   @override
-  String get supportChatAwaitingYourReplyStatus => 'Awaiting your reply';
+  String get supportChatAwaitingYourReplyStatus => 'Wartet auf Ihre Antwort';
 
   @override
   String get supportChatSupportRepliedStatusHint =>
-      'Support replied. Did this help?';
+      'Support hat geantwortet. Hat das geholfen?';
 
   @override
   String get supportChatResolvedStatusHint =>
-      'This request was marked as resolved. You can reopen it for 7 days.';
+      'Diese Anfrage wurde als gelöst markiert. Sie können sie 7 Tage lang wieder öffnen.';
 
   @override
   String get supportChatClosedStatusHint =>
-      'Conversation is closed. Send a new message to reopen it.';
+      'Gespräch ist geschlossen. Senden Sie eine neue Nachricht, um es wieder zu öffnen.';
 
   @override
   String get supportChatMessageDelivered => 'Zugestellt';
@@ -1689,7 +1699,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String supportChatAttachmentUploadingWithCount(Object current, Object total) {
-    return 'Uploading photo $current of $total';
+    return 'Foto $current von $total wird hochgeladen';
   }
 
   @override
@@ -1714,207 +1724,212 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wir antworten normalerweise innerhalb weniger Stunden';
 
   @override
-  String get supportChatAddPhotoTitle => 'Add photo';
+  String get supportChatAddPhotoTitle => 'Foto hinzufügen';
 
   @override
-  String get supportChatAddAttachmentTitle => 'Add attachment';
+  String get supportChatAddAttachmentTitle => 'Anhang hinzufügen';
 
   @override
-  String get supportChatTakePhotoAction => 'Take photo';
+  String get supportChatTakePhotoAction => 'Foto aufnehmen';
 
   @override
-  String get supportChatChooseGalleryAction => 'Choose from gallery';
+  String get supportChatChooseGalleryAction => 'Aus Galerie wählen';
 
   @override
-  String get supportChatChoosePhotosAction => 'Choose photos';
+  String get supportChatChoosePhotosAction => 'Fotos wählen';
 
   @override
-  String get supportChatRecordVideoAction => 'Record video';
+  String get supportChatRecordVideoAction => 'Video aufnehmen';
 
   @override
-  String get supportChatChooseVideoAction => 'Choose video';
+  String get supportChatChooseVideoAction => 'Video wählen';
 
   @override
-  String get supportChatAttachFileAction => 'Files';
+  String get supportChatAttachFileAction => 'Dateien';
 
   @override
-  String get supportChatRecentMediaTitle => 'Recent media';
+  String get supportChatRecentMediaTitle => 'Aktuelle Medien';
 
   @override
-  String get supportChatAttachmentNoRecentMedia => 'No recent photos or videos';
+  String get supportChatAttachmentNoRecentMedia =>
+      'Keine aktuellen Fotos oder Videos';
 
   @override
   String get supportChatAttachmentLimitedAccessHint =>
-      'Not all photos are available. Allow full gallery access in device settings.';
+      'Nicht alle Fotos sind verfügbar. Erlauben Sie in den Geräteeinstellungen vollen Galeriezugang.';
 
   @override
-  String get supportChatOpenSettingsAction => 'Open settings';
+  String get supportChatOpenSettingsAction => 'Einstellungen öffnen';
 
   @override
   String get supportChatAttachmentNoGalleryAccessError =>
-      'Gallery access is denied. Allow access in device settings.';
+      'Galeriezugang verweigert. Erlauben Sie den Zugang in den Geräteeinstellungen.';
 
   @override
   String get supportChatAttachmentExpiredPlaceholder =>
-      'Attachment was deleted after 30 days';
+      'Anhang wurde nach 30 Tagen gelöscht';
 
   @override
-  String get supportChatReplyLabel => 'Reply';
+  String get supportChatReplyLabel => 'Antworten';
 
   @override
-  String get supportChatReplyToPrefix => 'Reply to message';
+  String get supportChatReplyToPrefix => 'Antwort auf Nachricht';
 
   @override
   String get supportChatReplyOriginalUnavailable =>
-      'Original message is unavailable';
+      'Originalnachricht nicht verfügbar';
 
   @override
-  String get supportChatPhotoAttachedLabel => 'Photo attached';
+  String get supportChatPhotoAttachedLabel => 'Foto angehängt';
 
   @override
-  String get supportChatVideoAttachedLabel => 'Video attached';
+  String get supportChatVideoAttachedLabel => 'Video angehängt';
 
   @override
-  String get supportChatVideoLabel => 'Support video';
+  String get supportChatVideoLabel => 'Support-Video';
 
   @override
-  String get supportChatAssistantBadge => 'Assistant';
+  String get supportChatAssistantBadge => 'Assistent';
 
   @override
-  String get supportChatTooManyAttachmentsError => 'You can add up to 5 files';
+  String get supportChatTooManyAttachmentsError =>
+      'Sie können bis zu 5 Dateien hinzufügen';
 
   @override
   String get supportChatAttachmentUnsupportedFormatError =>
-      'This format is not supported';
+      'Dieses Format wird nicht unterstützt';
 
   @override
   String get supportChatAttachmentVideoTooLongError =>
-      'Video must be 60 seconds or shorter.';
+      'Video muss 60 Sekunden oder kürzer sein.';
 
   @override
-  String get supportChatMarkResolvedAction => 'Yes, close request';
+  String get supportChatMarkResolvedAction => 'Ja, Anfrage schließen';
 
   @override
-  String get supportChatKeepOpenAction => 'No, write more';
+  String get supportChatKeepOpenAction => 'Nein, mehr schreiben';
 
   @override
-  String get supportChatReopenAction => 'Reopen';
+  String get supportChatReopenAction => 'Wieder öffnen';
 
   @override
-  String get supportChatArchiveAction => 'Archive';
+  String get supportChatArchiveAction => 'Archivieren';
 
   @override
-  String get supportChatRateTitle => 'Rate the support reply';
+  String get supportChatRateTitle => 'Support-Antwort bewerten';
 
   @override
   String supportChatRatedLabel(Object rating) {
-    return 'Your rating: $rating/5';
+    return 'Ihre Bewertung: $rating/5';
   }
 
   @override
-  String get supportChatReadOnlyHint => 'This conversation is read-only';
+  String get supportChatReadOnlyHint => 'Dieses Gespräch ist schreibgeschützt';
 
   @override
-  String get supportHomeTitle => 'Help & Support';
+  String get supportHomeTitle => 'Hilfe & Support';
 
   @override
-  String get supportHomeSubtitle => 'What can we help you with?';
+  String get supportHomeSubtitle => 'Womit können wir Ihnen helfen?';
 
   @override
-  String get supportHomeTopicGenerationIssue => 'Issue with image generation';
+  String get supportHomeTopicGenerationIssue =>
+      'Problem mit der Bildgenerierung';
 
   @override
-  String get supportHomeTopicGenerationTooLong => 'Generation takes too long';
+  String get supportHomeTopicGenerationTooLong => 'Generierung dauert zu lange';
 
   @override
-  String get supportHomeTopicTokensNotArrived => 'Tokens did not arrive';
+  String get supportHomeTopicTokensNotArrived => 'Token sind nicht angekommen';
 
   @override
-  String get supportHomeTopicPremiumIssue => 'Premium issue';
+  String get supportHomeTopicPremiumIssue => 'Premium-Problem';
 
   @override
-  String get supportHomeTopicPaymentRefund => 'Payment / Refund';
+  String get supportHomeTopicPaymentRefund => 'Zahlung / Erstattung';
 
   @override
-  String get supportHomeTopicOther => 'Other';
+  String get supportHomeTopicOther => 'Sonstiges';
 
   @override
-  String get supportAssistantTitle => 'Support Assistant';
+  String get supportAssistantTitle => 'Support-Assistent';
 
   @override
-  String get supportAssistantThisHelpedAction => 'This helped';
+  String get supportAssistantThisHelpedAction => 'Das hat geholfen';
 
   @override
-  String get supportAssistantCreateTicketAction => 'Create support ticket';
+  String get supportAssistantCreateTicketAction => 'Support-Ticket erstellen';
 
   @override
-  String get supportAssistantCheckLaterAction => 'Check later';
+  String get supportAssistantCheckLaterAction => 'Später prüfen';
 
   @override
   String get supportAssistantRecommendationGeneration =>
-      'For better results, please use a photo where the pet is clearly visible, not cropped, not blurry, and well lit.';
+      'Für bessere Ergebnisse verwenden Sie bitte ein Foto, auf dem das Haustier deutlich sichtbar ist, nicht beschnitten, nicht unscharf und gut beleuchtet.';
 
   @override
   String get supportAssistantRecommendationGenerationTooLong =>
-      'Video generation may take several minutes. It usually takes around 2–10 minutes. If it has taken too long, we can send this issue to support.';
+      'Die Videogenerierung kann mehrere Minuten dauern. Normalerweise etwa 2–10 Minuten. Wenn es zu lange gedauert hat, können wir dieses Problem an den Support senden.';
 
   @override
   String get supportAssistantRecommendationTokensNotArrived =>
-      'Sometimes token delivery after payment may take a few minutes. If the tokens still do not appear, create a support ticket and we will check the purchase.';
+      'Manchmal kann die Token-Lieferung nach der Zahlung einige Minuten dauern. Wenn die Token noch immer nicht erscheinen, erstellen Sie ein Support-Ticket und wir prüfen den Kauf.';
 
   @override
   String get supportAssistantRecommendationPremiumIssue =>
-      'If Premium has already been paid for but is not visible in the app, please try restarting the app. If the problem remains, we will check your subscription status.';
+      'Wenn Premium bereits bezahlt wurde, aber in der App nicht sichtbar ist, versuchen Sie bitte, die App neu zu starten. Wenn das Problem weiterhin besteht, prüfen wir Ihren Abonnementstatus.';
 
   @override
   String get supportAssistantRecommendationPaymentRefund =>
-      'We can check your payment or forward your refund request to support. Create a support ticket and we will attach the relevant purchase information if available.';
+      'Wir können Ihre Zahlung prüfen oder Ihren Erstattungsantrag an den Support weiterleiten. Erstellen Sie ein Support-Ticket und wir fügen die relevanten Kaufinformationen hinzu, falls verfügbar.';
 
   @override
   String get supportAssistantRecommendationOther =>
-      'Please describe what happened. You can also attach a screenshot to help support understand the situation faster.';
+      'Bitte beschreiben Sie, was passiert ist. Sie können auch einen Screenshot anhängen, damit der Support die Situation schneller verstehen kann.';
 
   @override
-  String get supportTicketFormTitle => 'Create support ticket';
+  String get supportTicketFormTitle => 'Support-Ticket erstellen';
 
   @override
-  String get supportTicketFormTopicLabel => 'Topic';
+  String get supportTicketFormTopicLabel => 'Thema';
 
   @override
-  String get supportTicketFormDescriptionLabel => 'Problem description';
+  String get supportTicketFormDescriptionLabel => 'Problembeschreibung';
 
   @override
-  String get supportTicketFormDescriptionHint => 'Describe what happened...';
+  String get supportTicketFormDescriptionHint =>
+      'Beschreiben Sie, was passiert ist...';
 
   @override
-  String get supportTicketFormRelatedGenerationLabel => 'Related generation';
+  String get supportTicketFormRelatedGenerationLabel =>
+      'Zugehörige Generierung';
 
   @override
-  String get supportTicketFormRelatedPaymentLabel => 'Related payment';
+  String get supportTicketFormRelatedPaymentLabel => 'Zugehörige Zahlung';
 
   @override
   String get supportTicketFormRelatedSubscriptionLabel =>
-      'Related subscription';
+      'Zugehöriges Abonnement';
 
   @override
-  String get supportTicketFormAttachmentsLabel => 'Attachments';
+  String get supportTicketFormAttachmentsLabel => 'Anhänge';
 
   @override
-  String get supportTicketFormAddScreenshotAction => 'Add screenshot';
+  String get supportTicketFormAddScreenshotAction => 'Screenshot hinzufügen';
 
   @override
-  String get supportTicketFormSubmitAction => 'Send to support';
+  String get supportTicketFormSubmitAction => 'An Support senden';
 
   @override
-  String get supportTicketFormSubmittingLabel => 'Creating ticket...';
+  String get supportTicketFormSubmittingLabel => 'Ticket wird erstellt...';
 
   @override
   String get supportTicketFormSuccessMessage =>
-      'Your ticket has been created. We will reply in this chat.';
+      'Ihr Ticket wurde erstellt. Wir antworten in diesem Chat.';
 
   @override
   String get supportTicketFormErrorMessage =>
-      'Failed to create ticket. Please try again.';
+      'Ticket konnte nicht erstellt werden. Bitte versuchen Sie es erneut.';
 
   @override
   String get profileSettingsThemeSystem => 'System';
@@ -2295,7 +2310,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileActionFailed =>
-      'We could not complete this action. Please try again.';
+      'Wir konnten diese Aktion nicht abschließen. Bitte versuchen Sie es erneut.';
 
   @override
   String get authSecurePrivateTitle => 'Sicher und privat';
@@ -2350,17 +2365,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get rewardsActionComingSoon => 'Das Prämiencenter ist bald verfügbar.';
 
   @override
-  String get templateFlowPhotoSourceGallery => 'Gallery';
+  String get templateFlowPhotoSourceGallery => 'Galerie';
 
   @override
-  String get templateFlowPhotoSourceCamera => 'Camera';
+  String get templateFlowPhotoSourceCamera => 'Kamera';
 
   @override
-  String get templateFlowReadyTitle => 'Ready to create!';
+  String get templateFlowReadyTitle => 'Bereit zum Erstellen!';
 
   @override
   String get templateFlowCheckDetailsSubtitle =>
-      'Check the details before creating';
+      'Überprüfen Sie die Details vor dem Erstellen';
 
   @override
   String get templateFlowTemplateLabel => 'Vorlage';
@@ -2369,59 +2384,60 @@ class AppLocalizationsDe extends AppLocalizations {
   String get templateFlowCostLabel => 'Kosten';
 
   @override
-  String get templateFlowBalanceLabel => 'Your balance';
+  String get templateFlowBalanceLabel => 'Ihr Guthaben';
 
   @override
   String get templateFlowDurationHint =>
-      'Creation can take from 10 seconds to 1 minute.';
+      'Die Erstellung kann 10 Sekunden bis 1 Minute dauern.';
 
   @override
-  String get templateFlowCreateMagicAction => 'Create magic';
+  String get templateFlowCreateMagicAction => 'Magie erstellen';
 
   @override
-  String get templateFlowChangePhotoAction => 'Change photo';
+  String get templateFlowChangePhotoAction => 'Foto ändern';
 
   @override
-  String get templateFlowPremiumTemplateTitle => 'Premium template';
+  String get templateFlowPremiumTemplateTitle => 'Premium-Vorlage';
 
   @override
   String get templateFlowPremiumTemplateMessage =>
-      'This template is available with Premium.';
+      'Diese Vorlage ist mit Premium verfügbar.';
 
   @override
-  String get templateFlowInsufficientBalanceTitle => 'Not enough PawSpark';
+  String get templateFlowInsufficientBalanceTitle => 'Nicht genug PawSpark';
 
   @override
   String templateFlowInsufficientBalanceMessage(
     Object tokenCost,
     Object balance,
   ) {
-    return 'This template costs $tokenCost PawSpark. Your balance: $balance PawSpark.';
+    return 'Diese Vorlage kostet $tokenCost PawSpark. Ihr Guthaben: $balance PawSpark.';
   }
 
   @override
   String get templateFlowChooseAnotherTemplateAction =>
-      'Choose another template';
+      'Eine andere Vorlage wählen';
 
   @override
-  String get templateFlowCreateFailedTitle => 'Could not create magic';
+  String get templateFlowCreateFailedTitle =>
+      'Magie konnte nicht erstellt werden';
 
   @override
   String get templateFlowCreateFailedBalanceHint =>
-      'Top up your balance and try creating again.';
+      'Laden Sie Ihr Guthaben auf und versuchen Sie es erneut.';
 
   @override
   String get templateFlowCreateFailedRetryHint =>
-      'Try another photo or retry later.';
+      'Versuchen Sie ein anderes Foto oder wiederholen Sie es später.';
 
   @override
-  String get templateFlowCreateHint => 'This may take a little time';
+  String get templateFlowCreateHint => 'Das kann etwas Zeit dauern';
 
   @override
   String get templateFlowStepProcessPhoto => 'Foto wird verarbeitet';
 
   @override
-  String get templateFlowStepAnalyzePet => 'Analyzing pet';
+  String get templateFlowStepAnalyzePet => 'Haustier analysieren';
 
   @override
   String get templateFlowStepCreateMagic => 'Magie wird erstellt';
@@ -2430,65 +2446,65 @@ class AppLocalizationsDe extends AppLocalizations {
   String get templateFlowStepFinalTouches => 'Letzte Anpassungen';
 
   @override
-  String get templateFlowTopUpBalanceAction => 'Top up balance';
+  String get templateFlowTopUpBalanceAction => 'Guthaben aufladen';
 
   @override
-  String get templateFlowResultReadyTitle => 'Done!';
+  String get templateFlowResultReadyTitle => 'Fertig!';
 
   @override
-  String get templateFlowResultReadySubtitle => 'Your magic is ready';
+  String get templateFlowResultReadySubtitle => 'Ihre Magie ist bereit';
 
   @override
   String get templateFlowResultUnavailable =>
       'Ergebnis ist noch nicht verfugbar';
 
   @override
-  String get templateFlowLoadingResult => 'Loading result...';
+  String get templateFlowLoadingResult => 'Ergebnis wird geladen...';
 
   @override
   String get templateFlowResultLoadFailed =>
       'Ergebnis konnte nicht geladen werden';
 
   @override
-  String get templateFlowCreateMoreAction => 'Create more';
+  String get templateFlowCreateMoreAction => 'Mehr erstellen';
 
   @override
-  String get templateFlowPreviewFallback => 'Preview';
+  String get templateFlowPreviewFallback => 'Vorschau';
 
   @override
-  String get templateFlowLoadingPreview => 'Loading preview...';
+  String get templateFlowLoadingPreview => 'Vorschau wird geladen...';
 
   @override
-  String get templateFlowPreviewUnavailable => 'Preview unavailable';
+  String get templateFlowPreviewUnavailable => 'Vorschau nicht verfügbar';
 
   @override
-  String get templateFlowLoadingVideo => 'Loading video...';
+  String get templateFlowLoadingVideo => 'Video wird geladen...';
 
   @override
-  String get templateFlowBestPhotoTitle => 'Best photo for this template:';
+  String get templateFlowBestPhotoTitle => 'Bestes Foto für diese Vorlage:';
 
   @override
-  String get templateFlowUploadPetPhotoAction => 'Upload a pet photo';
+  String get templateFlowUploadPetPhotoAction => 'Haustierfoto hochladen';
 
   @override
   String get templateFlowPremiumRequiredError =>
-      'This template is available only with Premium.';
+      'Diese Vorlage ist nur mit Premium verfügbar.';
 
   @override
   String get templateFlowInsufficientBalanceError =>
-      'Not enough PawSpark to start generation.';
+      'Nicht genug PawSpark zum Starten der Generierung.';
 
   @override
   String get templateFlowNetworkError =>
-      'No connection. Check your network and try again.';
+      'Keine Verbindung. Überprüfen Sie Ihr Netzwerk und versuchen Sie es erneut.';
 
   @override
   String get templateFlowServerError =>
-      'Service is temporarily unavailable. Please try again later.';
+      'Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.';
 
   @override
   String get templateFlowStartFailedError =>
-      'Could not start generation. Please try again.';
+      'Generierung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.';
 
   @override
   String get generationStatusTitle => 'Generierungsstatus';
