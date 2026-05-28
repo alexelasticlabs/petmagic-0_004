@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PetMagic.Modules.SupportChat.Infrastructure.Data;
 namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(SupportChatDbContext))]
-    partial class SupportChatDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260528082035_AddSupportMessageAttachments")]
+    partial class AddSupportMessageAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,13 +78,6 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("ReadAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("ReplyToMessageId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ReplyToPreview")
-                        .HasMaxLength(280)
-                        .HasColumnType("character varying(280)");
-
                     b.Property<int>("SenderType")
                         .HasColumnType("integer");
 
@@ -90,11 +86,7 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ReplyToMessageId");
-
                     b.HasIndex("ConversationId", "CreatedAtUtc");
-
-                    b.HasIndex("ConversationId", "ReplyToMessageId");
 
                     b.HasIndex("ConversationId", "IsFromAdmin", "ReadAtUtc");
 
@@ -259,9 +251,9 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsDeleted", "ExpiresAtUtc");
-
                     b.HasIndex("MessageId", "SortOrder");
+
+                    b.HasIndex("IsDeleted", "ExpiresAtUtc");
 
                     b.ToTable("support_message_attachments", (string)null);
                 });
@@ -362,14 +354,7 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PetMagic.Modules.SupportChat.Infrastructure.Entities.ConversationMessage", "ReplyToMessage")
-                        .WithMany()
-                        .HasForeignKey("ReplyToMessageId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Conversation");
-
-                    b.Navigation("ReplyToMessage");
                 });
 
             modelBuilder.Entity("PetMagic.Modules.SupportChat.Infrastructure.Entities.SupportMessageAttachment", b =>

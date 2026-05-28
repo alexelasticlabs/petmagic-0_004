@@ -30,8 +30,8 @@ import {
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
-import styles from "@/components/dashboard-view.module.css";
 import { DonutChart, RevenueChart } from "@/components/dashboard/dashboard-charts";
+import styles from "@/components/dashboard-view.module.css";
 import {
   fetchAdminEconomyPurchases,
   fetchSupportInbox,

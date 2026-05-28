@@ -192,33 +192,79 @@ export function formatMoney(amount: number, currencyCode: string, locale: Locale
 }
 
 export function hasAttachment(
-  message: Pick<AdminSupportConversation["messages"][number], "attachmentUrl">
+  message: Pick<
+    AdminSupportConversation["messages"][number],
+    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
+  >
 ) {
-  return Boolean(message.attachmentUrl?.trim());
+  return getMessageAttachments(message).length > 0;
 }
 
 export function hasImageAttachment(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "attachmentUrl" | "attachmentContentType"
+    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
   >
 ) {
-  return hasAttachment(message) && Boolean(message.attachmentContentType?.startsWith("image/"));
+  const attachments = getMessageAttachments(message);
+  return attachments.length === 1 && attachments[0]?.mimeType?.startsWith("image/");
 }
 
 export function hasVideoAttachment(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "attachmentUrl" | "attachmentContentType"
+    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
   >
 ) {
-  return hasAttachment(message) && Boolean(message.attachmentContentType?.startsWith("video/"));
+  const attachments = getMessageAttachments(message);
+  return attachments.length === 1 && attachments[0]?.mimeType?.startsWith("video/");
+}
+
+export function getMessageAttachments(
+  message: Pick<
+    AdminSupportConversation["messages"][number],
+    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
+  >
+) {
+  const parsedAttachments =
+    message.attachments
+      ?.filter((attachment) => attachment.isDeleted || Boolean(attachment.fileUrl?.trim()))
+      .map((attachment) => ({
+        fileUrl: attachment.fileUrl,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        durationSeconds: attachment.durationSeconds ?? null,
+        isDeleted: attachment.isDeleted ?? false,
+        expiresAtUtc: attachment.expiresAtUtc ?? null,
+        deletedAtUtc: attachment.deletedAtUtc ?? null,
+      })) ?? [];
+  if (parsedAttachments.length > 0) {
+    return parsedAttachments;
+  }
+
+  if (!message.attachmentUrl?.trim() || !message.attachmentContentType?.trim()) {
+    return [];
+  }
+
+  return [
+      {
+        fileUrl: message.attachmentUrl,
+        fileName: message.attachmentFileName ?? "attachment",
+        mimeType: message.attachmentContentType,
+        sizeBytes: message.attachmentFileSizeBytes ?? 0,
+        durationSeconds: null,
+        isDeleted: false,
+        expiresAtUtc: null,
+        deletedAtUtc: null,
+      },
+    ];
 }
 
 export function shouldRenderMessageBody(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "body" | "attachmentFileName" | "attachmentUrl"
+    "body" | "attachments" | "attachmentFileName" | "attachmentUrl" | "attachmentContentType" | "attachmentFileSizeBytes"
   >
 ) {
   const normalizedBody = message.body.trim();
@@ -226,11 +272,16 @@ export function shouldRenderMessageBody(
     return false;
   }
 
-  if (!hasAttachment(message)) {
+  const attachments = getMessageAttachments(message);
+  if (attachments.length === 0) {
     return true;
   }
 
-  return normalizedBody !== (message.attachmentFileName?.trim() ?? "");
+  if (attachments.length > 1) {
+    return true;
+  }
+
+  return normalizedBody !== (attachments[0]?.fileName?.trim() ?? "");
 }
 
 export function formatFileSize(value: number | null | undefined, locale: Locale) {

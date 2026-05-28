@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
@@ -16,6 +17,8 @@ namespace PetMagic.Modules.SupportChat.Api.Endpoints;
 
 public static class SupportChatEndpoints
 {
+    private const int AttachmentBatchMaxCount = 5;
+
     public static IEndpointRouteBuilder MapSupportChatEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var userGroup = endpoints.MapGroup("/api/support")
@@ -26,6 +29,9 @@ public static class SupportChatEndpoints
             .RequireRateLimiting("support-chat");
         userGroup.MapGet("/conversation", GetUserConversationAsync);
         userGroup.MapPost("/conversation/{conversationId:guid}/messages", SendUserMessageAsync)
+            .RequireRateLimiting("support-chat");
+        userGroup.MapPost("/conversation/{conversationId:guid}/messages/attachments", SendUserAttachmentsAsync)
+            .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
         userGroup.MapPost("/conversation/{conversationId:guid}/attachments", SendUserAttachmentAsync)
             .DisableAntiforgery()
@@ -52,6 +58,9 @@ public static class SupportChatEndpoints
         adminGroup.MapGet("/conversations/{conversationId:guid}", GetAdminConversationAsync);
         adminGroup.MapPost("/conversations/{conversationId:guid}/messages", SendAdminMessageAsync)
             .RequireRateLimiting("support-chat");
+        adminGroup.MapPost("/conversations/{conversationId:guid}/messages/attachments", SendAdminAttachmentsAsync)
+            .DisableAntiforgery()
+            .RequireRateLimiting("support-chat");
         adminGroup.MapPost("/conversations/{conversationId:guid}/attachments", SendAdminAttachmentAsync)
             .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
@@ -71,6 +80,9 @@ public static class SupportChatEndpoints
         adminGroup.MapPost("/tickets/{conversationId:guid}/close", CloseAdminConversationAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/reopen", ReopenAdminConversationAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/messages", SendAdminMessageAsync)
+            .RequireRateLimiting("support-chat");
+        adminGroup.MapPost("/tickets/{conversationId:guid}/messages/attachments", SendAdminAttachmentsAsync)
+            .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
         adminGroup.MapPost("/tickets/{conversationId:guid}/attachments", SendAdminAttachmentAsync)
             .DisableAntiforgery()
@@ -157,6 +169,7 @@ public static class SupportChatEndpoints
             userId,
             request.Body,
             IsAdmin: false,
+            ReplyToMessageId: request.ReplyToMessageId,
             Locale: ResolvePreferredLocale(request.Locale, httpContext));
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -173,12 +186,31 @@ public static class SupportChatEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendUserAttachmentsAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] IValidator<SendSupportAttachmentsCommand> validator,
+        [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        return SendAttachmentsCoreAsync(
+            httpContext,
+            conversationId,
+            isAdmin: false,
+            validator,
+            attachmentStorage,
+            service,
+            cancellationToken);
+    }
+
     private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendUserAttachmentAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
         [FromForm] IFormFile? file,
         [FromForm] string? body,
         [FromForm] string? locale,
+        [FromForm] Guid? replyToMessageId,
         [FromServices] IValidator<SendSupportMessageCommand> validator,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
         [FromServices] ISupportChatService service,
@@ -210,6 +242,7 @@ public static class SupportChatEndpoints
                 IsAdmin: false,
                 AttachmentFileName: Path.GetFileName(file.FileName),
                 AttachmentContentType: requestedContentType,
+                ReplyToMessageId: replyToMessageId,
                 Locale: ResolvePreferredLocale(locale, httpContext)),
             cancellationToken);
 
@@ -273,6 +306,7 @@ public static class SupportChatEndpoints
                 IsAdmin: false,
                 AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
                 AttachmentUrl: storeResult.Value.Url,
+                AttachmentStorageKey: storeResult.Value.StorageKey,
                 AttachmentFileName: storeResult.Value.FileName,
                 AttachmentContentType: storeResult.Value.ContentType,
                 AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
@@ -308,6 +342,7 @@ public static class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromForm] IFormFile? file,
         [FromForm] string? body,
+        [FromForm] Guid? replyToMessageId,
         [FromServices] IValidator<SendSupportMessageCommand> validator,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
         [FromServices] ISupportChatService service,
@@ -338,7 +373,8 @@ public static class SupportChatEndpoints
                 normalizedBody,
                 IsAdmin: true,
                 AttachmentFileName: Path.GetFileName(file.FileName),
-                AttachmentContentType: requestedContentType),
+                AttachmentContentType: requestedContentType,
+                ReplyToMessageId: replyToMessageId),
             cancellationToken);
 
         if (createMessageResult.IsFailure)
@@ -401,6 +437,7 @@ public static class SupportChatEndpoints
                 IsAdmin: true,
                 AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
                 AttachmentUrl: storeResult.Value.Url,
+                AttachmentStorageKey: storeResult.Value.StorageKey,
                 AttachmentFileName: storeResult.Value.FileName,
                 AttachmentContentType: storeResult.Value.ContentType,
                 AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
@@ -429,6 +466,24 @@ public static class SupportChatEndpoints
         }
 
         return TypedResults.Ok(completeStatusResult.Value);
+    }
+
+    private static Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendAdminAttachmentsAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromServices] IValidator<SendSupportAttachmentsCommand> validator,
+        [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        return SendAttachmentsCoreAsync(
+            httpContext,
+            conversationId,
+            isAdmin: true,
+            validator,
+            attachmentStorage,
+            service,
+            cancellationToken);
     }
 
     private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> RetryUserAttachmentAsync(
@@ -526,6 +581,7 @@ public static class SupportChatEndpoints
                 IsAdmin: false,
                 AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
                 AttachmentUrl: storeResult.Value.Url,
+                AttachmentStorageKey: storeResult.Value.StorageKey,
                 AttachmentFileName: storeResult.Value.FileName,
                 AttachmentContentType: storeResult.Value.ContentType,
                 AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
@@ -538,6 +594,119 @@ public static class SupportChatEndpoints
         }
 
         return TypedResults.Ok(completeStatusResult.Value);
+    }
+
+    private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendAttachmentsCoreAsync(
+        HttpContext httpContext,
+        Guid conversationId,
+        bool isAdmin,
+        IValidator<SendSupportAttachmentsCommand> validator,
+        ISupportAttachmentStorage attachmentStorage,
+        ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        var form = await httpContext.Request.ReadFormAsync(cancellationToken);
+        var files = form.Files.Where(file => file.Length > 0).ToList();
+        if (files.Count == 0)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["files"] = ["At least one support attachment file is required."]
+            });
+        }
+
+        if (files.Count > AttachmentBatchMaxCount)
+        {
+            return ToProblem(new Error(
+                "support.attachment_batch_limit_exceeded",
+                $"Cannot upload more than {AttachmentBatchMaxCount} attachments in a single message."));
+        }
+
+        var storedAttachments = new List<StoredSupportAttachmentResponse>(files.Count);
+        foreach (var file in files)
+        {
+            await using var stream = file.OpenReadStream();
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream, cancellationToken);
+
+            var storeResult = await attachmentStorage.StoreAsync(
+                new SupportAttachmentUploadCommand(
+                    Path.GetFileName(file.FileName),
+                    file.ContentType ?? "application/octet-stream",
+                    memoryStream.ToArray()),
+                cancellationToken);
+
+            if (storeResult.IsFailure)
+            {
+                await CleanupStoredAttachmentsAsync(storedAttachments, attachmentStorage);
+                return ToProblem(storeResult.Error);
+            }
+
+            storedAttachments.Add(storeResult.Value);
+        }
+
+        var rawBody = form.TryGetValue("body", out var bodyValue)
+            ? bodyValue.ToString()
+            : string.Empty;
+        var locale = form.TryGetValue("locale", out var localeValue)
+            ? localeValue.ToString()
+            : null;
+        var replyToMessageId = form.TryGetValue("replyToMessageId", out var replyToMessageValue)
+            && Guid.TryParse(replyToMessageValue.ToString(), out var parsedReplyToMessageId)
+                ? parsedReplyToMessageId
+                : (Guid?)null;
+
+        var command = new SendSupportAttachmentsCommand(
+            conversationId,
+            userId,
+            rawBody.Trim(),
+            isAdmin,
+            storedAttachments
+                .Select(attachment => new SupportMessageAttachmentInput(
+                    attachment.Url,
+                    attachment.ContentType,
+                    attachment.FileName,
+                    attachment.FileSizeBytes,
+                    StorageKey: attachment.StorageKey))
+                .ToList(),
+            ReplyToMessageId: replyToMessageId,
+            Locale: isAdmin ? null : ResolvePreferredLocale(locale, httpContext));
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            await CleanupStoredAttachmentsAsync(storedAttachments, attachmentStorage);
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var sendResult = await service.SendMessageWithAttachmentsAsync(command, cancellationToken);
+        if (sendResult.IsFailure)
+        {
+            await CleanupStoredAttachmentsAsync(storedAttachments, attachmentStorage);
+            return ToProblem(sendResult.Error);
+        }
+
+        return TypedResults.Ok(sendResult.Value);
+    }
+
+    private static async Task CleanupStoredAttachmentsAsync(
+        IReadOnlyList<StoredSupportAttachmentResponse> storedAttachments,
+        ISupportAttachmentStorage attachmentStorage)
+    {
+        if (storedAttachments.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var attachment in storedAttachments)
+        {
+            await attachmentStorage.DeleteAsync(attachment.Url, CancellationToken.None);
+        }
     }
 
     private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> RetryAdminAttachmentAsync(
@@ -635,6 +804,7 @@ public static class SupportChatEndpoints
                 IsAdmin: true,
                 AttachmentUploadStatus: SupportAttachmentUploadStatus.Uploaded,
                 AttachmentUrl: storeResult.Value.Url,
+                AttachmentStorageKey: storeResult.Value.StorageKey,
                 AttachmentFileName: storeResult.Value.FileName,
                 AttachmentContentType: storeResult.Value.ContentType,
                 AttachmentFileSizeBytes: storeResult.Value.FileSizeBytes),
@@ -915,7 +1085,12 @@ public static class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var command = new SendSupportMessageCommand(conversationId, userId, request.Body, IsAdmin: true);
+        var command = new SendSupportMessageCommand(
+            conversationId,
+            userId,
+            request.Body,
+            IsAdmin: true,
+            ReplyToMessageId: request.ReplyToMessageId);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -1274,6 +1449,7 @@ public static class SupportChatEndpoints
             "support.attachment_content_type_not_allowed" => StatusCodes.Status400BadRequest,
             "support.attachment_mime_mismatch" => StatusCodes.Status400BadRequest,
             "support.attachment_file_too_large" => StatusCodes.Status400BadRequest,
+            "support.attachment_batch_limit_exceeded" => StatusCodes.Status400BadRequest,
             "support.attachment_storage_failed" => StatusCodes.Status400BadRequest,
             "support.attachment_retry_not_allowed" => StatusCodes.Status409Conflict,
             "support.conversation_read_only" => StatusCodes.Status409Conflict,
@@ -1328,7 +1504,7 @@ public static class SupportChatEndpoints
         Guid? RelatedPaymentId = null,
         Guid? RelatedSubscriptionId = null);
 
-    public sealed record SendSupportMessageRequest(string Body, string? Locale = null);
+    public sealed record SendSupportMessageRequest(string Body, string? Locale = null, Guid? ReplyToMessageId = null);
 
     public sealed record UpdateSupportConversationStatusRequest(string Status);
 

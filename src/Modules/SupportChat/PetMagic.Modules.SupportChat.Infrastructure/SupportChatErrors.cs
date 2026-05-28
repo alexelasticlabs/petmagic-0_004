@@ -8,6 +8,7 @@ internal static class SupportChatErrors
     public static readonly Error AttachmentContentTypeNotAllowed = new("support.attachment_content_type_not_allowed", "Support attachment content type is not allowed.");
     public static readonly Error AttachmentMimeMismatch = new("support.attachment_mime_mismatch", "Support attachment MIME type does not match file content.");
     public static readonly Error AttachmentFileTooLarge = new("support.attachment_file_too_large", "Support attachment exceeds the maximum allowed size.");
+    public static readonly Error AttachmentBatchLimitExceeded = new("support.attachment_batch_limit_exceeded", "Support message allows up to 5 attachments.");
     public static readonly Error AttachmentStorageFailed = new("support.attachment_storage_failed", "Support attachment could not be stored.");
     public static readonly Error AttachmentRetryNotAllowed = new("support.attachment_retry_not_allowed", "Support attachment retry is not allowed for this message state.");
     public static readonly Error ConversationReadOnly = new("support.conversation_read_only", "Support conversation is read-only.");

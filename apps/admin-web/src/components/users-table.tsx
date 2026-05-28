@@ -21,10 +21,10 @@ import {
 } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
-import styles from "@/components/users-table.module.css";
 import { useUsersAdmin } from "@/components/users/use-users-admin";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import { UserInlineAnalytics } from "@/components/users/user-inline-analytics";
+import styles from "@/components/users-table.module.css";
 import { assignRole, revokeRole, setActive, setPremium } from "@/lib/api-client";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 

@@ -40,6 +40,39 @@ public sealed class SendSupportMessageCommandValidator : AbstractValidator<SendS
             .NotNull()
             .GreaterThan(0)
             .When(x => !string.IsNullOrWhiteSpace(x.AttachmentUrl));
+        RuleFor(x => x.ReplyToMessageId)
+            .NotEmpty()
+            .When(x => x.ReplyToMessageId.HasValue);
+    }
+}
+
+public sealed class SendSupportAttachmentsCommandValidator : AbstractValidator<SendSupportAttachmentsCommand>
+{
+    public SendSupportAttachmentsCommandValidator()
+    {
+        RuleFor(x => x.ConversationId).NotEmpty();
+        RuleFor(x => x.SenderUserId).NotEmpty();
+        RuleFor(x => x.Body).MaximumLength(4000);
+        RuleFor(x => x.Attachments)
+            .NotNull()
+            .Must(attachments => attachments.Count is >= 1 and <= 5)
+            .WithMessage("Support message attachments must contain from 1 to 5 files.");
+        RuleForEach(x => x.Attachments).SetValidator(new SupportMessageAttachmentInputValidator());
+        RuleFor(x => x.ReplyToMessageId)
+            .NotEmpty()
+            .When(x => x.ReplyToMessageId.HasValue);
+    }
+}
+
+public sealed class SupportMessageAttachmentInputValidator : AbstractValidator<SupportMessageAttachmentInput>
+{
+    public SupportMessageAttachmentInputValidator()
+    {
+        RuleFor(x => x.FileUrl).NotEmpty().MaximumLength(2048);
+        RuleFor(x => x.FileName).NotEmpty().MaximumLength(256);
+        RuleFor(x => x.MimeType).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.SizeBytes).GreaterThan(0);
+        RuleFor(x => x.StorageKey).MaximumLength(1024);
     }
 }
 

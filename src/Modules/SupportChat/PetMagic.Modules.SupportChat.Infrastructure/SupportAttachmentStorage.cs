@@ -11,7 +11,19 @@ public sealed class SupportAttachmentStorageOptions
 
     public string LocalMediaRootPath { get; init; } = Path.Combine("wwwroot", "support-attachments");
 
-    public long MaxFileSizeBytes { get; init; } = 10 * 1024 * 1024;
+    public long MaxImageFileSizeBytes { get; init; } = 10 * 1024 * 1024;
+
+    public long MaxVideoFileSizeBytes { get; init; } = 50 * 1024 * 1024;
+
+    public int RetentionDays { get; init; } = 30;
+
+    public bool CleanupWorkerEnabled { get; init; } = true;
+
+    public int CleanupPollIntervalMilliseconds { get; init; } = 86_400_000;
+
+    public int CleanupBatchSize { get; init; } = 100;
+
+    public int CleanupRetryDelayMilliseconds { get; init; } = 30_000;
 }
 
 internal sealed class LocalSupportAttachmentStorage(
@@ -25,8 +37,7 @@ internal sealed class LocalSupportAttachmentStorage(
         ["image/png"] = ".png",
         ["image/webp"] = ".webp",
         ["video/mp4"] = ".mp4",
-        ["video/quicktime"] = ".mov",
-        ["video/webm"] = ".webm"
+        ["video/quicktime"] = ".mov"
     };
 
     private static readonly Dictionary<string, string> ExtensionContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -38,8 +49,7 @@ internal sealed class LocalSupportAttachmentStorage(
         [".mp4"] = "video/mp4",
         [".m4v"] = "video/mp4",
         [".mov"] = "video/quicktime",
-        [".qt"] = "video/quicktime",
-        [".webm"] = "video/webm"
+        [".qt"] = "video/quicktime"
     };
 
     public async Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
@@ -61,7 +71,8 @@ internal sealed class LocalSupportAttachmentStorage(
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentContentTypeNotAllowed);
         }
 
-        if (attachment.Content.LongLength > options.MaxFileSizeBytes)
+        var maxFileSizeBytes = ResolveMaxFileSizeBytes(normalizedContentType);
+        if (attachment.Content.LongLength > maxFileSizeBytes)
         {
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentFileTooLarge);
         }
@@ -264,13 +275,15 @@ internal sealed class LocalSupportAttachmentStorage(
                 && attachmentContent[5] == 0x74
                 && attachmentContent[6] == 0x79
                 && attachmentContent[7] == 0x70,
-            "video/webm" => attachmentContent.Length >= 4
-                && attachmentContent[0] == 0x1A
-                && attachmentContent[1] == 0x45
-                && attachmentContent[2] == 0xDF
-                && attachmentContent[3] == 0xA3,
             _ => false,
         };
+    }
+
+    private long ResolveMaxFileSizeBytes(string normalizedContentType)
+    {
+        return normalizedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+            ? options.MaxVideoFileSizeBytes
+            : options.MaxImageFileSizeBytes;
     }
 
     private static string NormalizeContentType(string contentType)

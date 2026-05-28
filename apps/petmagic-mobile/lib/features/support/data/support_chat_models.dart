@@ -1,3 +1,62 @@
+class SupportChatAttachment {
+  const SupportChatAttachment({
+    required this.fileUrl,
+    required this.type,
+    required this.mimeType,
+    required this.fileName,
+    required this.sizeBytes,
+    this.isDeleted = false,
+    this.expiresAtUtc,
+    this.deletedAtUtc,
+    this.durationSeconds,
+    this.width,
+    this.height,
+  });
+
+  final String fileUrl;
+  final String type;
+  final String mimeType;
+  final String fileName;
+  final int sizeBytes;
+  final bool isDeleted;
+  final DateTime? expiresAtUtc;
+  final DateTime? deletedAtUtc;
+  final double? durationSeconds;
+  final int? width;
+  final int? height;
+
+  bool get isImage => mimeType.startsWith('image/');
+  bool get isVideo => mimeType.startsWith('video/');
+
+  factory SupportChatAttachment.fromJson(Map<String, dynamic> json) {
+    return SupportChatAttachment(
+      fileUrl: json['fileUrl'] as String? ?? '',
+      type: json['type'] as String? ?? 'file',
+      mimeType: json['mimeType'] as String? ?? 'application/octet-stream',
+      fileName: json['fileName'] as String? ?? '',
+      sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
+      isDeleted: json['isDeleted'] as bool? ?? false,
+      expiresAtUtc: DateTime.tryParse(json['expiresAtUtc'] as String? ?? ''),
+      deletedAtUtc: DateTime.tryParse(json['deletedAtUtc'] as String? ?? ''),
+      durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
+      width: (json['width'] as num?)?.toInt(),
+      height: (json['height'] as num?)?.toInt(),
+    );
+  }
+}
+
+class SupportChatUploadAttachment {
+  const SupportChatUploadAttachment({
+    required this.filePath,
+    required this.fileName,
+    required this.contentType,
+  });
+
+  final String filePath;
+  final String fileName;
+  final String contentType;
+}
+
 class SupportChatMessage {
   const SupportChatMessage({
     required this.messageId,
@@ -9,6 +68,9 @@ class SupportChatMessage {
     required this.body,
     required this.isRead,
     required this.createdAtUtc,
+    required this.attachments,
+    this.replyToMessageId,
+    this.replyToPreview,
     this.attachmentUrl,
     this.attachmentFileName,
     this.attachmentContentType,
@@ -16,6 +78,7 @@ class SupportChatMessage {
     this.attachmentUploadStatus,
     this.attachmentUploadErrorCode,
     this.readAtUtc,
+    this.deliveredAtUtc,
   });
 
   final String messageId;
@@ -25,8 +88,11 @@ class SupportChatMessage {
   final bool isFromAdmin;
   final String senderType;
   final String body;
+  final String? replyToMessageId;
+  final String? replyToPreview;
   final bool isRead;
   final DateTime createdAtUtc;
+  final List<SupportChatAttachment> attachments;
   final String? attachmentUrl;
   final String? attachmentFileName;
   final String? attachmentContentType;
@@ -34,18 +100,24 @@ class SupportChatMessage {
   final String? attachmentUploadStatus;
   final String? attachmentUploadErrorCode;
   final DateTime? readAtUtc;
+  final DateTime? deliveredAtUtc;
 
   bool get isSystemMessage => senderType == 'System';
   bool get isBotMessage => senderType == 'Bot';
   bool get isUserMessage => senderType == 'User';
 
-  bool get hasAttachment => attachmentUrl?.isNotEmpty == true;
+  SupportChatAttachment? get primaryAttachment =>
+      attachments.isEmpty ? null : attachments.first;
+
+  bool get hasAttachment => attachments.isNotEmpty;
 
   bool get hasImageAttachment =>
-      hasAttachment && (attachmentContentType?.startsWith('image/') ?? false);
+      attachments.length == 1 && (primaryAttachment?.isImage ?? false);
 
   bool get hasVideoAttachment =>
-      hasAttachment && (attachmentContentType?.startsWith('video/') ?? false);
+      attachments.length == 1 && (primaryAttachment?.isVideo ?? false);
+
+  bool get hasMediaGroup => attachments.length > 1;
 
   String? get normalizedAttachmentUploadStatus {
     final value = attachmentUploadStatus?.trim();
@@ -76,6 +148,10 @@ class SupportChatMessage {
     int? attachmentFileSizeBytes,
     String? attachmentUploadStatus,
     String? attachmentUploadErrorCode,
+    List<SupportChatAttachment>? attachments,
+    DateTime? deliveredAtUtc,
+    String? replyToMessageId,
+    String? replyToPreview,
     bool clearAttachmentUploadErrorCode = false,
     bool clearReadAt = false,
   }) {
@@ -87,8 +163,11 @@ class SupportChatMessage {
       isFromAdmin: isFromAdmin,
       senderType: senderType,
       body: body,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      replyToPreview: replyToPreview ?? this.replyToPreview,
       isRead: isRead ?? this.isRead,
       createdAtUtc: createdAtUtc,
+      attachments: attachments ?? this.attachments,
       attachmentUrl: attachmentUrl ?? this.attachmentUrl,
       attachmentFileName: attachmentFileName ?? this.attachmentFileName,
       attachmentContentType:
@@ -101,10 +180,20 @@ class SupportChatMessage {
           ? null
           : (attachmentUploadErrorCode ?? this.attachmentUploadErrorCode),
       readAtUtc: clearReadAt ? null : (readAtUtc ?? this.readAtUtc),
+      deliveredAtUtc: deliveredAtUtc ?? this.deliveredAtUtc,
     );
   }
 
   factory SupportChatMessage.fromJson(Map<String, dynamic> json) {
+    final parsedAttachments = _parseAttachments(
+      json,
+      legacyAttachmentUrl: json['attachmentUrl'] as String?,
+      legacyAttachmentFileName: json['attachmentFileName'] as String?,
+      legacyAttachmentContentType: json['attachmentContentType'] as String?,
+      legacyAttachmentFileSizeBytes:
+          (json['attachmentFileSizeBytes'] as num?)?.toInt(),
+    );
+
     return SupportChatMessage(
       messageId: json['messageId'] as String? ?? '',
       conversationId: json['conversationId'] as String? ?? '',
@@ -113,18 +202,63 @@ class SupportChatMessage {
       isFromAdmin: json['isFromAdmin'] as bool? ?? false,
       senderType: json['senderType'] as String? ?? 'User',
       body: json['body'] as String? ?? '',
+      replyToMessageId: json['replyToMessageId'] as String?,
+      replyToPreview: json['replyToPreview'] as String?,
       isRead: json['isRead'] as bool? ?? false,
+      attachments: parsedAttachments,
       attachmentUrl: json['attachmentUrl'] as String?,
       attachmentFileName: json['attachmentFileName'] as String?,
       attachmentContentType: json['attachmentContentType'] as String?,
-      attachmentFileSizeBytes: json['attachmentFileSizeBytes'] as int?,
+      attachmentFileSizeBytes: (json['attachmentFileSizeBytes'] as num?)?.toInt(),
       attachmentUploadStatus: json['attachmentUploadStatus'] as String?,
       attachmentUploadErrorCode: json['attachmentUploadErrorCode'] as String?,
       createdAtUtc:
           DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       readAtUtc: DateTime.tryParse(json['readAtUtc'] as String? ?? ''),
+      deliveredAtUtc: DateTime.tryParse(json['deliveredAtUtc'] as String? ?? ''),
     );
+  }
+
+  static List<SupportChatAttachment> _parseAttachments(
+    Map<String, dynamic> json, {
+    required String? legacyAttachmentUrl,
+    required String? legacyAttachmentFileName,
+    required String? legacyAttachmentContentType,
+    required int? legacyAttachmentFileSizeBytes,
+  }) {
+    final parsedAttachments = (json['attachments'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(SupportChatAttachment.fromJson)
+        .where((attachment) => attachment.fileUrl.trim().isNotEmpty)
+        .toList(growable: false);
+
+    if (parsedAttachments.isNotEmpty) {
+      return parsedAttachments;
+    }
+
+    final legacyUrl = legacyAttachmentUrl?.trim();
+    final legacyMimeType = legacyAttachmentContentType?.trim();
+    if (legacyUrl == null ||
+        legacyUrl.isEmpty ||
+        legacyMimeType == null ||
+        legacyMimeType.isEmpty) {
+      return const [];
+    }
+
+    return [
+      SupportChatAttachment(
+        fileUrl: legacyUrl,
+        type: legacyMimeType.startsWith('image/')
+            ? 'image'
+            : (legacyMimeType.startsWith('video/') ? 'video' : 'file'),
+        mimeType: legacyMimeType,
+        fileName: legacyAttachmentFileName?.trim().isNotEmpty == true
+            ? legacyAttachmentFileName!.trim()
+            : legacyUrl.split('/').last,
+        sizeBytes: legacyAttachmentFileSizeBytes ?? 0,
+      ),
+    ];
   }
 }
 

@@ -356,6 +356,20 @@ export type SupportConversationPriority = "Low" | "Normal" | "High";
 
 export type SupportInboxAssignmentScope = "all" | "mine" | "unassigned";
 
+export type AdminSupportMessageAttachment = {
+  fileUrl: string;
+  type: string;
+  mimeType: string;
+  fileName: string;
+  sizeBytes: number;
+  isDeleted?: boolean;
+  expiresAtUtc?: string | null;
+  deletedAtUtc?: string | null;
+  durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
+};
+
 export type AdminSupportMessage = {
   messageId: string;
   conversationId: string;
@@ -364,12 +378,15 @@ export type AdminSupportMessage = {
   isFromAdmin: boolean;
   senderType: string;
   body: string;
+  replyToMessageId?: string | null;
+  replyToPreview?: string | null;
   attachmentUrl?: string | null;
   attachmentFileName?: string | null;
   attachmentContentType?: string | null;
   attachmentFileSizeBytes?: number | null;
   attachmentUploadStatus?: string | null;
   attachmentUploadErrorCode?: string | null;
+  attachments?: AdminSupportMessageAttachment[] | null;
   isRead: boolean;
   readAtUtc?: string | null;
   deliveredAtUtc?: string | null;

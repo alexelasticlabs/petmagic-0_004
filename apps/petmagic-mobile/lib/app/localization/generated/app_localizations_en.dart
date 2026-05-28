@@ -1643,8 +1643,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unable to send the attachment right now. Please try again in a moment.';
 
   @override
-  String get supportChatAttachmentTooLargeError =>
-      'Attachment is too large. Maximum size is 10 MB.';
+  String get supportChatAttachmentTooLargeError => 'File is too large';
 
   @override
   String get supportChatImageLabel => 'Support image';
@@ -1729,6 +1728,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportChatChooseVideoAction => 'Choose video';
 
   @override
+  String get supportChatAttachFileAction => 'Files';
+
+  @override
+  String get supportChatRecentMediaTitle => 'Recent media';
+
+  @override
+  String get supportChatAttachmentNoRecentMedia => 'No recent photos or videos';
+
+  @override
+  String get supportChatAttachmentLimitedAccessHint =>
+      'Not all photos are available. Allow full gallery access in device settings.';
+
+  @override
+  String get supportChatOpenSettingsAction => 'Open settings';
+
+  @override
+  String get supportChatAttachmentNoGalleryAccessError =>
+      'Gallery access is denied. Allow access in device settings.';
+
+  @override
+  String get supportChatAttachmentExpiredPlaceholder =>
+      'Attachment was deleted after 30 days';
+
+  @override
+  String get supportChatReplyLabel => 'Reply';
+
+  @override
+  String get supportChatReplyToPrefix => 'Reply to message';
+
+  @override
+  String get supportChatReplyOriginalUnavailable =>
+      'Original message is unavailable';
+
+  @override
   String get supportChatPhotoAttachedLabel => 'Photo attached';
 
   @override
@@ -1741,8 +1774,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportChatAssistantBadge => 'Assistant';
 
   @override
-  String get supportChatTooManyAttachmentsError =>
-      'You can attach up to 5 photos.';
+  String get supportChatTooManyAttachmentsError => 'You can add up to 5 files';
+
+  @override
+  String get supportChatAttachmentUnsupportedFormatError =>
+      'This format is not supported';
+
+  @override
+  String get supportChatAttachmentVideoTooLongError =>
+      'Video must be 60 seconds or shorter.';
 
   @override
   String get supportChatMarkResolvedAction => 'Yes, close request';

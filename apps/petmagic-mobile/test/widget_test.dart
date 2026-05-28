@@ -1466,6 +1466,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
               senderType: 'Admin',
               body: 'How can we help today?',
               isRead: false,
+              attachments: const [],
               createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
             ),
           ],
@@ -1498,6 +1499,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
             senderType: 'User',
             body: trimmedInitial,
             isRead: false,
+            attachments: const [],
             createdAtUtc: now,
           ),
         );
@@ -1542,6 +1544,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
     required String conversationId,
     required String body,
     required String localeTag,
+    String? replyToMessageId,
   }) async {
     if (!_hasConversation) {
       throw const AppException(
@@ -1560,6 +1563,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
       senderType: 'User',
       body: body,
       isRead: false,
+      attachments: const [],
       createdAtUtc: DateTime.utc(2026, 1, 1, 10, 10),
     );
 

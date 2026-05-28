@@ -16,7 +16,7 @@ class _SupportHeader extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 12, 6),
+      padding: const EdgeInsets.fromLTRB(8, 6, 12, 4),
       child: Row(
         children: [
           IconButton(
@@ -57,14 +57,14 @@ class _SupportHeader extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: colors.textStrong,
-                          fontSize: 16.5,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                 const SizedBox(height: 3),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -83,12 +83,12 @@ class _SupportHeader extends StatelessWidget {
                         subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 12,
-                          height: 1.2,
-                          fontWeight: FontWeight.w500,
-                        ),
+                         style: TextStyle(
+                           color: colors.textSoft,
+                           fontSize: 11.5,
+                           height: 1.2,
+                           fontWeight: FontWeight.w500,
+                         ),
                       ),
                     ),
                   ],
@@ -113,16 +113,16 @@ class _SupportSecurityCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+      padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
       decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.62),
+        color: colors.surfaceStrong.withValues(alpha: 0.54),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.border.withValues(alpha: 0.65)),
+        border: Border.all(color: colors.border.withValues(alpha: 0.58)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shield_rounded, color: colors.textMuted, size: 13),
+          Icon(Icons.shield_rounded, color: colors.textMuted, size: 12),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -130,11 +130,11 @@ class _SupportSecurityCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-              ),
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
             ),
           ),
         ],

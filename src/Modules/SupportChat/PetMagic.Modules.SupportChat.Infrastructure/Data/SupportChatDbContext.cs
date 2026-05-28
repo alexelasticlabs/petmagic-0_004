@@ -10,6 +10,8 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
 
     public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
 
+    public DbSet<SupportMessageAttachment> SupportMessageAttachments => Set<SupportMessageAttachment>();
+
     public DbSet<SupportReplyTemplate> SupportReplyTemplates => Set<SupportReplyTemplate>();
 
     public DbSet<SupportPushDeviceToken> SupportPushDeviceTokens => Set<SupportPushDeviceToken>();
@@ -40,6 +42,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.ToTable("support_messages");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.ReplyToPreview).HasMaxLength(280);
             entity.Property(x => x.SenderType).HasConversion<int>().IsRequired();
             entity.Property(x => x.AttachmentUrl).HasMaxLength(2048);
             entity.Property(x => x.AttachmentFileName).HasMaxLength(256);
@@ -49,9 +52,34 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.IsInternalNote).HasDefaultValue(false);
             entity.HasIndex(x => new { x.ConversationId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.ConversationId, x.IsFromAdmin, x.ReadAtUtc });
+            entity.HasIndex(x => new { x.ConversationId, x.ReplyToMessageId });
             entity.HasOne(x => x.Conversation)
                 .WithMany(x => x.Messages)
                 .HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ReplyToMessage)
+                .WithMany()
+                .HasForeignKey(x => x.ReplyToMessageId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<SupportMessageAttachment>(entity =>
+        {
+            entity.ToTable("support_message_attachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FileUrl).HasMaxLength(2048).IsRequired();
+            entity.Property(x => x.FileName).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.MimeType).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.StorageKey).HasMaxLength(1024);
+            entity.Property(x => x.SortOrder).IsRequired();
+            entity.Property(x => x.SizeBytes).IsRequired();
+            entity.Property(x => x.ExpiresAtUtc).IsRequired();
+            entity.Property(x => x.IsDeleted).HasDefaultValue(false);
+            entity.HasIndex(x => new { x.MessageId, x.SortOrder });
+            entity.HasIndex(x => new { x.IsDeleted, x.ExpiresAtUtc });
+            entity.HasOne(x => x.Message)
+                .WithMany(x => x.Attachments)
+                .HasForeignKey(x => x.MessageId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

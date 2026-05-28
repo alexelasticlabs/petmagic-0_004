@@ -15,6 +15,10 @@ class _SupportConversationViewport extends StatelessWidget {
     required this.onOpenImage,
     required this.onOpenVideo,
     required this.onRetryAttachment,
+    required this.onReplyToMessage,
+    required this.onJumpToMessage,
+    required this.highlightedMessageId,
+    required this.messageItemKeyForId,
     required this.formatDayLabel,
     required this.isSameDay,
   });
@@ -34,6 +38,10 @@ class _SupportConversationViewport extends StatelessWidget {
   final Future<void> Function({required String videoUrl, String? fileName})
   onOpenVideo;
   final Future<void> Function(SupportChatMessage message) onRetryAttachment;
+  final ValueChanged<SupportChatMessage> onReplyToMessage;
+  final ValueChanged<String> onJumpToMessage;
+  final String? highlightedMessageId;
+  final GlobalKey Function(String messageId) messageItemKeyForId;
   final String Function(DateTime day) formatDayLabel;
   final bool Function(DateTime a, DateTime b) isSameDay;
 
@@ -177,6 +185,7 @@ class _SupportConversationViewport extends StatelessWidget {
               !isSameDay(previousMessage.createdAtUtc, message.createdAtUtc);
 
           return Padding(
+            key: messageItemKeyForId(message.messageId),
             padding: EdgeInsets.only(top: showDayDivider ? 12 : 0, bottom: 14),
             child: Column(
               children: [
@@ -200,6 +209,9 @@ class _SupportConversationViewport extends StatelessWidget {
                     onOpenImage: onOpenImage,
                     onOpenVideo: onOpenVideo,
                     onRetryAttachment: () => onRetryAttachment(message),
+                    onReplyToMessage: () => onReplyToMessage(message),
+                    onJumpToMessage: onJumpToMessage,
+                    isHighlighted: highlightedMessageId == message.messageId,
                   ),
               ],
             ),
@@ -223,6 +235,8 @@ class _SupportComposerPanel extends StatelessWidget {
     required this.onShowAttachmentOptions,
     required this.onSendMessage,
     required this.onResolveConversation,
+    required this.replyToMessage,
+    required this.onClearReplyToMessage,
   });
 
   final SupportChatState state;
@@ -236,6 +250,8 @@ class _SupportComposerPanel extends StatelessWidget {
   final VoidCallback onShowAttachmentOptions;
   final Future<void> Function() onSendMessage;
   final Future<void> Function() onResolveConversation;
+  final SupportChatMessage? replyToMessage;
+  final VoidCallback onClearReplyToMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -287,6 +303,14 @@ class _SupportComposerPanel extends StatelessWidget {
                   isBusy: state.isSending,
                   onResolve: onResolveConversation,
                   onKeepOpen: messageFocusNode.requestFocus,
+                ),
+              ),
+            if (replyToMessage != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
+                child: _SupportReplyComposerPreview(
+                  message: replyToMessage!,
+                  onClear: state.isSending ? null : onClearReplyToMessage,
                 ),
               ),
             if (pendingAttachments.isNotEmpty) ...[
@@ -369,7 +393,7 @@ class _SupportComposerPanel extends StatelessWidget {
                             ? _supportComposerSendGreen.withValues(alpha: 0.85)
                             : effectiveCanSend
                             ? _supportComposerSendGreen
-                            : _supportComposerSendGreen.withValues(alpha: 0.3),
+                            : colors.surface,
                         shape: const CircleBorder(),
                         child: InkWell(
                           customBorder: const CircleBorder(),
@@ -377,13 +401,13 @@ class _SupportComposerPanel extends StatelessWidget {
                               ? null
                               : onSendMessage,
                           child: SizedBox(
-                            width: 38,
-                            height: 38,
+                            width: 48,
+                            height: 48,
                             child: Center(
                               child: state.isSending
                                   ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
+                                      width: 18,
+                                      height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         valueColor:
@@ -392,10 +416,12 @@ class _SupportComposerPanel extends StatelessWidget {
                                             ),
                                       ),
                                     )
-                                  : const Icon(
-                                      Icons.send_rounded,
-                                      size: 17,
-                                      color: Colors.white,
+                                  : Icon(
+                                      Icons.arrow_upward_rounded,
+                                      size: 24,
+                                      color: effectiveCanSend
+                                          ? Colors.white
+                                          : colors.textMuted,
                                     ),
                             ),
                           ),

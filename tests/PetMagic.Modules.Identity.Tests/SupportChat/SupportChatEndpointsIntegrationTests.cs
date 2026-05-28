@@ -740,6 +740,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             builder.Services.AddScoped<IIdentityUserLookupService, TestIdentityUserLookupService>();
             builder.Services.AddSingleton<ISupportAttachmentStorage, FakeSupportAttachmentStorage>();
             builder.Services.AddSingleton<ISupportChatPushNotificationSender, NoopSupportChatPushNotificationSender>();
+            builder.Services.AddSingleton(new SupportAttachmentStorageOptions());
             builder.Services.AddScoped<ISupportChatService, SupportChatService>();
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
             builder.Services.AddSupportChatApiModule();
@@ -967,8 +968,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             "image/png",
             "image/webp",
             "video/mp4",
-            "video/quicktime",
-            "video/webm"
+            "video/quicktime"
         };
 
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
@@ -1050,11 +1050,6 @@ public sealed class SupportChatEndpointsIntegrationTests
                     && payload[5] == 0x74
                     && payload[6] == 0x79
                     && payload[7] == 0x70,
-                "video/webm" => payload.Length >= 4
-                    && payload[0] == 0x1A
-                    && payload[1] == 0x45
-                    && payload[2] == 0xDF
-                    && payload[3] == 0xA3,
                 _ => false,
             };
         }

@@ -32,6 +32,29 @@ public sealed record SendSupportMessageCommand(
     string? AttachmentFileName = null,
     string? AttachmentContentType = null,
     long? AttachmentFileSizeBytes = null,
+    Guid? ReplyToMessageId = null,
+    string? Locale = null);
+
+public sealed record SupportMessageAttachmentInput(
+    string FileUrl,
+    string MimeType,
+    string FileName,
+    long SizeBytes,
+    double? DurationSeconds = null,
+    int? Width = null,
+    int? Height = null,
+    string? StorageKey = null,
+    DateTime? ExpiresAtUtc = null,
+    DateTime? DeletedAtUtc = null,
+    bool IsDeleted = false);
+
+public sealed record SendSupportAttachmentsCommand(
+    Guid ConversationId,
+    Guid SenderUserId,
+    string Body,
+    bool IsAdmin,
+    IReadOnlyList<SupportMessageAttachmentInput> Attachments,
+    Guid? ReplyToMessageId = null,
     string? Locale = null);
 
 public sealed record CreateSupportAttachmentMessageCommand(
@@ -41,6 +64,7 @@ public sealed record CreateSupportAttachmentMessageCommand(
     bool IsAdmin,
     string AttachmentFileName,
     string AttachmentContentType,
+    Guid? ReplyToMessageId = null,
     string? Locale = null);
 
 public sealed record UpdateSupportAttachmentMessageCommand(
@@ -50,9 +74,11 @@ public sealed record UpdateSupportAttachmentMessageCommand(
     bool IsAdmin,
     SupportAttachmentUploadStatus AttachmentUploadStatus,
     string? AttachmentUrl = null,
+    string? AttachmentStorageKey = null,
     string? AttachmentFileName = null,
     string? AttachmentContentType = null,
     long? AttachmentFileSizeBytes = null,
+    DateTime? AttachmentExpiresAtUtc = null,
     string? AttachmentUploadErrorCode = null);
 
 public sealed record MarkSupportConversationReadCommand(
@@ -146,6 +172,19 @@ public sealed record SupportConversationSummaryResponse(
     bool IsReadOnly,
     bool CanReopen);
 
+public sealed record SupportMessageAttachmentResponse(
+    string FileUrl,
+    string Type,
+    string MimeType,
+    string FileName,
+    long SizeBytes,
+    double? DurationSeconds,
+    int? Width,
+    int? Height,
+    bool IsDeleted = false,
+    DateTime? ExpiresAtUtc = null,
+    DateTime? DeletedAtUtc = null);
+
 public sealed record SupportMessageResponse(
     Guid MessageId,
     Guid ConversationId,
@@ -154,12 +193,15 @@ public sealed record SupportMessageResponse(
     bool IsFromAdmin,
     string SenderType,
     string Body,
+    Guid? ReplyToMessageId,
+    string? ReplyToPreview,
     string? AttachmentUrl,
     string? AttachmentFileName,
     string? AttachmentContentType,
     long? AttachmentFileSizeBytes,
     string? AttachmentUploadStatus,
     string? AttachmentUploadErrorCode,
+    IReadOnlyList<SupportMessageAttachmentResponse> Attachments,
     bool IsRead,
     DateTime? ReadAtUtc,
     DateTime? DeliveredAtUtc,

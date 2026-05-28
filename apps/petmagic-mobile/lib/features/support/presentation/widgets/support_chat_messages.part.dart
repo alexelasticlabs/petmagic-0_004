@@ -6,6 +6,9 @@ class _MessageBubble extends StatelessWidget {
     this.onOpenImage,
     this.onOpenVideo,
     this.onRetryAttachment,
+    this.onReplyToMessage,
+    this.onJumpToMessage,
+    this.isHighlighted = false,
   });
 
   final SupportChatMessage message;
@@ -14,26 +17,59 @@ class _MessageBubble extends StatelessWidget {
   final Future<void> Function({required String videoUrl, String? fileName})?
   onOpenVideo;
   final VoidCallback? onRetryAttachment;
+  final VoidCallback? onReplyToMessage;
+  final ValueChanged<String>? onJumpToMessage;
+  final bool isHighlighted;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
+    final primaryAttachment = message.primaryAttachment;
+    final hasMediaGroup = message.hasMediaGroup;
     final hasImageAttachment = message.hasImageAttachment;
     final hasVideoAttachment = message.hasVideoAttachment;
-    final maxBubbleWidth = hasImageAttachment || hasVideoAttachment
-        ? math.min(MediaQuery.sizeOf(context).width * 0.62, 228.0)
+    final hasRichMedia = hasImageAttachment || hasVideoAttachment || hasMediaGroup;
+    final maxBubbleWidth = hasRichMedia
+        ? math.min(MediaQuery.sizeOf(context).width * 0.78, 304.0)
         : math.min(MediaQuery.sizeOf(context).width * 0.68, 288.0);
     final senderLabel = _resolveAdminSenderLabel(text);
     final isBotMessage = message.isBotMessage;
+    final hasFileAttachment =
+        message.attachments.length == 1 &&
+        message.hasAttachment &&
+        !hasImageAttachment &&
+        !hasVideoAttachment;
+    final hasFailedAttachment =
+        message.isAttachmentFailed && !message.hasAttachment;
+    final attachmentFileName = primaryAttachment?.fileName.trim().isNotEmpty == true
+        ? primaryAttachment!.fileName.trim()
+        : message.attachmentFileName?.trim();
+    final normalizedBody = message.body.trim();
+    final attachmentNames = <String>{
+      for (final attachment in message.attachments)
+        if (attachment.fileName.trim().isNotEmpty) attachment.fileName.trim().toLowerCase(),
+      if (attachmentFileName?.isNotEmpty == true) attachmentFileName!.toLowerCase(),
+    };
+    final shouldShowBody =
+        normalizedBody.isNotEmpty && !attachmentNames.contains(normalizedBody.toLowerCase());
+    final isMediaOnlyBubble =
+        hasRichMedia &&
+        !hasFileAttachment &&
+        !hasFailedAttachment &&
+        !shouldShowBody;
     final bubbleColor = message.isFromAdmin
         ? (isBotMessage
-              ? colors.surfaceStrong.withValues(alpha: 0.92)
-              : colors.surfaceStrong)
-        : _supportMessageGreen;
+              ? colors.surfaceStrong.withValues(alpha: 0.98)
+              : colors.surfaceStrong.withValues(alpha: 0.95))
+        : (isMediaOnlyBubble
+              ? Colors.transparent
+              : _supportMessageGreen);
     final borderColor = message.isFromAdmin
         ? colors.border
-        : _supportMessageGreenBorder;
+        : (isMediaOnlyBubble
+              ? Colors.transparent
+              : _supportMessageGreenBorder);
     final alignment = message.isFromAdmin
         ? Alignment.centerLeft
         : Alignment.centerRight;
@@ -43,25 +79,44 @@ class _MessageBubble extends StatelessWidget {
     final textColor = message.isFromAdmin ? colors.textStrong : Colors.white;
     final metaColor = message.isFromAdmin
         ? colors.textMuted
-        : Colors.white.withValues(alpha: 0.78);
-    final deliveryLabel = message.isRead
-        ? text.supportChatMessageRead
-        : text.supportChatMessageDelivered;
+        : Colors.white.withValues(alpha: 0.82);
     final attachmentUploadStatus = message.normalizedAttachmentUploadStatus;
-    final hasFileAttachment =
-        message.hasAttachment && !hasImageAttachment && !hasVideoAttachment;
-    final hasFailedAttachment =
-        message.isAttachmentFailed && !message.hasAttachment;
-    final attachmentFileName = message.attachmentFileName?.trim();
-    final shouldShowBody =
-        message.body.trim().isNotEmpty &&
-        message.body.trim() != (attachmentFileName ?? '');
+    final shouldShowAttachmentStatus =
+        attachmentUploadStatus != null &&
+        {'uploading', 'failed', 'retry'}.contains(
+          attachmentUploadStatus.toLowerCase(),
+        );
+    final replyToMessageId = message.replyToMessageId?.trim();
+    final replyPreview = message.replyToPreview?.trim();
+    final hasReplyPreview =
+        (replyToMessageId?.isNotEmpty == true) ||
+        (replyPreview?.isNotEmpty == true);
+    final resolvedReplyPreview = replyPreview?.isNotEmpty == true
+        ? replyPreview!
+        : text.supportChatReplyOriginalUnavailable;
     final bubbleRadius = BorderRadius.only(
       topLeft: const Radius.circular(20),
       topRight: const Radius.circular(20),
       bottomLeft: Radius.circular(message.isFromAdmin ? 8 : 20),
       bottomRight: Radius.circular(message.isFromAdmin ? 20 : 8),
     );
+    final effectiveBorderColor = isHighlighted
+        ? colors.accent.withValues(alpha: 0.88)
+        : borderColor;
+    final bubbleShadow = <BoxShadow>[
+      if (!isMediaOnlyBubble)
+        BoxShadow(
+          color: colors.shadow.withValues(alpha: 0.2),
+          blurRadius: 8,
+          offset: const Offset(0, 4),
+        ),
+      if (isHighlighted)
+        BoxShadow(
+          color: colors.accent.withValues(alpha: 0.22),
+          blurRadius: 16,
+          spreadRadius: 1,
+        ),
+    ];
 
     return Align(
       alignment: alignment,
@@ -77,24 +132,81 @@ class _MessageBubble extends StatelessWidget {
           ],
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxBubbleWidth),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: bubbleRadius,
-                border: Border.all(color: borderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.shadow.withValues(alpha: 0.22),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+            child: GestureDetector(
+              onLongPress: onReplyToMessage,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: bubbleColor,
+                  borderRadius: bubbleRadius,
+                  border: Border.all(color: effectiveBorderColor),
+                  boxShadow: bubbleShadow.isEmpty ? null : bubbleShadow,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isMediaOnlyBubble ? 2 : 13,
+                    isMediaOnlyBubble ? 2 : 11,
+                    isMediaOnlyBubble ? 2 : 13,
+                    8,
                   ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(13, 11, 13, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (hasReplyPreview) ...[
+                        InkWell(
+                          onTap: replyToMessageId?.isNotEmpty == true
+                              ? () => onJumpToMessage?.call(replyToMessageId!)
+                              : null,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            margin: const EdgeInsets.only(bottom: 7),
+                            decoration: BoxDecoration(
+                              color: message.isFromAdmin
+                                  ? colors.surface.withValues(alpha: 0.65)
+                                  : Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: colors.accent.withValues(alpha: 0.34),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  text.supportChatReplyLabel,
+                                  style: TextStyle(
+                                    color: message.isFromAdmin
+                                        ? colors.accent
+                                        : Colors.white.withValues(alpha: 0.92),
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  resolvedReplyPreview,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: message.isFromAdmin
+                                        ? colors.textMuted
+                                        : Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 11.5,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     if (message.isFromAdmin) ...[
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -139,77 +251,53 @@ class _MessageBubble extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                     ],
-                    if (hasImageAttachment) ...[
-                      _NetworkImageAttachmentPreview(
-                        imageUrl: message.attachmentUrl!,
+                    if (hasMediaGroup) ...[
+                      _MessageMediaGroupGrid(
+                        attachments: message.attachments,
                         maxBubbleWidth: maxBubbleWidth,
-                        onTap: onOpenImage == null
-                            ? null
-                            : () => onOpenImage!(
-                                imageUrl: message.attachmentUrl!,
-                                fileName: attachmentFileName,
-                              ),
+                        onOpenImage: onOpenImage,
+                        onOpenVideo: onOpenVideo,
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.image_outlined,
-                            size: 13,
-                            color: metaColor,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              text.supportChatPhotoAttachedLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: metaColor,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (shouldShowBody) const SizedBox(height: 8),
+                      if (shouldShowBody) const SizedBox(height: 4),
                     ],
-                    if (hasVideoAttachment) ...[
-                      _NetworkVideoAttachmentPreview(
-                        videoUrl: message.attachmentUrl!,
-                        maxBubbleWidth: maxBubbleWidth,
-                        onTap: onOpenVideo == null
-                            ? null
-                            : () => onOpenVideo!(
-                                videoUrl: message.attachmentUrl!,
-                                fileName: attachmentFileName,
-                              ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.play_circle_outline_rounded,
-                            size: 13,
-                            color: metaColor,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              text.supportChatVideoAttachedLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: metaColor,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (shouldShowBody) const SizedBox(height: 8),
+                    if (hasImageAttachment && primaryAttachment != null) ...[
+                      if (primaryAttachment.isDeleted)
+                        _DeletedAttachmentPlaceholder(
+                          isVideo: false,
+                          maxBubbleWidth: maxBubbleWidth,
+                        )
+                      else
+                        _NetworkImageAttachmentPreview(
+                          imageUrl: primaryAttachment.fileUrl,
+                          maxBubbleWidth: maxBubbleWidth,
+                          onTap: onOpenImage == null
+                              ? null
+                              : () => onOpenImage!(
+                                  imageUrl: primaryAttachment.fileUrl,
+                                  fileName: attachmentFileName,
+                                ),
+                        ),
+                      if (shouldShowBody) const SizedBox(height: 6),
+                    ],
+                    if (hasVideoAttachment && primaryAttachment != null) ...[
+                      if (primaryAttachment.isDeleted)
+                        _DeletedAttachmentPlaceholder(
+                          isVideo: true,
+                          maxBubbleWidth: maxBubbleWidth,
+                        )
+                      else
+                        _NetworkVideoAttachmentPreview(
+                          videoUrl: primaryAttachment.fileUrl,
+                          maxBubbleWidth: maxBubbleWidth,
+                          onTap: onOpenVideo == null
+                              ? null
+                              : () => onOpenVideo!(
+                                  videoUrl: primaryAttachment.fileUrl,
+                                  fileName: attachmentFileName,
+                                ),
+                        ),
+                      if (shouldShowBody) const SizedBox(height: 6),
                     ],
                     if (hasFailedAttachment) ...[
                       Container(
@@ -253,64 +341,71 @@ class _MessageBubble extends StatelessWidget {
                       if (shouldShowBody) const SizedBox(height: 8),
                     ],
                     if (hasFileAttachment) ...[
-                      InkWell(
-                        onTap: () => _openAttachment(message.attachmentUrl),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 11,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colors.surface.withValues(alpha: 0.62),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: colors.border.withValues(alpha: 0.92),
+                      if (primaryAttachment?.isDeleted == true)
+                        _DeletedAttachmentPlaceholder(
+                          isVideo: false,
+                          maxBubbleWidth: maxBubbleWidth,
+                        )
+                      else
+                        InkWell(
+                          onTap: () => _openAttachment(primaryAttachment?.fileUrl),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 11,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colors.surface.withValues(alpha: 0.62),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: colors.border.withValues(alpha: 0.92),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.insert_drive_file_outlined,
+                                  size: 18,
+                                  color: metaColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        attachmentFileName ?? message.body,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: textColor,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _formatAttachmentSize(
+                                          context,
+                                          primaryAttachment?.sizeBytes ??
+                                              message.attachmentFileSizeBytes,
+                                        ),
+                                        style: TextStyle(
+                                          color: metaColor,
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.insert_drive_file_outlined,
-                                size: 18,
-                                color: metaColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      attachmentFileName ?? message.body,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: textColor,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      _formatAttachmentSize(
-                                        context,
-                                        message.attachmentFileSizeBytes,
-                                      ),
-                                      style: TextStyle(
-                                        color: metaColor,
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
-                      ),
                       if (shouldShowBody) const SizedBox(height: 8),
                     ],
                     if (shouldShowBody)
@@ -323,7 +418,7 @@ class _MessageBubble extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                    if (attachmentUploadStatus != null) ...[
+                    if (shouldShowAttachmentStatus) ...[
                       const SizedBox(height: 8),
                       _AttachmentStatusRow(
                         status: attachmentUploadStatus,
@@ -349,26 +444,12 @@ class _MessageBubble extends StatelessWidget {
                         ),
                         if (!message.isFromAdmin) ...[
                           const SizedBox(width: 4),
-                          Text(
-                            deliveryLabel,
-                            style: TextStyle(
-                              color: metaColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            message.isRead
-                                ? Icons.done_all_rounded
-                                : Icons.check_rounded,
-                            size: 12,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
+                          _MessageDeliveryStatusIcon(message: message),
                         ],
                       ],
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -420,6 +501,311 @@ class _MessageBubble extends StatelessWidget {
     }
 
     return '${(kilobytes / 1024).toStringAsFixed(1)} MB';
+  }
+}
+
+class _MessageDeliveryStatusIcon extends StatelessWidget {
+  const _MessageDeliveryStatusIcon({required this.message});
+
+  final SupportChatMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    if (message.isAttachmentUploading) {
+      return const SizedBox(
+        width: 12,
+        height: 12,
+        child: CircularProgressIndicator(
+          strokeWidth: 1.8,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+        ),
+      );
+    }
+
+    if (message.isAttachmentFailed) {
+      return const Icon(
+        Icons.error_outline_rounded,
+        size: 12.5,
+        color: Color(0xFFFF6B6B),
+      );
+    }
+
+    if (message.isRead) {
+      return const Icon(
+        Icons.done_all_rounded,
+        size: 13,
+        color: _supportComposerSendGreen,
+      );
+    }
+
+    return Icon(
+      Icons.check_rounded,
+      size: 13,
+      color: Colors.white.withValues(alpha: 0.78),
+    );
+  }
+}
+
+class _MessageMediaGroupGrid extends StatelessWidget {
+  const _MessageMediaGroupGrid({
+    required this.attachments,
+    required this.maxBubbleWidth,
+    required this.onOpenImage,
+    required this.onOpenVideo,
+  });
+
+  final List<SupportChatAttachment> attachments;
+  final double maxBubbleWidth;
+  final Future<void> Function({required String imageUrl, String? fileName})?
+  onOpenImage;
+  final Future<void> Function({required String videoUrl, String? fileName})?
+  onOpenVideo;
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = attachments.take(_supportAttachmentMaxCount).toList(growable: false);
+    final spacing = 1.5;
+    final tileWidth = ((maxBubbleWidth - spacing) / 2).clamp(96.0, 132.0);
+
+    return Wrap(
+      spacing: spacing,
+      runSpacing: spacing,
+      children: tiles.map((attachment) {
+        return _MessageMediaGroupTile(
+          attachment: attachment,
+          width: tileWidth,
+          height: tileWidth,
+          onTap: () async {
+            if (attachment.isImage) {
+              await onOpenImage?.call(
+                imageUrl: attachment.fileUrl,
+                fileName: attachment.fileName,
+              );
+              return;
+            }
+
+            if (attachment.isVideo) {
+              await onOpenVideo?.call(
+                videoUrl: attachment.fileUrl,
+                fileName: attachment.fileName,
+              );
+            }
+          },
+        );
+      }).toList(growable: false),
+    );
+  }
+}
+
+class _MessageMediaGroupTile extends StatelessWidget {
+  const _MessageMediaGroupTile({
+    required this.attachment,
+    required this.width,
+    required this.height,
+    required this.onTap,
+  });
+
+  final SupportChatAttachment attachment;
+  final double width;
+  final double height;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final canTap = !attachment.isDeleted && (attachment.isImage || attachment.isVideo);
+    return InkWell(
+      onTap: canTap ? onTap : null,
+      borderRadius: BorderRadius.circular(4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (attachment.isDeleted)
+                _DeletedAttachmentTileBackground(
+                  isVideo: attachment.isVideo,
+                  compact: true,
+                )
+              else if (attachment.isImage)
+                Image.network(
+                  attachment.fileUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return ColoredBox(
+                      color: colors.surface,
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: colors.textMuted,
+                        size: 20,
+                      ),
+                    );
+                  },
+                )
+              else if (attachment.isVideo)
+                ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.72),
+                  child: const Center(
+                    child: Icon(
+                      Icons.play_circle_fill_rounded,
+                      size: 34,
+                      color: Colors.white,
+                    ),
+                  ),
+                )
+              else
+                ColoredBox(
+                  color: colors.surface,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.insert_drive_file_outlined,
+                        color: colors.textMuted,
+                        size: 18,
+                      ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          attachment.fileName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: colors.textMuted,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (attachment.isVideo && !attachment.isDeleted) ...[
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.55),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 6,
+                  bottom: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.58),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      _formatDurationLabel(attachment.durationSeconds),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatDurationLabel(double? value) {
+  if (value == null || value <= 0) {
+    return '0:00';
+  }
+
+  final totalSeconds = value.round();
+  final minutes = totalSeconds ~/ 60;
+  final seconds = totalSeconds % 60;
+  return '$minutes:${seconds.toString().padLeft(2, '0')}';
+}
+
+class _DeletedAttachmentPlaceholder extends StatelessWidget {
+  const _DeletedAttachmentPlaceholder({
+    required this.isVideo,
+    required this.maxBubbleWidth,
+  });
+
+  final bool isVideo;
+  final double maxBubbleWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = _resolveMediaPreviewSize(maxWidth: maxBubbleWidth, aspectRatio: 1);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        width: size.width,
+        height: size.height,
+        child: _DeletedAttachmentTileBackground(isVideo: isVideo),
+      ),
+    );
+  }
+}
+
+class _DeletedAttachmentTileBackground extends StatelessWidget {
+  const _DeletedAttachmentTileBackground({
+    required this.isVideo,
+    this.compact = false,
+  });
+
+  final bool isVideo;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    return ColoredBox(
+      color: colors.surface,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isVideo ? Icons.videocam_off_rounded : Icons.image_not_supported_outlined,
+                size: compact ? 16 : 24,
+                color: colors.textMuted,
+              ),
+              SizedBox(height: compact ? 3 : 6),
+              Text(
+                text.supportChatAttachmentExpiredPlaceholder,
+                textAlign: TextAlign.center,
+                maxLines: compact ? 2 : 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: compact ? 9 : 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -508,10 +894,10 @@ class _NetworkImageAttachmentPreviewState
     );
 
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       onTap: widget.onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: SizedBox(
           width: size.width,
           height: size.height,
@@ -635,10 +1021,10 @@ class _NetworkVideoAttachmentPreviewState
     );
 
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       onTap: widget.onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: SizedBox(
           width: size.width,
           height: size.height,

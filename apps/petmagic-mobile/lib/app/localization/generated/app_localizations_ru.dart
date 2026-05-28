@@ -1644,8 +1644,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Сейчас не удается отправить вложение. Попробуйте снова через минуту.';
 
   @override
-  String get supportChatAttachmentTooLargeError =>
-      'Файл слишком большой. Максимальный размер — 10 МБ.';
+  String get supportChatAttachmentTooLargeError => 'Файл слишком большой';
 
   @override
   String get supportChatImageLabel => 'Изображение';
@@ -1734,6 +1733,41 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatChooseVideoAction => 'Выбрать видео';
 
   @override
+  String get supportChatAttachFileAction => 'Файлы';
+
+  @override
+  String get supportChatRecentMediaTitle => 'Недавние медиа';
+
+  @override
+  String get supportChatAttachmentNoRecentMedia =>
+      'Нет недавних фото или видео';
+
+  @override
+  String get supportChatAttachmentLimitedAccessHint =>
+      'Доступны не все фото. Разрешите полный доступ к галерее в настройках устройства.';
+
+  @override
+  String get supportChatOpenSettingsAction => 'Открыть настройки';
+
+  @override
+  String get supportChatAttachmentNoGalleryAccessError =>
+      'Нет доступа к галерее. Разрешите доступ в настройках устройства.';
+
+  @override
+  String get supportChatAttachmentExpiredPlaceholder =>
+      'Файл был удалён через 30 дней';
+
+  @override
+  String get supportChatReplyLabel => 'Ответ';
+
+  @override
+  String get supportChatReplyToPrefix => 'Ответ на сообщение';
+
+  @override
+  String get supportChatReplyOriginalUnavailable =>
+      'Исходное сообщение недоступно';
+
+  @override
   String get supportChatPhotoAttachedLabel => 'Фото прикреплено';
 
   @override
@@ -1747,7 +1781,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportChatTooManyAttachmentsError =>
-      'Можно прикрепить до 5 фото.';
+      'Можно добавить не более 5 файлов';
+
+  @override
+  String get supportChatAttachmentUnsupportedFormatError =>
+      'Этот формат не поддерживается';
+
+  @override
+  String get supportChatAttachmentVideoTooLongError =>
+      'Длительность видео должна быть не более 60 секунд.';
 
   @override
   String get supportChatMarkResolvedAction => 'Да, закрыть обращение';

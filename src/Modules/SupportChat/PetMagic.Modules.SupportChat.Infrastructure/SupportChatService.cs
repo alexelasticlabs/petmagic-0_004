@@ -14,7 +14,9 @@ public sealed class SupportChatService(
     SupportChatDbContext supportChatDbContext,
     IIdentityUserLookupService identityUserLookupService,
     ISupportChatRealtimeNotifier realtimeNotifier,
-    ISupportChatPushNotificationSender pushNotificationSender) : ISupportChatService
+    ISupportChatPushNotificationSender pushNotificationSender,
+    ISupportAttachmentStorage attachmentStorage,
+    SupportAttachmentStorageOptions attachmentStorageOptions) : ISupportChatService
 {
     private static readonly Guid AutomatedAssistantUserId = Guid.Parse("2F1E3B3B-8A2E-4A8E-9EE5-97BF31B33218");
     private static readonly Error ConversationNotFound = new("support.conversation_not_found", "Support conversation was not found.");
@@ -88,6 +90,8 @@ public sealed class SupportChatService(
                 command.UserId,
                 command.InitialMessage,
                 isAdmin: false,
+                replyToMessageId: null,
+                replyToPreview: null,
                 senderType: SupportMessageSenderType.User,
                 attachmentUrl: null,
                 attachmentFileName: null,
@@ -95,6 +99,7 @@ public sealed class SupportChatService(
                 attachmentFileSizeBytes: null,
                 attachmentUploadStatus: null,
                 attachmentUploadErrorCode: null,
+                attachments: [],
                 markAsReadAtUtc: null,
                 updateAssignmentAndStatus: true);
             appendedInitialMessage = true;
@@ -350,43 +355,97 @@ public sealed class SupportChatService(
 
     public async Task<Result<SupportMessageResponse>> SendMessageAsync(SendSupportMessageCommand command, CancellationToken cancellationToken)
     {
+        var legacyAttachments = BuildLegacyAttachmentInputs(command);
+        return await SendMessageCoreAsync(
+            command.ConversationId,
+            command.SenderUserId,
+            command.Body,
+            command.IsAdmin,
+            legacyAttachments,
+            command.ReplyToMessageId,
+            command.Locale,
+            cancellationToken);
+    }
+
+    public async Task<Result<SupportMessageResponse>> SendMessageWithAttachmentsAsync(
+        SendSupportAttachmentsCommand command,
+        CancellationToken cancellationToken)
+    {
+        return await SendMessageCoreAsync(
+            command.ConversationId,
+            command.SenderUserId,
+            command.Body,
+            command.IsAdmin,
+            command.Attachments,
+            command.ReplyToMessageId,
+            command.Locale,
+            cancellationToken);
+    }
+
+    private async Task<Result<SupportMessageResponse>> SendMessageCoreAsync(
+        Guid conversationId,
+        Guid senderUserId,
+        string body,
+        bool isAdmin,
+        IReadOnlyList<SupportMessageAttachmentInput>? attachments,
+        Guid? replyToMessageId,
+        string? locale,
+        CancellationToken cancellationToken)
+    {
         var conversation = await supportChatDbContext.SupportConversations
             .Include(x => x.Messages)
-            .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
         if (conversation is null)
         {
             return Result.Failure<SupportMessageResponse>(ConversationNotFound);
         }
 
-        if (!command.IsAdmin && conversation.InitiatorUserId != command.SenderUserId)
+        if (!isAdmin && conversation.InitiatorUserId != senderUserId)
         {
             return Result.Failure<SupportMessageResponse>(Forbidden);
         }
 
-        var canAppendError = ValidateConversationCanAcceptMessage(conversation, command.IsAdmin, DateTime.UtcNow);
+        var canAppendError = ValidateConversationCanAcceptMessage(conversation, isAdmin, DateTime.UtcNow);
         if (canAppendError is not null)
         {
             return Result.Failure<SupportMessageResponse>(canAppendError);
         }
 
+        var normalizedAttachments = NormalizeAttachmentInputs(attachments);
+        if (normalizedAttachments.Count == 0 && string.IsNullOrWhiteSpace(body))
+        {
+            return Result.Failure<SupportMessageResponse>(SupportChatErrors.InvalidAttachmentUpload);
+        }
+
+        var replyTargetResult = await ResolveReplyTargetAsync(conversationId, replyToMessageId, cancellationToken);
+        if (replyTargetResult.IsFailure)
+        {
+            return Result.Failure<SupportMessageResponse>(replyTargetResult.Error);
+        }
+        var replyTarget = replyTargetResult.Value;
+
+        var firstAttachment = normalizedAttachments.FirstOrDefault();
         var currentStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
-        var shouldAppendAutomaticReply = !command.IsAdmin
+        var shouldAppendAutomaticReply = !isAdmin
             && !conversation.Messages.Any(message =>
                 message.SenderType is SupportMessageSenderType.User or SupportMessageSenderType.Bot);
-        var shouldAppendReopenedEvent = !command.IsAdmin && currentStatus == SupportConversationStatus.Closed;
+        var shouldAppendReopenedEvent = !isAdmin && currentStatus == SupportConversationStatus.Closed;
 
         var message = await AppendMessageAsync(
             conversation,
-            command.SenderUserId,
-            command.Body,
-            command.IsAdmin,
-            senderType: command.IsAdmin ? SupportMessageSenderType.SupportAgent : SupportMessageSenderType.User,
-            command.AttachmentUrl,
-            command.AttachmentFileName,
-            command.AttachmentContentType,
-            command.AttachmentFileSizeBytes,
-            attachmentUploadStatus: command.AttachmentUrl is null ? null : SupportAttachmentUploadStatus.Uploaded,
+            senderUserId,
+            body,
+            isAdmin,
+            replyToMessageId: replyTarget?.MessageId,
+            replyToPreview: replyTarget?.Preview,
+            senderType: isAdmin ? SupportMessageSenderType.SupportAgent : SupportMessageSenderType.User,
+            firstAttachment?.FileUrl,
+            firstAttachment?.FileName,
+            firstAttachment?.MimeType,
+            firstAttachment?.SizeBytes,
+            attachmentUploadStatus: normalizedAttachments.Count == 0 ? null : SupportAttachmentUploadStatus.Uploaded,
             attachmentUploadErrorCode: null,
+            attachments: normalizedAttachments,
             markAsReadAtUtc: null,
             updateAssignmentAndStatus: true);
 
@@ -395,8 +454,10 @@ public sealed class SupportChatService(
             await AppendMessageAsync(
                 conversation,
                 AutomatedAssistantUserId,
-                SupportChatAutoReplyLocalizer.BuildFirstReplyAcknowledgement(command.Locale),
+                SupportChatAutoReplyLocalizer.BuildFirstReplyAcknowledgement(locale),
                 isAdmin: true,
+                replyToMessageId: null,
+                replyToPreview: null,
                 senderType: SupportMessageSenderType.Bot,
                 attachmentUrl: null,
                 attachmentFileName: null,
@@ -404,6 +465,7 @@ public sealed class SupportChatService(
                 attachmentFileSizeBytes: null,
                 attachmentUploadStatus: null,
                 attachmentUploadErrorCode: null,
+                attachments: [],
                 markAsReadAtUtc: DateTime.UtcNow,
                 updateAssignmentAndStatus: false);
         }
@@ -413,12 +475,12 @@ public sealed class SupportChatService(
         {
             await AppendSystemEventAsync(conversation, "Ticket reopened by user message");
         }
-        else if (!command.IsAdmin && currentStatus == SupportConversationStatus.WaitingForUser)
+        else if (!isAdmin && currentStatus == SupportConversationStatus.WaitingForUser)
         {
             await AppendSystemEventAsync(conversation, "User replied");
         }
 
-        if (command.IsAdmin)
+        if (isAdmin)
         {
             await AppendSystemEventAsync(conversation, "Support replied");
         }
@@ -431,7 +493,7 @@ public sealed class SupportChatService(
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         var response = await BuildMessageResponseAsync(message, cancellationToken);
-        if (command.IsAdmin)
+        if (isAdmin)
         {
             await NotifyUserMessageAsync(conversation, response, cancellationToken);
         }
@@ -462,12 +524,20 @@ public sealed class SupportChatService(
 
         var currentStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
         var shouldAppendReopenedEvent = !command.IsAdmin && currentStatus == SupportConversationStatus.Closed;
+        var replyTargetResult = await ResolveReplyTargetAsync(command.ConversationId, command.ReplyToMessageId, cancellationToken);
+        if (replyTargetResult.IsFailure)
+        {
+            return Result.Failure<SupportMessageResponse>(replyTargetResult.Error);
+        }
+        var replyTarget = replyTargetResult.Value;
 
         var message = await AppendMessageAsync(
             conversation,
             command.SenderUserId,
             command.Body,
             command.IsAdmin,
+            replyToMessageId: replyTarget?.MessageId,
+            replyToPreview: replyTarget?.Preview,
             senderType: command.IsAdmin ? SupportMessageSenderType.SupportAgent : SupportMessageSenderType.User,
             attachmentUrl: null,
             attachmentFileName: command.AttachmentFileName,
@@ -475,6 +545,7 @@ public sealed class SupportChatService(
             attachmentFileSizeBytes: null,
             attachmentUploadStatus: SupportAttachmentUploadStatus.Uploading,
             attachmentUploadErrorCode: null,
+            attachments: [],
             markAsReadAtUtc: null,
             updateAssignmentAndStatus: true);
 
@@ -505,23 +576,20 @@ public sealed class SupportChatService(
 
     public async Task<Result<SupportMessageResponse>> UpdateAttachmentMessageAsync(UpdateSupportAttachmentMessageCommand command, CancellationToken cancellationToken)
     {
-        var conversation = await supportChatDbContext.SupportConversations
-            .Include(x => x.Messages)
-            .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
-        if (conversation is null)
-        {
-            return Result.Failure<SupportMessageResponse>(ConversationNotFound);
-        }
-
-        if (!command.IsAdmin && conversation.InitiatorUserId != command.SenderUserId)
-        {
-            return Result.Failure<SupportMessageResponse>(Forbidden);
-        }
-
-        var message = conversation.Messages.FirstOrDefault(x => x.Id == command.MessageId);
+        var message = await supportChatDbContext.ConversationMessages
+            .Include(x => x.Conversation)
+            .FirstOrDefaultAsync(
+                x => x.Id == command.MessageId && x.ConversationId == command.ConversationId,
+                cancellationToken);
         if (message is null)
         {
             return Result.Failure<SupportMessageResponse>(MessageNotFound);
+        }
+
+        var conversation = message.Conversation;
+        if (!command.IsAdmin && conversation.InitiatorUserId != command.SenderUserId)
+        {
+            return Result.Failure<SupportMessageResponse>(Forbidden);
         }
 
         if (message.IsFromAdmin != command.IsAdmin)
@@ -547,6 +615,7 @@ public sealed class SupportChatService(
                 message.AttachmentUrl = null;
                 message.AttachmentUploadErrorCode = null;
                 message.AttachmentFileSizeBytes = null;
+                await ReplaceMessageAttachmentsAsync(message.Id, [], cancellationToken);
                 if (!string.IsNullOrWhiteSpace(command.AttachmentFileName))
                 {
                     message.AttachmentFileName = command.AttachmentFileName;
@@ -573,6 +642,18 @@ public sealed class SupportChatService(
                 message.AttachmentContentType = command.AttachmentContentType;
                 message.AttachmentFileSizeBytes = command.AttachmentFileSizeBytes;
                 message.AttachmentUploadErrorCode = null;
+                await ReplaceMessageAttachmentsAsync(
+                    message.Id,
+                    [
+                        new SupportMessageAttachmentInput(
+                            command.AttachmentUrl,
+                            command.AttachmentContentType,
+                            command.AttachmentFileName,
+                            command.AttachmentFileSizeBytes.Value,
+                            StorageKey: command.AttachmentStorageKey,
+                            ExpiresAtUtc: command.AttachmentExpiresAtUtc)
+                    ],
+                    cancellationToken);
                 break;
 
             case SupportAttachmentUploadStatus.Failed:
@@ -581,12 +662,14 @@ public sealed class SupportChatService(
                 message.AttachmentUploadErrorCode = string.IsNullOrWhiteSpace(command.AttachmentUploadErrorCode)
                     ? SupportChatErrors.AttachmentStorageFailed.Code
                     : command.AttachmentUploadErrorCode;
+                await ReplaceMessageAttachmentsAsync(message.Id, [], cancellationToken);
                 break;
 
             case SupportAttachmentUploadStatus.Retry:
                 message.AttachmentUrl = null;
                 message.AttachmentFileSizeBytes = null;
                 message.AttachmentUploadErrorCode = null;
+                await ReplaceMessageAttachmentsAsync(message.Id, [], cancellationToken);
                 if (!string.IsNullOrWhiteSpace(command.AttachmentFileName))
                 {
                     message.AttachmentFileName = command.AttachmentFileName;
@@ -606,6 +689,7 @@ public sealed class SupportChatService(
         message.AttachmentUploadStatus = (int)command.AttachmentUploadStatus;
         conversation.UpdatedAtUtc = DateTime.UtcNow;
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        await supportChatDbContext.Entry(message).Collection(x => x.Attachments).LoadAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
         var response = await BuildMessageResponseAsync(message, cancellationToken);
         if (command.IsAdmin && command.AttachmentUploadStatus == SupportAttachmentUploadStatus.Uploaded)
@@ -614,6 +698,70 @@ public sealed class SupportChatService(
         }
 
         return Result.Success(response);
+    }
+
+    private async Task ReplaceMessageAttachmentsAsync(
+        Guid messageId,
+        IReadOnlyList<SupportMessageAttachmentInput> attachments,
+        CancellationToken cancellationToken)
+    {
+        var normalizedAttachments = NormalizeAttachmentInputs(attachments);
+        var existingAttachments = await supportChatDbContext.SupportMessageAttachments
+            .Where(attachment => attachment.MessageId == messageId)
+            .ToListAsync(cancellationToken);
+        var nextUrls = normalizedAttachments
+            .Select(attachment => attachment.FileUrl)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var removedUrls = existingAttachments
+            .Select(attachment => attachment.FileUrl)
+            .Where(url => !string.IsNullOrWhiteSpace(url) && !nextUrls.Contains(url))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (existingAttachments.Count > 0)
+        {
+            supportChatDbContext.SupportMessageAttachments.RemoveRange(existingAttachments);
+        }
+
+        if (normalizedAttachments.Count == 0)
+        {
+            foreach (var removedUrl in removedUrls)
+            {
+                await attachmentStorage.DeleteAsync(removedUrl, cancellationToken);
+            }
+
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        var retentionDays = Math.Max(1, attachmentStorageOptions.RetentionDays);
+        for (var index = 0; index < normalizedAttachments.Count; index++)
+        {
+            var attachment = normalizedAttachments[index];
+            supportChatDbContext.SupportMessageAttachments.Add(new SupportMessageAttachment
+            {
+                Id = Guid.NewGuid(),
+                MessageId = messageId,
+                FileUrl = attachment.FileUrl,
+                FileName = attachment.FileName,
+                MimeType = attachment.MimeType,
+                SizeBytes = attachment.SizeBytes,
+                StorageKey = ResolveStorageKey(attachment.FileUrl, attachment.StorageKey),
+                ExpiresAtUtc = attachment.ExpiresAtUtc ?? now.AddDays(retentionDays),
+                DeletedAtUtc = attachment.DeletedAtUtc,
+                IsDeleted = attachment.IsDeleted,
+                DurationSeconds = attachment.DurationSeconds,
+                Width = attachment.Width,
+                Height = attachment.Height,
+                SortOrder = index,
+                CreatedAtUtc = now,
+            });
+        }
+
+        foreach (var removedUrl in removedUrls)
+        {
+            await attachmentStorage.DeleteAsync(removedUrl, cancellationToken);
+        }
     }
 
     public async Task<Result> MarkConversationReadAsync(MarkSupportConversationReadCommand command, CancellationToken cancellationToken)
@@ -904,7 +1052,7 @@ public sealed class SupportChatService(
                     message.MessageId,
                     message.SenderDisplayName,
                     message.Body,
-                    message.AttachmentUrl is not null),
+                    message.Attachments.Count > 0 || message.AttachmentUrl is not null),
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -922,6 +1070,8 @@ public sealed class SupportChatService(
         Guid senderUserId,
         string body,
         bool isAdmin,
+        Guid? replyToMessageId,
+        string? replyToPreview,
         SupportMessageSenderType senderType,
         string? attachmentUrl,
         string? attachmentFileName,
@@ -929,17 +1079,22 @@ public sealed class SupportChatService(
         long? attachmentFileSizeBytes,
         SupportAttachmentUploadStatus? attachmentUploadStatus,
         string? attachmentUploadErrorCode,
+        IReadOnlyList<SupportMessageAttachmentInput> attachments,
         DateTime? markAsReadAtUtc,
         bool updateAssignmentAndStatus)
     {
         var now = DateTime.UtcNow;
+        var retentionDays = Math.Max(1, attachmentStorageOptions.RetentionDays);
         var trimmedBody = body.Trim();
+        var orderedAttachments = NormalizeAttachmentInputs(attachments);
         var message = new ConversationMessage
         {
             Id = Guid.NewGuid(),
             ConversationId = conversation.Id,
             SenderUserId = senderUserId,
             Body = trimmedBody,
+            ReplyToMessageId = replyToMessageId,
+            ReplyToPreview = replyToPreview,
             IsFromAdmin = isAdmin,
             SenderType = senderType,
             AttachmentUrl = attachmentUrl,
@@ -952,6 +1107,32 @@ public sealed class SupportChatService(
             DeliveredAtUtc = now,
             CreatedAtUtc = now
         };
+
+        if (orderedAttachments.Count > 0)
+        {
+            for (var index = 0; index < orderedAttachments.Count; index++)
+            {
+                var attachment = orderedAttachments[index];
+                message.Attachments.Add(new SupportMessageAttachment
+                {
+                    Id = Guid.NewGuid(),
+                    MessageId = message.Id,
+                    FileUrl = attachment.FileUrl,
+                    FileName = attachment.FileName,
+                    MimeType = attachment.MimeType,
+                    SizeBytes = attachment.SizeBytes,
+                    StorageKey = ResolveStorageKey(attachment.FileUrl, attachment.StorageKey),
+                    ExpiresAtUtc = attachment.ExpiresAtUtc ?? now.AddDays(retentionDays),
+                    DeletedAtUtc = attachment.DeletedAtUtc,
+                    IsDeleted = attachment.IsDeleted,
+                    DurationSeconds = attachment.DurationSeconds,
+                    Width = attachment.Width,
+                    Height = attachment.Height,
+                    SortOrder = index,
+                    CreatedAtUtc = now,
+                });
+            }
+        }
 
         if (isAdmin && updateAssignmentAndStatus)
         {
@@ -971,8 +1152,11 @@ public sealed class SupportChatService(
             MarkActive(conversation, nextStatus, now);
         }
 
+        var messagePreview = BuildMessagePreview(trimmedBody, orderedAttachments);
         conversation.LastMessageAtUtc = now;
-        conversation.LastMessagePreview = Truncate(trimmedBody, 280);
+        conversation.LastMessagePreview = string.IsNullOrWhiteSpace(messagePreview)
+            ? null
+            : Truncate(messagePreview, 280);
         conversation.LastMessageSenderType = senderType;
         conversation.WaitingSinceUtc = ResolveWaitingSince(
             ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId),
@@ -1016,7 +1200,8 @@ public sealed class SupportChatService(
     {
         var conversation = await supportChatDbContext.SupportConversations
             .AsNoTracking()
-            .Include(x => x.Messages.OrderBy(message => message.CreatedAtUtc))
+            .Include(x => x.Messages)
+                .ThenInclude(message => message.Attachments)
             .FirstAsync(x => x.Id == conversationId, cancellationToken);
 
         var visibleMessages = conversation.Messages.OrderBy(x => x.CreatedAtUtc).ToList();
@@ -1042,6 +1227,7 @@ public sealed class SupportChatService(
         {
             users.TryGetValue(message.SenderUserId, out var sender);
             var resolvedSenderType = ResolveSenderDisplayType(message.SenderType, message.IsFromAdmin);
+            var messageAttachments = BuildAttachmentResponses(message);
             messages.Add(new SupportMessageResponse(
                 message.Id,
                 message.ConversationId,
@@ -1050,12 +1236,15 @@ public sealed class SupportChatService(
                 message.IsFromAdmin,
                 resolvedSenderType,
                 message.Body,
+                message.ReplyToMessageId,
+                message.ReplyToPreview,
                 message.AttachmentUrl,
                 message.AttachmentFileName,
                 message.AttachmentContentType,
                 message.AttachmentFileSizeBytes,
                 ParseAttachmentUploadStatus(message.AttachmentUploadStatus)?.ToString(),
                 message.AttachmentUploadErrorCode,
+                messageAttachments,
                 message.ReadAtUtc.HasValue,
                 message.ReadAtUtc,
                 message.DeliveredAtUtc,
@@ -1117,6 +1306,7 @@ public sealed class SupportChatService(
     private async Task<SupportMessageResponse> BuildMessageResponseAsync(ConversationMessage message, CancellationToken cancellationToken)
     {
         var sender = await identityUserLookupService.GetUserByIdAsync(message.SenderUserId, cancellationToken);
+        var messageAttachments = BuildAttachmentResponses(message);
 
         return new SupportMessageResponse(
             message.Id,
@@ -1126,17 +1316,247 @@ public sealed class SupportChatService(
             message.IsFromAdmin,
             ResolveSenderDisplayType(message.SenderType, message.IsFromAdmin),
             message.Body,
+            message.ReplyToMessageId,
+            message.ReplyToPreview,
             message.AttachmentUrl,
             message.AttachmentFileName,
             message.AttachmentContentType,
             message.AttachmentFileSizeBytes,
             ParseAttachmentUploadStatus(message.AttachmentUploadStatus)?.ToString(),
             message.AttachmentUploadErrorCode,
+            messageAttachments,
             message.ReadAtUtc.HasValue,
             message.ReadAtUtc,
             message.DeliveredAtUtc,
             message.IsInternalNote,
             message.CreatedAtUtc);
+    }
+
+    private async Task<Result<ResolvedReplyTarget?>> ResolveReplyTargetAsync(
+        Guid conversationId,
+        Guid? replyToMessageId,
+        CancellationToken cancellationToken)
+    {
+        if (!replyToMessageId.HasValue)
+        {
+            return Result.Success<ResolvedReplyTarget?>(null);
+        }
+
+        var sourceMessage = await supportChatDbContext.ConversationMessages
+            .AsNoTracking()
+            .Include(message => message.Attachments)
+            .FirstOrDefaultAsync(
+                message => message.Id == replyToMessageId.Value && message.ConversationId == conversationId,
+                cancellationToken);
+        if (sourceMessage is null)
+        {
+            return Result.Failure<ResolvedReplyTarget?>(MessageNotFound);
+        }
+
+        return Result.Success<ResolvedReplyTarget?>(
+            new ResolvedReplyTarget(
+                sourceMessage.Id,
+                BuildReplyPreview(sourceMessage)));
+    }
+
+    private static string BuildReplyPreview(ConversationMessage sourceMessage)
+    {
+        var trimmedBody = sourceMessage.Body.Trim();
+        var orderedAttachments = sourceMessage.Attachments
+            .OrderBy(attachment => attachment.SortOrder)
+            .ToList();
+        if (orderedAttachments.Count > 0)
+        {
+            if (!string.IsNullOrWhiteSpace(trimmedBody)
+                && !orderedAttachments.Any(attachment => string.Equals(
+                    attachment.FileName.Trim(),
+                    trimmedBody,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                return Truncate(trimmedBody, 160);
+            }
+
+            if (orderedAttachments.Count > 1)
+            {
+                return $"Attachments ({orderedAttachments.Count})";
+            }
+
+            var attachment = orderedAttachments[0];
+            if (attachment.IsDeleted)
+            {
+                return "Attachment deleted";
+            }
+
+            if (attachment.MimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Photo";
+            }
+
+            if (attachment.MimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Video";
+            }
+
+            return attachment.FileName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(trimmedBody))
+        {
+            return Truncate(trimmedBody, 160);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sourceMessage.AttachmentFileName))
+        {
+            return sourceMessage.AttachmentFileName;
+        }
+
+        return "Message";
+    }
+
+    private sealed record ResolvedReplyTarget(Guid MessageId, string Preview);
+
+    private static IReadOnlyList<SupportMessageAttachmentInput> BuildLegacyAttachmentInputs(SendSupportMessageCommand command)
+    {
+        if (string.IsNullOrWhiteSpace(command.AttachmentUrl)
+            || string.IsNullOrWhiteSpace(command.AttachmentFileName)
+            || string.IsNullOrWhiteSpace(command.AttachmentContentType)
+            || command.AttachmentFileSizeBytes is null or <= 0)
+        {
+            return [];
+        }
+
+        return
+        [
+            new SupportMessageAttachmentInput(
+                command.AttachmentUrl,
+                command.AttachmentContentType,
+                command.AttachmentFileName,
+                command.AttachmentFileSizeBytes.Value)
+        ];
+    }
+
+    private static IReadOnlyList<SupportMessageAttachmentInput> NormalizeAttachmentInputs(
+        IReadOnlyList<SupportMessageAttachmentInput>? attachments)
+    {
+        if (attachments is null || attachments.Count == 0)
+        {
+            return [];
+        }
+
+        return attachments
+            .Where(attachment =>
+                !string.IsNullOrWhiteSpace(attachment.FileUrl)
+                && !string.IsNullOrWhiteSpace(attachment.FileName)
+                && !string.IsNullOrWhiteSpace(attachment.MimeType)
+                && attachment.SizeBytes > 0)
+            .ToList();
+    }
+
+    private string? ResolveStorageKey(string fileUrl, string? explicitStorageKey)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitStorageKey))
+        {
+            return explicitStorageKey.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(fileUrl))
+        {
+            return null;
+        }
+
+        var baseUrl = attachmentStorageOptions.PublicBaseUrl.TrimEnd('/');
+        if (!fileUrl.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var relativePath = fileUrl[baseUrl.Length..].TrimStart('/');
+        return string.IsNullOrWhiteSpace(relativePath)
+            ? null
+            : relativePath.Replace('\\', '/');
+    }
+
+    private static IReadOnlyList<SupportMessageAttachmentResponse> BuildAttachmentResponses(ConversationMessage message)
+    {
+        if (message.Attachments.Count > 0)
+        {
+            return message.Attachments
+                .OrderBy(attachment => attachment.SortOrder)
+                .Select(attachment => new SupportMessageAttachmentResponse(
+                    attachment.IsDeleted ? string.Empty : attachment.FileUrl,
+                    ResolveAttachmentType(attachment.MimeType),
+                    attachment.MimeType,
+                    attachment.FileName,
+                    attachment.SizeBytes,
+                    attachment.DurationSeconds,
+                    attachment.Width,
+                    attachment.Height,
+                    attachment.IsDeleted,
+                    attachment.ExpiresAtUtc,
+                    attachment.DeletedAtUtc))
+                .ToList();
+        }
+
+        if (string.IsNullOrWhiteSpace(message.AttachmentUrl)
+            || string.IsNullOrWhiteSpace(message.AttachmentFileName)
+            || string.IsNullOrWhiteSpace(message.AttachmentContentType)
+            || message.AttachmentFileSizeBytes is null or <= 0)
+        {
+            return [];
+        }
+
+        return
+        [
+            new SupportMessageAttachmentResponse(
+                message.AttachmentUrl,
+                ResolveAttachmentType(message.AttachmentContentType),
+                message.AttachmentContentType,
+                message.AttachmentFileName,
+                message.AttachmentFileSizeBytes.Value,
+                DurationSeconds: null,
+                Width: null,
+                Height: null,
+                IsDeleted: false,
+                ExpiresAtUtc: null,
+                DeletedAtUtc: null)
+        ];
+    }
+
+    private static string ResolveAttachmentType(string mimeType)
+    {
+        if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "image";
+        }
+
+        if (mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "video";
+        }
+
+        return "file";
+    }
+
+    private static string BuildMessagePreview(
+        string trimmedBody,
+        IReadOnlyList<SupportMessageAttachmentInput> attachments)
+    {
+        if (!string.IsNullOrWhiteSpace(trimmedBody))
+        {
+            return trimmedBody;
+        }
+
+        if (attachments.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        if (attachments.Count == 1)
+        {
+            return attachments[0].FileName;
+        }
+
+        return $"{attachments.Count} attachments";
     }
 
     private static SupportAttachmentUploadStatus? ParseAttachmentUploadStatus(int? rawValue)

@@ -337,7 +337,7 @@ class _SupportVideoPreviewDialogState
                             if (!isInitialized) {
                               return;
                             }
-                            if (controller!.value.position >=
+                            if (controller.value.position >=
                                 controller.value.duration) {
                               await controller.seekTo(Duration.zero);
                             }

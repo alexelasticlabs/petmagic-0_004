@@ -67,6 +67,10 @@ public interface ISupportChatService
 
     Task<Result<SupportMessageResponse>> SendMessageAsync(SendSupportMessageCommand command, CancellationToken cancellationToken);
 
+    Task<Result<SupportMessageResponse>> SendMessageWithAttachmentsAsync(
+        SendSupportAttachmentsCommand command,
+        CancellationToken cancellationToken);
+
     Task<Result<SupportMessageResponse>> CreateAttachmentMessageAsync(CreateSupportAttachmentMessageCommand command, CancellationToken cancellationToken);
 
     Task<Result<SupportMessageResponse>> UpdateAttachmentMessageAsync(UpdateSupportAttachmentMessageCommand command, CancellationToken cancellationToken);

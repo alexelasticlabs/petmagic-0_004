@@ -16,6 +16,10 @@ public sealed class ConversationMessage
 
     public string Body { get; set; } = string.Empty;
 
+    public Guid? ReplyToMessageId { get; set; }
+
+    public string? ReplyToPreview { get; set; }
+
     public string? AttachmentUrl { get; set; }
 
     public string? AttachmentFileName { get; set; }
@@ -37,4 +41,8 @@ public sealed class ConversationMessage
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public SupportConversation Conversation { get; set; } = null!;
+
+    public ConversationMessage? ReplyToMessage { get; set; }
+
+    public ICollection<SupportMessageAttachment> Attachments { get; set; } = new List<SupportMessageAttachment>();
 }

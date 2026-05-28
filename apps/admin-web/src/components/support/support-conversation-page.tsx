@@ -5,37 +5,39 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
-import {
-  formatClockTime,
-  formatDateTime,
-  formatFileSize,
-  formatRelativeTime,
-  getConversationSla,
-  groupSupportConversationFeed,
-  hasAttachment,
-  hasImageAttachment,
-  hasVideoAttachment,
-  initialsFor,
-  shortId,
-  shouldRenderMessageBody,
-} from "@/components/support/support-conversation-helpers";
 import { SupportActionsPanel } from "@/components/support/support-actions-panel";
+import {
+    formatClockTime,
+    formatDateTime,
+    formatFileSize,
+    formatRelativeTime,
+    getConversationSla,
+    getMessageAttachments,
+    groupSupportConversationFeed,
+    hasAttachment,
+    initialsFor,
+    shortId,
+    shouldRenderMessageBody,
+} from "@/components/support/support-conversation-helpers";
 import { SupportInfoPanel } from "@/components/support/support-info-panel";
 import { SupportOptionGroup } from "@/components/support/support-option-group";
 import styles from "@/components/support/support-page.module.css";
 import { sourceLabel, statusHint, statusLabel, toneForStatus } from "@/components/support/support-status-helpers";
 import {
-  statusOptions,
-  type SupportQueueFilter,
-  useSupportConversationController,
+    statusOptions,
+    type SupportQueueFilter,
+    useSupportConversationController,
 } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
+import type { AdminSupportConversation } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 
 type SupportConversationPageProps = {
   locale: Locale;
   conversationId: string;
+  navigationMode?: "route" | "local";
+  onConversationSelect?: (conversationId: string) => void;
 };
 
 type FullscreenImage = {
@@ -47,13 +49,20 @@ type FullscreenImage = {
   fileSizeBytes?: number | null;
 };
 
-export function SupportConversationPage({ locale, conversationId }: SupportConversationPageProps) {
+export function SupportConversationPage({
+  locale,
+  conversationId,
+  navigationMode = "route",
+  onConversationSelect,
+}: SupportConversationPageProps) {
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned">("all");
   const [composerTab, setComposerTab] = useState<"reply" | "templates" | "attachments">("reply");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const messageHighlightTimerRef = useRef<number | null>(null);
   const controller = useSupportConversationController({ locale, conversationId });
   const {
     attachmentInputRef,
@@ -71,10 +80,13 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     isSidePanelOpen,
     primaryStatusAction,
     reply,
+    replyToMessage,
+    replyToPreview,
     resetSelectedAttachment,
     searchQuery,
     secondaryStatusActions,
     selectedAttachment,
+    selectReplyToMessage,
     sendMutation,
     setIsSidePanelOpen,
     setQueueFilter,
@@ -86,7 +98,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     toast,
     queueFilter,
     userDisplayName,
-    visibleTemplates,
   } = controller;
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
@@ -124,6 +135,11 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     date: locale === "ru" ? "Дата" : "Date",
     size: locale === "ru" ? "Размер" : "Size",
   };
+  const totalInboxCount = inboxQuery.data?.length ?? 0;
+  const supportWorkspaceSubtitle =
+    locale === "ru"
+      ? "Единое рабочее пространство для очереди, переписки и действий оператора"
+      : "Unified workspace for queue, conversation, and operator actions";
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -131,6 +147,10 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [conversation?.messages.length]);
+
+  useEffect(() => {
+    selectReplyToMessage(null);
+  }, [conversationId, selectReplyToMessage]);
 
   const submitReply = () => {
     sendMutation.mutate();
@@ -187,6 +207,15 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
       document.body.style.overflow = previousOverflow;
     };
   }, [fullscreenImage]);
+
+  useEffect(
+    () => () => {
+      if (messageHighlightTimerRef.current !== null) {
+        window.clearTimeout(messageHighlightTimerRef.current);
+      }
+    },
+    []
+  );
 
   const saveFullscreenImage = async () => {
     if (!fullscreenImage) {
@@ -252,6 +281,18 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     window.open(fullscreenImage.url, "_blank", "noopener,noreferrer");
   };
 
+  const highlightMessage = (messageId: string) => {
+    setHighlightedMessageId(messageId);
+    if (messageHighlightTimerRef.current !== null) {
+      window.clearTimeout(messageHighlightTimerRef.current);
+    }
+
+    messageHighlightTimerRef.current = window.setTimeout(() => {
+      setHighlightedMessageId((current) => (current === messageId ? null : current));
+      messageHighlightTimerRef.current = null;
+    }, 1500);
+  };
+
   const jumpToMessage = (messageId: string) => {
     const target = document.getElementById(`message-${messageId}`);
     if (!target) {
@@ -259,7 +300,58 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
     }
 
     target.scrollIntoView({ behavior: "smooth", block: "center" });
+    highlightMessage(messageId);
   };
+
+  const formatAttachmentDuration = (value?: number | null) => {
+    if (!value || value <= 0) {
+      return "0:00";
+    }
+
+    const totalSeconds = Math.max(0, Math.round(value));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+  const resolveReplyPreview = (
+    message: Pick<AdminSupportConversation["messages"][number], "body" | "attachments" | "replyToPreview">
+  ) => {
+    const body = message.body.trim();
+    if (body) {
+      return body;
+    }
+
+    const attachments = getMessageAttachments(message);
+    if (attachments.length > 1) {
+      return locale === "ru" ? `Вложения (${attachments.length})` : `Attachments (${attachments.length})`;
+    }
+
+    const primaryAttachment = attachments[0];
+    if (!primaryAttachment) {
+      return text.supportReplyOriginalUnavailable;
+    }
+
+    if (primaryAttachment.mimeType.startsWith("image/")) {
+      return locale === "ru" ? "Фото" : "Photo";
+    }
+
+    if (primaryAttachment.mimeType.startsWith("video/")) {
+      return locale === "ru" ? "Видео" : "Video";
+    }
+
+    return primaryAttachment.fileName || (locale === "ru" ? "Файл" : "File");
+  };
+
+  const startReplyToMessage = (message: AdminSupportConversation["messages"][number]) => {
+    const preview = resolveReplyPreview(message);
+    selectReplyToMessage(message.messageId, preview);
+    setComposerTab("reply");
+  };
+
+  const replyComposerPreview =
+    replyToPreview?.trim() ||
+    (replyToMessage ? resolveReplyPreview(replyToMessage) : text.supportReplyOriginalUnavailable);
 
   return (
     <AdminPage className={styles.page}>
@@ -286,14 +378,49 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
         />
       ) : (
         <>
-          <div className={styles.compactHeader}>
-            <div className={styles.compactHeaderTrail}>
-              <Link href={`/${locale}/support`} className={styles.compactHeaderLink}>
-                {text.supportTitle}
-              </Link>
-              <span className={styles.compactHeaderSeparator}>/</span>
-              <strong>{shortId(conversation.conversationId)}</strong>
-              <span className={styles.subtle}>{userDisplayName}</span>
+          <div className={styles.supportPageHeader}>
+            <div className={styles.supportPageTitleWrap}>
+              <div className={styles.supportPageTitleRow}>
+                <h1 className={styles.supportPageTitle}>{text.supportTitle}</h1>
+                <span className={styles.supportPageBadge}>{totalInboxCount}</span>
+              </div>
+              <span className={styles.supportPageSubtitle}>{supportWorkspaceSubtitle}</span>
+            </div>
+            <div className={styles.supportPageToolbar}>
+              <label className={styles.searchField}>
+                <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
+                <input
+                  ref={searchInputRef}
+                  className={`${styles.searchInput} ${styles.supportPageSearchInput}`}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder={text.supportSearchPlaceholder}
+                  aria-label={text.supportSearchPlaceholder}
+                  title={text.supportSearchKeyboardHint}
+                />
+              </label>
+              <div className={styles.supportPageFilterWrap}>
+                <SupportOptionGroup
+                  label={text.supportQueueFilterLabel}
+                  value={queueFilter}
+                  options={[
+                    { value: "all", label: text.supportStatusAll },
+                    ...statusOptions.map((status) => ({
+                      value: status,
+                      label: statusLabel(status, text),
+                    })),
+                    { value: "mine", label: text.supportAssignmentMine },
+                    { value: "unassigned", label: text.supportAssignmentUnassigned },
+                  ]}
+                  onChange={(value) => setQueueFilter(value as SupportQueueFilter)}
+                  compact
+                />
+              </div>
+              <div className={styles.compactHeaderMeta}>
+                <Button variant="secondary" size="sm" onClick={() => void inboxQuery.refetch()}>
+                  {text.supportRefresh}
+                </Button>
+              </div>
             </div>
             <div className={styles.compactHeaderMeta}>
               {conversation.adminUnreadCount > 0 ? (
@@ -319,41 +446,18 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
             className={`${styles.workspace} ${isSidePanelOpen ? styles.workspaceFullView : styles.workspaceCompact}`}
           >
             <div className={styles.inboxPaneFlat}>
-              <div className={styles.paneTopbar}>
-                <div className={styles.paneTitleGroup}>
-                  <span className={styles.paneEyebrow}>{text.supportTitle}</span>
-                  <h2 className={styles.paneTitle}>{text.supportInboxTitle}</h2>
+              <div className={styles.queuePaneHeader}>
+                <div className={styles.queuePaneTitleRow}>
+                  <h2 className={styles.queuePaneTitle}>
+                    {locale === "ru" ? "Очередь" : "Queue"}
+                  </h2>
+                  <span className={styles.paneCountBadge}>{filteredInboxItems.length}</span>
                 </div>
-                <div className={styles.paneCountBadge}>{filteredInboxItems.length}</div>
-              </div>
-              <div className={styles.inboxToolbar}>
-                <SupportOptionGroup
-                  label={text.supportQueueFilterLabel}
-                  value={queueFilter}
-                  options={[
-                    { value: "all", label: text.supportStatusAll },
-                    ...statusOptions.map((status) => ({
-                      value: status,
-                      label: statusLabel(status, text),
-                    })),
-                    { value: "mine", label: text.supportAssignmentMine },
-                    { value: "unassigned", label: text.supportAssignmentUnassigned },
-                  ]}
-                  onChange={(value) => setQueueFilter(value as SupportQueueFilter)}
-                  compact
-                />
-                <label className={styles.searchField}>
-                  <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
-                  <input
-                    ref={searchInputRef}
-                    className={styles.searchInput}
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder={text.supportSearchPlaceholder}
-                    aria-label={text.supportSearchPlaceholder}
-                    title={text.supportSearchKeyboardHint}
-                  />
-                </label>
+                <span className={styles.queuePaneSubtitle}>
+                  {locale === "ru"
+                    ? "Все активные и ожидающие обращения"
+                    : "All active and waiting conversations"}
+                </span>
               </div>
 
               <div className={styles.queueSubFilters}>
@@ -402,14 +506,9 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                     );
                     const hasUnread = item.adminUnreadCount > 0;
 
-                    return (
-                      <Link
-                        key={item.conversationId}
-                        href={`/${locale}/support/${item.conversationId}`}
-                        role="listitem"
-                        aria-current={item.conversationId === conversationId ? "page" : undefined}
-                        className={`${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""} ${hasUnread ? styles.conversationRowUnread : ""}`}
-                      >
+                    const queueItemClassName = `${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""} ${hasUnread ? styles.conversationRowUnread : ""}`;
+                    const queueItemContent = (
+                      <>
                         <div className={styles.rowHeader}>
                           <div className={styles.rowIdentity}>
                             <span
@@ -452,6 +551,33 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             {itemSla.waitLabel}
                           </span>
                         </div>
+                      </>
+                    );
+
+                    if (navigationMode === "local") {
+                      return (
+                        <button
+                          key={item.conversationId}
+                          type="button"
+                          role="listitem"
+                          aria-current={item.conversationId === conversationId ? "page" : undefined}
+                          className={`${queueItemClassName} ${styles.conversationRowButton}`}
+                          onClick={() => onConversationSelect?.(item.conversationId)}
+                        >
+                          {queueItemContent}
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <Link
+                        key={item.conversationId}
+                        href={`/${locale}/support/${item.conversationId}`}
+                        role="listitem"
+                        aria-current={item.conversationId === conversationId ? "page" : undefined}
+                        className={queueItemClassName}
+                      >
+                        {queueItemContent}
                       </Link>
                     );
                   })}
@@ -609,6 +735,15 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                             }
 
                             const message = item.message;
+                            const attachments = getMessageAttachments(message);
+                            const primaryAttachment = attachments[0];
+                            const hasAttachmentGroup = attachments.length > 1;
+                            const isSingleImageAttachment =
+                              attachments.length === 1 &&
+                              Boolean(primaryAttachment?.mimeType?.startsWith("image/"));
+                            const isSingleVideoAttachment =
+                              attachments.length === 1 &&
+                              Boolean(primaryAttachment?.mimeType?.startsWith("video/"));
                             const senderType = message.senderType?.toLowerCase() ?? "";
                             const isSystemMessage = senderType === "system";
                             const isBotMessage = senderType === "bot";
@@ -628,14 +763,15 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                               );
                             }
 
-                            return (
-                              <article
-                                key={message.messageId}
-                                id={`message-${message.messageId}`}
-                                className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser} ${isBotMessage ? styles.messageBot : ""}`}
-                              >
-                                <div className={styles.messageHeader}>
-                                  <div className={styles.messageSenderWrap}>
+                              return (
+                                <article
+                                  key={message.messageId}
+                                  id={`message-${message.messageId}`}
+                                  className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser} ${isBotMessage ? styles.messageBot : ""} ${highlightedMessageId === message.messageId ? styles.messageHighlighted : ""}`}
+                                  onDoubleClick={() => startReplyToMessage(message)}
+                                >
+                                  <div className={styles.messageHeader}>
+                                    <div className={styles.messageSenderWrap}>
                                     {message.isFromAdmin ? (
                                       <span
                                         className={`${styles.avatarTiny} ${styles.avatarTinyAdmin}`}
@@ -661,59 +797,214 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                                         : message.senderDisplayName}
                                     </strong>
                                   </div>
-                                  <span>{formatClockTime(message.createdAtUtc, locale)}</span>
+                                  <div className={styles.messageHeaderActions}>
+                                    <span>{formatClockTime(message.createdAtUtc, locale)}</span>
+                                    <button
+                                      type="button"
+                                      className={styles.messageReplyAction}
+                                      onClick={() => startReplyToMessage(message)}
+                                      title={locale === "ru" ? "Ответить" : "Reply"}
+                                    >
+                                      ↩
+                                    </button>
+                                  </div>
                                 </div>
-                                {hasImageAttachment(message) ? (
+                                {message.replyToMessageId || message.replyToPreview?.trim() ? (
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setFullscreenImage({
-                                        url: message.attachmentUrl!,
-                                        fileName: message.attachmentFileName,
-                                        messageId: message.messageId,
-                                        senderDisplayName: message.senderDisplayName,
-                                        createdAtUtc: message.createdAtUtc,
-                                        fileSizeBytes: message.attachmentFileSizeBytes,
-                                      })
-                                    }
-                                    className={styles.messageImageButton}
+                                    className={styles.messageReplyBlock}
+                                    onClick={() => {
+                                      if (message.replyToMessageId) {
+                                        jumpToMessage(message.replyToMessageId);
+                                      }
+                                    }}
+                                    disabled={!message.replyToMessageId}
                                   >
-                                    <Image
-                                      src={message.attachmentUrl!}
-                                      alt={message.attachmentFileName ?? message.body}
-                                      width={152}
-                                      height={120}
-                                      sizes="(max-width: 860px) 100vw, 152px"
-                                      className={styles.messageImage}
-                                      loading="lazy"
-                                      unoptimized
-                                    />
+                                    <span className={styles.messageReplyBlockLabel}>
+                                      {locale === "ru" ? "Ответ" : "Reply"}
+                                    </span>
+                                    <span className={styles.messageReplyBlockPreview}>
+                                      {(message.replyToPreview?.trim() || text.supportReplyOriginalUnavailable).trim()}
+                                    </span>
                                   </button>
-                                ) : hasVideoAttachment(message) ? (
-                                  <div className={styles.messageVideoButton}>
-                                    <video
-                                      controls
-                                      preload="metadata"
-                                      src={message.attachmentUrl!}
-                                      className={styles.messageVideo}
-                                    />
-                                  </div>
-                                ) : hasAttachment(message) ? (
-                                  <a
-                                    href={message.attachmentUrl!}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    download={message.attachmentFileName ?? "attachment"}
-                                    className={styles.messageAttachmentCard}
+                                ) : null}
+                                {hasAttachmentGroup ? (
+                                  <div
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                                      gap: 8,
+                                      marginBottom: 8,
+                                      maxWidth: 332,
+                                    }}
                                   >
-                                    <div className={styles.messageAttachmentIcon}>FILE</div>
-                                    <div className={styles.messageAttachmentMeta}>
-                                      <strong>{message.attachmentFileName ?? message.body}</strong>
-                                      <span>
-                                        {formatFileSize(message.attachmentFileSizeBytes, locale)}
-                                      </span>
+                                    {attachments.slice(0, 5).map((attachment, attachmentIndex) => {
+                                      if (attachment.isDeleted) {
+                                        return (
+                                          <div
+                                            key={`${message.messageId}:${attachmentIndex}`}
+                                            className={styles.deletedAttachmentPlaceholder}
+                                          >
+                                            {text.supportAttachmentExpiredLabel}
+                                          </div>
+                                        );
+                                      }
+
+                                      const isImage = attachment.mimeType.startsWith("image/");
+                                      const isVideo = attachment.mimeType.startsWith("video/");
+
+                                      if (isImage) {
+                                        return (
+                                          <button
+                                            key={`${message.messageId}:${attachmentIndex}`}
+                                            type="button"
+                                            onClick={() =>
+                                              setFullscreenImage({
+                                                url: attachment.fileUrl,
+                                                fileName: attachment.fileName,
+                                                messageId: message.messageId,
+                                                senderDisplayName: message.senderDisplayName,
+                                                createdAtUtc: message.createdAtUtc,
+                                                fileSizeBytes: attachment.sizeBytes,
+                                              })
+                                            }
+                                            className={styles.messageImageButton}
+                                          >
+                                            <Image
+                                              src={attachment.fileUrl}
+                                              alt={attachment.fileName || message.body}
+                                              width={152}
+                                              height={120}
+                                              sizes="(max-width: 860px) 100vw, 152px"
+                                              className={styles.messageImage}
+                                              loading="lazy"
+                                              unoptimized
+                                            />
+                                          </button>
+                                        );
+                                      }
+
+                                      if (isVideo) {
+                                        return (
+                                          <a
+                                            key={`${message.messageId}:${attachmentIndex}`}
+                                            href={attachment.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={styles.messageAttachmentCard}
+                                            style={{ position: "relative", overflow: "hidden" }}
+                                          >
+                                            <video
+                                              preload="metadata"
+                                              src={attachment.fileUrl}
+                                              className={styles.messageVideo}
+                                            />
+                                            <span
+                                              style={{
+                                                position: "absolute",
+                                                right: 8,
+                                                bottom: 8,
+                                                background: "rgba(17, 24, 39, 0.75)",
+                                                color: "#fff",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                borderRadius: 999,
+                                                padding: "2px 8px",
+                                              }}
+                                            >
+                                              ▶ {formatAttachmentDuration(attachment.durationSeconds)}
+                                            </span>
+                                          </a>
+                                        );
+                                      }
+
+                                      return (
+                                        <a
+                                          key={`${message.messageId}:${attachmentIndex}`}
+                                          href={attachment.fileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          download={attachment.fileName || "attachment"}
+                                          className={styles.messageAttachmentCard}
+                                        >
+                                          <div className={styles.messageAttachmentIcon}>FILE</div>
+                                          <div className={styles.messageAttachmentMeta}>
+                                            <strong>{attachment.fileName || message.body}</strong>
+                                            <span>{formatFileSize(attachment.sizeBytes, locale)}</span>
+                                          </div>
+                                        </a>
+                                      );
+                                    })}
+                                  </div>
+                                ) : isSingleImageAttachment && primaryAttachment ? (
+                                  primaryAttachment.isDeleted ? (
+                                    <div className={styles.deletedAttachmentPlaceholder}>
+                                      {text.supportAttachmentExpiredLabel}
                                     </div>
-                                  </a>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setFullscreenImage({
+                                          url: primaryAttachment.fileUrl,
+                                          fileName: primaryAttachment.fileName,
+                                          messageId: message.messageId,
+                                          senderDisplayName: message.senderDisplayName,
+                                          createdAtUtc: message.createdAtUtc,
+                                          fileSizeBytes: primaryAttachment.sizeBytes,
+                                        })
+                                      }
+                                      className={styles.messageImageButton}
+                                    >
+                                      <Image
+                                        src={primaryAttachment.fileUrl}
+                                        alt={primaryAttachment.fileName || message.body}
+                                        width={152}
+                                        height={120}
+                                        sizes="(max-width: 860px) 100vw, 152px"
+                                        className={styles.messageImage}
+                                        loading="lazy"
+                                        unoptimized
+                                      />
+                                    </button>
+                                  )
+                                ) : isSingleVideoAttachment && primaryAttachment ? (
+                                  primaryAttachment.isDeleted ? (
+                                    <div className={styles.deletedAttachmentPlaceholder}>
+                                      {text.supportAttachmentExpiredLabel}
+                                    </div>
+                                  ) : (
+                                    <div className={styles.messageVideoButton}>
+                                      <video
+                                        controls
+                                        preload="metadata"
+                                        src={primaryAttachment.fileUrl}
+                                        className={styles.messageVideo}
+                                      />
+                                    </div>
+                                  )
+                                ) : hasAttachment(message) ? (
+                                  primaryAttachment?.isDeleted ? (
+                                    <div className={styles.deletedAttachmentPlaceholder}>
+                                      {text.supportAttachmentExpiredLabel}
+                                    </div>
+                                  ) : (
+                                    <a
+                                      href={primaryAttachment?.fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      download={primaryAttachment?.fileName ?? "attachment"}
+                                      className={styles.messageAttachmentCard}
+                                    >
+                                      <div className={styles.messageAttachmentIcon}>FILE</div>
+                                      <div className={styles.messageAttachmentMeta}>
+                                        <strong>{primaryAttachment?.fileName ?? message.body}</strong>
+                                        <span>
+                                          {formatFileSize(primaryAttachment?.sizeBytes, locale)}
+                                        </span>
+                                      </div>
+                                    </a>
+                                  )
                                 ) : null}
                                 {shouldRenderMessageBody(message) ? (
                                   <div className={styles.messageBody}>{message.body}</div>
@@ -833,6 +1124,32 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                           <span className={styles.subtle}>{text.supportAttachmentHint}</span>
                         </div>
                       ) : null}
+                      {replyToMessage || replyToPreview ? (
+                        <div className={styles.composerReplyPreview}>
+                          <div className={styles.composerReplyPreviewContent}>
+                            <span className={styles.composerReplyPreviewLabel}>
+                              {text.supportReplyToLabel}
+                            </span>
+                            <strong>{replyComposerPreview}</strong>
+                          </div>
+                          {replyToMessage?.messageId ? (
+                            <button
+                              type="button"
+                              className={styles.attachmentActionButton}
+                              onClick={() => jumpToMessage(replyToMessage.messageId)}
+                            >
+                              {locale === "ru" ? "К сообщению" : "Jump"}
+                            </button>
+                          ) : null}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => selectReplyToMessage(null)}
+                          >
+                            {locale === "ru" ? "Отменить" : "Cancel"}
+                          </Button>
+                        </div>
+                      ) : null}
                       {selectedAttachment ? (
                         <div className={styles.attachmentPreviewCard}>
                           {attachmentPreviewUrl ? (
@@ -945,22 +1262,6 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                         >
                           📎
                         </button>
-                        <button
-                          type="button"
-                          className={styles.composerIconBtn}
-                          disabled={isConversationReadOnly}
-                          title={locale === "ru" ? "Эмодзи" : "Emoji"}
-                        >
-                          😊
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.composerIconBtn}
-                          disabled={isConversationReadOnly}
-                          title={locale === "ru" ? "Внутренняя заметка" : "Internal note"}
-                        >
-                          🔒
-                        </button>
                         <div className={styles.composerSendGroup}>
                           <Button
                             variant="primary"
@@ -975,20 +1276,8 @@ export function SupportConversationPage({ locale, conversationId }: SupportConve
                           >
                             {sendMutation.isPending
                               ? text.supportReplySending
-                              : `✈ ${text.supportReplyAction}`}
+                              : text.supportReplyAction}
                           </Button>
-                          <button
-                            type="button"
-                            className={styles.composerSendChevron}
-                            disabled={
-                              isConversationReadOnly ||
-                              sendMutation.isPending ||
-                              (!reply.trim() && !hasComposerAttachment)
-                            }
-                            title={locale === "ru" ? "Ещё действия" : "More actions"}
-                          >
-                            ▾
-                          </button>
                         </div>
                       </div>
                     </>

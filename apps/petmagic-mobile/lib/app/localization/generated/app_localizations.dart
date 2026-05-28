@@ -2985,7 +2985,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatAttachmentTooLargeError.
   ///
   /// In en, this message translates to:
-  /// **'Attachment is too large. Maximum size is 10 MB.'**
+  /// **'File is too large'**
   String get supportChatAttachmentTooLargeError;
 
   /// No description provided for @supportChatImageLabel.
@@ -3144,6 +3144,66 @@ abstract class AppLocalizations {
   /// **'Choose video'**
   String get supportChatChooseVideoAction;
 
+  /// No description provided for @supportChatAttachFileAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get supportChatAttachFileAction;
+
+  /// No description provided for @supportChatRecentMediaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent media'**
+  String get supportChatRecentMediaTitle;
+
+  /// No description provided for @supportChatAttachmentNoRecentMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent photos or videos'**
+  String get supportChatAttachmentNoRecentMedia;
+
+  /// No description provided for @supportChatAttachmentLimitedAccessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Not all photos are available. Allow full gallery access in device settings.'**
+  String get supportChatAttachmentLimitedAccessHint;
+
+  /// No description provided for @supportChatOpenSettingsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get supportChatOpenSettingsAction;
+
+  /// No description provided for @supportChatAttachmentNoGalleryAccessError.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery access is denied. Allow access in device settings.'**
+  String get supportChatAttachmentNoGalleryAccessError;
+
+  /// No description provided for @supportChatAttachmentExpiredPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment was deleted after 30 days'**
+  String get supportChatAttachmentExpiredPlaceholder;
+
+  /// No description provided for @supportChatReplyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get supportChatReplyLabel;
+
+  /// No description provided for @supportChatReplyToPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply to message'**
+  String get supportChatReplyToPrefix;
+
+  /// No description provided for @supportChatReplyOriginalUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Original message is unavailable'**
+  String get supportChatReplyOriginalUnavailable;
+
   /// No description provided for @supportChatPhotoAttachedLabel.
   ///
   /// In en, this message translates to:
@@ -3171,8 +3231,20 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatTooManyAttachmentsError.
   ///
   /// In en, this message translates to:
-  /// **'You can attach up to 5 photos.'**
+  /// **'You can add up to 5 files'**
   String get supportChatTooManyAttachmentsError;
+
+  /// No description provided for @supportChatAttachmentUnsupportedFormatError.
+  ///
+  /// In en, this message translates to:
+  /// **'This format is not supported'**
+  String get supportChatAttachmentUnsupportedFormatError;
+
+  /// No description provided for @supportChatAttachmentVideoTooLongError.
+  ///
+  /// In en, this message translates to:
+  /// **'Video must be 60 seconds or shorter.'**
+  String get supportChatAttachmentVideoTooLongError;
 
   /// No description provided for @supportChatMarkResolvedAction.
   ///

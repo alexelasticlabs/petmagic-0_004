@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -150,6 +151,81 @@ public sealed class SupportChatServiceTests
         Assert.Equal("broken-screen.png", sendResult.Value.AttachmentFileName);
         Assert.Equal("image/png", sendResult.Value.AttachmentContentType);
         Assert.Equal(2048, sendResult.Value.AttachmentFileSizeBytes);
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_WithReplyToMessage_ShouldPersistReplyMetadata()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid conversationId;
+        Guid replyTargetMessageId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help with premium", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+            replyTargetMessageId = openResult.Value.Messages
+                .Single(message => message.SenderType == "User")
+                .MessageId;
+        }
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageAsync(
+            new SendSupportMessageCommand(
+                conversationId,
+                adminId,
+                "Got it, checking now",
+                true,
+                ReplyToMessageId: replyTargetMessageId),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsSuccess);
+        Assert.Equal(replyTargetMessageId, sendResult.Value.ReplyToMessageId);
+        Assert.Equal("Need help with premium", sendResult.Value.ReplyToPreview);
+
+        var persisted = await sendScope.SupportDbContext.ConversationMessages
+            .AsNoTracking()
+            .SingleAsync(message => message.Id == sendResult.Value.MessageId);
+        Assert.Equal(replyTargetMessageId, persisted.ReplyToMessageId);
+        Assert.Equal("Need help with premium", persisted.ReplyToPreview);
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_WithMissingReplyTarget_ShouldFail()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageAsync(
+            new SendSupportMessageCommand(
+                conversationId,
+                userId,
+                "Replying to missing message",
+                false,
+                ReplyToMessageId: Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsFailure);
+        Assert.Equal("support.message_not_found", sendResult.Error.Code);
     }
 
     [Fact]
@@ -610,7 +686,9 @@ public sealed class SupportChatServiceTests
                 SupportDbContext,
                 new IdentityUserLookupService(IdentityDbContext),
                 realtimeNotifier,
-                new NoopSupportChatPushNotificationSender());
+                new NoopSupportChatPushNotificationSender(),
+                new NoopSupportAttachmentStorage(),
+                new SupportAttachmentStorageOptions());
         }
 
         public async ValueTask DisposeAsync()
@@ -646,6 +724,31 @@ public sealed class SupportChatServiceTests
         public Task NotifyUserAsync(SupportChatPushNotification notification, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class NoopSupportAttachmentStorage : ISupportAttachmentStorage
+    {
+        public Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
+            SupportAttachmentUploadCommand attachment,
+            CancellationToken cancellationToken)
+        {
+            var fileName = string.IsNullOrWhiteSpace(attachment.FileName) ? "attachment.bin" : attachment.FileName;
+            var contentType = string.IsNullOrWhiteSpace(attachment.ContentType) ? "application/octet-stream" : attachment.ContentType;
+            var storageKey = $"support-attachments/test/{Guid.NewGuid():N}";
+            return Task.FromResult(Result.Success(
+                new StoredSupportAttachmentResponse(
+                    Url: $"https://example.test/{storageKey}",
+                    StorageKey: storageKey,
+                    FileName: fileName,
+                    ContentType: contentType,
+                    FileSizeBytes: attachment.Content.LongLength,
+                    LocalPath: null)));
+        }
+
+        public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success());
         }
     }
 }

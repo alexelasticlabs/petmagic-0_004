@@ -388,9 +388,12 @@ export type Dictionary = {
   supportReplyPlaceholder: string;
   supportReplyAction: string;
   supportReplySending: string;
+  supportReplyToLabel: string;
+  supportReplyOriginalUnavailable: string;
   supportAttachmentHint: string;
   supportAttachmentOpenAction: string;
   supportAttachmentRemoveAction: string;
+  supportAttachmentExpiredLabel: string;
   supportSaveStatusAction: string;
   supportStatusSaved: string;
   supportReplySent: string;

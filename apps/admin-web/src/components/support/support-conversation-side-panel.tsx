@@ -9,6 +9,7 @@ import {
   formatFileSize,
   formatMoney,
   formatRelativeTime,
+  getMessageAttachments,
   hasAttachment,
   hasImageAttachment,
   initialsFor,
@@ -88,7 +89,13 @@ export function SupportConversationSidePanel({
   const attachmentItems = useMemo(
     () =>
       (conversation?.messages ?? [])
-        .filter((message) => hasAttachment(message))
+        .filter(
+          (message) =>
+            hasAttachment(message) &&
+            getMessageAttachments(message).some(
+              (attachment) => !attachment.isDeleted && Boolean(attachment.fileUrl?.trim())
+            )
+        )
         .slice()
         .reverse(),
     [conversation?.messages]
@@ -113,6 +120,7 @@ export function SupportConversationSidePanel({
     analyticsQuery.error,
     analyticsQuery.isError,
     contextLoadFailed,
+    conversation,
     conversation?.conversationId,
     conversation?.initiatorUserId,
     purchasesQuery.error,

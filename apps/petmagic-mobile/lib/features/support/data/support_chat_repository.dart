@@ -83,11 +83,17 @@ class SupportChatRepository {
     required String conversationId,
     required String body,
     required String localeTag,
+    String? replyToMessageId,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/messages',
-        data: {'body': body.trim(), 'locale': localeTag},
+        data: {
+          'body': body.trim(),
+          'locale': localeTag,
+          if (replyToMessageId?.trim().isNotEmpty == true)
+            'replyToMessageId': replyToMessageId!.trim(),
+        },
         options: _authorizedOptions(session),
       ),
     );
@@ -102,6 +108,7 @@ class SupportChatRepository {
     required String contentType,
     required String localeTag,
     String? body,
+    String? replyToMessageId,
     ProgressCallback? onSendProgress,
   }) async {
     final trimmedBody = body?.trim() ?? '';
@@ -111,11 +118,55 @@ class SupportChatRepository {
         data: FormData.fromMap({
           if (trimmedBody.isNotEmpty) 'body': trimmedBody,
           'locale': localeTag,
+          if (replyToMessageId?.trim().isNotEmpty == true)
+            'replyToMessageId': replyToMessageId!.trim(),
           'file': MultipartFile.fromFileSync(
             filePath,
             filename: fileName,
             contentType: MediaType.parse(contentType),
           ),
+        }),
+        options: _authorizedOptions(
+          session,
+        ).copyWith(contentType: 'multipart/form-data'),
+        onSendProgress: onSendProgress,
+      ),
+    );
+
+    return SupportChatMessage.fromJson(response.data ?? const {});
+  }
+
+  Future<SupportChatMessage> sendAttachments({
+    required String conversationId,
+    required List<SupportChatUploadAttachment> attachments,
+    required String localeTag,
+    String? body,
+    String? replyToMessageId,
+    ProgressCallback? onSendProgress,
+  }) async {
+    if (attachments.isEmpty) {
+      throw const AppException('support.attachment_invalid_upload', statusCode: 400);
+    }
+
+    final multipartFiles = attachments
+        .map(
+          (attachment) => MultipartFile.fromFileSync(
+            attachment.filePath,
+            filename: attachment.fileName,
+            contentType: MediaType.parse(attachment.contentType),
+          ),
+        )
+        .toList(growable: false);
+    final trimmedBody = body?.trim() ?? '';
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/support/conversation/$conversationId/messages/attachments',
+        data: FormData.fromMap({
+          if (trimmedBody.isNotEmpty) 'body': trimmedBody,
+          'locale': localeTag,
+          if (replyToMessageId?.trim().isNotEmpty == true)
+            'replyToMessageId': replyToMessageId!.trim(),
+          'files': multipartFiles,
         }),
         options: _authorizedOptions(
           session,

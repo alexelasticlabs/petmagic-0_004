@@ -19,6 +19,7 @@ public static class SupportChatApiModule
         services.AddScoped<ISupportChatRealtimeNotifier, SignalRSupportChatRealtimeNotifier>();
         services.AddScoped<IValidator<OpenSupportConversationCommand>, OpenSupportConversationCommandValidator>();
         services.AddScoped<IValidator<SendSupportMessageCommand>, SendSupportMessageCommandValidator>();
+        services.AddScoped<IValidator<SendSupportAttachmentsCommand>, SendSupportAttachmentsCommandValidator>();
         services.AddScoped<IValidator<MarkSupportConversationReadCommand>, MarkSupportConversationReadCommandValidator>();
         services.AddScoped<IValidator<UpdateSupportConversationStatusCommand>, UpdateSupportConversationStatusCommandValidator>();
         services.AddScoped<IValidator<AssignSupportConversationCommand>, AssignSupportConversationCommandValidator>();

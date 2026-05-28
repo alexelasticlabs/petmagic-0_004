@@ -50,13 +50,19 @@ export async function fetchSupportConversation(
 
 export async function sendSupportMessage(
   conversationId: string,
-  body: string
+  body: string,
+  replyToMessageId?: string | null
 ): Promise<AdminSupportMessage> {
   const message = await apiRequest<AdminSupportMessage>(
     `/api/admin/support/tickets/${conversationId}/messages`,
     {
       method: "POST",
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({
+        body,
+        ...(replyToMessageId?.trim()
+          ? { replyToMessageId: replyToMessageId.trim() }
+          : {}),
+      }),
     }
   );
 
@@ -67,12 +73,16 @@ export async function sendSupportMessage(
 export async function sendSupportAttachment(
   conversationId: string,
   file: File,
-  body?: string
+  body?: string,
+  replyToMessageId?: string | null
 ): Promise<AdminSupportMessage> {
   const formData = new FormData();
   const trimmedBody = body?.trim();
   if (trimmedBody) {
     formData.append("body", trimmedBody);
+  }
+  if (replyToMessageId?.trim()) {
+    formData.append("replyToMessageId", replyToMessageId.trim());
   }
 
   formData.append("file", file);

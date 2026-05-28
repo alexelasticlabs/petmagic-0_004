@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -12,10 +13,11 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_attachment_validation.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
@@ -48,10 +50,14 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   final ImagePicker _imagePicker = ImagePicker();
   late final SupportChatController _controller;
   Timer? _loadingFallbackTimer;
+  Timer? _messageHighlightTimer;
   bool _showLoadingFallback = false;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
   List<_PendingSupportAttachment> _pendingAttachments = const [];
+  SupportChatMessage? _replyToMessage;
+  String? _highlightedMessageId;
+  final Map<String, GlobalKey> _messageKeys = <String, GlobalKey>{};
   double _keyboardInset = 0;
 
   bool get _hasPendingAttachment => _pendingAttachments.isNotEmpty;
@@ -110,6 +116,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   @override
   void dispose() {
     _clearLoadingFallback();
+    _messageHighlightTimer?.cancel();
+    _messageHighlightTimer = null;
     _messageController.removeListener(_handleComposerChanged);
     _messageFocusNode.removeListener(_handleComposerFocusChanged);
     _controller.stop();
@@ -190,7 +198,75 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   }) {
     return _SupportChatPageActions(
       this,
-    )._openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
+        )._openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
+  }
+
+  void _setReplyToMessage(SupportChatMessage message) {
+    if (_isSupportSystemMessage(message) || !mounted) {
+      return;
+    }
+
+    _applyState(() {
+      _replyToMessage = message;
+    });
+    _messageFocusNode.requestFocus();
+  }
+
+  void _clearReplyToMessage() {
+    if (!mounted || _replyToMessage == null) {
+      return;
+    }
+
+    _applyState(() {
+      _replyToMessage = null;
+    });
+  }
+
+  GlobalKey _messageItemKeyForId(String messageId) {
+    return _messageKeys.putIfAbsent(
+      messageId,
+      () => GlobalKey(debugLabel: 'support-message-$messageId'),
+    );
+  }
+
+  Future<void> _jumpToMessage(String messageId) async {
+    if (!mounted || messageId.trim().isEmpty) {
+      return;
+    }
+
+    final targetKey = _messageKeys[messageId];
+    final targetContext = targetKey?.currentContext;
+    if (targetContext == null) {
+      final text = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(text.supportChatReplyOriginalUnavailable)),
+      );
+      return;
+    }
+
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: 0.25,
+    );
+    if (!mounted) {
+      return;
+    }
+
+    _messageHighlightTimer?.cancel();
+    _applyState(() {
+      _highlightedMessageId = messageId;
+    });
+    _messageHighlightTimer = Timer(const Duration(milliseconds: 1300), () {
+      if (!mounted || _highlightedMessageId != messageId) {
+        return;
+      }
+
+      _applyState(() {
+        _highlightedMessageId = null;
+      });
+    });
   }
 
   @override
@@ -299,10 +375,14 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                         onQuickActionSelected: _prefillComposer,
                         onOpenImage: _openImageFullscreen,
                         onOpenVideo: _openVideoFullscreen,
-                        onRetryAttachment: _retryAttachmentForMessage,
-                        formatDayLabel: _formatDayLabel,
-                        isSameDay: _isSameDay,
-                      ),
+                         onRetryAttachment: _retryAttachmentForMessage,
+                         onReplyToMessage: _setReplyToMessage,
+                         onJumpToMessage: _jumpToMessage,
+                         highlightedMessageId: _highlightedMessageId,
+                         messageItemKeyForId: _messageItemKeyForId,
+                         formatDayLabel: _formatDayLabel,
+                         isSameDay: _isSameDay,
+                       ),
                     ),
                   ),
                   _SupportComposerPanel(
@@ -314,10 +394,12 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     composerCanSend: _composerCanSend,
                     keyboardInset: _keyboardInset,
                     onRemovePendingAttachment: _removePendingAttachment,
-                    onShowAttachmentOptions: _showAttachmentOptions,
-                    onSendMessage: () => _sendCurrentMessage(localeTag),
-                    onResolveConversation: _controller.resolveConversation,
-                  ),
+                     onShowAttachmentOptions: _showAttachmentOptions,
+                     onSendMessage: () => _sendCurrentMessage(localeTag),
+                     onResolveConversation: _controller.resolveConversation,
+                     replyToMessage: _replyToMessage,
+                     onClearReplyToMessage: _clearReplyToMessage,
+                   ),
                 ],
               ),
             ),

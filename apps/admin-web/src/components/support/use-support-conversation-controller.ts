@@ -117,6 +117,8 @@ export function useSupportConversationController({
   const [templateSearchQuery, setTemplateSearchQuery] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
+  const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
+  const [replyToPreview, setReplyToPreview] = useState<string | null>(null);
   const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("user");
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 1321px)").matches
@@ -236,10 +238,17 @@ export function useSupportConversationController({
   const sendMutation = useMutation({
     mutationFn: async () =>
       selectedAttachment
-        ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim())
-        : sendSupportMessage(conversationId, reply.trim()),
+        ? sendSupportAttachment(
+            conversationId,
+            selectedAttachment,
+            reply.trim(),
+            replyToMessageId
+          )
+        : sendSupportMessage(conversationId, reply.trim(), replyToMessageId),
     onSuccess: async () => {
       setReply("");
+      setReplyToMessageId(null);
+      setReplyToPreview(null);
       resetSelectedAttachment();
       setToast({ type: "success", message: text.supportReplySent });
       await refreshConversationData();
@@ -476,6 +485,21 @@ export function useSupportConversationController({
     conversation?.userEmail ||
     text.supportConversationTitle;
   const hasComposerAttachment = selectedAttachment !== null;
+  const replyToMessage = useMemo(
+    () =>
+      replyToMessageId
+        ? (conversation?.messages.find((message) => message.messageId === replyToMessageId) ?? null)
+        : null,
+    [conversation?.messages, replyToMessageId]
+  );
+
+  const selectReplyToMessage = useCallback(
+    (messageId: string | null, preview?: string | null) => {
+      setReplyToMessageId(messageId);
+      setReplyToPreview(messageId ? (preview?.trim() || null) : null);
+    },
+    []
+  );
 
   const sidePanelTabs = useMemo<ReadonlyArray<{ value: SidePanelTab; label: string }>>(
     () => [
@@ -631,6 +655,8 @@ export function useSupportConversationController({
     lastActivityAtUtc,
     recentFailures,
     reply,
+    replyToMessage,
+    replyToPreview,
     resetSelectedAttachment,
     searchQuery,
     selectedAttachment,
@@ -644,6 +670,8 @@ export function useSupportConversationController({
     setIsSidePanelOpen,
     setIsTemplateEditorOpen,
     setReply,
+    setReplyToMessageId,
+    setReplyToPreview,
     setSearchQuery,
     setQueueFilter,
     setSelectedAttachment,
@@ -664,6 +692,7 @@ export function useSupportConversationController({
     text,
     toast,
     totalPurchases,
+    selectReplyToMessage,
     userDisplayName,
     userQuery,
     visibleTemplates,

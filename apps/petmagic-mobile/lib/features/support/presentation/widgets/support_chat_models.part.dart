@@ -1,13 +1,16 @@
 part of 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
-const _supportSecondaryGreen = Color(0xFF69D8A7);
-const _supportMessageGreen = Color(0xFF129369);
-const _supportMessageGreenBorder = Color(0xFF0D7752);
-const _supportComposerSendGreen = Color(0xFF34B77A);
+const _supportSecondaryGreen = Color(0xFF66D8A4);
+const _supportMessageGreen = Color(0xFF1B6E55);
+const _supportMessageGreenBorder = Color(0xFF205A49);
+const _supportComposerSendGreen = Color(0xFF2FBC7E);
 const _supportComposerIconColor = Color(0xFFA0AEC0);
 const _supportComposerHintColor = Color(0xFF7B8794);
-const _supportAttachmentMaxFileSizeBytes = 10 * 1024 * 1024;
 const _supportAttachmentMaxCount = 5;
+const _supportAttachmentRecentAssetCount = 48;
+const _supportAttachmentImageMaxFileSizeBytes = 10 * 1024 * 1024;
+const _supportAttachmentVideoMaxFileSizeBytes = 50 * 1024 * 1024;
+const _supportAttachmentVideoMaxDuration = Duration(seconds: 60);
 
 bool _isSupportSystemMessage(SupportChatMessage message) {
   if (message.isSystemMessage) {
@@ -38,7 +41,7 @@ String _mapSupportError(AppLocalizations text, String raw) {
 
   if (value.contains('support.attachment_content_type_not_allowed') ||
       value.contains('support.attachment_mime_mismatch')) {
-    return text.supportChatAttachmentUnavailableError;
+    return text.supportChatAttachmentUnsupportedFormatError;
   }
 
   if (value.contains('support.attachment_retry_not_allowed')) {
@@ -65,12 +68,7 @@ String _mapSupportError(AppLocalizations text, String raw) {
   return raw;
 }
 
-enum _SupportAttachmentAction {
-  cameraPhoto,
-  galleryPhotos,
-  cameraVideo,
-  galleryVideo,
-}
+enum _SupportAttachmentQuickAction { camera, video, files }
 
 class _SupportQuickActionData {
   const _SupportQuickActionData({
@@ -84,28 +82,18 @@ class _SupportQuickActionData {
   final String prompt;
 }
 
-class _SupportFaqItemData {
-  const _SupportFaqItemData({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-}
-
 class _PendingSupportAttachment {
   const _PendingSupportAttachment({
     required this.filePath,
     required this.fileName,
     required this.contentType,
     required this.isVideo,
+    this.sourceAssetId,
   });
 
   final String filePath;
   final String fileName;
   final String contentType;
   final bool isVideo;
+  final String? sourceAssetId;
 }

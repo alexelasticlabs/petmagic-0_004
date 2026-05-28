@@ -147,15 +147,19 @@ class SupportChatController extends Notifier<SupportChatState> {
     await _refreshConversation();
   }
 
-  Future<void> sendMessage(String value, {required String localeTag}) async {
+  Future<bool> sendMessage(
+    String value, {
+    required String localeTag,
+    String? replyToMessageId,
+  }) async {
     final body = value.trim();
     final conversation = state.conversation;
     if (body.isEmpty || state.isSending) {
-      return;
+      return false;
     }
 
     if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
-      return;
+      return false;
     }
 
     state = state.copyWith(
@@ -182,22 +186,25 @@ class SupportChatController extends Notifier<SupportChatState> {
           conversationId: conversation.conversationId,
           body: body,
           localeTag: localeTag,
+          replyToMessageId: replyToMessageId,
         );
 
         state = state.copyWith(
           isSending: false,
           conversation: _appendOutgoingMessage(conversation, message),
           clearError: true,
-          clearSendProgress: true,
-        );
+            clearSendProgress: true,
+          );
       }
       _resumePendingRealtimeRefreshIfNeeded();
+      return true;
     } on AppException catch (error) {
       state = state.copyWith(
         isSending: false,
         errorMessage: error.message,
         clearSendProgress: true,
       );
+      return false;
     }
   }
 
@@ -219,12 +226,86 @@ class SupportChatController extends Notifier<SupportChatState> {
     return _resolveContentType(path);
   }
 
+  Future<bool> sendAttachments({
+    required List<SupportChatUploadAttachment> attachments,
+    required String localeTag,
+    String? body,
+    String? replyToMessageId,
+  }) async {
+    if (attachments.isEmpty || state.isSending) {
+      return false;
+    }
+
+    var conversation = state.conversation;
+    if (conversation != null && _isConversationReadOnlyForUser(conversation)) {
+      return false;
+    }
+
+    state = state.copyWith(
+      isSending: true,
+      clearError: true,
+      sendProgress: 0,
+      sendingAttachmentIndex: attachments.length == 1 ? 1 : null,
+      sendingAttachmentTotal: attachments.length,
+    );
+
+    try {
+      if (conversation == null) {
+        conversation = await _repository.openConversation(source: 'MobileChat');
+        state = state.copyWith(conversation: conversation);
+      }
+
+      final message = await _repository.sendAttachments(
+        conversationId: conversation.conversationId,
+        attachments: attachments,
+        localeTag: localeTag,
+        body: body,
+        replyToMessageId: replyToMessageId,
+        onSendProgress: (sent, total) {
+          if (total <= 0) {
+            return;
+          }
+
+          state = state.copyWith(
+            sendProgress: (sent / total).clamp(0.0, 1.0).toDouble(),
+          );
+        },
+      );
+
+      final attachmentFailure = _messageFromAttachmentFailure(message);
+      state = state.copyWith(
+        isSending: false,
+        conversation: _appendOutgoingMessage(conversation, message),
+        errorMessage: attachmentFailure,
+        clearError: attachmentFailure == null,
+        clearSendProgress: true,
+      );
+      _resumePendingRealtimeRefreshIfNeeded();
+      return attachmentFailure == null;
+    } on AppException catch (error) {
+      state = state.copyWith(
+        isSending: false,
+        errorMessage: error.message,
+        clearSendProgress: true,
+      );
+      return false;
+    } on Object {
+      state = state.copyWith(
+        isSending: false,
+        errorMessage: 'support.attachment_unavailable',
+        clearSendProgress: true,
+      );
+      return false;
+    }
+  }
+
   Future<bool> sendAttachment({
     required String filePath,
     required String fileName,
     required String contentType,
     required String localeTag,
     String? body,
+    String? replyToMessageId,
     int? attachmentBatchIndex,
     int? attachmentBatchTotal,
   }) async {
@@ -258,6 +339,7 @@ class SupportChatController extends Notifier<SupportChatState> {
         contentType: contentType,
         localeTag: localeTag,
         body: body,
+        replyToMessageId: replyToMessageId,
         onSendProgress: (sent, total) {
           if (total <= 0) {
             return;
@@ -571,10 +653,6 @@ class SupportChatController extends Notifier<SupportChatState> {
 
     if (lowerPath.endsWith('.mov') || lowerPath.endsWith('.qt')) {
       return 'video/quicktime';
-    }
-
-    if (lowerPath.endsWith('.webm')) {
-      return 'video/webm';
     }
 
     return 'application/octet-stream';

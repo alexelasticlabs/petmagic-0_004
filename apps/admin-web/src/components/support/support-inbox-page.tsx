@@ -1,178 +1,103 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  AdminBadge,
-  AdminCard,
-  AdminPage,
-  AdminStateCard,
-} from "@/components/admin/admin-primitives";
-import {
-  formatRelativeTime,
-  formatWaitTime,
-  initialsFor,
-} from "@/components/support/support-conversation-helpers";
-import { SupportOptionGroup } from "@/components/support/support-option-group";
+import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
+import { sortSupportQueueItems } from "@/components/support/support-conversation-helpers";
+import { SupportConversationPage } from "@/components/support/support-conversation-page";
 import styles from "@/components/support/support-page.module.css";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-  priorityLabel,
-  priorityTone,
-  sourceLabel,
-  statusLabel,
-  toneForStatus,
-} from "@/components/support/support-status-helpers";
-import { statusOptions } from "@/components/support/use-support-conversation-controller";
-import {
-  type SupportQueueFilter,
-  useSupportInboxController,
-} from "@/components/support/use-support-inbox-controller";
-import { Button } from "@/components/ui/button";
-import { type Locale } from "@/lib/i18n";
+    fetchSupportInbox,
+    useAuthSession,
+    type AdminSupportConversationSummary,
+} from "@/lib/api-client";
+import { getDictionary, type Locale } from "@/lib/i18n";
 
 type SupportInboxPageProps = {
   locale: Locale;
 };
 
 export function SupportInboxPage({ locale }: SupportInboxPageProps) {
-  const {
-    filteredConversations,
-    inboxQuery,
-    queueFilter,
-    searchQuery,
-    setQueueFilter,
-    setSearchQuery,
-    text,
-  } = useSupportInboxController({ locale });
+  const router = useRouter();
+  const session = useAuthSession();
+  const text = getDictionary(locale);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
-  const queueFilterOptions = useMemo(
-    () => [
-      { value: "all", label: text.supportStatusAll },
-      ...statusOptions.map((status) => ({
-        value: status,
-        label: statusLabel(status, text),
-      })),
-      { value: "mine", label: text.supportAssignmentMine },
-      { value: "unassigned", label: text.supportAssignmentUnassigned },
-    ],
-    [text]
+  useEffect(() => {
+    if (!session) {
+      ensureAdminSession(locale, router);
+    }
+  }, [locale, router, session]);
+
+  const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
+    queryKey: adminQueryKeys.supportInbox("all", "all"),
+    queryFn: () => fetchSupportInbox(undefined, "all"),
+    enabled: Boolean(session),
+  });
+
+  const sortedConversations = useMemo(
+    () => sortSupportQueueItems(inboxQuery.data ?? []),
+    [inboxQuery.data]
   );
 
+  const activeConversationId = useMemo(() => {
+    if (sortedConversations.length === 0) {
+      return null;
+    }
+
+    if (
+      selectedConversationId &&
+      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)
+    ) {
+      return selectedConversationId;
+    }
+
+    return sortedConversations[0]?.conversationId ?? null;
+  }, [selectedConversationId, sortedConversations]);
+
+  if (inboxQuery.isLoading || (sortedConversations.length > 0 && !activeConversationId)) {
+    return (
+      <AdminPage className={styles.page}>
+        <AdminStateCard
+          tone="info"
+          title={text.loading}
+          description={text.supportConversationDescription}
+        />
+      </AdminPage>
+    );
+  }
+
+  if (inboxQuery.isError) {
+    return (
+      <AdminPage className={styles.page}>
+        <AdminStateCard
+          tone="danger"
+          title={text.supportLoadError}
+          description={text.supportDescription}
+        />
+      </AdminPage>
+    );
+  }
+
+  if (sortedConversations.length === 0 || !activeConversationId) {
+    return (
+      <AdminPage className={styles.page}>
+        <AdminStateCard tone="info" title={text.supportEmpty} description={text.supportDescription} />
+      </AdminPage>
+    );
+  }
+
   return (
-    <AdminPage className={styles.page}>
-      <AdminCard
-        title={text.supportInboxTitle}
-        description={text.supportInboxDescription}
-        className={styles.inboxShellCompact}
-      >
-        <div className={styles.inboxControlClusterCompact}>
-          <label className={styles.searchField}>
-            <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
-            <input
-              className={styles.searchInput}
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder={text.supportSearchPlaceholder}
-            />
-          </label>
-          <div className={styles.supportControlStack}>
-            <SupportOptionGroup
-              label={text.supportQueueFilterLabel}
-              value={queueFilter}
-              options={queueFilterOptions}
-              onChange={(value) => setQueueFilter(value as SupportQueueFilter)}
-            />
-          </div>
-          <div className={styles.toolbarCompactEnd}>
-            <Button variant="secondary" size="sm" onClick={() => void inboxQuery.refetch()}>
-              {text.supportRefresh}
-            </Button>
-          </div>
-        </div>
-        {inboxQuery.isLoading ? (
-          <AdminStateCard
-            tone="info"
-            title={text.loading}
-            description={text.supportInboxDescription}
-          />
-        ) : inboxQuery.isError ? (
-          <AdminStateCard
-            tone="danger"
-            title={text.supportLoadError}
-            description={text.supportDescription}
-          />
-        ) : (inboxQuery.data?.length ?? 0) === 0 ? (
-          <AdminStateCard tone="info" title={text.supportEmpty} />
-        ) : filteredConversations.length === 0 ? (
-          <AdminStateCard
-            tone="info"
-            title={text.supportEmpty}
-            description={text.supportSearchPlaceholder}
-          />
-        ) : (
-          <div className={styles.inboxQueueGrid}>
-            {filteredConversations.map((conversation) => (
-              <Link
-                key={conversation.conversationId}
-                href={`/${locale}/support/${conversation.conversationId}`}
-                className={`${styles.conversationRow} ${conversation.isReadOnly ? styles.conversationRowClosed : ""}`}
-              >
-                <div className={styles.rowHeader}>
-                  <div className={styles.rowIdentity}>
-                    <span className={styles.avatar}>
-                      {initialsFor(conversation.userDisplayName?.trim() || conversation.userEmail)}
-                    </span>
-                    <div className={styles.rowTextStack}>
-                      <div className={styles.rowTitle}>
-                        {conversation.userDisplayName?.trim() || conversation.userEmail}
-                      </div>
-                      <div className={styles.subtle}>{conversation.userEmail}</div>
-                    </div>
-                  </div>
-                  <div className={styles.rowMeta}>
-                    <AdminBadge tone={toneForStatus(conversation.status)}>
-                      {statusLabel(conversation.status, text)}
-                    </AdminBadge>
-                    <span className={styles.timePill}>
-                      {formatRelativeTime(
-                        conversation.lastMessageAtUtc ?? conversation.updatedAtUtc,
-                        locale,
-                        "verbose"
-                      )}
-                    </span>
-                  </div>
-                </div>
-                <div className={styles.rowPreview}>
-                  <span>{conversation.lastMessagePreview || text.supportNoMessages}</span>
-                </div>
-                <div className={styles.rowFooter}>
-                  <div className={styles.rowMetaGroup}>
-                    <AdminBadge tone={priorityTone(conversation.priority)}>
-                      {priorityLabel(conversation.priority, text)}
-                    </AdminBadge>
-                    <AdminBadge tone="neutral">{sourceLabel(conversation.source, text)}</AdminBadge>
-                    {conversation.adminUnreadCount > 0 ? (
-                      <span className={styles.unreadDot}>{conversation.adminUnreadCount}</span>
-                    ) : null}
-                    <span className={styles.rowSecondaryMeta}>
-                      {statusLabel(conversation.status, text)}
-                    </span>
-                    <span className={styles.rowDetailValue}>
-                      {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
-                    </span>
-                  </div>
-                  <div className={styles.rowMetaGroup}>
-                    <span
-                      className={styles.waitingLabel}
-                    >{`${text.supportWaitingLabel}: ${formatWaitTime(conversation.lastMessageAtUtc ?? conversation.createdAtUtc, locale)}`}</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </AdminCard>
-    </AdminPage>
+      <SupportConversationPage
+      key={activeConversationId}
+      locale={locale}
+      conversationId={activeConversationId}
+      navigationMode="local"
+      onConversationSelect={setSelectedConversationId}
+    />
   );
 }

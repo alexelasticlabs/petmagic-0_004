@@ -122,29 +122,36 @@ export function DonutChart({
     numericItems.reduce((sum, item) => sum + item.value, 0)
   );
   const circumference = 2 * Math.PI * 65;
-  let currentOffset = 0;
+  const segments = numericItems.reduce<{
+    offset: number;
+    circles: Array<{ color: string; length: number; offset: number }>;
+  }>(
+    (acc, item) => {
+      const length = (item.value / totalValue) * circumference;
+      return {
+        offset: acc.offset + length,
+        circles: [...acc.circles, { color: item.color, length, offset: acc.offset }],
+      };
+    },
+    { offset: 0, circles: [] }
+  ).circles;
 
   return (
     <svg viewBox="0 0 180 180" className={styles.donutSvg} aria-hidden="true">
       <circle cx="90" cy="90" r="65" stroke="#18231f" strokeWidth="22" fill="none" />
-      {numericItems.map((item) => {
-        const length = (item.value / totalValue) * circumference;
-        const circle = (
+      {segments.map((segment) => (
           <circle
-            key={item.color}
+            key={segment.color}
             cx="90"
             cy="90"
             r="65"
-            stroke={item.color}
+            stroke={segment.color}
             strokeWidth="22"
             fill="none"
-            strokeDasharray={`${length} ${circumference - length}`}
-            strokeDashoffset={String(-currentOffset)}
+            strokeDasharray={`${segment.length} ${circumference - segment.length}`}
+            strokeDashoffset={String(-segment.offset)}
           />
-        );
-        currentOffset += length;
-        return circle;
-      })}
+        ))}
       <text
         x="90"
         y="86"
