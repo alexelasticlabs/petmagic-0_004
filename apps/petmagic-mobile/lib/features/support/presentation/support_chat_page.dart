@@ -415,6 +415,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
                     onShowAttachmentOptions: _showAttachmentOptions,
                     onSendMessage: () => _sendCurrentMessage(localeTag),
                     onResolveConversation: _controller.resolveConversation,
+                    onReopenConversation: _controller.reopenConversation,
                     replyToMessage: _replyToMessage,
                     onClearReplyToMessage: _clearReplyToMessage,
                   ),

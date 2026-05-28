@@ -3258,11 +3258,29 @@ abstract class AppLocalizations {
   /// **'No, write more'**
   String get supportChatKeepOpenAction;
 
-  /// No description provided for @supportChatReopenAction.
+  /// No description provided for @supportChatCloseRequestDialogTitle.
   ///
   /// In en, this message translates to:
-  /// **'Reopen'**
-  String get supportChatReopenAction;
+  /// **'Close request?'**
+  String get supportChatCloseRequestDialogTitle;
+
+  /// No description provided for @supportChatCloseRequestDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'If the problem is resolved, we will close this conversation. You can create a new request later.'**
+  String get supportChatCloseRequestDialogBody;
+
+  /// No description provided for @supportChatCloseConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get supportChatCloseConfirmAction;
+
+  /// No description provided for @supportChatCancelAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get supportChatCancelAction;
 
   /// No description provided for @supportChatArchiveAction.
   ///

@@ -430,6 +430,7 @@ class _SupportComposerPanel extends StatelessWidget {
     required this.onShowAttachmentOptions,
     required this.onSendMessage,
     required this.onResolveConversation,
+    required this.onReopenConversation,
     required this.replyToMessage,
     required this.onClearReplyToMessage,
   });
@@ -445,6 +446,7 @@ class _SupportComposerPanel extends StatelessWidget {
   final VoidCallback onShowAttachmentOptions;
   final Future<void> Function() onSendMessage;
   final Future<void> Function() onResolveConversation;
+  final Future<void> Function() onReopenConversation;
   final SupportChatMessage? replyToMessage;
   final VoidCallback onClearReplyToMessage;
 
@@ -499,8 +501,19 @@ class _SupportComposerPanel extends StatelessWidget {
                   resolveLabel: text.supportChatMarkResolvedAction,
                   keepOpenLabel: text.supportChatKeepOpenAction,
                   isBusy: state.isSending,
-                  onResolve: onResolveConversation,
-                  onKeepOpen: messageFocusNode.requestFocus,
+                  onResolve: () async {
+                    final ok = await _showSupportCloseConversationDialog(context, text);
+                    if (ok) {
+                      await onResolveConversation();
+                    }
+                  },
+                  onKeepOpen: () {
+                    onReopenConversation().whenComplete(() {
+                      if (messageFocusNode.canRequestFocus) {
+                        messageFocusNode.requestFocus();
+                      }
+                    });
+                  },
                 ),
               ),
             AnimatedSwitcher(
@@ -549,14 +562,15 @@ class _SupportComposerPanel extends StatelessWidget {
                     duration: const Duration(milliseconds: 140),
                     curve: Curves.easeOut,
                     constraints: const BoxConstraints(minHeight: 42),
-                    padding: const EdgeInsets.only(left: 2, right: 6),
+                    padding: const EdgeInsets.only(left: 2, right: 4),
                     decoration: BoxDecoration(
                       color: colors.surfaceStrong.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: colors.border.withValues(
-                          alpha: composerHasFocus ? 0.74 : 0.42,
+                          alpha: composerHasFocus ? 0.55 : 0.28,
                         ),
+                        width: 0.8,
                       ),
                     ),
                     child: Row(
@@ -623,59 +637,47 @@ class _SupportComposerPanel extends StatelessWidget {
                             textAlignVertical: TextAlignVertical.center,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 7),
-                AnimatedScale(
-                  scale: effectiveCanSend ? 1 : 0.92,
-                  duration: const Duration(milliseconds: 140),
-                  curve: Curves.easeOut,
-                  child: IgnorePointer(
-                    ignoring: !effectiveCanSend || state.isSending,
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 140),
-                      opacity: effectiveCanSend || state.isSending ? 1 : 0.66,
-                      child: Material(
-                        color: state.isSending
-                            ? _supportComposerSendGreen.withValues(alpha: 0.85)
-                            : effectiveCanSend
-                            ? _supportComposerSendGreen
-                            : colors.surface.withValues(alpha: 0.88),
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: state.isSending || !effectiveCanSend
-                              ? null
-                              : onSendMessage,
-                          child: SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: Center(
-                              child: state.isSending
-                                  ? const SizedBox(
-                                      width: 17,
-                                      height: 17,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: AnimatedScale(
+                            scale: effectiveCanSend ? 1 : 0.88,
+                            duration: const Duration(milliseconds: 140),
+                            curve: Curves.easeOut,
+                            child: IgnorePointer(
+                              ignoring: !effectiveCanSend && !state.isSending,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 140),
+                                opacity: effectiveCanSend || state.isSending ? 1 : 0.38,
+                                child: IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints.tightFor(width: 34, height: 40),
+                                  splashRadius: 18,
+                                  onPressed: state.isSending || !effectiveCanSend ? null : onSendMessage,
+                                  icon: state.isSending
+                                      ? SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(
+                                              _supportComposerSendGreen,
                                             ),
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.arrow_upward_rounded,
-                                      size: 22,
-                                      color: effectiveCanSend
-                                          ? Colors.white
-                                          : colors.textMuted,
-                                    ),
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.arrow_upward_rounded,
+                                          size: 22,
+                                          color: effectiveCanSend
+                                              ? _supportComposerSendGreen
+                                              : colors.textMuted.withValues(alpha: 0.5),
+                                        ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),

@@ -1798,7 +1798,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatKeepOpenAction => 'Нет, написать ещё';
 
   @override
-  String get supportChatReopenAction => 'Переоткрыть';
+  String get supportChatCloseRequestDialogTitle => 'Закрыть обращение?';
+
+  @override
+  String get supportChatCloseRequestDialogBody =>
+      'Если проблема решена, мы закроем этот диалог. Вы сможете создать новое обращение позже.';
+
+  @override
+  String get supportChatCloseConfirmAction => 'Закрыть';
+
+  @override
+  String get supportChatCancelAction => 'Отмена';
 
   @override
   String get supportChatArchiveAction => 'В архив';

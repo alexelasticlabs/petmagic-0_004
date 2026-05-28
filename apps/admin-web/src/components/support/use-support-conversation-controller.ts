@@ -147,6 +147,7 @@ export function useSupportConversationController({
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const markReadRequestRef = useRef<Promise<void> | null>(null);
+  const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRealtimeToastRef = useRef<string | null>(null);
 
   const resetSelectedAttachment = useCallback(() => {
@@ -248,20 +249,59 @@ export function useSupportConversationController({
     }
   });
 
-  useEffect(() => {
-    if (!conversationQuery.data) {
+  const attemptMarkRead = useCallback(() => {
+    if (
+      !conversationQuery.data ||
+      conversationQuery.data.adminUnreadCount <= 0 ||
+      markReadRequestRef.current
+    ) {
       return;
     }
 
-    if (conversationQuery.data.adminUnreadCount > 0 && !markReadRequestRef.current) {
-      markReadRequestRef.current = markSupportConversationRead(conversationId)
-        .then(refreshConversationData)
-        .catch(() => undefined)
-        .finally(() => {
-          markReadRequestRef.current = null;
-        });
+    if (document.visibilityState !== 'visible') {
+      return;
     }
+
+    markReadRequestRef.current = markSupportConversationRead(conversationId)
+      .then(refreshConversationData)
+      .catch(() => undefined)
+      .finally(() => {
+        markReadRequestRef.current = null;
+      });
   }, [conversationId, conversationQuery.data, refreshConversationData]);
+
+  useEffect(() => {
+    if (!conversationQuery.data || conversationQuery.data.adminUnreadCount <= 0) {
+      return;
+    }
+
+    if (markReadDebounceRef.current) {
+      clearTimeout(markReadDebounceRef.current);
+    }
+
+    markReadDebounceRef.current = setTimeout(() => {
+      attemptMarkRead();
+    }, 600);
+
+    return () => {
+      if (markReadDebounceRef.current) {
+        clearTimeout(markReadDebounceRef.current);
+      }
+    };
+  }, [conversationQuery.data, attemptMarkRead]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        attemptMarkRead();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [attemptMarkRead]);
 
   const sendMutation = useMutation({
     mutationFn: async () =>

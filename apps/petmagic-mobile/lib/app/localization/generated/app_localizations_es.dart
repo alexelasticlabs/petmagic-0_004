@@ -1798,7 +1798,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get supportChatKeepOpenAction => 'No, write more';
 
   @override
-  String get supportChatReopenAction => 'Reopen';
+  String get supportChatCloseRequestDialogTitle => '¿Cerrar solicitud?';
+
+  @override
+  String get supportChatCloseRequestDialogBody =>
+      'Si el problema está resuelto, cerraremos esta conversación. Puedes crear una nueva solicitud más adelante.';
+
+  @override
+  String get supportChatCloseConfirmAction => 'Cerrar';
+
+  @override
+  String get supportChatCancelAction => 'Cancelar';
 
   @override
   String get supportChatArchiveAction => 'Archive';
@@ -1917,7 +1927,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Failed to create ticket. Please try again.';
 
   @override
-  String get profileSettingsThemeSystem => 'Sistema';
+  String get profileSettingsThemeSystem => 'System';
 
   @override
   String get profileSettingsThemeLight => 'Luz';

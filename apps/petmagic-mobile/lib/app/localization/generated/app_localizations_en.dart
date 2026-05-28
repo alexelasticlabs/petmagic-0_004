@@ -1791,7 +1791,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportChatKeepOpenAction => 'No, write more';
 
   @override
-  String get supportChatReopenAction => 'Reopen';
+  String get supportChatCloseRequestDialogTitle => 'Close request?';
+
+  @override
+  String get supportChatCloseRequestDialogBody =>
+      'If the problem is resolved, we will close this conversation. You can create a new request later.';
+
+  @override
+  String get supportChatCloseConfirmAction => 'Close';
+
+  @override
+  String get supportChatCancelAction => 'Cancel';
 
   @override
   String get supportChatArchiveAction => 'Archive';

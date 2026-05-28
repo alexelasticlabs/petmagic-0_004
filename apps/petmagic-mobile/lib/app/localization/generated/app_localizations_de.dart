@@ -1810,7 +1810,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportChatKeepOpenAction => 'Nein, mehr schreiben';
 
   @override
-  String get supportChatReopenAction => 'Wieder öffnen';
+  String get supportChatCloseRequestDialogTitle => 'Anfrage schließen?';
+
+  @override
+  String get supportChatCloseRequestDialogBody =>
+      'Wenn das Problem gelöst ist, schließen wir dieses Gespräch. Sie können später eine neue Anfrage erstellen.';
+
+  @override
+  String get supportChatCloseConfirmAction => 'Schließen';
+
+  @override
+  String get supportChatCancelAction => 'Abbrechen';
 
   @override
   String get supportChatArchiveAction => 'Archivieren';

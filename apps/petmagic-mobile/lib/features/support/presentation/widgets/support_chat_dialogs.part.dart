@@ -379,3 +379,36 @@ class _SupportVideoPreviewDialogState
 }
 
 enum _SupportImagePreviewAction { save, share, openOriginal }
+
+Future<bool> _showSupportCloseConversationDialog(
+  BuildContext context,
+  AppLocalizations text,
+) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(
+        text.supportChatCloseRequestDialogTitle,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      content: Text(
+        text.supportChatCloseRequestDialogBody,
+        style: const TextStyle(fontSize: 14.5, height: 1.38),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(text.supportChatCancelAction),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(
+            text.supportChatCloseConfirmAction,
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      ],
+    ),
+  );
+  return result == true;
+}

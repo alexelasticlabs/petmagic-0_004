@@ -1798,7 +1798,17 @@ class AppLocalizationsPl extends AppLocalizations {
   String get supportChatKeepOpenAction => 'No, write more';
 
   @override
-  String get supportChatReopenAction => 'Reopen';
+  String get supportChatCloseRequestDialogTitle => 'Zamknąć zgłoszenie?';
+
+  @override
+  String get supportChatCloseRequestDialogBody =>
+      'Jeśli problem został rozwiązany, zamkniemy tę rozmowę. Możesz później utworzyć nowe zgłoszenie.';
+
+  @override
+  String get supportChatCloseConfirmAction => 'Zamknij';
+
+  @override
+  String get supportChatCancelAction => 'Anuluj';
 
   @override
   String get supportChatArchiveAction => 'Archive';
