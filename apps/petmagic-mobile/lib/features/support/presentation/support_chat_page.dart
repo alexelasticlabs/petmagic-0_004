@@ -40,7 +40,8 @@ class SupportChatPage extends ConsumerStatefulWidget {
   ConsumerState<SupportChatPage> createState() => _SupportChatPageState();
 }
 
-class _SupportChatPageState extends ConsumerState<SupportChatPage> {
+class _SupportChatPageState extends ConsumerState<SupportChatPage>
+    with WidgetsBindingObserver {
   static const _loadingFallbackDelay = Duration(seconds: 8);
   static const _loadingFallbackMessageCode = 'support.unavailable';
 
@@ -101,6 +102,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
   void initState() {
     super.initState();
     _controller = ref.read(supportChatControllerProvider.notifier);
+    WidgetsBinding.instance.addObserver(this);
     _scheduleLoadingFallbackIfNeeded();
     _messageController.addListener(_handleComposerChanged);
     _messageFocusNode.addListener(_handleComposerFocusChanged);
@@ -110,7 +112,19 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
       }
 
       _controller.start();
+      _controller.setScreenVisible(true);
     });
+  }
+
+  @override
+  void deactivate() {
+    _controller.setScreenVisible(false);
+    super.deactivate();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _controller.setScreenVisible(state == AppLifecycleState.resumed);
   }
 
   @override
@@ -120,6 +134,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage> {
     _messageHighlightTimer = null;
     _messageController.removeListener(_handleComposerChanged);
     _messageFocusNode.removeListener(_handleComposerFocusChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _controller.stop();
     _messageController.dispose();
     _scrollController.dispose();

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -77,6 +78,7 @@ class SupportChatController extends Notifier<SupportChatState> {
   Timer? _realtimeRefreshTimer;
   bool _hasPendingRealtimeRefresh = false;
   bool _started = false;
+  bool _isScreenVisible = true;
 
   @override
   SupportChatState build() {
@@ -93,6 +95,11 @@ class SupportChatController extends Notifier<SupportChatState> {
     unawaited(_realtimeClient.disconnect());
     _started = false;
     _hasPendingRealtimeRefresh = false;
+    _isScreenVisible = false;
+  }
+
+  void setScreenVisible(bool visible) {
+    _isScreenVisible = visible;
   }
 
   Future<void> start() async {
@@ -608,6 +615,15 @@ class SupportChatController extends Notifier<SupportChatState> {
 
   Future<void> _markReadIfNeeded(SupportChatConversation conversation) async {
     if (conversation.userUnreadCount <= 0) {
+      return;
+    }
+
+    // Skip marking read when the screen is hidden or the app is in background.
+    if (!_isScreenVisible) {
+      return;
+    }
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
       return;
     }
 
