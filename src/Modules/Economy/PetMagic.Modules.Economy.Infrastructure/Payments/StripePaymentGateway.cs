@@ -179,6 +179,76 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             ["plan_code"] = request.PlanCode
         };
 
+        async Task<Result<SubscriptionCheckoutCreateResponse>> CreateHostedCheckoutSessionAsync(bool forceInlinePrice = false)
+        {
+            var shouldUseCatalogPrice = !forceInlinePrice && !string.IsNullOrWhiteSpace(request.StripePriceId);
+            try
+            {
+                var lineItem = new SessionLineItemOptions
+                {
+                    Quantity = 1
+                };
+
+                if (shouldUseCatalogPrice)
+                {
+                    lineItem.Price = request.StripePriceId;
+                }
+                else
+                {
+                    lineItem.PriceData = new SessionLineItemPriceDataOptions
+                    {
+                        Currency = request.CurrencyCode.Trim().ToLowerInvariant(),
+                        UnitAmount = amountInMinorUnits,
+                        Recurring = new SessionLineItemPriceDataRecurringOptions
+                        {
+                            Interval = NormalizeRecurringInterval(request.BillingInterval)
+                        },
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
+                        {
+                            Name = request.ProductName
+                        }
+                    };
+                }
+
+                var session = await new SessionService().CreateAsync(
+                    new SessionCreateOptions
+                    {
+                        Mode = "subscription",
+                        SuccessUrl = options.StripeCheckoutSuccessUrl,
+                        CancelUrl = options.StripeCheckoutCancelUrl,
+                        Customer = request.ExternalCustomerId,
+                        ClientReferenceId = request.UserId.ToString("D"),
+                        Metadata = metadata,
+                        SubscriptionData = new SessionSubscriptionDataOptions
+                        {
+                            Metadata = metadata
+                        },
+                        LineItems = [lineItem]
+                    },
+                    new RequestOptions
+                    {
+                        IdempotencyKey = $"economy-subscription-{request.UserId:D}-{request.PlanCode.ToLowerInvariant()}"
+                    },
+                    cancellationToken);
+
+                return Result.Success(new SubscriptionCheckoutCreateResponse(
+                    session.Id,
+                    session.Url ?? string.Empty));
+            }
+            catch (StripeException) when (shouldUseCatalogPrice)
+            {
+                return await CreateHostedCheckoutSessionAsync(forceInlinePrice: true);
+            }
+            catch (StripeException)
+            {
+                return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+            catch
+            {
+                return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+        }
+
         if (request.UsePaymentSheet)
         {
             try
@@ -193,48 +263,62 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
                     return Result.Failure<SubscriptionCheckoutCreateResponse>(ephemeralKeyResult.Error);
                 }
 
-                var item = new SubscriptionItemOptions();
-                if (!string.IsNullOrWhiteSpace(request.StripePriceId))
+                async Task<Subscription> CreateMobileSubscriptionAsync(bool forceInlinePrice = false)
                 {
-                    item.Price = request.StripePriceId;
-                }
-                else
-                {
-                    var product = await new ProductService().CreateAsync(
-                        new ProductCreateOptions
-                        {
-                            Name = request.ProductName,
-                            Metadata = metadata
-                        },
-                        cancellationToken: cancellationToken);
+                    var shouldUseCatalogPrice = !forceInlinePrice && !string.IsNullOrWhiteSpace(request.StripePriceId);
 
-                    item.PriceData = new SubscriptionItemPriceDataOptions
+                    var item = new SubscriptionItemOptions();
+                    if (shouldUseCatalogPrice)
                     {
-                        Currency = request.CurrencyCode.Trim().ToLowerInvariant(),
-                        UnitAmount = amountInMinorUnits,
-                        Recurring = new SubscriptionItemPriceDataRecurringOptions
+                        item.Price = request.StripePriceId;
+                    }
+                    else
+                    {
+                        var product = await new ProductService().CreateAsync(
+                            new ProductCreateOptions
+                            {
+                                Name = request.ProductName,
+                                Metadata = metadata
+                            },
+                            cancellationToken: cancellationToken);
+
+                        item.PriceData = new SubscriptionItemPriceDataOptions
                         {
-                            Interval = request.BillingInterval.Trim().ToLowerInvariant()
-                        },
-                        Product = product.Id
-                    };
+                            Currency = request.CurrencyCode.Trim().ToLowerInvariant(),
+                            UnitAmount = amountInMinorUnits,
+                            Recurring = new SubscriptionItemPriceDataRecurringOptions
+                            {
+                                Interval = NormalizeRecurringInterval(request.BillingInterval)
+                            },
+                            Product = product.Id
+                        };
+                    }
+
+                    try
+                    {
+                        return await new SubscriptionService().CreateAsync(
+                            new SubscriptionCreateOptions
+                            {
+                                Customer = request.ExternalCustomerId,
+                                Items = [item],
+                                PaymentBehavior = "default_incomplete",
+                                PaymentSettings = new SubscriptionPaymentSettingsOptions
+                                {
+                                    SaveDefaultPaymentMethod = "on_subscription"
+                                },
+                                Metadata = metadata,
+                                Expand = ["latest_invoice.payment_intent", "latest_invoice.confirmation_secret"]
+                            },
+                            requestOptions: null,
+                            cancellationToken);
+                    }
+                    catch (StripeException) when (shouldUseCatalogPrice)
+                    {
+                        return await CreateMobileSubscriptionAsync(forceInlinePrice: true);
+                    }
                 }
 
-                var subscription = await new SubscriptionService().CreateAsync(
-                    new SubscriptionCreateOptions
-                    {
-                        Customer = request.ExternalCustomerId,
-                        Items = [item],
-                        PaymentBehavior = "default_incomplete",
-                        PaymentSettings = new SubscriptionPaymentSettingsOptions
-                        {
-                            SaveDefaultPaymentMethod = "on_subscription"
-                        },
-                        Metadata = metadata,
-                        Expand = ["latest_invoice.payments.data.payment.payment_intent"]
-                    },
-                    requestOptions: null,
-                    cancellationToken);
+                var subscription = await CreateMobileSubscriptionAsync();
 
                 var clientSecret = subscription.LatestInvoice?
                     .Payments?
@@ -249,6 +333,30 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
                 if (string.IsNullOrWhiteSpace(clientSecret))
                 {
                     var latestInvoiceId = subscription.LatestInvoice?.Id ?? subscription.LatestInvoiceId;
+                    if (string.IsNullOrWhiteSpace(latestInvoiceId))
+                    {
+                        var refreshedSubscription = await new SubscriptionService().GetAsync(
+                            subscription.Id,
+                            new SubscriptionGetOptions
+                            {
+                                Expand = ["latest_invoice.confirmation_secret", "latest_invoice.payments.data.payment.payment_intent"]
+                            },
+                            requestOptions: null,
+                            cancellationToken);
+
+                        clientSecret = refreshedSubscription.LatestInvoice?
+                            .ConfirmationSecret?
+                            .ClientSecret
+                            ?? refreshedSubscription.LatestInvoice?
+                                .Payments?
+                                .Data?
+                                .FirstOrDefault()?
+                                .Payment?
+                                .PaymentIntent?
+                                .ClientSecret;
+                        latestInvoiceId = refreshedSubscription.LatestInvoice?.Id ?? refreshedSubscription.LatestInvoiceId;
+                    }
+
                     if (!string.IsNullOrWhiteSpace(latestInvoiceId))
                     {
                         var invoice = await new InvoiceService().GetAsync(
@@ -267,7 +375,6 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
                                 .Payment?
                                 .PaymentIntent?
                                 .ClientSecret;
-
                     }
                 }
 
@@ -294,60 +401,7 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
             }
         }
 
-        try
-        {
-            var session = await new SessionService().CreateAsync(
-                new SessionCreateOptions
-                {
-                    Mode = "subscription",
-                    SuccessUrl = options.StripeCheckoutSuccessUrl,
-                    CancelUrl = options.StripeCheckoutCancelUrl,
-                    Customer = request.ExternalCustomerId,
-                    ClientReferenceId = request.UserId.ToString("D"),
-                    Metadata = metadata,
-                    SubscriptionData = new SessionSubscriptionDataOptions
-                    {
-                        Metadata = metadata
-                    },
-                    LineItems =
-                    [
-                        new SessionLineItemOptions
-                        {
-                            Quantity = 1,
-                            PriceData = new SessionLineItemPriceDataOptions
-                            {
-                                Currency = request.CurrencyCode.Trim().ToLowerInvariant(),
-                                UnitAmount = amountInMinorUnits,
-                                Recurring = new SessionLineItemPriceDataRecurringOptions
-                                {
-                                    Interval = request.BillingInterval.Trim().ToLowerInvariant()
-                                },
-                                ProductData = new SessionLineItemPriceDataProductDataOptions
-                                {
-                                    Name = request.ProductName
-                                }
-                            }
-                        }
-                    ]
-                },
-                new RequestOptions
-                {
-                    IdempotencyKey = $"economy-subscription-{request.UserId:D}-{request.PlanCode.ToLowerInvariant()}"
-                },
-                cancellationToken);
-
-            return Result.Success(new SubscriptionCheckoutCreateResponse(
-                session.Id,
-                session.Url ?? string.Empty));
-        }
-        catch (StripeException)
-        {
-            return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
-        }
-        catch
-        {
-            return Result.Failure<SubscriptionCheckoutCreateResponse>(EconomyErrors.PaymentGatewayFailed);
-        }
+        return await CreateHostedCheckoutSessionAsync();
     }
 
     public async Task<Result<PaymentCustomerCreateResponse>> CreateCustomerAsync(PaymentCustomerCreateRequest request, CancellationToken cancellationToken)
@@ -603,6 +657,17 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
     private static bool IsStripe(string provider)
     {
         return string.Equals(provider, Provider, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeRecurringInterval(string value)
+    {
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "monthly" => "month",
+            "yearly" => "year",
+            "year" => "year",
+            _ => "month"
+        };
     }
 
     private static bool EnsureConfigured(string? apiKey)

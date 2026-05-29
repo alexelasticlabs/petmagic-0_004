@@ -1849,6 +1849,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportHomeSubtitle => 'Womit können wir Ihnen helfen?';
 
   @override
+  String get supportHomeOpenChatAction => 'Open chat';
+
+  @override
   String get supportHomeTopicGenerationIssue =>
       'Problem mit der Bildgenerierung';
 

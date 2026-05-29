@@ -698,6 +698,7 @@
   "supportChatReadOnlyHint": "Диалог доступен только для просмотра",
   "supportHomeTitle": "Помощь и поддержка",
   "supportHomeSubtitle": "Чем мы можем помочь?",
+  "supportHomeOpenChatAction": "Открыть чат",
   "supportHomeTopicGenerationIssue": "Проблема с генерацией изображения",
   "supportHomeTopicGenerationTooLong": "Генерация занимает слишком долго",
   "supportHomeTopicTokensNotArrived": "Токены не пришли",

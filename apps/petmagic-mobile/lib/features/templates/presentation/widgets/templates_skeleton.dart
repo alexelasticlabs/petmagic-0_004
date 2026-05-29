@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/shimmer_box.dart';
 
 class TemplatesSkeleton extends StatelessWidget {
   const TemplatesSkeleton({super.key});
@@ -71,10 +72,12 @@ class _SkeletonBlock extends StatelessWidget {
   final double radius;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: colors.border.withValues(alpha: 0.32),
-      borderRadius: BorderRadius.circular(radius),
+  Widget build(BuildContext context) => ShimmerBox(
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.border.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(radius),
+      ),
     ),
   );
 }

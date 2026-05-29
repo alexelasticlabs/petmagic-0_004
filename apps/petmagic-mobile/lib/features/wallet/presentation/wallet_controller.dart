@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 
@@ -34,6 +35,7 @@ class WalletState {
     this.errorMessage,
     this.checkoutUrl,
     this.pendingCheckoutOrderId,
+    this.pendingStoreProvider,
     this.checkoutVerificationState = WalletCheckoutVerificationState.idle,
     this.checkoutGrantedSpark,
     this.checkoutErrorMessage,
@@ -57,6 +59,7 @@ class WalletState {
   final String? errorMessage;
   final String? checkoutUrl;
   final String? pendingCheckoutOrderId;
+  final String? pendingStoreProvider;
   final WalletCheckoutVerificationState checkoutVerificationState;
   final int? checkoutGrantedSpark;
   final String? checkoutErrorMessage;
@@ -101,6 +104,7 @@ class WalletState {
     String? errorMessage,
     String? checkoutUrl,
     String? pendingCheckoutOrderId,
+    String? pendingStoreProvider,
     WalletCheckoutVerificationState? checkoutVerificationState,
     int? checkoutGrantedSpark,
     String? checkoutErrorMessage,
@@ -110,6 +114,7 @@ class WalletState {
     bool clearError = false,
     bool clearCheckoutUrl = false,
     bool clearPendingCheckout = false,
+    bool clearPendingStoreProvider = false,
     bool clearCheckoutGrantedSpark = false,
     bool clearCheckoutError = false,
     bool clearHighlightedPurchaseOrderId = false,
@@ -134,6 +139,9 @@ class WalletState {
       pendingCheckoutOrderId: clearPendingCheckout
           ? null
           : pendingCheckoutOrderId ?? this.pendingCheckoutOrderId,
+      pendingStoreProvider: clearPendingStoreProvider
+          ? null
+          : pendingStoreProvider ?? this.pendingStoreProvider,
       checkoutVerificationState:
           checkoutVerificationState ?? this.checkoutVerificationState,
       checkoutGrantedSpark: clearCheckoutGrantedSpark
@@ -158,10 +166,18 @@ class WalletState {
 class WalletController extends Notifier<WalletState> {
   late final WalletRepository _repository;
   Future<void>? _loadInFlight;
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
   @override
   WalletState build() {
     _repository = ref.watch(walletRepositoryProvider);
+    _purchaseSubscription?.cancel();
+    _purchaseSubscription = _repository.purchaseUpdates.listen(
+      _handlePurchaseUpdates,
+    );
+    ref.onDispose(() {
+      unawaited(_purchaseSubscription?.cancel());
+    });
     return const WalletState(isLoading: true);
   }
 
@@ -255,13 +271,11 @@ class WalletController extends Notifier<WalletState> {
     }
   }
 
-  Future<PurchaseCheckoutModel?> buyPack(CurrencyPackModel pack) async {
-    final paymentMethod = state.selectedPaymentMethod;
-    if (paymentMethod == null) {
-      developer.log(
-        'Checkout blocked: no enabled Stripe payment method (pack=${pack.code}, methods=${state.paymentMethods.length})',
-        name: 'PetMagic.Wallet.Checkout',
-      );
+  Future<PurchaseCheckoutModel?> buyPack(
+    CurrencyPackModel pack,
+    WalletPaymentMethodModel paymentMethod,
+  ) async {
+    if (!paymentMethod.isEnabled) {
       state = state.copyWith(errorMessage: 'wallet.payment_unavailable');
       return null;
     }
@@ -285,6 +299,32 @@ class WalletController extends Notifier<WalletState> {
     );
 
     try {
+      if (paymentMethod.isStoreNative) {
+        final expectedProductId = pack.productIdForProvider(
+          paymentMethod.provider,
+        );
+        if (expectedProductId == null || expectedProductId.isEmpty) {
+          state = state.copyWith(
+            isBuying: false,
+            errorMessage: 'wallet.payment_unavailable',
+          );
+          return null;
+        }
+
+        final availability = await _repository.fetchStoreAvailability(
+          [pack],
+          paymentMethod,
+        );
+        if (!availability.isAvailable ||
+            !availability.productIds.contains(expectedProductId)) {
+          state = state.copyWith(
+            isBuying: false,
+            errorMessage: 'wallet.payment_unavailable',
+          );
+          return null;
+        }
+      }
+
       final checkout = await _repository.createPurchase(
         pack,
         paymentMethod,
@@ -295,6 +335,18 @@ class WalletController extends Notifier<WalletState> {
         'Checkout response (order=${checkout.orderId}, status=${checkout.status}, urlLength=${checkout.checkoutUrl.length})',
         name: 'PetMagic.Wallet.Checkout',
       );
+
+      if (paymentMethod.isStoreNative) {
+        state = state.copyWith(
+          pendingCheckoutOrderId: checkout.orderId,
+          pendingStoreProvider: paymentMethod.provider,
+          isBuying: true,
+        );
+
+        await _repository.startStoreCheckout(pack, paymentMethod);
+        state = state.copyWith(isBuying: false);
+        return null;
+      }
 
       final checkoutUrl = checkout.checkoutUrl.trim();
       if (checkoutUrl.isEmpty && !checkout.usesPaymentSheet) {
@@ -320,6 +372,7 @@ class WalletController extends Notifier<WalletState> {
           isBuying: false,
           clearCheckoutUrl: true,
           clearPendingCheckout: true,
+          clearPendingStoreProvider: true,
           errorMessage: 'payment_gateway_failed',
         );
         return null;
@@ -329,6 +382,7 @@ class WalletController extends Notifier<WalletState> {
         isBuying: false,
         checkoutUrl: checkoutUrl,
         pendingCheckoutOrderId: checkout.orderId,
+        clearPendingStoreProvider: true,
       );
       return checkout;
     } catch (error) {
@@ -337,7 +391,12 @@ class WalletController extends Notifier<WalletState> {
         name: 'PetMagic.Wallet.Checkout',
         error: error,
       );
-      state = state.copyWith(isBuying: false, errorMessage: error.toString());
+      state = state.copyWith(
+        isBuying: false,
+        clearPendingCheckout: true,
+        clearPendingStoreProvider: true,
+        errorMessage: error.toString(),
+      );
       return null;
     }
   }
@@ -461,6 +520,7 @@ class WalletController extends Notifier<WalletState> {
             checkoutGrantedSpark: purchase.sparkToGrant,
             highlightedPurchaseOrderId: purchase.orderId,
             clearPendingCheckout: true,
+            clearPendingStoreProvider: true,
             clearCheckoutError: true,
             clearCheckoutProgressMessage: true,
             clearCheckoutVerificationStartedAt: true,
@@ -527,6 +587,7 @@ class WalletController extends Notifier<WalletState> {
             checkoutGrantedSpark: purchase.sparkToGrant,
             highlightedPurchaseOrderId: purchase.orderId,
             clearPendingCheckout: true,
+            clearPendingStoreProvider: true,
             clearCheckoutError: true,
             clearCheckoutProgressMessage: true,
             clearCheckoutVerificationStartedAt: true,
@@ -551,6 +612,7 @@ class WalletController extends Notifier<WalletState> {
             checkoutGrantedSpark: purchase.sparkToGrant,
             highlightedPurchaseOrderId: purchase.orderId,
             clearPendingCheckout: true,
+            clearPendingStoreProvider: true,
             clearCheckoutError: true,
             clearCheckoutProgressMessage: true,
             clearCheckoutVerificationStartedAt: true,
@@ -567,5 +629,126 @@ class WalletController extends Notifier<WalletState> {
     }
 
     await verifyCheckoutStatus();
+  }
+
+  Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases) async {
+    for (final purchase in purchases) {
+      switch (purchase.status) {
+        case PurchaseStatus.pending:
+          state = state.copyWith(isBuying: true, clearError: true);
+          break;
+        case PurchaseStatus.purchased:
+        case PurchaseStatus.restored:
+          await _verifyStorePurchase(purchase);
+          break;
+        case PurchaseStatus.error:
+          if (purchase.pendingCompletePurchase) {
+            await _repository.completePurchase(purchase);
+          }
+          state = state.copyWith(
+            isBuying: false,
+            checkoutVerificationState: WalletCheckoutVerificationState.error,
+            checkoutErrorMessage:
+                purchase.error?.message ?? 'wallet.payment_unavailable',
+            errorMessage: purchase.error?.message ?? 'wallet.payment_unavailable',
+          );
+          break;
+        case PurchaseStatus.canceled:
+          if (purchase.pendingCompletePurchase) {
+            await _repository.completePurchase(purchase);
+          }
+          state = state.copyWith(
+            isBuying: false,
+            errorMessage: 'wallet.payment_unavailable',
+          );
+          break;
+      }
+    }
+  }
+
+  Future<void> _verifyStorePurchase(PurchaseDetails purchase) async {
+    final pendingOrderId = state.pendingCheckoutOrderId;
+    final provider = state.pendingStoreProvider;
+    if (pendingOrderId == null ||
+        pendingOrderId.isEmpty ||
+        provider == null ||
+        provider.isEmpty) {
+      if (purchase.pendingCompletePurchase) {
+        await _repository.completePurchase(purchase);
+      }
+      return;
+    }
+
+    WalletPaymentMethodModel? paymentMethod;
+    for (final method in state.paymentMethods) {
+      if (method.provider == provider) {
+        paymentMethod = method;
+        break;
+      }
+    }
+
+    if (paymentMethod == null) {
+      if (purchase.pendingCompletePurchase) {
+        await _repository.completePurchase(purchase);
+      }
+      state = state.copyWith(
+        isBuying: false,
+        checkoutVerificationState: WalletCheckoutVerificationState.error,
+        checkoutErrorMessage: 'wallet.payment_unavailable',
+        errorMessage: 'wallet.payment_unavailable',
+      );
+      return;
+    }
+
+    try {
+      state = state.copyWith(
+        checkoutVerificationState: WalletCheckoutVerificationState.checking,
+        clearCheckoutError: true,
+      );
+
+      final verified = await _repository.verifyStorePurchase(
+        orderId: pendingOrderId,
+        paymentMethod: paymentMethod,
+        purchase: purchase,
+      );
+
+      if (purchase.pendingCompletePurchase) {
+        await _repository.completePurchase(purchase);
+      }
+
+      if (verified.status == 'succeeded') {
+        await load(refresh: true);
+        state = state.copyWith(
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+          checkoutGrantedSpark: verified.sparkToGrant,
+          highlightedPurchaseOrderId: verified.orderId,
+          clearPendingCheckout: true,
+          clearPendingStoreProvider: true,
+          clearCheckoutError: true,
+          clearCheckoutProgressMessage: true,
+          clearCheckoutVerificationStartedAt: true,
+        );
+        return;
+      }
+
+      state = state.copyWith(
+        isBuying: false,
+        checkoutVerificationState: WalletCheckoutVerificationState.pending,
+        clearCheckoutError: true,
+        checkoutProgressMessage: 'Waiting for payment provider confirmation...',
+      );
+      await verifyCheckoutStatus();
+    } catch (error) {
+      if (purchase.pendingCompletePurchase) {
+        await _repository.completePurchase(purchase);
+      }
+      state = state.copyWith(
+        isBuying: false,
+        checkoutVerificationState: WalletCheckoutVerificationState.error,
+        checkoutErrorMessage: error.toString(),
+        errorMessage: error.toString(),
+      );
+    }
   }
 }

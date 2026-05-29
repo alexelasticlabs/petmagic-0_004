@@ -80,6 +80,9 @@ public static class EconomyEndpoints
         group.MapPost("/premium/manage", CreatePremiumBillingPortalAsync)
             .RequireAuthorization();
 
+        group.MapPost("/premium/cancel", CancelPremiumSubscriptionAsync)
+            .RequireAuthorization();
+
         group.MapPost("/premium/store/verify", VerifyPremiumStorePurchaseAsync)
             .RequireAuthorization();
 
@@ -102,6 +105,9 @@ public static class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapPost("/purchases/{orderId:guid}/verify-stripe", VerifyStripeCheckoutAsync)
+            .RequireAuthorization();
+
+        group.MapPost("/purchases/{orderId:guid}/verify-store", VerifyStoreCheckoutAsync)
             .RequireAuthorization();
 
         group.MapGet("/purchases/{orderId:guid}", GetPurchaseAsync)
@@ -598,7 +604,7 @@ public static class EconomyEndpoints
             request.PackId,
             request.CurrencyCode,
             string.IsNullOrWhiteSpace(request.PaymentProvider) ? "stripe" : request.PaymentProvider,
-            request.Platform,
+            ResolveCheckoutPlatform(context, request.Platform),
             request.AppVersion,
             request.Country,
             request.Locale,
@@ -652,7 +658,7 @@ public static class EconomyEndpoints
             pack.PackId,
             string.IsNullOrWhiteSpace(request.CurrencyCode) ? pack.CurrencyCode : request.CurrencyCode,
             "stripe",
-            request.Platform,
+            ResolveCheckoutPlatform(context, request.Platform),
             request.AppVersion,
             request.Country,
             request.Locale,
@@ -725,7 +731,7 @@ public static class EconomyEndpoints
             userId!.Value,
             request.PlanCode,
             string.IsNullOrWhiteSpace(request.PaymentProvider) ? "stripe" : request.PaymentProvider,
-            request.Platform,
+            ResolveCheckoutPlatform(context, request.Platform),
             request.AppVersion,
             request.Country,
             request.Locale);
@@ -765,7 +771,7 @@ public static class EconomyEndpoints
             userId!.Value,
             request.PlanId,
             "stripe",
-            request.Platform,
+            ResolveCheckoutPlatform(context, request.Platform),
             request.AppVersion,
             request.Country,
             request.Locale);
@@ -812,6 +818,41 @@ public static class EconomyEndpoints
         }
 
         var result = await service.CreatePremiumBillingPortalAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "economy.premium_billing_unavailable", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SubscriptionSummaryResponse>, ValidationProblem, ProblemHttpResult>> CancelPremiumSubscriptionAsync(
+        HttpContext context,
+        CancelPremiumSubscriptionRequest request,
+        IValidator<CancelPremiumSubscriptionCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new CancelPremiumSubscriptionCommand(
+            userId!.Value,
+            string.IsNullOrWhiteSpace(request.PaymentProvider) ? "stripe" : request.PaymentProvider);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.CancelPremiumSubscriptionAsync(command, cancellationToken);
         if (result.IsFailure)
         {
             var statusCode = string.Equals(result.Error.Code, "economy.premium_billing_unavailable", StringComparison.Ordinal)
@@ -919,6 +960,53 @@ public static class EconomyEndpoints
             var statusCode = string.Equals(result.Error.Code, PurchaseNotFoundCode, StringComparison.Ordinal)
                 ? StatusCodes.Status404NotFound
                 : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<PurchaseOrderResponse>, ValidationProblem, ProblemHttpResult>> VerifyStoreCheckoutAsync(
+        HttpContext context,
+        Guid orderId,
+        VerifyPackStorePurchaseRequest request,
+        IValidator<VerifyPackStorePurchaseCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new VerifyPackStorePurchaseCommand(
+            userId!.Value,
+            orderId,
+            request.PaymentProvider,
+            request.ProductId,
+            request.ServerVerificationData,
+            request.LocalVerificationData,
+            request.PurchaseId,
+            request.TransactionDate);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.VerifyPackStorePurchaseAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                PurchaseNotFoundCode => StatusCodes.Status404NotFound,
+                "economy.store_verification_unavailable" => StatusCodes.Status503ServiceUnavailable,
+                "economy.store_purchase_invalid" => StatusCodes.Status400BadRequest,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
@@ -1104,6 +1192,71 @@ public static class EconomyEndpoints
             : null;
     }
 
+    private static string ResolveCheckoutPlatform(HttpContext context, string? requestPlatform)
+    {
+        var normalizedFromBody = NormalizePlatformToken(requestPlatform);
+        if (context.Request.Headers.TryGetValue("X-PetMagic-Platform", out var headerPlatform))
+        {
+            var normalizedFromHeader = NormalizePlatformToken(headerPlatform.ToString());
+            if (!string.Equals(normalizedFromHeader, "web", StringComparison.Ordinal))
+            {
+                return normalizedFromHeader;
+            }
+        }
+
+        if (!string.Equals(normalizedFromBody, "web", StringComparison.Ordinal))
+        {
+            return normalizedFromBody;
+        }
+
+        if (context.Request.Headers.TryGetValue("User-Agent", out var userAgentValues))
+        {
+            var userAgent = userAgentValues.ToString();
+            if (userAgent.Contains("Android", StringComparison.OrdinalIgnoreCase))
+            {
+                return "android";
+            }
+
+            if (userAgent.Contains("iPhone", StringComparison.OrdinalIgnoreCase)
+                || userAgent.Contains("iPad", StringComparison.OrdinalIgnoreCase)
+                || userAgent.Contains("iOS", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ios";
+            }
+        }
+
+        return normalizedFromBody;
+    }
+
+    private static string NormalizePlatformToken(string? rawPlatform)
+    {
+        if (string.IsNullOrWhiteSpace(rawPlatform))
+        {
+            return "web";
+        }
+
+        var normalized = rawPlatform.Trim().ToLowerInvariant();
+        if (normalized.Contains("android", StringComparison.Ordinal))
+        {
+            return "android";
+        }
+
+        if (normalized.Contains("ios", StringComparison.Ordinal)
+            || normalized.Contains("iphone", StringComparison.Ordinal)
+            || normalized.Contains("ipad", StringComparison.Ordinal))
+        {
+            return "ios";
+        }
+
+        return normalized switch
+        {
+            "iphone" => "ios",
+            "ipad" => "ios",
+            "mobile" => "web",
+            _ => normalized
+        };
+    }
+
     public sealed record SpendRequest(int Amount, string Reason);
 
     public sealed record RedeemCodeRequest(string Code);
@@ -1134,6 +1287,8 @@ public static class EconomyEndpoints
 
     public sealed record CreatePremiumBillingPortalRequest(string PaymentProvider = "stripe");
 
+    public sealed record CancelPremiumSubscriptionRequest(string PaymentProvider = "stripe");
+
     public sealed record CreateStripeTokenPurchaseRequest(
         string TokenPackId,
         string? CurrencyCode = null,
@@ -1153,6 +1308,14 @@ public static class EconomyEndpoints
 
     public sealed record VerifyPremiumStorePurchaseRequest(
         string PlanCode,
+        string PaymentProvider,
+        string ProductId,
+        string ServerVerificationData,
+        string? LocalVerificationData,
+        string? PurchaseId,
+        string? TransactionDate);
+
+    public sealed record VerifyPackStorePurchaseRequest(
         string PaymentProvider,
         string ProductId,
         string ServerVerificationData,

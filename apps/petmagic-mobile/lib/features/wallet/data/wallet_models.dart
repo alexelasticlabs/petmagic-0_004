@@ -127,6 +127,8 @@ class CurrencyPackModel {
     required this.grantedSpark,
     required this.bonusSpark,
     required this.totalSpark,
+    this.googlePlayProductId,
+    this.appStoreProductId,
   });
 
   final String packId;
@@ -137,6 +139,8 @@ class CurrencyPackModel {
   final int grantedSpark;
   final int bonusSpark;
   final int totalSpark;
+  final String? googlePlayProductId;
+  final String? appStoreProductId;
 
   factory CurrencyPackModel.fromJson(Map<String, dynamic> json) {
     return CurrencyPackModel(
@@ -148,7 +152,18 @@ class CurrencyPackModel {
       grantedSpark: (json['grantedSpark'] as num?)?.toInt() ?? 0,
       bonusSpark: (json['bonusSpark'] as num?)?.toInt() ?? 0,
       totalSpark: (json['totalSpark'] as num?)?.toInt() ?? 0,
+      googlePlayProductId: json['googlePlayProductId'] as String?,
+      appStoreProductId: json['appStoreProductId'] as String?,
     );
+  }
+
+  String? productIdForProvider(String provider) {
+    final normalizedProvider = provider.trim().toLowerCase();
+    return switch (normalizedProvider) {
+      'google_play' => googlePlayProductId,
+      'app_store' => appStoreProductId,
+      _ => null,
+    };
   }
 }
 
@@ -188,6 +203,11 @@ class WalletPaymentMethodModel {
   final String? notes;
 
   bool get isStripe => provider.toLowerCase() == 'stripe';
+
+  bool get isStoreNative {
+    final normalized = provider.toLowerCase();
+    return normalized == 'google_play' || normalized == 'app_store';
+  }
 
   factory WalletPaymentMethodModel.fromJson(Map<String, dynamic> json) {
     return WalletPaymentMethodModel(

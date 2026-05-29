@@ -8,8 +8,9 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'support_assistant_scenarios.dart';
+
 import 'support_assistant_page.dart';
+import 'support_assistant_scenarios.dart';
 
 enum _SupportHomeTab { active, archive }
 
@@ -41,7 +42,9 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
     });
 
     try {
-      final conversation = await ref.read(supportChatRepositoryProvider).getConversation();
+      final conversation = await ref
+          .read(supportChatRepositoryProvider)
+          .getConversation();
       if (!mounted) {
         return;
       }
@@ -54,9 +57,9 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
         return;
       }
 
-      final isNotFound = error.message
-          .toLowerCase()
-          .contains('support.conversation_not_found');
+      final isNotFound = error.message.toLowerCase().contains(
+        'support.conversation_not_found',
+      );
       setState(() {
         _conversation = null;
         _conversationError = isNotFound ? null : error.message;
@@ -70,6 +73,8 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
         _conversation = null;
         _conversationError = 'support.unavailable';
       });
+    }
+
     if (!mounted) {
       return;
     }
@@ -101,8 +106,10 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
 
     final topics = _buildTopics(text);
     final hasConversation = _conversation != null;
-    final conversationIsArchived = hasConversation && _isArchived(_conversation!);
-    final shouldShowConversation = hasConversation &&
+    final conversationIsArchived =
+        hasConversation && _isArchived(_conversation!);
+    final shouldShowConversation =
+        hasConversation &&
         ((_tab == _SupportHomeTab.active && !conversationIsArchived) ||
             (_tab == _SupportHomeTab.archive && conversationIsArchived));
 
@@ -133,7 +140,8 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                     child: _SupportTabButton(
                       title: text.supportChatStatusOpen,
                       isActive: _tab == _SupportHomeTab.active,
-                      onTap: () => setState(() => _tab = _SupportHomeTab.active),
+                      onTap: () =>
+                          setState(() => _tab = _SupportHomeTab.active),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -141,7 +149,8 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                     child: _SupportTabButton(
                       title: text.supportChatArchiveAction,
                       isActive: _tab == _SupportHomeTab.archive,
-                      onTap: () => setState(() => _tab = _SupportHomeTab.archive),
+                      onTap: () =>
+                          setState(() => _tab = _SupportHomeTab.archive),
                     ),
                   ),
                 ],
@@ -170,10 +179,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                       const SizedBox(height: 8),
                       Text(
                         text.supportChatEmptyMessage,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: colors.textSoft, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
                       TextButton(
@@ -188,7 +194,10 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                   conversation: _conversation!,
                   tab: _tab,
                   onOpenChat: () => context.push(SupportChatPage.routePath),
-                  subtitle: _formatLastActivity(context, _conversation!.lastMessageAtUtc),
+                  subtitle: _formatLastActivity(
+                    context,
+                    _conversation!.lastMessageAtUtc,
+                  ),
                 )
               else
                 ProfileGlassCard(
@@ -208,14 +217,12 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                       const SizedBox(height: 8),
                       Text(
                         text.supportChatEmptyMessage,
-                        style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: colors.textSoft, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
                       TextButton(
-                        onPressed: () => context.push(SupportChatPage.routePath),
+                        onPressed: () =>
+                            context.push(SupportChatPage.routePath),
                         child: Text(text.supportHomeOpenChatAction),
                       ),
                     ],
@@ -347,10 +354,7 @@ class _ConversationCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 subtitle,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: colors.textSoft, fontSize: 12),
               ),
             ),
           const SizedBox(height: 10),

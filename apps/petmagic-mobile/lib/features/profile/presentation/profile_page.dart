@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -17,7 +18,6 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_page.
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -236,27 +236,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     setState(() => _isOpeningSubscription = true);
-
-    try {
-      final managementService = ref.read(
-        premiumSubscriptionManagementServiceProvider,
-      );
-      final url = await managementService.createManagementUrl(
-        summary.manageSubscriptionAction,
-      );
-      final uri = Uri.tryParse(url);
-      if (uri == null) {
-        return;
-      }
-
-      final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      if (!launched) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isOpeningSubscription = false);
-      }
+    await context.push(SubscriptionManagementPage.routePath);
+    if (mounted) {
+      setState(() => _isOpeningSubscription = false);
     }
   }
 }

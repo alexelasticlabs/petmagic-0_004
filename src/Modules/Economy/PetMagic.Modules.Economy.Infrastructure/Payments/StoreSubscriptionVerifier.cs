@@ -30,6 +30,18 @@ public sealed class StoreSubscriptionVerifier(
         };
     }
 
+    public async Task<Result<StoreProductVerificationResponse>> VerifyProductPurchaseAsync(
+        StoreProductVerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        return request.PaymentProvider switch
+        {
+            "google_play" => await VerifyGooglePlayProductAsync(request, cancellationToken),
+            "app_store" => await VerifyAppStoreProductAsync(request, cancellationToken),
+            _ => Result.Failure<StoreProductVerificationResponse>(EconomyErrors.UnsupportedPaymentProvider)
+        };
+    }
+
     private async Task<Result<StoreSubscriptionVerificationResponse>> VerifyGooglePlayAsync(
         StoreSubscriptionVerificationRequest request,
         CancellationToken cancellationToken)
@@ -162,6 +174,107 @@ public sealed class StoreSubscriptionVerifier(
         return productionResult.Result;
     }
 
+    private async Task<Result<StoreProductVerificationResponse>> VerifyGooglePlayProductAsync(
+        StoreProductVerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.Value.GooglePlayServiceAccountEmail)
+            || string.IsNullOrWhiteSpace(options.Value.GooglePlayPrivateKeyPem)
+            || string.IsNullOrWhiteSpace(options.Value.GooglePlayPackageName))
+        {
+            return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
+        }
+
+        try
+        {
+            var accessToken = await RequestGoogleAccessTokenAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
+            }
+
+            using var requestMessage = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{Uri.EscapeDataString(options.Value.GooglePlayPackageName)}/purchases/products/{Uri.EscapeDataString(request.ProductId)}/tokens/{Uri.EscapeDataString(request.ServerVerificationData)}");
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var response = await httpClient.SendAsync(requestMessage, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var root = document.RootElement;
+
+            var purchaseState = root.TryGetProperty("purchaseState", out var purchaseStateElement)
+                && purchaseStateElement.ValueKind == JsonValueKind.Number
+                ? purchaseStateElement.GetInt32()
+                : -1;
+
+            var isPurchased = purchaseState == 0;
+            var orderId = root.TryGetProperty("orderId", out var orderIdElement)
+                && orderIdElement.ValueKind == JsonValueKind.String
+                ? orderIdElement.GetString()
+                : request.PurchaseId;
+
+            return Result.Success(new StoreProductVerificationResponse(
+                isPurchased,
+                isPurchased ? "purchased" : "not_purchased",
+                orderId));
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(
+                ex,
+                "Google Play product verification failed for product {ProductId}.",
+                request.ProductId);
+
+            return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
+        }
+    }
+
+    private async Task<Result<StoreProductVerificationResponse>> VerifyAppStoreProductAsync(
+        StoreProductVerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.Value.AppStoreSharedSecret)
+            || string.IsNullOrWhiteSpace(options.Value.AppStoreBundleId))
+        {
+            return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
+        }
+
+        var verificationPayload = JsonSerializer.Serialize(
+            new Dictionary<string, object?>
+            {
+                ["receipt-data"] = request.ServerVerificationData,
+                ["password"] = options.Value.AppStoreSharedSecret,
+                ["exclude-old-transactions"] = true,
+            },
+            JsonOptions);
+
+        var productionResult = await SendAppStoreProductVerificationAsync(
+            "https://buy.itunes.apple.com/verifyReceipt",
+            verificationPayload,
+            request,
+            cancellationToken);
+
+        if (productionResult.RequiresSandboxRetry)
+        {
+            var sandboxResult = await SendAppStoreProductVerificationAsync(
+                "https://sandbox.itunes.apple.com/verifyReceipt",
+                verificationPayload,
+                request,
+                cancellationToken,
+                requiresSandboxRetry: false);
+
+            return sandboxResult.Result;
+        }
+
+        return productionResult.Result;
+    }
+
     private async Task<(Result<StoreSubscriptionVerificationResponse> Result, bool RequiresSandboxRetry)> SendAppStoreVerificationAsync(
         string url,
         string payload,
@@ -252,6 +365,123 @@ public sealed class StoreSubscriptionVerifier(
 
             return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StoreVerificationUnavailable), false);
         }
+    }
+
+    private async Task<(Result<StoreProductVerificationResponse> Result, bool RequiresSandboxRetry)> SendAppStoreProductVerificationAsync(
+        string url,
+        string payload,
+        StoreProductVerificationRequest request,
+        CancellationToken cancellationToken,
+        bool requiresSandboxRetry = true)
+    {
+        try
+        {
+            using var response = await httpClient.PostAsync(
+                url,
+                new StringContent(payload, Encoding.UTF8, "application/json"),
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var root = document.RootElement;
+            var status = root.TryGetProperty("status", out var statusElement) && statusElement.ValueKind == JsonValueKind.Number
+                ? statusElement.GetInt32()
+                : -1;
+
+            if (status == 21007 && requiresSandboxRetry)
+            {
+                return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), true);
+            }
+
+            if (status != 0)
+            {
+                return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
+            }
+
+            var matched = false;
+            string? transactionId = null;
+            string? expectedPurchaseId = string.IsNullOrWhiteSpace(request.PurchaseId)
+                ? null
+                : request.PurchaseId.Trim();
+
+            if (root.TryGetProperty("receipt", out var receiptElement)
+                && receiptElement.ValueKind == JsonValueKind.Object
+                && receiptElement.TryGetProperty("in_app", out var inAppElement)
+                && inAppElement.ValueKind == JsonValueKind.Array)
+            {
+                matched = TryMatchAppStoreProductTransaction(
+                    inAppElement,
+                    request.ProductId,
+                    expectedPurchaseId,
+                    out transactionId);
+            }
+
+            if (!matched
+                && root.TryGetProperty("latest_receipt_info", out var latestReceiptsElement)
+                && latestReceiptsElement.ValueKind == JsonValueKind.Array)
+            {
+                matched = TryMatchAppStoreProductTransaction(
+                    latestReceiptsElement,
+                    request.ProductId,
+                    expectedPurchaseId,
+                    out transactionId);
+            }
+
+            return (Result.Success(new StoreProductVerificationResponse(
+                matched,
+                matched ? "purchased" : "not_purchased",
+                transactionId)), false);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(
+                ex,
+                "App Store product verification failed for endpoint {Endpoint} and product {ProductId}.",
+                url,
+                request.ProductId);
+
+            return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable), false);
+        }
+    }
+
+    private static bool TryMatchAppStoreProductTransaction(
+        JsonElement receiptsArray,
+        string expectedProductId,
+        string? expectedPurchaseId,
+        out string? transactionId)
+    {
+        transactionId = null;
+        foreach (var item in receiptsArray.EnumerateArray())
+        {
+            if (!item.TryGetProperty("product_id", out var productIdElement)
+                || productIdElement.ValueKind != JsonValueKind.String
+                || !string.Equals(productIdElement.GetString(), expectedProductId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var candidateTransactionId = item.TryGetProperty("transaction_id", out var transactionIdElement)
+                && transactionIdElement.ValueKind == JsonValueKind.String
+                ? transactionIdElement.GetString()
+                : null;
+
+            if (!string.IsNullOrWhiteSpace(expectedPurchaseId)
+                && !string.IsNullOrWhiteSpace(candidateTransactionId)
+                && !string.Equals(candidateTransactionId, expectedPurchaseId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            transactionId = candidateTransactionId;
+            return true;
+        }
+
+        return false;
     }
 
     private async Task<string?> RequestGoogleAccessTokenAsync(CancellationToken cancellationToken)

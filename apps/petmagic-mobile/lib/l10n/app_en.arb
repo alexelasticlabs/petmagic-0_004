@@ -698,6 +698,7 @@
   "supportChatReadOnlyHint": "This conversation is read-only",
   "supportHomeTitle": "Help & Support",
   "supportHomeSubtitle": "What can we help you with?",
+  "supportHomeOpenChatAction": "Open chat",
   "supportHomeTopicGenerationIssue": "Issue with image generation",
   "supportHomeTopicGenerationTooLong": "Generation takes too long",
   "supportHomeTopicTokensNotArrived": "Tokens did not arrive",

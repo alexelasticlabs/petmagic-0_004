@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // ─── Color constants ────────────────────────────────────────────────────────
@@ -70,6 +73,173 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     }
   }
 
+  Future<void> _startCheckout() async {
+    final controller = ref.read(premiumControllerProvider.notifier);
+    final wasPremiumBeforeCheckout = ref
+        .read(premiumControllerProvider)
+        .isPremium;
+    final checkout = await controller.startCheckout();
+    if (!mounted || checkout == null || !checkout.usesPaymentSheet) {
+      return;
+    }
+
+    await _presentStripePaymentSheet(
+      checkout: checkout,
+      wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
+    );
+  }
+
+  Future<void> _openPaymentMethodSheetAndCheckout() async {
+    final text = AppLocalizations.of(context);
+    final controller = ref.read(premiumControllerProvider.notifier);
+    final currentState = ref.read(premiumControllerProvider);
+    final options = _buildPaymentMethodOptions(currentState, text);
+    if (options.isEmpty) {
+      return;
+    }
+
+    final selected = await showPaymentMethodSheet(
+      context: context,
+      title: text.premiumPaymentTitle,
+      subtitle: text.premiumSecurePaymentSubtitle,
+      continueLabel: text.premiumContinueAction,
+      options: options,
+    );
+    if (!mounted || selected == null) {
+      return;
+    }
+
+    final provider = _providerFromOptionId(selected.id);
+    if (provider == null) {
+      return;
+    }
+
+    controller.selectProvider(provider);
+    await _startCheckout();
+  }
+
+  Future<void> _presentStripePaymentSheet({
+    required PremiumCheckoutModel checkout,
+    required bool wasPremiumBeforeCheckout,
+  }) async {
+    final clientSecret = checkout.paymentIntentClientSecret;
+    final publishableKey = checkout.publishableKey;
+    if (clientSecret == null ||
+        clientSecret.isEmpty ||
+        publishableKey == null ||
+        publishableKey.isEmpty) {
+      return;
+    }
+
+    try {
+      Stripe.publishableKey = publishableKey;
+      Stripe.urlScheme = 'petmagicstripe';
+      await Stripe.instance.applySettings();
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'PetMagic',
+          customerId: checkout.customerId,
+          customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
+          returnURL: 'petmagicstripe://redirect',
+        ),
+      );
+      await Stripe.instance.presentPaymentSheet();
+
+      if (!mounted) {
+        return;
+      }
+
+      final controller = ref.read(premiumControllerProvider.notifier);
+      controller.markCheckoutOpened(
+        wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
+      );
+      _shouldReloadOnResume = true;
+      await controller.verifyCheckoutStatus();
+    } on StripeException {
+      // User canceled/dismissed PaymentSheet.
+    } on PlatformException {
+      // Keep page responsive if native Stripe SDK returns an error.
+    }
+  }
+
+  List<PaymentMethodSheetOption> _buildPaymentMethodOptions(
+    PremiumState state,
+    AppLocalizations text,
+  ) {
+    final options = <PaymentMethodSheetOption>[];
+
+    for (final method in state.paymentMethods) {
+      if (!method.isEnabled) {
+        continue;
+      }
+
+      final provider = method.provider;
+      final badges = <String>[];
+      if (method.isSelectedByDefault) {
+        badges.add(text.premiumPaymentDefaultBadge);
+      }
+      if (method.isRecommended) {
+        badges.add(text.premiumPaymentRecommendedBadge);
+      }
+      if (method.bonusTokensPercent > 0) {
+        badges.add(text.paymentBonusPercentBadge(method.bonusTokensPercent));
+      }
+
+      final legalNotice = switch (provider) {
+        PremiumPaymentProvider.stripe => state.legalTexts?.stripeNotice,
+        PremiumPaymentProvider.googlePlay || PremiumPaymentProvider.appStore =>
+          state.legalTexts?.storeNotice,
+      };
+
+      options.add(
+        PaymentMethodSheetOption(
+          id: provider.value,
+          title:
+              method.displayLabel?.trim().isNotEmpty == true
+              ? method.displayLabel!.trim()
+              : _providerLabel(provider, text),
+          icon: _providerIcon(provider),
+          subtitle: method.displaySubtitle,
+          badge: badges.isEmpty ? null : badges.first,
+          warningTitle: method.warningTitle,
+          warningMessage: method.warningMessage,
+          notes: method.notes,
+          legalNotice: legalNotice,
+          isEnabled: state.isProviderAvailable(provider),
+        ),
+      );
+    }
+
+    return options;
+  }
+
+  PremiumPaymentProvider? _providerFromOptionId(String value) {
+    for (final provider in PremiumPaymentProvider.values) {
+      if (provider.value == value) {
+        return provider;
+      }
+    }
+
+    return null;
+  }
+
+  String _providerLabel(PremiumPaymentProvider provider, AppLocalizations text) {
+    return switch (provider) {
+      PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
+      PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
+      PremiumPaymentProvider.appStore => text.premiumPaymentApple,
+    };
+  }
+
+  IconData _providerIcon(PremiumPaymentProvider provider) {
+    return switch (provider) {
+      PremiumPaymentProvider.stripe => Icons.credit_card_rounded,
+      PremiumPaymentProvider.googlePlay => Icons.android_rounded,
+      PremiumPaymentProvider.appStore => Icons.apple_rounded,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(premiumControllerProvider);
@@ -116,6 +286,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                   controller: controller,
                   isDark: isDark,
                   onOpenUrl: _openExternalUrl,
+                  onStartCheckout: _openPaymentMethodSheetAndCheckout,
                 ),
         ),
       ),
@@ -131,12 +302,14 @@ class _PremiumBody extends StatelessWidget {
     required this.controller,
     required this.isDark,
     required this.onOpenUrl,
+    required this.onStartCheckout,
   });
 
   final PremiumState state;
   final PremiumController controller;
   final bool isDark;
   final Future<void> Function(String) onOpenUrl;
+  final Future<void> Function() onStartCheckout;
 
   @override
   Widget build(BuildContext context) {
@@ -181,8 +354,8 @@ class _PremiumBody extends StatelessWidget {
                   delayMs: 320,
                   child: _CtaButton(
                     state: state,
-                    controller: controller,
                     isDark: isDark,
+                    onStartCheckout: onStartCheckout,
                   ),
                 ),
               ),
@@ -1080,13 +1253,13 @@ class _BenefitItem {
 class _CtaButton extends StatefulWidget {
   const _CtaButton({
     required this.state,
-    required this.controller,
     required this.isDark,
+    required this.onStartCheckout,
   });
 
   final PremiumState state;
-  final PremiumController controller;
   final bool isDark;
+  final Future<void> Function() onStartCheckout;
 
   @override
   State<_CtaButton> createState() => _CtaButtonState();
@@ -1108,7 +1281,6 @@ class _CtaButtonState extends State<_CtaButton>
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
-    final controller = widget.controller;
     final isDark = widget.isDark;
     final btnTextColor = isDark ? const Color(0xFF13141F) : Colors.white;
     final glowColor = isDark
@@ -1152,7 +1324,7 @@ class _CtaButtonState extends State<_CtaButton>
             ? null
             : () {
                 HapticFeedback.lightImpact();
-                controller.startCheckout();
+                unawaited(widget.onStartCheckout());
               },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,

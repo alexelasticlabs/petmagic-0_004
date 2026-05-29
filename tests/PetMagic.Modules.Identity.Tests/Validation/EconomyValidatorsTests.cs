@@ -94,11 +94,100 @@ public sealed class EconomyValidatorsTests
     }
 
     [Fact]
+    public void VerifyPackStorePurchaseValidator_ShouldPass_WhenPayloadValid()
+    {
+        var validator = new VerifyPackStorePurchaseCommandValidator();
+        var result = validator.Validate(new VerifyPackStorePurchaseCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "app_store",
+            "com.petmagic.app.tokens.apple.starter",
+            "receipt-token",
+            "signed-payload",
+            "purchase-id",
+            "1234567890"));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void StripeWebhookValidator_ShouldFail_WhenSignatureEmpty()
     {
         var validator = new StripeWebhookCommandValidator();
         var result = validator.Validate(new StripeWebhookCommand("{}", string.Empty));
 
         Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void CreatePremiumCheckoutValidator_ShouldPass_WhenPlanCodeIsCustom()
+    {
+        var validator = new CreatePremiumCheckoutCommandValidator();
+        var result = validator.Validate(new CreatePremiumCheckoutCommand(
+            Guid.NewGuid(),
+            "plan_pro_v2",
+            "stripe",
+            "android",
+            "1.0.0",
+            "US",
+            "en"));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void CreatePremiumCheckoutValidator_ShouldFail_WhenProviderUnsupported()
+    {
+        var validator = new CreatePremiumCheckoutCommandValidator();
+        var result = validator.Validate(new CreatePremiumCheckoutCommand(
+            Guid.NewGuid(),
+            "monthly",
+            "paypal",
+            "android",
+            "1.0.0",
+            "US",
+            "en"));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void UpdateSubscriptionPlanValidator_ShouldFail_WhenActivePlanMissingProviderIds()
+    {
+        var validator = new UpdateSubscriptionPlanCommandValidator();
+        var result = validator.Validate(new UpdateSubscriptionPlanCommand(
+            "monthly",
+            "Monthly",
+            14.99m,
+            "USD",
+            500,
+            false,
+            true,
+            null,
+            null,
+            null,
+            1));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void UpdateSubscriptionPlanValidator_ShouldPass_WhenActivePlanHasAllProviderIds()
+    {
+        var validator = new UpdateSubscriptionPlanCommandValidator();
+        var result = validator.Validate(new UpdateSubscriptionPlanCommand(
+            "yearly",
+            "Yearly",
+            99.99m,
+            "USD",
+            1000,
+            true,
+            true,
+            "com.petmagic.app.premium.yearly",
+            "com.petmagic.app.premium.yearly",
+            "price_123",
+            2));
+
+        Assert.True(result.IsValid);
     }
 }

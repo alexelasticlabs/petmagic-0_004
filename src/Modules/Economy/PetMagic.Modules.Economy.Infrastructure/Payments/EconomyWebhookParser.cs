@@ -159,7 +159,7 @@ internal static partial class EconomyWebhookParser
         }
     }
 
-    public static (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken) ParseGooglePlayDeveloperNotification(string messageData, string? messageId)
+    public static (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken, bool IsSubscriptionNotification, bool IsOneTimeProductNotification) ParseGooglePlayDeveloperNotification(string messageData, string? messageId)
     {
         try
         {
@@ -167,31 +167,53 @@ internal static partial class EconomyWebhookParser
             using var document = JsonDocument.Parse(payloadBytes);
             var root = document.RootElement;
 
-            if (!root.TryGetProperty("subscriptionNotification", out var subscriptionElement)
-                || subscriptionElement.ValueKind != JsonValueKind.Object)
+            if (root.TryGetProperty("subscriptionNotification", out var subscriptionElement)
+                && subscriptionElement.ValueKind == JsonValueKind.Object)
             {
-                return (false, null, 0, null, null);
+                var productId = subscriptionElement.TryGetProperty("subscriptionId", out var productElement) && productElement.ValueKind == JsonValueKind.String
+                    ? productElement.GetString()
+                    : null;
+                var purchaseToken = subscriptionElement.TryGetProperty("purchaseToken", out var tokenElement) && tokenElement.ValueKind == JsonValueKind.String
+                    ? tokenElement.GetString()
+                    : null;
+                var notificationType = subscriptionElement.TryGetProperty("notificationType", out var typeElement) && typeElement.ValueKind == JsonValueKind.Number
+                    ? typeElement.GetInt32()
+                    : 0;
+
+                var eventId = !string.IsNullOrWhiteSpace(messageId)
+                    ? messageId
+                    : $"{purchaseToken}:{notificationType}:sub";
+
+                return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, true, false);
             }
 
-            var productId = subscriptionElement.TryGetProperty("subscriptionId", out var productElement) && productElement.ValueKind == JsonValueKind.String
-                ? productElement.GetString()
-                : null;
-            var purchaseToken = subscriptionElement.TryGetProperty("purchaseToken", out var tokenElement) && tokenElement.ValueKind == JsonValueKind.String
-                ? tokenElement.GetString()
-                : null;
-            var notificationType = subscriptionElement.TryGetProperty("notificationType", out var typeElement) && typeElement.ValueKind == JsonValueKind.Number
-                ? typeElement.GetInt32()
-                : 0;
+            if (root.TryGetProperty("oneTimeProductNotification", out var oneTimeElement)
+                && oneTimeElement.ValueKind == JsonValueKind.Object)
+            {
+                var productId = oneTimeElement.TryGetProperty("sku", out var skuElement) && skuElement.ValueKind == JsonValueKind.String
+                    ? skuElement.GetString()
+                    : oneTimeElement.TryGetProperty("productId", out var productIdElement) && productIdElement.ValueKind == JsonValueKind.String
+                        ? productIdElement.GetString()
+                        : null;
+                var purchaseToken = oneTimeElement.TryGetProperty("purchaseToken", out var tokenElement) && tokenElement.ValueKind == JsonValueKind.String
+                    ? tokenElement.GetString()
+                    : null;
+                var notificationType = oneTimeElement.TryGetProperty("notificationType", out var typeElement) && typeElement.ValueKind == JsonValueKind.Number
+                    ? typeElement.GetInt32()
+                    : 0;
 
-            var eventId = !string.IsNullOrWhiteSpace(messageId)
-                ? messageId
-                : $"{purchaseToken}:{notificationType}";
+                var eventId = !string.IsNullOrWhiteSpace(messageId)
+                    ? messageId
+                    : $"{purchaseToken}:{notificationType}:one_time";
 
-            return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken);
+                return (!string.IsNullOrWhiteSpace(productId) && !string.IsNullOrWhiteSpace(purchaseToken), eventId, notificationType, productId, purchaseToken, false, true);
+            }
+
+            return (false, null, 0, null, null, false, false);
         }
         catch
         {
-            return (false, null, 0, null, null);
+            return (false, null, 0, null, null, false, false);
         }
     }
 

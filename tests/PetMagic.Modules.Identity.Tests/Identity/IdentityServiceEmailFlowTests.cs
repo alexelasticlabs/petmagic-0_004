@@ -436,5 +436,12 @@ public sealed class IdentityServiceEmailFlowTests
         {
             return Task.FromResult(Result.Success(new StoreSubscriptionVerificationResponse(true, DateTime.UtcNow.AddDays(30), "active", request.PurchaseId)));
         }
+
+        public Task<Result<StoreProductVerificationResponse>> VerifyProductPurchaseAsync(
+            StoreProductVerificationRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new StoreProductVerificationResponse(true, "purchased", request.PurchaseId)));
+        }
     }
 }

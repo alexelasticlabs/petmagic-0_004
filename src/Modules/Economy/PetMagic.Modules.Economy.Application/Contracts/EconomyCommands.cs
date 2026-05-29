@@ -30,9 +30,21 @@ public sealed record CreatePremiumCheckoutCommand(
 
 public sealed record CreatePremiumBillingPortalCommand(Guid UserId, string PaymentProvider);
 
+public sealed record CancelPremiumSubscriptionCommand(Guid UserId, string PaymentProvider);
+
 public sealed record VerifyPremiumStorePurchaseCommand(
     Guid UserId,
     string PlanCode,
+    string PaymentProvider,
+    string ProductId,
+    string ServerVerificationData,
+    string? LocalVerificationData,
+    string? PurchaseId,
+    string? TransactionDate);
+
+public sealed record VerifyPackStorePurchaseCommand(
+    Guid UserId,
+    Guid OrderId,
     string PaymentProvider,
     string ProductId,
     string ServerVerificationData,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
 
 class TemplateTypeFilters extends StatelessWidget {
   const TemplateTypeFilters({
@@ -119,71 +120,67 @@ class _FilterPill extends StatelessWidget {
     final colors = context.petMagicColors;
     final textStyle = Theme.of(context).textTheme.labelMedium;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 10 : 11,
-            vertical: compact ? 8 : 7,
-          ),
-          decoration: BoxDecoration(
-            gradient: selected
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      colors.accent,
-                      colors.gold.withValues(alpha: 0.82),
-                    ],
-                  )
-                : LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      colors.surfaceGlass,
-                      colors.surface.withValues(alpha: 0.9),
-                    ],
+    return PressableScale(
+      onTap: onTap,
+      haptic: PressableScaleHaptic.selection,
+      borderRadius: BorderRadius.circular(22),
+      child: AnimatedContainer(
+        duration: AppTheme.motionFast,
+        curve: AppTheme.motionEmphasized,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 11,
+          vertical: compact ? 8 : 7,
+        ),
+        decoration: BoxDecoration(
+          gradient: selected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [colors.accent, colors.gold.withValues(alpha: 0.82)],
+                )
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    colors.surfaceGlass,
+                    colors.surface.withValues(alpha: 0.9),
+                  ],
+                ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: selected ? colors.accent : colors.border),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: colors.accent.withValues(alpha: 0.22),
+                    blurRadius: 16,
                   ),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: selected ? colors.accent : colors.border),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: colors.accent.withValues(alpha: 0.22),
-                      blurRadius: 16,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: compact ? 14 : 15,
-                  color: selected ? Colors.white : colors.textStrong,
-                ),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: textStyle?.copyWith(
-                  color: selected ? Colors.white : colors.textStrong,
-                  fontSize: compact ? 10.1 : 10.5,
-                  fontWeight: FontWeight.w700,
-                ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: compact ? 14 : 15,
+                color: selected ? Colors.white : colors.textStrong,
               ),
+              const SizedBox(width: 4),
             ],
-          ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: textStyle?.copyWith(
+                color: selected ? Colors.white : colors.textStrong,
+                fontSize: compact ? 10.1 : 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );

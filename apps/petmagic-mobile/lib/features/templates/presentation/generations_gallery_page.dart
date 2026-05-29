@@ -34,35 +34,37 @@ class GenerationsGalleryPage extends ConsumerStatefulWidget {
 class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     with WidgetsBindingObserver {
   bool _readyExpanded = false;
+  late final GenerationHistoryController _historyController;
 
   @override
   void initState() {
     super.initState();
+    _historyController = ref.read(generationHistoryControllerProvider.notifier);
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(() {
-      final controller = ref.read(generationHistoryControllerProvider.notifier);
-      controller.setScreenVisible(true);
-      return controller.load();
+    Future.microtask(() async {
+      if (!mounted) {
+        return;
+      }
+
+      _historyController.setScreenVisible(true);
+      await _historyController.load();
     });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final controller = ref.read(generationHistoryControllerProvider.notifier);
     if (state == AppLifecycleState.resumed) {
-      controller.setScreenVisible(true);
-      unawaited(controller.load(refresh: true));
+      _historyController.setScreenVisible(true);
+      unawaited(_historyController.load(refresh: true));
       return;
     }
 
-    controller.setScreenVisible(false);
+    _historyController.setScreenVisible(false);
   }
 
   @override
   void dispose() {
-    ref
-        .read(generationHistoryControllerProvider.notifier)
-        .setScreenVisible(false);
+    _historyController.setScreenVisible(false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

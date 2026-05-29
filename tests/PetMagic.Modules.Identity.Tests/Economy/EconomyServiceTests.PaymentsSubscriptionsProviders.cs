@@ -90,7 +90,7 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
-    public async Task VerifyPremiumStorePurchaseAsync_ShouldUseDatabasePlanAndGrantTokensOnlyOncePerPeriod()
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldMarkPendingUntilWebhook()
     {
         await using var dbContext = CreateDbContext();
 
@@ -149,18 +149,23 @@ public sealed partial class EconomyServiceTests
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
 
-        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId);
         var grantEntries = await dbContext.WalletLedgerEntries
             .Where(x => x.UserId == userId && x.Source == "premium_subscription_grant")
             .ToListAsync();
+        var hasWallet = await dbContext.Wallets.AnyAsync(x => x.UserId == userId);
 
-        Assert.Equal(777, wallet.Balance);
+        Assert.False(first.Value.IsActive);
+        Assert.Equal("pending_webhook", first.Value.Status);
+        Assert.False(second.Value.IsActive);
+        Assert.Equal("pending_webhook", second.Value.Status);
+        Assert.False(hasWallet);
         Assert.Equal("monthly", subscription.PlanId);
         Assert.Equal(777, subscription.MonthlyTokenLimit);
-        Assert.Equal(777, subscription.MonthlyTokensGranted);
-        Assert.Single(grantEntries);
-        Assert.Equal(2, identityService.SetPremiumStatusCalls.Count);
+        Assert.Equal("Pending", subscription.Status);
+        Assert.Equal(0, subscription.MonthlyTokensGranted);
+        Assert.Empty(grantEntries);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
     }
 
     [Fact]
@@ -345,6 +350,116 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("order-1", subscription.ExternalSubscriptionId);
         Assert.Single(identityService.SetPremiumStatusCalls);
         Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+    }
+
+    [Fact]
+    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldSettleOneTimeProductOrder()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "com.petmagic.pack.100",
+            DisplayName = "Pack 100",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "google_play",
+            Status = "pending",
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "gp-one-time-token-1",
+            CreatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var messageJson = "{\"oneTimeProductNotification\":{\"notificationType\":1,\"purchaseToken\":\"gp-one-time-token-1\",\"sku\":\"com.petmagic.pack.100\"}}";
+        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
+
+        var service = CreateService(dbContext);
+        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
+            new GooglePlayDeveloperNotificationCommand(messageData, "google-one-time-message-1"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Processed);
+        Assert.Equal("processed_token_purchase", result.Value.Outcome);
+
+        var order = await dbContext.PurchaseOrders.SingleAsync();
+        Assert.Equal("succeeded", order.Status);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(120, wallet.Balance);
+    }
+
+    [Fact]
+    public async Task HandleAppStoreServerNotificationAsync_ShouldSettleOneTimeProductOrder()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "com.petmagic.pack.200.apple",
+            DisplayName = "Pack 200",
+            CurrencyCode = "USD",
+            PriceAmount = 6.99m,
+            GrantedSpark = 180,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 2
+        });
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "app_store",
+            Status = "pending",
+            PriceAmount = 6.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 200,
+            ExternalPaymentId = "txn-app-one-time-1",
+            CreatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var signedTransactionInfo = CreateUnsignedJws("{\"productId\":\"com.petmagic.pack.200.apple\",\"originalTransactionId\":\"orig-app-one-time\",\"transactionId\":\"txn-app-one-time-1\"}");
+        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-one-time-notification-1\",\"notificationType\":\"ONE_TIME_CHARGE\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\"}}}}");
+
+        var service = CreateService(dbContext);
+        var result = await service.HandleAppStoreServerNotificationAsync(
+            new AppStoreServerNotificationCommand(signedPayload),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Processed);
+        Assert.Equal("processed_token_purchase", result.Value.Outcome);
+
+        var order = await dbContext.PurchaseOrders.SingleAsync();
+        Assert.Equal("succeeded", order.Status);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(200, wallet.Balance);
     }
 
     [Fact]

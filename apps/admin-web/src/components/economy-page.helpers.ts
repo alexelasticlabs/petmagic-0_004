@@ -159,6 +159,13 @@ export function toSubscriptionPlanPayload(
     throw new Error(text.invalidPlanNumbers);
   }
 
+  if (
+    draft.isActive &&
+    (!draft.stripePriceId.trim() || !draft.appleProductId.trim() || !draft.googleProductId.trim())
+  ) {
+    throw new Error(text.invalidPlanNumbers);
+  }
+
   return {
     name: draft.name.trim(),
     priceAmount,

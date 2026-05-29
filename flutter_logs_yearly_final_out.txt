@@ -1,0 +1,112 @@
+Showing SM G991B logs:
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM checkout_begin provider=stripe plan=yearly
+I/flutter (10039): PETMAGIC_PREMIUM stripe_response usesPaymentSheet=false urlLength=477 status=pending
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+D/FlutterJNI(10039): Sending viewport metrics to the engine.
+D/FlutterJNI(10039): Sending viewport metrics to the engine.
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM checkout_begin provider=stripe plan=yearly
+I/flutter (10039): PETMAGIC_PREMIUM stripe_response usesPaymentSheet=false urlLength=477 status=pending
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+I/flutter (10039): PETMAGIC_PREMIUM load selectedPlan=yearly selectedProvider=stripe canStartCheckout=true storeAvailable=true methods=google_play,stripe
+D/FlutterJNI(32767): Beginning load of flutter...
+D/FlutterJNI(32767): flutter (null) was loaded normally!
+I/flutter (32767): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+I/flutter (32767): The Dart VM service is listening on http://127.0.0.1:34661/ibKgddQWrvk=/
+D/FlutterRenderer(32767): Width is zero. 0,0
+D/FlutterRenderer(32767): Width is zero. 0,0
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+I/flutter (32767): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+E/flutter (32767): [ERROR:flutter/lib/ui/window/platform_configuration.cc(436)] Reported frame time is older than the last one; clamping. 326350140672 < 326350141033 ~= 361
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(32767): Sending viewport metrics to the engine.
+D/FlutterJNI(11968): Beginning load of flutter...
+D/FlutterJNI(11968): flutter (null) was loaded normally!
+I/flutter (11968): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+I/flutter (11968): The Dart VM service is listening on http://127.0.0.1:45351/Uwa76Qf0vsw=/
+D/FlutterRenderer(11968): Width is zero. 0,0
+D/FlutterRenderer(11968): Width is zero. 0,0
+D/FlutterJNI(11968): Sending viewport metrics to the engine.
+D/FlutterJNI(11968): Sending viewport metrics to the engine.
+I/flutter (11968): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+D/FlutterJNI(12416): Beginning load of flutter...
+D/FlutterJNI(12416): flutter (null) was loaded normally!
+I/flutter (12416): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+I/flutter (12416): The Dart VM service is listening on http://127.0.0.1:40439/a3fwWXY98Kc=/
+D/FlutterRenderer(12416): Width is zero. 0,0
+D/FlutterRenderer(12416): Width is zero. 0,0
+D/FlutterJNI(12416): Sending viewport metrics to the engine.
+D/FlutterJNI(12416): Sending viewport metrics to the engine.
+I/flutter (12416): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+D/FlutterJNI(12944): Beginning load of flutter...
+D/FlutterJNI(12944): flutter (null) was loaded normally!
+I/flutter (12944): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+I/flutter (12944): The Dart VM service is listening on http://127.0.0.1:39859/BT2ZmBs1FiQ=/
+D/FlutterRenderer(12944): Width is zero. 0,0
+D/FlutterRenderer(12944): Width is zero. 0,0
+D/FlutterJNI(12944): Sending viewport metrics to the engine.
+D/FlutterJNI(12944): Sending viewport metrics to the engine.
+I/flutter (12944): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).

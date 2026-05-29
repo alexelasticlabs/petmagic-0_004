@@ -34,7 +34,9 @@ public sealed record CurrencyPackResponse(
     decimal PriceAmount,
     int GrantedSpark,
     int BonusSpark,
-    int TotalSpark);
+    int TotalSpark,
+    string? GooglePlayProductId = null,
+    string? AppStoreProductId = null);
 
 public sealed record WalletCheckoutConfigResponse(
     IReadOnlyList<CurrencyPackResponse> Packs,

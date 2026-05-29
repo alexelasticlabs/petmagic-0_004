@@ -134,6 +134,13 @@ extension PetMagicTheme on BuildContext {
 }
 
 class AppTheme {
+  static const Duration motionFast = Duration(milliseconds: 160);
+  static const Duration motionMedium = Duration(milliseconds: 260);
+  static const Duration motionSlow = Duration(milliseconds: 380);
+
+  static const Curve motionEmphasized = Curves.easeOutCubic;
+  static const Curve motionStandard = Curves.easeOut;
+
   static const _accent = Color(0xFF10C878);
   static const _onAccentDark = Color(0xFF04110B);
   static const _onAccentLight = Color(0xFFF8FBFF);

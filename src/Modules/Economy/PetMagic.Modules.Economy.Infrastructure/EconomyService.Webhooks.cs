@@ -282,6 +282,38 @@ public sealed partial class EconomyService
             ProcessedAtUtc = DateTime.UtcNow
         });
 
+        var processedTokenPurchase = false;
+        if (!string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId)
+            && !string.IsNullOrWhiteSpace(parsed.ProductId))
+        {
+            var pendingOrder = await dbContext.PurchaseOrders
+                .Join(
+                    dbContext.CurrencyPacks.AsNoTracking(),
+                    order => order.PackId,
+                    pack => pack.Id,
+                    (order, pack) => new { order, pack })
+                .Where(x =>
+                    x.order.PaymentProvider == "app_store"
+                    && x.order.Status == "pending"
+                    && x.order.ExternalPaymentId == parsed.ExternalPurchaseId)
+                .OrderByDescending(x => x.order.CreatedAtUtc)
+                .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "app_store") })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (pendingOrder is not null
+                && string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
+            {
+                var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
+                if (confirmResult.IsFailure
+                    && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+                {
+                    return Result.Failure<StoreWebhookResultResponse>(confirmResult.Error);
+                }
+
+                processedTokenPurchase = true;
+            }
+        }
+
         var existingSubscription = await dbContext.UserSubscriptions
             .FirstOrDefaultAsync(
                 x => x.Provider == "app_store"
@@ -292,7 +324,11 @@ public sealed partial class EconomyService
         if (existingSubscription is null)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, false, "ignored_not_found"));
+            return Result.Success(new StoreWebhookResultResponse(
+                "app_store",
+                parsed.EventId,
+                processedTokenPurchase,
+                processedTokenPurchase ? "processed_token_purchase" : "ignored_not_found"));
         }
 
         var plan = await ResolveStoreNotificationPlanAsync(existingSubscription.PlanId, parsed.ProductId, "app_store", cancellationToken);
@@ -374,6 +410,48 @@ public sealed partial class EconomyService
             EventType = $"notification_{parsed.NotificationType}",
             ProcessedAtUtc = DateTime.UtcNow
         });
+
+        if (parsed.IsOneTimeProductNotification)
+        {
+            var pendingOrder = await dbContext.PurchaseOrders
+                .Join(
+                    dbContext.CurrencyPacks.AsNoTracking(),
+                    order => order.PackId,
+                    pack => pack.Id,
+                    (order, pack) => new { order, pack })
+                .Where(x =>
+                    x.order.PaymentProvider == "google_play"
+                    && x.order.Status == "pending"
+                    && !string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                    && x.order.ExternalPaymentId == parsed.PurchaseToken)
+                .OrderByDescending(x => x.order.CreatedAtUtc)
+                .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "google_play") })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (pendingOrder is null
+                || string.IsNullOrWhiteSpace(parsed.ProductId)
+                || !string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
+            }
+
+            var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
+            if (confirmResult.IsFailure
+                && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+            {
+                return Result.Failure<StoreWebhookResultResponse>(confirmResult.Error);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed_token_purchase"));
+        }
+
+        if (!parsed.IsSubscriptionNotification)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_unknown_notification"));
+        }
 
         var existingSubscription = await dbContext.UserSubscriptions
             .FirstOrDefaultAsync(

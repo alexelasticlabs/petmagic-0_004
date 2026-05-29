@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
+import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
 
 const _bottomNavHeight = 42.0;
 const _bottomNavOuterGap = 10.0;
@@ -293,8 +294,9 @@ class _ActiveGenerationBanner extends StatelessWidget {
           16,
           bottomPadding + _bottomNavOuterGap + _bottomNavHeight + 10,
         ),
-        child: InkWell(
+        child: PressableScale(
           borderRadius: BorderRadius.circular(18),
+          haptic: PressableScaleHaptic.selection,
           onTap: () => context.go(
             '${GenerationStatusPage.routePrefix}/${generation.generationId}',
           ),
@@ -421,9 +423,10 @@ class _BottomNavButton extends StatelessWidget {
       selected: selected,
       button: true,
       label: item.label,
-      child: InkWell(
+      child: PressableScale(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
+        haptic: PressableScaleHaptic.selection,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,

@@ -21,6 +21,9 @@ public sealed class SupportChatService(
     SupportAttachmentStorageOptions attachmentStorageOptions) : ISupportChatService
 {
     private static readonly Guid AutomatedAssistantUserId = Guid.Parse("2F1E3B3B-8A2E-4A8E-9EE5-97BF31B33218");
+    private const int LegacyDirectSourceValue = 0;
+    private const int LegacyResolvedStatusValue = 2;
+    private const int LegacyWaitingForSupportStatusValue = 4;
     private static readonly Error ConversationNotFound = new("support.conversation_not_found", "Support conversation was not found.");
     private static readonly Error MessageNotFound = new("support.message_not_found", "Support message was not found.");
     private static readonly Error Forbidden = new("support.forbidden", "You do not have access to this support conversation.");
@@ -57,7 +60,7 @@ public sealed class SupportChatService(
             supportChatDbContext.SupportConversations.Add(conversation);
             createdConversation = true;
 
-            if (command.Source is SupportConversationSource.MobileChat or SupportConversationSource.Direct)
+            if (ToCanonicalSource(command.Source) == SupportConversationSource.MobileChat)
             {
                 await AppendSystemEventAsync(
                     conversation,
@@ -156,14 +159,14 @@ public sealed class SupportChatService(
             {
                 SupportConversationStatus.New => conversationsQuery.Where(
                     x => x.Status == SupportConversationStatus.New
-                         || x.Status == SupportConversationStatus.WaitingForSupport),
+                         || (int)x.Status == LegacyWaitingForSupportStatusValue),
                 SupportConversationStatus.InProgress => conversationsQuery.Where(
                     x => x.Status == SupportConversationStatus.InProgress),
                 SupportConversationStatus.WaitingForUser => conversationsQuery.Where(
                     x => x.Status == SupportConversationStatus.WaitingForUser),
                 SupportConversationStatus.Closed => conversationsQuery.Where(
                     x => x.Status == SupportConversationStatus.Closed
-                         || x.Status == SupportConversationStatus.Resolved),
+                         || (int)x.Status == LegacyResolvedStatusValue),
                 _ => conversationsQuery
             };
         }
@@ -177,7 +180,7 @@ public sealed class SupportChatService(
 
             var requestedSource = ToCanonicalSource(source);
             conversationsQuery = requestedSource == SupportConversationSource.MobileChat
-                ? conversationsQuery.Where(x => x.Source == SupportConversationSource.MobileChat || x.Source == SupportConversationSource.Direct)
+                ? conversationsQuery.Where(x => x.Source == SupportConversationSource.MobileChat || (int)x.Source == LegacyDirectSourceValue)
                 : conversationsQuery.Where(x => x.Source == requestedSource);
         }
 
@@ -1470,7 +1473,7 @@ public sealed class SupportChatService(
                 return "Video";
             }
 
-            return attachment.FileName;
+            return string.IsNullOrWhiteSpace(attachment.FileName) ? "Attachment" : attachment.FileName;
         }
 
         if (!string.IsNullOrWhiteSpace(trimmedBody))
@@ -1788,23 +1791,30 @@ public sealed class SupportChatService(
         SupportConversationStatus status,
         Guid? assignedAdminId = null)
     {
-        return status switch
+        return (int)status switch
         {
-            SupportConversationStatus.Resolved => SupportConversationStatus.Closed,
-            SupportConversationStatus.WaitingForSupport => assignedAdminId.HasValue
+            LegacyResolvedStatusValue => SupportConversationStatus.Closed,
+            LegacyWaitingForSupportStatusValue => assignedAdminId.HasValue
                 ? SupportConversationStatus.InProgress
                 : SupportConversationStatus.New,
-            SupportConversationStatus.Open => SupportConversationStatus.New,
-            _ => status
+            (int)SupportConversationStatus.New => SupportConversationStatus.New,
+            (int)SupportConversationStatus.InProgress => SupportConversationStatus.InProgress,
+            (int)SupportConversationStatus.Closed => SupportConversationStatus.Closed,
+            (int)SupportConversationStatus.WaitingForUser => SupportConversationStatus.WaitingForUser,
+            _ => SupportConversationStatus.New
         };
     }
 
     private static SupportConversationSource ToCanonicalSource(SupportConversationSource source)
     {
-        return source switch
+        return (int)source switch
         {
-            SupportConversationSource.Direct => SupportConversationSource.MobileChat,
-            _ => source
+            LegacyDirectSourceValue => SupportConversationSource.MobileChat,
+            (int)SupportConversationSource.MobileAssistant => SupportConversationSource.MobileAssistant,
+            (int)SupportConversationSource.MobileChat => SupportConversationSource.MobileChat,
+            (int)SupportConversationSource.AdminCreated => SupportConversationSource.AdminCreated,
+            (int)SupportConversationSource.System => SupportConversationSource.System,
+            _ => SupportConversationSource.MobileChat
         };
     }
 

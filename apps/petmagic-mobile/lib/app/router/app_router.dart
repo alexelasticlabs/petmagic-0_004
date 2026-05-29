@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
@@ -136,6 +137,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: ProfilePage.routePath,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: ProfilePage()),
+          ),
+          GoRoute(
+            path: SubscriptionManagementPage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: SubscriptionManagementPage()),
           ),
           GoRoute(
             path: WalletPage.legacyRoutePath,

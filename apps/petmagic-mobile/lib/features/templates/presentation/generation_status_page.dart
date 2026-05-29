@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -17,10 +17,11 @@ import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:video_player/video_player.dart';
 
-part 'generation_status_page_sections.dart';
 part 'generation_status_page_common_sections.dart';
+part 'generation_status_page_sections.dart';
 
 class GenerationStatusPage extends ConsumerStatefulWidget {
   const GenerationStatusPage({required this.generationId, super.key});
@@ -84,7 +85,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
         body: SafeArea(
           child: RefreshIndicator.adaptive(
             color: colors.accent,
-            onRefresh: () => _load(),
+            onRefresh: () async {
+              await PetMagicHaptics.medium();
+              await _load();
+            },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
@@ -488,6 +492,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
     }
 
     try {
+      final previousGeneration = _generation;
       final generation = await ref
           .read(templateGenerationRepositoryProvider)
           .fetchGeneration(widget.generationId);
@@ -511,6 +516,13 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
 
       if (generation.isTerminal) {
         _pollTimer?.cancel();
+
+        final reachedTerminalNow = previousGeneration != null
+            ? !previousGeneration.isTerminal
+            : true;
+        if (reachedTerminalNow) {
+          unawaited(PetMagicHaptics.heavy());
+        }
       }
     } catch (error) {
       if (!mounted) {

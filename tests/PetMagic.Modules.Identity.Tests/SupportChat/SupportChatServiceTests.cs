@@ -32,7 +32,7 @@ public sealed class SupportChatServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal("New", result.Value.Status);
         Assert.Equal("High", result.Value.Priority);
-        var userMessage = Assert.Single(result.Value.Messages.Where(message => message.SenderType == "User"));
+        var userMessage = Assert.Single(result.Value.Messages, message => message.SenderType == "User");
         Assert.Equal("Help, please", userMessage.Body);
         Assert.False(userMessage.IsFromAdmin);
         Assert.Equal(2, result.Value.Messages.Count(message => message.SenderType == "System"));
@@ -616,9 +616,9 @@ public sealed class SupportChatServiceTests
         Assert.True(detail.IsSuccess);
         Assert.Equal("New", detail.Value.Status);
         Assert.Null(detail.Value.AssignedAdminId);
-        var userMessage = Assert.Single(detail.Value.Messages.Where(message => message.SenderType == "User"));
+        var userMessage = Assert.Single(detail.Value.Messages, message => message.SenderType == "User");
         Assert.Equal("Necesito ayuda", userMessage.Body);
-        var botReply = Assert.Single(detail.Value.Messages.Where(message => message.SenderType == "Bot"));
+        var botReply = Assert.Single(detail.Value.Messages, message => message.SenderType == "Bot");
         Assert.Equal(
             "Mensaje recibido. Soporte respondera en este chat.",
             botReply.Body);

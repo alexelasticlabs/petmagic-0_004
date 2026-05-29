@@ -13,11 +13,12 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:share_plus/share_plus.dart';
 
-part 'rewards_page_shell_widgets.dart';
 part 'rewards_page_referral_cards.dart';
 part 'rewards_page_shared_widgets.dart';
+part 'rewards_page_shell_widgets.dart';
 
 class RewardsPage extends ConsumerStatefulWidget {
   const RewardsPage({super.key});
@@ -345,7 +346,10 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                 ),
               )
             : RefreshIndicator.adaptive(
-                onRefresh: () => controller.load(refresh: true),
+                onRefresh: () async {
+                  await PetMagicHaptics.medium();
+                  await controller.load(refresh: true);
+                },
                 color: colors.accent,
                 backgroundColor: colors.surfaceStrong,
                 child: ListView(

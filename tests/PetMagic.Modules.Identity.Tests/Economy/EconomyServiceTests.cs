@@ -193,6 +193,13 @@ public sealed partial class EconomyServiceTests
         {
             return Task.FromResult(Result.Success(new StoreSubscriptionVerificationResponse(IsActive, ExpiresAtUtc, Status, request.PurchaseId)));
         }
+
+        public Task<Result<StoreProductVerificationResponse>> VerifyProductPurchaseAsync(
+            StoreProductVerificationRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new StoreProductVerificationResponse(true, "purchased", request.PurchaseId)));
+        }
     }
 
     private sealed class FakeIdentityService : IIdentityService

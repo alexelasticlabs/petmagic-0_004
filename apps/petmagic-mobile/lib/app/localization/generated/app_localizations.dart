@@ -3330,6 +3330,12 @@ abstract class AppLocalizations {
   /// **'What can we help you with?'**
   String get supportHomeSubtitle;
 
+  /// No description provided for @supportHomeOpenChatAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open chat'**
+  String get supportHomeOpenChatAction;
+
   /// No description provided for @supportHomeTopicGenerationIssue.
   ///
   /// In en, this message translates to:

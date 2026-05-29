@@ -1830,6 +1830,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportHomeSubtitle => 'What can we help you with?';
 
   @override
+  String get supportHomeOpenChatAction => 'Open chat';
+
+  @override
   String get supportHomeTopicGenerationIssue => 'Issue with image generation';
 
   @override

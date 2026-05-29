@@ -62,8 +62,14 @@ public sealed class CreatePremiumCheckoutCommandValidator : AbstractValidator<Cr
     public CreatePremiumCheckoutCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty();
-        RuleFor(x => x.PlanCode).NotEmpty().MaximumLength(40);
-        RuleFor(x => x.PaymentProvider).NotEmpty().MaximumLength(24);
+        RuleFor(x => x.PlanCode)
+            .NotEmpty()
+            .MaximumLength(40);
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PremiumSubscriptionValidationRules.IsSupportedCheckoutProvider)
+            .WithMessage("PaymentProvider must be one of: stripe, app_store, google_play.");
         RuleFor(x => x.Platform).NotEmpty().MaximumLength(24);
         RuleFor(x => x.AppVersion).NotEmpty().MaximumLength(32);
         RuleFor(x => x.Country).NotEmpty().MaximumLength(16);
@@ -80,13 +86,51 @@ public sealed class CreatePremiumBillingPortalCommandValidator : AbstractValidat
     }
 }
 
+public sealed class CancelPremiumSubscriptionCommandValidator : AbstractValidator<CancelPremiumSubscriptionCommand>
+{
+    public CancelPremiumSubscriptionCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(value => string.Equals(value.Trim(), "stripe", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("PaymentProvider must be stripe.");
+    }
+}
+
 public sealed class VerifyPremiumStorePurchaseCommandValidator : AbstractValidator<VerifyPremiumStorePurchaseCommand>
 {
     public VerifyPremiumStorePurchaseCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty();
-        RuleFor(x => x.PlanCode).NotEmpty().MaximumLength(40);
-        RuleFor(x => x.PaymentProvider).NotEmpty().MaximumLength(24);
+        RuleFor(x => x.PlanCode)
+            .NotEmpty()
+            .MaximumLength(40);
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PremiumSubscriptionValidationRules.IsSupportedStoreProvider)
+            .WithMessage("PaymentProvider must be one of: app_store, google_play.");
+        RuleFor(x => x.ProductId).NotEmpty().MaximumLength(160);
+        RuleFor(x => x.ServerVerificationData).NotEmpty().MaximumLength(8192);
+        RuleFor(x => x.LocalVerificationData).MaximumLength(32768);
+        RuleFor(x => x.PurchaseId).MaximumLength(160);
+        RuleFor(x => x.TransactionDate).MaximumLength(64);
+    }
+}
+
+public sealed class VerifyPackStorePurchaseCommandValidator : AbstractValidator<VerifyPackStorePurchaseCommand>
+{
+    public VerifyPackStorePurchaseCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.OrderId).NotEmpty();
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PremiumSubscriptionValidationRules.IsSupportedStoreProvider)
+            .WithMessage("PaymentProvider must be one of: app_store, google_play.");
         RuleFor(x => x.ProductId).NotEmpty().MaximumLength(160);
         RuleFor(x => x.ServerVerificationData).NotEmpty().MaximumLength(8192);
         RuleFor(x => x.LocalVerificationData).MaximumLength(32768);
@@ -165,7 +209,11 @@ public sealed class UpdateSubscriptionPlanCommandValidator : AbstractValidator<U
 {
     public UpdateSubscriptionPlanCommandValidator()
     {
-        RuleFor(x => x.PlanId).NotEmpty().MaximumLength(40);
+        RuleFor(x => x.PlanId)
+            .NotEmpty()
+            .MaximumLength(40)
+            .Must(PremiumSubscriptionValidationRules.IsSupportedPlanCode)
+            .WithMessage("PlanId must be one of: monthly, yearly.");
         RuleFor(x => x.Name).NotEmpty().MaximumLength(120);
         RuleFor(x => x.PriceAmount).GreaterThan(0);
         RuleFor(x => x.CurrencyCode).NotEmpty().Length(3);
@@ -174,6 +222,42 @@ public sealed class UpdateSubscriptionPlanCommandValidator : AbstractValidator<U
         RuleFor(x => x.GoogleProductId).MaximumLength(160);
         RuleFor(x => x.StripePriceId).MaximumLength(160);
         RuleFor(x => x.DisplayOrder).GreaterThanOrEqualTo(0);
+
+        When(
+            x => x.IsActive,
+            () =>
+            {
+                RuleFor(x => x.StripePriceId)
+                    .NotEmpty()
+                    .WithMessage("StripePriceId is required for active subscription plans.");
+                RuleFor(x => x.AppleProductId)
+                    .NotEmpty()
+                    .WithMessage("AppleProductId is required for active subscription plans.");
+                RuleFor(x => x.GoogleProductId)
+                    .NotEmpty()
+                    .WithMessage("GoogleProductId is required for active subscription plans.");
+            });
+    }
+}
+
+internal static class PremiumSubscriptionValidationRules
+{
+    public static bool IsSupportedPlanCode(string value)
+    {
+        var planCode = value.Trim().ToLowerInvariant();
+        return planCode is "monthly" or "yearly";
+    }
+
+    public static bool IsSupportedCheckoutProvider(string value)
+    {
+        var provider = value.Trim().ToLowerInvariant();
+        return provider is "stripe" or "app_store" or "google_play";
+    }
+
+    public static bool IsSupportedStoreProvider(string value)
+    {
+        var provider = value.Trim().ToLowerInvariant();
+        return provider is "app_store" or "google_play";
     }
 }
 

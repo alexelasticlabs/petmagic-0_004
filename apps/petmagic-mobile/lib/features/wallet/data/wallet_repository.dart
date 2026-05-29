@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -26,13 +27,22 @@ class WalletRepository {
     required Dio dio,
     required AuthSessionStorage sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
+    InAppPurchase? inAppPurchase,
   }) : _dio = dio,
        _authSessionCoordinator =
            authSessionCoordinator ??
-           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
+       _inAppPurchaseOverride = inAppPurchase;
 
   final Dio _dio;
   final AuthSessionCoordinator _authSessionCoordinator;
+  final InAppPurchase? _inAppPurchaseOverride;
+
+  InAppPurchase get _inAppPurchase =>
+      _inAppPurchaseOverride ?? InAppPurchase.instance;
+
+  Stream<List<PurchaseDetails>> get purchaseUpdates =>
+      _inAppPurchase.purchaseStream;
 
   Future<WalletStateModel> fetchWallet() async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -140,11 +150,12 @@ class WalletRepository {
     WalletPaymentMethodModel paymentMethod,
     Locale locale,
   ) async {
+    final platform = _platformValue();
     final payload = <String, Object?>{
       'packId': pack.packId,
       'currencyCode': pack.currencyCode,
       'paymentProvider': paymentMethod.provider,
-      'platform': _platformValue(),
+      'platform': platform,
       'appVersion': AppConfig.appVersion,
       'country': locale.countryCode ?? '*',
       'locale': locale.toLanguageTag(),
@@ -159,7 +170,10 @@ class WalletRepository {
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/purchases/create',
         data: payload,
-        options: _authOptions(session.accessToken),
+        options: _authOptions(
+          session.accessToken,
+          extraHeaders: {'X-PetMagic-Platform': platform},
+        ),
       ),
     );
 
@@ -169,6 +183,95 @@ class WalletRepository {
     );
 
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});
+  }
+
+  Future<({bool isAvailable, Set<String> productIds})> fetchStoreAvailability(
+    List<CurrencyPackModel> packs,
+    WalletPaymentMethodModel paymentMethod,
+  ) async {
+    if (!paymentMethod.isStoreNative) {
+      return (isAvailable: false, productIds: const <String>{});
+    }
+
+    final requestedIds = packs
+        .map((pack) => pack.productIdForProvider(paymentMethod.provider))
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toSet();
+
+    if (requestedIds.isEmpty) {
+      return (isAvailable: false, productIds: const <String>{});
+    }
+
+    final isAvailable = await _inAppPurchase.isAvailable();
+    if (!isAvailable) {
+      return (isAvailable: false, productIds: const <String>{});
+    }
+
+    final response = await _inAppPurchase.queryProductDetails(requestedIds);
+    if (response.error != null) {
+      throw const AppException('wallet.payment_unavailable');
+    }
+
+    return (
+      isAvailable: true,
+      productIds: response.productDetails.map((product) => product.id).toSet(),
+    );
+  }
+
+  Future<void> startStoreCheckout(
+    CurrencyPackModel pack,
+    WalletPaymentMethodModel paymentMethod,
+  ) async {
+    final productId = pack.productIdForProvider(paymentMethod.provider);
+    if (productId == null || productId.isEmpty) {
+      throw const AppException('wallet.payment_unavailable');
+    }
+
+    final isAvailable = await _inAppPurchase.isAvailable();
+    if (!isAvailable) {
+      throw const AppException('wallet.payment_unavailable');
+    }
+
+    final response = await _inAppPurchase.queryProductDetails({productId});
+    if (response.error != null || response.productDetails.isEmpty) {
+      throw const AppException('wallet.payment_unavailable');
+    }
+
+    final launched = await _inAppPurchase.buyConsumable(
+      purchaseParam: PurchaseParam(productDetails: response.productDetails.first),
+    );
+    if (!launched) {
+      throw const AppException('wallet.payment_unavailable');
+    }
+  }
+
+  Future<PurchaseHistoryItem> verifyStorePurchase({
+    required String orderId,
+    required WalletPaymentMethodModel paymentMethod,
+    required PurchaseDetails purchase,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/economy/purchases/$orderId/verify-store',
+        data: {
+          'paymentProvider': paymentMethod.provider,
+          'productId': purchase.productID,
+          'serverVerificationData':
+              purchase.verificationData.serverVerificationData,
+          'localVerificationData': purchase.verificationData.localVerificationData,
+          'purchaseId': purchase.purchaseID,
+          'transactionDate': purchase.transactionDate,
+        },
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return PurchaseHistoryItem.fromJson(response.data ?? const {});
+  }
+
+  Future<void> completePurchase(PurchaseDetails purchase) {
+    return _inAppPurchase.completePurchase(purchase);
   }
 
   Future<WalletStateModel> claimAdReward() async {
@@ -238,9 +341,17 @@ class WalletRepository {
     );
   }
 
-  Options _authOptions(String accessToken) {
+  Options _authOptions(
+    String accessToken, {
+    Map<String, String>? extraHeaders,
+  }) {
+    final headers = <String, String>{
+      HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+      if (extraHeaders != null) ...extraHeaders,
+    };
+
     return Options(
-      headers: {HttpHeaders.authorizationHeader: 'Bearer $accessToken'},
+      headers: headers,
     );
   }
 

@@ -19,10 +19,13 @@ public sealed partial class EconomyService
 {
     public async Task<Result<IReadOnlyList<CurrencyPackResponse>>> ListPacksAsync(CancellationToken cancellationToken)
     {
-        var packs = await dbContext.CurrencyPacks
+        var packEntities = await dbContext.CurrencyPacks
             .Where(x => x.IsActive)
             .OrderBy(x => x.CurrencyCode)
             .ThenBy(x => x.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        var packs = packEntities
             .Select(x => new CurrencyPackResponse(
                 x.Id,
                 x.Code,
@@ -31,8 +34,10 @@ public sealed partial class EconomyService
                 x.PriceAmount,
                 x.GrantedSpark,
                 x.BonusSpark,
-                x.GrantedSpark + x.BonusSpark))
-            .ToListAsync(cancellationToken);
+                x.GrantedSpark + x.BonusSpark,
+                ResolvePackStoreProductId(x, "google_play"),
+                ResolvePackStoreProductId(x, "app_store")))
+            .ToList();
 
         return Result.Success<IReadOnlyList<CurrencyPackResponse>>(packs);
     }
@@ -360,6 +365,12 @@ public sealed partial class EconomyService
             return Result.Failure<PremiumCheckoutResponse>(checkout.Error);
         }
 
+        if (usePaymentSheet
+            && string.IsNullOrWhiteSpace(checkout.Value.PaymentIntentClientSecret))
+        {
+            return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
         return Result.Success(new PremiumCheckoutResponse(
             provider,
             checkout.Value.CheckoutUrl,
@@ -406,6 +417,79 @@ public sealed partial class EconomyService
         }
 
         return Result.Success(new BillingPortalSessionResponse(provider, portal.Value.PortalUrl));
+    }
+
+    public async Task<Result<SubscriptionSummaryResponse>> CancelPremiumSubscriptionAsync(
+        CancelPremiumSubscriptionCommand command,
+        CancellationToken cancellationToken)
+    {
+        var provider = command.PaymentProvider.Trim().ToLowerInvariant();
+        if (!string.Equals(provider, "stripe", StringComparison.Ordinal))
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.UnsupportedPaymentProvider);
+        }
+
+        var subscription = await dbContext.UserSubscriptions
+            .Where(x => x.UserId == command.UserId && x.Provider == "stripe")
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (subscription is null || string.IsNullOrWhiteSpace(subscription.ExternalSubscriptionId))
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
+        var stripeApiKey = ResolveStripeApiKey();
+        if (string.IsNullOrWhiteSpace(stripeApiKey))
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
+        StripeConfiguration.ApiKey = stripeApiKey;
+
+        try
+        {
+            await new SubscriptionService().UpdateAsync(
+                subscription.ExternalSubscriptionId,
+                new SubscriptionUpdateOptions
+                {
+                    CancelAtPeriodEnd = true
+                },
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(
+                ex,
+                "Failed to request cancel_at_period_end for Stripe subscription {SubscriptionId}.",
+                subscription.ExternalSubscriptionId);
+
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        subscription.CancelAtPeriodEnd = true;
+        if (string.Equals(subscription.Status, "Active", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(subscription.Status, "Trialing", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(subscription.Status, "GracePeriod", StringComparison.OrdinalIgnoreCase))
+        {
+            subscription.Status = "Canceled";
+        }
+
+        subscription.UpdatedAtUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await AppendSubscriptionEventAsync(
+            command.UserId,
+            subscription.Id,
+            "stripe",
+            "CancelAtPeriodEndRequested",
+            subscription.Status,
+            null,
+            subscription.ExternalSubscriptionId,
+            null,
+            cancellationToken);
+
+        return await GetSubscriptionSummaryAsync(command.UserId, cancellationToken);
     }
 
     public async Task<Result<PremiumStoreVerificationResponse>> VerifyPremiumStorePurchaseAsync(
@@ -456,11 +540,6 @@ public sealed partial class EconomyService
             return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.StorePurchaseInactive);
         }
 
-        if (identityService is null)
-        {
-            return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.PremiumBillingUnavailable);
-        }
-
         var externalSubscriptionId = verification.Value.ExternalSubscriptionId;
         if (string.Equals(provider, "google_play", StringComparison.Ordinal))
         {
@@ -473,22 +552,13 @@ public sealed partial class EconomyService
             externalSubscriptionId = existingGoogleSubscription?.ExternalSubscriptionId ?? verification.Value.ExternalSubscriptionId;
         }
 
-        var premiumResult = await identityService.SetPremiumStatusAsync(
-            new SetPremiumStatusCommand(command.UserId, true),
-            cancellationToken);
-
-        if (premiumResult.IsFailure)
-        {
-            return Result.Failure<PremiumStoreVerificationResponse>(premiumResult.Error);
-        }
-
         var userSubscription = await UpsertUserSubscriptionAsync(
             command.UserId,
             provider,
             "in_app",
             string.Empty,
             plan.PlanCode,
-            EconomyWebhookParser.MapStoreSubscriptionStatus(verification.Value.Status, verification.Value.IsActive),
+            "Pending",
             null,
             externalSubscriptionId,
             string.Equals(provider, "google_play", StringComparison.Ordinal) ? command.ServerVerificationData : command.PurchaseId,
@@ -508,16 +578,14 @@ public sealed partial class EconomyService
             verification.Value.ExternalSubscriptionId,
             null,
             cancellationToken);
-
-        await SettlePendingReferralBonusAsync(command.UserId, $"premium:{provider}:{plan.PlanCode}", DateTime.UtcNow, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new PremiumStoreVerificationResponse(
             provider,
             command.ProductId,
-            true,
+            false,
             verification.Value.ExpiresAtUtc,
-            verification.Value.Status));
+            "pending_webhook"));
     }
 
     public async Task<Result<PaymentMethodSetupResponse>> CreatePaymentMethodSetupAsync(
@@ -618,27 +686,35 @@ public sealed partial class EconomyService
     public async Task<Result<PurchaseCheckoutResponse>> CreatePackPurchaseAsync(CreatePackPurchaseCommand command, CancellationToken cancellationToken)
     {
         var provider = command.PaymentProvider.Trim().ToLowerInvariant();
-        if (!string.Equals(provider, "stripe", StringComparison.Ordinal))
+        var isStripe = string.Equals(provider, "stripe", StringComparison.Ordinal);
+        var isStoreProvider =
+            string.Equals(provider, "google_play", StringComparison.Ordinal)
+            || string.Equals(provider, "app_store", StringComparison.Ordinal);
+
+        if (!isStripe && !isStoreProvider)
         {
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
-        var providerConfig = await ResolveEnabledPaymentProviderConfigAsync(
+        PaymentProviderConfiguration? providerConfig = await ResolveEnabledPaymentProviderConfigAsync(
             provider,
             command.Platform,
             command.Country,
             command.AppVersion,
             cancellationToken);
-
         if (providerConfig is null)
         {
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
 
-        var stripeApiKey = ResolveStripeApiKey(providerConfig.Mode);
-        if (string.IsNullOrWhiteSpace(stripeApiKey))
+        string? stripeApiKey = null;
+        if (isStripe)
         {
-            return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+            stripeApiKey = ResolveStripeApiKey(providerConfig.Mode);
+            if (string.IsNullOrWhiteSpace(stripeApiKey))
+            {
+                return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+            }
         }
 
         var currencyCode = command.CurrencyCode.Trim().ToUpperInvariant();
@@ -663,6 +739,29 @@ public sealed partial class EconomyService
             SparkToGrant = pack.GrantedSpark + pack.BonusSpark,
             CreatedAtUtc = DateTime.UtcNow
         };
+
+        if (isStoreProvider)
+        {
+            order.CheckoutUrl = string.Empty;
+            dbContext.PurchaseOrders.Add(order);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result.Success(new PurchaseCheckoutResponse(
+                order.Id,
+                order.UserId,
+                order.PaymentProvider,
+                order.ExternalPaymentId ?? string.Empty,
+                string.Empty,
+                null,
+                null,
+                null,
+                null,
+                order.Status,
+                order.PriceAmount,
+                order.CurrencyCode,
+                order.SparkToGrant,
+                order.CreatedAtUtc));
+        }
 
         if (command.PaymentMethodId.HasValue)
         {
@@ -759,6 +858,12 @@ public sealed partial class EconomyService
             cancellationToken);
 
         if (paymentResult.IsFailure)
+        {
+            return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        if (usePaymentSheet
+            && string.IsNullOrWhiteSpace(paymentResult.Value.PaymentIntentClientSecret))
         {
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
         }
@@ -944,10 +1049,16 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
-        if (confirmResult.IsFailure && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+        // Webhook is the source of truth for settlement: this endpoint validates
+        // payment state, but does not grant tokens directly.
+        logger?.LogInformation(
+            "Stripe payment validated for order {OrderId}; waiting webhook settlement.",
+            order.Id);
+
+        if (string.IsNullOrWhiteSpace(order.ExternalPaymentId))
         {
-            return Result.Failure<PurchaseOrderResponse>(confirmResult.Error);
+            order.ExternalPaymentId = stripeReferenceId;
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         return Result.Success(ToPurchaseOrderResponse(order));
@@ -964,5 +1075,114 @@ public sealed partial class EconomyService
         }
 
         return Result.Success(ToPurchaseOrderResponse(order));
+    }
+
+    public async Task<Result<PurchaseOrderResponse>> VerifyPackStorePurchaseAsync(
+        VerifyPackStorePurchaseCommand command,
+        CancellationToken cancellationToken)
+    {
+        var provider = command.PaymentProvider.Trim().ToLowerInvariant();
+        if (!string.Equals(provider, "google_play", StringComparison.Ordinal)
+            && !string.Equals(provider, "app_store", StringComparison.Ordinal))
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.UnsupportedPaymentProvider);
+        }
+
+        var order = await dbContext.PurchaseOrders
+            .FirstOrDefaultAsync(x => x.Id == command.OrderId && x.UserId == command.UserId, cancellationToken);
+        if (order is null)
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
+        }
+
+        if (!string.Equals(order.PaymentProvider, provider, StringComparison.Ordinal))
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        if (string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal))
+        {
+            return Result.Success(ToPurchaseOrderResponse(order));
+        }
+
+        var pack = await dbContext.CurrencyPacks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == order.PackId, cancellationToken);
+        if (pack is null)
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.CurrencyPackNotFound);
+        }
+
+        var expectedProductId = ResolvePackStoreProductId(pack, provider);
+        if (!string.Equals(expectedProductId, command.ProductId.Trim(), StringComparison.Ordinal))
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        var verification = await storeSubscriptionVerifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                command.UserId,
+                provider,
+                command.ProductId,
+                command.ServerVerificationData,
+                command.LocalVerificationData,
+                command.PurchaseId,
+                command.TransactionDate),
+            cancellationToken);
+
+        if (verification.IsFailure)
+        {
+            return Result.Failure<PurchaseOrderResponse>(verification.Error);
+        }
+
+        if (!verification.Value.IsPurchased)
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        order.ExternalPaymentId = string.Equals(provider, "google_play", StringComparison.Ordinal)
+            ? command.ServerVerificationData
+            : verification.Value.ExternalTransactionId
+                ?? command.PurchaseId
+                ?? order.ExternalPaymentId;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Store purchase settlement is webhook-authoritative.
+        return Result.Success(ToPurchaseOrderResponse(order));
+    }
+
+    private string ResolvePackStoreProductId(CurrencyPack pack, string provider)
+    {
+        var code = pack.Code.Trim();
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return string.Empty;
+        }
+
+        // Keep backward compatibility: when code already looks like an IAP SKU, use it as-is.
+        if (code.Contains('.', StringComparison.Ordinal))
+        {
+            return code.ToLowerInvariant();
+        }
+
+        var bundleId = options.Value.AppStoreBundleId?.Trim();
+        if (string.IsNullOrWhiteSpace(bundleId))
+        {
+            bundleId = options.Value.GooglePlayPackageName?.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(bundleId))
+        {
+            bundleId = "com.petmagic.app";
+        }
+
+        var normalizedProvider = provider.Trim().ToLowerInvariant() switch
+        {
+            "google_play" => "google",
+            "app_store" => "apple",
+            _ => "store"
+        };
+
+        return $"{bundleId}.tokens.{normalizedProvider}.{code.ToLowerInvariant()}";
     }
 }

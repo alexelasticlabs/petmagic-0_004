@@ -21,6 +21,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
   const TemplatesPage({super.key});
@@ -37,26 +38,35 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   final _imagePicker = ImagePicker();
+  late final TemplatesController _templatesController;
+  late final WalletController _walletController;
   Timer? _searchDebounce;
   DateTime? _lastRefreshAt;
 
   @override
   void initState() {
     super.initState();
+    _templatesController = ref.read(templatesControllerProvider.notifier);
+    _walletController = ref.read(walletControllerProvider.notifier);
+    final shouldLoadWallet = ref.read(walletControllerProvider).wallet == null;
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
     Future.microtask(() {
-      ref.read(templatesControllerProvider.notifier).setScreenVisible(true);
+      if (!mounted) {
+        return;
+      }
+
+      _templatesController.setScreenVisible(true);
       _refreshFeed(forceRefresh: true);
-      if (ref.read(walletControllerProvider).wallet == null) {
-        unawaited(ref.read(walletControllerProvider.notifier).load());
+      if (shouldLoadWallet) {
+        unawaited(_walletController.load());
       }
     });
   }
 
   @override
   void dispose() {
-    ref.read(templatesControllerProvider.notifier).setScreenVisible(false);
+    _templatesController.setScreenVisible(false);
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _searchDebounce?.cancel();
     _scrollController.dispose();
@@ -68,14 +78,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       _TemplatesLifecycleObserver(onStateChanged: _handleLifecycleState);
 
   void _handleLifecycleState(AppLifecycleState state) {
-    final controller = ref.read(templatesControllerProvider.notifier);
     if (state == AppLifecycleState.resumed) {
-      controller.setScreenVisible(true);
+      _templatesController.setScreenVisible(true);
       unawaited(_refreshFeed());
       return;
     }
 
-    controller.setScreenVisible(false);
+    _templatesController.setScreenVisible(false);
   }
 
   @override
@@ -98,7 +107,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         ),
       ),
       child: RefreshIndicator.adaptive(
-        onRefresh: controller.refresh,
+        onRefresh: () async {
+          await PetMagicHaptics.medium();
+          await controller.refresh();
+        },
         color: colors.accent,
         child: CustomScrollView(
           controller: _scrollController,
@@ -237,14 +249,14 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
     if (position.pixels > position.maxScrollExtent - 720) {
-      ref.read(templatesControllerProvider.notifier).loadMore();
+      _templatesController.loadMore();
     }
   }
 
   void _handleSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 360), () {
-      ref.read(templatesControllerProvider.notifier).setSearch(value);
+      _templatesController.setSearch(value);
     });
   }
 
@@ -257,9 +269,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     }
 
     _lastRefreshAt = now;
-    await ref
-        .read(templatesControllerProvider.notifier)
-        .loadInitial(forceRefresh: true);
+    await _templatesController.loadInitial(forceRefresh: true);
   }
 
   Future<void> _handleTemplateSelected(TemplateItem template) async {

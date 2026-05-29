@@ -26,14 +26,19 @@ class PremiumRepository {
     required Dio dio,
     required AuthSessionStorage sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
+    InAppPurchase? inAppPurchase,
   }) : _dio = dio,
        _authSessionCoordinator =
            authSessionCoordinator ??
-           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
+       _inAppPurchaseOverride = inAppPurchase;
 
   final Dio _dio;
   final AuthSessionCoordinator _authSessionCoordinator;
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+  final InAppPurchase? _inAppPurchaseOverride;
+
+  InAppPurchase get _inAppPurchase =>
+      _inAppPurchaseOverride ?? InAppPurchase.instance;
 
   Stream<List<PurchaseDetails>> get purchaseUpdates =>
       _inAppPurchase.purchaseStream;
@@ -89,22 +94,37 @@ class PremiumRepository {
     PremiumPlanModel plan,
     Locale locale,
   ) async {
+    final platform = _platformValue();
+    final payload = <String, Object?>{
+      'planCode': plan.planCode,
+      'paymentProvider': PremiumPaymentProvider.stripe.value,
+      'platform': platform,
+      'appVersion': AppConfig.appVersion,
+      'country': locale.countryCode ?? '*',
+      'locale': locale.toLanguageTag(),
+    };
+
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/checkout',
-        data: {
-          'planCode': plan.planCode,
-          'paymentProvider': PremiumPaymentProvider.stripe.value,
-          'platform': _platformValue(),
-          'appVersion': AppConfig.appVersion,
-          'country': locale.countryCode ?? '*',
-          'locale': locale.toLanguageTag(),
-        },
-        options: _authOptions(session.accessToken),
+        data: payload,
+        options: _authOptions(
+          session.accessToken,
+          extraHeaders: {'X-PetMagic-Platform': platform},
+        ),
       ),
     );
 
-    return PremiumCheckoutModel.fromJson(response.data ?? const {});
+    final checkout = PremiumCheckoutModel.fromJson(response.data ?? const {});
+    if (platform == 'web') {
+      return checkout;
+    }
+
+    if (checkout.usesPaymentSheet) {
+      return checkout;
+    }
+
+    throw const AppException('premium.checkout_failed');
   }
 
   Future<PremiumBillingPortalModel> createBillingPortal() async {
@@ -117,6 +137,20 @@ class PremiumRepository {
     );
 
     return PremiumBillingPortalModel.fromJson(response.data ?? const {});
+  }
+
+  Future<PremiumStatusModel> cancelSubscription({
+    PremiumPaymentProvider provider = PremiumPaymentProvider.stripe,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/economy/premium/cancel',
+        data: {'paymentProvider': provider.value},
+        options: _authOptions(session.accessToken),
+      ),
+    );
+
+    return PremiumStatusModel.fromJson(response.data ?? const {});
   }
 
   Future<String> createManagementUrl(PremiumStatusModel status) async {
@@ -254,9 +288,17 @@ class PremiumRepository {
     );
   }
 
-  Options _authOptions(String accessToken) {
+  Options _authOptions(
+    String accessToken, {
+    Map<String, String>? extraHeaders,
+  }) {
+    final headers = <String, String>{
+      HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+      if (extraHeaders != null) ...extraHeaders,
+    };
+
     return Options(
-      headers: {HttpHeaders.authorizationHeader: 'Bearer $accessToken'},
+      headers: headers,
     );
   }
 

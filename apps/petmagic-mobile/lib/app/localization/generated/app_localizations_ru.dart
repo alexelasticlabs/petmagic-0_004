@@ -1837,6 +1837,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportHomeSubtitle => 'Чем мы можем помочь?';
 
   @override
+  String get supportHomeOpenChatAction => 'Открыть чат';
+
+  @override
   String get supportHomeTopicGenerationIssue =>
       'Проблема с генерацией изображения';
 

@@ -105,7 +105,6 @@ export function SupportConversationPage({
     selectedAttachment,
     selectReplyToMessage,
     sendMutation,
-    setIsSidePanelOpen,
     setMessagesViewportVisible,
     setReply,
     setSearchQuery,

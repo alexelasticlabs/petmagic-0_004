@@ -15,8 +15,9 @@ import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_pa
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 
 part 'widgets/wallet_page_activity_widgets.dart';
 part 'widgets/wallet_page_overview_widgets.dart';
@@ -89,7 +90,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
         child: state.isInitialLoading
             ? const Center(child: CircularProgressIndicator.adaptive())
             : RefreshIndicator.adaptive(
-                onRefresh: () => controller.load(refresh: true),
+                onRefresh: () async {
+                  await PetMagicHaptics.medium();
+                  await controller.load(refresh: true);
+                },
                 color: colors.accent,
                 child: ListView(
                   padding: EdgeInsets.fromLTRB(16, 14, 16, bottomNavInset),
@@ -150,10 +154,14 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         onSelect: (pack) => _showPackDetailSheet(
                           context,
                           state.packs,
+                          paymentMethods: state.paymentMethods,
                           initialPack: pack,
                           isBuying: state.isBuying,
-                          onBuy: (selectedPack) =>
-                              controller.buyPack(selectedPack),
+                          onBuy: (selectedPack, selectedPaymentMethod) =>
+                              controller.buyPack(
+                                selectedPack,
+                                selectedPaymentMethod,
+                              ),
                           onCheckoutReady: (checkout) async {
                             controller.resetCheckoutVerification();
                             controller.consumeCheckoutUrl();
@@ -190,17 +198,24 @@ class _WalletPageState extends ConsumerState<WalletPage>
   }
 
   Future<void> _handleCheckout(PurchaseCheckoutModel checkout) async {
+    final text = AppLocalizations.of(context);
     developer.log(
       'Checkout dispatch (order=${checkout.orderId}, usesPaymentSheet=${checkout.usesPaymentSheet}, provider=${checkout.paymentProvider}, urlLength=${checkout.checkoutUrl.length}, hasClientSecret=${(checkout.paymentIntentClientSecret?.isNotEmpty ?? false)}, hasPublishableKey=${(checkout.publishableKey?.isNotEmpty ?? false)})',
       name: 'PetMagic.Wallet.Checkout',
     );
 
-    if (checkout.usesPaymentSheet) {
-      await _presentStripePaymentSheet(checkout);
+    if (!checkout.usesPaymentSheet) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
+      );
       return;
     }
 
-    await _openCheckout(checkout.checkoutUrl);
+    await _presentStripePaymentSheet(checkout);
   }
 
   Future<void> _presentStripePaymentSheet(
@@ -253,6 +268,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
         name: 'PetMagic.Wallet.Checkout',
       );
 
+      _shouldReloadOnResume = true;
       await Stripe.instance.presentPaymentSheet();
 
       developer.log(
@@ -274,6 +290,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
       if (verificationState != WalletCheckoutVerificationState.succeeded) {
         await controller.verifyCheckoutStatus();
       }
+      _shouldReloadOnResume = false;
     } on StripeException catch (error) {
       developer.log(
         'PaymentSheet StripeException (order=${checkout.orderId})',
@@ -286,6 +303,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
       }
 
       final message = error.error.localizedMessage;
+      _shouldReloadOnResume = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -312,6 +330,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
         Exception() => error.toString(),
         _ => null,
       };
+      _shouldReloadOnResume = false;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -325,83 +344,18 @@ class _WalletPageState extends ConsumerState<WalletPage>
     }
   }
 
-  Future<void> _openCheckout(String checkoutUrl) async {
-    final text = AppLocalizations.of(context);
-    final uri = _checkoutUri(checkoutUrl);
-    if (uri == null) {
-      debugPrint('PETMAGIC_WALLET_CHECKOUT invalid_url="$checkoutUrl"');
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
-      );
-      return;
-    }
-
-    debugPrint('PETMAGIC_WALLET_CHECKOUT opening uri="$uri"');
-    _shouldReloadOnResume = true;
-    var launched = false;
-    try {
-      launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      debugPrint(
-        'PETMAGIC_WALLET_CHECKOUT in_app_browser_view launched=$launched',
-      );
-    } catch (_) {
-      debugPrint('PETMAGIC_WALLET_CHECKOUT in_app_browser_view threw');
-      launched = false;
-    }
-
-    if (!launched) {
-      try {
-        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        debugPrint(
-          'PETMAGIC_WALLET_CHECKOUT external_application launched=$launched',
-        );
-      } catch (_) {
-        debugPrint('PETMAGIC_WALLET_CHECKOUT external_application threw');
-        launched = false;
-      }
-    }
-
-    if (!launched && mounted) {
-      debugPrint('PETMAGIC_WALLET_CHECKOUT failed_to_launch');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
-      );
-    }
-  }
-}
-
-Uri? _checkoutUri(String rawUrl) {
-  final value = rawUrl.trim();
-  if (value.isEmpty) {
-    return null;
-  }
-
-  final parsed = Uri.tryParse(value);
-  if (parsed == null) {
-    return null;
-  }
-
-  if (parsed.hasScheme) {
-    return parsed;
-  }
-
-  if (parsed.hasAuthority) {
-    return parsed.replace(scheme: 'https');
-  }
-
-  return null;
 }
 
 Future<void> _showPackDetailSheet(
   BuildContext context,
   List<CurrencyPackModel> packs, {
+  required List<WalletPaymentMethodModel> paymentMethods,
   required CurrencyPackModel initialPack,
   required bool isBuying,
-  required Future<PurchaseCheckoutModel?> Function(CurrencyPackModel pack)
+  required Future<PurchaseCheckoutModel?> Function(
+    CurrencyPackModel pack,
+    WalletPaymentMethodModel paymentMethod,
+  )
   onBuy,
   required Future<void> Function(PurchaseCheckoutModel checkout)
   onCheckoutReady,
@@ -422,6 +376,13 @@ Future<void> _showPackDetailSheet(
     return;
   }
 
+  final enabledMethods = paymentMethods
+      .where((method) => method.isEnabled)
+      .toList(growable: false);
+  if (enabledMethods.isEmpty) {
+    return;
+  }
+
   final bestOfferPack = sortedPacks.last;
   final popularPack = sortedPacks.length >= 3
       ? sortedPacks[(sortedPacks.length - 1) ~/ 2]
@@ -430,6 +391,55 @@ Future<void> _showPackDetailSheet(
     (pack) => pack.packId == initialPack.packId,
     orElse: () => sortedPacks.first,
   );
+  var selectedMethod = enabledMethods
+      .where((method) => method.isSelectedByDefault)
+      .cast<WalletPaymentMethodModel?>()
+      .firstOrNull ??
+      enabledMethods
+          .where((method) => method.isRecommended)
+          .cast<WalletPaymentMethodModel?>()
+          .firstOrNull ??
+      enabledMethods.first;
+
+  List<PaymentMethodSheetOption> buildMethodOptions() {
+    return enabledMethods
+        .map(
+          (method) => PaymentMethodSheetOption(
+            id: method.provider,
+            title: _walletProviderLabel(text, method),
+            icon: _walletProviderIcon(method),
+            subtitle: method.displaySubtitle,
+            badge: method.isRecommended
+                ? text.premiumPaymentRecommendedBadge
+                : (method.isSelectedByDefault
+                      ? text.premiumPaymentDefaultBadge
+                      : null),
+            warningTitle: method.warningTitle,
+            warningMessage: method.warningMessage,
+            notes: method.notes,
+            isEnabled: method.isEnabled,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  final selectedOption = await showPaymentMethodSheet(
+    context: context,
+    title: text.premiumPaymentTitle,
+    subtitle: text.premiumSecurePaymentSubtitle,
+    continueLabel: text.premiumContinueAction,
+    options: buildMethodOptions(),
+  );
+  if (selectedOption == null || !context.mounted) {
+    return;
+  }
+
+  for (final method in enabledMethods) {
+    if (method.provider == selectedOption.id) {
+      selectedMethod = method;
+      break;
+    }
+  }
 
   await showPetMagicModalBottomSheet<void>(
     context: context,
@@ -485,7 +495,7 @@ Future<void> _showPackDetailSheet(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Pay with Stripe',
+                                _walletProviderLabel(text, selectedMethod),
                                 style: TextStyle(
                                   color: colors.textStrong,
                                   fontSize: 19,
@@ -494,7 +504,10 @@ Future<void> _showPackDetailSheet(
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Secure card payment. Balance updates automatically.',
+                                selectedMethod.displaySubtitle?.trim().isNotEmpty ==
+                                        true
+                                    ? selectedMethod.displaySubtitle!.trim()
+                                    : text.premiumSecurePaymentSubtitle,
                                 style: TextStyle(
                                   color: colors.textSoft,
                                   fontSize: 12.5,
@@ -511,26 +524,95 @@ Future<void> _showPackDetailSheet(
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: const [
+                      children: [
                         _CheckoutTrustPill(
                           icon: Icons.verified_user_rounded,
-                          label: 'Secure Payment',
+                          label: text.premiumSecurePaymentTitle,
                         ),
                         _CheckoutTrustPill(
-                          icon: Icons.credit_card_rounded,
-                          label: 'Stripe',
+                          icon: _walletProviderIcon(selectedMethod),
+                          label: _walletProviderLabel(text, selectedMethod),
                         ),
-                        _CheckoutTrustPill(
-                          icon: Icons.payment_rounded,
-                          label: 'Visa • Mastercard',
-                        ),
-                        _CheckoutTrustPill(
-                          icon: Icons.phone_iphone_rounded,
-                          label: 'Apple Pay • Google Pay',
-                        ),
+                        if (selectedMethod.isStripe)
+                          const _CheckoutTrustPill(
+                            icon: Icons.payment_rounded,
+                            label: 'Visa • Mastercard',
+                          ),
+                        if (selectedMethod.isStripe)
+                          const _CheckoutTrustPill(
+                            icon: Icons.phone_iphone_rounded,
+                            label: 'Apple Pay • Google Pay',
+                          ),
                       ],
                     ),
                     const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.44),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  text.premiumPaymentTitle,
+                                  style: TextStyle(
+                                    color: colors.textMuted,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _walletProviderLabel(text, selectedMethod),
+                                  style: TextStyle(
+                                    color: colors.textStrong,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final selected = await showPaymentMethodSheet(
+                                context: sheetContext,
+                                title: text.premiumPaymentTitle,
+                                subtitle: text.premiumSecurePaymentSubtitle,
+                                continueLabel: text.premiumContinueAction,
+                                options: buildMethodOptions(),
+                              );
+                              if (selected == null || !sheetContext.mounted) {
+                                return;
+                              }
+
+                              WalletPaymentMethodModel? matched;
+                              for (final method in enabledMethods) {
+                                if (method.provider == selected.id) {
+                                  matched = method;
+                                  break;
+                                }
+                              }
+
+                              if (matched == null) {
+                                return;
+                              }
+
+                              setModalState(() => selectedMethod = matched!);
+                            },
+                            child: Text(text.externalCheckoutContinueAction),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     for (
                       var index = 0;
                       index < sortedPacks.length;
@@ -638,12 +720,20 @@ Future<void> _showPackDetailSheet(
                                 debugPrint(
                                   'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${selectedPack.code}',
                                 );
-                                final checkout = await onBuy(selectedPack);
+                                final checkout = await onBuy(
+                                  selectedPack,
+                                  selectedMethod,
+                                );
                                 if (!sheetContext.mounted) {
                                   return;
                                 }
 
                                 if (checkout == null) {
+                                  if (selectedMethod.isStoreNative) {
+                                    Navigator.of(sheetContext).pop();
+                                    return;
+                                  }
+
                                   debugPrint(
                                     'PETMAGIC_WALLET_CHECKOUT buy_result empty_checkout',
                                   );
@@ -672,7 +762,12 @@ Future<void> _showPackDetailSheet(
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      text.walletCheckoutHint,
+                      selectedMethod.isStripe
+                          ? text.premiumSecurePaymentSubtitle
+                          : (selectedMethod.warningMessage?.trim().isNotEmpty ==
+                                    true
+                                ? selectedMethod.warningMessage!.trim()
+                                : text.walletCheckoutHint),
                       style: TextStyle(
                         color: colors.textMuted,
                         fontSize: 11.5,
@@ -870,6 +965,34 @@ String _formatPrice(CurrencyPackModel pack) {
   return NumberFormat.simpleCurrency(
     name: pack.currencyCode,
   ).format(pack.priceAmount);
+}
+
+String _walletProviderLabel(
+  AppLocalizations text,
+  WalletPaymentMethodModel method,
+) {
+  final provider = method.provider.trim().toLowerCase();
+  final customLabel = method.displayLabel?.trim();
+  if (customLabel != null && customLabel.isNotEmpty) {
+    return customLabel;
+  }
+
+  return switch (provider) {
+    'stripe' => text.premiumPaymentStripe,
+    'google_play' => text.premiumPaymentGooglePlay,
+    'app_store' => text.premiumPaymentApple,
+    _ => method.provider,
+  };
+}
+
+IconData _walletProviderIcon(WalletPaymentMethodModel method) {
+  final provider = method.provider.trim().toLowerCase();
+  return switch (provider) {
+    'stripe' => Icons.credit_card_rounded,
+    'google_play' => Icons.android_rounded,
+    'app_store' => Icons.apple_rounded,
+    _ => Icons.payments_rounded,
+  };
 }
 
 String _valuePerCurrencyLabel(CurrencyPackModel pack) {

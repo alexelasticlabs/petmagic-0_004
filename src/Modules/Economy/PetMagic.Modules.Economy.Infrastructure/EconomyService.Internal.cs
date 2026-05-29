@@ -478,7 +478,7 @@ public sealed partial class EconomyService
                 stripeMobileConfig,
                 platform,
                 region,
-                string.Equals(platform, "ios", StringComparison.Ordinal) ? "external_checkout" : "alternative_billing"));
+                "in_app"));
         }
 
         return SortPaymentMethods(methods);
@@ -490,6 +490,20 @@ public sealed partial class EconomyService
         string region,
         string purchaseChannel)
     {
+        var warningTitle = config.WarningTitle;
+        var warningMessage = config.WarningMessage;
+        var notes = config.Notes;
+
+        if (string.Equals(config.Provider, "stripe", StringComparison.OrdinalIgnoreCase))
+        {
+            (warningTitle, warningMessage, notes) = NormalizeStripeDisclosures(
+                platform,
+                region,
+                warningTitle,
+                warningMessage,
+                notes);
+        }
+
         return new PaywallPaymentMethodResponse(
             config.Provider,
             purchaseChannel,
@@ -503,9 +517,51 @@ public sealed partial class EconomyService
             config.BonusTokensPercent,
             config.DisplayLabel,
             config.DisplaySubtitle,
-            config.WarningTitle,
-            config.WarningMessage,
-            config.Notes);
+            warningTitle,
+            warningMessage,
+            notes);
+    }
+
+    private static (string? WarningTitle, string? WarningMessage, string? Notes) NormalizeStripeDisclosures(
+        string platform,
+        string region,
+        string? warningTitle,
+        string? warningMessage,
+        string? notes)
+    {
+        var title = warningTitle;
+        var message = warningMessage;
+        var note = notes;
+
+        var warningText = warningMessage ?? string.Empty;
+        var noteText = notes ?? string.Empty;
+        var hasLegacyRedirectText =
+            warningText.Contains("stripe checkout", StringComparison.OrdinalIgnoreCase)
+            || warningText.Contains("continue to stripe", StringComparison.OrdinalIgnoreCase)
+            || noteText.Contains("external checkout", StringComparison.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            title = "Pay with Stripe";
+        }
+
+        var isEuRegion = string.Equals(region, "EU", StringComparison.OrdinalIgnoreCase)
+            || EconomyPaymentProviderPolicy.IsEuRegion(region);
+        if (string.IsNullOrWhiteSpace(message) || hasLegacyRedirectText)
+        {
+            message = isEuRegion
+                ? "Stripe billing is completed inside PetMagic with native payment sheet (Card / Apple Pay / Google Pay). Provider terms and support may differ from App Store or Google Play."
+                : "Stripe billing is completed inside PetMagic with native payment sheet (Card / Apple Pay / Google Pay). Your payment details are processed securely by Stripe.";
+        }
+
+        if (string.IsNullOrWhiteSpace(note) || hasLegacyRedirectText)
+        {
+            note = string.Equals(platform, "ios", StringComparison.OrdinalIgnoreCase)
+                ? "Subscription renewal and cancellation are available in PetMagic subscription management."
+                : "You can manage renewal and cancellation in PetMagic subscription management.";
+        }
+
+        return (title, message, note);
     }
 
     private static List<PaywallPaymentMethodResponse> SortPaymentMethods(IEnumerable<PaywallPaymentMethodResponse> methods)
@@ -520,8 +576,8 @@ public sealed partial class EconomyService
     {
         return new PaywallLegalTextsResponse(
             "Payments for in-app subscriptions are processed by Apple App Store or Google Play. You can manage or cancel the subscription in your store account settings.",
-            "External checkout opens a secure billing flow outside the store. Premium activates after verification, and additional disclosures may apply in your region.",
-            "Stripe checkout and customer portal are secure. PetMagic does not store raw card details and subscription management stays available inside PetMagic settings.");
+            "Alternative billing with Stripe is completed inside the app and may require additional provider disclosures depending on your region.",
+            "Stripe payments are completed inside PetMagic with native payment sheets. PetMagic does not store raw card details.");
     }
 
     [GeneratedRegex("\\s+", RegexOptions.CultureInvariant)]

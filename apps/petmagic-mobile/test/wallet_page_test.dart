@@ -52,7 +52,7 @@ void main() {
       await tester.tap(find.text(text.walletPackDetailsAction).first);
       await tester.pumpAndSettle();
 
-      expect(find.text('Pay with Stripe'), findsOneWidget);
+      expect(find.text(text.premiumPaymentStripe), findsAtLeastNWidgets(1));
       expect(tester.takeException(), isNull);
     },
   );

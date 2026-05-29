@@ -12,6 +12,12 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_controller
 final premiumControllerProvider =
     NotifierProvider<PremiumController, PremiumState>(PremiumController.new);
 
+typedef PremiumRefreshProfile = Future<void> Function();
+
+final premiumRefreshProfileProvider = Provider<PremiumRefreshProfile>((ref) {
+  return () => ref.read(profileControllerProvider.notifier).initialize();
+});
+
 enum PremiumCheckoutVerificationState {
   idle,
   checking,
@@ -106,6 +112,11 @@ class PremiumSubscriptionManagementService {
         throw const AppException('premium.manage_failed');
     }
   }
+
+  Future<PremiumSubscriptionSummaryView> requestCancelAtPeriodEnd() async {
+    final status = await _repository.cancelSubscription();
+    return PremiumSubscriptionSummaryView.fromStatus(status);
+  }
 }
 
 class PremiumState {
@@ -160,10 +171,12 @@ class PremiumState {
       }
     }
 
-    return plans.isEmpty ? null : plans.last;
+    return plans.isEmpty ? null : plans.first;
   }
 
   bool get isPremium => status?.isPremium == true;
+
+  bool get canManageSubscription => status?.canManageSubscription == true;
 
   bool get isInitialLoading => isLoading && plans.isEmpty;
 
@@ -189,7 +202,7 @@ class PremiumState {
     }
 
     if (selectedProvider == PremiumPaymentProvider.stripe) {
-      return true;
+      return plan.stripeCheckoutEnabled;
     }
 
     final productId = plan.productIdFor(selectedProvider);
@@ -309,11 +322,13 @@ class PremiumState {
 
 class PremiumController extends Notifier<PremiumState> {
   late final PremiumRepository _repository;
+  late final PremiumRefreshProfile _refreshProfile;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
   @override
   PremiumState build() {
     _repository = ref.watch(premiumRepositoryProvider);
+    _refreshProfile = ref.watch(premiumRefreshProfileProvider);
     _purchaseSubscription?.cancel();
     _purchaseSubscription = _repository.purchaseUpdates.listen(
       _handlePurchaseUpdates,
@@ -342,43 +357,32 @@ class PremiumController extends Notifier<PremiumState> {
 
       final config = results[0] as PremiumPaywallConfigModel;
       final status = results[1] as PremiumStatusModel;
-      final plans = config.plans;
-      const storeAvailable = false;
-      const availableStoreProductIds = <String>{};
-
-      final selectedPlanCode =
-          plans.any((plan) => plan.planCode == config.recommendedPlanCode)
-          ? config.recommendedPlanCode!
-          : plans.any((plan) => plan.planCode == state.selectedPlanCode)
-          ? state.selectedPlanCode
-          : plans.isEmpty
-          ? state.selectedPlanCode
-          : plans.last.planCode;
+      final plans = _normalizePlans(config.plans);
 
       final enabledMethods = config.paymentMethods
           .where((method) => method.isEnabled)
           .toList(growable: false);
-      final configuredProviders = enabledMethods
-          .map((method) => method.provider)
-          .toList(growable: false);
-        final stripeIsEnabled = configuredProviders.contains(
-        PremiumPaymentProvider.stripe,
-        );
-      final defaultProvider = enabledMethods
-          .where((method) => method.isSelectedByDefault)
-          .map((method) => method.provider)
-          .cast<PremiumPaymentProvider?>()
-          .firstOrNull;
+      final configuredProviders = _extractProviders(enabledMethods);
+      final storeAvailability = await _resolveStoreAvailability(
+        plans,
+        configuredProviders,
+      );
 
-      final selectedProvider =
-          stripeIsEnabled
-          ? PremiumPaymentProvider.stripe
-          : configuredProviders.contains(state.selectedProvider)
-          ? state.selectedProvider
-          : defaultProvider ??
-                (configuredProviders.isEmpty
-                    ? state.selectedProvider
-                    : configuredProviders.first);
+      final selectedPlanCode = _selectPlanCode(
+        plans,
+        preferredPlanCode: config.recommendedPlanCode,
+        currentPlanCode: state.selectedPlanCode,
+      );
+
+      final selectedProvider = _selectProvider(
+        enabledMethods: enabledMethods,
+        configuredProviders: configuredProviders,
+        currentProvider: state.selectedProvider,
+        storeAvailable: storeAvailability.isAvailable,
+        availableStoreProductIds: storeAvailability.productIds,
+        plans: plans,
+        selectedPlanCode: selectedPlanCode,
+      );
 
       state = state.copyWith(
         plans: plans,
@@ -387,8 +391,8 @@ class PremiumController extends Notifier<PremiumState> {
         legalTexts: config.legalTexts,
         selectedPlanCode: selectedPlanCode,
         selectedProvider: selectedProvider,
-        isStoreAvailable: storeAvailable,
-        availableStoreProductIds: availableStoreProductIds,
+        isStoreAvailable: storeAvailability.isAvailable,
+        availableStoreProductIds: storeAvailability.productIds,
         isLoading: false,
         clearError: true,
       );
@@ -402,6 +406,7 @@ class PremiumController extends Notifier<PremiumState> {
       selectedPlanCode: planCode,
       clearError: true,
       clearSuccess: true,
+      clearCheckoutError: true,
     );
   }
 
@@ -410,12 +415,18 @@ class PremiumController extends Notifier<PremiumState> {
       selectedProvider: provider,
       clearError: true,
       clearSuccess: true,
+      clearCheckoutError: true,
     );
   }
 
   Future<PremiumCheckoutModel?> startCheckout() async {
     final plan = state.selectedPlan;
     if (plan == null) {
+      return null;
+    }
+
+    if (!state.canStartCheckout) {
+      state = state.copyWith(errorMessage: 'premium.store_product_unavailable');
       return null;
     }
 
@@ -436,13 +447,7 @@ class PremiumController extends Notifier<PremiumState> {
           plan,
           WidgetsBinding.instance.platformDispatcher.locale,
         );
-        if (checkout.usesPaymentSheet) {
-          state = state.copyWith(isBuying: false);
-          return checkout;
-        }
-
-        final checkoutUrl = checkout.checkoutUrl.trim();
-        if (checkoutUrl.isEmpty) {
+        if (!checkout.usesPaymentSheet) {
           state = state.copyWith(
             isBuying: false,
             errorMessage: 'premium.checkout_failed',
@@ -450,24 +455,16 @@ class PremiumController extends Notifier<PremiumState> {
           return null;
         }
 
-        state = state.copyWith(isBuying: false, externalUrl: checkoutUrl);
-        return null;
-      }
-
-      if (!state.canStartCheckout) {
-        state = state.copyWith(
-          isBuying: false,
-          errorMessage: 'premium.store_product_unavailable',
-        );
-        return null;
+        state = state.copyWith(isBuying: false);
+        return checkout;
       }
 
       await _repository.startStoreCheckout(plan, state.selectedProvider);
+      return null;
     } catch (error) {
       state = state.copyWith(isBuying: false, errorMessage: error.toString());
+      return null;
     }
-
-    return null;
   }
 
   Future<void> manageBilling() async {
@@ -525,7 +522,7 @@ class PremiumController extends Notifier<PremiumState> {
       clearSuccess: true,
     );
 
-    await ref.read(profileControllerProvider.notifier).initialize();
+    await _refreshProfile();
     await load(refresh: true);
 
     state = state.copyWith(
@@ -561,7 +558,7 @@ class PremiumController extends Notifier<PremiumState> {
 
     const maxAttempts = 4;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      await ref.read(profileControllerProvider.notifier).initialize();
+      await _refreshProfile();
       await load(refresh: true);
 
       final updatedState = state;
@@ -621,9 +618,11 @@ class PremiumController extends Notifier<PremiumState> {
             clearError: true,
             clearSuccess: true,
           );
+          break;
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
           await _verifyStorePurchase(purchase);
+          break;
         case PurchaseStatus.error:
           if (purchase.pendingCompletePurchase) {
             await _repository.completePurchase(purchase);
@@ -634,17 +633,20 @@ class PremiumController extends Notifier<PremiumState> {
             isRestoring: false,
             errorMessage: purchase.error?.message ?? 'premium.checkout_failed',
           );
+          break;
         case PurchaseStatus.canceled:
           state = state.copyWith(
             isBuying: false,
             isRestoring: false,
             errorMessage: 'premium.purchase_cancelled',
           );
+          break;
       }
     }
   }
 
   Future<void> _verifyStorePurchase(PurchaseDetails purchase) async {
+    final wasPremiumBeforeCheckout = state.isPremium;
     final provider = _platformStoreProvider();
     if (provider == null) {
       state = state.copyWith(
@@ -677,7 +679,7 @@ class PremiumController extends Notifier<PremiumState> {
     }
 
     try {
-      await _repository.verifyStorePurchase(
+      final verified = await _repository.verifyStorePurchase(
         plan: matchedPlan,
         provider: provider,
         purchase: purchase,
@@ -687,14 +689,23 @@ class PremiumController extends Notifier<PremiumState> {
         await _repository.completePurchase(purchase);
       }
 
-      await ref.read(profileControllerProvider.notifier).initialize();
+      await _refreshProfile();
       await load(refresh: true);
 
-      state = state.copyWith(
-        isBuying: false,
-        isRestoring: false,
-        successMessage: 'premium.purchase_activated',
+      if (verified.isActive) {
+        state = state.copyWith(
+          isBuying: false,
+          isRestoring: false,
+          successMessage: 'premium.purchase_activated',
+        );
+        return;
+      }
+
+      state = state.copyWith(isBuying: false, isRestoring: false);
+      markCheckoutOpened(
+        wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
       );
+      await verifyCheckoutStatus();
     } catch (error) {
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
@@ -707,4 +718,192 @@ class PremiumController extends Notifier<PremiumState> {
       );
     }
   }
+
+  List<PremiumPlanModel> _normalizePlans(List<PremiumPlanModel> plans) {
+    final filtered = <PremiumPlanModel>[];
+    for (final plan in plans) {
+      final key = _billingPeriodKey(plan);
+      if (key == _BillingPeriod.monthly || key == _BillingPeriod.yearly) {
+        filtered.add(plan);
+      }
+    }
+
+    filtered.sort((left, right) {
+      final byOrder = left.sortOrder.compareTo(right.sortOrder);
+      if (byOrder != 0) {
+        return byOrder;
+      }
+
+      return left.planCode.compareTo(right.planCode);
+    });
+
+    return filtered;
+  }
+
+  List<PremiumPaymentProvider> _extractProviders(
+    List<PremiumPaymentMethodModel> methods,
+  ) {
+    final providers = <PremiumPaymentProvider>[];
+    for (final method in methods) {
+      if (!providers.contains(method.provider)) {
+        providers.add(method.provider);
+      }
+    }
+
+    return providers;
+  }
+
+  Future<({bool isAvailable, Set<String> productIds})>
+  _resolveStoreAvailability(
+    List<PremiumPlanModel> plans,
+    List<PremiumPaymentProvider> providers,
+  ) async {
+    var isAvailable = false;
+    final productIds = <String>{};
+
+    for (final provider in providers) {
+      if (provider == PremiumPaymentProvider.stripe) {
+        continue;
+      }
+
+      try {
+        final availability = await _repository.fetchStoreAvailability(
+          plans,
+          provider,
+        );
+        isAvailable = isAvailable || availability.isAvailable;
+        productIds.addAll(availability.productIds);
+      } catch (_) {
+        // Store products can be temporarily unavailable; keep paywall usable.
+      }
+    }
+
+    return (isAvailable: isAvailable, productIds: productIds);
+  }
+
+  String _selectPlanCode(
+    List<PremiumPlanModel> plans, {
+    required String? preferredPlanCode,
+    required String currentPlanCode,
+  }) {
+    if (plans.isEmpty) {
+      return currentPlanCode;
+    }
+
+    if (preferredPlanCode != null) {
+      for (final plan in plans) {
+        if (plan.planCode == preferredPlanCode) {
+          return preferredPlanCode;
+        }
+      }
+    }
+
+    for (final plan in plans) {
+      if (plan.planCode == currentPlanCode) {
+        return currentPlanCode;
+      }
+    }
+
+    return plans.first.planCode;
+  }
+
+  PremiumPaymentProvider _selectProvider({
+    required List<PremiumPaymentMethodModel> enabledMethods,
+    required List<PremiumPaymentProvider> configuredProviders,
+    required PremiumPaymentProvider currentProvider,
+    required bool storeAvailable,
+    required Set<String> availableStoreProductIds,
+    required List<PremiumPlanModel> plans,
+    required String selectedPlanCode,
+  }) {
+    if (configuredProviders.isEmpty) {
+      return currentProvider;
+    }
+
+    PremiumPaymentProvider? defaultProvider;
+    for (final method in enabledMethods) {
+      if (method.isSelectedByDefault) {
+        defaultProvider = method.provider;
+        break;
+      }
+    }
+
+    PremiumPaymentProvider? recommendedProvider;
+    for (final method in enabledMethods) {
+      if (method.isRecommended) {
+        recommendedProvider = method.provider;
+        break;
+      }
+    }
+
+    final candidates = <PremiumPaymentProvider>[
+      currentProvider,
+      ?defaultProvider,
+      ?recommendedProvider,
+      ...configuredProviders,
+    ];
+
+    for (final candidate in candidates) {
+      if (!configuredProviders.contains(candidate)) {
+        continue;
+      }
+
+      if (_providerIsCheckoutReady(
+        candidate,
+        plans,
+        selectedPlanCode,
+        storeAvailable,
+        availableStoreProductIds,
+      )) {
+        return candidate;
+      }
+    }
+
+    return configuredProviders.first;
+  }
+
+  bool _providerIsCheckoutReady(
+    PremiumPaymentProvider provider,
+    List<PremiumPlanModel> plans,
+    String selectedPlanCode,
+    bool storeAvailable,
+    Set<String> availableStoreProductIds,
+  ) {
+    PremiumPlanModel? selectedPlan;
+    for (final plan in plans) {
+      if (plan.planCode == selectedPlanCode) {
+        selectedPlan = plan;
+        break;
+      }
+    }
+
+    selectedPlan ??= plans.isEmpty ? null : plans.first;
+    if (selectedPlan == null) {
+      return false;
+    }
+
+    if (provider == PremiumPaymentProvider.stripe) {
+      return selectedPlan.stripeCheckoutEnabled;
+    }
+
+    final productId = selectedPlan.productIdFor(provider);
+    return storeAvailable &&
+        productId != null &&
+        availableStoreProductIds.contains(productId);
+  }
+
+  _BillingPeriod _billingPeriodKey(PremiumPlanModel plan) {
+    final value = '${plan.billingInterval}:${plan.planCode}'.toLowerCase();
+    if (value.contains('year') || value.contains('annual')) {
+      return _BillingPeriod.yearly;
+    }
+
+    if (value.contains('month')) {
+      return _BillingPeriod.monthly;
+    }
+
+    return _BillingPeriod.other;
+  }
 }
+
+enum _BillingPeriod { monthly, yearly, other }
