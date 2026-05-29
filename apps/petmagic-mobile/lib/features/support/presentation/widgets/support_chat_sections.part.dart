@@ -512,12 +512,7 @@ class _SupportComposerPanel extends StatelessWidget {
                   resolveLabel: text.supportChatMarkResolvedAction,
                   keepOpenLabel: text.supportChatKeepOpenAction,
                   isBusy: state.isSending,
-                  onResolve: () async {
-                    final ok = await _showSupportCloseConversationDialog(context, text);
-                    if (ok) {
-                      await onCloseConversation();
-                    }
-                  },
+                  onResolve: onCloseConversation,
                   onKeepOpen: () {
                     onReopenConversation().whenComplete(() {
                       if (messageFocusNode.canRequestFocus) {
@@ -658,22 +653,31 @@ class _SupportComposerPanel extends StatelessWidget {
                               ignoring: !effectiveCanSend && !state.isSending,
                               child: AnimatedOpacity(
                                 duration: const Duration(milliseconds: 140),
-                                opacity: effectiveCanSend || state.isSending ? 1 : 0.38,
+                                opacity: effectiveCanSend || state.isSending
+                                    ? 1
+                                    : 0.38,
                                 child: IconButton(
                                   visualDensity: VisualDensity.compact,
                                   padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints.tightFor(width: 34, height: 40),
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 34,
+                                    height: 40,
+                                  ),
                                   splashRadius: 18,
-                                  onPressed: state.isSending || !effectiveCanSend ? null : onSendMessage,
+                                  onPressed:
+                                      state.isSending || !effectiveCanSend
+                                      ? null
+                                      : onSendMessage,
                                   icon: state.isSending
                                       ? SizedBox(
                                           width: 16,
                                           height: 16,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(
-                                              _supportComposerSendGreen,
-                                            ),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  _supportComposerSendGreen,
+                                                ),
                                           ),
                                         )
                                       : Icon(
@@ -681,7 +685,9 @@ class _SupportComposerPanel extends StatelessWidget {
                                           size: 22,
                                           color: effectiveCanSend
                                               ? _supportComposerSendGreen
-                                              : colors.textMuted.withValues(alpha: 0.5),
+                                              : colors.textMuted.withValues(
+                                                  alpha: 0.5,
+                                                ),
                                         ),
                                 ),
                               ),
@@ -863,11 +869,7 @@ class _SupportClosedConversationBanner extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
         child: Row(
           children: [
-            Icon(
-              Icons.lock_outline_rounded,
-              size: 15,
-              color: colors.textMuted,
-            ),
+            Icon(Icons.lock_outline_rounded, size: 15, color: colors.textMuted),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -885,13 +887,21 @@ class _SupportClosedConversationBanner extends StatelessWidget {
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 foregroundColor: _supportComposerSendGreen,
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
-                backgroundColor: _supportComposerSendGreen.withValues(alpha: 0.1),
+                backgroundColor: _supportComposerSendGreen.withValues(
+                  alpha: 0.1,
+                ),
               ),
               onPressed: isBusy ? null : onReopen,
               child: Text(text.supportChatReopenAction),

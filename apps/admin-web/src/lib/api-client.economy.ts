@@ -23,8 +23,8 @@ export async function fetchAdminEconomyLedger(params?: {
   userId?: string;
 }): Promise<OffsetPagedResponse<AdminEconomyLedgerItem>> {
   const search = new URLSearchParams();
-  if (params?.skip) search.set("skip", String(params.skip));
-  if (params?.take) search.set("take", String(params.take));
+  if (params?.skip !== undefined) search.set("skip", String(params.skip));
+  if (params?.take !== undefined) search.set("take", String(params.take));
   if (params?.source) search.set("source", params.source);
   if (params?.userId) search.set("userId", params.userId);
 
@@ -42,8 +42,8 @@ export async function fetchAdminEconomyPurchases(params?: {
   userId?: string;
 }): Promise<OffsetPagedResponse<AdminEconomyPurchase>> {
   const search = new URLSearchParams();
-  if (params?.skip) search.set("skip", String(params.skip));
-  if (params?.take) search.set("take", String(params.take));
+  if (params?.skip !== undefined) search.set("skip", String(params.skip));
+  if (params?.take !== undefined) search.set("take", String(params.take));
   if (params?.status) search.set("status", params.status);
   if (params?.userId) search.set("userId", params.userId);
 
@@ -70,8 +70,8 @@ export async function fetchAdminEconomySubscriptions(params?: {
   provider?: string;
 }): Promise<OffsetPagedResponse<AdminEconomySubscription>> {
   const search = new URLSearchParams();
-  if (params?.skip) search.set("skip", String(params.skip));
-  if (params?.take) search.set("take", String(params.take));
+  if (params?.skip !== undefined) search.set("skip", String(params.skip));
+  if (params?.take !== undefined) search.set("take", String(params.take));
   if (params?.status) search.set("status", params.status);
   if (params?.provider) search.set("provider", params.provider);
 
@@ -221,8 +221,8 @@ export async function fetchAdminSubscriptionEvents(params?: {
   status?: string;
 }): Promise<OffsetPagedResponse<AdminSubscriptionEvent>> {
   const search = new URLSearchParams();
-  if (params?.skip) search.set("skip", String(params.skip));
-  if (params?.take) search.set("take", String(params.take));
+  if (params?.skip !== undefined) search.set("skip", String(params.skip));
+  if (params?.take !== undefined) search.set("take", String(params.take));
   if (params?.provider) search.set("provider", params.provider);
   if (params?.status) search.set("status", params.status);
 
@@ -284,8 +284,8 @@ export async function fetchAdminRedeemCodeActivations(
   }
 ): Promise<OffsetPagedResponse<AdminRedeemCodeRedemption>> {
   const search = new URLSearchParams();
-  if (params?.skip) search.set("skip", String(params.skip));
-  if (params?.take) search.set("take", String(params.take));
+  if (params?.skip !== undefined) search.set("skip", String(params.skip));
+  if (params?.take !== undefined) search.set("take", String(params.take));
   if (params?.userId) search.set("userId", params.userId);
 
   const query = search.size ? `?${search.toString()}` : "";

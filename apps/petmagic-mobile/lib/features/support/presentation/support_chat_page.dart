@@ -13,8 +13,8 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_attachment_validation.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_attachment_validation.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -124,7 +124,16 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _controller.setScreenVisible(state == AppLifecycleState.resumed);
+    if (state == AppLifecycleState.resumed) {
+      _controller.setScreenVisible(true);
+      _scheduleLoadingFallbackIfNeeded();
+      unawaited(_controller.start());
+      return;
+    }
+
+    _controller.setScreenVisible(false);
+    _clearLoadingFallback();
+    _controller.stop();
   }
 
   @override

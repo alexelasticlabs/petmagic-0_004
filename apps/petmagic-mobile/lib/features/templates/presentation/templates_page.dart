@@ -46,6 +46,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
     Future.microtask(() {
+      ref.read(templatesControllerProvider.notifier).setScreenVisible(true);
       _refreshFeed(forceRefresh: true);
       if (ref.read(walletControllerProvider).wallet == null) {
         unawaited(ref.read(walletControllerProvider.notifier).load());
@@ -55,6 +56,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   @override
   void dispose() {
+    ref.read(templatesControllerProvider.notifier).setScreenVisible(false);
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _searchDebounce?.cancel();
     _scrollController.dispose();
@@ -63,7 +65,18 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   late final WidgetsBindingObserver _lifecycleObserver =
-      _TemplatesLifecycleObserver(onResumed: () => _refreshFeed());
+      _TemplatesLifecycleObserver(onStateChanged: _handleLifecycleState);
+
+  void _handleLifecycleState(AppLifecycleState state) {
+    final controller = ref.read(templatesControllerProvider.notifier);
+    if (state == AppLifecycleState.resumed) {
+      controller.setScreenVisible(true);
+      unawaited(_refreshFeed());
+      return;
+    }
+
+    controller.setScreenVisible(false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -403,15 +416,13 @@ String _generationStartErrorText(AppLocalizations text, String raw) {
 }
 
 class _TemplatesLifecycleObserver with WidgetsBindingObserver {
-  _TemplatesLifecycleObserver({required this.onResumed});
+  _TemplatesLifecycleObserver({required this.onStateChanged});
 
-  final VoidCallback onResumed;
+  final ValueChanged<AppLifecycleState> onStateChanged;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      onResumed();
-    }
+    onStateChanged(state);
   }
 }
 

@@ -5,10 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { AdminLoginScreen } from "@/components/admin/admin-login-screen";
+import { useAdminNotifications } from "@/components/admin/admin-notifications";
 import styles from "@/components/admin/admin-shell.module.css";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { buildLocaleSwitchPath, getAdminPageMeta, stripLocalePrefix } from "@/lib/admin-navigation";
+import { shouldCreateSupportRealtimeNotification } from "@/lib/admin-notification-policy";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { fetchSupportInbox, logout, useAuthSession } from "@/lib/api-client";
 import { type Locale, getDictionary } from "@/lib/i18n";
@@ -31,6 +33,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const text = getDictionary(locale);
   const pathname = usePathname();
   const router = useRouter();
+  const { addNotification } = useAdminNotifications();
   const currentPath = stripLocalePrefix(pathname);
   const isLoginPage = currentPath === "/";
   const authSession = useAuthSession();
@@ -45,24 +48,62 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     staleTime: 30_000,
     refetchInterval: 120_000,
   });
-  useSupportRealtime(session?.accessToken, () => {
+  useSupportRealtime(session?.accessToken, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
+
+    const isUserMessage =
+      (event.adminUnreadCount ?? 0) > 0 &&
+      (event.lastMessageSenderType?.toLowerCase() === "user" || !event.lastMessageSenderType);
+
+    if (!isUserMessage) {
+      return;
+    }
+
+    if (
+      !shouldCreateSupportRealtimeNotification({
+        currentPath,
+        conversationId: event.conversationId,
+        isDocumentVisible: document.visibilityState === "visible",
+        isWindowFocused: typeof document.hasFocus !== "function" ? true : document.hasFocus(),
+      })
+    ) {
+      return;
+    }
+
+    const preview = event.lastMessagePreview?.trim();
+    const message =
+      preview && preview.length > 0
+        ? locale === "ru"
+          ? `Новое сообщение в поддержке: ${preview.length > 96 ? `${preview.slice(0, 93)}...` : preview}`
+          : `New support message: ${preview.length > 96 ? `${preview.slice(0, 93)}...` : preview}`
+        : locale === "ru"
+          ? "В поддержке появилось новое сообщение"
+          : "A new support message arrived";
+
+    addNotification({
+      title: locale === "ru" ? "Поддержка" : "Support",
+      message,
+      category: "support",
+      source: "support-realtime",
+      tone: "info",
+      href: `/${locale}/support/${event.conversationId}`,
+      dedupeKey: `${event.conversationId}:${event.updatedAtUtc}`,
+    });
   });
   const supportUnreadCount = useMemo(
     () => inboxQuery.data?.filter((c) => c.unreadForAdmin).length ?? 0,
-    [inboxQuery.data],
+    [inboxQuery.data]
   );
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [theme, setTheme] = useState<AdminTheme>(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
+  const [theme, setTheme] = useState<AdminTheme>("dark");
 
+  useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    return resolveAdminTheme(readStoredAdminTheme(), media.matches);
-  });
+    const resolvedTheme = resolveAdminTheme(readStoredAdminTheme(), media.matches);
+    setTheme(resolvedTheme);
+  }, []);
 
   useEffect(() => {
     applyAdminTheme(theme);
@@ -152,6 +193,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
           locale={locale}
           pageTitle={pageMeta.title}
           pageDescription={pageMeta.description}
+          supportUnreadCount={supportUnreadCount}
           theme={theme}
           userName={userBadgeName}
           userRole={userRole}

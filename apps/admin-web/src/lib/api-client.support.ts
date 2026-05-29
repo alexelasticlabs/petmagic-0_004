@@ -12,6 +12,7 @@ import type {
   AdminSupportConversationSummary,
   AdminSupportMessage,
   AdminSupportReplyTemplate,
+  SupportConversationPriority,
   SupportConversationStatus,
   SupportInboxAssignmentScope,
 } from "./api-client.types";
@@ -20,7 +21,6 @@ export async function fetchSupportInbox(
   status?: SupportConversationStatus,
   assignment: SupportInboxAssignmentScope = "all"
 ): Promise<AdminSupportConversationSummary[]> {
-  const cacheKey = `support-inbox:${status ?? "all"}:${assignment}`;
   const searchParams = new URLSearchParams();
   if (status) {
     searchParams.set("status", status);
@@ -31,21 +31,17 @@ export async function fetchSupportInbox(
 
   const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
 
-  return cachedGet(cacheKey, cachedSupportInbox, () =>
-    apiRequest<AdminSupportConversationSummary[]>(`/api/admin/support/tickets${query}`, {
-      method: "GET",
-    })
-  );
+  return apiRequest<AdminSupportConversationSummary[]>(`/api/admin/support/tickets${query}`, {
+    method: "GET",
+  });
 }
 
 export async function fetchSupportConversation(
   conversationId: string
 ): Promise<AdminSupportConversation> {
-  return cachedGet(`support-conversation:${conversationId}`, cachedSupportConversations, () =>
-    apiRequest<AdminSupportConversation>(`/api/admin/support/tickets/${conversationId}`, {
-      method: "GET",
-    })
-  );
+  return apiRequest<AdminSupportConversation>(`/api/admin/support/tickets/${conversationId}`, {
+    method: "GET",
+  });
 }
 
 export async function sendSupportMessage(
@@ -137,6 +133,25 @@ export async function assignSupportConversation(
       ? `/api/admin/support/tickets/${conversationId}/assign-to-me`
       : `/api/admin/support/tickets/${conversationId}/unassign`,
     { method: "POST" }
+  );
+
+  clearSupportCaches(conversationId);
+  return conversation;
+}
+
+export async function updateSupportConversationMetadata(
+  conversationId: string,
+  payload: {
+    priority: SupportConversationPriority;
+    tags: string[];
+  }
+): Promise<AdminSupportConversation> {
+  const conversation = await apiRequest<AdminSupportConversation>(
+    `/api/admin/support/tickets/${conversationId}/metadata`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
   );
 
   clearSupportCaches(conversationId);

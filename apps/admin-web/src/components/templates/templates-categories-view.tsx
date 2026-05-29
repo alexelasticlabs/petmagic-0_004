@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
+import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import {
   AdminCard,
   AdminKpiCard,
@@ -65,6 +66,13 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isRu = locale === "ru";
   const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
+
+  useSyncToastToAdminNotifications(toast, {
+    category: "templates",
+    source: "template-categories",
+    title: isRu ? "Категории шаблонов" : "Template categories",
+    href: `/${locale}/templates/categories`,
+  });
 
   useEffect(() => {
     if (!toast) {

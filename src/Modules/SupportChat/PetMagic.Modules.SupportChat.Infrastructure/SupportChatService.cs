@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
@@ -24,6 +26,7 @@ public sealed class SupportChatService(
     private static readonly Error Forbidden = new("support.forbidden", "You do not have access to this support conversation.");
     private static readonly Error InvalidStatus = new("support.status_invalid", "Support conversation status is not supported.");
     private static readonly Error InvalidStatusTransition = new("support.status_transition_invalid", "Support conversation status transition is not allowed.");
+    private static readonly Error InvalidTags = new("support.tags_invalid", "Support conversation tags are invalid.");
 
     public async Task<Result<SupportConversationDetailResponse>> OpenConversationAsync(OpenSupportConversationCommand command, CancellationToken cancellationToken)
     {
@@ -200,8 +203,10 @@ public sealed class SupportChatService(
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var search = query.Search.Trim();
+            var searchLower = search.ToLowerInvariant();
             conversationsQuery = conversationsQuery.Where(x =>
-                x.LastMessagePreview != null && x.LastMessagePreview.Contains(search));
+                (x.LastMessagePreview != null && x.LastMessagePreview.ToLower().Contains(searchLower))
+                || (x.TagsJson != null && x.TagsJson.ToLower().Contains(searchLower)));
         }
 
         var page = Math.Max(1, query.Page);
@@ -225,6 +230,7 @@ public sealed class SupportChatService(
                 conversation.Status,
                 conversation.Priority,
                 conversation.Source,
+                conversation.TagsJson,
                 conversation.AssistantScenario,
                 conversation.LastMessageAtUtc,
                 conversation.LastMessagePreview,
@@ -285,6 +291,7 @@ public sealed class SupportChatService(
                 normalizedStatus.ToString(),
                 conversation.Priority.ToString(),
                 normalizedSource.ToString(),
+                ParseTags(conversation.TagsJson),
                 conversation.AssistantScenario,
                 conversation.LastMessagePreview ?? (conversation.LastMessage is null ? null : Truncate(conversation.LastMessage.Body, 140)),
                 conversation.LastMessage?.CreatedAtUtc ?? conversation.LastMessageAtUtc,
@@ -928,6 +935,11 @@ public sealed class SupportChatService(
         var currentStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
         var nextStatus = ToCanonicalStatus(command.Status);
 
+        if (currentStatus == SupportConversationStatus.New && nextStatus == SupportConversationStatus.InProgress)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
+        }
+
         if (currentStatus != nextStatus && !IsAllowedStatusTransition(currentStatus, nextStatus))
         {
             return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
@@ -971,9 +983,9 @@ public sealed class SupportChatService(
     {
         return currentStatus switch
         {
-            SupportConversationStatus.New => nextStatus is SupportConversationStatus.InProgress or SupportConversationStatus.WaitingForUser or SupportConversationStatus.Closed,
-            SupportConversationStatus.InProgress => nextStatus is SupportConversationStatus.WaitingForUser or SupportConversationStatus.Closed,
-            SupportConversationStatus.WaitingForUser => nextStatus is SupportConversationStatus.InProgress or SupportConversationStatus.Closed,
+            SupportConversationStatus.New => nextStatus is SupportConversationStatus.Closed,
+            SupportConversationStatus.InProgress => nextStatus is SupportConversationStatus.Closed,
+            SupportConversationStatus.WaitingForUser => nextStatus is SupportConversationStatus.Closed,
             SupportConversationStatus.Closed => nextStatus is SupportConversationStatus.InProgress,
             _ => false
         };
@@ -990,6 +1002,11 @@ public sealed class SupportChatService(
 
         var now = DateTime.UtcNow;
         var currentStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
+        if (currentStatus == SupportConversationStatus.New && command.AssignedAdminId.HasValue)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
+        }
+
         if (currentStatus == SupportConversationStatus.Closed)
         {
             return Result.Failure<SupportConversationDetailResponse>(InvalidStatusTransition);
@@ -1011,6 +1028,32 @@ public sealed class SupportChatService(
         {
             await AppendSystemEventAsync(conversation, "Ticket unassigned");
         }
+
+        await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        await NotifyConversationUpdatedAsync(conversation, cancellationToken);
+        return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
+    }
+
+    public async Task<Result<SupportConversationDetailResponse>> UpdateConversationMetadataAsync(
+        UpdateSupportConversationMetadataCommand command,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await supportChatDbContext.SupportConversations
+            .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
+        }
+
+        var normalizedTags = NormalizeTags(command.Tags);
+        if (normalizedTags is null)
+        {
+            return Result.Failure<SupportConversationDetailResponse>(InvalidTags);
+        }
+
+        conversation.Priority = command.Priority;
+        conversation.TagsJson = SerializeTags(normalizedTags);
+        conversation.UpdatedAtUtc = DateTime.UtcNow;
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         await NotifyConversationUpdatedAsync(conversation, cancellationToken);
@@ -1304,6 +1347,7 @@ public sealed class SupportChatService(
             normalizedStatus.ToString(),
             conversation.Priority.ToString(),
             normalizedSource.ToString(),
+            ParseTags(conversation.TagsJson),
             conversation.AssistantScenario,
             conversation.RelatedGenerationId,
             conversation.RelatedPaymentId,
@@ -1683,10 +1727,10 @@ public sealed class SupportChatService(
     {
         return status switch
         {
-            SupportConversationStatus.New => ["assign-to-me", "close"],
+            SupportConversationStatus.New => ["close"],
             SupportConversationStatus.InProgress => hasAssignment
                 ? ["mark-waiting-for-user", "close", "unassign"]
-                : ["assign-to-me", "mark-waiting-for-user", "close"],
+                : ["mark-waiting-for-user", "close"],
             SupportConversationStatus.WaitingForUser => ["mark-in-progress", "close"],
             SupportConversationStatus.Closed => ["reopen"],
             _ => []
@@ -1801,5 +1845,60 @@ public sealed class SupportChatService(
         }
 
         return string.Concat(value.AsSpan(0, maxLength), "...");
+    }
+
+    private static IReadOnlyList<string> ParseTags(string? tagsJson)
+    {
+        if (string.IsNullOrWhiteSpace(tagsJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<string[]>(tagsJson);
+            if (parsed is null || parsed.Length == 0)
+            {
+                return [];
+            }
+
+            return parsed
+                .Select(tag => tag?.Trim())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .ToList()!;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static List<string>? NormalizeTags(IReadOnlyList<string>? tags)
+    {
+        if (tags is null)
+        {
+            return [];
+        }
+
+        if (tags.Count > 12)
+        {
+            return null;
+        }
+
+        var normalized = tags
+            .Select(tag => tag.Trim())
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Length <= 40 ? tag : tag[..40])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return normalized.Count > 12 ? null : normalized;
+    }
+
+    private static string SerializeTags(IReadOnlyList<string> tags)
+    {
+        return JsonSerializer.Serialize(tags);
     }
 }

@@ -94,4 +94,6 @@ public interface ISupportChatService
     Task<Result<SupportConversationDetailResponse>> UpdateConversationStatusAsync(UpdateSupportConversationStatusCommand command, CancellationToken cancellationToken);
 
     Task<Result<SupportConversationDetailResponse>> AssignConversationAsync(AssignSupportConversationCommand command, CancellationToken cancellationToken);
+
+    Task<Result<SupportConversationDetailResponse>> UpdateConversationMetadataAsync(UpdateSupportConversationMetadataCommand command, CancellationToken cancellationToken);
 }

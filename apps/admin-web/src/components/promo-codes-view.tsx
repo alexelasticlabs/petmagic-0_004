@@ -10,6 +10,7 @@ import {
   TrendUpIcon,
   UsersIcon,
 } from "@/components/admin/admin-icons";
+import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
 import { AdminKpiCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { PromoCodeActivationsCard } from "@/components/promo-code-activations-card";
@@ -86,11 +87,27 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const { actionsMenuCodeId, actionsMenuPosition, closeActionsMenu, handleToggleActionsMenu } =
     usePromoActionsMenu();
 
+  useSyncFeedbackToAdminNotifications(feedback, {
+    category: "promo",
+    source: "promo-codes",
+    title: locale === "ru" ? "Промокоды" : "Promo codes",
+    href: `/${locale}/promo-codes`,
+  });
+
   useEffect(() => {
     if (!session) {
       ensureAdminSession(locale, router);
     }
   }, [locale, router, session]);
+
+  useEffect(() => {
+    if (!feedback) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setFeedback(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
 
   useEffect(() => {
     if (!isEditorOpen) {

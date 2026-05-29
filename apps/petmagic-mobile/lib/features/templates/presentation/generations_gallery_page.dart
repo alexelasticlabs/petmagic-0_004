@@ -2,23 +2,23 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/templates/presentation/mappers/generations_gallery_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/mappers/generations_gallery_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
-part 'generations_gallery_page_filters_and_chrome.dart';
 part 'generations_gallery_page_cards.dart';
+part 'generations_gallery_page_filters_and_chrome.dart';
 part 'generations_gallery_page_states_and_actions.dart';
 
 class GenerationsGalleryPage extends ConsumerStatefulWidget {
@@ -31,16 +31,40 @@ class GenerationsGalleryPage extends ConsumerStatefulWidget {
       _GenerationsGalleryPageState();
 }
 
-class _GenerationsGalleryPageState
-    extends ConsumerState<GenerationsGalleryPage> {
+class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
+    with WidgetsBindingObserver {
   bool _readyExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(generationHistoryControllerProvider.notifier).load(),
-    );
+    WidgetsBinding.instance.addObserver(this);
+    Future.microtask(() {
+      final controller = ref.read(generationHistoryControllerProvider.notifier);
+      controller.setScreenVisible(true);
+      return controller.load();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final controller = ref.read(generationHistoryControllerProvider.notifier);
+    if (state == AppLifecycleState.resumed) {
+      controller.setScreenVisible(true);
+      unawaited(controller.load(refresh: true));
+      return;
+    }
+
+    controller.setScreenVisible(false);
+  }
+
+  @override
+  void dispose() {
+    ref
+        .read(generationHistoryControllerProvider.notifier)
+        .setScreenVisible(false);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

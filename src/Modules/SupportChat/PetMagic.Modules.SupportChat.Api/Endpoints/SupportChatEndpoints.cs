@@ -70,6 +70,7 @@ public static class SupportChatEndpoints
         adminGroup.MapPost("/conversations/{conversationId:guid}/read", MarkAdminReadAsync);
         adminGroup.MapPut("/conversations/{conversationId:guid}/status", UpdateConversationStatusAsync);
         adminGroup.MapPut("/conversations/{conversationId:guid}/assignment", AssignConversationAsync);
+        adminGroup.MapPut("/conversations/{conversationId:guid}/metadata", UpdateConversationMetadataAsync);
         adminGroup.MapGet("/tickets", ListAdminInboxAsync);
         adminGroup.MapGet("/tickets/{conversationId:guid}", GetAdminConversationAsync);
         adminGroup.MapGet("/tickets/{conversationId:guid}/context", GetAdminTicketContextAsync);
@@ -77,6 +78,7 @@ public static class SupportChatEndpoints
         adminGroup.MapPost("/tickets/{conversationId:guid}/unassign", UnassignConversationAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/mark-waiting-for-user", MarkConversationWaitingForUserAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/mark-in-progress", MarkConversationInProgressAsync);
+        adminGroup.MapPut("/tickets/{conversationId:guid}/metadata", UpdateConversationMetadataAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/close", CloseAdminConversationAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/reopen", ReopenAdminConversationAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/messages", SendAdminMessageAsync)
@@ -1200,6 +1202,48 @@ public static class SupportChatEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> UpdateConversationMetadataAsync(
+        HttpContext httpContext,
+        [FromRoute] Guid conversationId,
+        [FromBody] UpdateSupportConversationMetadataRequest request,
+        [FromServices] IValidator<UpdateSupportConversationMetadataCommand> validator,
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(httpContext, out var userId, out var unauthorized))
+        {
+            return unauthorized!;
+        }
+
+        if (!Enum.TryParse<SupportConversationPriority>(request.Priority, true, out var priority))
+        {
+            return TypedResults.Problem(
+                title: "support.priority_invalid",
+                detail: "Support conversation priority is not supported.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var command = new UpdateSupportConversationMetadataCommand(
+            conversationId,
+            userId,
+            priority,
+            request.Tags ?? []);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.UpdateConversationMetadataAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<SupportTicketContextResponse>, ProblemHttpResult>> GetAdminTicketContextAsync(
         [FromRoute] Guid conversationId,
         [FromServices] ISupportChatService service,
@@ -1444,6 +1488,8 @@ public static class SupportChatEndpoints
             "support.template_not_found" => StatusCodes.Status404NotFound,
             "support.forbidden" => StatusCodes.Status403Forbidden,
             "support.status_transition_invalid" => StatusCodes.Status400BadRequest,
+            "support.priority_invalid" => StatusCodes.Status400BadRequest,
+            "support.tags_invalid" => StatusCodes.Status400BadRequest,
             "support.invalid_subject" => StatusCodes.Status401Unauthorized,
             "support.attachment_invalid_upload" => StatusCodes.Status400BadRequest,
             "support.attachment_content_type_not_allowed" => StatusCodes.Status400BadRequest,
@@ -1509,6 +1555,8 @@ public static class SupportChatEndpoints
     public sealed record UpdateSupportConversationStatusRequest(string Status);
 
     public sealed record AssignSupportConversationRequest(Guid? AssignedAdminId);
+
+    public sealed record UpdateSupportConversationMetadataRequest(string Priority, IReadOnlyList<string>? Tags = null);
 
     public sealed record SubmitSupportConversationFeedbackRequest(int Rating, string? Comment = null);
 

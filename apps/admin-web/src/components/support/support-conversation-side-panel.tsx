@@ -58,13 +58,11 @@ export function SupportConversationSidePanel({
     activeSidePanelTab,
     accountCreatedAt,
     analyticsQuery,
-    assignmentMutation,
     conversation,
     conversationSla,
     conversationTimeline,
     destructiveStatusAction,
     failedGenerations,
-    isAssignedToCurrentAdmin,
     isSidePanelOpen,
     purchasesQuery,
     primaryStatusAction,
@@ -72,7 +70,6 @@ export function SupportConversationSidePanel({
     recentUserPurchases,
     lastUserPurchaseAtUtc,
     lastActivityAtUtc,
-    sessionUserId,
     secondaryStatusActions,
     setUserActiveMutation,
     setUserPremiumMutation,
@@ -140,21 +137,20 @@ export function SupportConversationSidePanel({
   const subscriptionStatusLabel =
     subscriptionQuery.data?.status ?? (locale === "ru" ? "Нет подписки" : "No subscription");
   const tokenBalanceLabel = locale === "ru" ? "Баланс токенов" : "Token balance";
-  const hasTopMetrics = Boolean(
-    conversation.assistantScenario || conversation.relatedGenerationId
-  );
+  const hasTopMetrics = Boolean(conversation.assistantScenario || conversation.relatedGenerationId);
 
   return (
     <div className={styles.sidePane}>
       <AdminCard className={`${styles.sideCard} ${styles.sidePanelCard}`}>
-
         {/* ── User identity ─────────────────────────────────── */}
         <div className={styles.spIdentity}>
           <span className={styles.spAvatarMd}>{initialsFor(userDisplayName)}</span>
           <div className={styles.spIdentityInfo}>
             <div className={styles.spNameRow}>
               <strong className={styles.spNameText}>{userDisplayName}</strong>
-              <span className={`${styles.spPlanChip} ${isUserPremium ? styles.spPlanChipPremium : ""}`}>
+              <span
+                className={`${styles.spPlanChip} ${isUserPremium ? styles.spPlanChipPremium : ""}`}
+              >
                 {isUserPremium ? text.premiumLabel : text.freeLabel}
               </span>
             </div>
@@ -172,7 +168,9 @@ export function SupportConversationSidePanel({
           {conversationSla.waitLabel ? (
             <>
               <span className={styles.spStatusDivider}>·</span>
-              <span className={`${styles.spStatusMeta} ${conversationSla.level === "critical" || conversationSla.level === "risk" ? styles.spStatusMetaUrgent : ""}`}>
+              <span
+                className={`${styles.spStatusMeta} ${conversationSla.level === "critical" || conversationSla.level === "risk" ? styles.spStatusMetaUrgent : ""}`}
+              >
                 ⏱ {conversationSla.waitLabel}
               </span>
             </>
@@ -205,17 +203,6 @@ export function SupportConversationSidePanel({
             </div>
           ) : (
             <div className={styles.spActionGrid}>
-              <Button
-                variant="secondary"
-                size="sm"
-                className={styles.spActionFull}
-                onClick={() =>
-                  assignmentMutation.mutate(isAssignedToCurrentAdmin ? null : sessionUserId)
-                }
-                disabled={assignmentMutation.isPending || !sessionUserId}
-              >
-                {isAssignedToCurrentAdmin ? text.supportUnassign : text.supportAssignToMe}
-              </Button>
               {primaryStatusAction ? (
                 <Button
                   variant="primary"
@@ -229,8 +216,7 @@ export function SupportConversationSidePanel({
                     }
                   }}
                   disabled={
-                    statusMutation.isPending ||
-                    conversation.status === primaryStatusAction.status
+                    statusMutation.isPending || conversation.status === primaryStatusAction.status
                   }
                 >
                   {primaryStatusAction.label}
@@ -261,8 +247,7 @@ export function SupportConversationSidePanel({
               className={styles.spActionFull}
               onClick={() => statusMutation.mutate(destructiveStatusAction.status)}
               disabled={
-                statusMutation.isPending ||
-                conversation.status === destructiveStatusAction.status
+                statusMutation.isPending || conversation.status === destructiveStatusAction.status
               }
             >
               {destructiveStatusAction.label}
@@ -289,13 +274,10 @@ export function SupportConversationSidePanel({
         {/* ── Overview tab ─────────────────────────────────── */}
         {activeSidePanelTab === "user" ? (
           <div className={styles.spContent}>
-
             {/* Scenario / generation context pills */}
             {hasTopMetrics ? (
               <div className={styles.spSection}>
-                <span className={styles.spSectionLabel}>
-                  {text.supportAiContextTitle}
-                </span>
+                <span className={styles.spSectionLabel}>{text.supportAiContextTitle}</span>
                 <div className={styles.spKvList}>
                   {conversation.assistantScenario ? (
                     <div className={styles.spKvRow}>
@@ -368,9 +350,7 @@ export function SupportConversationSidePanel({
 
             {/* Conversation meta */}
             <div className={styles.spSection}>
-              <span className={styles.spSectionLabel}>
-                {text.supportConversationMetaTitle}
-              </span>
+              <span className={styles.spSectionLabel}>{text.supportConversationMetaTitle}</span>
               <div className={styles.spKvList}>
                 <div className={styles.spKvRow}>
                   <span>{text.supportAssistantSourceLabel}</span>
@@ -479,7 +459,6 @@ export function SupportConversationSidePanel({
                 </div>
               ) : null}
             </div>
-
           </div>
         ) : null}
 

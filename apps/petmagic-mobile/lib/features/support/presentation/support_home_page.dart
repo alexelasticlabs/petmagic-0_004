@@ -1,15 +1,98 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'support_assistant_scenarios.dart';
 import 'support_assistant_page.dart';
 
-class SupportHomePage extends StatelessWidget {
+enum _SupportHomeTab { active, archive }
+
+class SupportHomePage extends ConsumerStatefulWidget {
   const SupportHomePage({super.key});
 
   static const routePath = '/profile/support';
+
+  @override
+  ConsumerState<SupportHomePage> createState() => _SupportHomePageState();
+}
+
+class _SupportHomePageState extends ConsumerState<SupportHomePage> {
+  _SupportHomeTab _tab = _SupportHomeTab.active;
+  bool _isLoadingConversation = true;
+  String? _conversationError;
+  SupportChatConversation? _conversation;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConversation();
+  }
+
+  Future<void> _loadConversation() async {
+    setState(() {
+      _isLoadingConversation = true;
+      _conversationError = null;
+    });
+
+    try {
+      final conversation = await ref.read(supportChatRepositoryProvider).getConversation();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _conversation = conversation;
+      });
+    } on AppException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final isNotFound = error.message
+          .toLowerCase()
+          .contains('support.conversation_not_found');
+      setState(() {
+        _conversation = null;
+        _conversationError = isNotFound ? null : error.message;
+      });
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _conversation = null;
+        _conversationError = 'support.unavailable';
+      });
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingConversation = false;
+    });
+  }
+
+  bool _isArchived(SupportChatConversation conversation) {
+    final status = conversation.status.trim().toLowerCase();
+    return status == 'closed' || status == 'resolved';
+  }
+
+  String _formatLastActivity(BuildContext context, DateTime? lastMessageAtUtc) {
+    if (lastMessageAtUtc == null) {
+      return '';
+    }
+
+    final localDateTime = lastMessageAtUtc.toLocal();
+    final material = MaterialLocalizations.of(context);
+    return '${material.formatShortDate(localDateTime)} ${material.formatTimeOfDay(TimeOfDay.fromDateTime(localDateTime), alwaysUse24HourFormat: true)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +100,11 @@ class SupportHomePage extends StatelessWidget {
     final colors = context.petMagicColors;
 
     final topics = _buildTopics(text);
+    final hasConversation = _conversation != null;
+    final conversationIsArchived = hasConversation && _isArchived(_conversation!);
+    final shouldShowConversation = hasConversation &&
+        ((_tab == _SupportHomeTab.active && !conversationIsArchived) ||
+            (_tab == _SupportHomeTab.archive && conversationIsArchived));
 
     return ProfileScreenBackground(
       child: Scaffold(
@@ -38,6 +126,101 @@ class SupportHomePage extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SupportTabButton(
+                      title: text.supportChatStatusOpen,
+                      isActive: _tab == _SupportHomeTab.active,
+                      onTap: () => setState(() => _tab = _SupportHomeTab.active),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _SupportTabButton(
+                      title: text.supportChatArchiveAction,
+                      isActive: _tab == _SupportHomeTab.archive,
+                      onTap: () => setState(() => _tab = _SupportHomeTab.archive),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_isLoadingConversation)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: CircularProgressIndicator(color: colors.accent),
+                  ),
+                )
+              else if (_conversationError != null)
+                ProfileGlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text.supportChatEmptyTitle,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        text.supportChatEmptyMessage,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _loadConversation,
+                        child: Text(text.retryAction),
+                      ),
+                    ],
+                  ),
+                )
+              else if (shouldShowConversation)
+                _ConversationCard(
+                  conversation: _conversation!,
+                  tab: _tab,
+                  onOpenChat: () => context.push(SupportChatPage.routePath),
+                  subtitle: _formatLastActivity(context, _conversation!.lastMessageAtUtc),
+                )
+              else
+                ProfileGlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _tab == _SupportHomeTab.archive
+                            ? text.supportChatArchiveAction
+                            : text.supportChatEmptyTitle,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        text.supportChatEmptyMessage,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () => context.push(SupportChatPage.routePath),
+                        child: Text(text.supportHomeOpenChatAction),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 20),
               ...topics.map((topic) => _TopicCard(topic: topic)),
             ],
@@ -66,6 +249,118 @@ class SupportHomePage extends StatelessWidget {
           ),
         )
         .toList(growable: false);
+  }
+}
+
+class _SupportTabButton extends StatelessWidget {
+  const _SupportTabButton({
+    required this.title,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isActive
+                  ? colors.accent.withValues(alpha: 0.75)
+                  : colors.border,
+            ),
+            color: isActive
+                ? colors.accent.withValues(alpha: 0.16)
+                : colors.surface,
+          ),
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isActive ? colors.accent : colors.textSoft,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversationCard extends StatelessWidget {
+  const _ConversationCard({
+    required this.conversation,
+    required this.tab,
+    required this.onOpenChat,
+    required this.subtitle,
+  });
+
+  final SupportChatConversation conversation;
+  final _SupportHomeTab tab;
+  final VoidCallback onOpenChat;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return ProfileGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            tab == _SupportHomeTab.archive
+                ? text.supportChatArchiveAction
+                : text.supportChatStatusOpen,
+            style: TextStyle(
+              color: colors.textStrong,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            conversation.userDisplayName?.trim().isNotEmpty == true
+                ? conversation.userDisplayName!.trim()
+                : conversation.userEmail,
+            style: TextStyle(
+              color: colors.textStrong,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (subtitle.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                subtitle,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: onOpenChat,
+            child: Text(text.supportHomeOpenChatAction),
+          ),
+        ],
+      ),
+    );
   }
 }
 

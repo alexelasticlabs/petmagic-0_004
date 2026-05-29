@@ -25,6 +25,7 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.Status).HasConversion<int>().IsRequired();
             entity.Property(x => x.Priority).HasConversion<int>().IsRequired();
             entity.Property(x => x.Source).HasConversion<int>().IsRequired();
+            entity.Property(x => x.TagsJson).HasMaxLength(1024);
             entity.Property(x => x.AssistantScenario).HasMaxLength(64);
             entity.Property(x => x.LastMessagePreview).HasMaxLength(280);
             entity.Property(x => x.LastMessageSenderType).HasConversion<int>();

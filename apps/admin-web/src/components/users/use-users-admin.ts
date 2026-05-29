@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { fetchUsers, useAuthSession, type UserListItem } from "@/lib/api-client";
@@ -22,6 +23,13 @@ export function useUsersAdmin(locale: Locale) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<UsersToastState | null>(null);
   const canManageRoles = session?.user.roles.includes("Admin") ?? false;
+
+  useSyncToastToAdminNotifications(toast, {
+    category: "users",
+    source: "users-admin",
+    title: locale === "ru" ? "Изменения пользователей" : "User updates",
+    href: `/${locale}/users`,
+  });
 
   const usersQuery = useQuery<UserListItem[]>({
     queryKey: adminQueryKeys.users,

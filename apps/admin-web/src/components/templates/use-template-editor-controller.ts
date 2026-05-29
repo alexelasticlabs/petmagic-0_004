@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { buildTemplateEditorModel } from "@/components/templates/template-editor-model";
 import {
@@ -71,6 +72,20 @@ export function useTemplateEditorController({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [editorStatus, setEditorStatus] = useState<EditorVisibilityStatus>("Draft");
   const isVideo = templateType === "Video";
+
+  useSyncToastToAdminNotifications(toast, {
+    category: "templates",
+    source: `template-editor:${templateType.toLowerCase()}`,
+    title:
+      locale === "ru"
+        ? templateType === "Video"
+          ? "Видео-шаблоны"
+          : "Изображения-шаблоны"
+        : templateType === "Video"
+          ? "Video templates"
+          : "Image templates",
+    href: getTemplateCatalogPath(locale, templateType),
+  });
 
   const saveTemplateMutation = useMutation<AdminTemplate, unknown, EditorVisibilityStatus>({
     mutationFn: (targetStatus) =>

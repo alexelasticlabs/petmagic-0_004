@@ -501,6 +501,305 @@
   justify-content: center;
 }
 
+.notificationRoot {
+  position: relative;
+}
+
+.notificationTrigger {
+  position: relative;
+  min-width: 2.6rem;
+  justify-content: center;
+  padding-inline: 0.72rem;
+}
+
+.notificationTriggerActive {
+  border-color: var(--border-accent);
+  background: var(--admin-accent-soft);
+  color: var(--admin-text);
+}
+
+.notificationBadge {
+  position: absolute;
+  top: -0.38rem;
+  right: -0.32rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.26rem;
+  border: 2px solid var(--admin-surface);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 82%, #fff 18%);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.notificationPanel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 40;
+  width: min(28rem, calc(100vw - 1.5rem));
+  display: grid;
+  gap: 0.82rem;
+  padding: 0.9rem;
+  border: 1px solid var(--admin-border);
+  border-radius: calc(var(--radius) + 2px);
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  box-shadow: var(--shadow-strong);
+  backdrop-filter: blur(14px);
+}
+
+.notificationPanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.notificationPanelCopy {
+  min-width: 0;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.notificationEyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.notificationTitle {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.notificationSummary {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.notificationHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.notificationTextButton {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notificationTextButton:disabled {
+  color: var(--text-subtle);
+  cursor: default;
+}
+
+.notificationFilters {
+  display: flex;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+}
+
+.notificationFilterChip {
+  min-height: 1.95rem;
+  padding: 0.38rem 0.68rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--admin-text-soft);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notificationFilterChipActive {
+  border-color: var(--border-accent);
+  background: var(--admin-accent-soft);
+  color: var(--admin-text);
+}
+
+.notificationList {
+  max-height: min(32rem, 62vh);
+  display: grid;
+  gap: 0.62rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.notificationGroupSection {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.notificationGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notificationGroupTitle {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.notificationGroupItems {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.notificationCard {
+  display: grid;
+  gap: 0.36rem;
+  padding: 0.78rem 0.82rem;
+  border: 1px solid var(--admin-border);
+  border-radius: calc(var(--radius-sm) + 2px);
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.notificationCard:hover {
+  border-color: var(--admin-border-strong);
+  background: var(--surface-hover);
+  box-shadow: var(--interactive-glow);
+}
+
+.notificationCardButton {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.notificationCardUnread {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--admin-border));
+  background: color-mix(in srgb, var(--admin-accent-soft) 72%, var(--surface-2));
+}
+
+.notificationCardPinned {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--admin-border));
+  background: color-mix(in srgb, var(--danger-soft-bg) 58%, var(--surface-2));
+}
+
+.notificationCardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.notificationCardMetaLead {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.notificationPinnedMark {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.32rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger-soft-fg);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.notificationCategoryPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.32rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.notificationCategorySupport {
+  background: color-mix(in srgb, var(--warning-soft-bg) 72%, transparent);
+  color: var(--warning-soft-fg);
+}
+
+.notificationCategoryUsers {
+  background: color-mix(in srgb, var(--primary-bg) 76%, transparent);
+  color: var(--accent-contrast);
+}
+
+.notificationCategoryTemplates {
+  background: color-mix(in srgb, var(--success-soft-bg) 72%, transparent);
+  color: var(--success-soft-fg);
+}
+
+.notificationCategoryEconomy {
+  background: color-mix(in srgb, var(--primary-soft-bg) 76%, transparent);
+  color: var(--primary-soft-fg);
+}
+
+.notificationCategoryPromo {
+  background: color-mix(in srgb, var(--info-soft-bg) 72%, transparent);
+  color: var(--info-soft-fg);
+}
+
+.notificationCategorySystem {
+  background: color-mix(in srgb, var(--surface-4) 72%, transparent);
+  color: var(--text-soft);
+}
+
+.notificationTime {
+  font-size: 0.72rem;
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+
+.notificationCardTitle {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.notificationCardMessage {
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.notificationEmptyState {
+  display: grid;
+  gap: 0.32rem;
+  padding: 1rem 0.6rem 0.4rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
 .themeIndicator {
   width: 0.56rem;
   height: 0.56rem;
@@ -663,8 +962,13 @@
     min-width: min(100%, 14rem);
   }
 
+  .notificationPanel {
+    right: auto;
+    left: 0;
+    width: min(100vw - 1.64rem, 28rem);
+  }
+
   .userRole {
     display: none;
   }
 }
-

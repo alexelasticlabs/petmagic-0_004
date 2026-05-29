@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import {
   buildActivityTimeline,
@@ -11,7 +12,6 @@ import {
   formatAccountAgeFact,
   formatCountFact,
   getConversationSla,
-  mergeTemplateDraft,
   sortSupportQueueItems,
   type SupportTimelineItem,
 } from "@/components/support/support-conversation-helpers";
@@ -19,30 +19,27 @@ import { getAvailableStatusActions } from "@/components/support/support-status-h
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   assignSupportConversation,
-  createSupportReplyTemplate,
-  deleteSupportReplyTemplate,
   fetchAdminEconomyPurchases,
   fetchAdminEconomyUserSubscriptionSummary,
   fetchAdminUser,
   fetchAdminUserAnalytics,
   fetchSupportConversation,
   fetchSupportInbox,
-  fetchSupportReplyTemplates,
   markSupportConversationRead,
   sendSupportAttachment,
   sendSupportMessage,
   setActive,
   setPremium,
+  updateSupportConversationMetadata,
   updateSupportConversationStatus,
-  updateSupportReplyTemplate,
   useAuthSession,
   type AdminEconomyPurchase,
   type AdminEconomyUserSubscriptionSummary,
   type AdminSupportConversation,
   type AdminSupportConversationSummary,
-  type AdminSupportReplyTemplate,
   type AdminUserAnalytics,
   type AdminUserDetail,
+  type SupportConversationPriority,
   type SupportConversationStatus,
   type SupportInboxAssignmentScope,
 } from "@/lib/api-client";
@@ -52,6 +49,12 @@ import { useSupportRealtime } from "@/lib/support-realtime";
 type UseSupportConversationControllerParams = {
   locale: Locale;
   conversationId: string;
+};
+
+type SendOptimisticContext = {
+  previousConversation?: AdminSupportConversation;
+  optimisticMessageId?: string;
+  optimisticAttachmentObjectUrl?: string;
 };
 
 export type ToastState = {
@@ -88,10 +91,15 @@ function buildSupportRealtimeToastMessage(
   }
 
   const safePreview = preview.length > 96 ? `${preview.slice(0, 93)}...` : preview;
-  return locale === "ru" ? `Новое сообщение: ${safePreview}` : `New support message: ${safePreview}`;
+  return locale === "ru"
+    ? `Новое сообщение: ${safePreview}`
+    : `New support message: ${safePreview}`;
 }
 
-function isUserSupportMessageEvent(event: { lastMessageSenderType?: string | null; adminUnreadCount?: number }) {
+function isUserSupportMessageEvent(event: {
+  lastMessageSenderType?: string | null;
+  adminUnreadCount?: number;
+}) {
   return (
     (event.adminUnreadCount ?? 0) > 0 &&
     (event.lastMessageSenderType?.toLowerCase() === "user" || !event.lastMessageSenderType)
@@ -99,13 +107,9 @@ function isUserSupportMessageEvent(event: { lastMessageSenderType?: string | nul
 }
 export type SidePanelTab = "user" | "activity" | "dialog" | "attachments";
 
-export type TemplateDraft = {
-  templateId: string | null;
-  title: string;
-  body: string;
-  isEnabled: boolean;
-  sortOrder: number;
-};
+function normalizeSupportTag(value: string): string {
+  return value.trim().replace(/\s+/g, " ").slice(0, 40);
+}
 
 export const statusOptions: SupportConversationStatus[] = [
   "New",
@@ -114,13 +118,7 @@ export const statusOptions: SupportConversationStatus[] = [
   "Closed",
 ];
 
-export const emptyTemplateDraft: TemplateDraft = {
-  templateId: null,
-  title: "",
-  body: "",
-  isEnabled: true,
-  sortOrder: 0,
-};
+const supportPollingIntervalMs = 5_000;
 
 export function useSupportConversationController({
   locale,
@@ -130,13 +128,10 @@ export function useSupportConversationController({
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
+  const { addNotification } = useAdminNotifications();
   const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [reply, setReply] = useState("");
-  const [templateDraft, setTemplateDraft] = useState<TemplateDraft>(emptyTemplateDraft);
-  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
   const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
   const [replyToPreview, setReplyToPreview] = useState<string | null>(null);
   const [activeSidePanelTab, setActiveSidePanelTab] = useState<SidePanelTab>("user");
@@ -149,6 +144,9 @@ export function useSupportConversationController({
   const markReadRequestRef = useRef<Promise<void> | null>(null);
   const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRealtimeToastRef = useRef<string | null>(null);
+  const messagesViewportVisibleRef = useRef(false);
+  const lastConversationRealtimeFetchRef = useRef(0);
+  const optimisticAttachmentObjectUrlsRef = useRef(new Map<string, string>());
 
   const resetSelectedAttachment = useCallback(() => {
     setSelectedAttachment(null);
@@ -166,9 +164,19 @@ export function useSupportConversationController({
     ]);
   }, [conversationId, queryClient]);
 
-  const refreshTemplateCatalog = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportTemplates });
-  }, [queryClient]);
+  const pushSupportNotification = useCallback(
+    (type: ToastState["type"], message: string) => {
+      addNotification({
+        title: locale === "ru" ? "Поддержка" : "Support",
+        message,
+        category: "support",
+        source: "support-workspace",
+        tone: type === "success" ? "success" : "error",
+        href: `/${locale}/support/${conversationId}`,
+      });
+    },
+    [addNotification, conversationId, locale]
+  );
 
   useEffect(() => {
     if (!session) {
@@ -198,6 +206,11 @@ export function useSupportConversationController({
       if (attachmentPreviewUrl) {
         URL.revokeObjectURL(attachmentPreviewUrl);
       }
+
+      for (const url of optimisticAttachmentObjectUrlsRef.current.values()) {
+        URL.revokeObjectURL(url);
+      }
+      optimisticAttachmentObjectUrlsRef.current.clear();
     },
     [attachmentPreviewUrl]
   );
@@ -206,6 +219,8 @@ export function useSupportConversationController({
     queryKey: adminQueryKeys.supportConversation(conversationId),
     queryFn: () => fetchSupportConversation(conversationId),
     enabled: Boolean(session),
+    refetchInterval: session ? supportPollingIntervalMs : false,
+    refetchIntervalInBackground: false,
   });
 
   const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
@@ -218,12 +233,8 @@ export function useSupportConversationController({
       return fetchSupportInbox(status, assignment);
     },
     enabled: Boolean(session),
-  });
-
-  const templatesQuery = useQuery<AdminSupportReplyTemplate[]>({
-    queryKey: adminQueryKeys.supportTemplates,
-    queryFn: () => fetchSupportReplyTemplates(),
-    enabled: Boolean(session),
+    refetchInterval: session ? supportPollingIntervalMs : false,
+    refetchIntervalInBackground: false,
   });
 
   const conversation = conversationQuery.data;
@@ -236,9 +247,22 @@ export function useSupportConversationController({
   useSupportRealtime(session?.accessToken, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
     if (event.conversationId === conversationId) {
-      void queryClient.invalidateQueries({
-        queryKey: adminQueryKeys.supportConversation(conversationId),
-      });
+      const now = Date.now();
+      if (now - lastConversationRealtimeFetchRef.current < 700) {
+        return;
+      }
+
+      lastConversationRealtimeFetchRef.current = now;
+      void queryClient
+        .fetchQuery({
+          queryKey: adminQueryKeys.supportConversation(conversationId),
+          queryFn: () => fetchSupportConversation(conversationId),
+        })
+        .catch(() => {
+          void queryClient.invalidateQueries({
+            queryKey: adminQueryKeys.supportConversation(conversationId),
+          });
+        });
       return;
     }
 
@@ -258,7 +282,18 @@ export function useSupportConversationController({
       return;
     }
 
-    if (document.visibilityState !== 'visible') {
+    // The conversation is only considered "read" when the operator is actively
+    // looking at it: the tab is visible, the browser window is focused, and the
+    // newest messages are actually scrolled into the visible area.
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+
+    if (typeof document.hasFocus === "function" && !document.hasFocus()) {
+      return;
+    }
+
+    if (!messagesViewportVisibleRef.current) {
       return;
     }
 
@@ -270,59 +305,202 @@ export function useSupportConversationController({
       });
   }, [conversationId, conversationQuery.data, refreshConversationData]);
 
-  useEffect(() => {
-    if (!conversationQuery.data || conversationQuery.data.adminUnreadCount <= 0) {
-      return;
-    }
-
+  const scheduleMarkRead = useCallback(() => {
     if (markReadDebounceRef.current) {
       clearTimeout(markReadDebounceRef.current);
     }
 
     markReadDebounceRef.current = setTimeout(() => {
       attemptMarkRead();
-    }, 600);
+    }, 1500);
+  }, [attemptMarkRead]);
+
+  // Signalled by the conversation view through an IntersectionObserver so the
+  // controller knows whether the latest messages are inside the viewport.
+  const setMessagesViewportVisible = useCallback(
+    (visible: boolean) => {
+      messagesViewportVisibleRef.current = visible;
+      if (visible) {
+        scheduleMarkRead();
+      }
+    },
+    [scheduleMarkRead]
+  );
+
+  useEffect(() => {
+    if (!conversationQuery.data || conversationQuery.data.adminUnreadCount <= 0) {
+      return;
+    }
+
+    scheduleMarkRead();
 
     return () => {
       if (markReadDebounceRef.current) {
         clearTimeout(markReadDebounceRef.current);
       }
     };
-  }, [conversationQuery.data, attemptMarkRead]);
+  }, [conversationQuery.data, scheduleMarkRead]);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        attemptMarkRead();
+    const handleActiveAgain = () => {
+      if (document.visibilityState === "visible") {
+        scheduleMarkRead();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleActiveAgain);
+    window.addEventListener("focus", handleActiveAgain);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleActiveAgain);
+      window.removeEventListener("focus", handleActiveAgain);
     };
-  }, [attemptMarkRead]);
+  }, [scheduleMarkRead]);
 
   const sendMutation = useMutation({
     mutationFn: async () =>
       selectedAttachment
-        ? sendSupportAttachment(
-            conversationId,
-            selectedAttachment,
-            reply.trim(),
-            replyToMessageId
-          )
+        ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim(), replyToMessageId)
         : sendSupportMessage(conversationId, reply.trim(), replyToMessageId),
-    onSuccess: async () => {
+    onMutate: async (): Promise<SendOptimisticContext> => {
+      const trimmedReply = reply.trim();
+      const hasAttachment = Boolean(selectedAttachment);
+      const canApplyOptimisticMessage = hasAttachment || trimmedReply.length > 0;
+      if (!canApplyOptimisticMessage) {
+        return {};
+      }
+
+      const queryKey = adminQueryKeys.supportConversation(conversationId);
+      await queryClient.cancelQueries({ queryKey });
+      const previousConversation = queryClient.getQueryData<AdminSupportConversation>(queryKey);
+      if (!previousConversation) {
+        return {};
+      }
+
+      const optimisticMessageId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const nowUtc = new Date().toISOString();
+      const optimisticAttachmentObjectUrl = selectedAttachment
+        ? URL.createObjectURL(selectedAttachment)
+        : undefined;
+      const optimisticLastMessagePreview =
+        trimmedReply ||
+        (selectedAttachment?.name?.trim()
+          ? `${locale === "ru" ? "Вложение" : "Attachment"}: ${selectedAttachment.name.trim()}`
+          : locale === "ru"
+            ? "Вложение"
+            : "Attachment");
+      const optimisticMessage = {
+        messageId: optimisticMessageId,
+        conversationId,
+        senderUserId: session?.user.userId ?? "admin",
+        senderDisplayName:
+          session?.user.displayName?.trim() || session?.user.email || (locale === "ru" ? "Оператор" : "Operator"),
+        isFromAdmin: true,
+        senderType: "Admin",
+        body: trimmedReply,
+        replyToMessageId: replyToMessageId?.trim() || null,
+        replyToPreview: replyToPreview?.trim() || null,
+        attachmentUrl: optimisticAttachmentObjectUrl ?? null,
+        attachmentFileName: selectedAttachment?.name ?? null,
+        attachmentContentType:
+          selectedAttachment?.type?.trim() || (selectedAttachment ? "application/octet-stream" : null),
+        attachmentFileSizeBytes: selectedAttachment?.size ?? null,
+        attachmentUploadStatus: selectedAttachment ? "uploading" : null,
+        attachmentUploadErrorCode: null,
+        attachments: selectedAttachment
+          ? [
+              {
+                fileUrl: optimisticAttachmentObjectUrl!,
+                type: selectedAttachment.type,
+                mimeType: selectedAttachment.type || "application/octet-stream",
+                fileName: selectedAttachment.name,
+                sizeBytes: selectedAttachment.size,
+                isDeleted: false,
+                expiresAtUtc: null,
+                deletedAtUtc: null,
+                durationSeconds: null,
+                width: null,
+                height: null,
+              },
+            ]
+          : null,
+        isRead: false,
+        readAtUtc: null,
+        deliveredAtUtc: null,
+        isInternalNote: false,
+        createdAtUtc: nowUtc,
+      };
+
+      if (optimisticAttachmentObjectUrl) {
+        optimisticAttachmentObjectUrlsRef.current.set(
+          optimisticMessageId,
+          optimisticAttachmentObjectUrl
+        );
+      }
+
+      queryClient.setQueryData<AdminSupportConversation>(queryKey, {
+        ...previousConversation,
+        messages: [...previousConversation.messages, optimisticMessage],
+        lastMessageAtUtc: nowUtc,
+        lastMessagePreview: optimisticLastMessagePreview,
+        lastMessageSenderType: "Admin",
+        updatedAtUtc: nowUtc,
+      });
+
+      return { previousConversation, optimisticMessageId, optimisticAttachmentObjectUrl };
+    },
+    onSuccess: async (_data, _variables, context) => {
+      if (context?.optimisticMessageId) {
+        const optimisticObjectUrl = optimisticAttachmentObjectUrlsRef.current.get(
+          context.optimisticMessageId
+        );
+        if (optimisticObjectUrl) {
+          URL.revokeObjectURL(optimisticObjectUrl);
+          optimisticAttachmentObjectUrlsRef.current.delete(context.optimisticMessageId);
+        }
+      }
+
+      const queryKey = adminQueryKeys.supportConversation(conversationId);
+      queryClient.setQueryData<AdminSupportConversation>(queryKey, (currentConversation) => {
+        if (!currentConversation) {
+          return currentConversation;
+        }
+
+        return {
+          ...currentConversation,
+          messages: currentConversation.messages.filter(
+            (message) => !message.messageId.startsWith("optimistic-")
+          ),
+        };
+      });
+
       setReply("");
       setReplyToMessageId(null);
       setReplyToPreview(null);
       resetSelectedAttachment();
       setToast({ type: "success", message: text.supportReplySent });
+      pushSupportNotification("success", text.supportReplySent);
       await refreshConversationData();
     },
-    onError: () => {
+    onError: (_error, _variables, context) => {
+      if (context?.optimisticMessageId) {
+        const optimisticObjectUrl = optimisticAttachmentObjectUrlsRef.current.get(
+          context.optimisticMessageId
+        );
+        if (optimisticObjectUrl) {
+          URL.revokeObjectURL(optimisticObjectUrl);
+          optimisticAttachmentObjectUrlsRef.current.delete(context.optimisticMessageId);
+        }
+      }
+
+      if (context?.previousConversation) {
+        queryClient.setQueryData(
+          adminQueryKeys.supportConversation(conversationId),
+          context.previousConversation
+        );
+      }
+
       setToast({ type: "error", message: text.supportLoadError });
+      pushSupportNotification("error", text.supportLoadError);
     },
   });
 
@@ -331,10 +509,12 @@ export function useSupportConversationController({
       updateSupportConversationStatus(conversationId, status),
     onSuccess: async () => {
       setToast({ type: "success", message: text.supportStatusSaved });
+      pushSupportNotification("success", text.supportStatusSaved);
       await refreshConversationData();
     },
     onError: () => {
       setToast({ type: "error", message: text.supportLoadError });
+      pushSupportNotification("error", text.supportLoadError);
     },
   });
 
@@ -343,10 +523,26 @@ export function useSupportConversationController({
       assignSupportConversation(conversationId, assignedAdminId),
     onSuccess: async () => {
       setToast({ type: "success", message: text.supportAssignmentSaved });
+      pushSupportNotification("success", text.supportAssignmentSaved);
       await refreshConversationData();
     },
     onError: () => {
       setToast({ type: "error", message: text.supportLoadError });
+      pushSupportNotification("error", text.supportLoadError);
+    },
+  });
+
+  const metadataMutation = useMutation({
+    mutationFn: async (payload: { priority: SupportConversationPriority; tags: string[] }) =>
+      updateSupportConversationMetadata(conversationId, payload),
+    onSuccess: async () => {
+      setToast({ type: "success", message: text.supportStatusSaved });
+      pushSupportNotification("success", text.supportStatusSaved);
+      await refreshConversationData();
+    },
+    onError: () => {
+      setToast({ type: "error", message: text.supportLoadError });
+      pushSupportNotification("error", text.supportLoadError);
     },
   });
 
@@ -360,16 +556,19 @@ export function useSupportConversationController({
       return isActive;
     },
     onSuccess: async (isActive) => {
+      const message = isActive
+        ? locale === "ru"
+          ? "Пользователь активирован"
+          : "User activated"
+        : locale === "ru"
+          ? "Пользователь заблокирован"
+          : "User blocked";
+
       setToast({
         type: "success",
-        message: isActive
-          ? locale === "ru"
-            ? "Пользователь активирован"
-            : "User activated"
-          : locale === "ru"
-            ? "Пользователь заблокирован"
-            : "User blocked",
+        message,
       });
+      pushSupportNotification("success", message);
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
@@ -380,6 +579,7 @@ export function useSupportConversationController({
     },
     onError: () => {
       setToast({ type: "error", message: text.supportLoadError });
+      pushSupportNotification("error", text.supportLoadError);
     },
   });
 
@@ -393,16 +593,19 @@ export function useSupportConversationController({
       return isPremium;
     },
     onSuccess: async (isPremium) => {
+      const message = isPremium
+        ? locale === "ru"
+          ? "Премиум включен"
+          : "Premium granted"
+        : locale === "ru"
+          ? "Премиум отключен"
+          : "Premium revoked";
+
       setToast({
         type: "success",
-        message: isPremium
-          ? locale === "ru"
-            ? "Премиум включен"
-            : "Premium granted"
-          : locale === "ru"
-            ? "Премиум отключен"
-            : "Premium revoked",
+        message,
       });
+      pushSupportNotification("success", message);
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
@@ -414,45 +617,7 @@ export function useSupportConversationController({
     },
     onError: () => {
       setToast({ type: "error", message: text.supportLoadError });
-    },
-  });
-
-  const templateSaveMutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        title: templateDraft.title.trim(),
-        body: templateDraft.body.trim(),
-        isEnabled: templateDraft.isEnabled,
-        sortOrder: templateDraft.sortOrder,
-      };
-
-      return templateDraft.templateId
-        ? updateSupportReplyTemplate(templateDraft.templateId, payload)
-        : createSupportReplyTemplate(payload);
-    },
-    onSuccess: async (savedTemplate) => {
-      setTemplateDraft(emptyTemplateDraft);
-      setSelectedTemplateId(savedTemplate.templateId);
-      setIsTemplateEditorOpen(false);
-      setToast({ type: "success", message: text.supportTemplateSaved });
-      await refreshTemplateCatalog();
-    },
-    onError: () => {
-      setToast({ type: "error", message: text.supportLoadError });
-    },
-  });
-
-  const templateDeleteMutation = useMutation({
-    mutationFn: async (templateId: string) => deleteSupportReplyTemplate(templateId),
-    onSuccess: async () => {
-      setTemplateDraft(emptyTemplateDraft);
-      setSelectedTemplateId(null);
-      setIsTemplateEditorOpen(false);
-      setToast({ type: "success", message: text.supportTemplateDeleted });
-      await refreshTemplateCatalog();
-    },
-    onError: () => {
-      setToast({ type: "error", message: text.supportLoadError });
+      pushSupportNotification("error", text.supportLoadError);
     },
   });
 
@@ -508,6 +673,7 @@ export function useSupportConversationController({
         item.userEmail,
         item.lastMessagePreview,
         item.assignedAdminDisplayName,
+        item.tags?.join(" "),
       ]
         .filter(Boolean)
         .join(" ")
@@ -516,35 +682,6 @@ export function useSupportConversationController({
       return haystacks.includes(normalizedQuery);
     });
   }, [inboxItems, searchQuery]);
-
-  const sortedTemplates = useMemo(
-    () =>
-      (templatesQuery.data ?? []).slice().sort((left, right) => {
-        if (left.sortOrder !== right.sortOrder) {
-          return left.sortOrder - right.sortOrder;
-        }
-
-        return left.title.localeCompare(right.title, locale === "ru" ? "ru" : "en");
-      }),
-    [locale, templatesQuery.data]
-  );
-
-  const filteredTemplates = useMemo(() => {
-    const normalizedQuery = templateSearchQuery.trim().toLowerCase();
-
-    return sortedTemplates.filter((template) => {
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      return `${template.title} ${template.body}`.toLowerCase().includes(normalizedQuery);
-    });
-  }, [sortedTemplates, templateSearchQuery]);
-
-  const visibleTemplates = useMemo(
-    () => sortedTemplates.filter((template) => template.isEnabled).slice(0, 4),
-    [sortedTemplates]
-  );
 
   const composerValue = reply;
   const composerPlaceholder = text.supportReplyPlaceholder;
@@ -561,12 +698,72 @@ export function useSupportConversationController({
     [conversation?.messages, replyToMessageId]
   );
 
-  const selectReplyToMessage = useCallback(
-    (messageId: string | null, preview?: string | null) => {
-      setReplyToMessageId(messageId);
-      setReplyToPreview(messageId ? (preview?.trim() || null) : null);
+  const selectReplyToMessage = useCallback((messageId: string | null, preview?: string | null) => {
+    setReplyToMessageId(messageId);
+    setReplyToPreview(messageId ? preview?.trim() || null : null);
+  }, []);
+
+  const operatorPriority: SupportConversationPriority = conversation?.priority ?? "Normal";
+
+  const operatorTags = conversation?.tags ?? [];
+
+  const setOperatorPriority = useCallback(
+    (priority: SupportConversationPriority) => {
+      if (!conversation || metadataMutation.isPending) {
+        return;
+      }
+
+      const currentTags = conversation.tags ?? [];
+      metadataMutation.mutate({ priority, tags: currentTags });
     },
-    []
+    [conversation, metadataMutation]
+  );
+
+  const addOperatorTag = useCallback(
+    (rawTag: string) => {
+      if (!conversation || metadataMutation.isPending) {
+        return false;
+      }
+
+      const tag = normalizeSupportTag(rawTag);
+      if (!tag) {
+        return false;
+      }
+
+      const currentTags = conversation.tags ?? [];
+      const nextTags = Array.from(new Set([...currentTags, tag])).slice(0, 12);
+      if (nextTags.length === currentTags.length) {
+        return false;
+      }
+
+      metadataMutation.mutate({
+        priority: conversation.priority,
+        tags: nextTags,
+      });
+
+      return true;
+    },
+    [conversation, metadataMutation]
+  );
+
+  const removeOperatorTag = useCallback(
+    (tagToRemove: string) => {
+      if (!conversation || metadataMutation.isPending) {
+        return;
+      }
+
+      const currentTags = conversation.tags ?? [];
+      const nextTags = currentTags.filter((tag) => tag !== tagToRemove);
+      if (nextTags.length === currentTags.length) {
+        return;
+      }
+
+      metadataMutation.mutate({
+        priority: conversation.priority,
+        tags: nextTags,
+      });
+    },
+    [conversation, metadataMutation]
   );
 
   const sidePanelTabs = useMemo<ReadonlyArray<{ value: SidePanelTab; label: string }>>(
@@ -602,14 +799,12 @@ export function useSupportConversationController({
           ? text.supportAttachmentsDescription
           : null;
 
-  const selectedTemplate =
-    filteredTemplates.find((template) => template.templateId === selectedTemplateId) ??
-    filteredTemplates[0] ??
-    null;
-
   const accountCreatedAt = userQuery.data?.createdAtUtc ?? conversation?.createdAtUtc ?? null;
   const conversationWaitingSince =
-    conversation?.waitingSinceUtc ?? conversation?.lastMessageAtUtc ?? conversation?.createdAtUtc ?? null;
+    conversation?.waitingSinceUtc ??
+    conversation?.lastMessageAtUtc ??
+    conversation?.createdAtUtc ??
+    null;
   const conversationSla = getConversationSla(
     conversationWaitingSince,
     locale,
@@ -664,38 +859,11 @@ export function useSupportConversationController({
     },
   });
 
-  const applyTemplate = useCallback((template: AdminSupportReplyTemplate) => {
-    setSelectedTemplateId(template.templateId);
-    setReply((current) => mergeTemplateDraft(current, template.body));
-  }, []);
-
-  const openTemplateEditor = useCallback((template?: AdminSupportReplyTemplate) => {
-    if (template) {
-      setSelectedTemplateId(template.templateId);
-      setTemplateDraft({
-        templateId: template.templateId,
-        title: template.title,
-        body: template.body,
-        isEnabled: template.isEnabled,
-        sortOrder: template.sortOrder,
-      });
-      setIsTemplateEditorOpen(true);
-      return;
-    }
-
-    setTemplateDraft({
-      ...emptyTemplateDraft,
-    });
-    setSelectedTemplateId(null);
-    setIsTemplateEditorOpen(true);
-  }, []);
-
   return {
     activeSidePanelTab,
     accountCreatedAt,
     activityTimeline,
     analyticsQuery,
-    applyTemplate,
     assignmentMutation,
     attachmentInputRef,
     attachmentPreviewUrl,
@@ -709,13 +877,10 @@ export function useSupportConversationController({
     destructiveStatusAction,
     failedGenerations,
     filteredInboxItems,
-    filteredTemplates,
     hasComposerAttachment,
     inboxQuery,
     isAssignedToCurrentAdmin,
     isSidePanelOpen,
-    isTemplateEditorOpen,
-    openTemplateEditor,
     primaryStatusAction,
     purchasesQuery,
     recentUserPurchases,
@@ -728,7 +893,6 @@ export function useSupportConversationController({
     resetSelectedAttachment,
     searchQuery,
     selectedAttachment,
-    selectedTemplate,
     secondaryStatusActions,
     sendMutation,
     sessionUserId,
@@ -736,33 +900,29 @@ export function useSupportConversationController({
     setUserPremiumMutation,
     setActiveSidePanelTab,
     setIsSidePanelOpen,
-    setIsTemplateEditorOpen,
     setReply,
     setReplyToMessageId,
     setReplyToPreview,
     setSearchQuery,
     setQueueFilter,
     setSelectedAttachment,
-    setSelectedTemplateId,
-    setTemplateDraft,
-    setTemplateSearchQuery,
+    setMessagesViewportVisible,
     sidePanelDescription,
     sidePanelTabs,
     sidePanelTitle,
+    operatorPriority,
+    operatorTags,
+    setOperatorPriority,
+    addOperatorTag,
+    removeOperatorTag,
     queueFilter,
     subscriptionQuery,
     statusMutation,
-    templateDeleteMutation,
-    templateDraft,
-    templateSaveMutation,
-    templateSearchQuery,
-    templatesQuery,
     text,
     toast,
     totalPurchases,
     selectReplyToMessage,
     userDisplayName,
     userQuery,
-    visibleTemplates,
   };
 }

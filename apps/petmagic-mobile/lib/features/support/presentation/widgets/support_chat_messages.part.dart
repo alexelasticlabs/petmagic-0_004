@@ -182,9 +182,8 @@ class _MessageBubble extends StatelessWidget {
                       ],
                       if (message.isFromAdmin) ...[
                         Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Flexible(
+                            Expanded(
                               child: Text(
                                 senderLabel,
                                 maxLines: 1,
@@ -198,26 +197,32 @@ class _MessageBubble extends StatelessWidget {
                             ),
                             if (isBotMessage) ...[
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.accent.withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
                                     color: colors.accent.withValues(
-                                      alpha: 0.26,
+                                      alpha: 0.14,
+                                    ),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: colors.accent.withValues(
+                                        alpha: 0.26,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                child: Text(
-                                  text.supportChatAssistantBadge,
-                                  style: TextStyle(
-                                    color: colors.accent,
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
+                                  child: Text(
+                                    text.supportChatAssistantBadge,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colors.accent,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -351,6 +356,7 @@ class _MessageBubble extends StatelessWidget {
                                 _openAttachment(primaryAttachment?.fileUrl),
                             borderRadius: BorderRadius.circular(14),
                             child: Container(
+                              width: double.infinity,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 11,
@@ -363,7 +369,6 @@ class _MessageBubble extends StatelessWidget {
                                 ),
                               ),
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
                                     Icons.insert_drive_file_outlined,
@@ -371,7 +376,7 @@ class _MessageBubble extends StatelessWidget {
                                     color: metaColor,
                                   ),
                                   const SizedBox(width: 8),
-                                  Flexible(
+                                  Expanded(
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,

@@ -225,6 +225,25 @@ export function RefreshIcon({ className }: IconProps) {
   );
 }
 
+export function BellIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M12 4a4 4 0 0 0-4 4v1.38c0 .58-.2 1.15-.56 1.61L6 13h12l-1.44-1.99A2.62 2.62 0 0 1 16 9.38V8a4 4 0 0 0-4-4Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 16.5a2 2 0 0 0 4 0"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function UserRegisterIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">

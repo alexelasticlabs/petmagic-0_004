@@ -4,32 +4,41 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { AdminBadge, AdminCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
-import { SupportActionsPanel } from "@/components/support/support-actions-panel";
 import {
-    formatClockTime,
-    formatDateTime,
-    formatFileSize,
-    formatRelativeTime,
-    getConversationSla,
-    getMessageAttachments,
-    groupSupportConversationFeed,
-    initialsFor,
-    shortId,
-    shouldRenderMessageBody,
+  AdminBadge,
+  AdminCard,
+  AdminPage,
+  AdminStateCard,
+} from "@/components/admin/admin-primitives";
+import {
+  formatClockTime,
+  formatDateTime,
+  formatFileSize,
+  formatRelativeTime,
+  getConversationSla,
+  getMessageAttachments,
+  groupSupportConversationFeed,
+  initialsFor,
+  shortId,
+  shouldRenderMessageBody,
 } from "@/components/support/support-conversation-helpers";
 import { SupportInfoPanel } from "@/components/support/support-info-panel";
-import { SupportOptionGroup } from "@/components/support/support-option-group";
 import styles from "@/components/support/support-page.module.css";
-import { sourceLabel, statusHint, statusLabel, toneForStatus } from "@/components/support/support-status-helpers";
 import {
-    statusOptions,
-    type SupportQueueFilter,
-    useSupportConversationController,
-} from "@/components/support/use-support-conversation-controller";
+  sourceLabel,
+  statusHint,
+  statusLabel,
+  toneForStatus,
+} from "@/components/support/support-status-helpers";
+import { useSupportConversationController } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Toast } from "@/components/ui/toast";
-import type { AdminSupportConversation } from "@/lib/api-client";
+import type {
+  AdminSupportConversation,
+  SupportConversationPriority,
+  SupportConversationStatus,
+} from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 
 type SupportConversationPageProps = {
@@ -40,12 +49,14 @@ type SupportConversationPageProps = {
 };
 
 type FullscreenImage = {
+  mediaType?: "image" | "video";
   url: string;
   fileName?: string | null;
   messageId?: string;
   senderDisplayName?: string | null;
   createdAtUtc?: string | null;
   fileSizeBytes?: number | null;
+  durationSeconds?: number | null;
 };
 
 type SupportMessage = AdminSupportConversation["messages"][number];
@@ -60,8 +71,14 @@ export function SupportConversationPage({
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned">("all");
-  const [composerTab, setComposerTab] = useState<"reply" | "templates" | "attachments">("reply");
+  const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned" | "archive">("all");
+  const [queueStatusFilter, setQueueStatusFilter] = useState<"all" | SupportConversationStatus>(
+    "all"
+  );
+  const [queuePriorityFilter, setQueuePriorityFilter] = useState<
+    "all" | SupportConversationPriority
+  >("all");
+  const [queueSortBy, setQueueSortBy] = useState<"recent" | "status" | "priority">("recent");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const messageHighlightTimerRef = useRef<number | null>(null);
@@ -69,14 +86,12 @@ export function SupportConversationPage({
   const {
     attachmentInputRef,
     attachmentPreviewUrl,
-    applyTemplate,
     composerPlaceholder,
     composerValue,
     conversation,
     conversationQuery,
     conversationSla,
     filteredInboxItems,
-    filteredTemplates,
     hasComposerAttachment,
     inboxQuery,
     isSidePanelOpen,
@@ -91,14 +106,13 @@ export function SupportConversationPage({
     selectReplyToMessage,
     sendMutation,
     setIsSidePanelOpen,
-    setQueueFilter,
+    setMessagesViewportVisible,
     setReply,
     setSearchQuery,
     setSelectedAttachment,
     statusMutation,
     text,
     toast,
-    queueFilter,
     userDisplayName,
   } = controller;
 
@@ -108,16 +122,65 @@ export function SupportConversationPage({
   const waitingCount = filteredInboxItems.filter(
     (item) => item.status === "New" || item.status === "WaitingForUser"
   ).length;
+  const archiveCount = filteredInboxItems.filter((item) => item.status === "Closed").length;
+  const activeCount = filteredInboxItems.length - archiveCount;
+  const incomingMessagesCount = filteredInboxItems.filter((item) => item.unreadForAdmin).length;
   const unassignedCount = filteredInboxItems.filter((item) => !item.assignedAdminId).length;
-  const displayedInboxItems = filteredInboxItems.filter((item) => {
-    if (subFilter === "waiting") {
-      return item.status === "New" || item.status === "WaitingForUser";
-    }
-    if (subFilter === "unassigned") {
-      return !item.assignedAdminId;
-    }
-    return true;
-  });
+  const displayedInboxItems = filteredInboxItems
+    .filter((item) => {
+      const isArchived = item.status === "Closed";
+
+      if (subFilter === "archive") {
+        return isArchived;
+      }
+
+      if (isArchived) {
+        return false;
+      }
+
+      if (subFilter === "waiting") {
+        return item.status === "New" || item.status === "WaitingForUser";
+      }
+      if (subFilter === "unassigned") {
+        return !item.assignedAdminId;
+      }
+      return true;
+    })
+    .filter((item) => (queueStatusFilter === "all" ? true : item.status === queueStatusFilter))
+    .filter((item) =>
+      queuePriorityFilter === "all" ? true : item.priority === queuePriorityFilter
+    )
+    .slice()
+    .sort((left, right) => {
+      if (queueSortBy === "status") {
+        const statusOrder: Record<SupportConversationStatus, number> = {
+          New: 0,
+          InProgress: 1,
+          WaitingForUser: 2,
+          Closed: 3,
+        };
+        const byStatus = statusOrder[left.status] - statusOrder[right.status];
+        if (byStatus !== 0) {
+          return byStatus;
+        }
+      }
+
+      if (queueSortBy === "priority") {
+        const priorityOrder: Record<SupportConversationPriority, number> = {
+          High: 0,
+          Normal: 1,
+          Low: 2,
+        };
+        const byPriority = priorityOrder[left.priority] - priorityOrder[right.priority];
+        if (byPriority !== 0) {
+          return byPriority;
+        }
+      }
+
+      const leftTs = left.lastMessageAtUtc ?? left.updatedAtUtc ?? left.createdAtUtc;
+      const rightTs = right.lastMessageAtUtc ?? right.updatedAtUtc ?? right.createdAtUtc;
+      return rightTs.localeCompare(leftTs);
+    });
   const reopenStatusAction =
     primaryStatusAction?.status === "InProgress"
       ? primaryStatusAction
@@ -137,7 +200,6 @@ export function SupportConversationPage({
     date: locale === "ru" ? "Дата" : "Date",
     size: locale === "ru" ? "Размер" : "Size",
   };
-  const totalInboxCount = inboxQuery.data?.length ?? 0;
   const supportWorkspaceSubtitle =
     locale === "ru"
       ? "Единое рабочее пространство для очереди, переписки и действий оператора"
@@ -149,6 +211,29 @@ export function SupportConversationPage({
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [conversation?.messages.length]);
+
+  // Track whether the latest messages are actually inside the viewport so the
+  // controller only marks the conversation read when the operator can see them.
+  useEffect(() => {
+    const node = messagesEndRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setMessagesViewportVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setMessagesViewportVisible(entries.some((entry) => entry.isIntersecting));
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      setMessagesViewportVisible(false);
+    };
+  }, [conversationId, conversation?.messages.length, setMessagesViewportVisible]);
 
   useEffect(() => {
     selectReplyToMessage(null);
@@ -164,6 +249,13 @@ export function SupportConversationPage({
       hash = (hash + name.charCodeAt(i)) % 8;
     }
     return styles[`avatarColor${hash}` as keyof typeof styles] ?? styles.avatarColor6;
+  };
+
+  const queueStatusIcon = (status: SupportConversationStatus) => {
+    if (status === "New") return "✦";
+    if (status === "InProgress") return "▶";
+    if (status === "WaitingForUser") return "⏳";
+    return "✓";
   };
 
   const closeFullscreenImage = () => {
@@ -234,7 +326,9 @@ export function SupportConversationPage({
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
-      link.download = fullscreenImage.fileName?.trim() || "support-image";
+      const defaultFileName =
+        fullscreenImage.mediaType === "video" ? "support-video" : "support-image";
+      link.download = fullscreenImage.fileName?.trim() || defaultFileName;
       document.body.append(link);
       link.click();
       link.remove();
@@ -335,7 +429,9 @@ export function SupportConversationPage({
 
     const attachments = getMessageAttachments(message);
     if (attachments.length > 1) {
-      return locale === "ru" ? `Вложения (${attachments.length})` : `Attachments (${attachments.length})`;
+      return locale === "ru"
+        ? `Вложения (${attachments.length})`
+        : `Attachments (${attachments.length})`;
     }
 
     const primaryAttachment = attachments[0];
@@ -357,7 +453,6 @@ export function SupportConversationPage({
   const startReplyToMessage = (message: AdminSupportConversation["messages"][number]) => {
     const preview = resolveReplyPreview(message);
     selectReplyToMessage(message.messageId, preview);
-    setComposerTab("reply");
   };
 
   const replyComposerPreview =
@@ -427,6 +522,7 @@ export function SupportConversationPage({
           type="button"
           onClick={() =>
             setFullscreenImage({
+              mediaType: "image",
               url: attachment.fileUrl,
               fileName: attachment.fileName,
               messageId: message.messageId,
@@ -448,18 +544,30 @@ export function SupportConversationPage({
             loading="lazy"
             unoptimized
           />
-          {overlayCount > 0 ? <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span> : null}
+          {overlayCount > 0 ? (
+            <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span>
+          ) : null}
         </button>
       );
     }
 
     if (isVideo) {
       return (
-        <a
+        <button
           key={key}
-          href={attachment.fileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+          type="button"
+          onClick={() =>
+            setFullscreenImage({
+              mediaType: "video",
+              url: attachment.fileUrl,
+              fileName: attachment.fileName,
+              messageId: message.messageId,
+              senderDisplayName: message.senderDisplayName,
+              createdAtUtc: message.createdAtUtc,
+              fileSizeBytes: attachment.sizeBytes,
+              durationSeconds: attachment.durationSeconds,
+            })
+          }
           className={`${styles.messageVideoButton} ${tileClassName}`}
           aria-label={locale === "ru" ? "Открыть видео" : "Open video"}
         >
@@ -467,8 +575,10 @@ export function SupportConversationPage({
           <span className={styles.messageVideoDurationBadge}>
             ▶ {formatAttachmentDuration(attachment.durationSeconds)}
           </span>
-          {overlayCount > 0 ? <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span> : null}
-        </a>
+          {overlayCount > 0 ? (
+            <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span>
+          ) : null}
+        </button>
       );
     }
 
@@ -486,7 +596,9 @@ export function SupportConversationPage({
           <strong>{attachment.fileName || (locale === "ru" ? "Файл" : "File")}</strong>
           <span>{formatFileSize(attachment.sizeBytes, locale)}</span>
         </div>
-        {overlayCount > 0 ? <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span> : null}
+        {overlayCount > 0 ? (
+          <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span>
+        ) : null}
       </a>
     );
   };
@@ -519,12 +631,17 @@ export function SupportConversationPage({
             <div className={styles.supportPageTitleWrap}>
               <div className={styles.supportPageTitleRow}>
                 <h1 className={styles.supportPageTitle}>{text.supportTitle}</h1>
-                <span className={styles.supportPageBadge}>{totalInboxCount}</span>
               </div>
               <span className={styles.supportPageSubtitle}>{supportWorkspaceSubtitle}</span>
             </div>
             <div className={styles.supportPageToolbar}>
-              <label className={styles.searchField}>
+              <label className={`${styles.searchField} ${styles.supportPageHeroSearch}`}>
+                <span className={styles.supportSearchIcon} aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <circle cx="8.5" cy="8.5" r="5.5" />
+                    <path d="M12.5 12.5 17 17" strokeLinecap="round" />
+                  </svg>
+                </span>
                 <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
                 <input
                   ref={searchInputRef}
@@ -535,47 +652,10 @@ export function SupportConversationPage({
                   aria-label={text.supportSearchPlaceholder}
                   title={text.supportSearchKeyboardHint}
                 />
-              </label>
-              <div className={styles.supportPageFilterWrap}>
-                <SupportOptionGroup
-                  label={text.supportQueueFilterLabel}
-                  value={queueFilter}
-                  options={[
-                    { value: "all", label: text.supportStatusAll },
-                    ...statusOptions.map((status) => ({
-                      value: status,
-                      label: statusLabel(status, text),
-                    })),
-                    { value: "mine", label: text.supportAssignmentMine },
-                    { value: "unassigned", label: text.supportAssignmentUnassigned },
-                  ]}
-                  onChange={(value) => setQueueFilter(value as SupportQueueFilter)}
-                  compact
-                />
-              </div>
-              <div className={styles.compactHeaderMeta}>
-                <Button variant="secondary" size="sm" onClick={() => void inboxQuery.refetch()}>
-                  {text.supportRefresh}
-                </Button>
-              </div>
-            </div>
-            <div className={styles.compactHeaderMeta}>
-              {conversation.adminUnreadCount > 0 ? (
-                <span
-                  className={styles.unreadDot}
-                  aria-live="polite"
-                  aria-label={`${conversation.adminUnreadCount} ${locale === "ru" ? "непрочитанных" : "unread"}`}
-                >
-                  {conversation.adminUnreadCount}
+                <span className={styles.supportSearchShortcut} aria-hidden="true">
+                  /
                 </span>
-              ) : null}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setIsSidePanelOpen((current) => !current)}
-              >
-                {isSidePanelOpen ? text.supportClosePanelAction : text.supportOpenPanelAction}
-              </Button>
+              </label>
             </div>
           </div>
 
@@ -585,16 +665,23 @@ export function SupportConversationPage({
             <div className={styles.inboxPaneFlat}>
               <div className={styles.queuePaneHeader}>
                 <div className={styles.queuePaneTitleRow}>
-                  <h2 className={styles.queuePaneTitle}>
-                    {locale === "ru" ? "Очередь" : "Queue"}
-                  </h2>
-                  <span className={styles.paneCountBadge}>{filteredInboxItems.length}</span>
+                  <h2 className={styles.queuePaneTitle}>{locale === "ru" ? "Очередь" : "Queue"}</h2>
+                  <span className={styles.paneCountBadge}>
+                    {subFilter === "archive" ? archiveCount : activeCount}
+                  </span>
+                  {incomingMessagesCount > 0 ? (
+                    <span
+                      className={`${styles.queueCountBadge} ${styles.queueCountBadgeIncoming}`}
+                      title={
+                        locale === "ru"
+                          ? `Новых сообщений от пользователей: ${incomingMessagesCount}`
+                          : `New messages from users: ${incomingMessagesCount}`
+                      }
+                    >
+                      💬 {incomingMessagesCount}
+                    </span>
+                  ) : null}
                 </div>
-                <span className={styles.queuePaneSubtitle}>
-                  {locale === "ru"
-                    ? "Все активные и ожидающие обращения"
-                    : "All active and waiting conversations"}
-                </span>
               </div>
 
               <div className={styles.queueSubFilters}>
@@ -605,7 +692,7 @@ export function SupportConversationPage({
                   }
                   onClick={() => setSubFilter("all")}
                 >
-                  {locale === "ru" ? "Все" : "All"} {filteredInboxItems.length}
+                  {locale === "ru" ? "Активные" : "Active"} {activeCount}
                 </button>
                 <button
                   type="button"
@@ -625,6 +712,69 @@ export function SupportConversationPage({
                 >
                   {locale === "ru" ? "Без ответств." : "Unassigned"} {unassignedCount}
                 </button>
+                <button
+                  type="button"
+                  className={
+                    subFilter === "archive" ? styles.queueSubFilterActive : styles.queueSubFilter
+                  }
+                  onClick={() => setSubFilter("archive")}
+                >
+                  {locale === "ru" ? "Архив" : "Archive"} {archiveCount}
+                </button>
+              </div>
+
+              <div className={styles.queueFiltersGrid}>
+                <label className={styles.queueToolField}>
+                  <span>{locale === "ru" ? "Статус" : "Status"}</span>
+                  <Select
+                    value={queueStatusFilter}
+                    onChange={(value) =>
+                      setQueueStatusFilter(value as "all" | SupportConversationStatus)
+                    }
+                    showSelectedDescription={false}
+                    options={[
+                      { value: "all", label: locale === "ru" ? "Все" : "All" },
+                      { value: "New", label: statusLabel("New", text) },
+                      { value: "InProgress", label: statusLabel("InProgress", text) },
+                      { value: "WaitingForUser", label: statusLabel("WaitingForUser", text) },
+                      { value: "Closed", label: statusLabel("Closed", text) },
+                    ]}
+                  />
+                </label>
+
+                <label className={styles.queueToolField}>
+                  <span>{locale === "ru" ? "Приоритет" : "Priority"}</span>
+                  <Select
+                    value={queuePriorityFilter}
+                    onChange={(value) =>
+                      setQueuePriorityFilter(value as "all" | SupportConversationPriority)
+                    }
+                    showSelectedDescription={false}
+                    options={[
+                      { value: "all", label: locale === "ru" ? "Все" : "All" },
+                      { value: "High", label: text.supportPriorityHigh },
+                      { value: "Normal", label: text.supportPriorityNormal },
+                      { value: "Low", label: text.supportPriorityLow },
+                    ]}
+                  />
+                </label>
+
+                <label className={styles.queueToolField}>
+                  <span>{locale === "ru" ? "Сортировка" : "Sort"}</span>
+                  <Select
+                    value={queueSortBy}
+                    onChange={(value) => setQueueSortBy(value as "recent" | "status" | "priority")}
+                    showSelectedDescription={false}
+                    options={[
+                      { value: "recent", label: locale === "ru" ? "Сначала новые" : "Newest" },
+                      { value: "status", label: locale === "ru" ? "По статусу" : "By status" },
+                      {
+                        value: "priority",
+                        label: locale === "ru" ? "По приоритету" : "By priority",
+                      },
+                    ]}
+                  />
+                </label>
               </div>
 
               {inboxQuery.isLoading ? (
@@ -646,19 +796,21 @@ export function SupportConversationPage({
                     const queueItemClassName = `${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""} ${hasUnread ? styles.conversationRowUnread : ""}`;
                     const queueItemContent = (
                       <>
-                        <div className={styles.rowHeader}>
-                          <div className={styles.rowIdentity}>
+                        <div className={styles.queueRowHeader}>
+                          <div className={styles.queueRowIdentity}>
                             <span
                               className={`${styles.avatar} ${avatarColorFor(item.userDisplayName?.trim() || item.userEmail || "")}`}
                               aria-hidden="true"
                             >
                               {initialsFor(item.userDisplayName?.trim() || item.userEmail)}
                             </span>
-                            <div className={styles.rowTextStack}>
-                              <div
-                                className={`${styles.rowTitle} ${hasUnread ? styles.rowTitleUnread : ""}`}
-                              >
-                                {item.userDisplayName?.trim() || item.userEmail}
+                            <div className={styles.queueRowTextStack}>
+                              <div className={styles.queueRowTitleLine}>
+                                <div
+                                  className={`${styles.rowTitle} ${hasUnread ? styles.rowTitleUnread : ""}`}
+                                >
+                                  {item.userDisplayName?.trim() || item.userEmail}
+                                </div>
                                 {hasUnread ? (
                                   <span className={styles.unreadDotInline} aria-hidden="true" />
                                 ) : null}
@@ -668,24 +820,68 @@ export function SupportConversationPage({
                               </div>
                             </div>
                           </div>
-                          <span className={styles.rowTime}>
-                            {item.lastMessageAtUtc
-                              ? formatClockTime(item.lastMessageAtUtc, locale)
-                              : formatRelativeTime(item.updatedAtUtc, locale)}
-                          </span>
+                          <div className={styles.queueRowMeta}>
+                            <span className={styles.rowTime}>
+                              {item.lastMessageAtUtc
+                                ? formatClockTime(item.lastMessageAtUtc, locale)
+                                : formatRelativeTime(item.updatedAtUtc, locale)}
+                            </span>
+                            <div className={styles.queueRowCounters}>
+                              {item.userUnreadCount > 0 ? (
+                                <span
+                                  className={`${styles.queueCountBadge} ${styles.queueCountBadgeIncoming}`}
+                                  title={
+                                    locale === "ru"
+                                      ? `Сообщений от пользователя: ${item.userUnreadCount}`
+                                      : `Messages from user: ${item.userUnreadCount}`
+                                  }
+                                >
+                                  💬 {item.userUnreadCount}
+                                </span>
+                              ) : null}
+                              {item.adminUnreadCount > 0 ? (
+                                <span
+                                  className={`${styles.queueCountBadge} ${styles.queueCountBadgeUnread}`}
+                                  title={
+                                    locale === "ru"
+                                      ? `Непрочитанных для админа: ${item.adminUnreadCount}`
+                                      : `Unread for admin: ${item.adminUnreadCount}`
+                                  }
+                                >
+                                  🔔 {item.adminUnreadCount}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
                         </div>
-                        <div className={styles.rowSlaLine}>
+                        <div className={styles.queueRowFooter}>
                           <span
-                            className={styles[`statusDot_${item.status}` as keyof typeof styles]}
-                          />
-                          <span className={styles.rowStatusLabel}>
+                            className={`${styles.queueStatusPill} ${styles[`queueStatusPill_${item.status}` as keyof typeof styles]}`}
+                          >
+                            <span aria-hidden="true">{queueStatusIcon(item.status)}</span>
                             {statusLabel(item.status, text)}
                           </span>
-                          <span className={styles.rowSlaSep}>·</span>
-                          <span
-                            className={`${styles.slaPill} ${styles[`slaPill_${itemSla.level}`]}`}
-                          >
-                            {itemSla.waitLabel}
+                          {itemSla.waitLabel ? (
+                            <span
+                              className={`${styles.slaPill} ${styles[`slaPill_${itemSla.level}`]}`}
+                            >
+                              {itemSla.waitLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className={styles.queueRowDetailLine}>
+                          <span className={styles.queueMetaChip}>
+                            {sourceLabel(item.source, text)}
+                          </span>
+                          <span className={styles.queueMetaChipMuted}>
+                            #{shortId(item.initiatorUserId)}
+                          </span>
+                          <span className={styles.queueMetaChipMuted}>
+                            {item.assignedAdminDisplayName?.trim()
+                              ? `${locale === "ru" ? "Оператор" : "Operator"}: ${item.assignedAdminDisplayName}`
+                              : locale === "ru"
+                                ? "Без оператора"
+                                : "Unassigned"}
                           </span>
                         </div>
                       </>
@@ -791,53 +987,42 @@ export function SupportConversationPage({
                       <div>
                         <div className={styles.chatHeaderNameRow}>
                           <strong>{userDisplayName}</strong>
-                          <AdminBadge tone={toneForStatus(conversation.status)}>
-                            {statusLabel(conversation.status, text)}
-                          </AdminBadge>
+                          <div className={styles.chatHeaderBadges}>
+                            <AdminBadge tone={toneForStatus(conversation.status)}>
+                              {statusLabel(conversation.status, text)}
+                            </AdminBadge>
+                            {conversationSla.waitLabel ? (
+                              <span
+                                className={`${styles.chatHeaderSlaBadge} ${
+                                  conversationSla.level === "critical" ||
+                                  conversationSla.level === "risk"
+                                    ? styles.chatHeaderSlaBadgeUrgent
+                                    : ""
+                                }`}
+                              >
+                                {conversationSla.waitLabel}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                         <span className={styles.chatHeaderSubtext}>
                           {conversation.userEmail} · #{shortId(conversation.initiatorUserId)}
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.chatHeaderMoreBtn}
-                      onClick={() => setIsSidePanelOpen((current) => !current)}
-                      title={
-                        isSidePanelOpen ? text.supportClosePanelAction : text.supportOpenPanelAction
-                      }
-                    >
-                      ···
-                    </button>
                   </div>
                   <div className={styles.chatMetaRow}>
-                    <span className={styles.chatMetaLabelPrefix}>
-                      {locale === "ru" ? "Источник:" : "Source:"}
-                    </span>
                     <span>{sourceLabel(conversation.source, text)}</span>
                     <span className={styles.chatMetaDivider}>·</span>
-                    <span className={styles.chatMetaLabelPrefix}>
-                      {locale === "ru" ? "Ответственный:" : "Assigned:"}
-                    </span>
                     <span>
-                      {conversation.assignedAdminDisplayName?.trim() || text.supportUnassigned}
+                      {conversation.priority === "High"
+                        ? text.supportPriorityHigh
+                        : conversation.priority === "Low"
+                          ? text.supportPriorityLow
+                          : text.supportPriorityNormal}
                     </span>
-                    {conversationSla.waitLabel ? (
-                      <>
-                        <span className={styles.chatMetaDivider}>·</span>
-                        <span
-                          className={`${styles.chatMetaSla} ${
-                            conversationSla.level === "critical" ||
-                            conversationSla.level === "risk"
-                              ? styles.chatMetaSlaUrgent
-                              : ""
-                          }`}
-                        >
-                          ⏱ {conversationSla.waitLabel}
-                        </span>
-                      </>
-                    ) : null}
+                    <span className={styles.chatMetaDivider}>·</span>
+                    <span>{formatDateTime(conversation.createdAtUtc, locale)}</span>
                   </div>
                 </div>
 
@@ -925,115 +1110,109 @@ export function SupportConversationPage({
                                   className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser} ${isBotMessage ? styles.messageBot : ""} ${highlightedMessageId === message.messageId ? styles.messageHighlighted : ""} ${hasMediaMessage ? styles.messageWithMedia : ""} ${isMediaOnlyBubble ? styles.messageMediaOnly : ""}`}
                                   onDoubleClick={() => startReplyToMessage(message)}
                                 >
-                                  <div className={styles.messageHeader}>
-                                    <div className={styles.messageSenderWrap}>
-                                    {message.isFromAdmin ? (
-                                      <span
-                                        className={`${styles.avatarTiny} ${styles.avatarTinyAdmin}`}
-                                        aria-hidden="true"
+                                  <button
+                                    type="button"
+                                    className={styles.messageReplyAction}
+                                    onClick={() => startReplyToMessage(message)}
+                                    title={locale === "ru" ? "Ответить" : "Reply"}
+                                    aria-label={locale === "ru" ? "Ответить" : "Reply"}
+                                  >
+                                    ↩
+                                  </button>
+                                  {message.replyToMessageId || message.replyToPreview?.trim() ? (
+                                    <button
+                                      type="button"
+                                      className={styles.messageReplyBlock}
+                                      onClick={() => {
+                                        if (message.replyToMessageId) {
+                                          jumpToMessage(message.replyToMessageId);
+                                        }
+                                      }}
+                                      disabled={!message.replyToMessageId}
+                                    >
+                                      {renderReplyThumbnail(repliedAttachment)}
+                                      <span className={styles.messageReplyBlockContent}>
+                                        <span className={styles.messageReplyBlockLabel}>
+                                          {locale === "ru" ? "Ответ на" : "Reply to"}
+                                        </span>
+                                        <span className={styles.messageReplyBlockPreview}>
+                                          {(
+                                            message.replyToPreview?.trim() ||
+                                            text.supportReplyOriginalUnavailable
+                                          ).trim()}
+                                        </span>
+                                      </span>
+                                    </button>
+                                  ) : null}
+                                  {attachments.length > 0 ? (
+                                    hasAttachmentGroup ? (
+                                      <div
+                                        className={`${styles.messageMediaGrid} ${mediaGridLayoutClass(attachments.length)}`}
                                       >
-                                        PM
-                                      </span>
-                                    ) : isBotMessage ? (
+                                        {attachments
+                                          .slice(
+                                            0,
+                                            attachments.length >= 7 ? 6 : attachments.length
+                                          )
+                                          .map((attachment, attachmentIndex, visibleAttachments) =>
+                                            renderAttachmentTile(
+                                              message,
+                                              attachment,
+                                              attachmentIndex,
+                                              {
+                                                overlayCount:
+                                                  attachments.length >= 7 &&
+                                                  attachmentIndex === visibleAttachments.length - 1
+                                                    ? attachments.length - visibleAttachments.length
+                                                    : 0,
+                                              }
+                                            )
+                                          )}
+                                      </div>
+                                    ) : primaryAttachment ? (
+                                      renderAttachmentTile(message, primaryAttachment, 0, {
+                                        single: true,
+                                      })
+                                    ) : null
+                                  ) : null}
+                                  {shouldShowBody ? (
+                                    <div className={styles.messageBody}>{message.body}</div>
+                                  ) : null}
+                                  {shouldShowAttachmentFailure ? (
+                                    <div className={styles.messageAttachmentStatusRow}>
                                       <span
-                                        className={`${styles.avatarTiny} ${styles.avatarTinyBot}`}
-                                        aria-hidden="true"
+                                        className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${normalizedAttachmentStatus}`] ?? ""}`}
                                       >
-                                        AI
+                                        {normalizedAttachmentStatus === "retry"
+                                          ? locale === "ru"
+                                            ? "Повторить"
+                                            : "Retry"
+                                          : text.supportAttachmentFailedLabel}
                                       </span>
-                                    ) : (
-                                      <span className={styles.avatarTiny} aria-hidden="true">
-                                        {initialsFor(message.senderDisplayName)}
-                                      </span>
-                                    )}
-                                    <strong>
-                                      {isBotMessage
-                                        ? text.supportAssistantMobileLabel
-                                        : message.senderDisplayName}
-                                    </strong>
-                                  </div>
-                                  <div className={styles.messageHeaderActions}>
+                                    </div>
+                                  ) : null}
+                                  <div className={styles.messageMeta}>
                                     <span>{formatClockTime(message.createdAtUtc, locale)}</span>
                                     {message.isFromAdmin && !isSystemMessage ? (
                                       <span
                                         className={`${styles.messageTick} ${message.isRead ? styles.messageTickRead : ""}`}
                                         aria-label={message.isRead ? "Read" : "Sent"}
-                                        title={message.isRead ? (locale === "ru" ? "Прочитано" : "Read") : (locale === "ru" ? "Отправлено" : "Sent")}
+                                        title={
+                                          message.isRead
+                                            ? locale === "ru"
+                                              ? "Прочитано"
+                                              : "Read"
+                                            : locale === "ru"
+                                              ? "Отправлено"
+                                              : "Sent"
+                                        }
                                       >
                                         {message.isRead ? "✓✓" : "✓"}
                                       </span>
                                     ) : null}
-                                    <button
-                                      type="button"
-                                      className={styles.messageReplyAction}
-                                      onClick={() => startReplyToMessage(message)}
-                                      title={locale === "ru" ? "Ответить" : "Reply"}
-                                    >
-                                      ↩
-                                    </button>
                                   </div>
-                                </div>
-                                {message.replyToMessageId || message.replyToPreview?.trim() ? (
-                                  <button
-                                    type="button"
-                                    className={styles.messageReplyBlock}
-                                    onClick={() => {
-                                      if (message.replyToMessageId) {
-                                        jumpToMessage(message.replyToMessageId);
-                                      }
-                                    }}
-                                    disabled={!message.replyToMessageId}
-                                  >
-                                    {renderReplyThumbnail(repliedAttachment)}
-                                    <span className={styles.messageReplyBlockContent}>
-                                      <span className={styles.messageReplyBlockLabel}>
-                                        {locale === "ru" ? "Ответ на" : "Reply to"}
-                                      </span>
-                                      <span className={styles.messageReplyBlockPreview}>
-                                        {(message.replyToPreview?.trim() || text.supportReplyOriginalUnavailable).trim()}
-                                      </span>
-                                    </span>
-                                  </button>
-                                ) : null}
-                                {attachments.length > 0 ? (
-                                  hasAttachmentGroup ? (
-                                    <div
-                                      className={`${styles.messageMediaGrid} ${mediaGridLayoutClass(attachments.length)}`}
-                                    >
-                                      {attachments
-                                        .slice(0, attachments.length >= 7 ? 6 : attachments.length)
-                                        .map((attachment, attachmentIndex, visibleAttachments) =>
-                                          renderAttachmentTile(message, attachment, attachmentIndex, {
-                                            overlayCount:
-                                              attachments.length >= 7 &&
-                                              attachmentIndex === visibleAttachments.length - 1
-                                                ? attachments.length - visibleAttachments.length
-                                                : 0,
-                                          })
-                                        )}
-                                    </div>
-                                  ) : primaryAttachment ? (
-                                    renderAttachmentTile(message, primaryAttachment, 0, { single: true })
-                                  ) : null
-                                ) : null}
-                                {shouldShowBody ? (
-                                  <div className={styles.messageBody}>{message.body}</div>
-                                ) : null}
-                                {shouldShowAttachmentFailure ? (
-                                  <div className={styles.messageAttachmentStatusRow}>
-                                    <span
-                                      className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${normalizedAttachmentStatus}`] ?? ""}`}
-                                    >
-                                      {normalizedAttachmentStatus === "retry"
-                                        ? locale === "ru"
-                                          ? "Повторить"
-                                          : "Retry"
-                                        : text.supportAttachmentFailedLabel}
-                                    </span>
-                                  </div>
-                                ) : null}
-                              </article>
-                            );
+                                </article>
+                              );
                             })}
                           </div>
                         );
@@ -1071,41 +1250,6 @@ export function SupportConversationPage({
                     </div>
                   ) : (
                     <>
-                      <div className={styles.composerTabBar}>
-                        <button
-                          type="button"
-                          className={
-                            composerTab === "reply"
-                              ? styles.composerTabActive
-                              : styles.composerTab
-                          }
-                          onClick={() => setComposerTab("reply")}
-                        >
-                          {locale === "ru" ? "⤵ Ответ" : "⤵ Reply"}
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            composerTab === "templates"
-                              ? styles.composerTabActive
-                              : styles.composerTab
-                          }
-                          onClick={() => setComposerTab("templates")}
-                        >
-                          {locale === "ru" ? "⚡ Шаблоны" : "⚡ Templates"}
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            composerTab === "attachments"
-                              ? styles.composerTabActive
-                              : styles.composerTab
-                          }
-                          onClick={() => setComposerTab("attachments")}
-                        >
-                          {locale === "ru" ? "📎 Вложения" : "📎 Attachments"}
-                        </button>
-                      </div>
                       <input
                         ref={attachmentInputRef}
                         type="file"
@@ -1116,24 +1260,15 @@ export function SupportConversationPage({
                           setSelectedAttachment(nextFile);
                         }}
                       />
-                      {composerTab === "attachments" ? (
-                        <div className={styles.composerAttachmentBar}>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => attachmentInputRef.current?.click()}
-                            disabled={sendMutation.isPending || isConversationReadOnly}
-                          >
-                            {text.chooseFile}
-                          </Button>
-                          <span className={styles.subtle}>{text.supportAttachmentHint}</span>
-                        </div>
-                      ) : null}
                       {replyToMessage || replyToPreview ? (
                         <div className={styles.composerReplyPreview}>
                           <span className={styles.composerReplyAccent} aria-hidden="true" />
-                          <span className={styles.composerReplyIcon} aria-hidden="true">↩</span>
-                          <span className={styles.composerReplyThumbSlot}>{renderReplyThumbnail(replyComposerAttachment)}</span>
+                          <span className={styles.composerReplyIcon} aria-hidden="true">
+                            ↩
+                          </span>
+                          <span className={styles.composerReplyThumbSlot}>
+                            {renderReplyThumbnail(replyComposerAttachment)}
+                          </span>
                           <div className={styles.composerReplyPreviewContent}>
                             <span className={styles.composerReplyPreviewLabel}>
                               {text.supportReplyToLabel}
@@ -1219,29 +1354,6 @@ export function SupportConversationPage({
                         </div>
                       ) : null}
 
-                      {composerTab === "templates" ? (
-                        <div className={styles.composerTemplateRail}>
-                          {filteredTemplates.length === 0 ? (
-                            <span className={styles.subtle}>{text.supportTemplateNoTemplates}</span>
-                          ) : (
-                            filteredTemplates.slice(0, 8).map((template) => (
-                              <button
-                                key={template.templateId}
-                                type="button"
-                                className={styles.templateListItem}
-                                onClick={() => {
-                                  applyTemplate(template);
-                                  setComposerTab("reply");
-                                }}
-                              >
-                                <strong>{template.title}</strong>
-                                <span className={styles.templateSnippet}>{template.body}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      ) : null}
-
                       <div className={styles.composerInputBar}>
                         <button
                           type="button"
@@ -1257,7 +1369,6 @@ export function SupportConversationPage({
                           className={`${styles.textarea} ${styles.composerTextarea}`}
                           value={composerValue}
                           onChange={(event) => setReply(event.target.value)}
-                          onFocus={() => setComposerTab("reply")}
                           onKeyDown={(event) => {
                             if (
                               event.key === "Enter" &&
@@ -1274,19 +1385,23 @@ export function SupportConversationPage({
                           disabled={isConversationReadOnly || sendMutation.isPending}
                           rows={1}
                         />
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={submitReply}
-                          className={styles.composerSendPrimary}
-                          disabled={
-                            isConversationReadOnly ||
-                            sendMutation.isPending ||
-                            (!reply.trim() && !hasComposerAttachment)
-                          }
-                        >
-                          {sendMutation.isPending ? text.supportReplySending : text.supportReplyAction}
-                        </Button>
+                        <div className={styles.composerSendGroup}>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={submitReply}
+                            className={styles.composerSendPrimary}
+                            disabled={
+                              isConversationReadOnly ||
+                              sendMutation.isPending ||
+                              (!reply.trim() && !hasComposerAttachment)
+                            }
+                          >
+                            {sendMutation.isPending
+                              ? text.supportReplySending
+                              : text.supportReplyAction}
+                          </Button>
+                        </div>
                       </div>
                     </>
                   )}
@@ -1297,7 +1412,6 @@ export function SupportConversationPage({
             {isSidePanelOpen ? (
               <>
                 <SupportInfoPanel locale={locale} controller={controller} />
-                <SupportActionsPanel locale={locale} controller={controller} />
               </>
             ) : null}
           </div>
@@ -1306,26 +1420,42 @@ export function SupportConversationPage({
               className={styles.imageViewerOverlay}
               role="dialog"
               aria-modal="true"
-              aria-label={fullscreenImage.fileName?.trim() || "Image preview"}
+              aria-label={
+                fullscreenImage.fileName?.trim() ||
+                (fullscreenImage.mediaType === "video" ? "Video preview" : "Image preview")
+              }
               onClick={closeFullscreenImage}
             >
               <div className={styles.imageViewerPanel} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.imageViewerHeader}>
-                  <strong>{fullscreenImage.fileName?.trim() || "Image"}</strong>
+                  <strong>
+                    {fullscreenImage.fileName?.trim() ||
+                      (fullscreenImage.mediaType === "video" ? "Video" : "Image")}
+                  </strong>
                   <Button variant="ghost" size="sm" onClick={closeFullscreenImage}>
                     {imageViewerLabels.close}
                   </Button>
                 </div>
                 <div className={styles.imageViewerBody}>
-                  <Image
-                    src={fullscreenImage.url}
-                    alt={fullscreenImage.fileName ?? "Support image"}
-                    width={1720}
-                    height={980}
-                    sizes="100vw"
-                    className={styles.imageViewerImage}
-                    unoptimized
-                  />
+                  {fullscreenImage.mediaType === "video" ? (
+                    <video
+                      src={fullscreenImage.url}
+                      className={styles.imageViewerVideo}
+                      controls
+                      preload="metadata"
+                      playsInline
+                    />
+                  ) : (
+                    <Image
+                      src={fullscreenImage.url}
+                      alt={fullscreenImage.fileName ?? "Support image"}
+                      width={1720}
+                      height={980}
+                      sizes="100vw"
+                      className={styles.imageViewerImage}
+                      unoptimized
+                    />
+                  )}
                 </div>
                 <div className={styles.imageViewerMeta}>
                   {fullscreenImage.senderDisplayName ? (
@@ -1344,6 +1474,12 @@ export function SupportConversationPage({
                     <span>{imageViewerLabels.size}</span>
                     <strong>{formatFileSize(fullscreenImage.fileSizeBytes, locale)}</strong>
                   </div>
+                  {fullscreenImage.mediaType === "video" ? (
+                    <div>
+                      <span>{locale === "ru" ? "Длительность" : "Duration"}</span>
+                      <strong>{formatAttachmentDuration(fullscreenImage.durationSeconds)}</strong>
+                    </div>
+                  ) : null}
                 </div>
                 <div className={styles.imageViewerActions}>
                   <Button variant="secondary" size="sm" onClick={saveFullscreenImage}>

@@ -3,10 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ─── Color constants ────────────────────────────────────────────────────────
 const _kDarkBg = Color(0xFF090A10);
@@ -84,7 +83,8 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       final externalUrl = next.externalUrl;
       if (externalUrl == null || externalUrl.isEmpty) return;
 
-      final openedForCheckout = previous?.isBuying == true &&
+      final openedForCheckout =
+          previous?.isBuying == true &&
           next.selectedProvider == PremiumPaymentProvider.stripe;
 
       if (openedForCheckout) {
@@ -101,14 +101,23 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: bg,
-        body: state.isLoading
-            ? Center(child: CircularProgressIndicator(color: accent))
-            : _PremiumBody(
-                state: state,
-                controller: controller,
-                isDark: isDark,
-                onOpenUrl: _openExternalUrl,
-              ),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: state.isLoading
+              ? Center(
+                  key: const ValueKey('premium-loading'),
+                  child: CircularProgressIndicator(color: accent),
+                )
+              : _PremiumBody(
+                  key: const ValueKey('premium-content'),
+                  state: state,
+                  controller: controller,
+                  isDark: isDark,
+                  onOpenUrl: _openExternalUrl,
+                ),
+        ),
       ),
     );
   }
@@ -117,6 +126,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 // ─── Body ────────────────────────────────────────────────────────────────────
 class _PremiumBody extends StatelessWidget {
   const _PremiumBody({
+    super.key,
     required this.state,
     required this.controller,
     required this.isDark,
@@ -138,39 +148,54 @@ class _PremiumBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _HeroBlock(isDark: isDark),
+              _FadeSlideIn(delayMs: 40, child: _HeroBlock(isDark: isDark)),
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _ComparisonCard(isDark: isDark),
-              ),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _PlansSection(
-                  state: state,
-                  controller: controller,
-                  isDark: isDark,
+                child: _FadeSlideIn(
+                  delayMs: 120,
+                  child: _ComparisonCard(isDark: isDark),
                 ),
               ),
               const SizedBox(height: 24),
-              _BenefitsSection(isDark: isDark),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _FadeSlideIn(
+                  delayMs: 190,
+                  child: _PlansSection(
+                    state: state,
+                    controller: controller,
+                    isDark: isDark,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _FadeSlideIn(
+                delayMs: 250,
+                child: _BenefitsSection(isDark: isDark),
+              ),
               const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _CtaButton(
-                  state: state,
-                  controller: controller,
-                  isDark: isDark,
+                child: _FadeSlideIn(
+                  delayMs: 320,
+                  child: _CtaButton(
+                    state: state,
+                    controller: controller,
+                    isDark: isDark,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _Footer(
-                  isDark: isDark,
-                  state: state,
-                  controller: controller,
+                child: _FadeSlideIn(
+                  delayMs: 380,
+                  child: _Footer(
+                    isDark: isDark,
+                    state: state,
+                    controller: controller,
+                  ),
                 ),
               ),
               SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
@@ -216,16 +241,25 @@ class _Header extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: textColor.withValues(alpha: 0.1),
                     ),
-                    child: Icon(Icons.close_rounded, color: textColor, size: 16),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: textColor,
+                      size: 16,
+                    ),
                   ),
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
                 const Spacer(),
                 TextButton.icon(
-                  onPressed: state.isRestoring ? null : controller.restorePurchases,
+                  onPressed: state.isRestoring
+                      ? null
+                      : controller.restorePurchases,
                   style: TextButton.styleFrom(
                     foregroundColor: accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                   ),
                   icon: state.isRestoring
                       ? SizedBox(
@@ -440,10 +474,34 @@ class _ComparisonCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          _cmpRow(true, 'Premium templates', isDark, textColor, accent: accent),
-                          _cmpRow(true, 'Priority queue', isDark, textColor, accent: accent),
-                          _cmpRow(true, 'No watermark', isDark, textColor, accent: accent),
-                          _cmpRow(true, 'Bigger rewards', isDark, textColor, accent: accent),
+                          _cmpRow(
+                            true,
+                            'Premium templates',
+                            isDark,
+                            textColor,
+                            accent: accent,
+                          ),
+                          _cmpRow(
+                            true,
+                            'Priority queue',
+                            isDark,
+                            textColor,
+                            accent: accent,
+                          ),
+                          _cmpRow(
+                            true,
+                            'No watermark',
+                            isDark,
+                            textColor,
+                            accent: accent,
+                          ),
+                          _cmpRow(
+                            true,
+                            'Bigger rewards',
+                            isDark,
+                            textColor,
+                            accent: accent,
+                          ),
                         ],
                       ),
                     ),
@@ -456,7 +514,9 @@ class _ComparisonCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1D1F2D) : const Color(0xFFE6E8F2),
+                  color: isDark
+                      ? const Color(0xFF1D1F2D)
+                      : const Color(0xFFE6E8F2),
                   shape: BoxShape.circle,
                   border: Border.all(color: border),
                 ),
@@ -476,7 +536,13 @@ class _ComparisonCard extends StatelessWidget {
     );
   }
 
-  Widget _cmpRow(bool premium, String label, bool isDark, Color textColor, {Color? accent}) {
+  Widget _cmpRow(
+    bool premium,
+    String label,
+    bool isDark,
+    Color textColor, {
+    Color? accent,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
@@ -484,7 +550,9 @@ class _ComparisonCard extends StatelessWidget {
           Icon(
             premium ? Icons.check_circle_rounded : Icons.close_rounded,
             size: 15,
-            color: premium ? accent : (isDark ? const Color(0xFF3A3B4E) : const Color(0xFFBEC0D0)),
+            color: premium
+                ? accent
+                : (isDark ? const Color(0xFF3A3B4E) : const Color(0xFFBEC0D0)),
           ),
           const SizedBox(width: 7),
           Expanded(
@@ -519,6 +587,24 @@ class _PlansSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = isDark ? _kDarkText : _kLightText;
+    final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
+    final accent = isDark ? _kDarkAccent : _kLightAccent;
+    final border = isDark ? _kDarkBorder : _kLightBorder;
+    final monthlyPlans = state.plans
+        .where((plan) => !_isYearlyPlan(plan))
+        .toList();
+    final yearlyPlans = state.plans.where(_isYearlyPlan).toList();
+
+    PremiumPlanModel? selectedPlan;
+    for (final plan in state.plans) {
+      if (plan.planCode == state.selectedPlanCode) {
+        selectedPlan = plan;
+        break;
+      }
+    }
+
+    final selectedIsYearly =
+        selectedPlan != null && _isYearlyPlan(selectedPlan);
 
     if (state.plans.isEmpty) return const SizedBox.shrink();
 
@@ -536,12 +622,52 @@ class _PlansSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...state.plans.map((plan) => _PlanCard(
-              plan: plan,
-              isSelected: state.selectedPlanCode == plan.planCode,
-              isDark: isDark,
-              onTap: () => controller.selectPlan(plan.planCode),
-            )),
+        Row(
+          children: [
+            Expanded(
+              child: _BillingChip(
+                label: 'Monthly',
+                isActive: !selectedIsYearly,
+                accent: accent,
+                border: border,
+                textColor: textColor,
+                mutedColor: sub,
+                onTap: monthlyPlans.isEmpty
+                    ? null
+                    : () {
+                        HapticFeedback.selectionClick();
+                        controller.selectPlan(monthlyPlans.first.planCode);
+                      },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _BillingChip(
+                label: 'Yearly',
+                isActive: selectedIsYearly,
+                accent: accent,
+                border: border,
+                textColor: textColor,
+                mutedColor: sub,
+                onTap: yearlyPlans.isEmpty
+                    ? null
+                    : () {
+                        HapticFeedback.selectionClick();
+                        controller.selectPlan(yearlyPlans.first.planCode);
+                      },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...state.plans.map(
+          (plan) => _PlanCard(
+            plan: plan,
+            isSelected: state.selectedPlanCode == plan.planCode,
+            isDark: isDark,
+            onTap: () => controller.selectPlan(plan.planCode),
+          ),
+        ),
       ],
     );
   }
@@ -568,133 +694,235 @@ class _PlanCard extends StatelessWidget {
     final surface = isDark ? _kDarkSurface : _kLightSurface;
     final border = isDark ? _kDarkBorder : _kLightBorder;
 
-    final isYearly = plan.billingInterval.toLowerCase().contains('year') ||
-        plan.planCode.toLowerCase().contains('annual');
+    final isYearly = _isYearlyPlan(plan);
     final title = isYearly ? 'Premium Yearly' : 'Premium Monthly';
     final priceStr = '\$${plan.priceAmount.toStringAsFixed(2)}';
     final interval = isYearly ? '/ year' : '/ month';
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? accent.withValues(alpha: 0.05) : surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isSelected ? accent : border,
-            width: isSelected ? 2 : 1,
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+      tween: Tween<double>(begin: 0, end: isSelected ? 1 : 0),
+      builder: (context, glow, child) {
+        return AnimatedScale(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          scale: isSelected ? 1.0 : 0.985,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              boxShadow: [
+                if (isSelected)
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.2 + (0.08 * glow)),
+                    blurRadius: 16 + (8 * glow),
+                    spreadRadius: 0.2 + (0.6 * glow),
+                    offset: const Offset(0, 8),
+                  ),
+              ],
+            ),
+            child: child,
           ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Icon(
-                        isSelected
-                            ? Icons.check_circle_rounded
-                            : Icons.radio_button_unchecked_rounded,
-                        color: isSelected ? accent : (isDark ? const Color(0xFF3A3B4E) : const Color(0xFFBEC0D0)),
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
+        );
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          splashColor: accent.withValues(alpha: 0.16),
+          highlightColor: accent.withValues(alpha: 0.08),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: isSelected ? accent.withValues(alpha: 0.05) : surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isSelected ? accent : border,
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  if (isSelected)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                accent.withValues(alpha: 0.08),
+                                Colors.transparent,
+                                accent.withValues(alpha: 0.03),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            isYearly ? 'Cancel anytime.' : 'Flexible. Cancel anytime.',
-                            style: TextStyle(color: sub, fontSize: 12),
-                          ),
-                          if (isYearly) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Text(
-                                'SAVE 33%',
-                                style: TextStyle(
-                                  color: accent,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 160),
+                              child: Icon(
+                                isSelected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked_rounded,
+                                key: ValueKey(
+                                  '${plan.planCode}:${isSelected ? 'on' : 'off'}',
                                 ),
+                                color: isSelected
+                                    ? accent
+                                    : (isDark
+                                          ? const Color(0xFF3A3B4E)
+                                          : const Color(0xFFBEC0D0)),
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Wrap(
+                                alignment: WrapAlignment.start,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  if (isSelected)
+                                    _PlanBadge(
+                                      label: 'SELECTED',
+                                      textColor: accent,
+                                      fill: accent.withValues(alpha: 0.14),
+                                      stroke: accent.withValues(alpha: 0.36),
+                                    ),
+                                  if (isYearly)
+                                    _PlanBadge(
+                                      label: 'BEST VALUE',
+                                      textColor: isDark
+                                          ? const Color(0xFF13141F)
+                                          : Colors.white,
+                                      fill: isSelected
+                                          ? accent
+                                          : accent.withValues(alpha: 0.7),
+                                      stroke: Colors.transparent,
+                                    ),
+                                ],
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          priceStr,
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
                         ),
-                        Text(
-                          interval,
-                          style: TextStyle(color: sub, fontSize: 12),
+                        const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(width: 30),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    isYearly
+                                        ? 'Cancel anytime.'
+                                        : 'Flexible. Cancel anytime.',
+                                    style: TextStyle(color: sub, fontSize: 12),
+                                  ),
+                                  if (isYearly) ...[
+                                    const SizedBox(height: 6),
+                                    _PlanBadge(
+                                      label: 'SAVE 33%',
+                                      textColor: accent,
+                                      fill: accent.withValues(alpha: 0.14),
+                                      stroke: Colors.transparent,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  priceStr,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  interval,
+                                  style: TextStyle(color: sub, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              // BEST VALUE badge — top right corner
-              if (isYearly)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isSelected ? accent : accent.withValues(alpha: 0.7),
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      'BEST VALUE',
-                      style: TextStyle(
-                        color: isDark ? const Color(0xFF13141F) : Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
                   ),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanBadge extends StatelessWidget {
+  const _PlanBadge({
+    required this.label,
+    required this.textColor,
+    required this.fill,
+    required this.stroke,
+  });
+
+  final String label;
+  final Color textColor;
+  final Color fill;
+  final Color stroke;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: stroke),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.35,
         ),
       ),
     );
@@ -708,11 +936,36 @@ class _BenefitsSection extends StatelessWidget {
   final bool isDark;
 
   static const _items = [
-    _BenefitItem(icon: Icons.flash_on_rounded, title: '30 AI\ngenerations', sub: 'every month', color: Color(0xFF6B4BFF)),
-    _BenefitItem(icon: Icons.photo_library_rounded, title: 'Premium\ntemplates', sub: 'exclusive', color: Color(0xFFFF9F43)),
-    _BenefitItem(icon: Icons.rocket_launch_rounded, title: 'Priority\nvideo queue', sub: 'faster results', color: Color(0xFFFF6B9D)),
-    _BenefitItem(icon: Icons.verified_user_rounded, title: 'No\nwatermark', sub: 'clean exports', color: Color(0xFF4CA1AF)),
-    _BenefitItem(icon: Icons.diamond_rounded, title: 'Bigger\nrewards', sub: 'daily bonuses', color: Color(0xFFFFD700)),
+    _BenefitItem(
+      icon: Icons.flash_on_rounded,
+      title: '30 AI\ngenerations',
+      sub: 'every month',
+      color: Color(0xFF6B4BFF),
+    ),
+    _BenefitItem(
+      icon: Icons.photo_library_rounded,
+      title: 'Premium\ntemplates',
+      sub: 'exclusive',
+      color: Color(0xFFFF9F43),
+    ),
+    _BenefitItem(
+      icon: Icons.rocket_launch_rounded,
+      title: 'Priority\nvideo queue',
+      sub: 'faster results',
+      color: Color(0xFFFF6B9D),
+    ),
+    _BenefitItem(
+      icon: Icons.verified_user_rounded,
+      title: 'No\nwatermark',
+      sub: 'clean exports',
+      color: Color(0xFF4CA1AF),
+    ),
+    _BenefitItem(
+      icon: Icons.diamond_rounded,
+      title: 'Bigger\nrewards',
+      sub: 'daily bonuses',
+      color: Color(0xFFFFD700),
+    ),
   ];
 
   @override
@@ -761,7 +1014,9 @@ class _BenefitsSection extends StatelessWidget {
                 final item = _items[i];
                 return Container(
                   width: 110,
-                  margin: EdgeInsets.only(right: i < _items.length - 1 ? 10 : 0),
+                  margin: EdgeInsets.only(
+                    right: i < _items.length - 1 ? 10 : 0,
+                  ),
                   decoration: BoxDecoration(
                     color: surface,
                     borderRadius: BorderRadius.circular(16),
@@ -793,11 +1048,7 @@ class _BenefitsSection extends StatelessWidget {
                       Text(
                         item.sub,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: sub,
-                          fontSize: 10,
-                          height: 1.2,
-                        ),
+                        style: TextStyle(color: sub, fontSize: 10, height: 1.2),
                       ),
                     ],
                   ),
@@ -826,7 +1077,7 @@ class _BenefitItem {
 }
 
 // ─── CTA Button ───────────────────────────────────────────────────────────────
-class _CtaButton extends StatelessWidget {
+class _CtaButton extends StatefulWidget {
   const _CtaButton({
     required this.state,
     required this.controller,
@@ -838,42 +1089,97 @@ class _CtaButton extends StatelessWidget {
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
-    final btnTextColor = isDark ? const Color(0xFF13141F) : Colors.white;
+  State<_CtaButton> createState() => _CtaButtonState();
+}
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: isDark
-            ? const LinearGradient(colors: [Color(0xFFFFE07C), Color(0xFFFFB300)])
-            : const LinearGradient(colors: [Color(0xFF9D6FFF), Color(0xFF6D28D9)]),
-        boxShadow: [
-          BoxShadow(
-            color: (isDark ? const Color(0xFFFFB300) : const Color(0xFF7C4DFF)).withValues(alpha: 0.3),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+class _CtaButtonState extends State<_CtaButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final controller = widget.controller;
+    final isDark = widget.isDark;
+    final btnTextColor = isDark ? const Color(0xFF13141F) : Colors.white;
+    final glowColor = isDark
+        ? const Color(0xFFFFB300)
+        : const Color(0xFF7C4DFF);
+
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final t = state.isBuying ? 0.0 : _pulseController.value;
+        final animatedBlur = 16 + (t * 8);
+
+        return Transform.scale(
+          scale: state.isBuying ? 1 : (0.995 + (t * 0.012)),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: isDark
+                  ? const LinearGradient(
+                      colors: [Color(0xFFFFE07C), Color(0xFFFFB300)],
+                    )
+                  : const LinearGradient(
+                      colors: [Color(0xFF9D6FFF), Color(0xFF6D28D9)],
+                    ),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(
+                    alpha: state.isBuying ? 0.22 : 0.32,
+                  ),
+                  blurRadius: animatedBlur,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: child,
           ),
-        ],
-      ),
+        );
+      },
       child: ElevatedButton(
-        onPressed: state.isBuying ? null : controller.startCheckout,
+        onPressed: state.isBuying
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                controller.startCheckout();
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           foregroundColor: btnTextColor,
           padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
         child: state.isBuying
             ? SizedBox(
                 height: 24,
                 width: 24,
-                child: CircularProgressIndicator(color: btnTextColor, strokeWidth: 2.5),
+                child: CircularProgressIndicator(
+                  color: btnTextColor,
+                  strokeWidth: 2.5,
+                ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.workspace_premium_rounded, color: btnTextColor, size: 26),
+                  Icon(
+                    Icons.workspace_premium_rounded,
+                    color: btnTextColor,
+                    size: 26,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Start Premium',
@@ -889,6 +1195,112 @@ class _CtaButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _FadeSlideIn extends StatefulWidget {
+  const _FadeSlideIn({required this.child, this.delayMs = 0});
+
+  final Widget child;
+  final int delayMs;
+
+  @override
+  State<_FadeSlideIn> createState() => _FadeSlideInState();
+}
+
+class _FadeSlideInState extends State<_FadeSlideIn> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (!mounted) return;
+      setState(() => _visible = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+      offset: _visible ? Offset.zero : const Offset(0, 0.06),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOut,
+        opacity: _visible ? 1 : 0,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _BillingChip extends StatelessWidget {
+  const _BillingChip({
+    required this.label,
+    required this.isActive,
+    required this.accent,
+    required this.border,
+    required this.textColor,
+    required this.mutedColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isActive;
+  final Color accent;
+  final Color border;
+  final Color textColor;
+  final Color mutedColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: isActive ? accent.withValues(alpha: 0.12) : Colors.transparent,
+        border: Border.all(color: isActive ? accent : border),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 160),
+                child: Icon(
+                  isActive ? Icons.bolt_rounded : Icons.circle_outlined,
+                  key: ValueKey('$label:$isActive'),
+                  size: 15,
+                  color: isActive ? accent : mutedColor,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isActive ? textColor : mutedColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _isYearlyPlan(PremiumPlanModel plan) {
+  return plan.billingInterval.toLowerCase().contains('year') ||
+      plan.planCode.toLowerCase().contains('annual');
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
@@ -917,7 +1329,11 @@ class _Footer extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               'Secure payment via App Store / Google Play',
-              style: TextStyle(color: sub, fontSize: 11, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: sub,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -926,7 +1342,11 @@ class _Footer extends StatelessWidget {
           'Payment will be charged to your App Store / Google Play account. '
           'Subscription renews automatically unless cancelled before the renewal date.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: sub.withValues(alpha: 0.7), fontSize: 10, height: 1.4),
+          style: TextStyle(
+            color: sub.withValues(alpha: 0.7),
+            fontSize: 10,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 14),
         Wrap(
@@ -934,11 +1354,23 @@ class _Footer extends StatelessWidget {
           spacing: 4,
           runSpacing: 8,
           children: [
-            _Link(text: 'Restore purchases', accent: accent, onTap: state.isRestoring ? null : controller.restorePurchases),
+            _Link(
+              text: 'Restore purchases',
+              accent: accent,
+              onTap: state.isRestoring ? null : controller.restorePurchases,
+            ),
             Text(' • ', style: TextStyle(color: sub, fontSize: 11)),
-            _Link(text: 'Terms of Use', accent: accent, url: 'https://petmagic.app/terms'),
+            _Link(
+              text: 'Terms of Use',
+              accent: accent,
+              url: 'https://petmagic.app/terms',
+            ),
             Text(' • ', style: TextStyle(color: sub, fontSize: 11)),
-            _Link(text: 'Privacy Policy', accent: accent, url: 'https://petmagic.app/privacy'),
+            _Link(
+              text: 'Privacy Policy',
+              accent: accent,
+              url: 'https://petmagic.app/privacy',
+            ),
           ],
         ),
       ],

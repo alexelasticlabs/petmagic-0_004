@@ -59,21 +59,14 @@ export function getAvailableStatusActions(
   switch (normalizeStatus(status)) {
     case "New":
       return [
-        { status: "InProgress", label: text.supportMarkInProgressAction, variant: "primary" },
         { status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" },
       ];
     case "InProgress":
       return [
-        {
-          status: "WaitingForUser",
-          label: text.supportMarkWaitingForUserAction,
-          variant: "primary",
-        },
         { status: "Closed", label: text.supportCloseConversationAction, variant: "secondary" },
       ];
     case "WaitingForUser":
       return [
-        { status: "InProgress", label: text.supportMarkInProgressAction, variant: "primary" },
         {
           status: "Closed",
           label: text.supportCloseConversationAction,
@@ -81,7 +74,9 @@ export function getAvailableStatusActions(
         },
       ];
     case "Closed":
-      return [{ status: "InProgress", label: text.supportReopenConversationAction, variant: "primary" }];
+      return [
+        { status: "InProgress", label: text.supportReopenConversationAction, variant: "primary" },
+      ];
     default:
       return [];
   }

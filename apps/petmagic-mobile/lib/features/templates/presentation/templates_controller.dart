@@ -91,6 +91,8 @@ class TemplatesController extends Notifier<TemplatesState> {
   Timer? _realtimeRefreshTimer;
   bool _hasPendingRealtimeRefresh = false;
   int _requestVersion = 0;
+  bool _isScreenVisible = true;
+  bool _isRealtimeConnected = false;
 
   static String? _normalizeCategory(String? value) {
     final normalized = value?.trim();
@@ -124,21 +126,33 @@ class TemplatesController extends Notifier<TemplatesState> {
   TemplatesState build() {
     _repository = ref.watch(templatesRepositoryProvider);
     _realtimeClient = ref.watch(realtimeClientProvider);
-    if (_realtimeSubscription == null) {
-      unawaited(_realtimeClient.connect());
-      _realtimeSubscription = _realtimeClient.events.listen(
-        _handleRealtimeEvent,
-      );
-    }
+    unawaited(_resumeRealtimeIfNeeded());
     ref.onDispose(() {
-      _realtimeRefreshTimer?.cancel();
-      unawaited(_realtimeSubscription?.cancel());
-      unawaited(_realtimeClient.disconnect());
+      _pauseRealtime();
     });
     return const TemplatesState();
   }
 
+  void setScreenVisible(bool visible) {
+    if (_isScreenVisible == visible) {
+      return;
+    }
+
+    _isScreenVisible = visible;
+    if (visible) {
+      unawaited(_resumeRealtimeIfNeeded());
+      _resumePendingRealtimeRefreshIfNeeded();
+      return;
+    }
+
+    _pauseRealtime();
+  }
+
   void _handleRealtimeEvent(RealtimeEvent event) {
+    if (!_isScreenVisible) {
+      return;
+    }
+
     if (event.topic != RealtimeTopics.templatesFeedInvalidated) {
       return;
     }
@@ -151,7 +165,7 @@ class TemplatesController extends Notifier<TemplatesState> {
       state.isLoading || state.isRefreshing || state.isLoadingMore;
 
   void _scheduleRealtimeRefresh() {
-    if (_isFeedBusy) {
+    if (!_isScreenVisible || _isFeedBusy) {
       return;
     }
 
@@ -173,8 +187,40 @@ class TemplatesController extends Notifier<TemplatesState> {
   }
 
   void _resumePendingRealtimeRefreshIfNeeded() {
-    if (_hasPendingRealtimeRefresh) {
+    if (_isScreenVisible && _hasPendingRealtimeRefresh) {
       _scheduleRealtimeRefresh();
+    }
+  }
+
+  Future<void> _resumeRealtimeIfNeeded() async {
+    if (!_isScreenVisible) {
+      return;
+    }
+
+    _realtimeSubscription ??= _realtimeClient.events.listen(
+      _handleRealtimeEvent,
+    );
+    if (_isRealtimeConnected) {
+      return;
+    }
+
+    try {
+      await _realtimeClient.connect();
+      _isRealtimeConnected = true;
+    } on Object {
+      // Realtime is best-effort; templates feed still works via pull refresh.
+    }
+  }
+
+  void _pauseRealtime() {
+    _realtimeRefreshTimer?.cancel();
+    _realtimeRefreshTimer = null;
+    unawaited(_realtimeSubscription?.cancel());
+    _realtimeSubscription = null;
+
+    if (_isRealtimeConnected) {
+      unawaited(_realtimeClient.disconnect());
+      _isRealtimeConnected = false;
     }
   }
 

@@ -112,10 +112,11 @@ public sealed class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Assigned case", SupportConversationPriority.Normal));
 
-        await PutAsJsonAsync<SupportConversationDetailResponse>(
+        var adminReply = await PostAsJsonAsync<SupportMessageResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{mine.ConversationId}/assignment",
-            new AssignSupportConversationRequest(AdminId));
+            $"/api/admin/support/conversations/{mine.ConversationId}/messages",
+            new SendSupportMessageRequest("Assigned via first admin reply"));
+        Assert.True(adminReply.IsFromAdmin);
 
         var unassignedApplication = await PostAsJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(OtherUserId, "User"),
@@ -160,20 +161,21 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("User", ticket.LastMessageSenderType);
         Assert.True(ticket.UnreadForAdmin);
 
-        var assigned = await PostEmptyAsync<SupportConversationDetailResponse>(
-            adminClient,
-            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
+        using var assignBlockedResponse = await adminClient.PostAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me",
+            content: null);
 
-        Assert.Equal("InProgress", assigned.Status);
-        Assert.Equal(AdminId, assigned.AssignedAdminId);
-        Assert.Contains(assigned.Messages, message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
+        Assert.Equal(HttpStatusCode.BadRequest, assignBlockedResponse.StatusCode);
+        var assignBlockedBody = await assignBlockedResponse.Content.ReadAsStringAsync();
+        Assert.Contains("support.status_transition_invalid", assignBlockedBody);
 
-        var waiting = await PostEmptyAsync<SupportConversationDetailResponse>(
-            adminClient,
-            $"/api/admin/support/tickets/{created.ConversationId}/mark-waiting-for-user");
+        using var waitingBlockedResponse = await adminClient.PostAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/mark-waiting-for-user",
+            content: null);
 
-        Assert.Equal("WaitingForUser", waiting.Status);
-        Assert.Contains(waiting.AvailableActions, action => action == "mark-in-progress");
+        Assert.Equal(HttpStatusCode.BadRequest, waitingBlockedResponse.StatusCode);
+        var waitingBlockedBody = await waitingBlockedResponse.Content.ReadAsStringAsync();
+        Assert.Contains("support.status_transition_invalid", waitingBlockedBody);
 
         var closed = await PostEmptyAsync<SupportConversationDetailResponse>(
             adminClient,

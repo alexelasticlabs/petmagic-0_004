@@ -75,28 +75,40 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   late final TemplateGenerationRepository _repository;
   late final RealtimeClient _realtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+  bool _isScreenVisible = true;
+  bool _isRealtimeConnected = false;
 
   @override
   GenerationHistoryState build() {
     _repository = ref.watch(templateGenerationRepositoryProvider);
     _realtimeClient = ref.watch(realtimeClientProvider);
-    if (_realtimeSubscription == null) {
-      unawaited(_realtimeClient.connect());
-      _realtimeSubscription = _realtimeClient.events.listen(
-        _handleRealtimeEvent,
-      );
-    }
     ref.onDispose(() {
-      unawaited(_realtimeSubscription?.cancel());
+      _pauseRealtime();
     });
     Future.microtask(refreshUnreadCount);
     return const GenerationHistoryState();
+  }
+
+  void setScreenVisible(bool visible) {
+    if (_isScreenVisible == visible) {
+      return;
+    }
+
+    _isScreenVisible = visible;
+    if (visible) {
+      unawaited(_resumeRealtimeIfNeeded());
+      return;
+    }
+
+    _pauseRealtime();
   }
 
   Future<void> load({
     GenerationHistoryFilter? filter,
     bool refresh = false,
   }) async {
+    await _resumeRealtimeIfNeeded();
+
     final nextFilter = filter ?? state.filter;
     if (state.isLoading && !refresh && nextFilter == state.filter) {
       return;
@@ -201,6 +213,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   void _handleRealtimeEvent(RealtimeEvent event) {
+    if (!_isScreenVisible) {
+      return;
+    }
+
     if (event.topic != RealtimeTopics.templatesGenerationStatusChanged ||
         event.payload.isEmpty) {
       return;
@@ -213,6 +229,36 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       _upsertGeneration(generation);
       unawaited(refreshUnreadCount());
     } catch (_) {}
+  }
+
+  Future<void> _resumeRealtimeIfNeeded() async {
+    if (!_isScreenVisible) {
+      return;
+    }
+
+    _realtimeSubscription ??= _realtimeClient.events.listen(
+      _handleRealtimeEvent,
+    );
+    if (_isRealtimeConnected) {
+      return;
+    }
+
+    try {
+      await _realtimeClient.connect();
+      _isRealtimeConnected = true;
+    } on Object {
+      // Realtime is best-effort; gallery remains available via manual refresh.
+    }
+  }
+
+  void _pauseRealtime() {
+    unawaited(_realtimeSubscription?.cancel());
+    _realtimeSubscription = null;
+
+    if (_isRealtimeConnected) {
+      unawaited(_realtimeClient.disconnect());
+      _isRealtimeConnected = false;
+    }
   }
 
   void _upsertGeneration(TemplateGenerationResult generation) {

@@ -15,7 +15,7 @@ type AdminLoginScreenProps = {
 
 export function AdminLoginScreen({
   locale,
-  theme,
+  theme: _theme,
   onToggleTheme,
   children,
 }: AdminLoginScreenProps) {
@@ -28,22 +28,8 @@ export function AdminLoginScreen({
     locale === "ru"
       ? "© 2026 Admin Panel. Все права защищены."
       : "© 2026 Admin Panel. All rights reserved.";
-  const themeLabel =
-    locale === "ru"
-      ? theme === "dark"
-        ? "Тёмная"
-        : "Светлая"
-      : theme === "dark"
-        ? "Dark"
-        : "Light";
-  const toggleThemeAriaLabel =
-    locale === "ru"
-      ? theme === "dark"
-        ? "Включить светлую тему"
-        : "Включить тёмную тему"
-      : theme === "dark"
-        ? "Switch to light theme"
-        : "Switch to dark theme";
+  const themeLabel = locale === "ru" ? "Тема" : "Theme";
+  const toggleThemeAriaLabel = locale === "ru" ? "Сменить тему" : "Toggle theme";
 
   return (
     <div className={styles.screen}>

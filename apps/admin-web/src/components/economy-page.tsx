@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
 import {
   AdminCard,
   AdminKpiCard,
@@ -123,6 +124,22 @@ export function EconomyPage({ locale }: EconomyPageProps) {
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(
     null
   );
+
+  useSyncFeedbackToAdminNotifications(feedback, {
+    category: "economy",
+    source: "economy-admin",
+    title: locale === "ru" ? "Экономика" : "Economy",
+    href: `/${locale}/economy`,
+  });
+
+  useEffect(() => {
+    if (!feedback) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setFeedback(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
 
   const savePackMutation = useMutation({
     mutationFn: async (packId: string) => {

@@ -35,20 +35,21 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
                 dbContext.TemplateItems.AsNoTracking(),
                 generation => generation.TemplateId,
                 template => template.Id,
-                (generation, template) => new AdminUserTemplateGenerationResponse(
-                    generation.Id,
-                    generation.TemplateId,
-                    template.Title,
-                    template.TemplateType.ToString(),
-                    generation.Status.ToString(),
-                    generation.TokenCost,
-                    generation.FailureCode,
-                    generation.FailureMessage,
-                    generation.OutputUrl,
-                    generation.CreatedAtUtc,
-                    generation.CompletedAtUtc))
-            .OrderByDescending(x => x.CreatedAtUtc)
+                (generation, template) => new { generation, template })
+            .OrderByDescending(x => x.generation.CreatedAtUtc)
             .Take(10)
+            .Select(x => new AdminUserTemplateGenerationResponse(
+                x.generation.Id,
+                x.generation.TemplateId,
+                x.template.Title,
+                x.template.TemplateType.ToString(),
+                x.generation.Status.ToString(),
+                x.generation.TokenCost,
+                x.generation.FailureCode,
+                x.generation.FailureMessage,
+                x.generation.OutputUrl,
+                x.generation.CreatedAtUtc,
+                x.generation.CompletedAtUtc))
             .ToListAsync(cancellationToken);
 
         var failureBreakdown = await dbContext.TemplateGenerationJobs
@@ -91,19 +92,20 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
                 dbContext.TemplateItems.AsNoTracking(),
                 templateEvent => templateEvent.TemplateId,
                 template => template.Id,
-                (templateEvent, template) => new AdminUserTemplateEventResponse(
-                    templateEvent.Id,
-                    templateEvent.TemplateId,
-                    template.Title,
-                    templateEvent.EventType,
-                    templateEvent.Source,
-                    templateEvent.DeviceClass,
-                    templateEvent.CountryCode,
-                    templateEvent.GenerationId,
-                    templateEvent.FeedbackMessage,
-                    templateEvent.CreatedAtUtc))
-            .OrderByDescending(x => x.CreatedAtUtc)
+                (templateEvent, template) => new { templateEvent, template })
+            .OrderByDescending(x => x.templateEvent.CreatedAtUtc)
             .Take(10)
+            .Select(x => new AdminUserTemplateEventResponse(
+                x.templateEvent.Id,
+                x.templateEvent.TemplateId,
+                x.template.Title,
+                x.templateEvent.EventType,
+                x.templateEvent.Source,
+                x.templateEvent.DeviceClass,
+                x.templateEvent.CountryCode,
+                x.templateEvent.GenerationId,
+                x.templateEvent.FeedbackMessage,
+                x.templateEvent.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
         var recentActivity = recentGenerations

@@ -150,7 +150,14 @@ export function AdminSidebar({
         <Icon className={styles.navIcon} />
         <span className={styles.navLabel}>{item.label}</span>
         {item.key === "support" && supportUnreadCount > 0 ? (
-          <span className={styles.navBadge} aria-label={`${supportUnreadCount} unread`}>
+          <span
+            className={styles.navBadge}
+            aria-label={
+              locale === "ru"
+                ? `${supportUnreadCount} новых сообщений в поддержке`
+                : `${supportUnreadCount} new support messages`
+            }
+          >
             {supportUnreadCount > 99 ? "99+" : supportUnreadCount}
           </span>
         ) : null}

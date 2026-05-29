@@ -144,6 +144,25 @@ public sealed class AssignSupportConversationCommandValidator : AbstractValidato
     }
 }
 
+public sealed class UpdateSupportConversationMetadataCommandValidator : AbstractValidator<UpdateSupportConversationMetadataCommand>
+{
+    public UpdateSupportConversationMetadataCommandValidator()
+    {
+        RuleFor(x => x.ConversationId).NotEmpty();
+        RuleFor(x => x.AdminUserId).NotEmpty();
+        RuleFor(x => x.Priority)
+            .Must(priority => Enum.IsDefined(priority))
+            .WithMessage("Support conversation priority is not supported.");
+        RuleFor(x => x.Tags)
+            .NotNull();
+        RuleFor(x => x.Tags.Count)
+            .LessThanOrEqualTo(12);
+        RuleForEach(x => x.Tags)
+            .NotEmpty()
+            .MaximumLength(40);
+    }
+}
+
 public sealed class UpsertSupportReplyTemplateCommandValidator : AbstractValidator<UpsertSupportReplyTemplateCommand>
 {
     public UpsertSupportReplyTemplateCommandValidator()

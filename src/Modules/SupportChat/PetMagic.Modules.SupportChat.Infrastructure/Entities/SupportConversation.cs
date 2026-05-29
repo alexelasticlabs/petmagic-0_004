@@ -16,6 +16,8 @@ public sealed class SupportConversation
 
     public SupportConversationSource Source { get; set; } = SupportConversationSource.MobileChat;
 
+    public string? TagsJson { get; set; }
+
     public string? AssistantScenario { get; set; }
 
     public Guid? RelatedGenerationId { get; set; }

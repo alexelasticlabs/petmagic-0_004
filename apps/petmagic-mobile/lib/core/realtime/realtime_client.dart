@@ -92,10 +92,10 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
     HttpClient? httpClient,
     this.reconnectDelay = const Duration(seconds: 3),
   }) : _apiBaseUrlResolver = apiBaseUrlResolver,
-       _httpClient = httpClient ?? HttpClient();
+       _httpClient = httpClient;
 
   final ApiBaseUrlResolver _apiBaseUrlResolver;
-  final HttpClient _httpClient;
+  HttpClient? _httpClient;
   final Duration reconnectDelay;
 
   StreamController<RealtimeEvent>? _controller;
@@ -123,7 +123,8 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       stopSignal.complete();
     }
 
-    _httpClient.close(force: true);
+    _httpClient?.close(force: true);
+    _httpClient = null;
 
     final connectionLoop = _connectionLoop;
     _connectionLoop = null;
@@ -163,7 +164,8 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
 
   Future<bool> _tryConnect(String baseUrl) async {
     try {
-      final request = await _httpClient.getUrl(
+      final httpClient = _httpClient ??= HttpClient();
+      final request = await httpClient.getUrl(
         Uri.parse('$baseUrl/api/templates/events'),
       );
       request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');

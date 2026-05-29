@@ -403,6 +403,7 @@ export type AdminSupportConversationSummary = {
   assignedAdminDisplayName?: string | null;
   status: SupportConversationStatus;
   priority: SupportConversationPriority;
+  tags?: string[];
   source: SupportConversationSource;
   assistantScenario?: string | null;
   lastMessagePreview?: string | null;
@@ -435,6 +436,7 @@ export type AdminSupportConversation = {
   assignedAdminDisplayName?: string | null;
   status: SupportConversationStatus;
   priority: SupportConversationPriority;
+  tags?: string[];
   source: SupportConversationSource;
   assistantScenario?: string | null;
   relatedGenerationId?: string | null;

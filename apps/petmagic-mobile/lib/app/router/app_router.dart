@@ -179,7 +179,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: SupportHomePage.routePath,
-            redirect: (context, state) => SupportChatPage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: SupportHomePage()),
           ),
           GoRoute(
             path: SupportChatPage.routePath,

@@ -86,24 +86,25 @@ public sealed partial class EconomyService
                 dbContext.CurrencyPacks.AsNoTracking(),
                 order => order.PackId,
                 pack => pack.Id,
-                (order, pack) => new PurchaseHistoryItemResponse(
-                    order.Id,
-                    order.UserId,
-                    order.PackId,
-                    pack.Code,
-                    pack.DisplayName,
-                    order.PaymentProvider,
-                    order.Status,
-                    order.PriceAmount,
-                    order.CurrencyCode,
-                    order.SparkToGrant,
-                    order.ExternalPaymentId,
-                    order.CreatedAtUtc,
-                    order.ConfirmedAtUtc))
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .ThenByDescending(x => x.OrderId)
+                (order, pack) => new { order, pack })
+            .OrderByDescending(x => x.order.CreatedAtUtc)
+            .ThenByDescending(x => x.order.Id)
             .Skip(normalizedSkip)
             .Take(normalizedTake + 1)
+            .Select(x => new PurchaseHistoryItemResponse(
+                x.order.Id,
+                x.order.UserId,
+                x.order.PackId,
+                x.pack.Code,
+                x.pack.DisplayName,
+                x.order.PaymentProvider,
+                x.order.Status,
+                x.order.PriceAmount,
+                x.order.CurrencyCode,
+                x.order.SparkToGrant,
+                x.order.ExternalPaymentId,
+                x.order.CreatedAtUtc,
+                x.order.ConfirmedAtUtc))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));

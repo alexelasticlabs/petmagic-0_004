@@ -892,6 +892,109 @@ void main() {
     expect(find.text('Tokens did not arrive'), findsOneWidget);
   });
 
+  testWidgets(
+    'support chat attachment bubble does not overflow on narrow screens',
+    (tester) async {
+      final view = tester.view;
+      view.physicalSize = const Size(320, 720);
+      view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        view.resetPhysicalSize();
+        view.resetDevicePixelRatio();
+      });
+
+      const longFileName =
+          'ultra-super-mega-long-support-attachment-file-name-for-mobile-overflow-regression-check-2026-final-version.pdf';
+
+      final supportRepository = _FakeSupportChatRepository();
+      supportRepository._conversation = SupportChatConversation(
+        conversationId: 'conversation-overflow-1',
+        initiatorUserId: 'user-1',
+        userEmail: 'pet@example.com',
+        userDisplayName: 'Pet Parent',
+        assignedAdminId: 'admin-1',
+        assignedAdminDisplayName: 'PetMagic Support',
+        status: 'Open',
+        priority: 'Normal',
+        source: 'Direct',
+        userUnreadCount: 0,
+        adminUnreadCount: 0,
+        createdAtUtc: DateTime.utc(2026, 1, 1, 10),
+        updatedAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
+        lastMessageAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
+        messages: [
+          SupportChatMessage(
+            messageId: 'message-replied',
+            conversationId: 'conversation-overflow-1',
+            senderUserId: 'admin-1',
+            senderDisplayName: 'PetMagic Support',
+            isFromAdmin: true,
+            senderType: 'Admin',
+            body: 'Please attach the file so we can investigate this issue.',
+            isRead: true,
+            attachments: const [],
+            createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
+          ),
+          SupportChatMessage(
+            messageId: 'message-attachment',
+            conversationId: 'conversation-overflow-1',
+            senderUserId: 'user-1',
+            senderDisplayName: 'Pet Parent',
+            isFromAdmin: false,
+            senderType: 'User',
+            body: '',
+            replyToMessageId: 'message-replied',
+            replyToPreview: 'Please attach the file so we can investigate.',
+            isRead: false,
+            attachments: const [
+              SupportChatAttachment(
+                fileUrl: 'https://example.com/files/attachment.pdf',
+                type: 'file',
+                mimeType: 'application/pdf',
+                fileName: longFileName,
+                sizeBytes: 245760,
+              ),
+            ],
+            createdAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
+          ),
+        ],
+      );
+
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            supportChatRepositoryProvider.overrideWith(
+              (ref) => supportRepository,
+            ),
+            supportChatRealtimeClientProvider.overrideWith(
+              (ref) => const _FakeSupportChatRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            home: const SupportChatPage(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.insert_drive_file_outlined), findsOneWidget);
+      expect(find.textContaining('Please attach the file'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test('app preferences controller persists theme and locale', () async {
     SharedPreferences.setMockInitialValues(const {});
 

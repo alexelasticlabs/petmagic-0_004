@@ -129,6 +129,12 @@ public sealed record AssignSupportConversationCommand(
     Guid AdminUserId,
     Guid? AssignedAdminId);
 
+public sealed record UpdateSupportConversationMetadataCommand(
+    Guid ConversationId,
+    Guid AdminUserId,
+    SupportConversationPriority Priority,
+    IReadOnlyList<string> Tags);
+
 public sealed record UpsertSupportReplyTemplateCommand(
     Guid? TemplateId,
     Guid AdminUserId,
@@ -151,6 +157,7 @@ public sealed record SupportConversationSummaryResponse(
     string Status,
     string Priority,
     string Source,
+    IReadOnlyList<string> Tags,
     string? AssistantScenario,
     string? LastMessagePreview,
     DateTime? LastMessageAtUtc,
@@ -218,6 +225,7 @@ public sealed record SupportConversationDetailResponse(
     string Status,
     string Priority,
     string Source,
+    IReadOnlyList<string> Tags,
     string? AssistantScenario,
     Guid? RelatedGenerationId,
     Guid? RelatedPaymentId,

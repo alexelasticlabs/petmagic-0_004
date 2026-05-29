@@ -234,9 +234,11 @@ public sealed class SupportChatServiceTests
         var store = CreateStore();
 
         var userId = Guid.NewGuid();
-        var adminId = Guid.NewGuid();
+        var adminAId = Guid.NewGuid();
+        var adminBId = Guid.NewGuid();
         await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
-        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+        await SeedUserAsync(store, adminAId, "admin-a@petmagic.test", "Support Admin A");
+        await SeedUserAsync(store, adminBId, "admin-b@petmagic.test", "Support Admin B");
 
         Guid conversationId;
         await using (var openScope = await store.CreateScopeAsync())
@@ -247,14 +249,23 @@ public sealed class SupportChatServiceTests
             conversationId = openResult.Value.ConversationId;
         }
 
+        await using (var sendScope = await store.CreateScopeAsync())
+        {
+            var sendResult = await sendScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(conversationId, adminAId, "Taking this case", true),
+                CancellationToken.None);
+
+            Assert.True(sendResult.IsSuccess);
+        }
+
         await using var assignScope = await store.CreateScopeAsync();
         var assignResult = await assignScope.CreateService().AssignConversationAsync(
-            new AssignSupportConversationCommand(conversationId, adminId, adminId),
+            new AssignSupportConversationCommand(conversationId, adminAId, adminBId),
             CancellationToken.None);
 
         Assert.True(assignResult.IsSuccess);
-        Assert.Equal(adminId, assignResult.Value.AssignedAdminId);
-        Assert.Equal("Support Admin", assignResult.Value.AssignedAdminDisplayName);
+        Assert.Equal(adminBId, assignResult.Value.AssignedAdminId);
+        Assert.Equal("Support Admin B", assignResult.Value.AssignedAdminDisplayName);
     }
 
     [Fact]
@@ -284,13 +295,13 @@ public sealed class SupportChatServiceTests
                 CancellationToken.None)).Value.ConversationId;
         }
 
-        await using (var assignScope = await store.CreateScopeAsync())
+        await using (var replyScope = await store.CreateScopeAsync())
         {
-            var assignResult = await assignScope.CreateService().AssignConversationAsync(
-                new AssignSupportConversationCommand(assignedConversationId, adminId, adminId),
+            var replyResult = await replyScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(assignedConversationId, adminId, "Assigned via first reply", true),
                 CancellationToken.None);
 
-            Assert.True(assignResult.IsSuccess);
+            Assert.True(replyResult.IsSuccess);
         }
 
         await using var verificationScope = await store.CreateScopeAsync();
