@@ -8,7 +8,7 @@ export const ledgerSourceOptions = {
     { value: "weekly_grant", label: "Недельная награда" },
     { value: "ad_reward", label: "Награда за рекламу" },
     { value: "redeem_code", label: "Промокод" },
-    { value: "premium_subscription_grant", label: "Выдача Premium токенов" },
+    { value: "premium_subscription_grant", label: "Выдача Premium PawSpark" },
     { value: "admin_grant", label: "Ручное начисление" },
     { value: "admin_debit", label: "Ручное списание" },
   ],
@@ -19,7 +19,7 @@ export const ledgerSourceOptions = {
     { value: "weekly_grant", label: "Weekly reward" },
     { value: "ad_reward", label: "Ad reward" },
     { value: "redeem_code", label: "Redeem code" },
-    { value: "premium_subscription_grant", label: "Premium token grant" },
+    { value: "premium_subscription_grant", label: "Premium PawSpark grant" },
     { value: "admin_grant", label: "Manual grant" },
     { value: "admin_debit", label: "Manual debit" },
   ],
@@ -134,7 +134,7 @@ export function getEconomyText(locale: Locale) {
       providerConfigNoMatchLabel: "Совпадений нет для указанных входных условий.",
       subscriptionsTitle: "Активные и недавние подписки",
       subscriptionsDescription:
-        "Снимок последних premium подписок по пользователям с провайдером, токенами и датой продления.",
+        "Снимок последних premium подписок по пользователям с провайдером, PawSpark и датой продления.",
       subscriptionEventsTitle: "Лог событий подписок",
       subscriptionEventsDescription:
         "Последние lifecycle события из store/Stripe flows для диагностики интеграции.",
@@ -154,7 +154,7 @@ export function getEconomyText(locale: Locale) {
       providerConfigTestError: "Не удалось выполнить тест маршрутизации.",
       planMissingDraft: "План не найден в текущем списке.",
       providerConfigMissingDraft: "Маршрут оплаты не найден в текущем списке.",
-      invalidPlanNumbers: "Укажите корректные цену, валюту и лимит токенов для плана.",
+      invalidPlanNumbers: "Укажите корректные цену, валюту и лимит PawSpark для плана.",
       invalidProviderConfig:
         "Заполните регион, минимальную версию приложения, режим маршрута и бонус от 0 до 100%.",
       invalidProviderConfigCreate: "Укажите provider и platform для нового маршрута.",
@@ -197,7 +197,7 @@ export function getEconomyText(locale: Locale) {
       amountColumn: "Сумма",
       statusColumn: "Статус",
       billingColumn: "Период",
-      tokensColumn: "Лимит токенов",
+      tokensColumn: "Лимит PawSpark",
       providerColumn: "Провайдер",
       platformColumn: "Платформа",
       regionColumn: "Регион",
@@ -270,7 +270,7 @@ export function getEconomyText(locale: Locale) {
     providerConfigNoMatchLabel: "No route matched the provided input conditions.",
     subscriptionsTitle: "Active and recent subscriptions",
     subscriptionsDescription:
-      "Snapshot of recent premium subscriptions with provider, token usage, and renewal date.",
+      "Snapshot of recent premium subscriptions with provider, PawSpark usage, and renewal date.",
     subscriptionEventsTitle: "Subscription event log",
     subscriptionEventsDescription:
       "Recent lifecycle events from store and Stripe flows for integration diagnostics.",
@@ -290,7 +290,7 @@ export function getEconomyText(locale: Locale) {
     providerConfigTestError: "Failed to run routing test.",
     planMissingDraft: "Premium plan was not found in the current list.",
     providerConfigMissingDraft: "Payment route was not found in the current list.",
-    invalidPlanNumbers: "Enter a valid price, currency, and token limit for the plan.",
+    invalidPlanNumbers: "Enter a valid price, currency, and PawSpark limit for the plan.",
     invalidProviderConfig:
       "Enter a valid region, minimum app version, routing mode, and 0-100% bonus.",
     invalidProviderConfigCreate: "Enter provider and platform for the new route.",
@@ -331,7 +331,7 @@ export function getEconomyText(locale: Locale) {
     amountColumn: "Amount",
     statusColumn: "Status",
     billingColumn: "Period",
-    tokensColumn: "Token limit",
+    tokensColumn: "PawSpark limit",
     providerColumn: "Provider",
     platformColumn: "Platform",
     regionColumn: "Region",

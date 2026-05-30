@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/app.dart';
+import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -18,6 +19,8 @@ Future<void> main() async {
     debugPaintPointersEnabled = false;
     return true;
   }());
+
+  TempMediaCleanup.scheduleTtlSweep();
 
   if (await _initializeFirebase()) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

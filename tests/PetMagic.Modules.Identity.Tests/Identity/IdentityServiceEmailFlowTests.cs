@@ -223,6 +223,36 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task RequestCurrentPasswordChangeCodeAsync_ShouldSucceed_ForExternalOnlyAccountWithEmail()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var user = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            Email = "external.user@petmagic.app",
+            UserName = "external.user@petmagic.app",
+            EmailConfirmed = true,
+            IsActive = true,
+            PasswordHash = null,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.RequestCurrentPasswordChangeCodeAsync(user.Id, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var code = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == user.Id && x.Purpose == EmailCodePurpose.PasswordReset)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(code);
+    }
+
+    [Fact]
     public async Task SendBulkEmailAsync_ShouldQueueOnlyMatchingConfirmedRecipients()
     {
         await using var dbContext = CreateDbContext();

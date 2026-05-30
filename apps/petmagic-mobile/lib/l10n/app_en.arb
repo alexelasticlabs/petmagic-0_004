@@ -63,7 +63,7 @@
   "profileSubscriptionStatusLabel": "Status",
   "profileSubscriptionProviderLabel": "Provider",
   "profileSubscriptionNextBillingLabel": "Next billing date",
-  "profileSubscriptionTokensLabel": "Tokens available",
+  "profileSubscriptionTokensLabel": "PawSpark available",
   "subscriptionStatusActive": "Premium active",
   "subscriptionStatusCancelled": "Cancelled (active until period end)",
   "subscriptionStatusExpired": "Expired",
@@ -75,7 +75,7 @@
   "subscriptionAutoRenewLabel": "Auto-renewal",
   "subscriptionAutoRenewOn": "Enabled",
   "subscriptionAutoRenewOff": "Disabled",
-  "subscriptionTokensSectionTitle": "Premium tokens",
+  "subscriptionTokensSectionTitle": "Premium PawSpark",
   "subscriptionTokensAvailableLabel": "Available now",
   "subscriptionTokensPerPeriodLabel": "Every 7 days",
   "subscriptionTokensNextGrantLabel": "Next grant",
@@ -87,9 +87,9 @@
       "minutes": {}
     }
   },
-  "subscriptionTokensExplanation": "Tokens are granted every 7 days from subscription start. The first bonus is granted immediately after purchase.",
+  "subscriptionTokensExplanation": "PawSpark are granted every 7 days from subscription start. The first bonus is granted immediately after purchase.",
   "subscriptionBenefitsSectionTitle": "Premium benefits",
-  "subscriptionBenefitTokens": "40 tokens every 7 days",
+  "subscriptionBenefitTokens": "40 PawSpark every 7 days",
   "subscriptionBenefitFirstBonus": "First bonus granted right after purchase",
   "subscriptionBenefitTemplates": "Access to Premium templates",
   "subscriptionBenefitPriorityGeneration": "Priority generation",
@@ -303,27 +303,27 @@
   },
   "walletPackDetailsAction": "Details",
   "walletPackDetailSubtitle": "Check what is included before opening checkout.",
-  "walletCheckoutHint": "Payment opens in secure Stripe Checkout. PetMagic does not store your card details.",
-  "walletCheckoutProductSubtitle": "Tokens for creating photos and videos in PetMagic",
-  "walletCheckoutTokensImmediately": "{count} tokens right after payment",
+  "walletCheckoutHint": "Payment opens in secure Stripe Checkout. After payment, PawSpark are credited to your balance right away.",
+  "walletCheckoutProductSubtitle": "One-time top-up of your PawSpark balance for creating photos and videos in PetMagic",
+  "walletCheckoutTokensImmediately": "{count} PawSpark right after payment",
   "@walletCheckoutTokensImmediately": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletCheckoutBonusTokens": "+{count} bonus tokens included",
+  "walletCheckoutBonusTokens": "+{count} bonus PawSpark included",
   "@walletCheckoutBonusTokens": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletCheckoutIncludesTitle": "What's included",
+  "walletCheckoutIncludesTitle": "What you get",
   "walletCheckoutFeaturePremiumTemplates": "Premium templates",
   "walletCheckoutFeaturePriority": "Priority generation",
   "walletCheckoutFeatureMoreVideos": "More video creation options",
   "walletCheckoutStripeMethodSubtitle": "Card, Apple Pay or Google Pay",
   "walletCheckoutTrustText": "PetMagic does not store your card details. Payments are securely processed by Stripe.",
-  "walletCheckoutOrderSectionTitle": "Order summary",
+  "walletCheckoutOrderSectionTitle": "Your top-up",
   "walletCheckoutSucceeded": "Payment confirmed. +{spark} PawSpark is already in your wallet.",
   "@walletCheckoutSucceeded": {
     "placeholders": {
@@ -419,13 +419,13 @@
   "premiumMonthlyPeriod": "/ month",
   "premiumYearlyPeriod": "/ year",
   "premiumPopularBadge": "Most popular",
-  "premiumTokensPerWeek": "{count} tokens / week",
+  "premiumTokensPerWeek": "{count} PawSpark / week",
   "@premiumTokensPerWeek": {
     "placeholders": {
       "count": {}
     }
   },
-  "premiumTokensPerMonth": "{count} tokens / month",
+  "premiumTokensPerMonth": "{count} PawSpark / month",
   "@premiumTokensPerMonth": {
     "placeholders": {
       "count": {}
@@ -448,11 +448,17 @@
   },
   "premiumSocialProof": "Most chosen plan for regular PetMagic creators.",
   "premiumPaymentTitle": "Payment method",
-  "premiumPaymentStripe": "Card via Stripe",
+  "premiumPaymentChooseSubtitle": "Choose how you want to subscribe",
+  "premiumPaymentStripe": "Stripe",
+  "premiumPaymentStripeSubtitle": "Card, Apple Pay or Google Pay",
   "premiumPaymentGooglePlay": "Google Play",
+  "premiumPaymentGooglePlaySubtitle": "Payment via Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
   "premiumPaymentRecommendedBadge": "Recommended",
   "premiumPaymentDefaultBadge": "Default",
+  "premiumPaymentTrustStripeProcesses": "Card data is securely processed by Stripe.",
+  "premiumPaymentTrustNoStorage": "PetMagic does not store your card details.",
+  "premiumPaymentTrustManageInApp": "Subscription renewal and cancellation are managed inside PetMagic.",
   "paymentBonusPercentBadge": "+{percent}% bonus",
   "@paymentBonusPercentBadge": {
     "placeholders": {
@@ -464,19 +470,19 @@
   "premiumPremiumColumn": "Premium",
   "premiumComparisonFreeTemplates": "Free templates",
   "premiumComparisonPremiumTemplates": "Premium templates",
-  "premiumComparisonTokens": "Tokens per month",
+  "premiumComparisonTokens": "PawSpark per month",
   "premiumComparisonPremiumTokens": "Up to {count}",
   "@premiumComparisonPremiumTokens": {
     "placeholders": {
       "count": {}
     }
   },
-  "premiumComparisonPremiumTokensFallback": "Up to 1000",
+  "premiumComparisonPremiumTokensFallback": "40 PawSpark / week",
   "premiumComparisonFast": "Fast generation",
   "premiumComparisonHighQuality": "High quality export",
   "premiumComparisonNoWatermark": "No watermark",
   "premiumComparisonPrioritySupport": "Priority support",
-  "premiumFreeSummaryTokens": "20 tokens per month",
+  "premiumFreeSummaryTokens": "20 PawSpark per month",
   "premiumFreeSummaryWatermark": "Watermark on content",
   "premiumFreeSummaryTemplates": "Basic templates",
   "premiumFreeSummaryQuality": "Standard quality",
@@ -677,7 +683,7 @@
   "supportChatQuickActionHuman": "Talk to an operator",
   "supportChatQuickActionSubscription": "Subscription issue",
   "supportChatQuickActionVideo": "Video generation issue",
-  "supportChatQuickActionTokens": "Tokens were not credited",
+  "supportChatQuickActionTokens": "PawSpark were not credited",
   "supportChatFaqTitle": "FAQ",
   "supportChatFaqGenerationTitle": "Why did my generation fail?",
   "supportChatFaqGenerationBody": "Send the template name, your pet type and a screenshot if possible. This usually gives support enough context on the first reply.",
@@ -772,7 +778,7 @@
   "supportHomeOpenChatAction": "Open chat",
   "supportHomeTopicGenerationIssue": "Issue with image generation",
   "supportHomeTopicGenerationTooLong": "Generation takes too long",
-  "supportHomeTopicTokensNotArrived": "Tokens did not arrive",
+  "supportHomeTopicTokensNotArrived": "PawSpark did not arrive",
   "supportHomeTopicPremiumIssue": "Premium issue",
   "supportHomeTopicPaymentRefund": "Payment / Refund",
   "supportHomeTopicOther": "Other",
@@ -782,7 +788,7 @@
   "supportAssistantCheckLaterAction": "Check later",
   "supportAssistantRecommendationGeneration": "For better results, please use a photo where the pet is clearly visible, not cropped, not blurry, and well lit.",
   "supportAssistantRecommendationGenerationTooLong": "Video generation may take several minutes. It usually takes around 2–10 minutes. If it has taken too long, we can send this issue to support.",
-  "supportAssistantRecommendationTokensNotArrived": "Sometimes token delivery after payment may take a few minutes. If the tokens still do not appear, create a support ticket and we will check the purchase.",
+  "supportAssistantRecommendationTokensNotArrived": "Sometimes PawSpark delivery after payment may take a few minutes. If PawSpark still do not appear, create a support ticket and we will check the purchase.",
   "supportAssistantRecommendationPremiumIssue": "If Premium has already been paid for but is not visible in the app, please try restarting the app. If the problem remains, we will check your subscription status.",
   "supportAssistantRecommendationPaymentRefund": "We can check your payment or forward your refund request to support. Create a support ticket and we will attach the relevant purchase information if available.",
   "supportAssistantRecommendationOther": "Please describe what happened. You can also attach a screenshot to help support understand the situation faster.",
@@ -843,10 +849,10 @@
   "startupOnboardingPageTwoHighlightOne": "Guest browsing",
   "startupOnboardingPageTwoHighlightTwo": "One-tap sign in",
   "startupOnboardingPageTwoHighlightThree": "Smooth handoff",
-  "startupOnboardingPageThreeTitle": "Collect tokens and premium perks later",
-  "startupOnboardingPageThreeSubtitle": "Keep the first impression fun. Tokens, rewards and premium actions wait behind a clean auth step.",
+  "startupOnboardingPageThreeTitle": "Collect PawSpark and premium perks later",
+  "startupOnboardingPageThreeSubtitle": "Keep the first impression fun. PawSpark, rewards and premium actions wait behind a clean auth step.",
   "startupOnboardingPageThreeHighlightOne": "Premium unlocks",
-  "startupOnboardingPageThreeHighlightTwo": "Token balance",
+  "startupOnboardingPageThreeHighlightTwo": "PawSpark balance",
   "startupOnboardingPageThreeHighlightThree": "Creator perks",
   "startupMiniFeatureFastStart": "Fast start",
   "startupMiniFeaturePetFirst": "Pet-first",
@@ -864,7 +870,7 @@
   "authEntryTitle": "Welcome back!",
   "authEntrySubtitle": "Sign in to continue your pet magic.",
   "authRegisterTitle": "Create your account",
-  "authRegisterSubtitle": "Join PetMagic and unlock templates, tokens and premium features.",
+  "authRegisterSubtitle": "Join PetMagic and unlock templates, PawSpark and premium features.",
   "authRegisterAction": "Sign Up",
   "authDisplayNameLabel": "Display name (optional)",
   "authConfirmPasswordLabel": "Confirm password",
@@ -924,12 +930,12 @@
   "authPrivacyTitle": "Your privacy matters",
   "authPrivacySubtitle": "We never sell or share your data with third parties.",
   "authRequiredTitle": "Sign in to unlock this action",
-  "authRequiredMessage": "Guests can explore the app, but template actions, rewards and token features require a PetMagic account.",
+  "authRequiredMessage": "Guests can explore the app, but template actions, rewards and PawSpark features require a PetMagic account.",
   "authRequiredContinueBrowsing": "Continue browsing",
   "templateTryAction": "Try template",
   "templateGuestPreview": "Guest preview",
   "templateActionComingSoon": "Template studio is coming soon.",
-  "tokensActionComingSoon": "Token wallet is coming soon.",
+  "tokensActionComingSoon": "PawSpark wallet is coming soon.",
   "rewardsActionComingSoon": "Rewards center is coming soon.",
   "templateFlowPhotoSourceGallery": "Gallery",
   "templateFlowPhotoSourceCamera": "Camera",
@@ -1018,8 +1024,8 @@
   "generationStatusVideoReady": "Video is ready",
   "generationStatusShareVideoAction": "Share video",
   "generationStatusFailedTitle": "Could not create result",
-  "generationStatusTokensRefundedHint": "Tokens were returned to your balance.",
-  "generationStatusTokensRefundedShort": "Tokens refunded",
+  "generationStatusTokensRefundedHint": "PawSpark were returned to your balance.",
+  "generationStatusTokensRefundedShort": "PawSpark refunded",
   "generationStatusSupportHint": "If this repeats, contact support.",
   "generationStatusBackgroundHint": "Generation continues on the server. We will show the result in Gallery when it is ready.",
   "generationStatusDownloadAction": "Download",
@@ -1047,11 +1053,11 @@
   "generationStatusEtaStartsSoon": "Will start in a few minutes",
   "generationStatusEtaNotifyHint": "We will notify you when the result is ready.",
   "generationStatusFailurePhotoHint": "The photo is not suitable for this template. Try a photo where the pet is clearly visible.",
-  "generationStatusFailureTechnicalHint": "Could not create the result due to a technical issue. Tokens were returned to your balance.",
+  "generationStatusFailureTechnicalHint": "Could not create the result due to a technical issue. PawSpark were returned to your balance.",
   "generationStatusStatusCompleted": "Your result is ready",
   "generationStatusStatusFailed": "Could not create result",
   "generationStatusStatusCreatingMagic": "Creating magic...",
-  "generationStatusTerminalRefundedHint": "Tokens were refunded automatically.",
+  "generationStatusTerminalRefundedHint": "PawSpark were refunded automatically.",
   "generationStatusTerminalFailureHint": "A technical issue has been recorded.",
   "generationStatusTerminalSuccessHint": "Open result, share it, or leave feedback.",
   "generationStatusSectionActive": "In progress",
@@ -1174,5 +1180,21 @@
   "premiumBenefitNoWatermarkTitle": "No watermark",
   "premiumBenefitNoWatermarkSubtitle": "clean exports",
   "premiumBenefitBiggerRewardsTitle": "Bigger rewards",
-  "premiumBenefitBiggerRewardsSubtitle": "daily bonuses"
+  "premiumBenefitBiggerRewardsSubtitle": "daily bonuses",
+  "subscriptionDangerZoneTitle": "Danger zone",
+  "subscriptionCancelConfirmTitle": "Cancel subscription?",
+  "subscriptionCancelConfirmBody": "Premium will stay active until {date}. New charges will be disabled.",
+  "@subscriptionCancelConfirmBody": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "subscriptionCancelConfirmAction": "Confirm cancellation",
+  "subscriptionCancelConfirmKeep": "Keep Premium",
+  "subscriptionRestoreSuccessMessage": "Purchases restored",
+  "subscriptionRestoreNoneFoundMessage": "No active subscription found",
+  "subscriptionPaymentTrustText": "Card data is securely processed by Stripe. PetMagic does not store your card data.",
+  "subscriptionBillingPeriodLabel": "Billing period",
+  "subscriptionBillingPeriodMonthly": "Monthly",
+  "subscriptionBillingPeriodYearly": "Yearly"
 }

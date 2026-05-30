@@ -244,6 +244,7 @@ class _BottomNavBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
 
     return RepaintBoundary(
@@ -262,9 +263,15 @@ class _BottomNavBackdrop extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: [
                   colors.backgroundBottom.withValues(alpha: 0),
-                  colors.backgroundBottom.withValues(alpha: 0.18),
-                  colors.backgroundBottom.withValues(alpha: 0.42),
-                  colors.backgroundBottom.withValues(alpha: 0.74),
+                  colors.backgroundBottom.withValues(
+                    alpha: isLight ? 0.3 : 0.18,
+                  ),
+                  colors.backgroundBottom.withValues(
+                    alpha: isLight ? 0.62 : 0.42,
+                  ),
+                  colors.backgroundBottom.withValues(
+                    alpha: isLight ? 0.9 : 0.74,
+                  ),
                 ],
                 stops: const [0, 0.34, 0.68, 1],
               ),
@@ -289,6 +296,7 @@ class _FloatingBottomNav extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     final unreadCount = ref.watch(
       generationHistoryControllerProvider.select((state) => state.unreadCount),
@@ -331,8 +339,10 @@ class _FloatingBottomNav extends ConsumerWidget {
                         offset: const Offset(0, 4),
                       ),
                       BoxShadow(
-                        color: colors.backgroundBottom.withValues(alpha: 0.18),
-                        blurRadius: 18,
+                        color: colors.backgroundBottom.withValues(
+                          alpha: isLight ? 0.28 : 0.18,
+                        ),
+                        blurRadius: isLight ? 22 : 18,
                         offset: const Offset(0, 8),
                       ),
                     ],
@@ -345,10 +355,14 @@ class _FloatingBottomNav extends ConsumerWidget {
                   filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: colors.surfaceGlass.withValues(alpha: 0.68),
+                      color: colors.surfaceGlass.withValues(
+                        alpha: isLight ? 0.92 : 0.68,
+                      ),
                       borderRadius: BorderRadius.circular(15),
                       border: Border.all(
-                        color: colors.border.withValues(alpha: 0.22),
+                        color: colors.border.withValues(
+                          alpha: isLight ? 0.6 : 0.22,
+                        ),
                       ),
                     ),
                     child: Padding(
@@ -402,6 +416,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     final previewUrl = generation.sourceImageAsset?.url;
     final progress = generation.effectiveProgressPercent;
@@ -425,7 +440,9 @@ class _ActiveGenerationBanner extends StatelessWidget {
             decoration: BoxDecoration(
               color: colors.surfaceGlass.withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.accent.withValues(alpha: 0.22)),
+              border: Border.all(
+                color: colors.accent.withValues(alpha: isLight ? 0.36 : 0.22),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: colors.shadow.withValues(alpha: 0.18),
@@ -538,6 +555,7 @@ class _BottomNavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final inactiveColor = Color.lerp(colors.textMuted, colors.textSoft, 0.34)!;
 
     return Semantics(
@@ -555,10 +573,14 @@ class _BottomNavButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             color: selected
-                ? colors.accent.withValues(alpha: 0.1)
+                ? colors.accent.withValues(alpha: isLight ? 0.14 : 0.1)
                 : Colors.transparent,
             border: selected
-                ? Border.all(color: colors.accent.withValues(alpha: 0.08))
+                ? Border.all(
+                    color: colors.accent.withValues(
+                      alpha: isLight ? 0.22 : 0.08,
+                    ),
+                  )
                 : null,
           ),
           child: Column(

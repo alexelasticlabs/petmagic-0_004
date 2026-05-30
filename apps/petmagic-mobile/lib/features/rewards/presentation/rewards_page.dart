@@ -129,6 +129,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
       isScrollControlled: true,
       builder: (context, bottomInset) {
         final colors = context.petMagicColors;
+        final isLight = Theme.of(context).brightness == Brightness.light;
         final localeTag = Localizations.localeOf(context).toLanguageTag();
         final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.72;
 
@@ -159,7 +160,9 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                       width: 38,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: colors.textMuted.withValues(alpha: 0.5),
+                        color: colors.textMuted.withValues(
+                          alpha: isLight ? 0.72 : 0.5,
+                        ),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),

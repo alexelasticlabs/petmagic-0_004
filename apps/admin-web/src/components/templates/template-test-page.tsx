@@ -420,7 +420,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <StatusPill tone={template.isPremium ? "premium" : "success"}>
                 {template.isPremium ? text.premiumLabel : text.freeLabel}
               </StatusPill>
-              <StatusPill tone="muted">{template.tokenCost} tokens</StatusPill>
+              <StatusPill tone="muted">{template.tokenCost} PawSpark</StatusPill>
               <StatusPill tone="muted">
                 {isVideoTemplate
                   ? formatReferenceDuration(template.referenceVideoDurationSeconds, isRu)
@@ -636,7 +636,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                           {isRu ? "Попытка" : "Attempt"}: {item.attemptCount}
                         </span>
                         <span>
-                          {isRu ? "Токены" : "Tokens"}: {item.tokenCost}
+                          {isRu ? "PawSpark" : "PawSpark"}: {item.tokenCost}
                         </span>
                         <span>
                           {isRu ? "Старт" : "Started"}:{" "}
@@ -1204,7 +1204,7 @@ function formatGenerationDuration(run: AdminTemplateTestRun | null, isRu: boolea
 }
 
 function formatTokenCost(value: number, isRu: boolean) {
-  return `${value} ${isRu ? "токенов" : "tokens"}`;
+  return `${value} PawSpark`;
 }
 
 function formatSeconds(value: number | undefined | null, isRu: boolean) {
@@ -1345,7 +1345,7 @@ function buildTimeline(
       label: isRu ? "Тест поставлен в очередь" : "Test queued",
       at: formatDateTime(run.createdAtUtc, locale),
       description: isRu
-        ? "Создана админская тестовая задача без списания токенов."
+        ? "Создана админская тестовая задача без списания PawSpark."
         : "A non-billed admin test job was created.",
       done: true,
     },

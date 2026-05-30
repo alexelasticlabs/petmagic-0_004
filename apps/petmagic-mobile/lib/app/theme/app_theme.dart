@@ -147,21 +147,21 @@ class AppTheme {
 
   static const PetMagicColors _lightColors = PetMagicColors(
     backgroundTop: Color(0xFFFFFFFF),
-    backgroundBottom: Color(0xFFF5F8FC),
+    backgroundBottom: Color(0xFFF0F4FA),
     surface: Color(0xFFFFFFFF),
-    surfaceGlass: Color(0xECFFFFFF),
-    surfaceStrong: Color(0xFFF8FAFD),
-    border: Color(0xFFE2E8F0),
-    textStrong: Color(0xFF101B31),
-    textSoft: Color(0xFF334155),
-    textMuted: Color(0xFF8290A3),
+    surfaceGlass: Color(0xFFF7FAFF),
+    surfaceStrong: Color(0xFFF0F4FA),
+    border: Color(0xFFC9D5E2),
+    textStrong: Color(0xFF0F1D35),
+    textSoft: Color(0xFF2A3A52),
+    textMuted: Color(0xFF5C6D83),
     accent: _accent,
-    accentSoft: Color(0xFFE7FAF1),
+    accentSoft: Color(0xFFDCF6E9),
     gold: Color(0xFFFFB703),
     purple: Color(0xFFA855F7),
-    blue: Color(0xFF0EA5E9),
+    blue: Color(0xFF0284C7),
     danger: Color(0xFFEF4444),
-    shadow: Color(0x1A0F172A),
+    shadow: Color(0x2410203A),
   );
 
   static const PetMagicColors _darkColors = PetMagicColors(
@@ -187,11 +187,31 @@ class AppTheme {
   static ThemeData? _darkTheme;
 
   static ThemeData light() {
-    return _lightTheme ??= _base(Brightness.light, _lightColors);
+    return _lightTheme ??= _base(
+      Brightness.light,
+      _lightColors,
+      compactDisplay: _isCompactDisplay(),
+    );
   }
 
   static ThemeData dark() {
-    return _darkTheme ??= _base(Brightness.dark, _darkColors);
+    return _darkTheme ??= _base(
+      Brightness.dark,
+      _darkColors,
+      compactDisplay: _isCompactDisplay(),
+    );
+  }
+
+  static bool _isCompactDisplay() {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) {
+      return false;
+    }
+
+    final primaryView = views.first;
+    final logicalWidth =
+        primaryView.physicalSize.width / primaryView.devicePixelRatio;
+    return logicalWidth <= 380;
   }
 
   static PetMagicColors _fallbackColors(Brightness brightness) {
@@ -221,22 +241,71 @@ class AppTheme {
     return (lighter + 0.05) / (darker + 0.05);
   }
 
-  static ThemeData _base(Brightness brightness, PetMagicColors colors) {
-    final textTheme = _buildTextTheme(colors);
+  static ThemeData _base(
+    Brightness brightness,
+    PetMagicColors colors, {
+    required bool compactDisplay,
+  }) {
+    final textTheme = _buildTextTheme(
+      colors,
+      brightness: brightness,
+      compactDisplay: compactDisplay,
+    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: _accent,
+          brightness: brightness,
+          primary: colors.accent,
+          surface: colors.surface,
+        ).copyWith(
+          primary: colors.accent,
+          onPrimary: _onColor(colors.accent),
+          surface: colors.surface,
+          onSurface: colors.textStrong,
+          outline: colors.border,
+          shadow: colors.shadow,
+          surfaceContainerHighest: colors.surfaceStrong,
+        );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _accent,
-        brightness: brightness,
-        primary: colors.accent,
-        surface: colors.surface,
-      ),
+      colorScheme: colorScheme,
       scaffoldBackgroundColor: colors.backgroundBottom,
       extensions: [colors],
       textTheme: textTheme,
       primaryTextTheme: textTheme,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        foregroundColor: colors.textStrong,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          color: colors.textStrong,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: brightness == Brightness.light ? 0.7 : 0.3,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: colors.border),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: colors.border,
+        space: 1,
+        thickness: 1,
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: colors.textSoft,
+        textColor: colors.textStrong,
+        tileColor: Colors.transparent,
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(54),
@@ -289,7 +358,12 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colors.surfaceGlass,
+        fillColor: colors.surfaceStrong.withValues(alpha: 0.92),
+        hintStyle: TextStyle(
+          color: colors.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide(color: colors.border),
@@ -306,103 +380,125 @@ class AppTheme {
     );
   }
 
-  static TextTheme _buildTextTheme(PetMagicColors colors) {
+  static TextTheme _buildTextTheme(
+    PetMagicColors colors, {
+    required Brightness brightness,
+    required bool compactDisplay,
+  }) {
+    final compactLight = compactDisplay && brightness == Brightness.light;
+    final displayLargeSize = compactLight ? 50.0 : 54.0;
+    final displayMediumSize = compactLight ? 41.0 : 44.0;
+    final displaySmallSize = compactLight ? 34.0 : 36.0;
+    final headlineLargeSize = compactLight ? 28.0 : 30.0;
+    final headlineMediumSize = compactLight ? 24.0 : 26.0;
+    final headlineSmallSize = compactLight ? 20.5 : 22.0;
+    final titleLargeSize = compactLight ? 19.0 : 20.0;
+    final titleMediumSize = compactLight ? 14.5 : 15.0;
+    final titleSmallSize = compactLight ? 12.5 : 13.0;
+    final bodyLargeSize = compactLight ? 14.5 : 15.0;
+    final bodyMediumSize = compactLight ? 13.0 : 13.5;
+    final bodySmallSize = compactLight ? 11.5 : 12.0;
+    final labelLargeSize = compactLight ? 13.0 : 13.5;
+    final labelMediumSize = compactLight ? 11.5 : 12.0;
+    final labelSmallSize = compactLight ? 10.5 : 11.0;
+    final bodyWeight = compactLight ? FontWeight.w600 : FontWeight.w500;
+
     final base = Typography.material2021(platform: TargetPlatform.iOS).black
         .apply(bodyColor: colors.textStrong, displayColor: colors.textStrong);
 
     return GoogleFonts.comfortaaTextTheme(base)
         .copyWith(
           displayLarge: GoogleFonts.comfortaa(
-            fontSize: 54,
+            fontSize: displayLargeSize,
             fontWeight: FontWeight.w700,
             height: 1.06,
             color: colors.textStrong,
           ),
           displayMedium: GoogleFonts.comfortaa(
-            fontSize: 44,
+            fontSize: displayMediumSize,
             fontWeight: FontWeight.w700,
             height: 1.06,
             color: colors.textStrong,
           ),
           displaySmall: GoogleFonts.comfortaa(
-            fontSize: 36,
+            fontSize: displaySmallSize,
             fontWeight: FontWeight.w700,
             height: 1.08,
             color: colors.textStrong,
           ),
           headlineLarge: GoogleFonts.comfortaa(
-            fontSize: 30,
+            fontSize: headlineLargeSize,
             fontWeight: FontWeight.w700,
             height: 1.1,
             color: colors.textStrong,
           ),
           headlineMedium: GoogleFonts.comfortaa(
-            fontSize: 26,
+            fontSize: headlineMediumSize,
             fontWeight: FontWeight.w700,
             height: 1.12,
             color: colors.textStrong,
           ),
           headlineSmall: GoogleFonts.comfortaa(
-            fontSize: 22,
+            fontSize: headlineSmallSize,
             fontWeight: FontWeight.w700,
             height: 1.12,
             color: colors.textStrong,
           ),
           titleLarge: GoogleFonts.comfortaa(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+            fontSize: titleLargeSize,
+            fontWeight: compactLight ? FontWeight.w800 : FontWeight.w700,
             height: 1.14,
             color: colors.textStrong,
           ),
           titleMedium: GoogleFonts.comfortaa(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
+            fontSize: titleMediumSize,
+            fontWeight: compactLight ? FontWeight.w800 : FontWeight.w700,
             height: 1.16,
             color: colors.textStrong,
           ),
           titleSmall: GoogleFonts.comfortaa(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
+            fontSize: titleSmallSize,
+            fontWeight: compactLight ? FontWeight.w800 : FontWeight.w700,
             height: 1.16,
             color: colors.textStrong,
           ),
           bodyLarge: GoogleFonts.comfortaa(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
+            fontSize: bodyLargeSize,
+            fontWeight: bodyWeight,
             height: 1.22,
             color: colors.textStrong,
           ),
           bodyMedium: GoogleFonts.comfortaa(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
+            fontSize: bodyMediumSize,
+            fontWeight: bodyWeight,
             height: 1.24,
             color: colors.textStrong,
           ),
           bodySmall: GoogleFonts.comfortaa(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+            fontSize: bodySmallSize,
+            fontWeight: bodyWeight,
             height: 1.24,
             color: colors.textSoft,
           ),
           labelLarge: GoogleFonts.comfortaa(
-            fontSize: 13.5,
+            fontSize: labelLargeSize,
             fontWeight: FontWeight.w700,
             height: 1.14,
             color: colors.textStrong,
           ),
           labelMedium: GoogleFonts.comfortaa(
-            fontSize: 12,
+            fontSize: labelMediumSize,
             fontWeight: FontWeight.w700,
             height: 1.14,
             color: colors.textStrong,
           ),
           labelSmall: GoogleFonts.comfortaa(
-            fontSize: 11,
+            fontSize: labelSmallSize,
             fontWeight: FontWeight.w700,
             height: 1.12,
             color: colors.textSoft,
           ),
         )
-        .apply(fontSizeFactor: 0.93);
+        .apply(fontSizeFactor: compactLight ? 0.91 : 0.93);
   }
 }

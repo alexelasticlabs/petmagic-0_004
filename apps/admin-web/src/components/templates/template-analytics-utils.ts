@@ -281,7 +281,7 @@ export function formatTokens(value: number, isRu: boolean) {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
   });
 
-  return `${formatter.format(value)} ${isRu ? "токенов" : "tokens"}`;
+  return `${formatter.format(value)} PawSpark`;
 }
 
 export function formatUsd(value: number | null | undefined, locale: Locale) {

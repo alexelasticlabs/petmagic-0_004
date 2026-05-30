@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 
 class TemplateMediaCache {
   TemplateMediaCache._();
 
-  static const int _previewMaxTotalBytes = 280 * 1024 * 1024;
   static bool _isPreviewBudgetCleanupRunning = false;
 
   static final CacheManager thumbnailCache = CacheManager(
@@ -21,7 +21,7 @@ class TemplateMediaCache {
   static final CacheManager previewVideoCache = CacheManager(
     Config(
       'templatePreviewVideoCache',
-      stalePeriod: const Duration(days: 3),
+      stalePeriod: AppConfig.mediaCacheStalePeriod,
       maxNrOfCacheObjects: 80,
       repo: JsonCacheInfoRepository(databaseName: 'templatePreviewVideoCache'),
       fileService: HttpFileService(),
@@ -82,13 +82,13 @@ class TemplateMediaCache {
           }
         }
 
-        if (totalBytes <= _previewMaxTotalBytes) {
+        if (totalBytes <= AppConfig.mediaCacheMaxBytesSafe) {
           return;
         }
 
         stats.sort((a, b) => a.modifiedAt.compareTo(b.modifiedAt));
         for (final item in stats) {
-          if (totalBytes <= _previewMaxTotalBytes) {
+          if (totalBytes <= AppConfig.mediaCacheMaxBytesSafe) {
             break;
           }
 

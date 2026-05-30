@@ -182,7 +182,7 @@
   "premiumComparisonPremiumTemplates": "Szablony premium",
   "premiumComparisonTokens": "Tokeny miesięcznie",
   "premiumComparisonPremiumTokens": "Do {count}",
-  "premiumComparisonPremiumTokensFallback": "Do 1000",
+  "premiumComparisonPremiumTokensFallback": "40 tokenów / tydzień",
   "premiumComparisonFast": "Szybkie generowanie",
   "premiumComparisonHighQuality": "Eksport w wysokiej jakości",
   "premiumComparisonNoWatermark": "Bez znaku wodnego",
@@ -1173,5 +1173,21 @@
   "premiumBenefitNoWatermarkTitle": "Brak znaku wodnego",
   "premiumBenefitNoWatermarkSubtitle": "czysty eksport",
   "premiumBenefitBiggerRewardsTitle": "Większe nagrody",
-  "premiumBenefitBiggerRewardsSubtitle": "bonusy dzienne"
+  "premiumBenefitBiggerRewardsSubtitle": "bonusy dzienne",
+  "subscriptionDangerZoneTitle": "Strefa niebezpieczna",
+  "subscriptionCancelConfirmTitle": "Anulować subskrypcję?",
+  "subscriptionCancelConfirmBody": "Premium pozostanie aktywne do {date}. Nowe opłaty zostaną wyłączone.",
+  "@subscriptionCancelConfirmBody": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "subscriptionCancelConfirmAction": "Potwierdź anulowanie",
+  "subscriptionCancelConfirmKeep": "Zachowaj Premium",
+  "subscriptionRestoreSuccessMessage": "Zakupy przywrócone",
+  "subscriptionRestoreNoneFoundMessage": "Nie znaleziono aktywnej subskrypcji",
+  "subscriptionPaymentTrustText": "Dane karty są bezpiecznie przetwarzane przez Stripe. PetMagic nie przechowuje danych Twojej karty.",
+  "subscriptionBillingPeriodLabel": "Okres rozliczeniowy",
+  "subscriptionBillingPeriodMonthly": "Miesięczny",
+  "subscriptionBillingPeriodYearly": "Roczny"
 }

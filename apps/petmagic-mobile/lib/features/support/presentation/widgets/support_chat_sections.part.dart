@@ -493,6 +493,7 @@ class _SupportComposerPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     final isKeyboardVisible = keyboardInset > 0;
     final sendProgress = state.sendProgress;
@@ -609,13 +610,17 @@ class _SupportComposerPanel extends StatelessWidget {
                     constraints: const BoxConstraints(minHeight: 42),
                     padding: const EdgeInsets.only(left: 2, right: 4),
                     decoration: BoxDecoration(
-                      color: colors.surfaceStrong.withValues(alpha: 0.9),
+                      color: colors.surfaceStrong.withValues(
+                        alpha: isLight ? 0.98 : 0.9,
+                      ),
                       borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: colors.border.withValues(
-                          alpha: composerHasFocus ? 0.55 : 0.28,
+                          alpha: composerHasFocus
+                              ? (isLight ? 0.88 : 0.55)
+                              : (isLight ? 0.62 : 0.28),
                         ),
-                        width: 0.8,
+                        width: isLight ? 1.0 : 0.8,
                       ),
                     ),
                     child: Row(

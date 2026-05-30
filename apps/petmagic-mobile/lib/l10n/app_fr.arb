@@ -158,8 +158,8 @@
   "premiumMonthlyPeriod": "/ mois",
   "premiumYearlyPeriod": "/ an",
   "premiumPopularBadge": "Le plus populaire",
-  "premiumTokensPerWeek": "{count} tokens / semaine",
-  "premiumTokensPerMonth": "{count} tokens / mois",
+  "premiumTokensPerWeek": "{count} PawSpark / semaine",
+  "premiumTokensPerMonth": "{count} PawSpark / mois",
   "premiumDiscountLabel": "Économisez {percent}%",
   "premiumCancelAnytime": "Annulez à tout moment",
   "premiumIncludesTitle": "Ce que Premium inclut",
@@ -180,9 +180,9 @@
   "premiumPremiumColumn": "Prime",
   "premiumComparisonFreeTemplates": "Modèles gratuits",
   "premiumComparisonPremiumTemplates": "Modèles premium",
-  "premiumComparisonTokens": "Tokens par mois",
+  "premiumComparisonTokens": "PawSpark par mois",
   "premiumComparisonPremiumTokens": "Jusqu'à {count}",
-  "premiumComparisonPremiumTokensFallback": "Jusqu'à 1000",
+  "premiumComparisonPremiumTokensFallback": "40 jetons / semaine",
   "premiumComparisonFast": "Génération rapide",
   "premiumComparisonHighQuality": "Export haute qualité",
   "premiumComparisonNoWatermark": "Sans filigrane",
@@ -435,8 +435,8 @@
   "generationStatusVideoReady": "La video est prete",
   "generationStatusShareVideoAction": "Partager la video",
   "generationStatusFailedTitle": "Impossible de creer le resultat",
-  "generationStatusTokensRefundedHint": "Les tokens ont ete recredites sur votre solde.",
-  "generationStatusTokensRefundedShort": "Tokens rembourses",
+  "generationStatusTokensRefundedHint": "Les PawSpark ont ete recredites sur votre solde.",
+  "generationStatusTokensRefundedShort": "PawSpark rembourses",
   "generationStatusSupportHint": "Si cela se reproduit, contactez le support.",
   "generationStatusBackgroundHint": "La generation continue sur le serveur. Nous afficherons le resultat dans la Galerie lorsqu'il sera pret.",
   "generationStatusDownloadAction": "Telecharger",
@@ -464,11 +464,11 @@
   "generationStatusEtaStartsSoon": "Demarrera dans quelques minutes",
   "generationStatusEtaNotifyHint": "Nous vous informerons lorsque le resultat sera pret.",
   "generationStatusFailurePhotoHint": "La photo ne convient pas a ce modele. Essayez une photo ou l'animal est clairement visible.",
-  "generationStatusFailureTechnicalHint": "Impossible de creer le resultat en raison d'un probleme technique. Les tokens ont ete recredites sur votre solde.",
+  "generationStatusFailureTechnicalHint": "Impossible de creer le resultat en raison d'un probleme technique. Les PawSpark ont ete recredites sur votre solde.",
   "generationStatusStatusCompleted": "Votre resultat est pret",
   "generationStatusStatusFailed": "Impossible de creer le resultat",
   "generationStatusStatusCreatingMagic": "Creation de la magie...",
-  "generationStatusTerminalRefundedHint": "Les tokens ont ete rembourses automatiquement.",
+  "generationStatusTerminalRefundedHint": "Les PawSpark ont ete rembourses automatiquement.",
   "generationStatusTerminalFailureHint": "Un probleme technique a ete enregistre.",
   "generationStatusTerminalSuccessHint": "Ouvrez le resultat, partagez-le ou laissez un retour.",
   "generationStatusSectionActive": "En cours",
@@ -776,14 +776,14 @@
   "walletPackDetailsAction": "Détails",
   "walletPackDetailSubtitle": "Vérifiez ce qui est inclus avant d'ouvrir la caisse.",
   "walletCheckoutHint": "Le paiement s'ouvre dans Stripe Checkout sécurisé. PetMagic ne stocke pas les détails de votre carte.",
-  "walletCheckoutProductSubtitle": "Tokens pour créer des photos et vidéos dans PetMagic",
-  "walletCheckoutTokensImmediately": "{count} tokens immédiatement après le paiement",
+  "walletCheckoutProductSubtitle": "PawSpark pour créer des photos et vidéos dans PetMagic",
+  "walletCheckoutTokensImmediately": "{count} PawSpark immédiatement après le paiement",
   "@walletCheckoutTokensImmediately": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletCheckoutBonusTokens": "+{count} tokens bonus inclus",
+  "walletCheckoutBonusTokens": "+{count} PawSpark bonus inclus",
   "@walletCheckoutBonusTokens": {
     "placeholders": {
       "count": {}
@@ -1173,5 +1173,21 @@
   "premiumBenefitNoWatermarkTitle": "Pas de filigrane",
   "premiumBenefitNoWatermarkSubtitle": "exportations propres",
   "premiumBenefitBiggerRewardsTitle": "Des récompenses plus importantes",
-  "premiumBenefitBiggerRewardsSubtitle": "bonus quotidiens"
+  "premiumBenefitBiggerRewardsSubtitle": "bonus quotidiens",
+  "subscriptionDangerZoneTitle": "Zone de danger",
+  "subscriptionCancelConfirmTitle": "Annuler l'abonnement ?",
+  "subscriptionCancelConfirmBody": "Premium restera actif jusqu'au {date}. Les nouveaux débits seront désactivés.",
+  "@subscriptionCancelConfirmBody": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "subscriptionCancelConfirmAction": "Confirmer l'annulation",
+  "subscriptionCancelConfirmKeep": "Garder Premium",
+  "subscriptionRestoreSuccessMessage": "Achats restaurés",
+  "subscriptionRestoreNoneFoundMessage": "Aucun abonnement actif trouvé",
+  "subscriptionPaymentTrustText": "Les données de la carte sont traitées en toute sécurité par Stripe. PetMagic ne stocke pas vos données de carte.",
+  "subscriptionBillingPeriodLabel": "Période de facturation",
+  "subscriptionBillingPeriodMonthly": "Mensuel",
+  "subscriptionBillingPeriodYearly": "Annuel"
 }

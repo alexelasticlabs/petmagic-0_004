@@ -249,7 +249,7 @@ export function TemplatesCatalogView({
       {
         value: "tokens",
         label: copy.sortTokens,
-        description: locale === "ru" ? "По стоимости в токенах" : "By token cost",
+        description: locale === "ru" ? "По стоимости в PawSpark" : "By PawSpark cost",
         tone: "fast",
       },
     ],
@@ -1017,12 +1017,12 @@ function getCatalogCopy(locale: Locale, templateType: TemplateType) {
     sortLabel: isRu ? "Сортировка" : "Sort",
     sortNewest: isRu ? "Новые сначала" : "Newest first",
     sortTitle: isRu ? "По названию" : "By title",
-    sortTokens: isRu ? "По токенам" : "By tokens",
+    sortTokens: isRu ? "По PawSpark" : "By PawSpark",
     viewToggleLabel: isRu ? "Переключение вида" : "View mode",
     cardsView: isRu ? "Карточки" : "Cards",
     listView: isRu ? "Список" : "List",
     testAction: isRu ? "Тест" : "Test",
-    tokensShort: isRu ? "ток." : "tokens",
+    tokensShort: "PawSpark",
     updatedLabel: isRu ? "Обновлен" : "Updated",
     updatedShort: isRu ? "Обновлен" : "Updated",
     showing: (visible: number, total: number) =>

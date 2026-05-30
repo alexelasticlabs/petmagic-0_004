@@ -489,7 +489,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileSubscriptionTokensLabel.
   ///
   /// In en, this message translates to:
-  /// **'Tokens available'**
+  /// **'PawSpark available'**
   String get profileSubscriptionTokensLabel;
 
   /// No description provided for @subscriptionStatusActive.
@@ -561,7 +561,7 @@ abstract class AppLocalizations {
   /// No description provided for @subscriptionTokensSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Premium tokens'**
+  /// **'Premium PawSpark'**
   String get subscriptionTokensSectionTitle;
 
   /// No description provided for @subscriptionTokensAvailableLabel.
@@ -591,7 +591,7 @@ abstract class AppLocalizations {
   /// No description provided for @subscriptionTokensExplanation.
   ///
   /// In en, this message translates to:
-  /// **'Tokens are granted every 7 days from subscription start. The first bonus is granted immediately after purchase.'**
+  /// **'PawSpark are granted every 7 days from subscription start. The first bonus is granted immediately after purchase.'**
   String get subscriptionTokensExplanation;
 
   /// No description provided for @subscriptionBenefitsSectionTitle.
@@ -603,7 +603,7 @@ abstract class AppLocalizations {
   /// No description provided for @subscriptionBenefitTokens.
   ///
   /// In en, this message translates to:
-  /// **'40 tokens every 7 days'**
+  /// **'40 PawSpark every 7 days'**
   String get subscriptionBenefitTokens;
 
   /// No description provided for @subscriptionBenefitFirstBonus.
@@ -1329,31 +1329,31 @@ abstract class AppLocalizations {
   /// No description provided for @walletCheckoutHint.
   ///
   /// In en, this message translates to:
-  /// **'Payment opens in secure Stripe Checkout. PetMagic does not store your card details.'**
+  /// **'Payment opens in secure Stripe Checkout. After payment, PawSpark are credited to your balance right away.'**
   String get walletCheckoutHint;
 
   /// No description provided for @walletCheckoutProductSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Tokens for creating photos and videos in PetMagic'**
+  /// **'One-time top-up of your PawSpark balance for creating photos and videos in PetMagic'**
   String get walletCheckoutProductSubtitle;
 
   /// No description provided for @walletCheckoutTokensImmediately.
   ///
   /// In en, this message translates to:
-  /// **'{count} tokens right after payment'**
+  /// **'{count} PawSpark right after payment'**
   String walletCheckoutTokensImmediately(Object count);
 
   /// No description provided for @walletCheckoutBonusTokens.
   ///
   /// In en, this message translates to:
-  /// **'+{count} bonus tokens included'**
+  /// **'+{count} bonus PawSpark included'**
   String walletCheckoutBonusTokens(Object count);
 
   /// No description provided for @walletCheckoutIncludesTitle.
   ///
   /// In en, this message translates to:
-  /// **'What\'s included'**
+  /// **'What you get'**
   String get walletCheckoutIncludesTitle;
 
   /// No description provided for @walletCheckoutFeaturePremiumTemplates.
@@ -1389,7 +1389,7 @@ abstract class AppLocalizations {
   /// No description provided for @walletCheckoutOrderSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Order summary'**
+  /// **'Your top-up'**
   String get walletCheckoutOrderSectionTitle;
 
   /// No description provided for @walletCheckoutSucceeded.
@@ -1821,13 +1821,13 @@ abstract class AppLocalizations {
   /// No description provided for @premiumTokensPerWeek.
   ///
   /// In en, this message translates to:
-  /// **'{count} tokens / week'**
+  /// **'{count} PawSpark / week'**
   String premiumTokensPerWeek(Object count);
 
   /// No description provided for @premiumTokensPerMonth.
   ///
   /// In en, this message translates to:
-  /// **'{count} tokens / month'**
+  /// **'{count} PawSpark / month'**
   String premiumTokensPerMonth(Object count);
 
   /// No description provided for @premiumDiscountLabel.
@@ -1866,17 +1866,35 @@ abstract class AppLocalizations {
   /// **'Payment method'**
   String get premiumPaymentTitle;
 
+  /// No description provided for @premiumPaymentChooseSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how you want to subscribe'**
+  String get premiumPaymentChooseSubtitle;
+
   /// No description provided for @premiumPaymentStripe.
   ///
   /// In en, this message translates to:
-  /// **'Card via Stripe'**
+  /// **'Stripe'**
   String get premiumPaymentStripe;
+
+  /// No description provided for @premiumPaymentStripeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Card, Apple Pay or Google Pay'**
+  String get premiumPaymentStripeSubtitle;
 
   /// No description provided for @premiumPaymentGooglePlay.
   ///
   /// In en, this message translates to:
   /// **'Google Play'**
   String get premiumPaymentGooglePlay;
+
+  /// No description provided for @premiumPaymentGooglePlaySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment via Google Play'**
+  String get premiumPaymentGooglePlaySubtitle;
 
   /// No description provided for @premiumPaymentApple.
   ///
@@ -1895,6 +1913,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Default'**
   String get premiumPaymentDefaultBadge;
+
+  /// No description provided for @premiumPaymentTrustStripeProcesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Card data is securely processed by Stripe.'**
+  String get premiumPaymentTrustStripeProcesses;
+
+  /// No description provided for @premiumPaymentTrustNoStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic does not store your card details.'**
+  String get premiumPaymentTrustNoStorage;
+
+  /// No description provided for @premiumPaymentTrustManageInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription renewal and cancellation are managed inside PetMagic.'**
+  String get premiumPaymentTrustManageInApp;
 
   /// No description provided for @paymentBonusPercentBadge.
   ///
@@ -1935,7 +1971,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumComparisonTokens.
   ///
   /// In en, this message translates to:
-  /// **'Tokens per month'**
+  /// **'PawSpark per month'**
   String get premiumComparisonTokens;
 
   /// No description provided for @premiumComparisonPremiumTokens.
@@ -1947,7 +1983,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumComparisonPremiumTokensFallback.
   ///
   /// In en, this message translates to:
-  /// **'Up to 1000'**
+  /// **'40 PawSpark / week'**
   String get premiumComparisonPremiumTokensFallback;
 
   /// No description provided for @premiumComparisonFast.
@@ -1977,7 +2013,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumFreeSummaryTokens.
   ///
   /// In en, this message translates to:
-  /// **'20 tokens per month'**
+  /// **'20 PawSpark per month'**
   String get premiumFreeSummaryTokens;
 
   /// No description provided for @premiumFreeSummaryWatermark.
@@ -3111,7 +3147,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportChatQuickActionTokens.
   ///
   /// In en, this message translates to:
-  /// **'Tokens were not credited'**
+  /// **'PawSpark were not credited'**
   String get supportChatQuickActionTokens;
 
   /// No description provided for @supportChatFaqTitle.
@@ -3615,7 +3651,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportHomeTopicTokensNotArrived.
   ///
   /// In en, this message translates to:
-  /// **'Tokens did not arrive'**
+  /// **'PawSpark did not arrive'**
   String get supportHomeTopicTokensNotArrived;
 
   /// No description provided for @supportHomeTopicPremiumIssue.
@@ -3675,7 +3711,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportAssistantRecommendationTokensNotArrived.
   ///
   /// In en, this message translates to:
-  /// **'Sometimes token delivery after payment may take a few minutes. If the tokens still do not appear, create a support ticket and we will check the purchase.'**
+  /// **'Sometimes PawSpark delivery after payment may take a few minutes. If PawSpark still do not appear, create a support ticket and we will check the purchase.'**
   String get supportAssistantRecommendationTokensNotArrived;
 
   /// No description provided for @supportAssistantRecommendationPremiumIssue.
@@ -4011,13 +4047,13 @@ abstract class AppLocalizations {
   /// No description provided for @startupOnboardingPageThreeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Collect tokens and premium perks later'**
+  /// **'Collect PawSpark and premium perks later'**
   String get startupOnboardingPageThreeTitle;
 
   /// No description provided for @startupOnboardingPageThreeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Keep the first impression fun. Tokens, rewards and premium actions wait behind a clean auth step.'**
+  /// **'Keep the first impression fun. PawSpark, rewards and premium actions wait behind a clean auth step.'**
   String get startupOnboardingPageThreeSubtitle;
 
   /// No description provided for @startupOnboardingPageThreeHighlightOne.
@@ -4029,7 +4065,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupOnboardingPageThreeHighlightTwo.
   ///
   /// In en, this message translates to:
-  /// **'Token balance'**
+  /// **'PawSpark balance'**
   String get startupOnboardingPageThreeHighlightTwo;
 
   /// No description provided for @startupOnboardingPageThreeHighlightThree.
@@ -4137,7 +4173,7 @@ abstract class AppLocalizations {
   /// No description provided for @authRegisterSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Join PetMagic and unlock templates, tokens and premium features.'**
+  /// **'Join PetMagic and unlock templates, PawSpark and premium features.'**
   String get authRegisterSubtitle;
 
   /// No description provided for @authRegisterAction.
@@ -4497,7 +4533,7 @@ abstract class AppLocalizations {
   /// No description provided for @authRequiredMessage.
   ///
   /// In en, this message translates to:
-  /// **'Guests can explore the app, but template actions, rewards and token features require a PetMagic account.'**
+  /// **'Guests can explore the app, but template actions, rewards and PawSpark features require a PetMagic account.'**
   String get authRequiredMessage;
 
   /// No description provided for @authRequiredContinueBrowsing.
@@ -4527,7 +4563,7 @@ abstract class AppLocalizations {
   /// No description provided for @tokensActionComingSoon.
   ///
   /// In en, this message translates to:
-  /// **'Token wallet is coming soon.'**
+  /// **'PawSpark wallet is coming soon.'**
   String get tokensActionComingSoon;
 
   /// No description provided for @rewardsActionComingSoon.
@@ -5028,13 +5064,13 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusTokensRefundedHint.
   ///
   /// In en, this message translates to:
-  /// **'Tokens were returned to your balance.'**
+  /// **'PawSpark were returned to your balance.'**
   String get generationStatusTokensRefundedHint;
 
   /// No description provided for @generationStatusTokensRefundedShort.
   ///
   /// In en, this message translates to:
-  /// **'Tokens refunded'**
+  /// **'PawSpark refunded'**
   String get generationStatusTokensRefundedShort;
 
   /// No description provided for @generationStatusSupportHint.
@@ -5172,7 +5208,7 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusFailureTechnicalHint.
   ///
   /// In en, this message translates to:
-  /// **'Could not create the result due to a technical issue. Tokens were returned to your balance.'**
+  /// **'Could not create the result due to a technical issue. PawSpark were returned to your balance.'**
   String get generationStatusFailureTechnicalHint;
 
   /// No description provided for @generationStatusStatusCompleted.
@@ -5196,7 +5232,7 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusTerminalRefundedHint.
   ///
   /// In en, this message translates to:
-  /// **'Tokens were refunded automatically.'**
+  /// **'PawSpark were refunded automatically.'**
   String get generationStatusTerminalRefundedHint;
 
   /// No description provided for @generationStatusTerminalFailureHint.
@@ -5636,6 +5672,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'daily bonuses'**
   String get premiumBenefitBiggerRewardsSubtitle;
+
+  /// No description provided for @subscriptionDangerZoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get subscriptionDangerZoneTitle;
+
+  /// No description provided for @subscriptionCancelConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel subscription?'**
+  String get subscriptionCancelConfirmTitle;
+
+  /// No description provided for @subscriptionCancelConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium will stay active until {date}. New charges will be disabled.'**
+  String subscriptionCancelConfirmBody(String date);
+
+  /// No description provided for @subscriptionCancelConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm cancellation'**
+  String get subscriptionCancelConfirmAction;
+
+  /// No description provided for @subscriptionCancelConfirmKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Premium'**
+  String get subscriptionCancelConfirmKeep;
+
+  /// No description provided for @subscriptionRestoreSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases restored'**
+  String get subscriptionRestoreSuccessMessage;
+
+  /// No description provided for @subscriptionRestoreNoneFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No active subscription found'**
+  String get subscriptionRestoreNoneFoundMessage;
+
+  /// No description provided for @subscriptionPaymentTrustText.
+  ///
+  /// In en, this message translates to:
+  /// **'Card data is securely processed by Stripe. PetMagic does not store your card data.'**
+  String get subscriptionPaymentTrustText;
+
+  /// No description provided for @subscriptionBillingPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Billing period'**
+  String get subscriptionBillingPeriodLabel;
+
+  /// No description provided for @subscriptionBillingPeriodMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get subscriptionBillingPeriodMonthly;
+
+  /// No description provided for @subscriptionBillingPeriodYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get subscriptionBillingPeriodYearly;
 }
 
 class _AppLocalizationsDelegate

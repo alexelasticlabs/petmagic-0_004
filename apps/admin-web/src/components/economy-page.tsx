@@ -683,7 +683,7 @@ function humanizeSource(value: string, locale: Locale) {
     weekly_grant: { ru: "Недельная награда", en: "Weekly reward" },
     ad_reward: { ru: "Награда за рекламу", en: "Ad reward" },
     redeem_code: { ru: "Промокод", en: "Redeem code" },
-    premium_subscription_grant: { ru: "Выдача Premium токенов", en: "Premium token grant" },
+    premium_subscription_grant: { ru: "Выдача Premium PawSpark", en: "Premium PawSpark grant" },
     generation_spend: { ru: "Списание за генерацию", en: "Generation spend" },
     generation_refund: { ru: "Возврат за генерацию", en: "Generation refund" },
     pack_purchase: { ru: "Покупка пакета", en: "Pack purchase" },

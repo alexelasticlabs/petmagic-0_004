@@ -35,7 +35,8 @@ public sealed record SubscriptionSummaryResponse(
     string ManageSubscriptionAction,
     DateTime? LastTokenGrantAtUtc,
     string? CardBrand,
-    string? CardLast4);
+    string? CardLast4,
+    int WeeklyGrantAmount);
 
 public sealed record PaywallPlanResponse(
     string PlanId,

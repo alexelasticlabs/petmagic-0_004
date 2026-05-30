@@ -80,6 +80,7 @@ class ProfileGlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return RepaintBoundary(
       child: ClipRRect(
@@ -88,14 +89,16 @@ class ProfileGlassCard extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: colors.surfaceGlass,
+              color: colors.surfaceGlass.withValues(alpha: isLight ? 0.98 : 1),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: colors.border),
+              border: Border.all(
+                color: colors.border.withValues(alpha: isLight ? 0.92 : 1),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: colors.shadow,
-                  blurRadius: 24,
-                  offset: const Offset(0, 16),
+                  color: colors.shadow.withValues(alpha: isLight ? 0.24 : 1),
+                  blurRadius: isLight ? 20 : 24,
+                  offset: const Offset(0, 14),
                 ),
               ],
             ),

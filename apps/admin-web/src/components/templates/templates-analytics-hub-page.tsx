@@ -959,7 +959,7 @@ function formatPercent(value: number, isRu: boolean) {
 }
 
 function formatTokens(value: number, isRu: boolean) {
-  return `${new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", { maximumFractionDigits: value % 1 === 0 ? 0 : 1 }).format(value)} ${isRu ? "токенов" : "tokens"}`;
+  return `${new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", { maximumFractionDigits: value % 1 === 0 ? 0 : 1 }).format(value)} PawSpark`;
 }
 
 function formatTemplateCount(value: number, locale: AppLocale, fallbackLabel: string) {
@@ -1067,10 +1067,10 @@ function getCopy(locale: AppLocale) {
     conversionHint: isRu
       ? "Успешные генерации от всех запусков."
       : "Completed jobs divided by starts.",
-    tokens: isRu ? "Потрачено токенов" : "Token spend",
+    tokens: isRu ? "Потрачено PawSpark" : "PawSpark spend",
     tokensHint: isRu
       ? "Суммарный расход пользователей на генерации."
-      : "Total user token spend for generations.",
+      : "Total user PawSpark spend for generations.",
     providerSpend: isRu ? "Наши затраты" : "Provider spend",
     providerSpendHint: isRu
       ? "Реальные USD-затраты на AI-провайдера."
@@ -1150,7 +1150,7 @@ function getCopy(locale: AppLocale) {
     viewsColumn: isRu ? "Просмотры" : "Views",
     startsColumn: isRu ? "Запуски" : "Starts",
     conversionColumn: isRu ? "Конверсия" : "Conversion",
-    tokensColumn: isRu ? "Токены" : "Tokens",
+    tokensColumn: isRu ? "PawSpark" : "PawSpark",
     costColumn: isRu ? "Затраты" : "Cost",
     actionsColumn: isRu ? "Действия" : "Actions",
     openAnalytics: isRu ? "Аналитика" : "Analytics",

@@ -75,7 +75,9 @@ class _SkeletonBlock extends StatelessWidget {
   Widget build(BuildContext context) => ShimmerBox(
     child: DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.border.withValues(alpha: 0.32),
+        color: colors.border.withValues(
+          alpha: Theme.of(context).brightness == Brightness.light ? 0.55 : 0.32,
+        ),
         borderRadius: BorderRadius.circular(radius),
       ),
     ),

@@ -139,7 +139,7 @@ export function SupportConversationSidePanel({
   const isModerationPending = setUserActiveMutation.isPending || setUserPremiumMutation.isPending;
   const subscriptionStatusLabel =
     subscriptionQuery.data?.status ?? (locale === "ru" ? "Нет подписки" : "No subscription");
-  const tokenBalanceLabel = locale === "ru" ? "Баланс токенов" : "Token balance";
+  const tokenBalanceLabel = locale === "ru" ? "Баланс PawSpark" : "PawSpark balance";
   const hasTopMetrics = Boolean(conversation.assistantScenario || conversation.relatedGenerationId);
 
   return (

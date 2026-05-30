@@ -31,8 +31,8 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     successRate: isRu ? "Успешность" : "Success rate",
     completedRuns: isRu ? "Успешные" : "Completed",
     failedRuns: isRu ? "Ошибки" : "Failed",
-    totalTokenCost: isRu ? "Всего токенов" : "Total token cost",
-    averageTokenCost: isRu ? "Средний cost" : "Average token cost",
+    totalTokenCost: isRu ? "Всего PawSpark" : "Total PawSpark cost",
+    averageTokenCost: isRu ? "Средняя стоимость" : "Average PawSpark cost",
     views: isRu ? "Просмотры" : "Views",
     viewsHint: isRu
       ? "События view из публичного template endpoint."
@@ -49,8 +49,8 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     generationConversionHint: isRu
       ? "Доля успешных jobs среди запусков."
       : "Completed jobs as a share of started jobs.",
-    tokenSpend: isRu ? "Потрачено токенов" : "Token spend",
-    tokenSpendHint: isRu ? "Суммарная стоимость запусков в токенах." : "Total token cost of runs.",
+    tokenSpend: isRu ? "Потрачено PawSpark" : "PawSpark spend",
+    tokenSpendHint: isRu ? "Суммарная стоимость запусков в PawSpark." : "Total PawSpark cost of runs.",
     complaints: isRu ? "Жалобы" : "Complaints",
     complaintsHint: isRu
       ? "События complaint из публичного analytics endpoint."
@@ -99,7 +99,7 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     chartRuns: isRu ? "Запуски" : "Runs",
     chartCompleted: isRu ? "Успешные" : "Completed",
     chartFailed: isRu ? "Ошибки" : "Failed",
-    chartTokens: isRu ? "Токены" : "Tokens",
+    chartTokens: isRu ? "PawSpark" : "PawSpark",
     chartDuration: isRu ? "Время" : "Duration",
     statusBreakdownTitle: isRu ? "Состояние пайплайна" : "Pipeline health",
     statusBreakdownHint: isRu
@@ -157,7 +157,7 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     userHeader: isRu ? "Пользователь" : "User",
     recentCreated: isRu ? "Создан" : "Created",
     recentStatus: isRu ? "Статус" : "Status",
-    recentTokens: isRu ? "Токены" : "Tokens",
+    recentTokens: isRu ? "PawSpark" : "PawSpark",
     recentDuration: isRu ? "Время" : "Duration",
     recentModels: isRu ? "Модели" : "Models",
     failureCodeHeader: isRu ? "Код ошибки" : "Failure code",

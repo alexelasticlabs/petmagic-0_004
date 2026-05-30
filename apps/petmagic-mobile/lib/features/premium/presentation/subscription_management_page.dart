@@ -23,20 +23,14 @@ class SubscriptionManagementPage extends ConsumerStatefulWidget {
 class _SubscriptionManagementPageState
     extends ConsumerState<SubscriptionManagementPage> {
   bool _isProcessing = false;
-  Timer? _countdownTimer;
-  DateTime _now = DateTime.now().toUtc();
 
   @override
   void initState() {
     super.initState();
-    _countdownTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now().toUtc());
-    });
   }
 
   @override
   void dispose() {
-    _countdownTimer?.cancel();
     super.dispose();
   }
 
@@ -60,7 +54,6 @@ class _SubscriptionManagementPageState
           data: (summary) => _SubscriptionContent(
             summary: summary,
             isProcessing: _isProcessing,
-            now: _now,
             onManage: () => _openManageTarget(summary.manageSubscriptionAction),
             onRestore: _restorePurchases,
             onChangePayment: () =>
@@ -88,11 +81,30 @@ class _SubscriptionManagementPageState
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } finally {
-      if (mounted) setState(() => _isProcessing = false);
+      if (mounted) {
+        ref.invalidate(premiumSubscriptionSummaryProvider);
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
   Future<void> _cancelAtPeriodEnd() async {
+    final summary = ref.read(premiumSubscriptionSummaryProvider).value;
+    final text = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final dateStr = summary?.currentPeriodEndUtc != null
+        ? DateFormat.yMMMd(
+            locale,
+          ).format(summary!.currentPeriodEndUtc!.toLocal())
+        : '';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) =>
+          _CancelConfirmDialog(text: text, periodEndDateStr: dateStr),
+    );
+    if (confirmed != true) return;
+
     setState(() => _isProcessing = true);
     try {
       final service = ref.read(premiumSubscriptionManagementServiceProvider);
@@ -120,6 +132,17 @@ class _SubscriptionManagementPageState
       await ref.read(premiumControllerProvider.notifier).restorePurchases();
       ref.invalidate(premiumSubscriptionSummaryProvider);
       ref.invalidate(profileControllerProvider);
+      // Read updated summary to determine snackbar message
+      final updated = await ref.read(premiumSubscriptionSummaryProvider.future);
+      if (mounted) {
+        final text = AppLocalizations.of(context);
+        final message = updated.isPremium
+            ? text.subscriptionRestoreSuccessMessage
+            : text.subscriptionRestoreNoneFoundMessage;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -132,7 +155,6 @@ class _SubscriptionContent extends StatelessWidget {
   const _SubscriptionContent({
     required this.summary,
     required this.isProcessing,
-    required this.now,
     required this.onManage,
     required this.onRestore,
     required this.onChangePayment,
@@ -141,7 +163,6 @@ class _SubscriptionContent extends StatelessWidget {
 
   final PremiumSubscriptionSummaryView summary;
   final bool isProcessing;
-  final DateTime now;
   final VoidCallback onManage;
   final VoidCallback onRestore;
   final VoidCallback onChangePayment;
@@ -156,29 +177,28 @@ class _SubscriptionContent extends StatelessWidget {
         isStripe && summary.isPremium && summary.cancelAtPeriodEnd != true;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
-        _StatusSection(summary: summary, now: now),
+        _PremiumHeroCard(summary: summary),
         const SizedBox(height: 12),
-        _TokensSection(summary: summary, now: now),
+        _TokensCard(summary: summary),
         const SizedBox(height: 12),
-        _BenefitsSection(),
+        _BenefitsCard(),
         if (isStripe) ...[
           const SizedBox(height: 12),
-          _PaymentSection(
+          _PaymentCard(
             summary: summary,
             isProcessing: isProcessing,
             onChangePayment: onChangePayment,
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         _ActionsSection(
           summary: summary,
           isProcessing: isProcessing,
           canCancel: canCancel,
           onManage: onManage,
           onRestore: onRestore,
-          onChangePayment: onChangePayment,
           onCancel: onCancel,
         ),
         if (summary.isPremium && summary.cancelAtPeriodEnd == true) ...[
@@ -190,13 +210,12 @@ class _SubscriptionContent extends StatelessWidget {
   }
 }
 
-// ─── Block 1: Status ─────────────────────────────────────────────────────────
+// ─── Block 1: Premium Hero Card ───────────────────────────────────────────────
 
-class _StatusSection extends StatelessWidget {
-  const _StatusSection({required this.summary, required this.now});
+class _PremiumHeroCard extends StatelessWidget {
+  const _PremiumHeroCard({required this.summary});
 
   final PremiumSubscriptionSummaryView summary;
-  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
@@ -220,42 +239,66 @@ class _StatusSection extends StatelessWidget {
             summary.cancelAtPeriodEnd != true
         ? fmt.format(summary.currentPeriodEndUtc!.toLocal())
         : null;
+    final billingPeriodStr = switch (summary.billingPeriod?.toLowerCase()) {
+      'monthly' => text.subscriptionBillingPeriodMonthly,
+      'yearly' => text.subscriptionBillingPeriodYearly,
+      _ => summary.billingPeriod,
+    };
 
     return ProfileGlassCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _StatusBadge(label: statusLabel, color: statusColor),
-              const Spacer(),
-              if (summary.planName != null)
-                Text(
-                  summary.planName!,
+              Icon(
+                Icons.workspace_premium_rounded,
+                color: colors.gold,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  summary.planName ?? 'PetMagic Premium',
                   style: TextStyle(
                     color: colors.textStrong,
-                    fontSize: 15,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
                   ),
                 ),
+              ),
             ],
           ),
+          const SizedBox(height: 12),
+          _GlowStatusBadge(label: statusLabel, color: statusColor),
+          const SizedBox(height: 16),
+          Divider(color: colors.border, height: 1),
+          const SizedBox(height: 16),
           if (startDate != null) ...[
-            const SizedBox(height: 14),
             _InfoRow(label: text.subscriptionStartDateLabel, value: startDate),
+            const SizedBox(height: 10),
           ],
           if (periodEnd != null) ...[
-            const SizedBox(height: 8),
             _InfoRow(label: text.subscriptionPeriodEndLabel, value: periodEnd),
+            const SizedBox(height: 10),
           ],
           if (nextBilling != null) ...[
-            const SizedBox(height: 8),
             _InfoRow(
               label: text.profileSubscriptionNextBillingLabel,
               value: nextBilling,
             ),
+            const SizedBox(height: 10),
           ],
-          const SizedBox(height: 8),
+          if (billingPeriodStr != null) ...[
+            _InfoRow(
+              label: text.subscriptionBillingPeriodLabel,
+              value: billingPeriodStr,
+            ),
+            const SizedBox(height: 10),
+          ],
           _InfoRow(
             label: text.subscriptionAutoRenewLabel,
             value: summary.cancelAtPeriodEnd == true
@@ -271,15 +314,14 @@ class _StatusSection extends StatelessWidget {
   }
 }
 
-// ─── Block 2: Tokens ─────────────────────────────────────────────────────────
+// ─── Block 2: Tokens Card ─────────────────────────────────────────────────────
 
-class _TokensSection extends StatelessWidget {
-  const _TokensSection({required this.summary, required this.now});
+class _TokensCard extends StatelessWidget {
+  const _TokensCard({required this.summary});
 
   final PremiumSubscriptionSummaryView summary;
-  final DateTime now;
 
-  DateTime? _nextGrantUtc() {
+  DateTime? _nextGrantUtc(DateTime now) {
     final base = summary.lastTokenGrantAtUtc ?? summary.currentPeriodStartUtc;
     if (base == null) return null;
     var next = base.add(const Duration(days: 7));
@@ -293,77 +335,104 @@ class _TokensSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final locale = Localizations.localeOf(context).toLanguageTag();
-    final fmt = DateFormat.yMMMd(locale);
+    final now = DateTime.now().toUtc();
 
-    final nextGrant = _nextGrantUtc();
+    final nextGrant = _nextGrantUtc(now);
     final tokensAvailable = summary.tokensAvailable ?? 0;
-    final tokensPerPeriod = summary.monthlyTokenLimit ?? 40;
-
-    String? countdownStr;
-    String? nextGrantDateStr;
-    if (nextGrant != null) {
-      nextGrantDateStr = fmt.format(nextGrant.toLocal());
-      final diff = nextGrant.difference(now);
-      if (diff.isNegative == false) {
-        final days = diff.inDays;
-        final hours = diff.inHours % 24;
-        final minutes = diff.inMinutes % 60;
-        countdownStr = text.subscriptionTokensCountdown(
-          days.toString(),
-          hours.toString(),
-          minutes.toString(),
-        );
-      }
-    }
+    final weeklyGrant = summary.weeklyGrantAmount ?? 40;
 
     return ProfileGlassCard(
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            text.subscriptionTokensSectionTitle,
-            style: TextStyle(
-              color: colors.textStrong,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _InfoRow(
-            label: text.subscriptionTokensAvailableLabel,
-            value: '$tokensAvailable',
-            valueColor: colors.gold,
-          ),
-          const SizedBox(height: 8),
-          _InfoRow(
-            label: text.subscriptionTokensPerPeriodLabel,
-            value: '$tokensPerPeriod',
-          ),
-          if (nextGrantDateStr != null) ...[
-            const SizedBox(height: 8),
-            _InfoRow(
-              label: text.subscriptionTokensNextGrantLabel,
-              value: nextGrantDateStr,
-            ),
-            if (countdownStr != null) ...[
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerRight,
+          // Header row: title + badge
+          Row(
+            children: [
+              Expanded(
                 child: Text(
-                  countdownStr,
-                  style: TextStyle(color: colors.textMuted, fontSize: 12),
+                  text.subscriptionTokensSectionTitle,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colors.gold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: colors.gold.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt_rounded, color: colors.gold, size: 13),
+                    const SizedBox(width: 3),
+                    Text(
+                      '+$weeklyGrant',
+                      style: TextStyle(
+                        color: colors.gold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      ' / 7д',
+                      style: TextStyle(
+                        color: colors.gold.withValues(alpha: 0.7),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ],
+          ),
+          const SizedBox(height: 14),
+          // Balance row: big number + label side by side
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$tokensAvailable',
+                style: TextStyle(
+                  color: colors.gold,
+                  fontSize: 42,
+                  fontWeight: FontWeight.w900,
+                  height: 1.0,
+                  letterSpacing: -1.5,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  text.subscriptionTokensAvailableLabel,
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Animated progress bar + live countdown
+          _TokenGrantProgressBar(
+            nextGrantUtc: nextGrant,
+            weeklyGrantAmount: weeklyGrant,
+          ),
           const SizedBox(height: 12),
           Text(
             text.subscriptionTokensExplanation,
             style: TextStyle(
               color: colors.textMuted,
-              fontSize: 12,
-              height: 1.5,
+              fontSize: 11,
+              height: 1.4,
             ),
           ),
         ],
@@ -372,10 +441,184 @@ class _TokensSection extends StatelessWidget {
   }
 }
 
-// ─── Block 3: Benefits ───────────────────────────────────────────────────────
+// ─── Animated token grant progress bar ───────────────────────────────────────
 
-class _BenefitsSection extends StatelessWidget {
-  const _BenefitsSection();
+class _TokenGrantProgressBar extends StatefulWidget {
+  const _TokenGrantProgressBar({
+    required this.nextGrantUtc,
+    required this.weeklyGrantAmount,
+  });
+
+  final DateTime? nextGrantUtc;
+  final int weeklyGrantAmount;
+
+  @override
+  State<_TokenGrantProgressBar> createState() => _TokenGrantProgressBarState();
+}
+
+class _TokenGrantProgressBarState extends State<_TokenGrantProgressBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late Animation<double> _progressAnim;
+  Timer? _ticker;
+  DateTime _now = DateTime.now().toUtc();
+
+  double get _currentProgress {
+    final next = widget.nextGrantUtc;
+    if (next == null) return 0.0;
+    final prev = next.subtract(const Duration(days: 7));
+    final total = const Duration(days: 7).inSeconds;
+    final elapsed = _now.difference(prev).inSeconds;
+    return (elapsed / total).clamp(0.0, 1.0);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _progressAnim = Tween<double>(begin: 0, end: _currentProgress)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.addListener(() {
+      if (mounted) setState(() {});
+    });
+    _controller.forward();
+
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now().toUtc());
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _buildCountdown() {
+    final next = widget.nextGrantUtc;
+    if (next == null) return '';
+    final diff = next.difference(_now);
+    if (diff.isNegative) return '';
+    final d = diff.inDays;
+    final h = diff.inHours % 24;
+    final m = diff.inMinutes % 60;
+    final s = diff.inSeconds % 60;
+    if (d > 0) return '$dд $hч $mм';
+    if (h > 0) return '$hч $mм $sс';
+    return '$mм $sс';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final p = _controller.isCompleted ? _currentProgress : _progressAnim.value;
+    final countdown = _buildCountdown();
+    final isReady = widget.nextGrantUtc != null &&
+        _now.isAfter(widget.nextGrantUtc!);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final fillW = (w * p).clamp(0.0, w);
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Track
+                Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: colors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                // Fill with gradient
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: fillW,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [colors.accent, colors.gold],
+                      ),
+                    ),
+                  ),
+                ),
+                // Glow dot at fill end
+                if (fillW > 6)
+                  Positioned(
+                    left: fillW - 6,
+                    top: -1,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colors.gold,
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.gold.withValues(alpha: 0.55),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 7),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            if (isReady)
+              Text(
+                '✦ Готово к начислению!',
+                style: TextStyle(
+                  color: colors.accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            else if (countdown.isNotEmpty)
+              Text(
+                'Следующее начисление: $countdown',
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              )
+            else
+              const SizedBox.shrink(),
+            Text(
+              '${(p * 100).round()}%',
+              style: TextStyle(
+                color: colors.accent.withValues(alpha: 0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Block 3: Benefits Card ───────────────────────────────────────────────────
+
+class _BenefitsCard extends StatelessWidget {
+  const _BenefitsCard();
 
   @override
   Widget build(BuildContext context) {
@@ -383,14 +626,35 @@ class _BenefitsSection extends StatelessWidget {
     final colors = context.petMagicColors;
 
     final benefits = [
-      text.subscriptionBenefitTokens,
-      text.subscriptionBenefitFirstBonus,
-      text.subscriptionBenefitTemplates,
-      text.subscriptionBenefitPriorityGeneration,
-      text.subscriptionBenefitNoWatermark,
+      _BenefitItem(
+        icon: Icons.bolt_rounded,
+        title: text.subscriptionBenefitTokens,
+        description: 'Автоматически каждые 7 дней',
+      ),
+      _BenefitItem(
+        icon: Icons.card_giftcard_rounded,
+        title: text.subscriptionBenefitFirstBonus,
+        description: 'Мгновенно при покупке',
+      ),
+      _BenefitItem(
+        icon: Icons.auto_awesome_rounded,
+        title: text.subscriptionBenefitTemplates,
+        description: 'Все сценарии разблокированы',
+      ),
+      _BenefitItem(
+        icon: Icons.flash_on_rounded,
+        title: text.subscriptionBenefitPriorityGeneration,
+        description: 'Ваши задачи в приоритете',
+      ),
+      _BenefitItem(
+        icon: Icons.hide_image_outlined,
+        title: text.subscriptionBenefitNoWatermark,
+        description: 'Чистый результат',
+      ),
     ];
 
     return ProfileGlassCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -402,39 +666,76 @@ class _BenefitsSection extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 12),
-          ...benefits.map(
-            (b) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+          const SizedBox(height: 16),
+          ...benefits.asMap().entries.map((entry) {
+            final i = entry.key;
+            final b = entry.value;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: i < benefits.length - 1 ? 14 : 0,
+              ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                    color: colors.accent,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colors.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(b.icon, color: colors.accent, size: 22),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 14),
                   Expanded(
-                    child: Text(
-                      b,
-                      style: TextStyle(color: colors.textSoft, fontSize: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          b.title,
+                          style: TextStyle(
+                            color: colors.textStrong,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          b.description,
+                          style: TextStyle(
+                            color: colors.textMuted,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
   }
 }
 
-// ─── Block 4: Payment (Stripe only) ──────────────────────────────────────────
+class _BenefitItem {
+  const _BenefitItem({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+  final IconData icon;
+  final String title;
+  final String description;
+}
 
-class _PaymentSection extends StatelessWidget {
-  const _PaymentSection({
+// ─── Block 4: Payment Card (Stripe only) ─────────────────────────────────────
+
+class _PaymentCard extends StatelessWidget {
+  const _PaymentCard({
     required this.summary,
     required this.isProcessing,
     required this.onChangePayment,
@@ -448,11 +749,16 @@ class _PaymentSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final maskedCard = summary.cardLast4 != null
         ? '**** ${summary.cardLast4}'
         : null;
+    final paymentLabel = maskedCard != null
+        ? '${text.subscriptionPaymentProviderStripe}  ·  $maskedCard'
+        : text.subscriptionPaymentProviderStripe;
 
     return ProfileGlassCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -465,17 +771,68 @@ class _PaymentSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          _InfoRow(
-            label: text.subscriptionPaymentMethodLabel,
-            value: text.subscriptionPaymentProviderStripe,
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: colors.accent.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.credit_card_rounded,
+                  color: colors.accent,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  paymentLabel,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-          if (maskedCard != null) ...[
-            const SizedBox(height: 8),
-            _InfoRow(
-              label: text.subscriptionPaymentCardLabel,
-              value: maskedCard,
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colors.surfaceStrong.withValues(
+                alpha: isLight ? 0.94 : 0.78,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colors.border.withValues(alpha: isLight ? 0.92 : 1),
+              ),
             ),
-          ],
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.lock_outline_rounded,
+                  color: colors.textMuted,
+                  size: 15,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text.subscriptionPaymentTrustText,
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
@@ -492,7 +849,7 @@ class _PaymentSection extends StatelessWidget {
   }
 }
 
-// ─── Block 5: Actions ────────────────────────────────────────────────────────
+// ─── Block 5: Actions Section ─────────────────────────────────────────────────
 
 class _ActionsSection extends StatelessWidget {
   const _ActionsSection({
@@ -501,7 +858,6 @@ class _ActionsSection extends StatelessWidget {
     required this.canCancel,
     required this.onManage,
     required this.onRestore,
-    required this.onChangePayment,
     required this.onCancel,
   });
 
@@ -510,7 +866,6 @@ class _ActionsSection extends StatelessWidget {
   final bool canCancel;
   final VoidCallback onManage;
   final VoidCallback onRestore;
-  final VoidCallback onChangePayment;
   final VoidCallback onCancel;
 
   @override
@@ -536,16 +891,73 @@ class _ActionsSection extends StatelessWidget {
           child: Text(text.premiumRestoreAction),
         ),
         if (canCancel) ...[
-          const SizedBox(height: 32),
+          const SizedBox(height: 40),
+          Row(
+            children: [
+              Expanded(
+                child: Divider(color: colors.danger.withValues(alpha: 0.25)),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                text.subscriptionDangerZoneTitle,
+                style: TextStyle(
+                  color: colors.danger.withValues(alpha: 0.7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Divider(color: colors.danger.withValues(alpha: 0.25)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           OutlinedButton(
             onPressed: isProcessing ? null : onCancel,
             style: OutlinedButton.styleFrom(
               foregroundColor: colors.danger,
-              side: BorderSide(color: colors.danger.withValues(alpha: 0.4)),
+              side: BorderSide(color: colors.danger.withValues(alpha: 0.5)),
             ),
             child: Text(text.subscriptionCancelAction),
           ),
         ],
+      ],
+    );
+  }
+}
+
+// ─── Cancel Confirm Dialog ────────────────────────────────────────────────────
+
+class _CancelConfirmDialog extends StatelessWidget {
+  const _CancelConfirmDialog({
+    required this.text,
+    required this.periodEndDateStr,
+  });
+
+  final AppLocalizations text;
+  final String periodEndDateStr;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return AlertDialog(
+      title: Text(text.subscriptionCancelConfirmTitle),
+      content: Text(
+        text.subscriptionCancelConfirmBody(periodEndDateStr),
+        style: TextStyle(color: colors.textSoft, height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(text.subscriptionCancelConfirmKeep),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: FilledButton.styleFrom(backgroundColor: colors.danger),
+          child: Text(text.subscriptionCancelConfirmAction),
+        ),
       ],
     );
   }
@@ -626,8 +1038,8 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
+class _GlowStatusBadge extends StatelessWidget {
+  const _GlowStatusBadge({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -635,17 +1047,24 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: Offset.zero,
+          ),
+        ],
       ),
       child: Text(
         label,
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -660,8 +1079,9 @@ String _resolveStatusLabel(
   AppLocalizations text,
 ) {
   if (!summary.isPremium) return text.subscriptionStatusInactive;
-  if (summary.cancelAtPeriodEnd == true)
+  if (summary.cancelAtPeriodEnd == true) {
     return text.subscriptionStatusCancelled;
+  }
   return switch (summary.status.toLowerCase()) {
     'active' || 'trialing' => text.subscriptionStatusActive,
     'past_due' || 'unpaid' => text.subscriptionStatusPaymentFailed,

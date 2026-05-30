@@ -348,7 +348,7 @@ public sealed class IdentityService(
         var user = await userManager.Users
             .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
-        if (user is null || !user.IsActive || string.IsNullOrWhiteSpace(user.Email) || string.IsNullOrWhiteSpace(user.PasswordHash))
+        if (user is null || !user.IsActive || string.IsNullOrWhiteSpace(user.Email))
         {
             return Result.Failure(IdentityErrors.UserNotFound);
         }

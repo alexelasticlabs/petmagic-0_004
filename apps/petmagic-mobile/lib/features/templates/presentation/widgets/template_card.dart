@@ -69,9 +69,10 @@ class _TemplateCardState extends State<TemplateCard> {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final premiumBorder = widget.template.isPremium
         ? colors.gold.withValues(alpha: 0.58)
-        : colors.border.withValues(alpha: 0.28);
+        : colors.border.withValues(alpha: isLight ? 0.62 : 0.28);
     final premiumGlow = widget.template.isPremium
         ? colors.gold.withValues(alpha: 0.16)
         : colors.shadow;
@@ -94,8 +95,8 @@ class _TemplateCardState extends State<TemplateCard> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  colors.surfaceGlass.withValues(alpha: 0.28),
-                  colors.surfaceStrong.withValues(alpha: 0.12),
+                  colors.surfaceGlass.withValues(alpha: isLight ? 0.58 : 0.28),
+                  colors.surfaceStrong.withValues(alpha: isLight ? 0.28 : 0.12),
                 ],
               ),
               boxShadow: [

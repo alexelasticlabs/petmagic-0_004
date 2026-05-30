@@ -111,11 +111,17 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     final selected = await showPaymentMethodSheet(
       context: context,
       title: text.premiumPaymentTitle,
-      subtitle: text.premiumSecurePaymentSubtitle,
+      subtitle: text.premiumPaymentChooseSubtitle,
       continueLabel: text.premiumContinueAction,
       continueLabelBuilder: (option) =>
           text.paymentContinueViaProviderAction(option.title),
       options: options,
+      trustTitle: text.premiumSecurePaymentTitle,
+      trustLines: [
+        text.premiumPaymentTrustStripeProcesses,
+        text.premiumPaymentTrustNoStorage,
+        text.premiumPaymentTrustManageInApp,
+      ],
     );
     if (!mounted || selected == null) {
       return;
@@ -223,7 +229,9 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
               ? method.displayLabel!.trim()
               : _providerLabel(provider, text),
           icon: _providerIcon(provider),
-          subtitle: method.displaySubtitle,
+          subtitle: method.displaySubtitle?.trim().isNotEmpty == true
+              ? method.displaySubtitle
+              : _providerSubtitle(provider, text),
           badge: badges.isEmpty ? null : badges.first,
           warningTitle: method.warningTitle,
           warningMessage: method.warningMessage,
@@ -254,6 +262,18 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     return switch (provider) {
       PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
       PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
+      PremiumPaymentProvider.appStore => text.premiumPaymentApple,
+    };
+  }
+
+  String _providerSubtitle(
+    PremiumPaymentProvider provider,
+    AppLocalizations text,
+  ) {
+    return switch (provider) {
+      PremiumPaymentProvider.stripe => text.premiumPaymentStripeSubtitle,
+      PremiumPaymentProvider.googlePlay =>
+        text.premiumPaymentGooglePlaySubtitle,
       PremiumPaymentProvider.appStore => text.premiumPaymentApple,
     };
   }

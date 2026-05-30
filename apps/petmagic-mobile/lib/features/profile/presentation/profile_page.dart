@@ -147,10 +147,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     if (profile != null) ...[
                       MotionEntrance(
                         delay: const Duration(milliseconds: 100),
-                        child: _ProfileHeroCard(
-                          profile: profile,
-                          walletBalance: walletState.wallet?.balance,
-                        ),
+                        child: _ProfileHeroCard(profile: profile),
                       ),
                       const SizedBox(height: 12),
                       MotionEntrance(
@@ -283,10 +280,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 }
 
 class _ProfileHeroCard extends StatelessWidget {
-  const _ProfileHeroCard({required this.profile, required this.walletBalance});
+  const _ProfileHeroCard({required this.profile});
 
   final MobileUserProfile profile;
-  final int? walletBalance;
 
   @override
   Widget build(BuildContext context) {
@@ -301,9 +297,6 @@ class _ProfileHeroCard extends StatelessWidget {
     final emailLabel = profile.emailConfirmed
         ? text.profileEmailVerifiedShort
         : text.profileEmailPendingShort;
-    final balanceLabel = walletBalance == null
-        ? text.profileWalletLoadingHint
-        : '${_formatProfileNumber(context, walletBalance!)} PawSpark';
 
     return ProfileGlassCard(
       child: Column(
@@ -367,44 +360,6 @@ class _ProfileHeroCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            profile.email,
-            style: TextStyle(
-              color: colors.textStrong,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: colors.surfaceStrong.withValues(alpha: 0.42),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.border.withValues(alpha: 0.8)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  color: colors.accent,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    balanceLabel,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),

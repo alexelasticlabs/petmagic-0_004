@@ -124,6 +124,7 @@ class _SupportSecurityCardState extends State<_SupportSecurityCard> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final borderRadius = BorderRadius.circular(_isExpanded ? 16 : 999);
 
     return AnimatedSize(
@@ -138,9 +139,13 @@ class _SupportSecurityCardState extends State<_SupportSecurityCard> {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
             decoration: BoxDecoration(
-              color: colors.surfaceStrong.withValues(alpha: 0.54),
+              color: colors.surfaceStrong.withValues(
+                alpha: isLight ? 0.9 : 0.54,
+              ),
               borderRadius: borderRadius,
-              border: Border.all(color: colors.border.withValues(alpha: 0.58)),
+              border: Border.all(
+                color: colors.border.withValues(alpha: isLight ? 0.84 : 0.58),
+              ),
             ),
             child: Row(
               children: [

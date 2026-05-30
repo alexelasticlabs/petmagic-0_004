@@ -63,7 +63,7 @@
   "profileSubscriptionStatusLabel": "Статус",
   "profileSubscriptionProviderLabel": "Провайдер",
   "profileSubscriptionNextBillingLabel": "Следующее списание",
-  "profileSubscriptionTokensLabel": "Доступно токенов",
+  "profileSubscriptionTokensLabel": "Доступно PawSpark",
   "subscriptionStatusActive": "Premium активен",
   "subscriptionStatusCancelled": "Отменён (до конца периода)",
   "subscriptionStatusExpired": "Истёк",
@@ -75,7 +75,7 @@
   "subscriptionAutoRenewLabel": "Автопродление",
   "subscriptionAutoRenewOn": "Включено",
   "subscriptionAutoRenewOff": "Отключено",
-  "subscriptionTokensSectionTitle": "Premium-токены",
+  "subscriptionTokensSectionTitle": "Premium PawSpark",
   "subscriptionTokensAvailableLabel": "Доступно сейчас",
   "subscriptionTokensPerPeriodLabel": "Каждые 7 дней",
   "subscriptionTokensNextGrantLabel": "Следующее начисление",
@@ -87,9 +87,9 @@
       "minutes": {}
     }
   },
-  "subscriptionTokensExplanation": "Токены начисляются каждые 7 дней с момента покупки подписки. Первый бонус начисляется сразу после покупки.",
+  "subscriptionTokensExplanation": "PawSpark начисляются каждые 7 дней с момента покупки подписки. Первый бонус начисляется сразу после покупки.",
   "subscriptionBenefitsSectionTitle": "Преимущества Premium",
-  "subscriptionBenefitTokens": "40 токенов каждые 7 дней",
+  "subscriptionBenefitTokens": "40 PawSpark каждые 7 дней",
   "subscriptionBenefitFirstBonus": "Первый бонус сразу после покупки",
   "subscriptionBenefitTemplates": "Доступ к Premium-шаблонам",
   "subscriptionBenefitPriorityGeneration": "Приоритетная генерация",
@@ -303,27 +303,27 @@
   },
   "walletPackDetailsAction": "Подробнее",
   "walletPackDetailSubtitle": "Проверьте состав пакета перед переходом к оплате.",
-  "walletCheckoutHint": "Оплата откроется в защищенном Stripe Checkout. PetMagic не сохраняет данные карты.",
-  "walletCheckoutProductSubtitle": "Токены для создания фото и видео в PetMagic",
-  "walletCheckoutTokensImmediately": "{count} токенов сразу после оплаты",
+  "walletCheckoutHint": "Оплата откроется в защищенном Stripe Checkout. После оплаты PawSpark сразу зачисляются на ваш баланс.",
+  "walletCheckoutProductSubtitle": "Разовое пополнение вашего баланса PawSpark для создания фото и видео в PetMagic",
+  "walletCheckoutTokensImmediately": "{count} PawSpark сразу после оплаты",
   "@walletCheckoutTokensImmediately": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletCheckoutBonusTokens": "+{count} бонусных токенов в подарок",
+  "walletCheckoutBonusTokens": "+{count} бонусных PawSpark в подарок",
   "@walletCheckoutBonusTokens": {
     "placeholders": {
       "count": {}
     }
   },
-  "walletCheckoutIncludesTitle": "Что входит",
+  "walletCheckoutIncludesTitle": "Что вы получите",
   "walletCheckoutFeaturePremiumTemplates": "Premium-шаблоны",
   "walletCheckoutFeaturePriority": "Приоритетная генерация",
   "walletCheckoutFeatureMoreVideos": "Больше возможностей для видео",
   "walletCheckoutStripeMethodSubtitle": "Карта, Apple Pay или Google Pay",
   "walletCheckoutTrustText": "PetMagic не хранит данные вашей карты. Платежи безопасно обрабатываются Stripe.",
-  "walletCheckoutOrderSectionTitle": "Итого сегодня",
+  "walletCheckoutOrderSectionTitle": "Ваше пополнение",
   "walletCheckoutSucceeded": "Оплата подтверждена. +{spark} PawSpark уже в вашем кошельке.",
   "@walletCheckoutSucceeded": {
     "placeholders": {
@@ -419,13 +419,13 @@
   "premiumMonthlyPeriod": "/ месяц",
   "premiumYearlyPeriod": "/ год",
   "premiumPopularBadge": "Самый популярный",
-  "premiumTokensPerWeek": "{count} токенов / неделя",
+  "premiumTokensPerWeek": "{count} PawSpark / неделя",
   "@premiumTokensPerWeek": {
     "placeholders": {
       "count": {}
     }
   },
-  "premiumTokensPerMonth": "{count} токенов / месяц",
+  "premiumTokensPerMonth": "{count} PawSpark / месяц",
   "@premiumTokensPerMonth": {
     "placeholders": {
       "count": {}
@@ -448,11 +448,17 @@
   },
   "premiumSocialProof": "Самый популярный тариф для тех, кто регулярно создаёт контент в PetMagic.",
   "premiumPaymentTitle": "Способ оплаты",
-  "premiumPaymentStripe": "Карта через Stripe",
+  "premiumPaymentChooseSubtitle": "Выберите, как хотите оформить подписку",
+  "premiumPaymentStripe": "Stripe",
+  "premiumPaymentStripeSubtitle": "Оплата картой, Apple Pay или Google Pay",
   "premiumPaymentGooglePlay": "Google Play",
+  "premiumPaymentGooglePlaySubtitle": "Оплата через Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
   "premiumPaymentRecommendedBadge": "Рекомендуем",
   "premiumPaymentDefaultBadge": "По умолчанию",
+  "premiumPaymentTrustStripeProcesses": "Данные карты безопасно обрабатываются Stripe.",
+  "premiumPaymentTrustNoStorage": "PetMagic не хранит данные вашей карты.",
+  "premiumPaymentTrustManageInApp": "Продление и отмена подписки управляются внутри PetMagic.",
   "paymentBonusPercentBadge": "+{percent}% бонус",
   "@paymentBonusPercentBadge": {
     "placeholders": {
@@ -464,19 +470,19 @@
   "premiumPremiumColumn": "Premium",
   "premiumComparisonFreeTemplates": "Бесплатные шаблоны",
   "premiumComparisonPremiumTemplates": "Premium-шаблоны",
-  "premiumComparisonTokens": "Токены в месяц",
+  "premiumComparisonTokens": "PawSpark в месяц",
   "premiumComparisonPremiumTokens": "До {count}",
   "@premiumComparisonPremiumTokens": {
     "placeholders": {
       "count": {}
     }
   },
-  "premiumComparisonPremiumTokensFallback": "До 1000",
+  "premiumComparisonPremiumTokensFallback": "40 PawSpark / неделю",
   "premiumComparisonFast": "Быстрая генерация",
   "premiumComparisonHighQuality": "Экспорт высокого качества",
   "premiumComparisonNoWatermark": "Без водяного знака",
   "premiumComparisonPrioritySupport": "Приоритетная поддержка",
-  "premiumFreeSummaryTokens": "20 токенов в месяц",
+  "premiumFreeSummaryTokens": "20 PawSpark в месяц",
   "premiumFreeSummaryWatermark": "Водяной знак",
   "premiumFreeSummaryTemplates": "Базовые шаблоны",
   "premiumFreeSummaryQuality": "Стандартное качество",
@@ -677,7 +683,7 @@
   "supportChatQuickActionHuman": "Связаться с оператором",
   "supportChatQuickActionSubscription": "Проблема с подпиской",
   "supportChatQuickActionVideo": "Видео не создается",
-  "supportChatQuickActionTokens": "Не пришли токены",
+  "supportChatQuickActionTokens": "Не пришли PawSpark",
   "supportChatFaqTitle": "FAQ",
   "supportChatFaqGenerationTitle": "Почему генерация не сработала?",
   "supportChatFaqGenerationBody": "Отправьте название шаблона, тип питомца и по возможности скриншот. Обычно этого хватает, чтобы поддержка сразу начала разбор.",
@@ -772,7 +778,7 @@
   "supportHomeOpenChatAction": "Открыть чат",
   "supportHomeTopicGenerationIssue": "Проблема с генерацией изображения",
   "supportHomeTopicGenerationTooLong": "Генерация занимает слишком долго",
-  "supportHomeTopicTokensNotArrived": "Токены не пришли",
+  "supportHomeTopicTokensNotArrived": "PawSpark не пришли",
   "supportHomeTopicPremiumIssue": "Проблема с Premium",
   "supportHomeTopicPaymentRefund": "Оплата / Возврат",
   "supportHomeTopicOther": "Другое",
@@ -782,7 +788,7 @@
   "supportAssistantCheckLaterAction": "Проверить позже",
   "supportAssistantRecommendationGeneration": "Для лучшего результата используйте фото, где питомец хорошо виден, не обрезан, не размыт и при хорошем освещении.",
   "supportAssistantRecommendationGenerationTooLong": "Генерация видео может занять несколько минут — обычно от 2 до 10 минут. Если прошло слишком много времени, мы можем передать этот вопрос в поддержку.",
-  "supportAssistantRecommendationTokensNotArrived": "Иногда токены после оплаты поступают с задержкой в несколько минут. Если токены так и не появились, создайте обращение, и мы проверим платёж.",
+  "supportAssistantRecommendationTokensNotArrived": "Иногда PawSpark после оплаты поступают с задержкой в несколько минут. Если PawSpark так и не появились, создайте обращение, и мы проверим платёж.",
   "supportAssistantRecommendationPremiumIssue": "Если Premium уже оплачен, но не отображается в приложении, попробуйте перезапустить приложение. Если проблема сохраняется, мы проверим статус подписки.",
   "supportAssistantRecommendationPaymentRefund": "Мы можем проверить ваш платёж или передать запрос на возврат в поддержку. Создайте обращение, и мы прикрепим информацию о покупке, если она доступна.",
   "supportAssistantRecommendationOther": "Опишите, что произошло. Вы также можете приложить скриншот, чтобы поддержка быстрее разобралась в ситуации.",
@@ -843,10 +849,10 @@
   "startupOnboardingPageTwoHighlightOne": "Гостевой просмотр",
   "startupOnboardingPageTwoHighlightTwo": "Вход в один тап",
   "startupOnboardingPageTwoHighlightThree": "Плавный переход",
-  "startupOnboardingPageThreeTitle": "Токены и premium ждут позже",
-  "startupOnboardingPageThreeSubtitle": "Первое знакомство должно быть лёгким. Токены, награды и premium-действия откроются после аккуратной авторизации.",
+  "startupOnboardingPageThreeTitle": "PawSpark и premium ждут позже",
+  "startupOnboardingPageThreeSubtitle": "Первое знакомство должно быть лёгким. PawSpark, награды и premium-действия откроются после аккуратной авторизации.",
   "startupOnboardingPageThreeHighlightOne": "Premium-фишки",
-  "startupOnboardingPageThreeHighlightTwo": "Баланс токенов",
+  "startupOnboardingPageThreeHighlightTwo": "Баланс PawSpark",
   "startupOnboardingPageThreeHighlightThree": "Бонусы автора",
   "startupMiniFeatureFastStart": "Быстрый старт",
   "startupMiniFeaturePetFirst": "Pet-first",
@@ -864,7 +870,7 @@
   "authEntryTitle": "С возвращением!",
   "authEntrySubtitle": "Войдите, чтобы продолжить магию для вашего питомца.",
   "authRegisterTitle": "Создайте аккаунт",
-  "authRegisterSubtitle": "Присоединяйтесь к PetMagic и откройте шаблоны, токены и premium-возможности.",
+  "authRegisterSubtitle": "Присоединяйтесь к PetMagic и откройте шаблоны, PawSpark и premium-возможности.",
   "authRegisterAction": "Зарегистрироваться",
   "authDisplayNameLabel": "Имя профиля (необязательно)",
   "authConfirmPasswordLabel": "Подтвердите пароль",
@@ -924,12 +930,12 @@
   "authPrivacyTitle": "Ваша приватность важна",
   "authPrivacySubtitle": "Мы не продаем и не передаем ваши данные третьим лицам.",
   "authRequiredTitle": "Войдите, чтобы открыть это действие",
-  "authRequiredMessage": "Гость может изучать приложение, но действия с шаблонами, наградами и токенами требуют аккаунт PetMagic.",
+  "authRequiredMessage": "Гость может изучать приложение, но действия с шаблонами, наградами и PawSpark требуют аккаунт PetMagic.",
   "authRequiredContinueBrowsing": "Продолжить просмотр",
   "templateTryAction": "Попробовать шаблон",
   "templateGuestPreview": "Гостевой просмотр",
   "templateActionComingSoon": "Студия шаблонов скоро появится.",
-  "tokensActionComingSoon": "Кошелёк токенов скоро появится.",
+  "tokensActionComingSoon": "Кошелёк PawSpark скоро появится.",
   "rewardsActionComingSoon": "Центр наград скоро появится.",
   "templateFlowPhotoSourceGallery": "Галерея",
   "templateFlowPhotoSourceCamera": "Камера",
@@ -1018,8 +1024,8 @@
   "generationStatusVideoReady": "Видео готово",
   "generationStatusShareVideoAction": "Поделиться видео",
   "generationStatusFailedTitle": "Не удалось создать результат",
-  "generationStatusTokensRefundedHint": "Токены возвращены на ваш баланс.",
-  "generationStatusTokensRefundedShort": "Токены возвращены",
+  "generationStatusTokensRefundedHint": "PawSpark возвращены на ваш баланс.",
+  "generationStatusTokensRefundedShort": "PawSpark возвращены",
   "generationStatusSupportHint": "Если ошибка повторится, напишите в поддержку.",
   "generationStatusBackgroundHint": "Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.",
   "generationStatusDownloadAction": "Скачать",
@@ -1047,11 +1053,11 @@
   "generationStatusEtaStartsSoon": "Начнем через несколько минут",
   "generationStatusEtaNotifyHint": "Мы сообщим, когда результат будет готов.",
   "generationStatusFailurePhotoHint": "Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.",
-  "generationStatusFailureTechnicalHint": "Не удалось создать результат из-за технической ошибки. Мы вернули токены на ваш баланс.",
+  "generationStatusFailureTechnicalHint": "Не удалось создать результат из-за технической ошибки. Мы вернули PawSpark на ваш баланс.",
   "generationStatusStatusCompleted": "Ваш результат готов",
   "generationStatusStatusFailed": "Не удалось создать результат",
   "generationStatusStatusCreatingMagic": "Создаем магию...",
-  "generationStatusTerminalRefundedHint": "Токены возвращены автоматически.",
+  "generationStatusTerminalRefundedHint": "PawSpark возвращены автоматически.",
   "generationStatusTerminalFailureHint": "Техническая ошибка уже зафиксирована.",
   "generationStatusTerminalSuccessHint": "Откройте результат, поделитесь им или оставьте отзыв.",
   "generationStatusSectionActive": "В процессе",
@@ -1174,5 +1180,21 @@
   "premiumBenefitNoWatermarkTitle": "Без водяного знака",
   "premiumBenefitNoWatermarkSubtitle": "чистый экспорт",
   "premiumBenefitBiggerRewardsTitle": "Больше наград",
-  "premiumBenefitBiggerRewardsSubtitle": "ежедневные бонусы"
+  "premiumBenefitBiggerRewardsSubtitle": "ежедневные бонусы",
+  "subscriptionDangerZoneTitle": "Опасная зона",
+  "subscriptionCancelConfirmTitle": "Отменить подписку?",
+  "subscriptionCancelConfirmBody": "Premium останется активным до {date}. Новые списания будут отключены.",
+  "@subscriptionCancelConfirmBody": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "subscriptionCancelConfirmAction": "Подтвердить",
+  "subscriptionCancelConfirmKeep": "Сохранить Premium",
+  "subscriptionRestoreSuccessMessage": "Покупки восстановлены",
+  "subscriptionRestoreNoneFoundMessage": "Активная подписка не найдена",
+  "subscriptionPaymentTrustText": "Данные карты безопасно обрабатываются Stripe. PetMagic не хранит данные вашей карты.",
+  "subscriptionBillingPeriodLabel": "Период подписки",
+  "subscriptionBillingPeriodMonthly": "Ежемесячный",
+  "subscriptionBillingPeriodYearly": "Годовой"
 }

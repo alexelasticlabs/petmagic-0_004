@@ -268,7 +268,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                   </AdminStatusBadge>
                 </div>
                 <p>
-                  {generation.templateType} • {generation.tokenCost} tokens
+                  {generation.templateType} • {generation.tokenCost} PawSpark
                 </p>
                 <span>
                   {formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}

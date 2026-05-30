@@ -427,6 +427,20 @@ class ProfileRepository {
     required String fallbackMessage,
   }) {
     final payload = NetworkErrorMapper.parseApiPayload(error);
+    final statusCode = error.response?.statusCode;
+    final title = payload.title?.trim();
+    final detail = payload.detail?.trim();
+
+    final isUserNotFound =
+        title == 'users.not_found' || detail == 'User not found.';
+    if (isUserNotFound && statusCode == 404) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        'auth.session_expired',
+        statusCode: statusCode,
+      );
+    }
+
     if (payload.flattened != null) {
       return NetworkErrorMapper.fromMessage(error, payload.flattened!);
     }

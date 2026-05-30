@@ -225,7 +225,8 @@ public sealed partial class EconomyService
             manageAction,
             subscription?.LastTokenGrantAtUtc,
             cardBrand,
-            cardLast4));
+            cardLast4,
+            options.Value.WeeklyPremiumSpark));
     }
 
     public async Task<Result<StripeDiagnosticsResponse>> GetStripeDiagnosticsAsync(Guid userId, CancellationToken cancellationToken)

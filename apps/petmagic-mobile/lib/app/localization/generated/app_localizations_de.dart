@@ -205,7 +205,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileSubscriptionNextBillingLabel => 'Nächste Abrechnung';
 
   @override
-  String get profileSubscriptionTokensLabel => 'Verfügbare Token';
+  String get profileSubscriptionTokensLabel => 'Verfügbare PawSpark';
 
   @override
   String get subscriptionStatusActive => 'Premium aktiv';
@@ -242,7 +242,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get subscriptionAutoRenewOff => 'Deaktiviert';
 
   @override
-  String get subscriptionTokensSectionTitle => 'Premium-Token';
+  String get subscriptionTokensSectionTitle => 'Premium PawSpark';
 
   @override
   String get subscriptionTokensAvailableLabel => 'Jetzt verfügbar';
@@ -264,13 +264,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get subscriptionTokensExplanation =>
-      'Token werden alle 7 Tage ab Abonnementstart gutgeschrieben. Der erste Bonus wird sofort nach dem Kauf gewährt.';
+      'PawSpark werden alle 7 Tage ab Abonnementstart gutgeschrieben. Der erste Bonus wird sofort nach dem Kauf gewährt.';
 
   @override
   String get subscriptionBenefitsSectionTitle => 'Premium-Vorteile';
 
   @override
-  String get subscriptionBenefitTokens => '40 Token alle 7 Tage';
+  String get subscriptionBenefitTokens => '40 PawSpark alle 7 Tage';
 
   @override
   String get subscriptionBenefitFirstBonus =>
@@ -700,16 +700,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get walletCheckoutProductSubtitle =>
-      'Tokens für Foto- und Videogenerierungen in PetMagic';
+      'PawSpark für Foto- und Videogenerierungen in PetMagic';
 
   @override
   String walletCheckoutTokensImmediately(Object count) {
-    return '$count Tokens sofort nach der Zahlung';
+    return '$count PawSpark sofort nach der Zahlung';
   }
 
   @override
   String walletCheckoutBonusTokens(Object count) {
-    return '+$count Bonus-Tokens inklusive';
+    return '+$count Bonus-PawSpark inklusive';
   }
 
   @override
@@ -977,12 +977,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String premiumTokensPerWeek(Object count) {
-    return '$count Token / Woche';
+    return '$count PawSpark / Woche';
   }
 
   @override
   String premiumTokensPerMonth(Object count) {
-    return '$count Token / Monat';
+    return '$count PawSpark / Monat';
   }
 
   @override
@@ -1009,10 +1009,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumPaymentTitle => 'Zahlungsmethode';
 
   @override
+  String get premiumPaymentChooseSubtitle => 'Choose how you want to subscribe';
+
+  @override
   String get premiumPaymentStripe => 'Karte über Stripe';
 
   @override
+  String get premiumPaymentStripeSubtitle => 'Card, Apple Pay or Google Pay';
+
+  @override
   String get premiumPaymentGooglePlay => 'Google Play';
+
+  @override
+  String get premiumPaymentGooglePlaySubtitle => 'Payment via Google Play';
 
   @override
   String get premiumPaymentApple => 'Apple Pay / App Store';
@@ -1022,6 +1031,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get premiumPaymentDefaultBadge => 'Standard';
+
+  @override
+  String get premiumPaymentTrustStripeProcesses =>
+      'Card data is securely processed by Stripe.';
+
+  @override
+  String get premiumPaymentTrustNoStorage =>
+      'PetMagic does not store your card details.';
+
+  @override
+  String get premiumPaymentTrustManageInApp =>
+      'Subscription renewal and cancellation are managed inside PetMagic.';
 
   @override
   String paymentBonusPercentBadge(Object percent) {
@@ -1044,7 +1065,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumComparisonPremiumTemplates => 'Premium-Vorlagen';
 
   @override
-  String get premiumComparisonTokens => 'Token pro Monat';
+  String get premiumComparisonTokens => 'PawSpark pro Monat';
 
   @override
   String premiumComparisonPremiumTokens(Object count) {
@@ -1052,7 +1073,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get premiumComparisonPremiumTokensFallback => 'Bis zu 1000';
+  String get premiumComparisonPremiumTokensFallback => '40 PawSpark / Woche';
 
   @override
   String get premiumComparisonFast => 'Schnelle Generierung';
@@ -1067,7 +1088,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumComparisonPrioritySupport => 'Priorisierter Support';
 
   @override
-  String get premiumFreeSummaryTokens => '20 Token pro Monat';
+  String get premiumFreeSummaryTokens => '20 PawSpark pro Monat';
 
   @override
   String get premiumFreeSummaryWatermark => 'Wasserzeichen auf Inhalten';
@@ -1729,7 +1750,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get supportChatQuickActionTokens =>
-      'Token wurden nicht gutgeschrieben';
+      'PawSpark wurden nicht gutgeschrieben';
 
   @override
   String get supportChatFaqTitle => 'FAQ';
@@ -2012,7 +2033,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportHomeTopicGenerationTooLong => 'Generierung dauert zu lange';
 
   @override
-  String get supportHomeTopicTokensNotArrived => 'Token sind nicht angekommen';
+  String get supportHomeTopicTokensNotArrived =>
+      'PawSpark sind nicht angekommen';
 
   @override
   String get supportHomeTopicPremiumIssue => 'Premium-Problem';
@@ -2045,7 +2067,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get supportAssistantRecommendationTokensNotArrived =>
-      'Manchmal kann die Token-Lieferung nach der Zahlung einige Minuten dauern. Wenn die Token noch immer nicht erscheinen, erstellen Sie ein Support-Ticket und wir prüfen den Kauf.';
+      'Manchmal kann die PawSpark-Lieferung nach der Zahlung einige Minuten dauern. Wenn die PawSpark noch immer nicht erscheinen, erstellen Sie ein Support-Ticket und wir prüfen den Kauf.';
 
   @override
   String get supportAssistantRecommendationPremiumIssue =>
@@ -2236,18 +2258,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get startupOnboardingPageThreeTitle =>
-      'Sammle später Token und Premium-Vergünstigungen';
+      'Sammle später PawSpark und Premium-Vergünstigungen';
 
   @override
   String get startupOnboardingPageThreeSubtitle =>
-      'Sorgen Sie dafür, dass der erste Eindruck Spaß macht. Token, Belohnungen und Premium-Aktionen warten hinter einem sauberen Authentifizierungsschritt.';
+      'Sorgen Sie dafür, dass der erste Eindruck Spaß macht. PawSpark, Belohnungen und Premium-Aktionen warten hinter einem sauberen Authentifizierungsschritt.';
 
   @override
   String get startupOnboardingPageThreeHighlightOne =>
       'Premium-Freischaltungen';
 
   @override
-  String get startupOnboardingPageThreeHighlightTwo => 'Token-Guthaben';
+  String get startupOnboardingPageThreeHighlightTwo => 'PawSpark-Guthaben';
 
   @override
   String get startupOnboardingPageThreeHighlightThree =>
@@ -2307,7 +2329,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get authRegisterSubtitle =>
-      'Treten Sie PetMagic bei und schalten Sie Vorlagen, Token und Premium-Funktionen frei.';
+      'Treten Sie PetMagic bei und schalten Sie Vorlagen, PawSpark und Premium-Funktionen frei.';
 
   @override
   String get authRegisterAction => 'Melden Sie sich an';
@@ -2516,7 +2538,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get authRequiredMessage =>
-      'Gäste können die App erkunden, für Vorlagenaktionen, Belohnungen und Token-Funktionen ist jedoch ein PetMagic-Konto erforderlich.';
+      'Gäste können die App erkunden, für Vorlagenaktionen, Belohnungen und PawSpark-Funktionen ist jedoch ein PetMagic-Konto erforderlich.';
 
   @override
   String get authRequiredContinueBrowsing => 'Stöbern Sie weiter';
@@ -2531,7 +2553,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get templateActionComingSoon => 'Template Studio kommt bald.';
 
   @override
-  String get tokensActionComingSoon => 'Token-Wallet kommt bald.';
+  String get tokensActionComingSoon => 'PawSpark-Wallet kommt bald.';
 
   @override
   String get rewardsActionComingSoon => 'Das Prämiencenter ist bald verfügbar.';
@@ -2811,10 +2833,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get generationStatusTokensRefundedHint =>
-      'Tokens wurden deinem Guthaben zuruckerstattet.';
+      'PawSpark wurden deinem Guthaben zuruckerstattet.';
 
   @override
-  String get generationStatusTokensRefundedShort => 'Tokens zuruckerstattet';
+  String get generationStatusTokensRefundedShort => 'PawSpark zuruckerstattet';
 
   @override
   String get generationStatusSupportHint =>
@@ -2898,7 +2920,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Das Ergebnis konnte wegen eines technischen Problems nicht erstellt werden. Tokens wurden deinem Guthaben zuruckerstattet.';
+      'Das Ergebnis konnte wegen eines technischen Problems nicht erstellt werden. PawSpark wurden deinem Guthaben zuruckerstattet.';
 
   @override
   String get generationStatusStatusCompleted => 'Dein Ergebnis ist fertig';
@@ -2912,7 +2934,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get generationStatusTerminalRefundedHint =>
-      'Tokens wurden automatisch zuruckerstattet.';
+      'PawSpark wurden automatisch zuruckerstattet.';
 
   @override
   String get generationStatusTerminalFailureHint =>
@@ -3169,4 +3191,41 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get premiumBenefitBiggerRewardsSubtitle => 'tägliche Boni';
+
+  @override
+  String get subscriptionDangerZoneTitle => 'Gefahrenzone';
+
+  @override
+  String get subscriptionCancelConfirmTitle => 'Abonnement kündigen?';
+
+  @override
+  String subscriptionCancelConfirmBody(String date) {
+    return 'Premium bleibt bis $date aktiv. Neue Abbuchungen werden deaktiviert.';
+  }
+
+  @override
+  String get subscriptionCancelConfirmAction => 'Bestätigen';
+
+  @override
+  String get subscriptionCancelConfirmKeep => 'Premium behalten';
+
+  @override
+  String get subscriptionRestoreSuccessMessage => 'Käufe wiederhergestellt';
+
+  @override
+  String get subscriptionRestoreNoneFoundMessage =>
+      'Kein aktives Abonnement gefunden';
+
+  @override
+  String get subscriptionPaymentTrustText =>
+      'Kartendaten werden sicher von Stripe verarbeitet. PetMagic speichert keine Kartendaten.';
+
+  @override
+  String get subscriptionBillingPeriodLabel => 'Abrechnungszeitraum';
+
+  @override
+  String get subscriptionBillingPeriodMonthly => 'Monatlich';
+
+  @override
+  String get subscriptionBillingPeriodYearly => 'Jährlich';
 }

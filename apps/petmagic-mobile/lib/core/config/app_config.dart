@@ -34,6 +34,39 @@ class AppConfig {
     defaultValue: 8,
   );
 
+  static const mediaCacheMaxBytes = int.fromEnvironment(
+    'PETMAGIC_MEDIA_CACHE_MAX_BYTES',
+    defaultValue: 120 * 1024 * 1024,
+  );
+  static const mediaCacheStalePeriodHours = int.fromEnvironment(
+    'PETMAGIC_MEDIA_CACHE_STALE_HOURS',
+    defaultValue: 24,
+  );
+  static const mediaTempFileTtlHours = int.fromEnvironment(
+    'PETMAGIC_MEDIA_TEMP_FILE_TTL_HOURS',
+    defaultValue: 24,
+  );
+
+  static Duration get mediaCacheStalePeriod {
+    final safeHours = mediaCacheStalePeriodHours <= 0
+        ? 24
+        : mediaCacheStalePeriodHours;
+    return Duration(hours: safeHours);
+  }
+
+  static Duration get mediaTempFileTtl {
+    final safeHours = mediaTempFileTtlHours <= 0 ? 24 : mediaTempFileTtlHours;
+    return Duration(hours: safeHours);
+  }
+
+  static int get mediaCacheMaxBytesSafe {
+    if (mediaCacheMaxBytes <= 0) {
+      return 120 * 1024 * 1024;
+    }
+
+    return mediaCacheMaxBytes;
+  }
+
   static List<String> get apiBaseUrls {
     if (configuredApiBaseUrl.isNotEmpty) {
       return [configuredApiBaseUrl];

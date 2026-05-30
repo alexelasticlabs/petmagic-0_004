@@ -340,6 +340,7 @@ class _OrbitIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final radius = 88.0;
     final x = math.cos(angle) * radius;
     final y = math.sin(angle) * radius;
@@ -350,9 +351,11 @@ class _OrbitIcon extends StatelessWidget {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: colors.surfaceGlass.withValues(alpha: 0.9),
+          color: colors.surfaceGlass.withValues(alpha: isLight ? 0.96 : 0.9),
           shape: BoxShape.circle,
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(
+            color: color.withValues(alpha: isLight ? 0.42 : 0.3),
+          ),
           boxShadow: [
             BoxShadow(
               color: color.withValues(alpha: 0.18),
@@ -413,6 +416,7 @@ class _PawStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return AnimatedContainer(
       key: ValueKey('magic-loading-paw-$index'),
@@ -424,16 +428,18 @@ class _PawStep extends StatelessWidget {
         shape: BoxShape.circle,
         color: active
             ? color.withValues(alpha: 0.18)
-            : colors.surfaceGlass.withValues(alpha: 0.34),
+            : colors.surfaceGlass.withValues(alpha: isLight ? 0.6 : 0.34),
         border: Border.all(
           color: active
               ? color.withValues(alpha: 0.42)
-              : colors.border.withValues(alpha: 0.28),
+              : colors.border.withValues(alpha: isLight ? 0.64 : 0.28),
         ),
       ),
       child: Icon(
         Icons.pets_rounded,
-        color: active ? color : colors.textMuted.withValues(alpha: 0.68),
+        color: active
+            ? color
+            : colors.textMuted.withValues(alpha: isLight ? 0.9 : 0.68),
         size: 18,
       ),
     );

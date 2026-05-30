@@ -26,6 +26,7 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final text = AppLocalizations.of(context);
     final primaryAttachment = message.primaryAttachment;
     final hasMediaGroup = message.hasMediaGroup;
@@ -80,7 +81,7 @@ class _MessageBubble extends StatelessWidget {
     final borderColor = message.isFromAdmin
         ? colors.border
         : (isMediaOnlyBubble
-              ? colors.border.withValues(alpha: 0.45)
+              ? colors.border.withValues(alpha: isLight ? 0.72 : 0.45)
               : _supportMessageGreenBorder);
     final alignment = message.isFromAdmin
         ? Alignment.centerLeft

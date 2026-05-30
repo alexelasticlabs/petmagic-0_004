@@ -1006,10 +1006,19 @@ class AppLocalizationsPl extends AppLocalizations {
   String get premiumPaymentTitle => 'Metoda płatności';
 
   @override
+  String get premiumPaymentChooseSubtitle => 'Choose how you want to subscribe';
+
+  @override
   String get premiumPaymentStripe => 'Karta poprzez Stripe';
 
   @override
+  String get premiumPaymentStripeSubtitle => 'Card, Apple Pay or Google Pay';
+
+  @override
   String get premiumPaymentGooglePlay => 'Google Play';
+
+  @override
+  String get premiumPaymentGooglePlaySubtitle => 'Payment via Google Play';
 
   @override
   String get premiumPaymentApple => 'Apple Pay/App Store';
@@ -1019,6 +1028,18 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get premiumPaymentDefaultBadge => 'Domyślny';
+
+  @override
+  String get premiumPaymentTrustStripeProcesses =>
+      'Card data is securely processed by Stripe.';
+
+  @override
+  String get premiumPaymentTrustNoStorage =>
+      'PetMagic does not store your card details.';
+
+  @override
+  String get premiumPaymentTrustManageInApp =>
+      'Subscription renewal and cancellation are managed inside PetMagic.';
 
   @override
   String paymentBonusPercentBadge(Object percent) {
@@ -1049,7 +1070,7 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
-  String get premiumComparisonPremiumTokensFallback => 'Do 1000';
+  String get premiumComparisonPremiumTokensFallback => '40 tokenów / tydzień';
 
   @override
   String get premiumComparisonFast => 'Szybkie generowanie';
@@ -3143,4 +3164,41 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get premiumBenefitBiggerRewardsSubtitle => 'bonusy dzienne';
+
+  @override
+  String get subscriptionDangerZoneTitle => 'Strefa niebezpieczna';
+
+  @override
+  String get subscriptionCancelConfirmTitle => 'Anulować subskrypcję?';
+
+  @override
+  String subscriptionCancelConfirmBody(String date) {
+    return 'Premium pozostanie aktywne do $date. Nowe opłaty zostaną wyłączone.';
+  }
+
+  @override
+  String get subscriptionCancelConfirmAction => 'Potwierdź anulowanie';
+
+  @override
+  String get subscriptionCancelConfirmKeep => 'Zachowaj Premium';
+
+  @override
+  String get subscriptionRestoreSuccessMessage => 'Zakupy przywrócone';
+
+  @override
+  String get subscriptionRestoreNoneFoundMessage =>
+      'Nie znaleziono aktywnej subskrypcji';
+
+  @override
+  String get subscriptionPaymentTrustText =>
+      'Dane karty są bezpiecznie przetwarzane przez Stripe. PetMagic nie przechowuje danych Twojej karty.';
+
+  @override
+  String get subscriptionBillingPeriodLabel => 'Okres rozliczeniowy';
+
+  @override
+  String get subscriptionBillingPeriodMonthly => 'Miesięczny';
+
+  @override
+  String get subscriptionBillingPeriodYearly => 'Roczny';
 }

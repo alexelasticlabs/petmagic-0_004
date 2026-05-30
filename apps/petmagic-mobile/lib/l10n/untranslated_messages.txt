@@ -1,1 +1,46 @@
-{}
+{
+  "de": [
+    "premiumPaymentChooseSubtitle",
+    "premiumPaymentStripeSubtitle",
+    "premiumPaymentGooglePlaySubtitle",
+    "premiumPaymentTrustStripeProcesses",
+    "premiumPaymentTrustNoStorage",
+    "premiumPaymentTrustManageInApp"
+  ],
+
+  "es": [
+    "premiumPaymentChooseSubtitle",
+    "premiumPaymentStripeSubtitle",
+    "premiumPaymentGooglePlaySubtitle",
+    "premiumPaymentTrustStripeProcesses",
+    "premiumPaymentTrustNoStorage",
+    "premiumPaymentTrustManageInApp"
+  ],
+
+  "fr": [
+    "premiumPaymentChooseSubtitle",
+    "premiumPaymentStripeSubtitle",
+    "premiumPaymentGooglePlaySubtitle",
+    "premiumPaymentTrustStripeProcesses",
+    "premiumPaymentTrustNoStorage",
+    "premiumPaymentTrustManageInApp"
+  ],
+
+  "it": [
+    "premiumPaymentChooseSubtitle",
+    "premiumPaymentStripeSubtitle",
+    "premiumPaymentGooglePlaySubtitle",
+    "premiumPaymentTrustStripeProcesses",
+    "premiumPaymentTrustNoStorage",
+    "premiumPaymentTrustManageInApp"
+  ],
+
+  "pl": [
+    "premiumPaymentChooseSubtitle",
+    "premiumPaymentStripeSubtitle",
+    "premiumPaymentGooglePlaySubtitle",
+    "premiumPaymentTrustStripeProcesses",
+    "premiumPaymentTrustNoStorage",
+    "premiumPaymentTrustManageInApp"
+  ]
+}

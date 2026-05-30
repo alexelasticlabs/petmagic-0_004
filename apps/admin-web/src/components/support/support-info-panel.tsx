@@ -307,7 +307,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   <strong>{isUserPremium ? text.premiumLabel : text.freeLabel}</strong>
                 </div>
                 <div className={styles.infoPanelStatTile}>
-                  <span>{locale === "ru" ? "Токены" : "Tokens"}</span>
+                  <span>{locale === "ru" ? "PawSpark" : "PawSpark"}</span>
                   <strong>{String(analyticsQuery.data?.summary.walletBalance ?? 0)}</strong>
                 </div>
                 <div className={styles.infoPanelStatTile}>

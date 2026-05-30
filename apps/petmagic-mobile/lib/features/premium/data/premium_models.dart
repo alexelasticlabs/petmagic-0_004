@@ -224,6 +224,7 @@ class PremiumStatusModel {
     this.lastTokenGrantAtUtc,
     this.cardBrand,
     this.cardLast4,
+    this.weeklyGrantAmount,
   });
 
   final bool isPremium;
@@ -243,6 +244,7 @@ class PremiumStatusModel {
   final int tokensAvailable;
   final bool canManageSubscription;
   final String manageSubscriptionAction;
+  final int? weeklyGrantAmount;
 
   PremiumPaymentProvider? get provider {
     final rawValue = paymentProvider;
@@ -284,6 +286,8 @@ class PremiumStatusModel {
       canManageSubscription: json['canManageSubscription'] as bool? ?? false,
       manageSubscriptionAction:
           json['manageSubscriptionAction'] as String? ?? 'None',
+      weeklyGrantAmount:
+          (json['weeklyGrantAmount'] as num?)?.toInt(),
     );
   }
 }

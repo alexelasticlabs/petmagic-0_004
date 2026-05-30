@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -49,7 +49,7 @@ class _WalletStripeCheckoutPageState extends State<WalletStripeCheckoutPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(text.externalCheckoutStripeTitle),
+        title: Text(text.walletBuySparkTitle),
         centerTitle: false,
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -234,10 +234,10 @@ class _HeroPackCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.diamond_rounded, color: colors.purple, size: 14),
+                    Icon(Icons.bolt_rounded, color: colors.purple, size: 14),
                     const SizedBox(width: 4),
                     Text(
-                      'PawSpark Premium',
+                      text.walletBuySparkTitle,
                       style: TextStyle(
                         color: colors.purple,
                         fontSize: 11.5,
@@ -255,7 +255,7 @@ class _HeroPackCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  text.premiumPaymentRecommendedBadge,
+                  text.walletPackTotalSpark(pack.totalSpark),
                   style: TextStyle(
                     color: colors.accent,
                     fontSize: 11,
@@ -292,7 +292,7 @@ class _HeroPackCard extends StatelessWidget {
             children: [
               _BenefitChip(
                 icon: Icons.bolt_rounded,
-                label: text.walletCheckoutTokensImmediately(pack.grantedSpark),
+                label: text.walletCheckoutTokensImmediately(pack.totalSpark),
                 color: colors.accent,
               ),
               if (pack.bonusSpark > 0)
@@ -400,7 +400,7 @@ class _IncludedSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         _CheckItem(
-          label: text.walletCheckoutTokensImmediately(pack.grantedSpark),
+          label: text.walletCheckoutTokensImmediately(pack.totalSpark),
           color: colors.accent,
         ),
         if (pack.bonusSpark > 0) ...[
@@ -411,11 +411,7 @@ class _IncludedSection extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 6),
-        _CheckItem(label: text.walletCheckoutFeaturePremiumTemplates),
-        const SizedBox(height: 6),
-        _CheckItem(label: text.walletCheckoutFeaturePriority),
-        const SizedBox(height: 6),
-        _CheckItem(label: text.walletCheckoutFeatureMoreVideos),
+        _CheckItem(label: text.walletPackUsageNote),
       ],
     );
   }
@@ -480,7 +476,7 @@ class _PaymentMethodSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          text.premiumPaymentTitle,
+          text.subscriptionPaymentMethodLabel,
           style: TextStyle(
             color: colors.textStrong,
             fontSize: 15,
@@ -518,30 +514,11 @@ class _PaymentMethodSection extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          text.premiumPaymentStripe,
+                          label,
                           style: TextStyle(
                             color: colors.textStrong,
                             fontSize: 14.5,
                             fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colors.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            text.premiumPaymentRecommendedBadge,
-                            style: TextStyle(
-                              color: colors.accent,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
                           ),
                         ),
                       ],
@@ -653,6 +630,11 @@ class _OrderSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
+          _SummaryRow(
+            label: text.walletSourcePackPurchase,
+            value: text.walletPackTotalSpark(pack.totalSpark),
+          ),
+          const SizedBox(height: 6),
           _SummaryRow(label: pack.displayName, value: price),
           const SizedBox(height: 6),
           _SummaryRow(
