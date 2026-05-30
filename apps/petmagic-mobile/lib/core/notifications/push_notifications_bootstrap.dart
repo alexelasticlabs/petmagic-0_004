@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/core/notifications/notification_coordinator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
@@ -33,17 +32,24 @@ class PushNotificationsBootstrap extends ConsumerStatefulWidget {
 class _PushNotificationsBootstrapState
     extends ConsumerState<PushNotificationsBootstrap> {
   final AppLinks _appLinks = AppLinks();
-  StreamSubscription<String>? _tokenRefreshSubscription;
-  StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
+  NotificationCoordinator? _coordinator;
   StreamSubscription<Uri>? _deepLinkSubscription;
-  bool _started = false;
-  bool _startInFlight = false;
-  bool _handledInitialMessage = false;
+  bool _wasAuthenticated = false;
+  bool _initialLinkHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _coordinator = NotificationCoordinator(
+      templateRepository: ref.read(templateGenerationRepositoryProvider),
+      supportRepository: ref.read(supportChatRepositoryProvider),
+      onRouteRequested: _openRoute,
+    );
+  }
 
   @override
   void dispose() {
-    unawaited(_tokenRefreshSubscription?.cancel());
-    unawaited(_messageOpenedSubscription?.cancel());
+    unawaited(_coordinator?.dispose());
     unawaited(_deepLinkSubscription?.cancel());
     super.dispose();
   }
@@ -51,103 +57,40 @@ class _PushNotificationsBootstrapState
   @override
   Widget build(BuildContext context) {
     final launchState = ref.watch(appLaunchControllerProvider);
-    if (launchState.isAuthenticated && !_started && !_startInFlight) {
-      Future.microtask(_start);
+    if (launchState.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
+      Future.microtask(() => _coordinator?.initializeForAuthenticatedUser());
+    }
+
+    if (!launchState.isAuthenticated && _wasAuthenticated) {
+      _wasAuthenticated = false;
+      Future.microtask(() => _coordinator?.unregisterCurrentTokenOnSignOut());
+    }
+
+    _deepLinkSubscription ??= _appLinks.uriLinkStream.listen(_openDeepLink);
+    if (!_initialLinkHandled) {
+      _initialLinkHandled = true;
+      Future.microtask(_handleInitialLinkOnce);
     }
 
     return widget.child;
   }
 
-  Future<void> _start() async {
-    if (_started || _startInFlight || Firebase.apps.isEmpty) {
+  Future<void> _handleInitialLinkOnce() async {
+    if (Firebase.apps.isEmpty || _deepLinkSubscription == null) {
       return;
     }
 
-    _startInFlight = true;
-    try {
-      final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
-      await messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-
-      final token = await messaging.getToken();
-      if (token != null && token.isNotEmpty) {
-        await _registerToken(token);
-      }
-
-      _tokenRefreshSubscription ??= messaging.onTokenRefresh.listen(
-        (token) => unawaited(_registerToken(token)),
-      );
-      _messageOpenedSubscription ??= FirebaseMessaging.onMessageOpenedApp
-          .listen((message) => _openMessageRoute(message));
-      _deepLinkSubscription ??= _appLinks.uriLinkStream.listen(_openDeepLink);
-
-      if (!_handledInitialMessage) {
-        _handledInitialMessage = true;
-        final initialMessage = await messaging.getInitialMessage();
-        if (initialMessage != null) {
-          _openMessageRoute(initialMessage);
-        }
-
-        final initialLink = await _appLinks.getInitialLink();
-        if (initialLink != null) {
-          _openDeepLink(initialLink);
-        }
-      }
-
-      _started = true;
-    } catch (_) {
-      _started = false;
-    } finally {
-      _startInFlight = false;
+    final initialLink = await _appLinks.getInitialLink();
+    if (initialLink != null) {
+      _openDeepLink(initialLink);
     }
   }
 
-  Future<void> _registerToken(String token) async {
-    try {
-      await ref
-          .read(templateGenerationRepositoryProvider)
-          .registerPushToken(
-            token: token,
-            platform: Platform.operatingSystem,
-            locale: Platform.localeName,
-          );
-    } catch (_) {}
-
-    try {
-      await ref
-          .read(supportChatRepositoryProvider)
-          .registerPushToken(
-            token: token,
-            platform: Platform.operatingSystem,
-            locale: Platform.localeName,
-          );
-    } catch (_) {}
-  }
-
-  void _openMessageRoute(RemoteMessage message) {
-    final route = message.data['route'];
-    if (route is String && _isGenerationRoute(route)) {
+  void _openRoute(String route) {
+    if (_isGenerationRoute(route) || _isSupportRoute(route)) {
       widget.router.go(route);
       return;
-    }
-
-    if (route is String && _isSupportRoute(route)) {
-      widget.router.go(route);
-      return;
-    }
-
-    final generationId = message.data['generationId'];
-    if (generationId is String && generationId.isNotEmpty) {
-      widget.router.go('${GenerationStatusPage.routePrefix}/$generationId');
-      return;
-    }
-
-    if (message.data['type'] == 'support_chat') {
-      widget.router.go(SupportChatPage.routePath);
     }
   }
 

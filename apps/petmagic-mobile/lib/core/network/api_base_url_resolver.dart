@@ -39,17 +39,34 @@ class ApiBaseUrlResolver {
 
   String? _activeBaseUrl;
   Completer<String>? _resolveInFlight;
+  bool _backgroundRefreshInFlight = false;
 
   String? get activeBaseUrl => _activeBaseUrl;
 
   Future<String> resolveBaseUrl({bool forceRefresh = false}) async {
-    if (!forceRefresh) {
-      final activeBaseUrl = _activeBaseUrl;
-      if (activeBaseUrl != null) {
-        return activeBaseUrl;
-      }
+    if (forceRefresh) {
+      return _resolveWithProbe();
     }
 
+    final activeBaseUrl = _activeBaseUrl;
+    if (activeBaseUrl != null) {
+      _refreshInBackground();
+      return activeBaseUrl;
+    }
+
+    final persisted = await _readPersistedBaseUrl();
+    if (persisted != null) {
+      _activeBaseUrl = persisted;
+      _refreshInBackground();
+      return persisted;
+    }
+
+    _activeBaseUrl = AppConfig.apiBaseUrl;
+    _refreshInBackground();
+    return _activeBaseUrl!;
+  }
+
+  Future<String> _resolveWithProbe() async {
     final inFlight = _resolveInFlight;
     if (inFlight != null) {
       return inFlight.future;
@@ -57,20 +74,16 @@ class ApiBaseUrlResolver {
 
     final completer = Completer<String>();
     _resolveInFlight = completer;
-
     try {
       final candidates = await prioritizedCandidates();
       final reachableBaseUrl = await _findReachableBaseUrl(candidates);
-
       if (reachableBaseUrl != null) {
         await markSuccessful(reachableBaseUrl);
         completer.complete(reachableBaseUrl);
         return completer.future;
       }
 
-      final fallback = candidates.isNotEmpty
-          ? candidates.first
-          : AppConfig.apiBaseUrl;
+      final fallback = _activeBaseUrl ?? AppConfig.apiBaseUrl;
       _activeBaseUrl = fallback;
       completer.complete(fallback);
       return completer.future;
@@ -82,6 +95,19 @@ class ApiBaseUrlResolver {
         _resolveInFlight = null;
       }
     }
+  }
+
+  void _refreshInBackground() {
+    if (_backgroundRefreshInFlight) {
+      return;
+    }
+
+    _backgroundRefreshInFlight = true;
+    unawaited(
+      _resolveWithProbe().whenComplete(() {
+        _backgroundRefreshInFlight = false;
+      }),
+    );
   }
 
   Future<List<String>> prioritizedCandidates() async {

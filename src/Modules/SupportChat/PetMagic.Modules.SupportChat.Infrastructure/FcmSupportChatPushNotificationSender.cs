@@ -58,20 +58,22 @@ internal sealed class FcmSupportChatPushNotificationSender(
     {
         var isRussian = token.Locale?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
         var route = "/profile/support";
+        var eventId = $"{notification.ConversationId}:{notification.MessageId}";
         var body = BuildBody(notification, isRussian);
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = "support_chat",
+            ["conversationId"] = notification.ConversationId.ToString(),
+            ["messageId"] = notification.MessageId.ToString(),
+            ["route"] = route
+        };
         var request = new FcmSendRequest(
             new FcmMessage(
                 token.Token,
                 new FcmNotification(
                     isRussian ? "Поддержка PetMagic ответила" : "PetMagic Support replied",
                     body),
-                new Dictionary<string, string>
-                {
-                    ["type"] = "support_chat",
-                    ["conversationId"] = notification.ConversationId.ToString(),
-                    ["messageId"] = notification.MessageId.ToString(),
-                    ["route"] = route
-                },
+                data,
                 new FcmAndroidConfig("high"),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default", notification.UserUnreadCount)))));
 
@@ -84,15 +86,20 @@ internal sealed class FcmSupportChatPushNotificationSender(
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (response.IsSuccessStatusCode)
         {
+            logger.LogInformation(
+                "FCM send succeeded for support event {EventId} token {TokenId}: {Body}",
+                eventId,
+                token.Id,
+                responseBody);
             return;
         }
 
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         logger.LogWarning(
-            "FCM send failed for support conversation {ConversationId} token {TokenId}: {StatusCode} {Body}",
-            notification.ConversationId,
+            "FCM send failed for support event {EventId} token {TokenId}: {StatusCode} {Body}",
+            eventId,
             token.Id,
             response.StatusCode,
             responseBody);

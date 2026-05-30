@@ -1632,7 +1632,10 @@ class _FakeSupportChatRepository extends SupportChatRepository {
   }
 
   @override
-  Future<SupportChatConversation> getConversation() async {
+  Future<SupportChatConversation> getConversation({
+    int take = 60,
+    DateTime? beforeMessageCreatedAtUtc,
+  }) async {
     if (!_hasConversation) {
       throw const AppException(
         'support.conversation_not_found',
@@ -1703,7 +1706,10 @@ class _ThrowingSupportChatRepository extends SupportChatRepository {
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   @override
-  Future<SupportChatConversation> getConversation() async {
+  Future<SupportChatConversation> getConversation({
+    int take = 60,
+    DateTime? beforeMessageCreatedAtUtc,
+  }) async {
     throw Exception('unexpected support failure');
   }
 }
@@ -1713,7 +1719,10 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   @override
-  Future<SupportChatConversation> getConversation() async {
+  Future<SupportChatConversation> getConversation({
+    int take = 60,
+    DateTime? beforeMessageCreatedAtUtc,
+  }) async {
     return Completer<SupportChatConversation>().future;
   }
 }

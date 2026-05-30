@@ -128,6 +128,25 @@ class _FakeTemplateGenerationRepository
   }
 
   @override
+  Future<TemplateGenerationResult?> readCachedGeneration(
+    String generationId,
+  ) async {
+    return null;
+  }
+
+  @override
+  Future<List<TemplateGenerationResult>?> readCachedGenerations({
+    String? status,
+  }) async {
+    return null;
+  }
+
+  @override
+  Future<int?> readCachedUnreadGenerationCount() async {
+    return null;
+  }
+
+  @override
   Future<List<TemplateGenerationResult>> fetchGenerations({
     String? status,
     int? skip,

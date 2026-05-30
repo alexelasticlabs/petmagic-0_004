@@ -60,6 +60,14 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
     {
         var isFailed = generation.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase);
         var route = $"/generations/{generation.GenerationId}";
+        var eventId = generation.GenerationId.ToString();
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = "template_generation",
+            ["generationId"] = eventId,
+            ["route"] = route,
+            ["status"] = generation.Status
+        };
         var request = new FcmSendRequest(
             new FcmMessage(
                 token.Token,
@@ -68,13 +76,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
                     isFailed
                         ? "Мы сохранили статус генерации и вернули токены, если списание прошло."
                         : "Откройте Галерею, чтобы посмотреть результат."),
-                new Dictionary<string, string>
-                {
-                    ["type"] = "template_generation",
-                    ["generationId"] = generation.GenerationId.ToString(),
-                    ["route"] = route,
-                    ["status"] = generation.Status
-                },
+                data,
                 new FcmAndroidConfig("high"),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default")))));
 
@@ -87,15 +89,20 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (response.IsSuccessStatusCode)
         {
+            logger.LogInformation(
+                "FCM send succeeded for template generation event {EventId} token {TokenId}: {Body}",
+                eventId,
+                token.Id,
+                body);
             return;
         }
 
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
         logger.LogWarning(
-            "FCM send failed for generation {GenerationId} token {TokenId}: {StatusCode} {Body}",
-            generation.GenerationId,
+            "FCM send failed for template generation event {EventId} token {TokenId}: {StatusCode} {Body}",
+            eventId,
             token.Id,
             response.StatusCode,
             body);
