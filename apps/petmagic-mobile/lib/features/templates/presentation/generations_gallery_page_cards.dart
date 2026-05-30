@@ -62,6 +62,7 @@ class _ActiveCard extends ConsumerWidget {
                               : CachedNetworkImage(
                                   imageUrl: previewImageUrl,
                                   fit: BoxFit.cover,
+                                  memCacheWidth: 320,
                                   errorWidget: (context, url, error) =>
                                       _ThumbnailPlaceholder(
                                         generation: generation,
@@ -243,6 +244,7 @@ class _ReadyGridCard extends ConsumerWidget {
                             : CachedNetworkImage(
                                 imageUrl: previewImageUrl,
                                 fit: BoxFit.cover,
+                                memCacheWidth: 320,
                                 errorWidget: (context, url, error) =>
                                     _ThumbnailPlaceholder(
                                       generation: generation,
@@ -401,6 +403,7 @@ class _FailedCard extends ConsumerWidget {
                                 : CachedNetworkImage(
                                     imageUrl: previewImageUrl,
                                     fit: BoxFit.cover,
+                                    memCacheWidth: 320,
                                     errorWidget: (context, url, error) =>
                                         _ThumbnailPlaceholder(
                                           generation: generation,
@@ -540,6 +543,9 @@ class _CardEntrance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (PerformanceGuard.isDegradedMode(context)) {
+      return child;
+    }
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,

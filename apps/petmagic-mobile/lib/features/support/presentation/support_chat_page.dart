@@ -11,6 +11,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
+import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
@@ -49,6 +52,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
+  final AppPermissionCoordinator _permissionCoordinator =
+      AppPermissionCoordinator();
   late final SupportChatController _controller;
   Timer? _loadingFallbackTimer;
   Timer? _messageHighlightTimer;

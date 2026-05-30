@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
@@ -33,6 +34,8 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
 
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
+  final AppPermissionCoordinator _permissionCoordinator =
+      AppPermissionCoordinator();
 
   List<XFile> _attachments = const [];
   bool _isSubmitting = false;
@@ -320,6 +323,22 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   }
 
   Future<void> _pickFromCamera() async {
+    final permission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.camera,
+    );
+    if (!permission.granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Camera permission is required to take a photo.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     final picked = await _imagePicker.pickImage(
       source: ImageSource.camera,
       imageQuality: 92,
@@ -340,6 +359,22 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   }
 
   Future<void> _pickFromGallery() async {
+    final permission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.photos,
+    );
+    if (!permission.granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Gallery permission is required to choose photos.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     final remainingSlots = _maxAttachmentCount - _attachments.length;
     final pickedImages = await _imagePicker.pickMultiImage(
       imageQuality: 92,

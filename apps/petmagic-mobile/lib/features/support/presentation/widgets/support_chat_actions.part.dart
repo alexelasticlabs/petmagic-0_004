@@ -5,6 +5,19 @@ extension _SupportChatPageActions on _SupportChatPageState {
     if (!_canAddMoreAttachments()) {
       return;
     }
+    final permission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.camera,
+    );
+    if (!permission.granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Camera permission is required to take a photo.'),
+          ),
+        );
+      }
+      return;
+    }
 
     final picked = await _imagePicker.pickImage(
       source: ImageSource.camera,
@@ -27,6 +40,19 @@ extension _SupportChatPageActions on _SupportChatPageState {
 
   Future<void> _pickCameraVideoAttachmentImpl() async {
     if (!_canAddMoreAttachments()) {
+      return;
+    }
+    final permission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.camera,
+    );
+    if (!permission.granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Camera permission is required to record video.'),
+          ),
+        );
+      }
       return;
     }
 
@@ -93,6 +119,19 @@ extension _SupportChatPageActions on _SupportChatPageState {
 
   Future<void> _pickFileAttachmentsImpl() async {
     if (!_canAddMoreAttachments()) {
+      return;
+    }
+    final permission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.files,
+    );
+    if (!permission.granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Files permission is required to attach files.'),
+          ),
+        );
+      }
       return;
     }
 
@@ -666,6 +705,8 @@ class _SupportAttachmentPickerSheet extends StatefulWidget {
 class _SupportAttachmentPickerSheetState
     extends State<_SupportAttachmentPickerSheet> {
   final TextEditingController _captionController = TextEditingController();
+  final AppPermissionCoordinator _permissionCoordinator =
+      AppPermissionCoordinator();
   late Map<String, int> _selectedAssetOrderById;
   final Map<String, AssetEntity> _selectedAssetsById = <String, AssetEntity>{};
   PermissionState? _permissionState;
@@ -707,6 +748,22 @@ class _SupportAttachmentPickerSheetState
   }
 
   Future<void> _initializeAssets() async {
+    final galleryPermission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.photos,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (!galleryPermission.granted) {
+      setState(() {
+        _permissionState = null;
+        _isInitialLoading = false;
+        _assets = const [];
+        _hasMore = false;
+      });
+      return;
+    }
+
     final permission = await PhotoManager.requestPermissionExtend();
     if (!mounted) {
       return;

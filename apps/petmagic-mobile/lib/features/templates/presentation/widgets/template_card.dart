@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:video_player/video_player.dart';
@@ -36,6 +37,7 @@ class _TemplateCardState extends State<TemplateCard> {
   VideoPlayerController? _videoController;
   Timer? _disposeTimer;
   bool _isPreviewActive = false;
+  bool _hasPreviewSlot = false;
 
   @override
   void didUpdateWidget(covariant TemplateCard oldWidget) {
@@ -52,6 +54,10 @@ class _TemplateCardState extends State<TemplateCard> {
   void dispose() {
     _disposeTimer?.cancel();
     _videoController?.dispose();
+    if (_hasPreviewSlot) {
+      MediaLifecyclePolicy.releaseVideoPreviewSlot();
+      _hasPreviewSlot = false;
+    }
     super.dispose();
   }
 
@@ -194,6 +200,10 @@ class _TemplateCardState extends State<TemplateCard> {
 
     _videoController = null;
     await controller.dispose();
+    if (_hasPreviewSlot) {
+      MediaLifecyclePolicy.releaseVideoPreviewSlot();
+      _hasPreviewSlot = false;
+    }
     if (mounted) {
       setState(() {});
     }
@@ -208,6 +218,11 @@ class _TemplateCardState extends State<TemplateCard> {
       }
       return;
     }
+
+    if (!_hasPreviewSlot && !MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
+      return;
+    }
+    _hasPreviewSlot = true;
 
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(widget.template.previewAsset!.url),
@@ -231,6 +246,10 @@ class _TemplateCardState extends State<TemplateCard> {
     } catch (_) {
       await controller.dispose();
       _isPreviewActive = false;
+      if (_hasPreviewSlot) {
+        MediaLifecyclePolicy.releaseVideoPreviewSlot();
+        _hasPreviewSlot = false;
+      }
       if (mounted) {
         setState(() => _videoController = null);
       }

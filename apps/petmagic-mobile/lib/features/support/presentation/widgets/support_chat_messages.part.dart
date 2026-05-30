@@ -758,6 +758,7 @@ class _MessageReplyAttachmentThumbnail extends StatelessWidget {
             ? Image.network(
                 attachment.fileUrl,
                 fit: BoxFit.cover,
+                cacheWidth: 720,
                 errorBuilder: (context, error, stackTrace) {
                   return ColoredBox(
                     color: colors.surface,
@@ -1165,6 +1166,7 @@ class _MessageMediaGroupTile extends StatelessWidget {
                 Image.network(
                   attachment.fileUrl,
                   fit: BoxFit.cover,
+                  cacheWidth: 512,
                   errorBuilder: (context, error, stackTrace) {
                     return ColoredBox(
                       color: colors.surface,
@@ -1437,6 +1439,7 @@ class _NetworkImageAttachmentPreviewState
           child: Image.network(
             widget.imageUrl,
             fit: BoxFit.cover,
+            cacheWidth: 720,
             errorBuilder: (context, error, stackTrace) {
               return ColoredBox(
                 color: colors.surface,
@@ -1490,11 +1493,12 @@ class _NetworkVideoAttachmentPreviewState
     extends State<_NetworkVideoAttachmentPreview> {
   VideoPlayerController? _controller;
   bool _failedToLoad = false;
+  bool _hasPreviewSlot = false;
 
   @override
   void initState() {
     super.initState();
-    _initialize();
+    _tryInitializePreview();
   }
 
   @override
@@ -1504,15 +1508,33 @@ class _NetworkVideoAttachmentPreviewState
       final previous = _controller;
       _controller = null;
       _failedToLoad = false;
+      _releasePreviewSlot();
       unawaited(previous?.dispose());
-      _initialize();
+      _tryInitializePreview();
     }
   }
 
   @override
   void dispose() {
+    _releasePreviewSlot();
     unawaited(_controller?.dispose());
     super.dispose();
+  }
+
+  void _tryInitializePreview() {
+    _hasPreviewSlot = MediaLifecyclePolicy.tryAcquireVideoPreviewSlot();
+    if (!_hasPreviewSlot) {
+      return;
+    }
+    _initialize();
+  }
+
+  void _releasePreviewSlot() {
+    if (!_hasPreviewSlot) {
+      return;
+    }
+    _hasPreviewSlot = false;
+    MediaLifecyclePolicy.releaseVideoPreviewSlot();
   }
 
   Future<void> _initialize() async {
@@ -1531,6 +1553,7 @@ class _NetworkVideoAttachmentPreviewState
       setState(() {});
     } on Object {
       await controller.dispose();
+      _releasePreviewSlot();
       if (!mounted) {
         return;
       }
@@ -1544,6 +1567,38 @@ class _NetworkVideoAttachmentPreviewState
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    if (!_hasPreviewSlot) {
+      final size = _resolveMediaPreviewSize(
+        maxWidth: widget.maxBubbleWidth,
+        aspectRatio: 16 / 9,
+      );
+      return InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: widget.onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: size.width,
+            height: size.height,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ColoredBox(color: colors.surfaceStrong),
+                Container(color: Colors.black.withValues(alpha: 0.18)),
+                const Center(
+                  child: Icon(
+                    Icons.play_circle_fill_rounded,
+                    size: 42,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final controller = _controller;
     final aspectRatio = controller?.value.isInitialized == true
         ? controller!.value.aspectRatio

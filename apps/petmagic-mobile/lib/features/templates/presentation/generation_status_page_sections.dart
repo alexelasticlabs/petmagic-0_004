@@ -281,6 +281,7 @@ class _ResultCard extends StatelessWidget {
                                   : CachedNetworkImage(
                                       imageUrl: outputUrl,
                                       fit: BoxFit.contain,
+                                      memCacheWidth: 1080,
                                       errorWidget: (context, url, error) =>
                                           _MediaPlaceholder(
                                             label: text
@@ -624,11 +625,12 @@ class _InlineVideoPreview extends StatefulWidget {
 class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   VideoPlayerController? _controller;
   bool _failedToLoad = false;
+  bool _hasPreviewSlot = false;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_initialize());
+    _tryInitialize();
   }
 
   @override
@@ -637,14 +639,33 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
     if (oldWidget.url != widget.url) {
       _controller?.dispose();
       _controller = null;
-      unawaited(_initialize());
+      _releasePreviewSlot();
+      _tryInitialize();
     }
   }
 
   @override
   void dispose() {
+    _releasePreviewSlot();
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _tryInitialize() {
+    _hasPreviewSlot = MediaLifecyclePolicy.tryAcquireVideoPreviewSlot();
+    if (!_hasPreviewSlot) {
+      _failedToLoad = false;
+      return;
+    }
+    unawaited(_initialize());
+  }
+
+  void _releasePreviewSlot() {
+    if (!_hasPreviewSlot) {
+      return;
+    }
+    _hasPreviewSlot = false;
+    MediaLifecyclePolicy.releaseVideoPreviewSlot();
   }
 
   Future<void> _initialize() async {
@@ -665,6 +686,7 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
       setState(() {});
     } catch (_) {
       await controller.dispose();
+      _releasePreviewSlot();
       if (mounted) {
         setState(() {
           _controller = null;
@@ -678,6 +700,19 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final controller = _controller;
+
+    if (!_hasPreviewSlot) {
+      return ColoredBox(
+        color: Colors.black.withValues(alpha: 0.75),
+        child: const Center(
+          child: Icon(
+            Icons.play_circle_fill_rounded,
+            color: Colors.white,
+            size: 38,
+          ),
+        ),
+      );
+    }
 
     if (_failedToLoad) {
       return _MediaPlaceholder(label: text.templateFlowResultLoadFailed);
@@ -732,7 +767,6 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
   @override
   void dispose() {
     _controlsTimer?.cancel();
-    _videoController?.removeListener(_onVideoTick);
     _videoController?.dispose();
     super.dispose();
   }
@@ -751,7 +785,6 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
         return;
       }
 
-      controller.addListener(_onVideoTick);
       await controller.play();
       setState(() {});
     } catch (_) {
@@ -763,14 +796,6 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
         });
       }
     }
-  }
-
-  void _onVideoTick() {
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {});
   }
 
   void _toggleControls() {
@@ -814,6 +839,7 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                       child: CachedNetworkImage(
                         imageUrl: widget.mediaUrl,
                         fit: BoxFit.contain,
+                        memCacheWidth: 1440,
                         errorWidget: (context, url, error) => _MediaPlaceholder(
                           label: text.templateFlowResultLoadFailed,
                         ),
@@ -856,86 +882,11 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                     if (_isVideo &&
                         controller != null &&
                         controller.value.isInitialized)
-                      SafeArea(
-                        top: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.64),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: colors.border.withValues(alpha: 0.5),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-                              child: Row(
-                                children: [
-                                  IconButton(
-                                    visualDensity: VisualDensity.compact,
-                                    onPressed: () async {
-                                      if (controller.value.isPlaying) {
-                                        await controller.pause();
-                                      } else {
-                                        await controller.play();
-                                      }
-                                      if (mounted) {
-                                        setState(() {});
-                                        _startControlsTimer();
-                                      }
-                                    },
-                                    icon: Icon(
-                                      controller.value.isPlaying
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Slider(
-                                      value: controller
-                                          .value
-                                          .position
-                                          .inMilliseconds
-                                          .toDouble()
-                                          .clamp(
-                                            0,
-                                            controller
-                                                .value
-                                                .duration
-                                                .inMilliseconds
-                                                .toDouble(),
-                                          ),
-                                      max: controller
-                                          .value
-                                          .duration
-                                          .inMilliseconds
-                                          .toDouble()
-                                          .clamp(1, double.infinity),
-                                      onChanged: (value) async {
-                                        await controller.seekTo(
-                                          Duration(milliseconds: value.round()),
-                                        );
-                                        if (mounted) {
-                                          setState(() {});
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                  Text(
-                                    '${_formatVideoTime(controller.value.position)} / ${_formatVideoTime(controller.value.duration)}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                      _FullscreenVideoControls(
+                        controller: controller,
+                        borderColor: colors.border.withValues(alpha: 0.5),
+                        onInteraction: _startControlsTimer,
+                        formatVideoTime: _formatVideoTime,
                       )
                     else
                       SafeArea(
@@ -989,6 +940,92 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
     final minutes = totalSeconds ~/ 60;
     final seconds = totalSeconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+class _FullscreenVideoControls extends StatelessWidget {
+  const _FullscreenVideoControls({
+    required this.controller,
+    required this.borderColor,
+    required this.onInteraction,
+    required this.formatVideoTime,
+  });
+
+  final VideoPlayerController controller;
+  final Color borderColor;
+  final VoidCallback onInteraction;
+  final String Function(Duration value) formatVideoTime;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.64),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+            child: ValueListenableBuilder<VideoPlayerValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                final durationMs = value.duration.inMilliseconds.toDouble();
+                final max = durationMs.clamp(1, double.infinity).toDouble();
+                final current = value.position.inMilliseconds
+                    .toDouble()
+                    .clamp(0, max)
+                    .toDouble();
+                return Row(
+                  children: [
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        if (value.isPlaying) {
+                          await controller.pause();
+                        } else {
+                          await controller.play();
+                        }
+                        onInteraction();
+                      },
+                      icon: Icon(
+                        value.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Expanded(
+                      child: Slider(
+                        value: current,
+                        max: max,
+                        onChanged: (next) async {
+                          await controller.seekTo(
+                            Duration(milliseconds: next.round()),
+                          );
+                          onInteraction();
+                        },
+                      ),
+                    ),
+                    Text(
+                      '${formatVideoTime(value.position)} / ${formatVideoTime(value.duration)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

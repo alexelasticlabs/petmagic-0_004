@@ -280,6 +280,9 @@ class _MessageEntranceAnimation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (PerformanceGuard.isDegradedMode(context)) {
+      return child;
+    }
     return TweenAnimationBuilder<double>(
       key: ValueKey<String>('support-message-entrance-$messageId'),
       tween: Tween<double>(begin: 0, end: 1),

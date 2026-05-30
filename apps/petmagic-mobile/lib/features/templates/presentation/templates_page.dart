@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -38,6 +39,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   final _imagePicker = ImagePicker();
+  final _permissionCoordinator = AppPermissionCoordinator();
   late final TemplatesController _templatesController;
   late final WalletController _walletController;
   Timer? _searchDebounce;
@@ -376,6 +378,25 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       PetPhotoSourceAction.camera => ImageSource.camera,
       PetPhotoSourceAction.gallery => ImageSource.gallery,
     };
+
+    final requiredPermission = source == ImageSource.camera
+        ? AppPermissionType.camera
+        : AppPermissionType.photos;
+    final permission = await _permissionCoordinator.requestOnDemand(
+      requiredPermission,
+    );
+    if (!permission.granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Permission is required to continue. You can enable it in system settings.',
+            ),
+          ),
+        );
+      }
+      return null;
+    }
 
     return _imagePicker.pickImage(
       source: source,

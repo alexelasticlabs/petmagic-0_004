@@ -60,6 +60,10 @@
 	<string>PetMagic needs access to your photo library so you can save generation results.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>PetMagic saves generated photos and videos to your gallery on request.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PetMagic needs camera access so you can take photos and videos for templates and support tickets.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>PetMagic uses microphone access when recording videos in support and template flows.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

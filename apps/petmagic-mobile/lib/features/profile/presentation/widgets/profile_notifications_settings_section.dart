@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/profile/data/notification_preferences_storage.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
@@ -35,9 +36,12 @@ class _ProfileNotificationsSettingsSectionState
     extends ConsumerState<ProfileNotificationsSettingsSection> {
   final NotificationPreferencesStorage _storage =
       NotificationPreferencesStorage();
+  final AppPermissionCoordinator _permissionCoordinator =
+      AppPermissionCoordinator();
 
   NotificationPreferences? _preferences;
   AuthorizationStatus? _pushAuthorizationStatus;
+  List<AppPermissionStatus> _devicePermissions = const [];
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isRequestingPermission = false;
@@ -68,8 +72,10 @@ class _ProfileNotificationsSettingsSectionState
       setState(() {
         _preferences = preferences;
         _pushAuthorizationStatus = settings.authorizationStatus;
+        _devicePermissions = const [];
         _isLoading = false;
       });
+      await _refreshDevicePermissions();
     } catch (_) {
       if (!mounted) {
         return;
@@ -80,9 +86,20 @@ class _ProfileNotificationsSettingsSectionState
           emailOffersAndDiscounts: widget.fallbackMarketingEmails,
         );
         _pushAuthorizationStatus = null;
+        _devicePermissions = const [];
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _refreshDevicePermissions() async {
+    final statuses = await _permissionCoordinator.readStatuses();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _devicePermissions = statuses;
+    });
   }
 
   Future<void> _update(NotificationPreferences next) async {
@@ -156,6 +173,45 @@ class _ProfileNotificationsSettingsSectionState
       AuthorizationStatus.provisional =>
         text.profileNotificationsPushPermissionProvisional,
       _ => text.profileNotificationsPushPermissionUnknown,
+    };
+  }
+
+  Future<void> _requestCorePermissions() async {
+    setState(() {
+      _isRequestingPermission = true;
+    });
+    try {
+      await _permissionCoordinator.requestOnDemand(AppPermissionType.camera);
+      await _permissionCoordinator.requestOnDemand(AppPermissionType.photos);
+      await _permissionCoordinator.requestOnDemand(AppPermissionType.files);
+      await _refreshPushPermissionStatus();
+      await _refreshDevicePermissions();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequestingPermission = false;
+        });
+      }
+    }
+  }
+
+  String _devicePermissionStateLabel(AppPermissionState state) {
+    return switch (state) {
+      AppPermissionState.granted => 'Allowed',
+      AppPermissionState.limited => 'Limited',
+      AppPermissionState.denied => 'Denied',
+      AppPermissionState.permanentlyDenied => 'Permanently denied',
+      AppPermissionState.restricted => 'Restricted',
+      _ => 'Unknown',
+    };
+  }
+
+  String _devicePermissionName(AppPermissionType type) {
+    return switch (type) {
+      AppPermissionType.notifications => 'Notifications',
+      AppPermissionType.camera => 'Camera',
+      AppPermissionType.photos => 'Photos',
+      AppPermissionType.files => 'Files',
     };
   }
 
@@ -329,8 +385,37 @@ class _ProfileNotificationsSettingsSectionState
                                 : text.profileNotificationsRequestPermission,
                           ),
                         ),
+                        FilledButton.tonal(
+                          onPressed: _isRequestingPermission
+                              ? null
+                              : _requestCorePermissions,
+                          child: Text(
+                            _isRequestingPermission
+                                ? text.profileLoadingAction
+                                : 'Request device permissions',
+                          ),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: _isRequestingPermission
+                              ? null
+                              : () => _permissionCoordinator.openSettings(),
+                          child: const Text('Open settings'),
+                        ),
                       ],
                     ),
+                    if (_devicePermissions.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      for (final permission in _devicePermissions)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: _NotificationsInfoRow(
+                            label: _devicePermissionName(permission.type),
+                            value: _devicePermissionStateLabel(
+                              permission.state,
+                            ),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),
