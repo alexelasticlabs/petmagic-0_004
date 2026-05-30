@@ -70,19 +70,20 @@ class TemplateTypeFilters extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         SizedBox(
-          height: 40,
+          height: 36,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: normalizedCategories.length + 1,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            separatorBuilder: (_, _) => const SizedBox(width: 6),
             itemBuilder: (context, index) {
               if (index == 0) {
                 return _FilterPill(
                   label: text.allFilter,
                   selected: selectedCategory == null,
                   onTap: () => onCategorySelected(null),
+                  compact: true,
                 );
               }
 
@@ -91,6 +92,7 @@ class TemplateTypeFilters extends StatelessWidget {
                 label: category,
                 selected: selectedCategory == category,
                 onTap: () => onCategorySelected(category),
+                compact: true,
               );
             },
           ),
@@ -123,13 +125,13 @@ class _FilterPill extends StatelessWidget {
     return PressableScale(
       onTap: onTap,
       haptic: PressableScaleHaptic.selection,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(compact ? 18 : 22),
       child: AnimatedContainer(
         duration: AppTheme.motionFast,
         curve: AppTheme.motionEmphasized,
         padding: EdgeInsets.symmetric(
-          horizontal: compact ? 10 : 11,
-          vertical: compact ? 8 : 7,
+          horizontal: compact ? 9 : 11,
+          vertical: compact ? 6 : 7,
         ),
         decoration: BoxDecoration(
           gradient: selected
@@ -164,7 +166,7 @@ class _FilterPill extends StatelessWidget {
             if (icon != null) ...[
               Icon(
                 icon,
-                size: compact ? 14 : 15,
+                size: compact ? 13 : 15,
                 color: selected ? Colors.white : colors.textStrong,
               ),
               const SizedBox(width: 4),
@@ -176,7 +178,7 @@ class _FilterPill extends StatelessWidget {
               textAlign: TextAlign.center,
               style: textStyle?.copyWith(
                 color: selected ? Colors.white : colors.textStrong,
-                fontSize: compact ? 10.1 : 10.5,
+                fontSize: compact ? 9.8 : 10.5,
                 fontWeight: FontWeight.w700,
               ),
             ),

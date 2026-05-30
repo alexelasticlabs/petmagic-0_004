@@ -158,6 +158,28 @@ public sealed class ConfirmPasswordResetCommandValidator : AbstractValidator<Con
     }
 }
 
+public sealed class ConfirmCurrentPasswordChangeCommandValidator : AbstractValidator<ConfirmCurrentPasswordChangeCommand>
+{
+    public ConfirmCurrentPasswordChangeCommandValidator()
+    {
+        RuleFor(x => x.Code)
+            .NotEmpty()
+            .Length(6)
+            .Matches("^[0-9]{6}$");
+        RuleFor(x => x.NewPassword)
+            .NotEmpty()
+            .MinimumLength(8)
+            .WithMessage("Password must be at least 8 characters long.")
+            .Matches("[A-Z]")
+            .WithMessage("Password must contain at least one uppercase letter.")
+            .Matches("[a-z]")
+            .WithMessage("Password must contain at least one lowercase letter.")
+            .Matches("[0-9]")
+            .WithMessage("Password must contain at least one digit.");
+        RuleFor(x => x.RefreshToken).NotEmpty();
+    }
+}
+
 public sealed class RefreshTokenCommandValidator : AbstractValidator<RefreshTokenCommand>
 {
     public RefreshTokenCommandValidator()

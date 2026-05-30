@@ -193,6 +193,8 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result> VerifyPasswordResetCodeAsync(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> ResetPasswordAsync(ResetPasswordCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> RequestCurrentPasswordChangeCodeAsync(Guid userId, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> ConfirmCurrentPasswordChangeAsync(Guid userId, ConfirmCurrentPasswordChangeCommand command, CancellationToken cancellationToken) => NotSupported();
 
         public Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
         {

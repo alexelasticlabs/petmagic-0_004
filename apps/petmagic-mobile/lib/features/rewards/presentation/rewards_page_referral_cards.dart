@@ -641,6 +641,10 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final referrerCode = widget.rewards?.referrerCode?.trim();
+    final hasReferrerCode = referrerCode != null && referrerCode.isNotEmpty;
+    final isReferralAlreadyActive =
+        widget.rewards?.hasActivatedReferral == true;
     final cardBorder = colors.purple.withValues(alpha: 0.26);
     final cardGradient = [
       colors.surface,
@@ -745,7 +749,62 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                     onPressed: _openFriendCodeInput,
                   ),
                 ],
-                if (_showFriendCodeInput) ...[
+                if (isReferralAlreadyActive) ...[
+                  const SizedBox(height: 14),
+                  _InlineStatus(
+                    message: text.rewardsReferralActivatedMessage,
+                    tone: _feedbackToneColor(_FeedbackTone.success, colors),
+                  ),
+                  if (hasReferrerCode) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceGlass,
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.verified_rounded,
+                            size: 18,
+                            color: colors.accent,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  text.rewardsReferralInputLabel,
+                                  style: TextStyle(
+                                    color: colors.textSoft,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  referrerCode,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: colors.textStrong,
+                                    fontSize: 14,
+                                    letterSpacing: 0.45,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ] else if (_showFriendCodeInput) ...[
                   const SizedBox(height: 14),
                   TextField(
                     key: const Key('rewards_referral_input'),
@@ -777,7 +836,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                     onPressed: widget.isSubmitting ? null : _submit,
                   ),
                 ],
-                if (_message != null) ...[
+                if (_message != null && !isReferralAlreadyActive) ...[
                   const SizedBox(height: 12),
                   _InlineStatus(
                     message: _message!,

@@ -136,6 +136,54 @@ class ProfileRepository {
     }
   }
 
+  Future<void> requestCurrentPasswordChangeCode() async {
+    try {
+      await _authorizedRequest<void>(
+        (session) => _dio.post<void>(
+          '/api/auth/me/password-change/request',
+          options: Options(
+            headers: {
+              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+            },
+          ),
+        ),
+      );
+    } on DioException catch (error) {
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.password_reset_request_failed',
+      );
+    }
+  }
+
+  Future<void> confirmCurrentPasswordChange({
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _authorizedRequest<void>(
+        (session) => _dio.post<void>(
+          '/api/auth/me/password-change/confirm',
+          data: {
+            'code': code.trim(),
+            'newPassword': newPassword,
+            'refreshToken': session.refreshToken,
+          },
+          options: Options(
+            headers: {
+              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+            },
+          ),
+        ),
+      );
+    } on DioException catch (error) {
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.password_reset_failed',
+      );
+    }
+  }
+
   Future<void> resendEmailVerificationCode({required String email}) async {
     try {
       await _dio.post<void>(

@@ -27,6 +27,7 @@ public static class IdentityApiModule
         services.AddScoped<IValidator<VerifyPasswordResetCodeCommand>, VerifyPasswordResetCodeCommandValidator>();
         services.AddScoped<IValidator<ResetPasswordCommand>, ResetPasswordCommandValidator>();
         services.AddScoped<IValidator<ConfirmPasswordResetCommand>, ConfirmPasswordResetCommandValidator>();
+        services.AddScoped<IValidator<ConfirmCurrentPasswordChangeCommand>, ConfirmCurrentPasswordChangeCommandValidator>();
         services.AddScoped<IValidator<RefreshTokenCommand>, RefreshTokenCommandValidator>();
         services.AddScoped<IValidator<LogoutCommand>, LogoutCommandValidator>();
         services.AddScoped<IValidator<ExternalLoginCallbackCommand>, ExternalLoginCallbackCommandValidator>();

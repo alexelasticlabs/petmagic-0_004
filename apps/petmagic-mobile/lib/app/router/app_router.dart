@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/features/premium/presentation/stripe_paymentshee
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
@@ -273,6 +274,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: ProfileSettingsPage.routePath,
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: ProfileSettingsPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: PasswordChangePage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: PasswordChangePage(
+            email: state.uri.queryParameters['email'] ?? '',
+          ),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

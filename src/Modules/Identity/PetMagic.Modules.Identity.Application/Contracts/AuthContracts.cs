@@ -28,6 +28,8 @@ public sealed record ResetPasswordCommand(string Email, string Code, string NewP
 
 public sealed record ConfirmPasswordResetCommand(string Email, string Code, string NewPassword);
 
+public sealed record ConfirmCurrentPasswordChangeCommand(string Code, string NewPassword, string? RefreshToken);
+
 public sealed record RefreshTokenCommand(string RefreshToken);
 
 public sealed record LogoutCommand(Guid UserId, string RefreshToken);

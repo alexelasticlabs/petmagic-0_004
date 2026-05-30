@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 
@@ -77,6 +78,21 @@ void main() {
 
     expect(_FakeProfileController.deleteAccountCalls, 1);
   });
+
+  testWidgets('change password row opens in-app password change route', (
+    tester,
+  ) async {
+    await _pumpSettingsPage(tester);
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(ProfileSettingsPage)),
+    );
+
+    await tester.tap(find.text(text.profileSettingsPasswordTitle));
+    await tester.pumpAndSettle();
+
+    expect(find.text('password-change-screen'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpSettingsPage(WidgetTester tester) async {
@@ -111,6 +127,11 @@ Future<void> _pumpSettingsPage(WidgetTester tester) async {
               path: '/',
               builder: (context, state) =>
                   const Scaffold(body: ProfileSettingsPage()),
+            ),
+            GoRoute(
+              path: PasswordChangePage.routePath,
+              builder: (context, state) =>
+                  const Scaffold(body: Text('password-change-screen')),
             ),
           ],
         ),

@@ -228,6 +228,8 @@ public sealed partial class EconomyServiceTests
         public Task<Result> VerifyPasswordResetCodeAsync(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> ResetPasswordAsync(ResetPasswordCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> RequestCurrentPasswordChangeCodeAsync(Guid userId, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> ConfirmCurrentPasswordChangeAsync(Guid userId, ConfirmCurrentPasswordChangeCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
         public Task<Result<IReadOnlyList<LinkedAccountResponse>>> GetLinkedAccountsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<IReadOnlyList<LinkedAccountResponse>>();
         public Task<Result<IReadOnlyList<LinkedAccountResponse>>> LinkExternalLoginAsync(Guid userId, ExternalLoginCallbackCommand command, CancellationToken cancellationToken) => NotSupported<IReadOnlyList<LinkedAccountResponse>>();

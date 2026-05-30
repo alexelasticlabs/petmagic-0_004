@@ -454,11 +454,13 @@ Color _feedbackToneColor(_FeedbackTone tone, PetMagicColors colors) {
 }
 
 String _referralStatusText(AppLocalizations text, _RewardsSummaryView rewards) {
-  if (rewards.isReferralRewarded) {
+  if (rewards.isReferralRewarded || rewards.rewardedReferredUsersCount > 0) {
     return text.rewardsReferralStatusRewarded;
   }
 
-  if (rewards.hasActivatedReferral) {
+  if (rewards.hasActivatedReferral ||
+      rewards.pendingReferredUsersCount > 0 ||
+      rewards.referredUsersCount > 0) {
     return text.rewardsReferralStatusPending;
   }
 

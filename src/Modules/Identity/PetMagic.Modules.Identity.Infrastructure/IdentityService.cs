@@ -343,6 +343,83 @@ public sealed class IdentityService(
         return Result.Success();
     }
 
+    public async Task<Result> RequestCurrentPasswordChangeCodeAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+
+        if (user is null || !user.IsActive || string.IsNullOrWhiteSpace(user.Email) || string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return Result.Failure(IdentityErrors.UserNotFound);
+        }
+
+        var now = DateTime.UtcNow;
+        var sentInWindow = await dbContext.UserEmailCodes
+            .Where(x => x.Email == user.Email
+                && x.Purpose == EmailCodePurpose.PasswordReset
+                && x.RequestedAtUtc > now.AddHours(-1))
+            .CountAsync(cancellationToken);
+        if (sentInWindow >= MaxCodesPerHourPerEmail)
+        {
+            return Result.Success();
+        }
+
+        await QueueEmailCodeAsync(user, EmailCodePurpose.PasswordReset, cancellationToken);
+        await WriteAuditAsync(user.Id, "auth.password_change.requested", "Authenticated password change code requested.", cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> ConfirmCurrentPasswordChangeAsync(Guid userId, ConfirmCurrentPasswordChangeCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return Result.Failure(IdentityErrors.UserNotFound);
+        }
+
+        if (string.IsNullOrWhiteSpace(command.RefreshToken))
+        {
+            return Result.Failure(IdentityErrors.InvalidRefreshToken);
+        }
+
+        var now = DateTime.UtcNow;
+        var currentRefreshTokenHash = HashToken(command.RefreshToken);
+        var currentSession = await dbContext.RefreshTokenSessions
+            .Where(x => x.UserId == userId
+                && x.TokenHash == currentRefreshTokenHash
+                && x.RevokedAtUtc == null
+                && x.ExpiresAtUtc > now)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (currentSession is null)
+        {
+            return Result.Failure(IdentityErrors.InvalidRefreshToken);
+        }
+
+        var codeEntity = await FindMatchingCodeAsync(userId, EmailCodePurpose.PasswordReset, command.Code, now, cancellationToken);
+        if (codeEntity is null)
+        {
+            await RegisterCodeFailureAsync(userId, EmailCodePurpose.PasswordReset, now, cancellationToken);
+            return Result.Failure(IdentityErrors.PasswordResetCodeInvalid);
+        }
+
+        user.PasswordHash = userManager.PasswordHasher.HashPassword(user, command.NewPassword);
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.OperationFailed);
+        }
+
+        codeEntity.ConsumedAtUtc = now;
+        await RevokeRefreshTokensExceptAsync(userId, now, currentRefreshTokenHash, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditAsync(user.Id, "auth.password_change.succeeded", "Password changed for authenticated session; other sessions revoked.", cancellationToken);
+        return Result.Success();
+    }
+
     public async Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Provider) || string.IsNullOrWhiteSpace(command.ProviderSubject))
@@ -1259,6 +1336,20 @@ public sealed class IdentityService(
     {
         var sessions = await dbContext.RefreshTokenSessions
             .Where(x => x.UserId == userId && x.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var session in sessions)
+        {
+            session.RevokedAtUtc = revokedAtUtc;
+        }
+    }
+
+    private async Task RevokeRefreshTokensExceptAsync(Guid userId, DateTime revokedAtUtc, string keepTokenHash, CancellationToken cancellationToken)
+    {
+        var sessions = await dbContext.RefreshTokenSessions
+            .Where(x => x.UserId == userId
+                && x.RevokedAtUtc == null
+                && x.TokenHash != keepTokenHash)
             .ToListAsync(cancellationToken);
 
         foreach (var session in sessions)

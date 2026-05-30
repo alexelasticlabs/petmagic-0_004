@@ -157,6 +157,72 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task ConfirmCurrentPasswordChangeAsync_ShouldKeepCurrentSession_And_RevokeOtherSessions()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var registerResult = await service.RegisterAsync(
+            new RegisterUserCommand("inapp.change@petmagic.app", "StrongPassword123", "In App", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
+            CancellationToken.None);
+
+        Assert.True(registerResult.IsSuccess);
+
+        var user = await dbContext.Users.SingleAsync();
+        user.EmailConfirmed = true;
+        await dbContext.SaveChangesAsync();
+
+        var deviceOneSession = await service.LoginAsync(
+            new LoginCommand("inapp.change@petmagic.app", "StrongPassword123"),
+            CancellationToken.None);
+        var deviceTwoSession = await service.LoginAsync(
+            new LoginCommand("inapp.change@petmagic.app", "StrongPassword123"),
+            CancellationToken.None);
+
+        Assert.True(deviceOneSession.IsSuccess);
+        Assert.True(deviceTwoSession.IsSuccess);
+
+        var requestCode = await service.RequestCurrentPasswordChangeCodeAsync(user.Id, CancellationToken.None);
+        Assert.True(requestCode.IsSuccess);
+
+        var resetCode = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == user.Id && x.Purpose == EmailCodePurpose.PasswordReset)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstAsync();
+        resetCode.CodeHash = HashValue("456789");
+        await dbContext.SaveChangesAsync();
+
+        var confirmChange = await service.ConfirmCurrentPasswordChangeAsync(
+            user.Id,
+            new ConfirmCurrentPasswordChangeCommand("456789", "AnotherStrong123", deviceOneSession.Value.RefreshToken),
+            CancellationToken.None);
+
+        Assert.True(confirmChange.IsSuccess);
+
+        var sessions = await dbContext.RefreshTokenSessions
+            .Where(x => x.UserId == user.Id)
+            .ToListAsync();
+
+        Assert.Equal(2, sessions.Count);
+
+        var currentSession = sessions.Single(x => x.TokenHash == HashValue(deviceOneSession.Value.RefreshToken));
+        var otherSession = sessions.Single(x => x.TokenHash == HashValue(deviceTwoSession.Value.RefreshToken));
+
+        Assert.Null(currentSession.RevokedAtUtc);
+        Assert.NotNull(otherSession.RevokedAtUtc);
+
+        var oldPasswordLogin = await service.LoginAsync(
+            new LoginCommand("inapp.change@petmagic.app", "StrongPassword123"),
+            CancellationToken.None);
+        Assert.True(oldPasswordLogin.IsFailure);
+
+        var newPasswordLogin = await service.LoginAsync(
+            new LoginCommand("inapp.change@petmagic.app", "AnotherStrong123"),
+            CancellationToken.None);
+        Assert.True(newPasswordLogin.IsSuccess);
+    }
+
+    [Fact]
     public async Task SendBulkEmailAsync_ShouldQueueOnlyMatchingConfirmedRecipients()
     {
         await using var dbContext = CreateDbContext();

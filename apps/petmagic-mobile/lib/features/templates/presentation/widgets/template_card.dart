@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -253,7 +254,9 @@ class _TemplateCardState extends State<TemplateCard> {
     }
     _hasPreviewSlot = true;
 
-    final previewUrl = widget.template.previewAsset!.url;
+    final previewUrl =
+        _normalizeTemplateMediaUrl(widget.template.previewAsset!.url) ??
+        widget.template.previewAsset!.url;
     final controller = widget.previewControllerFactory != null
         ? await widget.previewControllerFactory!(previewUrl)
         : await _createVideoController(previewUrl);
@@ -318,15 +321,16 @@ class _TemplateMedia extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final asset = template.previewAsset;
-    final thumbnailUrl = template.thumbnailUrl?.trim();
+    final thumbnailUrl = _normalizeTemplateMediaUrl(template.thumbnailUrl);
+    final assetUrl = _normalizeTemplateMediaUrl(asset?.url);
     final showVideo = controller != null && controller!.value.isInitialized;
     final assetIsVideo = asset != null && isVideoPreview(asset);
     final renderableThumbnailUrl =
-        thumbnailUrl != null &&
-            thumbnailUrl.isNotEmpty &&
-            !isVideoUrl(thumbnailUrl)
-        ? thumbnailUrl
+        thumbnailUrl != null && !isVideoUrl(thumbnailUrl) ? thumbnailUrl : null;
+    final fallbackImageUrl = assetUrl != null && !assetIsVideo
+        ? assetUrl
         : null;
+    final imageUrl = renderableThumbnailUrl ?? fallbackImageUrl;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -346,29 +350,11 @@ class _TemplateMedia extends StatelessWidget {
                   child: VideoPlayer(controller!),
                 ),
               )
-            else if (renderableThumbnailUrl != null)
-              CachedNetworkImage(
-                imageUrl: renderableThumbnailUrl,
-                fit: BoxFit.cover,
-                cacheManager: TemplateMediaCache.thumbnailCache,
-                memCacheWidth: cacheWidth,
-                memCacheHeight: cacheHeight,
-                maxWidthDiskCache: cacheWidth,
-                maxHeightDiskCache: cacheHeight,
-                placeholder: (context, url) => const _MediaPlaceholder(),
-                errorWidget: (context, url, error) => const _MediaPlaceholder(),
-              )
-            else if (asset != null && asset.url.isNotEmpty && !assetIsVideo)
-              CachedNetworkImage(
-                imageUrl: asset.url,
-                fit: BoxFit.cover,
-                cacheManager: TemplateMediaCache.thumbnailCache,
-                memCacheWidth: cacheWidth,
-                memCacheHeight: cacheHeight,
-                maxWidthDiskCache: cacheWidth,
-                maxHeightDiskCache: cacheHeight,
-                placeholder: (context, url) => const _MediaPlaceholder(),
-                errorWidget: (context, url, error) => const _MediaPlaceholder(),
+            else if (imageUrl != null)
+              _TemplateImageWithFallback(
+                imageUrl: imageUrl,
+                cacheWidth: cacheWidth,
+                cacheHeight: cacheHeight,
               )
             else
               const _MediaPlaceholder(),
@@ -385,6 +371,120 @@ class _TemplateMedia extends StatelessWidget {
 
     return (logicalSize * pixelRatio).ceil();
   }
+}
+
+class _TemplateImageWithFallback extends StatelessWidget {
+  const _TemplateImageWithFallback({
+    required this.imageUrl,
+    required this.cacheWidth,
+    required this.cacheHeight,
+  });
+
+  final String imageUrl;
+  final int? cacheWidth;
+  final int? cacheHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: CachedNetworkImage(
+        imageUrl: imageUrl,
+        cacheManager: TemplateMediaCache.thumbnailCache,
+        memCacheWidth: cacheWidth,
+        memCacheHeight: cacheHeight,
+        maxWidthDiskCache: cacheWidth,
+        maxHeightDiskCache: cacheHeight,
+        placeholder: (context, url) => const _MediaPlaceholder(),
+        imageBuilder: (context, imageProvider) =>
+            _CoverImageFill(imageProvider: imageProvider),
+        errorWidget: (context, url, error) {
+          debugPrint('Template image preview failed for $url: $error');
+          unawaited(TemplateMediaCache.thumbnailCache.removeFile(url));
+          return Image.network(
+            url,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            width: double.infinity,
+            height: double.infinity,
+            cacheWidth: cacheWidth,
+            cacheHeight: cacheHeight,
+            filterQuality: FilterQuality.medium,
+            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+              return SizedBox.expand(child: child);
+            },
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) {
+                return child;
+              }
+
+              return const _MediaPlaceholder();
+            },
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint(
+                'Template direct image fallback failed for $url: $error',
+              );
+              return const _MediaPlaceholder();
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CoverImageFill extends StatelessWidget {
+  const _CoverImageFill({required this.imageProvider});
+
+  final ImageProvider imageProvider;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: imageProvider,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String? _normalizeTemplateMediaUrl(String? rawUrl) {
+  final trimmed = rawUrl?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+
+  final sanitized = _sanitizeTemplateMediaUrl(trimmed);
+
+  final parsed = Uri.tryParse(sanitized);
+  if (parsed?.hasScheme == true) {
+    return parsed.toString();
+  }
+
+  if (sanitized.startsWith('//')) {
+    final base = Uri.tryParse(AppConfig.apiBaseUrl);
+    final scheme = (base?.scheme.isNotEmpty ?? false) ? base!.scheme : 'http';
+    return '$scheme:$sanitized';
+  }
+
+  final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+  if (baseUri == null) {
+    return sanitized;
+  }
+
+  final relativePath = sanitized.startsWith('/') ? sanitized : '/$sanitized';
+  return baseUri.resolve(relativePath).toString();
+}
+
+String _sanitizeTemplateMediaUrl(String rawUrl) {
+  final normalizedSlashes = rawUrl.replaceAll('\\', '/');
+  return Uri.encodeFull(normalizedSlashes);
 }
 
 class _TemplateShadeOverlay extends StatelessWidget {

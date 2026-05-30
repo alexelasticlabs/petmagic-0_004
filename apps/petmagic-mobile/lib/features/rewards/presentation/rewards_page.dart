@@ -330,6 +330,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
             referralCode: rewards.referralCode,
             referralBonusSpark: rewards.referralBonusSpark,
             referralStatus: rewards.referralStatus,
+            referrerCode: rewards.referrerCode,
             totalReferralBonusEarned: rewards.totalReferralBonusEarned,
             referredUsersCount: rewards.referredUsersCount,
             pendingReferredUsersCount: rewards.pendingReferredUsersCount,
@@ -381,14 +382,12 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                         rewardsSummary?.referralBonusSpark ?? 15,
                       ),
                     ),
-                    if (rewardsSummary?.hasActivatedReferral != true) ...[
-                      const SizedBox(height: 16),
-                      _FriendCodeCard(
-                        rewards: rewardsSummary,
-                        isSubmitting: state.isApplyingReferral,
-                        onSubmit: controller.applyReferralCode,
-                      ),
-                    ],
+                    const SizedBox(height: 16),
+                    _FriendCodeCard(
+                      rewards: rewardsSummary,
+                      isSubmitting: state.isApplyingReferral,
+                      onSubmit: controller.applyReferralCode,
+                    ),
                   ],
                 ),
               ),
@@ -402,6 +401,7 @@ class _RewardsSummaryView {
     required this.referralCode,
     required this.referralBonusSpark,
     required this.referralStatus,
+    required this.referrerCode,
     required this.totalReferralBonusEarned,
     required this.referredUsersCount,
     required this.pendingReferredUsersCount,
@@ -411,6 +411,7 @@ class _RewardsSummaryView {
   final String referralCode;
   final int referralBonusSpark;
   final String referralStatus;
+  final String? referrerCode;
   final int totalReferralBonusEarned;
   final int referredUsersCount;
   final int pendingReferredUsersCount;

@@ -32,6 +32,8 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authSignInRequired;
     case 'auth.session_expired':
       return text.authSessionExpired;
+    case 'auth.invalid_refresh':
+      return text.authSessionExpired;
     case 'auth.login_failed':
       return text.authLoginFailed;
     case 'auth.registration_failed':

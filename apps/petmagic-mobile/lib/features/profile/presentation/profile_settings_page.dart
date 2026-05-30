@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
@@ -112,8 +112,23 @@ class ProfileSettingsPage extends ConsumerWidget {
                     subtitle: text.profileSettingsPasswordSubtitle,
                     showDivider: false,
                     onTap: () {
+                      final email = (state.profile?.email ?? state.email)
+                          .trim();
+                      if (email.isEmpty) {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                text.profileSettingsUnavailableSubtitle,
+                              ),
+                            ),
+                          );
+                        return;
+                      }
+
                       context.push(
-                        '${PasswordResetPage.routePath}?email=${Uri.encodeComponent(state.profile?.email ?? state.email)}',
+                        '${PasswordChangePage.routePath}?email=${Uri.encodeComponent(email)}',
                       );
                     },
                   ),

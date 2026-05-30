@@ -68,7 +68,8 @@ public static class AuthEndpoints
             .RequireRateLimiting("auth-password-reset");
 
         group.MapPost("/password-reset/confirm", ConfirmPasswordResetAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting("auth-password-reset");
 
         group.MapPost("/request-password-reset", RequestPasswordResetAsync)
             .AllowAnonymous()
@@ -78,7 +79,16 @@ public static class AuthEndpoints
             .AllowAnonymous();
 
         group.MapPost("/reset-password", ResetPasswordAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting("auth-password-reset");
+
+        group.MapPost("/me/password-change/request", RequestCurrentPasswordChangeCodeAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("auth-password-reset");
+
+        group.MapPost("/me/password-change/confirm", ConfirmCurrentPasswordChangeAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("auth-password-reset");
 
         group.MapPost("/refresh", RefreshAsync)
             .AllowAnonymous();
@@ -340,6 +350,73 @@ public static class AuthEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Accepted, ProblemHttpResult>> RequestCurrentPasswordChangeCodeAsync(
+        HttpContext context,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var result = await service.RequestCurrentPasswordChangeCodeAsync(userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: statusCode);
+        }
+
+        return TypedResults.Accepted((string?)null);
+    }
+
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> ConfirmCurrentPasswordChangeAsync(
+        HttpContext context,
+        ConfirmCurrentPasswordChangeCommand command,
+        IValidator<ConfirmCurrentPasswordChangeCommand> validator,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var resolvedCommand = command with
+        {
+            RefreshToken = ResolveRefreshToken(context, command.RefreshToken)
+        };
+
+        var validation = await validator.ValidateAsync(resolvedCommand, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ConfirmCurrentPasswordChangeAsync(userId, resolvedCommand, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "auth.invalid_refresh", StringComparison.Ordinal)
+                ? StatusCodes.Status401Unauthorized
+                : string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest;
+
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: statusCode);
         }
 
         return TypedResults.NoContent();
