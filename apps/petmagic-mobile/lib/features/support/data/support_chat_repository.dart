@@ -352,6 +352,15 @@ class SupportChatRepository {
     }
 
     if (payload.detail != null || payload.title != null) {
+      final apiCode = payload.title?.trim();
+      if (apiCode != null && apiCode.contains('.')) {
+        return NetworkErrorMapper.fromMessage(
+          error,
+          apiCode,
+          includeCause: false,
+        );
+      }
+
       return NetworkErrorMapper.fromMessage(
         error,
         payload.detail ?? payload.title!,

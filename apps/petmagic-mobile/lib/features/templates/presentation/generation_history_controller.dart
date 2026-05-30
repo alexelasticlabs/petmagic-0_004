@@ -94,20 +94,29 @@ class GenerationHistoryState {
 }
 
 class GenerationHistoryController extends Notifier<GenerationHistoryState> {
+  static const Duration _autoRefreshMinInterval = Duration(seconds: 8);
+  static const Duration _autoRefreshMaxInterval = Duration(seconds: 30);
+
   late final TemplateGenerationRepository _repository;
   late final RealtimeClient _realtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Timer? _offlineBannerTimer;
+  Timer? _autoRefreshTimer;
   bool _isScreenVisible = true;
   bool _isRealtimeConnected = false;
+  bool _isLoadInFlight = false;
+  int _autoRefreshFailureStreak = 0;
 
   @override
   GenerationHistoryState build() {
     _repository = ref.watch(templateGenerationRepositoryProvider);
     _realtimeClient = ref.watch(realtimeClientProvider);
+    _startAutoRefresh();
     ref.onDispose(() {
       _offlineBannerTimer?.cancel();
       _offlineBannerTimer = null;
+      _autoRefreshTimer?.cancel();
+      _autoRefreshTimer = null;
       _pauseRealtime();
     });
     Future.microtask(() async {
@@ -127,10 +136,12 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
     _isScreenVisible = visible;
     if (visible) {
+      _startAutoRefresh();
       unawaited(_resumeRealtimeIfNeeded());
       return;
     }
 
+    _stopAutoRefresh();
     _pauseRealtime();
   }
 
@@ -138,95 +149,157 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     GenerationHistoryFilter? filter,
     bool refresh = false,
   }) async {
-    await _resumeRealtimeIfNeeded();
-
-    final nextFilter = filter ?? state.filter;
-    if (state.isLoading && !refresh && nextFilter == state.filter) {
+    if (_isLoadInFlight) {
       return;
     }
 
-    final cachedItems = state.cachedItemsByFilter[nextFilter];
-    if (!refresh && cachedItems != null) {
-      state = state.copyWith(
-        filter: nextFilter,
-        items: cachedItems,
-        isLoading: false,
-        clearError: true,
-      );
-      return;
-    }
-
-    List<TemplateGenerationResult>? persistedItems;
-    if (!refresh) {
-      persistedItems = await _repository.readCachedGenerations(
-        status: nextFilter.apiStatus,
-      );
-    }
-
-    final seedItems = refresh
-        ? (cachedItems ?? state.items)
-        : (persistedItems ?? const []);
-
-    state = state.copyWith(
-      items: seedItems,
-      filter: nextFilter,
-      isLoading: true,
-      syncFailed: false,
-      clearError: true,
-    );
-
-    if (persistedItems != null) {
-      final persistedCache =
-          Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
-            state.cachedItemsByFilter,
-          )..[nextFilter] = persistedItems;
-      state = state.copyWith(cachedItemsByFilter: persistedCache);
-    }
-
+    _isLoadInFlight = true;
     try {
-      final wasOffline = state.syncFailed;
-      final items = await _repository.fetchGenerations(
-        status: nextFilter.apiStatus,
-        take: 50,
-      );
-      final unreadCount = await _repository.fetchUnreadGenerationCount();
-      final updatedCache =
-          Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
-            state.cachedItemsByFilter,
-          )..[nextFilter] = items;
-      final nowUtc = DateTime.now().toUtc();
-      state = state.copyWith(
-        items: items,
-        unreadCount: unreadCount,
-        isLoading: false,
-        syncFailed: false,
-        showOfflineBanner: wasOffline && items.isNotEmpty,
-        isConnectionRecovered: wasOffline && items.isNotEmpty,
-        lastSyncedAtUtc: nowUtc,
-        cachedItemsByFilter: updatedCache,
-        clearError: true,
-      );
+      await _resumeRealtimeIfNeeded();
 
-      if (wasOffline && items.isNotEmpty) {
-        _scheduleOfflineBannerHide();
+      final nextFilter = filter ?? state.filter;
+      if (state.isLoading && !refresh && nextFilter == state.filter) {
+        return;
       }
-    } catch (error) {
-      if (state.items.isNotEmpty) {
-        _offlineBannerTimer?.cancel();
-        _offlineBannerTimer = null;
+
+      final cachedItems = state.cachedItemsByFilter[nextFilter];
+      if (!refresh && cachedItems != null) {
         state = state.copyWith(
+          filter: nextFilter,
+          items: cachedItems,
           isLoading: false,
-          syncFailed: true,
-          showOfflineBanner: true,
-          isConnectionRecovered: false,
+          clearError: true,
         );
         return;
       }
 
-      _offlineBannerTimer?.cancel();
-      _offlineBannerTimer = null;
-      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+      List<TemplateGenerationResult>? persistedItems;
+      if (!refresh) {
+        persistedItems = await _repository.readCachedGenerations(
+          status: nextFilter.apiStatus,
+        );
+      }
+
+      final seedItems = refresh
+          ? (cachedItems ?? state.items)
+          : (persistedItems ?? const []);
+
+      state = state.copyWith(
+        items: seedItems,
+        filter: nextFilter,
+        isLoading: true,
+        syncFailed: false,
+        clearError: true,
+      );
+
+      if (persistedItems != null) {
+        final persistedCache =
+            Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
+              state.cachedItemsByFilter,
+            )..[nextFilter] = persistedItems;
+        state = state.copyWith(cachedItemsByFilter: persistedCache);
+      }
+
+      try {
+        final wasOffline = state.syncFailed;
+        final items = await _repository.fetchGenerations(
+          status: nextFilter.apiStatus,
+          take: 50,
+        );
+        final unreadCount = await _repository.fetchUnreadGenerationCount();
+        final updatedCache =
+            Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
+              state.cachedItemsByFilter,
+            )..[nextFilter] = items;
+        final nowUtc = DateTime.now().toUtc();
+        state = state.copyWith(
+          items: items,
+          unreadCount: unreadCount,
+          isLoading: false,
+          syncFailed: false,
+          showOfflineBanner: wasOffline && items.isNotEmpty,
+          isConnectionRecovered: wasOffline && items.isNotEmpty,
+          lastSyncedAtUtc: nowUtc,
+          cachedItemsByFilter: updatedCache,
+          clearError: true,
+        );
+        _registerAutoRefreshSuccess();
+
+        if (wasOffline && items.isNotEmpty) {
+          _scheduleOfflineBannerHide();
+        }
+      } catch (error) {
+        _registerAutoRefreshFailure();
+        if (state.items.isNotEmpty) {
+          _offlineBannerTimer?.cancel();
+          _offlineBannerTimer = null;
+          state = state.copyWith(
+            isLoading: false,
+            syncFailed: true,
+            showOfflineBanner: true,
+            isConnectionRecovered: false,
+          );
+          return;
+        }
+
+        _offlineBannerTimer?.cancel();
+        _offlineBannerTimer = null;
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: error.toString(),
+        );
+      }
+    } finally {
+      _isLoadInFlight = false;
     }
+  }
+
+  void _startAutoRefresh() {
+    _scheduleNextAutoRefresh();
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
+  void _scheduleNextAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    if (!_isScreenVisible) {
+      return;
+    }
+
+    _autoRefreshTimer = Timer(_currentAutoRefreshInterval(), () {
+      if (!_isScreenVisible || _isLoadInFlight) {
+        _scheduleNextAutoRefresh();
+        return;
+      }
+
+      unawaited(load(refresh: true).whenComplete(_scheduleNextAutoRefresh));
+    });
+  }
+
+  Duration _currentAutoRefreshInterval() {
+    final multiplier = 1 << _autoRefreshFailureStreak.clamp(0, 3);
+    final nextSeconds = _autoRefreshMinInterval.inSeconds * multiplier;
+    final maxSeconds = _autoRefreshMaxInterval.inSeconds;
+    final boundedSeconds = nextSeconds > maxSeconds ? maxSeconds : nextSeconds;
+    return Duration(seconds: boundedSeconds);
+  }
+
+  void _registerAutoRefreshSuccess() {
+    if (_autoRefreshFailureStreak == 0) {
+      return;
+    }
+
+    _autoRefreshFailureStreak = 0;
+    _scheduleNextAutoRefresh();
+  }
+
+  void _registerAutoRefreshFailure() {
+    final next = _autoRefreshFailureStreak + 1;
+    _autoRefreshFailureStreak = next > 3 ? 3 : next;
+    _scheduleNextAutoRefresh();
   }
 
   void _scheduleOfflineBannerHide() {

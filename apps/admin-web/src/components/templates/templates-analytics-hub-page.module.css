@@ -46,8 +46,8 @@
 }
 
 .heroBadge {
-  border: 1px solid rgba(83, 155, 245, 0.34);
-  background: rgba(18, 36, 67, 0.62);
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
   color: var(--text-strong);
   padding: 0.34rem 0.58rem;
 }
@@ -75,8 +75,8 @@
 }
 
 .primaryButton {
-  border: 1px solid rgba(83, 155, 245, 0.48);
-  background: #1a73e8;
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--border-soft));
+  background: var(--primary-bg);
   color: var(--accent-contrast);
   padding: 0.46rem 0.68rem;
   cursor: pointer;
@@ -86,15 +86,15 @@
 .segmentedButton,
 .chartTab {
   border: 1px solid var(--border-soft);
-  background: rgba(5, 8, 14, 0.94);
+  background: var(--surface-2);
   color: var(--text-soft);
   padding: 0.44rem 0.62rem;
 }
 
 .segmentedActive,
 .chartTabActive {
-  border: 1px solid rgba(83, 155, 245, 0.38);
-  background: rgba(18, 36, 67, 0.78);
+  border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--border-soft));
+  background: var(--accent-soft-bg);
   color: var(--text-strong);
   padding: 0.44rem 0.62rem;
 }
@@ -113,7 +113,7 @@
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   padding: 0.58rem;
-  background: rgba(4, 7, 12, 0.94);
+  background: var(--surface-1);
 }
 
 .segmented,
@@ -151,7 +151,7 @@
   padding: 0.72rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  background: rgba(5, 8, 14, 0.96);
+  background: var(--surface-1);
   box-shadow: none;
 }
 
@@ -247,7 +247,7 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.7rem;
   padding: 0.75rem 0.85rem;
-  background: rgba(5, 8, 14, 0.92);
+  background: var(--surface-2);
 }
 
 .chartSummary > * {
@@ -305,7 +305,7 @@
 }
 
 .feedbackTemplateLink:hover {
-  color: #58a6ff;
+  color: var(--accent);
 }
 
 .feedbackMessage {
@@ -511,7 +511,11 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--border-soft);
-  background: linear-gradient(135deg, rgba(88, 166, 255, 0.14), rgba(56, 189, 248, 0.08));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 18%, var(--surface-2)),
+    color-mix(in srgb, var(--info) 12%, var(--surface-2))
+  );
   color: var(--text-soft);
   font-weight: 600;
 }
@@ -574,19 +578,19 @@
 .statusBadge {
   padding: 0.25rem 0.46rem;
   border: 1px solid var(--border-soft);
-  background: rgba(17, 22, 29, 0.76);
+  background: var(--surface-2);
   color: var(--text-soft);
 }
 
 .status_active {
-  background: rgba(46, 160, 67, 0.12);
-  border-color: rgba(46, 160, 67, 0.34);
-  color: #8ddb9c;
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));
+  color: var(--success);
 }
 
 .status_draft {
-  background: rgba(56, 189, 248, 0.1);
-  border-color: rgba(83, 155, 245, 0.3);
+  background: color-mix(in srgb, var(--info) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
   color: var(--info);
 }
 
@@ -597,20 +601,20 @@
 }
 
 .status_failed {
-  background: rgba(251, 113, 133, 0.14);
-  border-color: rgba(251, 113, 133, 0.42);
-  color: #ffd1db;
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border-soft));
+  color: var(--danger-soft-fg);
 }
 
 .inlineAction {
   min-height: 2rem;
-  border: 1px solid rgba(83, 155, 245, 0.34);
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border-soft));
   color: var(--text-strong);
   padding: 0.38rem 0.58rem;
 }
 
 .refreshPill {
-  background: rgba(88, 166, 255, 0.1);
+  background: color-mix(in srgb, var(--info) 14%, var(--surface-1));
   color: var(--text-strong);
   padding: 0.32rem 0.55rem;
 }

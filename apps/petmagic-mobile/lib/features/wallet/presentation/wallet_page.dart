@@ -16,6 +16,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
+import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 
@@ -34,23 +35,37 @@ class WalletPage extends ConsumerStatefulWidget {
 
 class _WalletPageState extends ConsumerState<WalletPage>
     with WidgetsBindingObserver {
+  static const Duration _autoRefreshMinInterval = Duration(seconds: 12);
+  static const Duration _autoRefreshMaxInterval = Duration(seconds: 36);
+
   bool _shouldReloadOnResume = false;
+  Timer? _autoRefreshTimer;
+  late final WalletController _walletController;
+  int _autoRefreshErrorStreak = 0;
 
   @override
   void initState() {
     super.initState();
+    _walletController = ref.read(walletControllerProvider.notifier);
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(() => ref.read(walletControllerProvider.notifier).load());
+    _startAutoRefresh();
+    Future.microtask(() => _walletController.load());
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+
     if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
       _shouldReloadOnResume = false;
       unawaited(() async {
@@ -64,7 +79,70 @@ class _WalletPageState extends ConsumerState<WalletPage>
           await controller.verifyStripeCheckout(null);
         }
       }());
+      return;
     }
+
+    unawaited(_walletController.load(refresh: true));
+  }
+
+  void _startAutoRefresh() {
+    _scheduleNextAutoRefresh();
+  }
+
+  void _scheduleNextAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer(_currentAutoRefreshInterval(), () {
+      if (!mounted) {
+        return;
+      }
+
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+        return;
+      }
+
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isCurrent) {
+        _scheduleNextAutoRefresh();
+        return;
+      }
+
+      unawaited(
+        _walletController
+            .load(refresh: true)
+            .then((_) {
+              if (!mounted) {
+                return;
+              }
+
+              final hasError =
+                  ref.read(walletControllerProvider).errorMessage != null;
+              if (hasError) {
+                _registerAutoRefreshFailure();
+              } else {
+                _registerAutoRefreshSuccess();
+              }
+            })
+            .whenComplete(_scheduleNextAutoRefresh),
+      );
+    });
+  }
+
+  Duration _currentAutoRefreshInterval() {
+    final multiplier = 1 << _autoRefreshErrorStreak.clamp(0, 2);
+    final nextSeconds = _autoRefreshMinInterval.inSeconds * multiplier;
+    final maxSeconds = _autoRefreshMaxInterval.inSeconds;
+    final boundedSeconds = nextSeconds > maxSeconds ? maxSeconds : nextSeconds;
+    return Duration(seconds: boundedSeconds);
+  }
+
+  void _registerAutoRefreshSuccess() {
+    _autoRefreshErrorStreak = 0;
+  }
+
+  void _registerAutoRefreshFailure() {
+    final next = _autoRefreshErrorStreak + 1;
+    _autoRefreshErrorStreak = next > 2 ? 2 : next;
   }
 
   @override
@@ -243,33 +321,20 @@ class _WalletPageState extends ConsumerState<WalletPage>
         'PaymentSheet init start (order=${checkout.orderId})',
         name: 'PetMagic.Wallet.Checkout',
       );
-
-      Stripe.publishableKey = publishableKey;
-      Stripe.urlScheme = 'petmagicstripe';
-      await Stripe.instance.applySettings();
-
-      developer.log(
-        'PaymentSheet settings applied (order=${checkout.orderId})',
-        name: 'PetMagic.Wallet.Checkout',
-      );
-
-      await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
+      _shouldReloadOnResume = true;
+      final result = await StripePaymentSheetCoordinator.present(
+        context,
+        request: StripePaymentSheetRequest(
           paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'PetMagic',
+          publishableKey: publishableKey,
           customerId: checkout.customerId,
           customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
-          returnURL: 'petmagicstripe://redirect',
         ),
       );
 
-      developer.log(
-        'PaymentSheet initialized (order=${checkout.orderId})',
-        name: 'PetMagic.Wallet.Checkout',
-      );
-
-      _shouldReloadOnResume = true;
-      await Stripe.instance.presentPaymentSheet();
+      if (!result.completed) {
+        throw result.error ?? Exception('stripe.payment_sheet_failed');
+      }
 
       developer.log(
         'PaymentSheet completed (order=${checkout.orderId})',
@@ -343,7 +408,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
       );
     }
   }
-
 }
 
 Future<void> _showPackDetailSheet(
@@ -391,10 +455,11 @@ Future<void> _showPackDetailSheet(
     (pack) => pack.packId == initialPack.packId,
     orElse: () => sortedPacks.first,
   );
-  var selectedMethod = enabledMethods
-      .where((method) => method.isSelectedByDefault)
-      .cast<WalletPaymentMethodModel?>()
-      .firstOrNull ??
+  var selectedMethod =
+      enabledMethods
+          .where((method) => method.isSelectedByDefault)
+          .cast<WalletPaymentMethodModel?>()
+          .firstOrNull ??
       enabledMethods
           .where((method) => method.isRecommended)
           .cast<WalletPaymentMethodModel?>()
@@ -504,7 +569,9 @@ Future<void> _showPackDetailSheet(
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                selectedMethod.displaySubtitle?.trim().isNotEmpty ==
+                                selectedMethod.displaySubtitle
+                                            ?.trim()
+                                            .isNotEmpty ==
                                         true
                                     ? selectedMethod.displaySubtitle!.trim()
                                     : text.premiumSecurePaymentSubtitle,
@@ -1020,7 +1087,8 @@ String _sourceLabel(AppLocalizations text, String source) {
     'pack_purchase' => text.walletSourcePackPurchase,
     'generation_spend' => text.walletSourceGenerationSpend,
     'generation_refund' => text.walletSourceGenerationRefund,
-    'weekly_grant' || 'premium_subscription_weekly_grant' => text.walletSourceWeeklyGrant,
+    'weekly_grant' ||
+    'premium_subscription_weekly_grant' => text.walletSourceWeeklyGrant,
     'ad_reward' => text.walletSourceAdReward,
     'promo_redeem' || 'redeem_code' => text.walletSourcePromoCode,
     'admin_grant' => text.walletSourceAdminGrant,
@@ -1034,7 +1102,8 @@ IconData _sourceIcon(String source) {
     'pack_purchase' => Icons.account_balance_wallet_rounded,
     'generation_spend' => Icons.auto_awesome_rounded,
     'generation_refund' => Icons.undo_rounded,
-    'weekly_grant' || 'premium_subscription_weekly_grant' => Icons.card_giftcard_rounded,
+    'weekly_grant' ||
+    'premium_subscription_weekly_grant' => Icons.card_giftcard_rounded,
     'ad_reward' => Icons.play_circle_fill_rounded,
     'promo_redeem' || 'redeem_code' => Icons.confirmation_number_rounded,
     'admin_grant' => Icons.support_agent_rounded,

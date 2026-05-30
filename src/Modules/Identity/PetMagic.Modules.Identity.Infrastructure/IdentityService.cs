@@ -162,6 +162,12 @@ public sealed class IdentityService(
             return Result.Failure<TokenPairResponse>(IdentityErrors.EmailNotConfirmed);
         }
 
+        var accountStatusNormalization = await NormalizeAccountStatusForAuthenticatedUserAsync(user, cancellationToken);
+        if (accountStatusNormalization.IsFailure)
+        {
+            return Result.Failure<TokenPairResponse>(accountStatusNormalization.Error);
+        }
+
         var roles = await userManager.GetRolesAsync(user);
         var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken);
         await WriteAuditAsync(user.Id, "auth.login.succeeded", "User logged in.", cancellationToken);
@@ -357,6 +363,7 @@ public sealed class IdentityService(
 
             if (user is null)
             {
+                var now = DateTime.UtcNow;
                 user = new AppUser
                 {
                     Id = Guid.NewGuid(),
@@ -366,7 +373,9 @@ public sealed class IdentityService(
                     DisplayName = command.DisplayName,
                     IsPremium = false,
                     IsActive = true,
-                    CreatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = now,
+                    AccountStatus = AccountStatus.Active,
+                    AccountStatusUpdatedAtUtc = now
                 };
 
                 var createResult = await userManager.CreateAsync(user);
@@ -388,6 +397,12 @@ public sealed class IdentityService(
         if (!user.IsActive)
         {
             return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
+        }
+
+        var accountStatusNormalization = await NormalizeAccountStatusForAuthenticatedUserAsync(user, cancellationToken);
+        if (accountStatusNormalization.IsFailure)
+        {
+            return Result.Failure<TokenPairResponse>(accountStatusNormalization.Error);
         }
 
         var roles = await userManager.GetRolesAsync(user);
@@ -534,6 +549,12 @@ public sealed class IdentityService(
         if (user is null || !user.IsActive)
         {
             return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidRefreshToken);
+        }
+
+        var accountStatusNormalization = await NormalizeAccountStatusForAuthenticatedUserAsync(user, cancellationToken);
+        if (accountStatusNormalization.IsFailure)
+        {
+            return Result.Failure<TokenPairResponse>(accountStatusNormalization.Error);
         }
 
         session.RevokedAtUtc = DateTime.UtcNow;
@@ -1079,6 +1100,26 @@ public sealed class IdentityService(
             refreshToken,
             expiresAt,
             ToUserProfileResponse(user, roles));
+    }
+
+    private async Task<Result> NormalizeAccountStatusForAuthenticatedUserAsync(AppUser user, CancellationToken cancellationToken)
+    {
+        if (!user.IsActive || !user.EmailConfirmed || user.AccountStatus == AccountStatus.Active)
+        {
+            return Result.Success();
+        }
+
+        user.AccountStatus = AccountStatus.Active;
+        user.AccountStatusUpdatedAtUtc = DateTime.UtcNow;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.OperationFailed);
+        }
+
+        await WriteAuditAsync(user.Id, "user.account_status.normalized", "Account status normalized to Active for authenticated user.", cancellationToken);
+        return Result.Success();
     }
 
     private async Task WriteAuditAsync(Guid? subjectUserId, string action, string details, CancellationToken cancellationToken)

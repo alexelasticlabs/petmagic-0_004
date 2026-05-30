@@ -210,6 +210,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     final template = state.items[index];
                     return TemplateCard(
                       template: template,
+                      enableAggressiveVideoPrewarm:
+                          template.isVideo && index < 4,
                       onPressed: () => _handleTemplateSelected(template),
                     );
                   },

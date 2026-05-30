@@ -153,15 +153,15 @@
 }
 
 .inlineStateReady {
-  border-color: rgba(46, 160, 67, 0.3);
+  border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));
   color: var(--success);
-  background: rgba(46, 160, 67, 0.12);
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-1));
 }
 
 .inlineStateAttention {
-  border-color: rgba(245, 158, 11, 0.28);
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--border-soft));
   color: var(--warning);
-  background: rgba(120, 53, 15, 0.18);
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-1));
 }
 
 .mediaGrid {
@@ -252,13 +252,13 @@
 }
 
 .railStatCardReady {
-  background: rgba(9, 21, 24, 0.94);
-  border-color: rgba(52, 211, 153, 0.18);
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border-soft));
 }
 
 .railStatCardMissing {
-  background: rgba(26, 18, 8, 0.9);
-  border-color: rgba(251, 191, 36, 0.16);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--warning) 24%, var(--border-soft));
 }
 
 .railStatLabel {
@@ -300,11 +300,11 @@
 }
 
 .checklistItemReady {
-  border-color: rgba(83, 155, 245, 0.14);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-soft));
 }
 
 .checklistItemMissing {
-  border-color: rgba(245, 158, 11, 0.12);
+  border-color: color-mix(in srgb, var(--warning) 22%, var(--border-soft));
 }
 
 .checklistCopy {
@@ -318,12 +318,12 @@
   height: 0.46rem;
   border-radius: var(--radius-sm);
   background: var(--warning);
-  box-shadow: 0 0 0 0.14rem rgba(245, 158, 11, 0.12);
+  box-shadow: 0 0 0 0.14rem color-mix(in srgb, var(--warning) 20%, transparent);
 }
 
 .checkReady {
   background: var(--success);
-  box-shadow: 0 0 0 0.18rem rgba(46, 160, 67, 0.14);
+  box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--success) 20%, transparent);
 }
 
 .checkMissing {
@@ -344,7 +344,7 @@
   align-items: center;
   justify-content: center;
   min-width: 5rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   padding: 0.18rem 0.45rem;
   font-size: 0.62rem;
@@ -354,14 +354,14 @@
 }
 
 .checklistStateReady {
-  border-color: rgba(46, 160, 67, 0.18);
-  background: rgba(22, 101, 52, 0.18);
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 16%, var(--surface-2));
   color: var(--success);
 }
 
 .checklistStateMissing {
-  border-color: rgba(245, 158, 11, 0.18);
-  background: rgba(120, 53, 15, 0.18);
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 16%, var(--surface-2));
   color: var(--warning);
 }
 
@@ -454,11 +454,11 @@
 .footerStatusButtonActive {
   background: var(--accent-soft-bg);
   color: var(--text-strong);
-  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.18);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
 .footerStatusButtonLive.footerStatusButtonActive {
-  background: rgba(16, 55, 42, 0.82);
+  background: color-mix(in srgb, var(--success) 22%, var(--surface-1));
   color: var(--toast-success-fg);
 }
 
@@ -539,32 +539,32 @@
 }
 
 .accessOptionPremium {
-  background: rgba(22, 17, 9, 0.9);
-  border-color: rgba(120, 93, 41, 0.54);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--warning) 44%, var(--border-soft));
 }
 
 .accessOption:hover {
   border-color: var(--border-accent);
   background: var(--surface-hover);
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .accessOptionActive {
-  border-color: rgba(83, 155, 245, 0.28);
-  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .accessOptionActiveFree {
-  border-color: rgba(83, 155, 245, 0.32);
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border-soft));
   background: var(--accent-soft-bg);
-  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .accessOptionActivePremium {
-  border-color: rgba(245, 208, 101, 0.34);
-  background: rgba(39, 29, 12, 0.92);
-  box-shadow: inset 0 0 0 1px rgba(245, 208, 101, 0.1);
+  border-color: color-mix(in srgb, var(--warning) 48%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 16%, var(--surface-1));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 24%, transparent);
 }
 
 .accessOptionTitle {
@@ -602,20 +602,20 @@
 
 .assetPreviewInteractive:hover {
   border-color: var(--border-accent);
-  box-shadow: 0 18px 36px rgba(4, 10, 20, 0.24);
+  box-shadow: var(--shadow-strong);
 }
 
 .assetPreviewInteractive:focus-visible {
   outline: none;
-  border-color: rgba(83, 155, 245, 0.62);
-  box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.14);
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--border-soft));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .assetPreviewDragActive {
-  border-color: rgba(83, 155, 245, 0.66);
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--border-soft));
   box-shadow:
-    inset 0 0 0 1px rgba(83, 155, 245, 0.28),
-    0 0 0 4px rgba(83, 155, 245, 0.12);
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .assetPreviewOverlay {
@@ -643,20 +643,20 @@
 }
 
 .assetPreviewBadge {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(7, 12, 20, 0.52);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
   color: var(--text-soft);
 }
 
 .assetPreviewStateReady {
-  border: 1px solid rgba(34, 197, 94, 0.24);
-  background: rgba(46, 160, 67, 0.18);
+  border: 1px solid color-mix(in srgb, var(--success) 36%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 16%, var(--surface-2));
   color: var(--success);
 }
 
 .assetPreviewStateMissing {
-  border: 1px solid rgba(245, 158, 11, 0.24);
-  background: rgba(180, 83, 9, 0.16);
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 16%, var(--surface-2));
   color: var(--warning);
 }
 
@@ -743,7 +743,7 @@
   display: grid;
   gap: 0.28rem;
   padding-bottom: 0.25rem;
-  border-bottom: 1px solid rgba(33, 51, 45, 0.76);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .modelCardEyebrow {
@@ -886,7 +886,7 @@
 
 .adminButton {
   border-color: var(--border-soft) !important;
-  background: rgba(5, 8, 14, 0.94) !important;
+  background: var(--surface-2) !important;
   color: var(--text-soft) !important;
   box-shadow: none !important;
 }
@@ -898,15 +898,15 @@
 }
 
 .primaryButton {
-  border-color: rgba(83, 155, 245, 0.38) !important;
-  background: rgba(18, 36, 67, 0.9) !important;
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-1)) !important;
   color: var(--text-strong) !important;
-  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.08) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent) !important;
 }
 
 .dangerButton {
-  border-color: rgba(248, 113, 113, 0.26) !important;
-  background: rgba(58, 20, 30, 0.72) !important;
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface-1)) !important;
   color: var(--danger-soft-fg) !important;
   box-shadow: none !important;
 }
@@ -1000,8 +1000,8 @@
 .fieldBlock > textarea:focus-visible,
 .fieldBlock > select:focus-visible,
 .filePicker:focus-within .filePickerSurface {
-  border-color: rgba(83, 155, 245, 0.62);
-  box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.14);
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--border-soft));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .split {
@@ -1049,11 +1049,11 @@
   border-radius: 0.63rem;
   padding: 0.72rem;
   background:
-    radial-gradient(circle at top right, rgba(88, 166, 255, 0.08), transparent 34%),
-    linear-gradient(180deg, rgba(21, 27, 35, 0.96) 0%, rgba(13, 17, 23, 0.9) 100%);
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 16%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 96%, var(--surface-2)) 0%, color-mix(in srgb, var(--surface-2) 92%, var(--surface-1)) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 14px 28px rgba(0, 0, 0, 0.12);
+    inset 0 1px 0 color-mix(in srgb, var(--text-strong) 8%, transparent),
+    var(--shadow-card);
 }
 
 .uploadPanelHeader {
@@ -1112,7 +1112,7 @@
   cursor: pointer;
   border-style: dashed;
   background:
-    linear-gradient(180deg, rgba(12, 18, 16, 0.94) 0%, rgba(5, 8, 7, 0.8) 100%), rgba(5, 8, 7, 0.76);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 92%, var(--surface-1)) 0%, color-mix(in srgb, var(--surface-1) 92%, var(--surface-2)) 100%), var(--surface-1);
 }
 
 .filePickerButton {
@@ -1120,12 +1120,12 @@
   border: 1px solid var(--border-soft);
   border-radius: 0.5rem;
   padding: 0.42rem 0.72rem;
-  background: linear-gradient(180deg, rgba(31, 48, 42, 0.95) 0%, rgba(12, 20, 17, 0.95) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--success) 14%, var(--surface-1)) 0%, color-mix(in srgb, var(--success) 10%, var(--surface-2)) 100%);
   color: var(--text-strong);
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-strong) 10%, transparent);
 }
 
 .filePickerName {
@@ -1156,21 +1156,21 @@
 }
 
 .uploadPanel .primaryButton:hover:not(:disabled) {
-  border-color: rgba(74, 222, 128, 0.5) !important;
+  border-color: color-mix(in srgb, var(--success) 56%, var(--border-soft)) !important;
   background: linear-gradient(
     180deg,
-    rgba(40, 96, 64, 0.92) 0%,
-    rgba(21, 56, 37, 0.98) 100%
+    color-mix(in srgb, var(--success) 28%, var(--surface-1)) 0%,
+    color-mix(in srgb, var(--success) 22%, var(--surface-2)) 100%
   ) !important;
   transform: translateY(-1px);
 }
 
 .uploadPanel .dangerButton:hover:not(:disabled) {
-  border-color: rgba(251, 146, 146, 0.44) !important;
+  border-color: color-mix(in srgb, var(--danger) 52%, var(--border-soft)) !important;
   background: linear-gradient(
     180deg,
-    rgba(96, 39, 48, 0.86) 0%,
-    rgba(58, 23, 29, 0.96) 100%
+    color-mix(in srgb, var(--danger) 26%, var(--surface-1)) 0%,
+    color-mix(in srgb, var(--danger) 20%, var(--surface-2)) 100%
   ) !important;
   transform: translateY(-1px);
 }

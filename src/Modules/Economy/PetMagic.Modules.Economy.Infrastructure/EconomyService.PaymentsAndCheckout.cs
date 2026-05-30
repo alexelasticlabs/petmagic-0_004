@@ -1307,19 +1307,36 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        // Webhook is the source of truth for settlement: this endpoint validates
-        // payment state, but does not grant tokens directly.
-        logger?.LogInformation(
-            "Stripe payment validated for order {OrderId}; waiting webhook settlement.",
-            order.Id);
-
         if (string.IsNullOrWhiteSpace(order.ExternalPaymentId))
         {
             order.ExternalPaymentId = stripeReferenceId;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return Result.Success(ToPurchaseOrderResponse(order));
+        // For mobile PaymentSheet flows we can observe Stripe success before webhook delivery.
+        // Settle immediately and keep webhook handling idempotent.
+        var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
+        if (confirmResult.IsFailure
+            && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+        {
+            return Result.Failure<PurchaseOrderResponse>(confirmResult.Error);
+        }
+
+        if (confirmResult.IsSuccess)
+        {
+            return Result.Success(ToPurchaseOrderResponse(confirmResult.Value));
+        }
+
+        var refreshedOrder = await dbContext.PurchaseOrders
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == order.Id && x.UserId == order.UserId, cancellationToken);
+
+        if (refreshedOrder is null)
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
+        }
+
+        return Result.Success(ToPurchaseOrderResponse(refreshedOrder));
     }
 
     public async Task<Result<PurchaseOrderResponse>> GetPurchaseAsync(Guid userId, Guid orderId, CancellationToken cancellationToken)

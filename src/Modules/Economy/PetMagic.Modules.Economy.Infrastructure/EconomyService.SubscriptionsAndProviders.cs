@@ -44,7 +44,6 @@ public sealed partial class EconomyService
 
         var normalizedStatus = status.Trim();
         var previousPeriodStartUtc = subscription?.CurrentPeriodStartUtc;
-        var previousTokensGranted = subscription?.MonthlyTokensGranted ?? 0;
 
         if (subscription is null)
         {
@@ -79,19 +78,6 @@ public sealed partial class EconomyService
         subscription.CancelAtPeriodEnd = cancelAtPeriodEnd;
         subscription.MonthlyTokenLimit = monthlyTokenLimit;
         subscription.UpdatedAtUtc = now;
-
-        if (ShouldGrantSubscriptionTokens(subscription, previousPeriodStartUtc, previousTokensGranted))
-        {
-            var wallet = await GetOrCreateWalletAsync(userId, cancellationToken);
-            ApplyWalletDelta(
-                wallet,
-                monthlyTokenLimit,
-                WalletLedgerSource.PremiumSubscriptionGrant,
-                $"subscription:{provider}:{planId}",
-                now);
-            subscription.MonthlyTokensGranted += monthlyTokenLimit;
-            subscription.LastTokenGrantAtUtc = now;
-        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return subscription;
@@ -160,15 +146,11 @@ public sealed partial class EconomyService
         var subscriptionStartUtc = subscription!.CurrentPeriodStartUtc ?? subscription.CreatedAtUtc;
         if (subscriptionStartUtc > now)
         {
-            return subscriptionStartUtc.AddDays(7);
+            return subscriptionStartUtc;
         }
 
         var elapsedDays = (now - subscriptionStartUtc).TotalDays;
-        var eligibleGrantCount = (int)Math.Floor(elapsedDays / 7d);
-        if (eligibleGrantCount <= 0)
-        {
-            return subscriptionStartUtc.AddDays(7);
-        }
+        var targetGrantCount = (int)Math.Floor(elapsedDays / 7d) + 1;
 
         var reasonPrefix = $"premium_weekly:{subscription.Id:D}:";
         var grantedCount = await dbContext.WalletLedgerEntries
@@ -179,7 +161,7 @@ public sealed partial class EconomyService
                     && x.Reason.StartsWith(reasonPrefix),
                 cancellationToken);
 
-        var grantsToApply = eligibleGrantCount - grantedCount;
+        var grantsToApply = targetGrantCount - grantedCount;
         if (grantsToApply > 0)
         {
             for (var index = 0; index < grantsToApply; index++)
@@ -197,7 +179,7 @@ public sealed partial class EconomyService
             grantedCount += grantsToApply;
         }
 
-        return subscriptionStartUtc.AddDays((grantedCount + 1) * 7d);
+        return subscriptionStartUtc.AddDays(grantedCount * 7d);
     }
 
     private static string GetManageSubscriptionAction(string? provider)
@@ -392,32 +374,6 @@ public sealed partial class EconomyService
             : currentPeriodEndUtc.Value.AddMonths(-1);
     }
 
-    private static bool ShouldGrantSubscriptionTokens(
-        UserSubscription subscription,
-        DateTime? previousPeriodStartUtc,
-        int previousTokensGranted)
-    {
-        if (subscription.MonthlyTokenLimit <= 0)
-        {
-            return false;
-        }
-
-        if (!string.Equals(subscription.Status, "Active", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(subscription.Status, "Trialing", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(subscription.Status, "GracePeriod", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (subscription.LastTokenGrantAtUtc is null && previousTokensGranted <= 0)
-        {
-            return true;
-        }
-
-        return subscription.CurrentPeriodStartUtc.HasValue
-            && (!previousPeriodStartUtc.HasValue || subscription.CurrentPeriodStartUtc.Value > previousPeriodStartUtc.Value)
-            && subscription.MonthlyTokensGranted < subscription.MonthlyTokenLimit;
-    }
 
     private async Task<PaymentProviderConfiguration?> ResolveEnabledPaymentProviderConfigAsync(
         string provider,

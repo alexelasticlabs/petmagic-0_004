@@ -208,7 +208,14 @@ public sealed partial class EconomyService
 
         return await dbContext.UserSubscriptions
             .AsNoTracking()
-            .AnyAsync(x => x.UserId == userId, cancellationToken);
+            .AnyAsync(
+                x => x.UserId == userId
+                    && !string.IsNullOrWhiteSpace(x.ExternalSubscriptionId)
+                    && (x.Status == "Active"
+                        || x.Status == "GracePeriod"
+                        || x.Status == "Canceled")
+                    && (x.CurrentPeriodEndUtc == null || x.CurrentPeriodEndUtc >= DateTime.UtcNow),
+                cancellationToken);
     }
 
     private async Task SettlePendingReferralBonusAsync(Guid refereeUserId, string triggerReason, DateTime now, CancellationToken cancellationToken)
@@ -438,6 +445,17 @@ public sealed partial class EconomyService
     private static string BuildRedeemCodePrefix(string normalizedCode)
     {
         return normalizedCode[..Math.Min(normalizedCode.Length, 4)];
+    }
+
+    // Treat legacy/sentinel values as "no window" to avoid false inactive/expired checks.
+    private static DateTime? NormalizeOptionalUtcBoundary(DateTime? value)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        return value.Value <= DateTime.UnixEpoch ? null : value.Value;
     }
 
     private async Task<List<PaywallPaymentMethodResponse>> BuildAvailablePaymentMethodsAsync(

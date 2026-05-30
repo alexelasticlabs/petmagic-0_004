@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/premium/presentation/stripe_paymentsheet_smoke_test_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
@@ -120,6 +121,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: PremiumPage.routePath,
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: PremiumPage()),
+      ),
+      GoRoute(
+        path: StripePaymentSheetSmokeTestPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: StripePaymentSheetSmokeTestPage()),
       ),
       ShellRoute(
         builder: (context, state, child) =>

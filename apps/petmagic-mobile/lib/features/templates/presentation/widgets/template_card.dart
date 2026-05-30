@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -12,19 +14,27 @@ class TemplateCard extends StatefulWidget {
     required this.template,
     this.onPressed,
     this.showGuestPreview = false,
+    this.enableAggressiveVideoPrewarm = false,
     super.key,
   });
 
   final TemplateItem template;
   final VoidCallback? onPressed;
   final bool showGuestPreview;
+  final bool enableAggressiveVideoPrewarm;
 
   @override
   State<TemplateCard> createState() => _TemplateCardState();
 }
 
 class _TemplateCardState extends State<TemplateCard> {
+  static const Duration _disposeDelay = Duration(seconds: 8);
+  static const double _prewarmVisibilityFraction = 0.32;
+  static const double _aggressivePrewarmVisibilityFraction = 0.12;
+  static const double _playVisibilityFraction = 0.58;
+
   VideoPlayerController? _videoController;
+  Timer? _disposeTimer;
   bool _isPreviewActive = false;
 
   @override
@@ -33,12 +43,14 @@ class _TemplateCardState extends State<TemplateCard> {
 
     if (oldWidget.template.templateId != widget.template.templateId) {
       _isPreviewActive = false;
+      _disposeTimer?.cancel();
       _disposeVideoController();
     }
   }
 
   @override
   void dispose() {
+    _disposeTimer?.cancel();
     _videoController?.dispose();
     super.dispose();
   }
@@ -131,10 +143,28 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _handleVisibility(VisibilityInfo info) {
-    final shouldPlay =
-        info.visibleFraction > 0.58 &&
-        widget.template.isVideo &&
-        isVideoPreview(widget.template.previewAsset);
+    final isVideoTemplate =
+        widget.template.isVideo && isVideoPreview(widget.template.previewAsset);
+    if (!isVideoTemplate) {
+      _isPreviewActive = false;
+      _disposeTimer?.cancel();
+      unawaited(_disposeVideoController());
+      return;
+    }
+
+    final visibleFraction = info.visibleFraction;
+    final prewarmThreshold = widget.enableAggressiveVideoPrewarm
+        ? _aggressivePrewarmVisibilityFraction
+        : _prewarmVisibilityFraction;
+    final shouldPrewarm = visibleFraction > prewarmThreshold;
+    final shouldPlay = visibleFraction > _playVisibilityFraction;
+
+    if (shouldPrewarm) {
+      _disposeTimer?.cancel();
+      unawaited(_ensureVideoController());
+    } else {
+      _scheduleVideoDispose();
+    }
 
     if (_isPreviewActive == shouldPlay) {
       return;
@@ -142,13 +172,21 @@ class _TemplateCardState extends State<TemplateCard> {
 
     _isPreviewActive = shouldPlay;
     if (shouldPlay) {
-      _ensureVideoController();
+      unawaited(_ensureVideoController());
     } else {
-      _disposeVideoController();
+      unawaited(_videoController?.pause());
     }
   }
 
+  void _scheduleVideoDispose() {
+    _disposeTimer?.cancel();
+    _disposeTimer = Timer(_disposeDelay, () {
+      unawaited(_disposeVideoController());
+    });
+  }
+
   Future<void> _disposeVideoController() async {
+    _disposeTimer?.cancel();
     final controller = _videoController;
     if (controller == null) {
       return;
@@ -164,7 +202,9 @@ class _TemplateCardState extends State<TemplateCard> {
   Future<void> _ensureVideoController() async {
     if (_videoController != null || widget.template.previewAsset == null) {
       if (_videoController?.value.isInitialized ?? false) {
-        await _videoController?.play();
+        if (_isPreviewActive) {
+          await _videoController?.play();
+        }
       }
       return;
     }

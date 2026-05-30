@@ -739,7 +739,9 @@ class SupportChatController extends Notifier<SupportChatState> {
   }
 
   bool _isConversationNotFound(String message) {
-    return message.toLowerCase().contains('support.conversation_not_found');
+    final normalized = message.toLowerCase();
+    return normalized.contains('support.conversation_not_found') ||
+        normalized.contains('support conversation was not found');
   }
 
   bool _isConversationReadOnlyForUser(SupportChatConversation conversation) {

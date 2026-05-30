@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
+import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // ─── Color constants ────────────────────────────────────────────────────────
@@ -136,19 +136,18 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     }
 
     try {
-      Stripe.publishableKey = publishableKey;
-      Stripe.urlScheme = 'petmagicstripe';
-      await Stripe.instance.applySettings();
-      await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
+      final result = await StripePaymentSheetCoordinator.present(
+        context,
+        request: StripePaymentSheetRequest(
           paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'PetMagic',
+          publishableKey: publishableKey,
           customerId: checkout.customerId,
           customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
-          returnURL: 'petmagicstripe://redirect',
         ),
       );
-      await Stripe.instance.presentPaymentSheet();
+      if (!result.completed) {
+        throw result.error ?? Exception('stripe.payment_sheet_failed');
+      }
 
       if (!mounted) {
         return;

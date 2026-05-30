@@ -250,6 +250,43 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task ApplyReferralCodeAsync_ShouldAllowPendingSubscriptionWithoutPaidPurchase()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var referrerId = Guid.NewGuid();
+        var refereeId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = refereeId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Pending",
+            ExternalSubscriptionId = null,
+            CurrentPeriodStartUtc = null,
+            CurrentPeriodEndUtc = null,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var referrerRewards = await service.GetRewardsSummaryAsync(referrerId, CancellationToken.None);
+        var activation = await service.ApplyReferralCodeAsync(
+            new ApplyReferralCodeCommand(refereeId, referrerRewards.Value.ReferralCode),
+            CancellationToken.None);
+
+        Assert.True(activation.IsSuccess);
+        Assert.Equal(ReferralAttributionStatus.Pending, activation.Value.Status);
+    }
+
+    [Fact]
     public async Task ConfirmPackPurchaseAsync_ShouldSettlePendingReferralBonusOnce()
     {
         await using var dbContext = CreateDbContext();

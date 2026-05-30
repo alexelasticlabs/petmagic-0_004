@@ -183,12 +183,14 @@ public sealed partial class EconomyService(
         }
 
         var now = DateTime.UtcNow;
-        if (!redeemCode.IsActive || redeemCode.StartsAtUtc > now)
+        var startsAtUtc = NormalizeOptionalUtcBoundary(redeemCode.StartsAtUtc);
+        if (!redeemCode.IsActive || (startsAtUtc.HasValue && startsAtUtc.Value > now))
         {
             return Result.Failure<RedeemCodeAppliedResponse>(EconomyErrors.RedeemCodeInactive);
         }
 
-        if (redeemCode.ExpiresAtUtc <= now)
+        var expiresAtUtc = NormalizeOptionalUtcBoundary(redeemCode.ExpiresAtUtc);
+        if (expiresAtUtc.HasValue && expiresAtUtc.Value <= now)
         {
             return Result.Failure<RedeemCodeAppliedResponse>(EconomyErrors.RedeemCodeExpired);
         }

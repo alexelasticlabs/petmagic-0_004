@@ -76,6 +76,11 @@ String _mapSupportError(AppLocalizations text, String raw) {
     return text.supportChatUnavailableError;
   }
 
+  if (value.contains('support.conversation_not_found') ||
+      value.contains('support conversation was not found')) {
+    return text.supportChatUnavailableError;
+  }
+
   if (value.contains('auth.sign_in_required')) {
     return text.authSignInRequired;
   }

@@ -61,7 +61,7 @@
 
 .pageTitle {
   margin: 0;
-  color: #f5f7fa;
+  color: var(--text-strong);
   font-family: var(--font-heading), sans-serif;
   font-size: clamp(1.28rem, 1.02rem + 0.42vw, 1.56rem);
   font-weight: 600;
@@ -78,8 +78,12 @@
 .tableCard {
   border-color: var(--border-soft);
   background:
-    radial-gradient(circle at top left, rgba(26, 115, 232, 0.12), transparent 34%),
-    rgba(6, 12, 20, 0.98);
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent) 14%, transparent),
+      transparent 34%
+    ),
+    color-mix(in srgb, var(--surface-1) 96%, var(--surface-2));
 }
 
 .kpiGrid :global(article[class*="kpiCard"]) {
@@ -138,10 +142,10 @@
 
 .statusTab {
   appearance: none;
-  border: 1px solid rgba(46, 60, 79, 0.88);
+  border: 1px solid var(--border-soft);
   border-radius: 0.5rem;
-  background: rgba(9, 16, 27, 0.9);
-  color: rgba(191, 206, 224, 0.9);
+  background: var(--surface-2);
+  color: var(--text-soft);
   min-height: 1.72rem;
   padding: 0.18rem 0.42rem;
   display: inline-flex;
@@ -159,16 +163,16 @@
 }
 
 .statusTab:hover {
-  border-color: rgba(83, 155, 245, 0.6);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-soft));
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-soft);
 }
 
 .statusTabActive {
-  border-color: rgba(83, 155, 245, 0.8);
-  background: rgba(26, 115, 232, 0.22);
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--border-soft));
+  background: var(--accent-soft-bg);
   color: var(--text-strong);
-  box-shadow: inset 0 0 0 1px rgba(83, 155, 245, 0.28);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
 }
 
 .statusTabCount {
@@ -179,8 +183,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(17, 34, 58, 0.94);
-  color: rgba(186, 230, 253, 0.96);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
+  color: var(--text-strong);
   font-size: 0.6rem;
   font-weight: 600;
 }
@@ -198,10 +202,10 @@
   align-items: center;
   min-height: 1.62rem;
   padding: 0.14rem 0.42rem;
-  border: 1px solid rgba(56, 189, 248, 0.28);
+  border: 1px solid color-mix(in srgb, var(--info) 34%, var(--border-soft));
   border-radius: 0.5rem;
-  background: rgba(13, 30, 45, 0.72);
-  color: #bae6fd;
+  background: color-mix(in srgb, var(--surface-2) 84%, var(--info) 16%);
+  color: var(--text-strong);
   font-size: 0.66rem;
   font-weight: 600;
 }
@@ -212,10 +216,10 @@
   gap: 0.34rem;
   min-height: 1.62rem;
   padding: 0.14rem 0.42rem;
-  border: 1px solid rgba(56, 189, 248, 0.28);
+  border: 1px solid color-mix(in srgb, var(--info) 34%, var(--border-soft));
   border-radius: 0.5rem;
-  background: rgba(8, 23, 36, 0.82);
-  color: #c7f1ff;
+  background: color-mix(in srgb, var(--surface-2) 84%, var(--info) 16%);
+  color: var(--text-strong);
   font-size: 0.66rem;
   font-weight: 600;
   white-space: nowrap;
@@ -231,8 +235,8 @@
 }
 
 .autoRefreshBadgeLoading {
-  border-color: rgba(56, 189, 248, 0.5);
-  color: #e3f7ff;
+  border-color: color-mix(in srgb, var(--info) 58%, var(--border-soft));
+  color: var(--text-strong);
 }
 
 .autoRefreshBadgeLoading .autoRefreshDot {
@@ -264,7 +268,7 @@
 }
 
 .fieldLabel {
-  color: rgba(225, 233, 244, 0.72);
+  color: var(--text-muted);
   font-size: 0.64rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -320,7 +324,7 @@
 }
 
 .input[readonly] {
-  color: rgba(225, 233, 244, 0.76);
+  color: var(--text-soft);
 }
 
 .helperText {
@@ -332,8 +336,8 @@
 .tableCard :global(table thead th) {
   padding: 0.54rem 0.52rem;
   border-bottom: 1px solid var(--border-soft);
-  background: rgba(8, 15, 25, 0.84);
-  color: rgba(173, 189, 207, 0.88);
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-1));
+  color: var(--text-muted);
   font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.07em;
@@ -345,7 +349,7 @@
 
 .tableRow td {
   padding: 0.62rem 0.52rem;
-  border-bottom: 1px solid rgba(28, 40, 56, 0.78);
+  border-bottom: 1px solid var(--border-soft);
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
@@ -369,10 +373,10 @@
 }
 
 .rowSelected td {
-  background: rgba(26, 115, 232, 0.14);
+  background: var(--accent-soft-bg);
   box-shadow:
-    inset 0 1px 0 rgba(83, 155, 245, 0.28),
-    inset 0 -1px 0 rgba(83, 155, 245, 0.28);
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 36%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--accent) 36%, transparent);
 }
 
 .codeCell,
@@ -386,13 +390,13 @@
 .codeValue {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.9rem;
-  color: #f4f8ff;
+  color: var(--text-strong);
 }
 
 .codeMeta,
 .descriptionMeta,
 .usageCell span {
-  color: rgba(173, 189, 207, 0.66);
+  color: var(--text-muted);
   font-size: 0.74rem;
   line-height: 1.32;
 }
@@ -405,13 +409,13 @@
 }
 
 .usagePercent {
-  color: rgba(173, 189, 207, 0.9);
+  color: var(--text-soft);
   font-size: 0.72rem;
   font-weight: 600;
 }
 
 .usageToneGood {
-  color: #67e8a4;
+  color: var(--success);
 }
 
 .usageToneMedium {
@@ -427,7 +431,7 @@
   height: 0.26rem;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(35, 49, 67, 0.74);
+  background: color-mix(in srgb, var(--surface-3) 88%, transparent);
 }
 
 .usageMeter > span {
@@ -449,14 +453,14 @@
 }
 
 .windowCell {
-  color: rgba(225, 233, 244, 0.8);
+  color: var(--text-soft);
   min-width: 10rem;
   font-size: 0.76rem;
   line-height: 1.35;
 }
 
 .inlineNumeric {
-  color: rgba(225, 233, 244, 0.9);
+  color: var(--text-strong);
   font-weight: 600;
 }
 
@@ -560,7 +564,7 @@
 }
 
 .paginationInfo {
-  color: rgba(225, 233, 244, 0.78);
+  color: var(--text-soft);
   font-size: 0.74rem;
   font-weight: 600;
 }
@@ -633,7 +637,7 @@
   font-family: var(--font-heading), sans-serif;
   font-size: 0.86rem;
   font-weight: 600;
-  color: #f1f7ff;
+  color: var(--text-strong);
 }
 
 .inlineField {
@@ -671,7 +675,7 @@
   gap: 0.7rem;
   padding-top: 0.7rem;
   border-top: 1px solid var(--border-soft);
-  background: linear-gradient(180deg, rgba(8, 13, 22, 0), var(--surface-1) 18%);
+  background: linear-gradient(180deg, transparent, var(--surface-1) 18%);
 }
 
 .deactivateButton {
@@ -688,7 +692,7 @@
   padding: 0.84rem;
   border: 1px dashed var(--border-soft);
   border-radius: 0.86rem;
-  background: rgba(10, 16, 28, 0.62);
+  background: color-mix(in srgb, var(--surface-2) 86%, transparent);
 }
 
 .usageEmpty strong {
@@ -752,10 +756,10 @@
   gap: 0.7rem;
   margin-bottom: 0.72rem;
   padding: 0.62rem 0.74rem;
-  border: 1px solid rgba(248, 113, 113, 0.34);
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border-soft));
   border-radius: 0.8rem;
   background: var(--danger-soft-bg);
-  color: #fecaca;
+  color: var(--danger-soft-fg);
   font-size: 0.8rem;
 }
 
@@ -935,15 +939,15 @@
 }
 
 .quickChip:hover {
-  border-color: rgba(83, 155, 245, 0.54);
-  background: rgba(26, 115, 232, 0.14);
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--border-soft));
+  background: var(--accent-soft-bg);
   color: var(--text-strong);
 }
 
 .quickChipActive {
-  border-color: rgba(83, 155, 245, 0.8);
-  background: rgba(26, 115, 232, 0.22);
-  color: #c2dcff;
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-1));
+  color: var(--text-strong);
 }
 
 .formSummary {
@@ -954,7 +958,7 @@
   padding: 0.52rem 0.72rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.72rem;
-  background: rgba(10, 16, 28, 0.56);
+  background: color-mix(in srgb, var(--surface-2) 86%, transparent);
   font-size: 0.76rem;
   color: var(--text-muted);
 }
@@ -975,4 +979,3 @@
   color: var(--border-strong);
   user-select: none;
 }
-
