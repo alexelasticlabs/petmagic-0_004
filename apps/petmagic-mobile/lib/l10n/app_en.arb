@@ -1048,4 +1048,60 @@
     }
   },
   "shellActiveGenerationFallback": "result"
+,
+  "walletStripeCardBrandsLabel": "Visa • Mastercard",
+  "walletStripeWalletsLabel": "Apple Pay • Google Pay",
+  "walletPackUsageNote": "Used for photo and video generations",
+  "walletCheckoutTaxLabel": "Tax",
+  "walletCheckoutTaxIncludedValue": "Included",
+  "walletCheckoutTotalLabel": "Total",
+  "walletCheckoutPayAction": "Pay {price}",
+  "@walletCheckoutPayAction": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "emailVerificationTitle": "Verify email",
+  "emailVerificationCodeSentMessage": "We sent a 6-digit code to {email}.",
+  "@emailVerificationCodeSentMessage": {
+    "placeholders": {
+      "email": {}
+    }
+  },
+  "emailVerificationCodeLabel": "Code",
+  "emailVerificationWorkingLabel": "Working...",
+  "emailVerificationVerifyAction": "Verify",
+  "emailVerificationResendAction": "Send code again",
+  "emailVerificationChangeEmailAction": "Change email",
+  "emailVerificationConfirmedMessage": "Email confirmed. Please sign in.",
+  "emailVerificationResentFallbackMessage": "If the account exists, a new code has been sent.",
+  "profileNotificationsDeviceAllowed": "Allowed",
+  "profileNotificationsDeviceLimited": "Limited",
+  "profileNotificationsDeviceDenied": "Denied",
+  "profileNotificationsDevicePermanentlyDenied": "Permanently denied",
+  "profileNotificationsDeviceRestricted": "Restricted",
+  "profileNotificationsDeviceUnknown": "Unknown",
+  "profileNotificationsDeviceNotifications": "Notifications",
+  "profileNotificationsDeviceCamera": "Camera",
+  "profileNotificationsDevicePhotos": "Photos",
+  "profileNotificationsDeviceFiles": "Files",
+  "profileNotificationsRequestDevicePermissions": "Request device permissions",
+  "supportChatLoadPreviousMessagesAction": "Load previous messages",
+  "generationStatusCopyLinkAction": "Copy link",
+  "generationStatusShareFailedMessage": "Failed to share result. Please try again.",
+  "generationStatusDeleteFailedMessage": "Failed to delete result. Please try again.",
+  "premiumSelectedBadge": "SELECTED",
+  "premiumBestValueBadge": "BEST VALUE",
+  "premiumStorePaymentDisclaimerTitle": "Secure payment via App Store / Google Play",
+  "premiumStorePaymentDisclaimerBody": "Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.",
+  "premiumBenefitAiGenerationsTitle": "30 AI generations",
+  "premiumBenefitAiGenerationsSubtitle": "every month",
+  "premiumBenefitPremiumTemplatesTitle": "Premium templates",
+  "premiumBenefitPremiumTemplatesSubtitle": "exclusive",
+  "premiumBenefitPriorityVideoQueueTitle": "Priority video queue",
+  "premiumBenefitPriorityVideoQueueSubtitle": "faster results",
+  "premiumBenefitNoWatermarkTitle": "No watermark",
+  "premiumBenefitNoWatermarkSubtitle": "clean exports",
+  "premiumBenefitBiggerRewardsTitle": "Bigger rewards",
+  "premiumBenefitBiggerRewardsSubtitle": "daily bonuses"
 }

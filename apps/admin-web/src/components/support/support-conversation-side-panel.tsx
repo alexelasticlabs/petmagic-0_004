@@ -64,6 +64,7 @@ export function SupportConversationSidePanel({
     destructiveStatusAction,
     failedGenerations,
     isSidePanelOpen,
+    isSubjectUserDeleted,
     purchasesQuery,
     primaryStatusAction,
     recentFailures,
@@ -79,6 +80,7 @@ export function SupportConversationSidePanel({
     statusMutation,
     text,
     totalPurchases,
+    userEmailDisplay,
     userDisplayName,
     userQuery,
   } = controller;
@@ -99,7 +101,8 @@ export function SupportConversationSidePanel({
   );
 
   const contextLoadFailed =
-    analyticsQuery.isError || purchasesQuery.isError || subscriptionQuery.isError;
+    !isSubjectUserDeleted &&
+    (analyticsQuery.isError || purchasesQuery.isError || subscriptionQuery.isError);
 
   useEffect(() => {
     if (!contextLoadFailed || !conversation) {
@@ -154,7 +157,9 @@ export function SupportConversationSidePanel({
                 {isUserPremium ? text.premiumLabel : text.freeLabel}
               </span>
             </div>
-            <span className={styles.spUserEmail}>{conversation.userEmail}</span>
+            <span className={styles.spUserEmail}>
+              {userEmailDisplay || (locale === "ru" ? "Пользователь удален" : "User deleted")}
+            </span>
           </div>
         </div>
 
@@ -331,10 +336,27 @@ export function SupportConversationSidePanel({
             {/* Quick links */}
             <div className={styles.spLinksRow}>
               <Link
-                href={`/${locale}/users/${conversation.initiatorUserId}`}
+                href={
+                  isSubjectUserDeleted
+                    ? `/${locale}/support/${conversation.conversationId}`
+                    : `/${locale}/users/${conversation.initiatorUserId}`
+                }
                 className={styles.spLinkBtn}
+                aria-disabled={isSubjectUserDeleted}
+                onClick={(event) => {
+                  if (isSubjectUserDeleted) {
+                    event.preventDefault();
+                  }
+                }}
               >
-                ↗ {locale === "ru" ? "Профиль" : "Profile"}
+                ↗{" "}
+                {isSubjectUserDeleted
+                  ? locale === "ru"
+                    ? "Профиль недоступен"
+                    : "Profile unavailable"
+                  : locale === "ru"
+                    ? "Профиль"
+                    : "Profile"}
               </Link>
               <Link href={`/${locale}/economy`} className={styles.spLinkBtn}>
                 ↗ {locale === "ru" ? "Платежи" : "Payments"}
@@ -434,10 +456,18 @@ export function SupportConversationSidePanel({
                 type="button"
                 className={styles.spDangerTrigger}
                 onClick={() => setShowDangerousActions((v) => !v)}
+                disabled={isSubjectUserDeleted}
               >
                 <span>{showDangerousActions ? "▾" : "▸"}</span>
                 {locale === "ru" ? "Опасные действия" : "Dangerous actions"}
               </button>
+              {isSubjectUserDeleted ? (
+                <span className={styles.subtle}>
+                  {locale === "ru"
+                    ? "Пользователь удален: действия модерации недоступны."
+                    : "User is deleted: moderation actions are unavailable."}
+                </span>
+              ) : null}
               {showDangerousActions ? (
                 <div className={styles.spDangerActions}>
                   <button

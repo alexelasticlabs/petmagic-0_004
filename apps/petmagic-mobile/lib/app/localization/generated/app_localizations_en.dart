@@ -2816,4 +2816,151 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shellActiveGenerationFallback => 'result';
+
+  @override
+  String get walletStripeCardBrandsLabel => 'Visa • Mastercard';
+
+  @override
+  String get walletStripeWalletsLabel => 'Apple Pay • Google Pay';
+
+  @override
+  String get walletPackUsageNote => 'Used for photo and video generations';
+
+  @override
+  String get walletCheckoutTaxLabel => 'Tax';
+
+  @override
+  String get walletCheckoutTaxIncludedValue => 'Included';
+
+  @override
+  String get walletCheckoutTotalLabel => 'Total';
+
+  @override
+  String walletCheckoutPayAction(Object price) {
+    return 'Pay $price';
+  }
+
+  @override
+  String get emailVerificationTitle => 'Verify email';
+
+  @override
+  String emailVerificationCodeSentMessage(Object email) {
+    return 'We sent a 6-digit code to $email.';
+  }
+
+  @override
+  String get emailVerificationCodeLabel => 'Code';
+
+  @override
+  String get emailVerificationWorkingLabel => 'Working...';
+
+  @override
+  String get emailVerificationVerifyAction => 'Verify';
+
+  @override
+  String get emailVerificationResendAction => 'Send code again';
+
+  @override
+  String get emailVerificationChangeEmailAction => 'Change email';
+
+  @override
+  String get emailVerificationConfirmedMessage =>
+      'Email confirmed. Please sign in.';
+
+  @override
+  String get emailVerificationResentFallbackMessage =>
+      'If the account exists, a new code has been sent.';
+
+  @override
+  String get profileNotificationsDeviceAllowed => 'Allowed';
+
+  @override
+  String get profileNotificationsDeviceLimited => 'Limited';
+
+  @override
+  String get profileNotificationsDeviceDenied => 'Denied';
+
+  @override
+  String get profileNotificationsDevicePermanentlyDenied =>
+      'Permanently denied';
+
+  @override
+  String get profileNotificationsDeviceRestricted => 'Restricted';
+
+  @override
+  String get profileNotificationsDeviceUnknown => 'Unknown';
+
+  @override
+  String get profileNotificationsDeviceNotifications => 'Notifications';
+
+  @override
+  String get profileNotificationsDeviceCamera => 'Camera';
+
+  @override
+  String get profileNotificationsDevicePhotos => 'Photos';
+
+  @override
+  String get profileNotificationsDeviceFiles => 'Files';
+
+  @override
+  String get profileNotificationsRequestDevicePermissions =>
+      'Request device permissions';
+
+  @override
+  String get supportChatLoadPreviousMessagesAction => 'Load previous messages';
+
+  @override
+  String get generationStatusCopyLinkAction => 'Copy link';
+
+  @override
+  String get generationStatusShareFailedMessage =>
+      'Failed to share result. Please try again.';
+
+  @override
+  String get generationStatusDeleteFailedMessage =>
+      'Failed to delete result. Please try again.';
+
+  @override
+  String get premiumSelectedBadge => 'SELECTED';
+
+  @override
+  String get premiumBestValueBadge => 'BEST VALUE';
+
+  @override
+  String get premiumStorePaymentDisclaimerTitle =>
+      'Secure payment via App Store / Google Play';
+
+  @override
+  String get premiumStorePaymentDisclaimerBody =>
+      'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.';
+
+  @override
+  String get premiumBenefitAiGenerationsTitle => '30 AI generations';
+
+  @override
+  String get premiumBenefitAiGenerationsSubtitle => 'every month';
+
+  @override
+  String get premiumBenefitPremiumTemplatesTitle => 'Premium templates';
+
+  @override
+  String get premiumBenefitPremiumTemplatesSubtitle => 'exclusive';
+
+  @override
+  String get premiumBenefitPriorityVideoQueueTitle => 'Priority video queue';
+
+  @override
+  String get premiumBenefitPriorityVideoQueueSubtitle => 'faster results';
+
+  @override
+  String get premiumBenefitNoWatermarkTitle => 'No watermark';
+
+  @override
+  String get premiumBenefitNoWatermarkSubtitle => 'clean exports';
+
+  @override
+  String get premiumBenefitBiggerRewardsTitle => 'Bigger rewards';
+
+  @override
+  String get premiumBenefitBiggerRewardsSubtitle => 'daily bonuses';
 }

@@ -113,6 +113,7 @@ export function SupportConversationPage({
     statusMutation,
     text,
     toast,
+    userEmailDisplay,
     userDisplayName,
   } = controller;
 
@@ -829,6 +830,10 @@ export function SupportConversationPage({
                       item.adminUnreadCount
                     );
                     const hasUnread = item.adminUnreadCount > 0;
+                    const queueUserLabel =
+                      item.userDisplayName?.trim() ||
+                      item.userEmail?.trim() ||
+                      (locale === "ru" ? "Удаленный пользователь" : "Deleted user");
 
                     const queueItemClassName = `${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""} ${hasUnread ? styles.conversationRowUnread : ""}`;
                     const queueItemContent = (
@@ -836,17 +841,17 @@ export function SupportConversationPage({
                         <div className={styles.queueRowHeader}>
                           <div className={styles.queueRowIdentity}>
                             <span
-                              className={`${styles.avatar} ${avatarColorFor(item.userDisplayName?.trim() || item.userEmail || "")}`}
+                              className={`${styles.avatar} ${avatarColorFor(queueUserLabel)}`}
                               aria-hidden="true"
                             >
-                              {initialsFor(item.userDisplayName?.trim() || item.userEmail)}
+                              {initialsFor(queueUserLabel)}
                             </span>
                             <div className={styles.queueRowTextStack}>
                               <div className={styles.queueRowTitleLine}>
                                 <div
                                   className={`${styles.rowTitle} ${hasUnread ? styles.rowTitleUnread : ""}`}
                                 >
-                                  {item.userDisplayName?.trim() || item.userEmail}
+                                  {queueUserLabel}
                                 </div>
                                 {hasUnread ? (
                                   <span className={styles.unreadDotInline} aria-hidden="true" />
@@ -1043,7 +1048,9 @@ export function SupportConversationPage({
                           </div>
                         </div>
                         <span className={styles.chatHeaderSubtext}>
-                          {conversation.userEmail} · #{shortId(conversation.initiatorUserId)}
+                          {userEmailDisplay ||
+                            (locale === "ru" ? "Пользователь удален" : "User deleted")}{" "}
+                          · #{shortId(conversation.initiatorUserId)}
                         </span>
                       </div>
                     </div>

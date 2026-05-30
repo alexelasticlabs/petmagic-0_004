@@ -145,7 +145,7 @@ export function TemplatesCatalogView({
   const copy = useMemo(() => getCatalogCopy(locale, templateType), [locale, templateType]);
   const router = useRouter();
   const session = useAuthSession();
-  const { analyticsRows, hasError, isLoading, refresh, templates } = useAdminTemplateCatalog({
+  const { getAnalyticsRow, hasError, isLoading, refresh, templates } = useAdminTemplateCatalog({
     enabled: Boolean(session),
     templateType,
   });
@@ -428,7 +428,7 @@ export function TemplatesCatalogView({
                   key={template.templateId}
                   locale={locale}
                   template={template}
-                  analytics={analyticsRows[template.templateId]}
+                  analytics={getAnalyticsRow(template.templateId)}
                   editorBasePath={editorBasePath}
                   analyticsBasePath={analyticsBasePath}
                   testBasePath={testBasePath}
@@ -461,7 +461,7 @@ export function TemplatesCatalogView({
                   <tbody>
                     {filteredTemplates.map((template) => {
                       const isBusy = busyTemplateId === template.templateId;
-                      const analytics = analyticsRows[template.templateId];
+                      const analytics = getAnalyticsRow(template.templateId);
 
                       return (
                         <tr key={template.templateId}>

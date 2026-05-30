@@ -18,6 +18,10 @@ type UseAdminTemplateCatalogOptions = {
 
 type AnalyticsRowsMap = Record<string, AdminTemplatesAnalyticsTemplateRow>;
 
+function normalizeTemplateId(templateId: string) {
+  return templateId.trim().toLowerCase();
+}
+
 export function useAdminTemplateCatalog({
   enabled = true,
   templateType,
@@ -36,7 +40,14 @@ export function useAdminTemplateCatalog({
         sort: "updated",
         take: 500,
       });
-      return Object.fromEntries(response.templates.map((row) => [row.templateId, row]));
+      const rowsByTemplateId: AnalyticsRowsMap = {};
+
+      for (const row of response.templates) {
+        rowsByTemplateId[row.templateId] = row;
+        rowsByTemplateId[normalizeTemplateId(row.templateId)] = row;
+      }
+
+      return rowsByTemplateId;
     },
     enabled,
   });
@@ -51,13 +62,24 @@ export function useAdminTemplateCatalog({
       throw templatesResult.error;
     }
 
+    if (analyticsResult.isError) {
+      throw analyticsResult.error;
+    }
+
     return analyticsResult;
   }
 
+  const analyticsRows = analyticsRowsQuery.data ?? {};
+
+  function getAnalyticsRow(templateId: string) {
+    return analyticsRows[templateId] ?? analyticsRows[normalizeTemplateId(templateId)];
+  }
+
   return {
-    analyticsRows: analyticsRowsQuery.data ?? {},
-    hasError: templatesQuery.isError,
-    isLoading: templatesQuery.isLoading,
+    analyticsRows,
+    getAnalyticsRow,
+    hasError: templatesQuery.isError || analyticsRowsQuery.isError,
+    isLoading: templatesQuery.isLoading || analyticsRowsQuery.isLoading,
     refresh,
     templates: templatesQuery.data ?? [],
   };

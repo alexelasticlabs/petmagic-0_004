@@ -1048,4 +1048,60 @@
     }
   },
   "shellActiveGenerationFallback": "результат"
+,
+  "walletStripeCardBrandsLabel": "Visa • Mastercard",
+  "walletStripeWalletsLabel": "Apple Pay • Google Pay",
+  "walletPackUsageNote": "Используется для генерации фото и видео.",
+  "walletCheckoutTaxLabel": "Налог",
+  "walletCheckoutTaxIncludedValue": "Включено",
+  "walletCheckoutTotalLabel": "Итого",
+  "walletCheckoutPayAction": "Оплатить {price}",
+  "@walletCheckoutPayAction": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "emailVerificationTitle": "Подтверждение email",
+  "emailVerificationCodeSentMessage": "Мы отправили 6-значный код на {email}.",
+  "@emailVerificationCodeSentMessage": {
+    "placeholders": {
+      "email": {}
+    }
+  },
+  "emailVerificationCodeLabel": "Код",
+  "emailVerificationWorkingLabel": "Выполняем...",
+  "emailVerificationVerifyAction": "Подтвердить",
+  "emailVerificationResendAction": "Отправить код еще раз",
+  "emailVerificationChangeEmailAction": "Изменить email",
+  "emailVerificationConfirmedMessage": "Email подтвержден. Пожалуйста, войдите в аккаунт.",
+  "emailVerificationResentFallbackMessage": "Если аккаунт существует, новый код был отправлен.",
+  "profileNotificationsDeviceAllowed": "Разрешено",
+  "profileNotificationsDeviceLimited": "Ограничено",
+  "profileNotificationsDeviceDenied": "Запрещено",
+  "profileNotificationsDevicePermanentlyDenied": "Запрещено навсегда",
+  "profileNotificationsDeviceRestricted": "Ограничено",
+  "profileNotificationsDeviceUnknown": "Неизвестно",
+  "profileNotificationsDeviceNotifications": "Уведомления",
+  "profileNotificationsDeviceCamera": "Камера",
+  "profileNotificationsDevicePhotos": "Фото",
+  "profileNotificationsDeviceFiles": "Файлы",
+  "profileNotificationsRequestDevicePermissions": "Запросить разрешения устройства",
+  "supportChatLoadPreviousMessagesAction": "Загрузить предыдущие сообщения",
+  "generationStatusCopyLinkAction": "Скопировать ссылку",
+  "generationStatusShareFailedMessage": "Не удалось поделиться результатом. Попробуйте еще раз.",
+  "generationStatusDeleteFailedMessage": "Не удалось удалить результат. Попробуйте еще раз.",
+  "premiumSelectedBadge": "ВЫБРАНО",
+  "premiumBestValueBadge": "ЛУЧШАЯ ВЫГОДА",
+  "premiumStorePaymentDisclaimerTitle": "Безопасная оплата через App Store / Google Play",
+  "premiumStorePaymentDisclaimerBody": "Оплата будет списана с вашего аккаунта App Store / Google Play. Подписка продлевается автоматически, если ее не отменить до даты продления.",
+  "premiumBenefitAiGenerationsTitle": "30 AI-генераций",
+  "premiumBenefitAiGenerationsSubtitle": "каждый месяц",
+  "premiumBenefitPremiumTemplatesTitle": "Premium-шаблоны",
+  "premiumBenefitPremiumTemplatesSubtitle": "эксклюзивные",
+  "premiumBenefitPriorityVideoQueueTitle": "Приоритетная очередь видео",
+  "premiumBenefitPriorityVideoQueueSubtitle": "быстрее результаты",
+  "premiumBenefitNoWatermarkTitle": "Без водяного знака",
+  "premiumBenefitNoWatermarkSubtitle": "чистый экспорт",
+  "premiumBenefitBiggerRewardsTitle": "Больше наград",
+  "premiumBenefitBiggerRewardsSubtitle": "ежедневные бонусы"
 }

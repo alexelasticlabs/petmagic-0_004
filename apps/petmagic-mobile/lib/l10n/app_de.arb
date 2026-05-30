@@ -710,7 +710,7 @@
       "price": {}
     }
   },
-  "walletPackDetailsAction": "Details",
+  "walletPackDetailsAction": "Einzelheiten",
   "walletPackDetailSubtitle": "Prüfen Sie, was enthalten ist, bevor Sie zur Kasse gehen.",
   "walletCheckoutHint": "Zahlung öffnet sich in sicherem Stripe Checkout. PetMagic speichert Ihre Kartendaten nicht.",
   "walletCheckoutSucceeded": "Zahlung bestätigt. +{spark} PawSpark ist bereits in Ihrer Wallet.",
@@ -1047,5 +1047,60 @@
     "placeholders": {
       "value": {}
     }
-  }
+  },
+  "walletStripeCardBrandsLabel": "Visa • Mastercard",
+  "walletStripeWalletsLabel": "Apple Pay • Google Pay",
+  "walletPackUsageNote": "Wird für Foto- und Videogenerierungen verwendet",
+  "walletCheckoutTaxLabel": "Steuer",
+  "walletCheckoutTaxIncludedValue": "Im Lieferumfang enthalten",
+  "walletCheckoutTotalLabel": "Gesamt",
+  "walletCheckoutPayAction": "Zahlen Sie {price}",
+  "@walletCheckoutPayAction": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "emailVerificationTitle": "E-Mail bestätigen",
+  "emailVerificationCodeSentMessage": "Wir haben einen 6-stelligen Code an {email} gesendet.",
+  "@emailVerificationCodeSentMessage": {
+    "placeholders": {
+      "email": {}
+    }
+  },
+  "emailVerificationCodeLabel": "Code",
+  "emailVerificationWorkingLabel": "Arbeiten...",
+  "emailVerificationVerifyAction": "Verifizieren",
+  "emailVerificationResendAction": "Code erneut senden",
+  "emailVerificationChangeEmailAction": "E-Mail ändern",
+  "emailVerificationConfirmedMessage": "E-Mail bestätigt. Bitte melden Sie sich an.",
+  "emailVerificationResentFallbackMessage": "Wenn das Konto vorhanden ist, wurde ein neuer Code gesendet.",
+  "profileNotificationsDeviceAllowed": "Erlaubt",
+  "profileNotificationsDeviceLimited": "Beschränkt",
+  "profileNotificationsDeviceDenied": "Bestritten",
+  "profileNotificationsDevicePermanentlyDenied": "Dauerhaft abgelehnt",
+  "profileNotificationsDeviceRestricted": "Eingeschränkt",
+  "profileNotificationsDeviceUnknown": "Unbekannt",
+  "profileNotificationsDeviceNotifications": "Benachrichtigungen",
+  "profileNotificationsDeviceCamera": "Kamera",
+  "profileNotificationsDevicePhotos": "Fotos",
+  "profileNotificationsDeviceFiles": "Dateien",
+  "profileNotificationsRequestDevicePermissions": "Fordern Sie Geräteberechtigungen an",
+  "supportChatLoadPreviousMessagesAction": "Vorherige Nachrichten laden",
+  "generationStatusCopyLinkAction": "Link kopieren",
+  "generationStatusShareFailedMessage": "Ergebnis konnte nicht geteilt werden. Bitte versuchen Sie es erneut.",
+  "generationStatusDeleteFailedMessage": "Ergebnis konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.",
+  "premiumSelectedBadge": "AUSGEWÄHLT",
+  "premiumBestValueBadge": "BESTER PREIS",
+  "premiumStorePaymentDisclaimerTitle": "Sichere Zahlung über App Store / Google Play",
+  "premiumStorePaymentDisclaimerBody": "Die Zahlung wird Ihrem App Store-/Google Play-Konto belastet. Das Abonnement verlängert sich automatisch, sofern es nicht vor dem Verlängerungsdatum gekündigt wird.",
+  "premiumBenefitAiGenerationsTitle": "30 KI-Generationen",
+  "premiumBenefitAiGenerationsSubtitle": "jeden Monat",
+  "premiumBenefitPremiumTemplatesTitle": "Premium-Vorlagen",
+  "premiumBenefitPremiumTemplatesSubtitle": "exklusiv",
+  "premiumBenefitPriorityVideoQueueTitle": "Prioritäts-Videowarteschlange",
+  "premiumBenefitPriorityVideoQueueSubtitle": "schnellere Ergebnisse",
+  "premiumBenefitNoWatermarkTitle": "Kein Wasserzeichen",
+  "premiumBenefitNoWatermarkSubtitle": "saubere Exporte",
+  "premiumBenefitBiggerRewardsTitle": "Größere Belohnungen",
+  "premiumBenefitBiggerRewardsSubtitle": "tägliche Boni"
 }

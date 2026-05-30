@@ -2826,4 +2826,153 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get shellActiveGenerationFallback => 'результат';
+
+  @override
+  String get walletStripeCardBrandsLabel => 'Visa • Mastercard';
+
+  @override
+  String get walletStripeWalletsLabel => 'Apple Pay • Google Pay';
+
+  @override
+  String get walletPackUsageNote => 'Используется для генерации фото и видео.';
+
+  @override
+  String get walletCheckoutTaxLabel => 'Налог';
+
+  @override
+  String get walletCheckoutTaxIncludedValue => 'Включено';
+
+  @override
+  String get walletCheckoutTotalLabel => 'Итого';
+
+  @override
+  String walletCheckoutPayAction(Object price) {
+    return 'Оплатить $price';
+  }
+
+  @override
+  String get emailVerificationTitle => 'Подтверждение email';
+
+  @override
+  String emailVerificationCodeSentMessage(Object email) {
+    return 'Мы отправили 6-значный код на $email.';
+  }
+
+  @override
+  String get emailVerificationCodeLabel => 'Код';
+
+  @override
+  String get emailVerificationWorkingLabel => 'Выполняем...';
+
+  @override
+  String get emailVerificationVerifyAction => 'Подтвердить';
+
+  @override
+  String get emailVerificationResendAction => 'Отправить код еще раз';
+
+  @override
+  String get emailVerificationChangeEmailAction => 'Изменить email';
+
+  @override
+  String get emailVerificationConfirmedMessage =>
+      'Email подтвержден. Пожалуйста, войдите в аккаунт.';
+
+  @override
+  String get emailVerificationResentFallbackMessage =>
+      'Если аккаунт существует, новый код был отправлен.';
+
+  @override
+  String get profileNotificationsDeviceAllowed => 'Разрешено';
+
+  @override
+  String get profileNotificationsDeviceLimited => 'Ограничено';
+
+  @override
+  String get profileNotificationsDeviceDenied => 'Запрещено';
+
+  @override
+  String get profileNotificationsDevicePermanentlyDenied =>
+      'Запрещено навсегда';
+
+  @override
+  String get profileNotificationsDeviceRestricted => 'Ограничено';
+
+  @override
+  String get profileNotificationsDeviceUnknown => 'Неизвестно';
+
+  @override
+  String get profileNotificationsDeviceNotifications => 'Уведомления';
+
+  @override
+  String get profileNotificationsDeviceCamera => 'Камера';
+
+  @override
+  String get profileNotificationsDevicePhotos => 'Фото';
+
+  @override
+  String get profileNotificationsDeviceFiles => 'Файлы';
+
+  @override
+  String get profileNotificationsRequestDevicePermissions =>
+      'Запросить разрешения устройства';
+
+  @override
+  String get supportChatLoadPreviousMessagesAction =>
+      'Загрузить предыдущие сообщения';
+
+  @override
+  String get generationStatusCopyLinkAction => 'Скопировать ссылку';
+
+  @override
+  String get generationStatusShareFailedMessage =>
+      'Не удалось поделиться результатом. Попробуйте еще раз.';
+
+  @override
+  String get generationStatusDeleteFailedMessage =>
+      'Не удалось удалить результат. Попробуйте еще раз.';
+
+  @override
+  String get premiumSelectedBadge => 'ВЫБРАНО';
+
+  @override
+  String get premiumBestValueBadge => 'ЛУЧШАЯ ВЫГОДА';
+
+  @override
+  String get premiumStorePaymentDisclaimerTitle =>
+      'Безопасная оплата через App Store / Google Play';
+
+  @override
+  String get premiumStorePaymentDisclaimerBody =>
+      'Оплата будет списана с вашего аккаунта App Store / Google Play. Подписка продлевается автоматически, если ее не отменить до даты продления.';
+
+  @override
+  String get premiumBenefitAiGenerationsTitle => '30 AI-генераций';
+
+  @override
+  String get premiumBenefitAiGenerationsSubtitle => 'каждый месяц';
+
+  @override
+  String get premiumBenefitPremiumTemplatesTitle => 'Premium-шаблоны';
+
+  @override
+  String get premiumBenefitPremiumTemplatesSubtitle => 'эксклюзивные';
+
+  @override
+  String get premiumBenefitPriorityVideoQueueTitle =>
+      'Приоритетная очередь видео';
+
+  @override
+  String get premiumBenefitPriorityVideoQueueSubtitle => 'быстрее результаты';
+
+  @override
+  String get premiumBenefitNoWatermarkTitle => 'Без водяного знака';
+
+  @override
+  String get premiumBenefitNoWatermarkSubtitle => 'чистый экспорт';
+
+  @override
+  String get premiumBenefitBiggerRewardsTitle => 'Больше наград';
+
+  @override
+  String get premiumBenefitBiggerRewardsSubtitle => 'ежедневные бонусы';
 }

@@ -340,7 +340,7 @@ Future<void> _showReadyCardActions(
             ),
             ListTile(
               leading: const Icon(Icons.link_rounded),
-              title: const Text('Copy link'),
+              title: Text(text.generationStatusCopyLinkAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
                 unawaited(_copyGenerationLink(context, text, generation));
@@ -479,14 +479,14 @@ Future<void> _shareGenerationFile(
       fileName: _buildGenerationFileName(generation, outputUrl),
       title: generation.templateTitle ?? text.generationStatusResultTitle,
     );
-  } on Object {
-    if (!context.mounted) {
-      return;
-    }
+    } on Object {
+      if (!context.mounted) {
+        return;
+      }
 
-    _notifySoon(context, 'Failed to share result. Please try again.');
+      _notifySoon(context, text.generationStatusShareFailedMessage);
+    }
   }
-}
 
 Future<void> _copyGenerationLink(
   BuildContext context,
@@ -523,14 +523,14 @@ Future<void> _deleteGeneration(
     }
 
     _notifySoon(context, text.generationStatusDeletedMessage);
-  } on Object {
-    if (!context.mounted) {
-      return;
-    }
+    } on Object {
+      if (!context.mounted) {
+        return;
+      }
 
-    _notifySoon(context, 'Failed to delete result. Please try again.');
+      _notifySoon(context, text.generationStatusDeleteFailedMessage);
+    }
   }
-}
 
 String _buildGenerationFileName(
   TemplateGenerationResult generation,

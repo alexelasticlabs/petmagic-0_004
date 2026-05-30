@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
@@ -27,6 +28,11 @@ const _kLightSubtitle = Color(0xFF595C70);
 const _kLightAccent = Color(0xFF7C4DFF);
 const _kLightBorder = Color(0xFFEBEDF5);
 const _kLightFreeBg = Color(0xFFF0F1F7);
+
+AppLocalizations _premiumText(BuildContext context) {
+  return Localizations.of<AppLocalizations>(context, AppLocalizations) ??
+      AppLocalizationsEn();
+}
 
 class PremiumPage extends ConsumerStatefulWidget {
   const PremiumPage({super.key});
@@ -91,7 +97,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
   }
 
   Future<void> _openPaymentMethodSheetAndCheckout() async {
-    final text = AppLocalizations.of(context);
+    final text = _premiumText(context);
     final controller = ref.read(premiumControllerProvider.notifier);
     final currentState = ref.read(premiumControllerProvider);
     if (currentState.isPremium || currentState.recentlyActivatedPremium) {
@@ -289,7 +295,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
         return;
       }
 
-      final text = AppLocalizations.of(context);
+      final fallbackText = _premiumText(context);
       final messenger = ScaffoldMessenger.of(context);
       final navigator = Navigator.of(context);
 
@@ -299,7 +305,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(text.premiumPurchaseActivated)));
+        ..showSnackBar(SnackBar(content: Text(fallbackText.premiumPurchaseActivated)));
     });
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -429,6 +435,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = _premiumText(context);
     final textColor = isDark ? _kDarkText : _kLightText;
     final accent = isDark ? _kDarkAccent : _kLightAccent;
 
@@ -480,7 +487,7 @@ class _Header extends StatelessWidget {
                         )
                       : Icon(Icons.refresh_rounded, size: 14, color: accent),
                   label: Text(
-                    'Restore purchases',
+                    text.premiumRestoreAction,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -505,6 +512,7 @@ class _HeroBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = _premiumText(context);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isCompactScreen = screenWidth < 380;
     final accent = isDark ? _kDarkAccent : _kLightAccent;
@@ -573,25 +581,14 @@ class _HeroBlock extends StatelessWidget {
                       color: textColor,
                     ),
                     children: [
-                      const TextSpan(text: 'Make\nyour pet\n'),
-                      TextSpan(
-                        text: 'go viral',
-                        style: TextStyle(color: accent),
-                      ),
-                      TextSpan(
-                        text: ' ✦',
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
+                      TextSpan(text: '${text.premiumHeroTitle}\n'),
+                      TextSpan(text: ' ✦', style: TextStyle(color: accent)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Premium templates, priority queue, no watermark & 40 tokens every week.',
+                  text.premiumHeroSubtitle,
                   style: TextStyle(
                     fontSize: isCompactScreen ? 12 : 13,
                     color: sub,
@@ -618,6 +615,7 @@ class _ComparisonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = _premiumText(context);
     final accent = isDark ? _kDarkAccent : _kLightAccent;
     final textColor = isDark ? _kDarkText : _kLightText;
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
@@ -650,7 +648,7 @@ class _ComparisonCard extends StatelessWidget {
                         children: [
                           Center(
                             child: Text(
-                              'Free',
+                              text.premiumFreeColumn,
                               style: TextStyle(
                                 color: sub,
                                 fontSize: 15,
@@ -659,10 +657,30 @@ class _ComparisonCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          _cmpRow(false, 'Limited templates', isDark, sub),
-                          _cmpRow(false, 'Limited generations', isDark, sub),
-                          _cmpRow(false, 'Standard queue', isDark, sub),
-                          _cmpRow(false, 'Watermark on videos', isDark, sub),
+                          _cmpRow(
+                            false,
+                            text.premiumComparisonFreeTemplates,
+                            isDark,
+                            sub,
+                          ),
+                          _cmpRow(
+                            false,
+                            text.premiumFreeSummaryTokens,
+                            isDark,
+                            sub,
+                          ),
+                          _cmpRow(
+                            false,
+                            text.premiumFreeSummaryQuality,
+                            isDark,
+                            sub,
+                          ),
+                          _cmpRow(
+                            false,
+                            text.premiumFreeSummaryWatermark,
+                            isDark,
+                            sub,
+                          ),
                         ],
                       ),
                     ),
@@ -677,7 +695,7 @@ class _ComparisonCard extends StatelessWidget {
                         children: [
                           Center(
                             child: Text(
-                              'Premium',
+                              text.premiumPremiumColumn,
                               style: TextStyle(
                                 color: accent,
                                 fontSize: 15,
@@ -688,28 +706,28 @@ class _ComparisonCard extends StatelessWidget {
                           const SizedBox(height: 14),
                           _cmpRow(
                             true,
-                            'Premium templates',
+                            text.premiumComparisonPremiumTemplates,
                             isDark,
                             textColor,
                             accent: accent,
                           ),
                           _cmpRow(
                             true,
-                            'Priority queue',
+                            text.premiumTokensPerWeek(40),
                             isDark,
                             textColor,
                             accent: accent,
                           ),
                           _cmpRow(
                             true,
-                            'No watermark',
+                            text.premiumComparisonHighQuality,
                             isDark,
                             textColor,
                             accent: accent,
                           ),
                           _cmpRow(
                             true,
-                            '40 tokens every week',
+                            text.premiumComparisonNoWatermark,
                             isDark,
                             textColor,
                             accent: accent,
@@ -798,6 +816,7 @@ class _PlansSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = _premiumText(context);
     final textColor = isDark ? _kDarkText : _kLightText;
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
     final accent = isDark ? _kDarkAccent : _kLightAccent;
@@ -827,7 +846,7 @@ class _PlansSection extends StatelessWidget {
       children: [
         Center(
           child: Text(
-            'Choose your plan',
+            text.premiumChoosePlanTitle,
             style: TextStyle(
               color: textColor,
               fontSize: 16,
@@ -840,7 +859,7 @@ class _PlansSection extends StatelessWidget {
           children: [
             Expanded(
               child: _BillingChip(
-                label: 'Monthly',
+                label: text.premiumMonthlyPlan,
                 isActive: !selectedIsYearly,
                 accent: accent,
                 border: border,
@@ -861,7 +880,7 @@ class _PlansSection extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: _BillingChip(
-                label: 'Yearly',
+                label: text.premiumYearlyPlan,
                 isActive: selectedIsYearly,
                 accent: accent,
                 border: border,
@@ -916,6 +935,7 @@ class _PlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = _premiumText(context);
     final accent = isDark ? _kDarkAccent : _kLightAccent;
     final textColor = isDark ? _kDarkText : _kLightText;
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
@@ -923,9 +943,10 @@ class _PlanCard extends StatelessWidget {
     final border = isDark ? _kDarkBorder : _kLightBorder;
 
     final isYearly = _isYearlyPlan(plan);
-    final title = isYearly ? 'Premium Yearly' : 'Premium Monthly';
+    final title =
+        '${text.premiumPageTitle} ${isYearly ? text.premiumYearlyPlan : text.premiumMonthlyPlan}';
     final priceStr = '\$${plan.priceAmount.toStringAsFixed(2)}';
-    final interval = isYearly ? '/ year' : '/ month';
+    final interval = isYearly ? text.premiumYearlyPeriod : text.premiumMonthlyPeriod;
 
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 360),
@@ -1031,14 +1052,14 @@ class _PlanCard extends StatelessWidget {
                                 children: [
                                   if (isSelected)
                                     _PlanBadge(
-                                      label: 'SELECTED',
+                                      label: text.premiumSelectedBadge,
                                       textColor: accent,
                                       fill: accent.withValues(alpha: 0.14),
                                       stroke: accent.withValues(alpha: 0.36),
                                     ),
                                   if (isYearly)
                                     _PlanBadge(
-                                      label: 'BEST VALUE',
+                                      label: text.premiumBestValueBadge,
                                       textColor: isDark
                                           ? const Color(0xFF13141F)
                                           : Colors.white,
@@ -1072,14 +1093,14 @@ class _PlanCard extends StatelessWidget {
                                   const SizedBox(height: 3),
                                   Text(
                                     isYearly
-                                        ? 'Cancel anytime.'
-                                        : 'Flexible. Cancel anytime.',
+                                        ? text.premiumCancelAnytime
+                                        : text.premiumCancelAnytime,
                                     style: TextStyle(color: sub, fontSize: 12),
                                   ),
                                   if (isYearly) ...[
                                     const SizedBox(height: 6),
                                     _PlanBadge(
-                                      label: 'SAVE 33%',
+                                      label: text.premiumDiscountLabel(33),
                                       textColor: accent,
                                       fill: accent.withValues(alpha: 0.14),
                                       stroke: Colors.transparent,
@@ -1163,45 +1184,45 @@ class _BenefitsSection extends StatelessWidget {
 
   final bool isDark;
 
-  static const _items = [
-    _BenefitItem(
-      icon: Icons.flash_on_rounded,
-      title: '30 AI\ngenerations',
-      sub: 'every month',
-      color: Color(0xFF6B4BFF),
-    ),
-    _BenefitItem(
-      icon: Icons.photo_library_rounded,
-      title: 'Premium\ntemplates',
-      sub: 'exclusive',
-      color: Color(0xFFFF9F43),
-    ),
-    _BenefitItem(
-      icon: Icons.rocket_launch_rounded,
-      title: 'Priority\nvideo queue',
-      sub: 'faster results',
-      color: Color(0xFFFF6B9D),
-    ),
-    _BenefitItem(
-      icon: Icons.verified_user_rounded,
-      title: 'No\nwatermark',
-      sub: 'clean exports',
-      color: Color(0xFF4CA1AF),
-    ),
-    _BenefitItem(
-      icon: Icons.diamond_rounded,
-      title: 'Bigger\nrewards',
-      sub: 'daily bonuses',
-      color: Color(0xFFFFD700),
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final text = _premiumText(context);
     final textColor = isDark ? _kDarkText : _kLightText;
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
     final surface = isDark ? _kDarkSurface : _kLightSurface;
     final border = isDark ? _kDarkBorder : _kLightBorder;
+    final items = <_BenefitItem>[
+      _BenefitItem(
+        icon: Icons.flash_on_rounded,
+        title: text.premiumBenefitAiGenerationsTitle,
+        sub: text.premiumBenefitAiGenerationsSubtitle,
+        color: const Color(0xFF6B4BFF),
+      ),
+      _BenefitItem(
+        icon: Icons.photo_library_rounded,
+        title: text.premiumBenefitPremiumTemplatesTitle,
+        sub: text.premiumBenefitPremiumTemplatesSubtitle,
+        color: const Color(0xFFFF9F43),
+      ),
+      _BenefitItem(
+        icon: Icons.rocket_launch_rounded,
+        title: text.premiumBenefitPriorityVideoQueueTitle,
+        sub: text.premiumBenefitPriorityVideoQueueSubtitle,
+        color: const Color(0xFFFF6B9D),
+      ),
+      _BenefitItem(
+        icon: Icons.verified_user_rounded,
+        title: text.premiumBenefitNoWatermarkTitle,
+        sub: text.premiumBenefitNoWatermarkSubtitle,
+        color: const Color(0xFF4CA1AF),
+      ),
+      _BenefitItem(
+        icon: Icons.diamond_rounded,
+        title: text.premiumBenefitBiggerRewardsTitle,
+        sub: text.premiumBenefitBiggerRewardsSubtitle,
+        color: const Color(0xFFFFD700),
+      ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1210,7 +1231,7 @@ class _BenefitsSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Center(
             child: Text(
-              'What you get',
+              text.premiumIncludesTitle,
               style: TextStyle(
                 color: textColor,
                 fontSize: 16,
@@ -1236,14 +1257,14 @@ class _BenefitsSection extends StatelessWidget {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _items.length,
+              itemCount: items.length,
               physics: const BouncingScrollPhysics(),
               itemBuilder: (context, i) {
-                final item = _items[i];
+                final item = items[i];
                 return Container(
                   width: 110,
                   margin: EdgeInsets.only(
-                    right: i < _items.length - 1 ? 10 : 0,
+                    right: i < items.length - 1 ? 10 : 0,
                   ),
                   decoration: BoxDecoration(
                     color: surface,
@@ -1549,6 +1570,7 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = _premiumText(context);
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
     final accent = isDark ? const Color(0xFFAA8FFF) : _kLightAccent;
 
@@ -1560,7 +1582,7 @@ class _Footer extends StatelessWidget {
             Icon(Icons.lock_outline_rounded, size: 12, color: sub),
             const SizedBox(width: 5),
             Text(
-              'Secure payment via App Store / Google Play',
+              text.premiumStorePaymentDisclaimerTitle,
               style: TextStyle(
                 color: sub,
                 fontSize: 11,
@@ -1571,8 +1593,7 @@ class _Footer extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Payment will be charged to your App Store / Google Play account. '
-          'Subscription renews automatically unless cancelled before the renewal date.',
+          text.premiumStorePaymentDisclaimerBody,
           textAlign: TextAlign.center,
           style: TextStyle(
             color: sub.withValues(alpha: 0.7),
@@ -1587,19 +1608,19 @@ class _Footer extends StatelessWidget {
           runSpacing: 8,
           children: [
             _Link(
-              text: 'Restore purchases',
+              text: text.premiumRestoreAction,
               accent: accent,
               onTap: state.isRestoring ? null : controller.restorePurchases,
             ),
             Text(' • ', style: TextStyle(color: sub, fontSize: 11)),
             _Link(
-              text: 'Terms of Use',
+              text: text.profileSettingsTermsTitle,
               accent: accent,
               url: 'https://petmagic.app/terms',
             ),
             Text(' • ', style: TextStyle(color: sub, fontSize: 11)),
             _Link(
-              text: 'Privacy Policy',
+              text: text.profileSettingsPrivacyTitle,
               accent: accent,
               url: 'https://petmagic.app/privacy',
             ),

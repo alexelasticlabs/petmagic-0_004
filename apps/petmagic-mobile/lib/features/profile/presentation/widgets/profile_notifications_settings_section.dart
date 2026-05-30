@@ -195,23 +195,32 @@ class _ProfileNotificationsSettingsSectionState
     }
   }
 
-  String _devicePermissionStateLabel(AppPermissionState state) {
+  String _devicePermissionStateLabel(
+    AppLocalizations text,
+    AppPermissionState state,
+  ) {
     return switch (state) {
-      AppPermissionState.granted => 'Allowed',
-      AppPermissionState.limited => 'Limited',
-      AppPermissionState.denied => 'Denied',
-      AppPermissionState.permanentlyDenied => 'Permanently denied',
-      AppPermissionState.restricted => 'Restricted',
-      _ => 'Unknown',
+      AppPermissionState.granted => text.profileNotificationsDeviceAllowed,
+      AppPermissionState.limited => text.profileNotificationsDeviceLimited,
+      AppPermissionState.denied => text.profileNotificationsDeviceDenied,
+      AppPermissionState.permanentlyDenied =>
+        text.profileNotificationsDevicePermanentlyDenied,
+      AppPermissionState.restricted =>
+        text.profileNotificationsDeviceRestricted,
+      _ => text.profileNotificationsDeviceUnknown,
     };
   }
 
-  String _devicePermissionName(AppPermissionType type) {
+  String _devicePermissionName(
+    AppLocalizations text,
+    AppPermissionType type,
+  ) {
     return switch (type) {
-      AppPermissionType.notifications => 'Notifications',
-      AppPermissionType.camera => 'Camera',
-      AppPermissionType.photos => 'Photos',
-      AppPermissionType.files => 'Files',
+      AppPermissionType.notifications =>
+        text.profileNotificationsDeviceNotifications,
+      AppPermissionType.camera => text.profileNotificationsDeviceCamera,
+      AppPermissionType.photos => text.profileNotificationsDevicePhotos,
+      AppPermissionType.files => text.profileNotificationsDeviceFiles,
     };
   }
 
@@ -389,30 +398,28 @@ class _ProfileNotificationsSettingsSectionState
                           onPressed: _isRequestingPermission
                               ? null
                               : _requestCorePermissions,
-                          child: Text(
-                            _isRequestingPermission
-                                ? text.profileLoadingAction
-                                : 'Request device permissions',
-                          ),
+                        child: Text(
+                          _isRequestingPermission
+                              ? text.profileLoadingAction
+                              : text.profileNotificationsRequestDevicePermissions,
                         ),
-                        FilledButton.tonal(
-                          onPressed: _isRequestingPermission
-                              ? null
-                              : () => _permissionCoordinator.openSettings(),
-                          child: const Text('Open settings'),
-                        ),
+                      ),
+                      FilledButton.tonal(
+                        onPressed: _isRequestingPermission
+                            ? null
+                            : () => _permissionCoordinator.openSettings(),
+                        child: Text(text.supportChatOpenSettingsAction),
+                      ),
                       ],
                     ),
                     if (_devicePermissions.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      for (final permission in _devicePermissions)
+                    for (final permission in _devicePermissions)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4),
                           child: _NotificationsInfoRow(
-                            label: _devicePermissionName(permission.type),
-                            value: _devicePermissionStateLabel(
-                              permission.state,
-                            ),
+                            label: _devicePermissionName(text, permission.type),
+                            value: _devicePermissionStateLabel(text, permission.state),
                           ),
                         ),
                     ],

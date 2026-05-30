@@ -149,7 +149,10 @@ public sealed class StartTemplateGenerationCommandValidator : AbstractValidator<
         RuleFor(x => x.TemplateId).NotEmpty();
         RuleFor(x => x.SourceImageAsset).NotNull().SetValidator(new TemplateAssetCommandValidator());
         RuleFor(x => x.SourceImageAsset.ContentType)
-            .Must(contentType => contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            .WithMessage("Source image content type is invalid.");
+            .Must(contentType =>
+                contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(contentType, "image/heic", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(contentType, "image/heif", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("Source image content type is invalid. Please upload JPEG, PNG, or WebP.");
     }
 }

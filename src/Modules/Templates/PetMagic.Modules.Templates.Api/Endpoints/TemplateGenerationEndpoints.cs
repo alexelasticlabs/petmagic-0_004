@@ -358,9 +358,11 @@ public static class TemplateGenerationEndpoints
             return errors;
         }
 
-        if (!sourceImage.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        if (!sourceImage.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(sourceImage.ContentType, "image/heic", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(sourceImage.ContentType, "image/heif", StringComparison.OrdinalIgnoreCase))
         {
-            errors[nameof(sourceImage)] = ["Source image content type is not allowed."];
+            errors[nameof(sourceImage)] = ["Source image content type is not allowed. Please upload JPEG, PNG, or WebP."];
         }
 
         if (sourceImage.Length > maxSizeBytes)

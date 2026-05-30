@@ -15,9 +15,7 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         ["jpg"] = ".jpg",
         ["png"] = ".png",
         ["webp"] = ".webp",
-        ["gif"] = ".gif",
-        ["heic"] = ".heic",
-        ["heif"] = ".heif"
+        ["gif"] = ".gif"
     };
 
     private static readonly Dictionary<string, string> VideoSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -39,8 +37,6 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         [".png"] = "image/png",
         [".webp"] = "image/webp",
         [".gif"] = "image/gif",
-        [".heic"] = "image/heic",
-        [".heif"] = "image/heif",
         [".mp4"] = "video/mp4",
         [".mov"] = "video/quicktime",
         [".webm"] = "video/webm"

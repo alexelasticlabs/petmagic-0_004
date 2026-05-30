@@ -601,14 +601,14 @@ Future<void> _showPackDetailSheet(
                           label: _walletProviderLabel(text, selectedMethod),
                         ),
                         if (selectedMethod.isStripe)
-                          const _CheckoutTrustPill(
+                          _CheckoutTrustPill(
                             icon: Icons.payment_rounded,
-                            label: 'Visa • Mastercard',
+                            label: text.walletStripeCardBrandsLabel,
                           ),
                         if (selectedMethod.isStripe)
-                          const _CheckoutTrustPill(
+                          _CheckoutTrustPill(
                             icon: Icons.phone_iphone_rounded,
-                            label: 'Apple Pay • Google Pay',
+                            label: text.walletStripeWalletsLabel,
                           ),
                       ],
                     ),
@@ -715,7 +715,7 @@ Future<void> _showPackDetailSheet(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${selectedPack.totalSpark} PawSpark Tokens',
+                            text.walletPackTotalSpark(selectedPack.totalSpark),
                             style: TextStyle(
                               color: colors.textStrong,
                               fontSize: 15,
@@ -729,7 +729,7 @@ Future<void> _showPackDetailSheet(
                                     selectedPack.grantedSpark,
                                     selectedPack.bonusSpark,
                                   )
-                                : 'Used for photo and video generations',
+                                : text.walletPackUsageNote,
                             style: TextStyle(
                               color: colors.textSoft,
                               fontSize: 12,
@@ -760,17 +760,19 @@ Future<void> _showPackDetailSheet(
                       child: Column(
                         children: [
                           _CheckoutSummaryRow(
-                            label: '${selectedPack.totalSpark} PawSpark',
+                            label: text.walletPackTotalSpark(
+                              selectedPack.totalSpark,
+                            ),
                             value: selectedPrice,
                           ),
                           const SizedBox(height: 6),
-                          const _CheckoutSummaryRow(
-                            label: 'Tax',
-                            value: 'Included',
+                          _CheckoutSummaryRow(
+                            label: text.walletCheckoutTaxLabel,
+                            value: text.walletCheckoutTaxIncludedValue,
                           ),
                           const Divider(height: 16),
                           _CheckoutSummaryRow(
-                            label: 'Total',
+                            label: text.walletCheckoutTotalLabel,
                             value: selectedPrice,
                             isEmphasized: true,
                           ),
@@ -824,7 +826,7 @@ Future<void> _showPackDetailSheet(
                               ? Icons.hourglass_top_rounded
                               : Icons.credit_card_rounded,
                         ),
-                        label: Text('Pay $selectedPrice'),
+                        label: Text(text.walletCheckoutPayAction(selectedPrice)),
                       ),
                     ),
                     const SizedBox(height: 8),

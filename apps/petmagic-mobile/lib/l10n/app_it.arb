@@ -1047,5 +1047,60 @@
     "placeholders": {
       "value": {}
     }
-  }
+  },
+  "walletStripeCardBrandsLabel": "Visa • Mastercard",
+  "walletStripeWalletsLabel": "Apple Pay • Google Pay",
+  "walletPackUsageNote": "Utilizzato per le generazioni di foto e video",
+  "walletCheckoutTaxLabel": "Tassare",
+  "walletCheckoutTaxIncludedValue": "Incluso",
+  "walletCheckoutTotalLabel": "Totale",
+  "walletCheckoutPayAction": "Paga {price}",
+  "@walletCheckoutPayAction": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "emailVerificationTitle": "Verifica l'e-mail",
+  "emailVerificationCodeSentMessage": "Abbiamo inviato un codice di 6 cifre a {email}.",
+  "@emailVerificationCodeSentMessage": {
+    "placeholders": {
+      "email": {}
+    }
+  },
+  "emailVerificationCodeLabel": "Codice",
+  "emailVerificationWorkingLabel": "Lavorando...",
+  "emailVerificationVerifyAction": "Verificare",
+  "emailVerificationResendAction": "Invia nuovamente il codice",
+  "emailVerificationChangeEmailAction": "Cambia e-mail",
+  "emailVerificationConfirmedMessage": "E-mail confermata. Per favore accedi.",
+  "emailVerificationResentFallbackMessage": "Se l'account esiste, è stato inviato un nuovo codice.",
+  "profileNotificationsDeviceAllowed": "Consentito",
+  "profileNotificationsDeviceLimited": "Limitato",
+  "profileNotificationsDeviceDenied": "Negato",
+  "profileNotificationsDevicePermanentlyDenied": "Negato permanentemente",
+  "profileNotificationsDeviceRestricted": "Limitato",
+  "profileNotificationsDeviceUnknown": "Sconosciuto",
+  "profileNotificationsDeviceNotifications": "Notifiche",
+  "profileNotificationsDeviceCamera": "Telecamera",
+  "profileNotificationsDevicePhotos": "Foto",
+  "profileNotificationsDeviceFiles": "File",
+  "profileNotificationsRequestDevicePermissions": "Richiedi autorizzazioni dispositivo",
+  "supportChatLoadPreviousMessagesAction": "Carica i messaggi precedenti",
+  "generationStatusCopyLinkAction": "Copia collegamento",
+  "generationStatusShareFailedMessage": "Impossibile condividere il risultato. Per favore riprova.",
+  "generationStatusDeleteFailedMessage": "Impossibile eliminare il risultato. Per favore riprova.",
+  "premiumSelectedBadge": "SELEZIONATO",
+  "premiumBestValueBadge": "MIGLIOR VALORE",
+  "premiumStorePaymentDisclaimerTitle": "Pagamento sicuro tramite App Store/Google Play",
+  "premiumStorePaymentDisclaimerBody": "Il pagamento verrà addebitato sul tuo account App Store/Google Play. L'abbonamento si rinnova automaticamente a meno che non venga annullato prima della data di rinnovo.",
+  "premiumBenefitAiGenerationsTitle": "30 generazioni di IA",
+  "premiumBenefitAiGenerationsSubtitle": "ogni mese",
+  "premiumBenefitPremiumTemplatesTitle": "Modelli premium",
+  "premiumBenefitPremiumTemplatesSubtitle": "esclusivo",
+  "premiumBenefitPriorityVideoQueueTitle": "Coda video prioritaria",
+  "premiumBenefitPriorityVideoQueueSubtitle": "risultati più rapidi",
+  "premiumBenefitNoWatermarkTitle": "Nessuna filigrana",
+  "premiumBenefitNoWatermarkSubtitle": "esportazioni pulite",
+  "premiumBenefitBiggerRewardsTitle": "Ricompense più grandi",
+  "premiumBenefitBiggerRewardsSubtitle": "bonus giornalieri"
 }

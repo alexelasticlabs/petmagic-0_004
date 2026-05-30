@@ -249,7 +249,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
               if (generation.isCompleted) ...[
                 ListTile(
                   leading: const Icon(Icons.link_rounded),
-                  title: const Text('Copy link'),
+                  title: Text(text.generationStatusCopyLinkAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     unawaited(_copyResultLink(generation));
@@ -384,7 +384,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
         return;
       }
 
-      _showInfo('Failed to delete result. Please try again.');
+      _showInfo(text.generationStatusDeleteFailedMessage);
     } finally {
       if (mounted) {
         setState(() => _isDeleting = false);
@@ -420,7 +420,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
         return;
       }
 
-      _showInfo('Failed to share result. Please try again.');
+      _showInfo(text.generationStatusShareFailedMessage);
     }
   }
 

@@ -105,6 +105,19 @@ function isUserSupportMessageEvent(event: {
     (event.lastMessageSenderType?.toLowerCase() === "user" || !event.lastMessageSenderType)
   );
 }
+
+function isNotFoundError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  if (!("status" in error)) {
+    return false;
+  }
+
+  return (error as { status?: number }).status === 404;
+}
+
 export type SidePanelTab = "user" | "activity" | "dialog" | "attachments";
 
 function normalizeSupportTag(value: string): string {
@@ -707,14 +720,20 @@ export function useSupportConversationController({
       : adminQueryKeys.userDetailDisabled,
     queryFn: () => fetchAdminUser(subjectUserId!),
     enabled: Boolean(session && subjectUserId),
+    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
+
+  const isSubjectUserDeleted = Boolean(
+    subjectUserId && userQuery.isError && isNotFoundError(userQuery.error)
+  );
 
   const analyticsQuery = useQuery<AdminUserAnalytics>({
     queryKey: subjectUserId
       ? adminQueryKeys.userAnalytics(subjectUserId)
       : adminQueryKeys.userAnalyticsDisabled,
     queryFn: () => fetchAdminUserAnalytics(subjectUserId!),
-    enabled: Boolean(session && subjectUserId),
+    enabled: Boolean(session && subjectUserId && !isSubjectUserDeleted),
+    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
   const purchasesQuery = useQuery<AdminEconomyPurchase[]>({
@@ -728,7 +747,8 @@ export function useSupportConversationController({
 
       return response.items;
     },
-    enabled: Boolean(session && subjectUserId),
+    enabled: Boolean(session && subjectUserId && !isSubjectUserDeleted),
+    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
   const subscriptionQuery = useQuery<AdminEconomyUserSubscriptionSummary>({
@@ -736,7 +756,8 @@ export function useSupportConversationController({
       ? adminQueryKeys.economyUserSubscriptionSummary(subjectUserId)
       : adminQueryKeys.economyUserSubscriptionSummaryDisabled,
     queryFn: () => fetchAdminEconomyUserSubscriptionSummary(subjectUserId!),
-    enabled: Boolean(session && subjectUserId),
+    enabled: Boolean(session && subjectUserId && !isSubjectUserDeleted),
+    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
   const inboxItems = useMemo(() => sortSupportQueueItems(inboxQuery.data ?? []), [inboxQuery.data]);
@@ -765,9 +786,14 @@ export function useSupportConversationController({
 
   const composerValue = reply;
   const composerPlaceholder = text.supportReplyPlaceholder;
+  const deletedUserNameFallback = locale === "ru" ? "Удаленный пользователь" : "Deleted user";
+  const deletedUserEmailFallback = locale === "ru" ? "Пользователь удален" : "User deleted";
+  const userEmailDisplay =
+    conversation?.userEmail?.trim() || (isSubjectUserDeleted ? deletedUserEmailFallback : "");
   const userDisplayName =
     conversation?.userDisplayName?.trim() ||
-    conversation?.userEmail ||
+    userEmailDisplay ||
+    (isSubjectUserDeleted ? deletedUserNameFallback : "") ||
     text.supportConversationTitle;
   const hasComposerAttachment = selectedAttachment !== null;
   const replyToMessage = useMemo(
@@ -997,12 +1023,14 @@ export function useSupportConversationController({
     addOperatorTag,
     removeOperatorTag,
     queueFilter,
+    isSubjectUserDeleted,
     subscriptionQuery,
     statusMutation,
     text,
     toast,
     totalPurchases,
     selectReplyToMessage,
+    userEmailDisplay,
     userDisplayName,
     userQuery,
   };

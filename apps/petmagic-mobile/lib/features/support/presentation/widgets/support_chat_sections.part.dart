@@ -177,10 +177,8 @@ class _SupportConversationViewport extends StatelessWidget {
 
           if (conversation?.hasOlderMessages ?? false) {
             if (currentIndex == 0) {
-              final locale = Localizations.localeOf(context).languageCode;
-              final loadOlderLabel = locale == 'ru'
-                  ? 'Загрузить предыдущие сообщения'
-                  : 'Load previous messages';
+              final text = AppLocalizations.of(context);
+              final loadOlderLabel = text.supportChatLoadPreviousMessagesAction;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Align(

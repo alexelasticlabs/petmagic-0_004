@@ -593,9 +593,7 @@ public static class AdminTemplateEndpoints
         return string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
             || string.Equals(contentType, "image/png", StringComparison.OrdinalIgnoreCase)
             || string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(contentType, "image/gif", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(contentType, "image/heic", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(contentType, "image/heif", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(contentType, "image/gif", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAllowedVideoUpload(string contentType)

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 
@@ -29,39 +30,44 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify email')),
+      appBar: AppBar(title: Text(text.emailVerificationTitle)),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('We sent a 6-digit code to ${widget.email}.'),
+            Text(text.emailVerificationCodeSentMessage(widget.email)),
             const SizedBox(height: 12),
             TextField(
               controller: _codeController,
               keyboardType: TextInputType.number,
               maxLength: 6,
-              decoration: const InputDecoration(labelText: 'Code'),
+              decoration: InputDecoration(labelText: text.emailVerificationCodeLabel),
             ),
             if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
             if (_info != null) Text(_info!),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: _isBusy ? null : _verify,
-              child: Text(_isBusy ? 'Working...' : 'Verify'),
+              child: Text(
+                _isBusy
+                    ? text.emailVerificationWorkingLabel
+                    : text.emailVerificationVerifyAction,
+              ),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: _isBusy ? null : _resend,
-              child: const Text('Send code again'),
+              child: Text(text.emailVerificationResendAction),
             ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: _isBusy
                   ? null
                   : () => context.go('${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}'),
-              child: const Text('Change email'),
+              child: Text(text.emailVerificationChangeEmailAction),
             ),
           ],
         ),
@@ -70,6 +76,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   }
 
   Future<void> _verify() async {
+    final text = AppLocalizations.of(context);
     setState(() {
       _isBusy = true;
       _error = null;
@@ -81,7 +88,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       await repository.verifyEmailCode(email: widget.email, code: _codeController.text);
       if (!mounted) return;
       setState(() {
-        _info = 'Email confirmed. Please sign in.';
+        _info = text.emailVerificationConfirmedMessage;
       });
       context.go('${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}');
     } catch (error) {
@@ -98,6 +105,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   }
 
   Future<void> _resend() async {
+    final text = AppLocalizations.of(context);
     setState(() {
       _isBusy = true;
       _error = null;
@@ -108,7 +116,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       final repository = ref.read(profileRepositoryProvider);
       await repository.resendEmailVerificationCode(email: widget.email);
       setState(() {
-        _info = 'If the account exists, a new code has been sent.';
+        _info = text.emailVerificationResentFallbackMessage;
       });
     } catch (error) {
       setState(() {

@@ -2876,4 +2876,156 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get shellActiveGenerationFallback => 'resultat';
+
+  @override
+  String get walletStripeCardBrandsLabel => 'Visa • Mastercard';
+
+  @override
+  String get walletStripeWalletsLabel => 'Apple Pay • Google Pay';
+
+  @override
+  String get walletPackUsageNote =>
+      'Utilisé pour les générations photo et vidéo';
+
+  @override
+  String get walletCheckoutTaxLabel => 'Impôt';
+
+  @override
+  String get walletCheckoutTaxIncludedValue => 'Compris';
+
+  @override
+  String get walletCheckoutTotalLabel => 'Total';
+
+  @override
+  String walletCheckoutPayAction(Object price) {
+    return 'Payer $price';
+  }
+
+  @override
+  String get emailVerificationTitle => 'Vérifier l\'e-mail';
+
+  @override
+  String emailVerificationCodeSentMessage(Object email) {
+    return 'Nous avons envoyé un code à 6 chiffres à $email.';
+  }
+
+  @override
+  String get emailVerificationCodeLabel => 'Code';
+
+  @override
+  String get emailVerificationWorkingLabel => 'Fonctionnement...';
+
+  @override
+  String get emailVerificationVerifyAction => 'Vérifier';
+
+  @override
+  String get emailVerificationResendAction => 'Envoyer à nouveau le code';
+
+  @override
+  String get emailVerificationChangeEmailAction => 'Changer d\'e-mail';
+
+  @override
+  String get emailVerificationConfirmedMessage =>
+      'E-mail confirmé. Veuillez vous connecter.';
+
+  @override
+  String get emailVerificationResentFallbackMessage =>
+      'Si le compte existe, un nouveau code a été envoyé.';
+
+  @override
+  String get profileNotificationsDeviceAllowed => 'Autorisé';
+
+  @override
+  String get profileNotificationsDeviceLimited => 'Limité';
+
+  @override
+  String get profileNotificationsDeviceDenied => 'Refusé';
+
+  @override
+  String get profileNotificationsDevicePermanentlyDenied =>
+      'Refusé définitivement';
+
+  @override
+  String get profileNotificationsDeviceRestricted => 'Limité';
+
+  @override
+  String get profileNotificationsDeviceUnknown => 'Inconnu';
+
+  @override
+  String get profileNotificationsDeviceNotifications => 'Notifications';
+
+  @override
+  String get profileNotificationsDeviceCamera => 'Caméra';
+
+  @override
+  String get profileNotificationsDevicePhotos => 'Photos';
+
+  @override
+  String get profileNotificationsDeviceFiles => 'Fichiers';
+
+  @override
+  String get profileNotificationsRequestDevicePermissions =>
+      'Demander les autorisations de l\'appareil';
+
+  @override
+  String get supportChatLoadPreviousMessagesAction =>
+      'Charger les messages précédents';
+
+  @override
+  String get generationStatusCopyLinkAction => 'Copier le lien';
+
+  @override
+  String get generationStatusShareFailedMessage =>
+      'Échec du partage du résultat. Veuillez réessayer.';
+
+  @override
+  String get generationStatusDeleteFailedMessage =>
+      'Échec de la suppression du résultat. Veuillez réessayer.';
+
+  @override
+  String get premiumSelectedBadge => 'CHOISI';
+
+  @override
+  String get premiumBestValueBadge => 'MEILLEURE VALEUR';
+
+  @override
+  String get premiumStorePaymentDisclaimerTitle =>
+      'Paiement sécurisé via App Store / Google Play';
+
+  @override
+  String get premiumStorePaymentDisclaimerBody =>
+      'Le paiement sera débité de votre compte App Store / Google Play. L\'abonnement se renouvelle automatiquement sauf annulation avant la date de renouvellement.';
+
+  @override
+  String get premiumBenefitAiGenerationsTitle => '30 générations d\'IA';
+
+  @override
+  String get premiumBenefitAiGenerationsSubtitle => 'chaque mois';
+
+  @override
+  String get premiumBenefitPremiumTemplatesTitle => 'Modèles premium';
+
+  @override
+  String get premiumBenefitPremiumTemplatesSubtitle => 'exclusif';
+
+  @override
+  String get premiumBenefitPriorityVideoQueueTitle =>
+      'File d\'attente vidéo prioritaire';
+
+  @override
+  String get premiumBenefitPriorityVideoQueueSubtitle =>
+      'des résultats plus rapides';
+
+  @override
+  String get premiumBenefitNoWatermarkTitle => 'Pas de filigrane';
+
+  @override
+  String get premiumBenefitNoWatermarkSubtitle => 'exportations propres';
+
+  @override
+  String get premiumBenefitBiggerRewardsTitle =>
+      'Des récompenses plus importantes';
+
+  @override
+  String get premiumBenefitBiggerRewardsSubtitle => 'bonus quotidiens';
 }

@@ -5102,6 +5102,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'result'**
   String get shellActiveGenerationFallback;
+
+  /// No description provided for @walletStripeCardBrandsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Visa • Mastercard'**
+  String get walletStripeCardBrandsLabel;
+
+  /// No description provided for @walletStripeWalletsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Pay • Google Pay'**
+  String get walletStripeWalletsLabel;
+
+  /// No description provided for @walletPackUsageNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Used for photo and video generations'**
+  String get walletPackUsageNote;
+
+  /// No description provided for @walletCheckoutTaxLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax'**
+  String get walletCheckoutTaxLabel;
+
+  /// No description provided for @walletCheckoutTaxIncludedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Included'**
+  String get walletCheckoutTaxIncludedValue;
+
+  /// No description provided for @walletCheckoutTotalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get walletCheckoutTotalLabel;
+
+  /// No description provided for @walletCheckoutPayAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {price}'**
+  String walletCheckoutPayAction(Object price);
+
+  /// No description provided for @emailVerificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify email'**
+  String get emailVerificationTitle;
+
+  /// No description provided for @emailVerificationCodeSentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'We sent a 6-digit code to {email}.'**
+  String emailVerificationCodeSentMessage(Object email);
+
+  /// No description provided for @emailVerificationCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get emailVerificationCodeLabel;
+
+  /// No description provided for @emailVerificationWorkingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Working...'**
+  String get emailVerificationWorkingLabel;
+
+  /// No description provided for @emailVerificationVerifyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get emailVerificationVerifyAction;
+
+  /// No description provided for @emailVerificationResendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code again'**
+  String get emailVerificationResendAction;
+
+  /// No description provided for @emailVerificationChangeEmailAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get emailVerificationChangeEmailAction;
+
+  /// No description provided for @emailVerificationConfirmedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Email confirmed. Please sign in.'**
+  String get emailVerificationConfirmedMessage;
+
+  /// No description provided for @emailVerificationResentFallbackMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'If the account exists, a new code has been sent.'**
+  String get emailVerificationResentFallbackMessage;
+
+  /// No description provided for @profileNotificationsDeviceAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed'**
+  String get profileNotificationsDeviceAllowed;
+
+  /// No description provided for @profileNotificationsDeviceLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Limited'**
+  String get profileNotificationsDeviceLimited;
+
+  /// No description provided for @profileNotificationsDeviceDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get profileNotificationsDeviceDenied;
+
+  /// No description provided for @profileNotificationsDevicePermanentlyDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently denied'**
+  String get profileNotificationsDevicePermanentlyDenied;
+
+  /// No description provided for @profileNotificationsDeviceRestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Restricted'**
+  String get profileNotificationsDeviceRestricted;
+
+  /// No description provided for @profileNotificationsDeviceUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get profileNotificationsDeviceUnknown;
+
+  /// No description provided for @profileNotificationsDeviceNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get profileNotificationsDeviceNotifications;
+
+  /// No description provided for @profileNotificationsDeviceCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get profileNotificationsDeviceCamera;
+
+  /// No description provided for @profileNotificationsDevicePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get profileNotificationsDevicePhotos;
+
+  /// No description provided for @profileNotificationsDeviceFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get profileNotificationsDeviceFiles;
+
+  /// No description provided for @profileNotificationsRequestDevicePermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Request device permissions'**
+  String get profileNotificationsRequestDevicePermissions;
+
+  /// No description provided for @supportChatLoadPreviousMessagesAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Load previous messages'**
+  String get supportChatLoadPreviousMessagesAction;
+
+  /// No description provided for @generationStatusCopyLinkAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get generationStatusCopyLinkAction;
+
+  /// No description provided for @generationStatusShareFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to share result. Please try again.'**
+  String get generationStatusShareFailedMessage;
+
+  /// No description provided for @generationStatusDeleteFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete result. Please try again.'**
+  String get generationStatusDeleteFailedMessage;
+
+  /// No description provided for @premiumSelectedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'SELECTED'**
+  String get premiumSelectedBadge;
+
+  /// No description provided for @premiumBestValueBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'BEST VALUE'**
+  String get premiumBestValueBadge;
+
+  /// No description provided for @premiumStorePaymentDisclaimerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure payment via App Store / Google Play'**
+  String get premiumStorePaymentDisclaimerTitle;
+
+  /// No description provided for @premiumStorePaymentDisclaimerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.'**
+  String get premiumStorePaymentDisclaimerBody;
+
+  /// No description provided for @premiumBenefitAiGenerationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'30 AI generations'**
+  String get premiumBenefitAiGenerationsTitle;
+
+  /// No description provided for @premiumBenefitAiGenerationsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'every month'**
+  String get premiumBenefitAiGenerationsSubtitle;
+
+  /// No description provided for @premiumBenefitPremiumTemplatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium templates'**
+  String get premiumBenefitPremiumTemplatesTitle;
+
+  /// No description provided for @premiumBenefitPremiumTemplatesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'exclusive'**
+  String get premiumBenefitPremiumTemplatesSubtitle;
+
+  /// No description provided for @premiumBenefitPriorityVideoQueueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority video queue'**
+  String get premiumBenefitPriorityVideoQueueTitle;
+
+  /// No description provided for @premiumBenefitPriorityVideoQueueSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'faster results'**
+  String get premiumBenefitPriorityVideoQueueSubtitle;
+
+  /// No description provided for @premiumBenefitNoWatermarkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No watermark'**
+  String get premiumBenefitNoWatermarkTitle;
+
+  /// No description provided for @premiumBenefitNoWatermarkSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'clean exports'**
+  String get premiumBenefitNoWatermarkSubtitle;
+
+  /// No description provided for @premiumBenefitBiggerRewardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bigger rewards'**
+  String get premiumBenefitBiggerRewardsTitle;
+
+  /// No description provided for @premiumBenefitBiggerRewardsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'daily bonuses'**
+  String get premiumBenefitBiggerRewardsSubtitle;
 }
 
 class _AppLocalizationsDelegate
