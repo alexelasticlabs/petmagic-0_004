@@ -208,6 +208,112 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileSubscriptionTokensLabel => 'Доступно токенов';
 
   @override
+  String get subscriptionStatusActive => 'Premium активен';
+
+  @override
+  String get subscriptionStatusCancelled => 'Отменён (до конца периода)';
+
+  @override
+  String get subscriptionStatusExpired => 'Истёк';
+
+  @override
+  String get subscriptionStatusPaymentFailed => 'Ошибка оплаты';
+
+  @override
+  String get subscriptionStatusPending => 'Платёж ожидается';
+
+  @override
+  String get subscriptionStatusInactive => 'Неактивна';
+
+  @override
+  String get subscriptionStartDateLabel => 'Начало подписки';
+
+  @override
+  String get subscriptionPeriodEndLabel => 'Оплачено до';
+
+  @override
+  String get subscriptionAutoRenewLabel => 'Автопродление';
+
+  @override
+  String get subscriptionAutoRenewOn => 'Включено';
+
+  @override
+  String get subscriptionAutoRenewOff => 'Отключено';
+
+  @override
+  String get subscriptionTokensSectionTitle => 'Premium-токены';
+
+  @override
+  String get subscriptionTokensAvailableLabel => 'Доступно сейчас';
+
+  @override
+  String get subscriptionTokensPerPeriodLabel => 'Каждые 7 дней';
+
+  @override
+  String get subscriptionTokensNextGrantLabel => 'Следующее начисление';
+
+  @override
+  String subscriptionTokensCountdown(
+    Object days,
+    Object hours,
+    Object minutes,
+  ) {
+    return 'Через $daysд $hoursч $minutesм';
+  }
+
+  @override
+  String get subscriptionTokensExplanation =>
+      'Токены начисляются каждые 7 дней с момента покупки подписки. Первый бонус начисляется сразу после покупки.';
+
+  @override
+  String get subscriptionBenefitsSectionTitle => 'Преимущества Premium';
+
+  @override
+  String get subscriptionBenefitTokens => '40 токенов каждые 7 дней';
+
+  @override
+  String get subscriptionBenefitFirstBonus =>
+      'Первый бонус сразу после покупки';
+
+  @override
+  String get subscriptionBenefitTemplates => 'Доступ к Premium-шаблонам';
+
+  @override
+  String get subscriptionBenefitPriorityGeneration => 'Приоритетная генерация';
+
+  @override
+  String get subscriptionBenefitNoWatermark => 'Без водяного знака';
+
+  @override
+  String get subscriptionPaymentSectionTitle => 'Оплата';
+
+  @override
+  String get subscriptionPaymentMethodLabel => 'Способ оплаты';
+
+  @override
+  String get subscriptionPaymentCardLabel => 'Карта';
+
+  @override
+  String get subscriptionPaymentProviderStripe => 'Карта через Stripe';
+
+  @override
+  String get subscriptionPaymentProviderGooglePlay => 'Google Play';
+
+  @override
+  String get subscriptionPaymentProviderAppStore => 'Apple / App Store';
+
+  @override
+  String get subscriptionChangePaymentAction => 'Изменить способ оплаты';
+
+  @override
+  String get subscriptionCancelAction => 'Отменить подписку';
+
+  @override
+  String subscriptionCancelledHint(Object date) {
+    return 'Подписка активна до $date. После этого автопродление не произойдёт.';
+  }
+
+  @override
   String get profileWalletTitle => 'Кошелек';
 
   @override
@@ -587,6 +693,43 @@ class AppLocalizationsRu extends AppLocalizations {
       'Оплата откроется в защищенном Stripe Checkout. PetMagic не сохраняет данные карты.';
 
   @override
+  String get walletCheckoutProductSubtitle =>
+      'Токены для создания фото и видео в PetMagic';
+
+  @override
+  String walletCheckoutTokensImmediately(Object count) {
+    return '$count токенов сразу после оплаты';
+  }
+
+  @override
+  String walletCheckoutBonusTokens(Object count) {
+    return '+$count бонусных токенов в подарок';
+  }
+
+  @override
+  String get walletCheckoutIncludesTitle => 'Что входит';
+
+  @override
+  String get walletCheckoutFeaturePremiumTemplates => 'Premium-шаблоны';
+
+  @override
+  String get walletCheckoutFeaturePriority => 'Приоритетная генерация';
+
+  @override
+  String get walletCheckoutFeatureMoreVideos => 'Больше возможностей для видео';
+
+  @override
+  String get walletCheckoutStripeMethodSubtitle =>
+      'Карта, Apple Pay или Google Pay';
+
+  @override
+  String get walletCheckoutTrustText =>
+      'PetMagic не хранит данные вашей карты. Платежи безопасно обрабатываются Stripe.';
+
+  @override
+  String get walletCheckoutOrderSectionTitle => 'Итого сегодня';
+
+  @override
   String walletCheckoutSucceeded(int spark) {
     return 'Оплата подтверждена. +$spark PawSpark уже в вашем кошельке.';
   }
@@ -936,6 +1079,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get premiumContinueAction => 'Продолжить';
+
+  @override
+  String paymentContinueViaProviderAction(Object provider) {
+    return 'Продолжить через $provider';
+  }
+
+  @override
+  String get paymentChooseAnotherMethodAction => 'Выбрать другой способ оплаты';
 
   @override
   String get externalCheckoutStripeTitle => 'Оплата через Stripe';

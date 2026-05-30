@@ -194,6 +194,21 @@ public sealed partial class EconomyService
         var isPremium = IsActivePremiumSubscription(subscription) || profileIsPremium;
         var manageAction = GetManageSubscriptionAction(subscription?.Provider);
 
+        string? cardBrand = null;
+        string? cardLast4 = null;
+        if (string.Equals(subscription?.Provider, "stripe", StringComparison.OrdinalIgnoreCase))
+        {
+            var savedCard = await dbContext.SavedPaymentMethods
+                .AsNoTracking()
+                .Where(x => x.UserId == userId && x.Provider == "stripe" && x.IsActive)
+                .OrderByDescending(x => x.IsDefault)
+                .ThenByDescending(x => x.UpdatedAtUtc)
+                .Select(x => new { x.Brand, x.Last4 })
+                .FirstOrDefaultAsync(cancellationToken);
+            cardBrand = savedCard?.Brand;
+            cardLast4 = savedCard?.Last4;
+        }
+
         return Result.Success(new SubscriptionSummaryResponse(
             isPremium,
             subscription?.Provider,
@@ -201,12 +216,16 @@ public sealed partial class EconomyService
             subscription?.Status ?? (isPremium ? "Active" : "None"),
             plan?.Name,
             plan?.BillingPeriod,
+            subscription?.CurrentPeriodStartUtc,
             subscription?.CurrentPeriodEndUtc,
             subscription?.CancelAtPeriodEnd ?? false,
             subscription?.MonthlyTokenLimit ?? plan?.MonthlyTokenLimit ?? 0,
             wallet.Balance,
             !string.Equals(manageAction, "None", StringComparison.Ordinal),
-            manageAction));
+            manageAction,
+            subscription?.LastTokenGrantAtUtc,
+            cardBrand,
+            cardLast4));
     }
 
     public async Task<Result<StripeDiagnosticsResponse>> GetStripeDiagnosticsAsync(Guid userId, CancellationToken cancellationToken)

@@ -190,6 +190,13 @@
   "premiumSecurePaymentTitle": "Sichere Zahlung",
   "premiumSecurePaymentSubtitle": "Verwalte oder kündige dein Abo jederzeit in den Zahlungseinstellungen.",
   "premiumContinueAction": "Weiter",
+  "paymentContinueViaProviderAction": "Weiter mit {provider}",
+  "@paymentContinueViaProviderAction": {
+    "placeholders": {
+      "provider": {}
+    }
+  },
+  "paymentChooseAnotherMethodAction": "Andere Zahlungsmethode wählen",
   "premiumManageAction": "Abo verwalten",
   "premiumRestoreAction": "Käufe wiederherstellen",
   "premiumTermsNotice": "Wenn du fortfährst, stimmst du den Nutzungsbedingungen und der Datenschutzrichtlinie zu.",
@@ -517,6 +524,50 @@
   "profileSubscriptionProviderLabel": "Anbieter",
   "profileSubscriptionNextBillingLabel": "Nächste Abrechnung",
   "profileSubscriptionTokensLabel": "Verfügbare Token",
+  "subscriptionStatusActive": "Premium aktiv",
+  "subscriptionStatusCancelled": "Gekündigt (bis Periodenende aktiv)",
+  "subscriptionStatusExpired": "Abgelaufen",
+  "subscriptionStatusPaymentFailed": "Zahlung fehlgeschlagen",
+  "subscriptionStatusPending": "Zahlung ausstehend",
+  "subscriptionStatusInactive": "Inaktiv",
+  "subscriptionStartDateLabel": "Abo gestartet",
+  "subscriptionPeriodEndLabel": "Bezahlt bis",
+  "subscriptionAutoRenewLabel": "Automatische Verlängerung",
+  "subscriptionAutoRenewOn": "Aktiviert",
+  "subscriptionAutoRenewOff": "Deaktiviert",
+  "subscriptionTokensSectionTitle": "Premium-Token",
+  "subscriptionTokensAvailableLabel": "Jetzt verfügbar",
+  "subscriptionTokensPerPeriodLabel": "Alle 7 Tage",
+  "subscriptionTokensNextGrantLabel": "Nächste Gutschrift",
+  "subscriptionTokensCountdown": "In {days}T {hours}Std {minutes}Min",
+  "@subscriptionTokensCountdown": {
+    "placeholders": {
+      "days": {},
+      "hours": {},
+      "minutes": {}
+    }
+  },
+  "subscriptionTokensExplanation": "Token werden alle 7 Tage ab Abonnementstart gutgeschrieben. Der erste Bonus wird sofort nach dem Kauf gewährt.",
+  "subscriptionBenefitsSectionTitle": "Premium-Vorteile",
+  "subscriptionBenefitTokens": "40 Token alle 7 Tage",
+  "subscriptionBenefitFirstBonus": "Erster Bonus direkt nach dem Kauf",
+  "subscriptionBenefitTemplates": "Zugang zu Premium-Vorlagen",
+  "subscriptionBenefitPriorityGeneration": "Prioritätsgenerierung",
+  "subscriptionBenefitNoWatermark": "Kein Wasserzeichen",
+  "subscriptionPaymentSectionTitle": "Zahlung",
+  "subscriptionPaymentMethodLabel": "Zahlungsmethode",
+  "subscriptionPaymentCardLabel": "Karte",
+  "subscriptionPaymentProviderStripe": "Karte über Stripe",
+  "subscriptionPaymentProviderGooglePlay": "Google Play",
+  "subscriptionPaymentProviderAppStore": "Apple / App Store",
+  "subscriptionChangePaymentAction": "Zahlungsmethode ändern",
+  "subscriptionCancelAction": "Abonnement kündigen",
+  "subscriptionCancelledHint": "Das Abonnement ist bis {date} aktiv. Es wird danach nicht verlängert.",
+  "@subscriptionCancelledHint": {
+    "placeholders": {
+      "date": {}
+    }
+  },
   "profileWalletTitle": "Geldbörse",
   "profileWalletHistoryHint": "Guthaben, Käufe und Verlauf öffnen.",
   "walletPageTitle": "PawSpark-Wallet",
@@ -713,6 +764,26 @@
   "walletPackDetailsAction": "Einzelheiten",
   "walletPackDetailSubtitle": "Prüfen Sie, was enthalten ist, bevor Sie zur Kasse gehen.",
   "walletCheckoutHint": "Zahlung öffnet sich in sicherem Stripe Checkout. PetMagic speichert Ihre Kartendaten nicht.",
+  "walletCheckoutProductSubtitle": "Tokens für Foto- und Videogenerierungen in PetMagic",
+  "walletCheckoutTokensImmediately": "{count} Tokens sofort nach der Zahlung",
+  "@walletCheckoutTokensImmediately": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletCheckoutBonusTokens": "+{count} Bonus-Tokens inklusive",
+  "@walletCheckoutBonusTokens": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletCheckoutIncludesTitle": "Was enthalten ist",
+  "walletCheckoutFeaturePremiumTemplates": "Premium-Vorlagen",
+  "walletCheckoutFeaturePriority": "Priorisierte Generierung",
+  "walletCheckoutFeatureMoreVideos": "Mehr Videooptionen",
+  "walletCheckoutStripeMethodSubtitle": "Karte, Apple Pay oder Google Pay",
+  "walletCheckoutTrustText": "PetMagic speichert keine Kartendaten. Zahlungen werden sicher über Stripe abgewickelt.",
+  "walletCheckoutOrderSectionTitle": "Bestellübersicht",
   "walletCheckoutSucceeded": "Zahlung bestätigt. +{spark} PawSpark ist bereits in Ihrer Wallet.",
   "@walletCheckoutSucceeded": {
     "placeholders": {

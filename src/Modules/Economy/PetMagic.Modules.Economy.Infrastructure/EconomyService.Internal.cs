@@ -587,10 +587,28 @@ public sealed partial class EconomyService
 
     private static List<PaywallPaymentMethodResponse> SortPaymentMethods(IEnumerable<PaywallPaymentMethodResponse> methods)
     {
-        return [.. methods
-            .OrderByDescending(x => x.IsSelectedByDefault)
+        var source = methods.ToList();
+        var hasStripe = source.Any(x => IsStripeProvider(x.Provider));
+
+        if (hasStripe)
+        {
+            source = [.. source.Select(x => x with
+            {
+                IsSelectedByDefault = IsStripeProvider(x.Provider),
+                IsRecommended = IsStripeProvider(x.Provider)
+            })];
+        }
+
+        return [.. source
+            .OrderByDescending(x => IsStripeProvider(x.Provider))
+            .ThenByDescending(x => x.IsSelectedByDefault)
             .ThenByDescending(x => x.IsRecommended)
             .ThenBy(x => x.Provider, StringComparer.Ordinal)];
+    }
+
+    private static bool IsStripeProvider(string provider)
+    {
+        return string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase);
     }
 
     private static PaywallLegalTextsResponse BuildPaywallLegalTexts()

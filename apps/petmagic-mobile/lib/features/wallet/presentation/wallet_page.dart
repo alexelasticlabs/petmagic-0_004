@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -13,7 +11,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
@@ -163,6 +161,24 @@ class _WalletPageState extends ConsumerState<WalletPage>
     final checkoutStatusMessage = _checkoutStatusMessage(text, state);
     final checkoutCheckingMessage = _checkoutCheckingMessage(text, state);
 
+    ref.listen(walletControllerProvider, (previous, next) {
+      final justSucceeded =
+          previous?.checkoutVerificationState !=
+              WalletCheckoutVerificationState.succeeded &&
+          next.checkoutVerificationState ==
+              WalletCheckoutVerificationState.succeeded;
+      if (!justSucceeded || !mounted) {
+        return;
+      }
+
+      final grantedSpark = next.checkoutGrantedSpark ?? 0;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(text.walletCheckoutSucceeded(grantedSpark))),
+        );
+    });
+
     return ProfileScreenBackground(
       child: SafeArea(
         child: state.isInitialLoading
@@ -243,7 +259,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                           onCheckoutReady: (checkout) async {
                             controller.resetCheckoutVerification();
                             controller.consumeCheckoutUrl();
-                            await _handleCheckout(checkout);
+                            return _handleCheckout(checkout);
                           },
                         ),
                       ),
@@ -275,7 +291,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
     );
   }
 
-  Future<void> _handleCheckout(PurchaseCheckoutModel checkout) async {
+  Future<StripePaymentSheetResult> _handleCheckout(
+    PurchaseCheckoutModel checkout,
+  ) async {
     final text = AppLocalizations.of(context);
     developer.log(
       'Checkout dispatch (order=${checkout.orderId}, usesPaymentSheet=${checkout.usesPaymentSheet}, provider=${checkout.paymentProvider}, urlLength=${checkout.checkoutUrl.length}, hasClientSecret=${(checkout.paymentIntentClientSecret?.isNotEmpty ?? false)}, hasPublishableKey=${(checkout.publishableKey?.isNotEmpty ?? false)})',
@@ -283,20 +301,16 @@ class _WalletPageState extends ConsumerState<WalletPage>
     );
 
     if (!checkout.usesPaymentSheet) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
+      return StripePaymentSheetResult.failure(
+        error: StateError('wallet.payment_gateway_unavailable'),
+        errorMessage: text.walletPaymentGatewayUnavailableError,
       );
-      return;
     }
 
-    await _presentStripePaymentSheet(checkout);
+    return _presentStripePaymentSheet(checkout);
   }
 
-  Future<void> _presentStripePaymentSheet(
+  Future<StripePaymentSheetResult> _presentStripePaymentSheet(
     PurchaseCheckoutModel checkout,
   ) async {
     final text = AppLocalizations.of(context);
@@ -306,107 +320,77 @@ class _WalletPageState extends ConsumerState<WalletPage>
         clientSecret.isEmpty ||
         publishableKey == null ||
         publishableKey.isEmpty) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.walletPaymentGatewayUnavailableError)),
+      return StripePaymentSheetResult.failure(
+        error: StateError('wallet.payment_gateway_unavailable'),
+        errorMessage: text.walletPaymentGatewayUnavailableError,
       );
-      return;
     }
 
-    try {
-      developer.log(
-        'PaymentSheet init start (order=${checkout.orderId})',
-        name: 'PetMagic.Wallet.Checkout',
+    developer.log(
+      'PaymentSheet init start (order=${checkout.orderId})',
+      name: 'PetMagic.Wallet.Checkout',
+    );
+    _shouldReloadOnResume = true;
+    final sheetResult = await StripePaymentSheetCoordinator.present(
+      context,
+      request: StripePaymentSheetRequest(
+        paymentIntentClientSecret: clientSecret,
+        publishableKey: publishableKey,
+        customerId: checkout.customerId,
+        customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
+      ),
+    );
+
+    if (!sheetResult.completed) {
+      _shouldReloadOnResume = false;
+      return sheetResult;
+    }
+
+    if (!mounted) {
+      _shouldReloadOnResume = false;
+      return StripePaymentSheetResult.failure(
+        error: StateError('wallet.context_unmounted'),
+        errorMessage: text.walletPaymentGatewayUnavailableError,
       );
-      _shouldReloadOnResume = true;
-      final result = await StripePaymentSheetCoordinator.present(
-        context,
-        request: StripePaymentSheetRequest(
-          paymentIntentClientSecret: clientSecret,
-          publishableKey: publishableKey,
-          customerId: checkout.customerId,
-          customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
-        ),
-      );
+    }
 
-      if (!result.completed) {
-        throw result.error ?? Exception('stripe.payment_sheet_failed');
-      }
+    final controller = ref.read(walletControllerProvider.notifier);
+    await controller.verifyStripeCheckout(checkout.externalPaymentId);
 
-      developer.log(
-        'PaymentSheet completed (order=${checkout.orderId})',
-        name: 'PetMagic.Wallet.Checkout',
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      final controller = ref.read(walletControllerProvider.notifier);
-      await controller.verifyStripeCheckout(checkout.externalPaymentId);
-
-      // Fallback polling keeps UX resilient when direct verification is delayed.
-      final verificationState = ref
+    // Fallback polling keeps UX resilient when direct verification is delayed.
+    var verificationState = ref
+        .read(walletControllerProvider)
+        .checkoutVerificationState;
+    if (verificationState != WalletCheckoutVerificationState.succeeded) {
+      await controller.verifyCheckoutStatus();
+      verificationState = ref
           .read(walletControllerProvider)
           .checkoutVerificationState;
-      if (verificationState != WalletCheckoutVerificationState.succeeded) {
-        await controller.verifyCheckoutStatus();
-      }
-      _shouldReloadOnResume = false;
-    } on StripeException catch (error) {
-      developer.log(
-        'PaymentSheet StripeException (order=${checkout.orderId})',
-        name: 'PetMagic.Wallet.Checkout',
-        error: error,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      final message = error.error.localizedMessage;
-      _shouldReloadOnResume = false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            (message == null || message.isEmpty)
-                ? text.walletPaymentGatewayUnavailableError
-                : message,
-          ),
-        ),
-      );
-    } catch (error, stackTrace) {
-      developer.log(
-        'PaymentSheet unexpected error (order=${checkout.orderId})',
-        name: 'PetMagic.Wallet.Checkout',
-        error: error,
-        stackTrace: stackTrace,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      final platformMessage = switch (error) {
-        PlatformException(:final message) => message,
-        Exception() => error.toString(),
-        _ => null,
-      };
-      _shouldReloadOnResume = false;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            (platformMessage == null || platformMessage.isEmpty)
-                ? text.walletPaymentGatewayUnavailableError
-                : platformMessage,
-          ),
-        ),
-      );
     }
+
+    _shouldReloadOnResume = false;
+
+    if (verificationState == WalletCheckoutVerificationState.succeeded) {
+      return StripePaymentSheetResult.success;
+    }
+
+    final currentState = ref.read(walletControllerProvider);
+    final message = switch (verificationState) {
+      WalletCheckoutVerificationState.pending =>
+        text.externalCheckoutPendingVerificationMessage,
+      WalletCheckoutVerificationState.error => _friendlyError(
+        text,
+        currentState.checkoutErrorMessage ??
+            currentState.errorMessage ??
+            text.walletPaymentGatewayUnavailableError,
+      ),
+      _ => text.walletPaymentGatewayUnavailableError,
+    };
+
+    return StripePaymentSheetResult.failure(
+      error: StateError('wallet.checkout_verification_failed'),
+      errorMessage: message,
+    );
   }
 }
 
@@ -421,24 +405,20 @@ Future<void> _showPackDetailSheet(
     WalletPaymentMethodModel paymentMethod,
   )
   onBuy,
-  required Future<void> Function(PurchaseCheckoutModel checkout)
+  required Future<StripePaymentSheetResult> Function(
+    PurchaseCheckoutModel checkout,
+  )
   onCheckoutReady,
 }) async {
   final text = AppLocalizations.of(context);
-  final colors = context.petMagicColors;
-  final sortedPacks = packs.toList(growable: false)
-    ..sort((left, right) {
-      final bySpark = left.totalSpark.compareTo(right.totalSpark);
-      if (bySpark != 0) {
-        return bySpark;
-      }
-
-      return left.priceAmount.compareTo(right.priceAmount);
-    });
-
-  if (sortedPacks.isEmpty) {
+  if (packs.isEmpty) {
     return;
   }
+
+  final selectedPack = packs.firstWhere(
+    (pack) => pack.packId == initialPack.packId,
+    orElse: () => packs.first,
+  );
 
   final enabledMethods = paymentMethods
       .where((method) => method.isEnabled)
@@ -447,14 +427,6 @@ Future<void> _showPackDetailSheet(
     return;
   }
 
-  final bestOfferPack = sortedPacks.last;
-  final popularPack = sortedPacks.length >= 3
-      ? sortedPacks[(sortedPacks.length - 1) ~/ 2]
-      : null;
-  var selectedPack = sortedPacks.firstWhere(
-    (pack) => pack.packId == initialPack.packId,
-    orElse: () => sortedPacks.first,
-  );
   var selectedMethod =
       enabledMethods
           .where((method) => method.isSelectedByDefault)
@@ -493,6 +465,8 @@ Future<void> _showPackDetailSheet(
     title: text.premiumPaymentTitle,
     subtitle: text.premiumSecurePaymentSubtitle,
     continueLabel: text.premiumContinueAction,
+    continueLabelBuilder: (option) =>
+        text.paymentContinueViaProviderAction(option.title),
     options: buildMethodOptions(),
   );
   if (selectedOption == null || !context.mounted) {
@@ -506,536 +480,81 @@ Future<void> _showPackDetailSheet(
     }
   }
 
-  await showPetMagicModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    backgroundColor: colors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-    ),
-    builder: (sheetContext, _) {
-      final safeBottom = MediaQuery.viewPaddingOf(sheetContext).bottom;
-      return StatefulBuilder(
-        builder: (modalContext, setModalState) {
-          final selectedPrice = _formatPrice(selectedPack);
-          final photosApprox = (selectedPack.totalSpark / _kPhotoCostSpark)
-              .floor();
-          final videosApprox = (selectedPack.totalSpark / _kVideoCostSpark)
-              .floor();
-          final usageSummary = videosApprox > 0
-              ? '${text.walletApproxPhotos(photosApprox)} • ${text.walletApproxVideos(videosApprox)}'
-              : text.walletApproxPhotos(photosApprox);
+  if (!selectedMethod.isStripe) {
+    final checkout = await onBuy(selectedPack, selectedMethod);
+    if (!context.mounted || checkout == null) {
+      return;
+    }
 
-          return Padding(
-            padding: EdgeInsets.fromLTRB(20, 18, 20, safeBottom + 12),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.88,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: colors.accent.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            Icons.lock_outline_rounded,
-                            color: colors.accent,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _walletProviderLabel(text, selectedMethod),
-                                style: TextStyle(
-                                  color: colors.textStrong,
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                selectedMethod.displaySubtitle
-                                            ?.trim()
-                                            .isNotEmpty ==
-                                        true
-                                    ? selectedMethod.displaySubtitle!.trim()
-                                    : text.premiumSecurePaymentSubtitle,
-                                style: TextStyle(
-                                  color: colors.textSoft,
-                                  fontSize: 12.5,
-                                  height: 1.35,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _CheckoutTrustPill(
-                          icon: Icons.verified_user_rounded,
-                          label: text.premiumSecurePaymentTitle,
-                        ),
-                        _CheckoutTrustPill(
-                          icon: _walletProviderIcon(selectedMethod),
-                          label: _walletProviderLabel(text, selectedMethod),
-                        ),
-                        if (selectedMethod.isStripe)
-                          _CheckoutTrustPill(
-                            icon: Icons.payment_rounded,
-                            label: text.walletStripeCardBrandsLabel,
-                          ),
-                        if (selectedMethod.isStripe)
-                          _CheckoutTrustPill(
-                            icon: Icons.phone_iphone_rounded,
-                            label: text.walletStripeWalletsLabel,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceStrong.withValues(alpha: 0.44),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: colors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  text.premiumPaymentTitle,
-                                  style: TextStyle(
-                                    color: colors.textMuted,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _walletProviderLabel(text, selectedMethod),
-                                  style: TextStyle(
-                                    color: colors.textStrong,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              final selected = await showPaymentMethodSheet(
-                                context: sheetContext,
-                                title: text.premiumPaymentTitle,
-                                subtitle: text.premiumSecurePaymentSubtitle,
-                                continueLabel: text.premiumContinueAction,
-                                options: buildMethodOptions(),
-                              );
-                              if (selected == null || !sheetContext.mounted) {
-                                return;
-                              }
+    final result = await onCheckoutReady(checkout);
+    if (!context.mounted || result.completed) {
+      return;
+    }
 
-                              WalletPaymentMethodModel? matched;
-                              for (final method in enabledMethods) {
-                                if (method.provider == selected.id) {
-                                  matched = method;
-                                  break;
-                                }
-                              }
+    final message = result.errorMessage?.trim();
+    if (message != null && message.isNotEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+    return;
+  }
 
-                              if (matched == null) {
-                                return;
-                              }
+  final checkoutCompleted = await Navigator.of(context).push<bool>(
+    MaterialPageRoute(
+      builder: (pageContext) => WalletStripeCheckoutPage(
+        pack: selectedPack,
+        paymentMethodLabel: _walletProviderLabel(text, selectedMethod),
+        onChooseAnotherMethod: () {},
+        onSubmit: () async {
+          debugPrint(
+            'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${selectedPack.code}',
+          );
+          final checkout = await onBuy(selectedPack, selectedMethod);
+          if (checkout == null) {
+            return WalletStripeCheckoutSubmitResult(
+              status: WalletStripeCheckoutActionStatus.failed,
+              message: text.walletPaymentUnavailableError,
+            );
+          }
 
-                              setModalState(() => selectedMethod = matched!);
-                            },
-                            child: Text(text.externalCheckoutContinueAction),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    for (
-                      var index = 0;
-                      index < sortedPacks.length;
-                      index++
-                    ) ...[
-                      _CheckoutPackOptionTile(
-                        pack: sortedPacks[index],
-                        price: _formatPrice(sortedPacks[index]),
-                        isSelected:
-                            sortedPacks[index].packId == selectedPack.packId,
-                        isBestValue:
-                            bestOfferPack.packId == sortedPacks[index].packId,
-                        isPopular:
-                            popularPack?.packId == sortedPacks[index].packId &&
-                            bestOfferPack.packId != sortedPacks[index].packId,
-                        onTap: () => setModalState(
-                          () => selectedPack = sortedPacks[index],
-                        ),
-                      ),
-                      if (index != sortedPacks.length - 1)
-                        const SizedBox(height: 8),
-                    ],
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceStrong.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: colors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            text.walletPackTotalSpark(selectedPack.totalSpark),
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            selectedPack.bonusSpark > 0
-                                ? text.walletPackBreakdown(
-                                    selectedPack.grantedSpark,
-                                    selectedPack.bonusSpark,
-                                  )
-                                : text.walletPackUsageNote,
-                            style: TextStyle(
-                              color: colors.textSoft,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${text.walletWhatYouCanCreateTitle} $usageSummary',
-                            style: TextStyle(
-                              color: colors.textMuted,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceStrong.withValues(alpha: 0.44),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: colors.border),
-                      ),
-                      child: Column(
-                        children: [
-                          _CheckoutSummaryRow(
-                            label: text.walletPackTotalSpark(
-                              selectedPack.totalSpark,
-                            ),
-                            value: selectedPrice,
-                          ),
-                          const SizedBox(height: 6),
-                          _CheckoutSummaryRow(
-                            label: text.walletCheckoutTaxLabel,
-                            value: text.walletCheckoutTaxIncludedValue,
-                          ),
-                          const Divider(height: 16),
-                          _CheckoutSummaryRow(
-                            label: text.walletCheckoutTotalLabel,
-                            value: selectedPrice,
-                            isEmphasized: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: isBuying
-                            ? null
-                            : () async {
-                                debugPrint(
-                                  'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${selectedPack.code}',
-                                );
-                                final checkout = await onBuy(
-                                  selectedPack,
-                                  selectedMethod,
-                                );
-                                if (!sheetContext.mounted) {
-                                  return;
-                                }
+          final paymentResult = await onCheckoutReady(checkout);
+          if (paymentResult.completed) {
+            return const WalletStripeCheckoutSubmitResult(
+              status: WalletStripeCheckoutActionStatus.success,
+            );
+          }
 
-                                if (checkout == null) {
-                                  if (selectedMethod.isStoreNative) {
-                                    Navigator.of(sheetContext).pop();
-                                    return;
-                                  }
+          if (paymentResult.cancelled) {
+            return WalletStripeCheckoutSubmitResult(
+              status: WalletStripeCheckoutActionStatus.cancelled,
+              message: text.premiumPurchaseCancelled,
+            );
+          }
 
-                                  debugPrint(
-                                    'PETMAGIC_WALLET_CHECKOUT buy_result empty_checkout',
-                                  );
-                                  ScaffoldMessenger.of(
-                                    sheetContext,
-                                  ).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        text.walletPaymentUnavailableError,
-                                      ),
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                Navigator.of(sheetContext).pop();
-                                await onCheckoutReady(checkout);
-                              },
-                        icon: Icon(
-                          isBuying
-                              ? Icons.hourglass_top_rounded
-                              : Icons.credit_card_rounded,
-                        ),
-                        label: Text(
-                          text.walletCheckoutPayAction(selectedPrice),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      selectedMethod.isStripe
-                          ? text.premiumSecurePaymentSubtitle
-                          : (selectedMethod.warningMessage?.trim().isNotEmpty ==
-                                    true
-                                ? selectedMethod.warningMessage!.trim()
-                                : text.walletCheckoutHint),
-                      style: TextStyle(
-                        color: colors.textMuted,
-                        fontSize: 11.5,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          final failureMessage = paymentResult.errorMessage?.trim();
+          return WalletStripeCheckoutSubmitResult(
+            status: WalletStripeCheckoutActionStatus.failed,
+            message: (failureMessage == null || failureMessage.isEmpty)
+                ? text.walletPaymentGatewayUnavailableError
+                : failureMessage,
           );
         },
-      );
-    },
+      ),
+    ),
   );
-}
 
-class _CheckoutPackOptionTile extends StatelessWidget {
-  const _CheckoutPackOptionTile({
-    required this.pack,
-    required this.price,
-    required this.isSelected,
-    required this.isBestValue,
-    required this.isPopular,
-    required this.onTap,
-  });
-
-  final CurrencyPackModel pack;
-  final String price;
-  final bool isSelected;
-  final bool isBestValue;
-  final bool isPopular;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final borderColor = isSelected ? colors.accent : colors.border;
-    final badgeLabel = isBestValue
-        ? text.walletBestValueBadge
-        : (isPopular ? text.walletPopularBadge : null);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: isSelected
-                ? colors.accent.withValues(alpha: 0.12)
-                : colors.surfaceStrong.withValues(alpha: 0.34),
-            border: Border.all(color: borderColor, width: isSelected ? 1.8 : 1),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                isSelected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: isSelected ? colors.accent : colors.textMuted,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${pack.totalSpark} PawSpark Tokens',
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (badgeLabel != null) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        badgeLabel,
-                        style: TextStyle(
-                          color: isBestValue ? colors.gold : colors.accent,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                price,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  if (checkoutCompleted == false && context.mounted) {
+    await _showPackDetailSheet(
+      context,
+      packs,
+      paymentMethods: paymentMethods,
+      initialPack: selectedPack,
+      isBuying: isBuying,
+      onBuy: onBuy,
+      onCheckoutReady: onCheckoutReady,
     );
   }
-}
-
-class _CheckoutTrustPill extends StatelessWidget {
-  const _CheckoutTrustPill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: colors.surfaceStrong.withValues(alpha: 0.46),
-        border: Border.all(color: colors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: colors.accent),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CheckoutSummaryRow extends StatelessWidget {
-  const _CheckoutSummaryRow({
-    required this.label,
-    required this.value,
-    this.isEmphasized = false,
-  });
-
-  final String label;
-  final String value;
-  final bool isEmphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    final valueColor = isEmphasized ? colors.accent : colors.textStrong;
-    final valueWeight = isEmphasized ? FontWeight.w900 : FontWeight.w800;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: colors.textSoft,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor,
-            fontSize: 13,
-            fontWeight: valueWeight,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-String _formatPrice(CurrencyPackModel pack) {
-  return NumberFormat.simpleCurrency(
-    name: pack.currencyCode,
-  ).format(pack.priceAmount);
 }
 
 String _walletProviderLabel(
@@ -1074,6 +593,12 @@ String _valuePerCurrencyLabel(CurrencyPackModel pack) {
   final sparkPerUnit = pack.totalSpark / pack.priceAmount;
   final formatted = NumberFormat('0.0').format(sparkPerUnit);
   return '$formatted PawSpark / ${pack.currencyCode}1';
+}
+
+String _formatPrice(CurrencyPackModel pack) {
+  return NumberFormat.simpleCurrency(
+    name: pack.currencyCode,
+  ).format(pack.priceAmount);
 }
 
 String _formatDate(BuildContext context, DateTime? value) {

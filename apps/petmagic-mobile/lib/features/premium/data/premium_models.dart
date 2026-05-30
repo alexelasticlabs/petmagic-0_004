@@ -219,7 +219,11 @@ class PremiumStatusModel {
     this.purchaseChannel,
     this.planName,
     this.billingPeriod,
+    this.currentPeriodStartUtc,
     this.currentPeriodEndUtc,
+    this.lastTokenGrantAtUtc,
+    this.cardBrand,
+    this.cardLast4,
   });
 
   final bool isPremium;
@@ -229,7 +233,11 @@ class PremiumStatusModel {
   final String status;
   final String? planName;
   final String? billingPeriod;
+  final DateTime? currentPeriodStartUtc;
   final DateTime? currentPeriodEndUtc;
+  final DateTime? lastTokenGrantAtUtc;
+  final String? cardBrand;
+  final String? cardLast4;
   final bool cancelAtPeriodEnd;
   final int monthlyTokenLimit;
   final int tokensAvailable;
@@ -257,11 +265,19 @@ class PremiumStatusModel {
       status: json['status'] as String? ?? 'None',
       planName: json['planName'] as String?,
       billingPeriod: json['billingPeriod'] as String?,
+      currentPeriodStartUtc: json['currentPeriodStartUtc'] == null
+          ? null
+          : DateTime.tryParse(json['currentPeriodStartUtc'] as String),
       currentPeriodEndUtc: json['currentPeriodEndUtc'] == null
           ? (json['currentPeriodEnd'] == null
                 ? null
                 : DateTime.tryParse(json['currentPeriodEnd'] as String))
           : DateTime.tryParse(json['currentPeriodEndUtc'] as String),
+      lastTokenGrantAtUtc: json['lastTokenGrantAtUtc'] == null
+          ? null
+          : DateTime.tryParse(json['lastTokenGrantAtUtc'] as String),
+      cardBrand: json['cardBrand'] as String?,
+      cardLast4: json['cardLast4'] as String?,
       cancelAtPeriodEnd: json['cancelAtPeriodEnd'] as bool? ?? false,
       monthlyTokenLimit: (json['monthlyTokenLimit'] as num?)?.toInt() ?? 0,
       tokensAvailable: (json['tokensAvailable'] as num?)?.toInt() ?? 0,

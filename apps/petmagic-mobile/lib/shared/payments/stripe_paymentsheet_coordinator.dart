@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 
+enum StripePaymentSheetOutcome { completed, cancelled, failed }
+
 class StripePaymentSheetRequest {
   const StripePaymentSheetRequest({
     required this.paymentIntentClientSecret,
@@ -26,25 +28,34 @@ class StripePaymentSheetRequest {
 
 class StripePaymentSheetResult {
   const StripePaymentSheetResult._({
-    required this.completed,
+    required this.outcome,
     this.error,
     this.errorMessage,
   });
 
-  final bool completed;
+  final StripePaymentSheetOutcome outcome;
   final Object? error;
   final String? errorMessage;
 
+  bool get completed => outcome == StripePaymentSheetOutcome.completed;
+  bool get cancelled => outcome == StripePaymentSheetOutcome.cancelled;
+
   static const StripePaymentSheetResult success = StripePaymentSheetResult._(
-    completed: true,
+    outcome: StripePaymentSheetOutcome.completed,
   );
+
+  static const StripePaymentSheetResult cancelledResult =
+      StripePaymentSheetResult._(outcome: StripePaymentSheetOutcome.cancelled);
 
   factory StripePaymentSheetResult.failure({
     required Object error,
     String? errorMessage,
+    bool isCancelled = false,
   }) {
     return StripePaymentSheetResult._(
-      completed: false,
+      outcome: isCancelled
+          ? StripePaymentSheetOutcome.cancelled
+          : StripePaymentSheetOutcome.failed,
       error: error,
       errorMessage: errorMessage,
     );
@@ -79,14 +90,25 @@ class StripePaymentSheetCoordinator {
       await Stripe.instance.presentPaymentSheet();
       return StripePaymentSheetResult.success;
     } on StripeException catch (error) {
+      final code = error.error.code.toString().toLowerCase();
+      final isCancelled =
+          code.contains('canceled') ||
+          code.contains('cancelled') ||
+          code.contains('cancellation');
       return StripePaymentSheetResult.failure(
         error: error,
         errorMessage: error.error.localizedMessage,
+        isCancelled: isCancelled,
       );
     } on PlatformException catch (error) {
+      final normalizedMessage = error.message?.toLowerCase() ?? '';
+      final isCancelled =
+          normalizedMessage.contains('cancel') ||
+          normalizedMessage.contains('dismiss');
       return StripePaymentSheetResult.failure(
         error: error,
         errorMessage: error.message,
+        isCancelled: isCancelled,
       );
     } catch (error) {
       return StripePaymentSheetResult.failure(error: error);

@@ -492,6 +492,198 @@ abstract class AppLocalizations {
   /// **'Tokens available'**
   String get profileSubscriptionTokensLabel;
 
+  /// No description provided for @subscriptionStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium active'**
+  String get subscriptionStatusActive;
+
+  /// No description provided for @subscriptionStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled (active until period end)'**
+  String get subscriptionStatusCancelled;
+
+  /// No description provided for @subscriptionStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get subscriptionStatusExpired;
+
+  /// No description provided for @subscriptionStatusPaymentFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get subscriptionStatusPaymentFailed;
+
+  /// No description provided for @subscriptionStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment pending'**
+  String get subscriptionStatusPending;
+
+  /// No description provided for @subscriptionStatusInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get subscriptionStatusInactive;
+
+  /// No description provided for @subscriptionStartDateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription started'**
+  String get subscriptionStartDateLabel;
+
+  /// No description provided for @subscriptionPeriodEndLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid until'**
+  String get subscriptionPeriodEndLabel;
+
+  /// No description provided for @subscriptionAutoRenewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-renewal'**
+  String get subscriptionAutoRenewLabel;
+
+  /// No description provided for @subscriptionAutoRenewOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get subscriptionAutoRenewOn;
+
+  /// No description provided for @subscriptionAutoRenewOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get subscriptionAutoRenewOff;
+
+  /// No description provided for @subscriptionTokensSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium tokens'**
+  String get subscriptionTokensSectionTitle;
+
+  /// No description provided for @subscriptionTokensAvailableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Available now'**
+  String get subscriptionTokensAvailableLabel;
+
+  /// No description provided for @subscriptionTokensPerPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 7 days'**
+  String get subscriptionTokensPerPeriodLabel;
+
+  /// No description provided for @subscriptionTokensNextGrantLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Next grant'**
+  String get subscriptionTokensNextGrantLabel;
+
+  /// No description provided for @subscriptionTokensCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'In {days}d {hours}h {minutes}m'**
+  String subscriptionTokensCountdown(Object days, Object hours, Object minutes);
+
+  /// No description provided for @subscriptionTokensExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens are granted every 7 days from subscription start. The first bonus is granted immediately after purchase.'**
+  String get subscriptionTokensExplanation;
+
+  /// No description provided for @subscriptionBenefitsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium benefits'**
+  String get subscriptionBenefitsSectionTitle;
+
+  /// No description provided for @subscriptionBenefitTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'40 tokens every 7 days'**
+  String get subscriptionBenefitTokens;
+
+  /// No description provided for @subscriptionBenefitFirstBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'First bonus granted right after purchase'**
+  String get subscriptionBenefitFirstBonus;
+
+  /// No description provided for @subscriptionBenefitTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Access to Premium templates'**
+  String get subscriptionBenefitTemplates;
+
+  /// No description provided for @subscriptionBenefitPriorityGeneration.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority generation'**
+  String get subscriptionBenefitPriorityGeneration;
+
+  /// No description provided for @subscriptionBenefitNoWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'No watermark'**
+  String get subscriptionBenefitNoWatermark;
+
+  /// No description provided for @subscriptionPaymentSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get subscriptionPaymentSectionTitle;
+
+  /// No description provided for @subscriptionPaymentMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get subscriptionPaymentMethodLabel;
+
+  /// No description provided for @subscriptionPaymentCardLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get subscriptionPaymentCardLabel;
+
+  /// No description provided for @subscriptionPaymentProviderStripe.
+  ///
+  /// In en, this message translates to:
+  /// **'Card via Stripe'**
+  String get subscriptionPaymentProviderStripe;
+
+  /// No description provided for @subscriptionPaymentProviderGooglePlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play'**
+  String get subscriptionPaymentProviderGooglePlay;
+
+  /// No description provided for @subscriptionPaymentProviderAppStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple / App Store'**
+  String get subscriptionPaymentProviderAppStore;
+
+  /// No description provided for @subscriptionChangePaymentAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change payment method'**
+  String get subscriptionChangePaymentAction;
+
+  /// No description provided for @subscriptionCancelAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel subscription'**
+  String get subscriptionCancelAction;
+
+  /// No description provided for @subscriptionCancelledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription is active until {date}. It will not renew after that.'**
+  String subscriptionCancelledHint(Object date);
+
   /// No description provided for @profileWalletTitle.
   ///
   /// In en, this message translates to:
@@ -1140,6 +1332,66 @@ abstract class AppLocalizations {
   /// **'Payment opens in secure Stripe Checkout. PetMagic does not store your card details.'**
   String get walletCheckoutHint;
 
+  /// No description provided for @walletCheckoutProductSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens for creating photos and videos in PetMagic'**
+  String get walletCheckoutProductSubtitle;
+
+  /// No description provided for @walletCheckoutTokensImmediately.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tokens right after payment'**
+  String walletCheckoutTokensImmediately(Object count);
+
+  /// No description provided for @walletCheckoutBonusTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} bonus tokens included'**
+  String walletCheckoutBonusTokens(Object count);
+
+  /// No description provided for @walletCheckoutIncludesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s included'**
+  String get walletCheckoutIncludesTitle;
+
+  /// No description provided for @walletCheckoutFeaturePremiumTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium templates'**
+  String get walletCheckoutFeaturePremiumTemplates;
+
+  /// No description provided for @walletCheckoutFeaturePriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority generation'**
+  String get walletCheckoutFeaturePriority;
+
+  /// No description provided for @walletCheckoutFeatureMoreVideos.
+  ///
+  /// In en, this message translates to:
+  /// **'More video creation options'**
+  String get walletCheckoutFeatureMoreVideos;
+
+  /// No description provided for @walletCheckoutStripeMethodSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Card, Apple Pay or Google Pay'**
+  String get walletCheckoutStripeMethodSubtitle;
+
+  /// No description provided for @walletCheckoutTrustText.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic does not store your card details. Payments are securely processed by Stripe.'**
+  String get walletCheckoutTrustText;
+
+  /// No description provided for @walletCheckoutOrderSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order summary'**
+  String get walletCheckoutOrderSectionTitle;
+
   /// No description provided for @walletCheckoutSucceeded.
   ///
   /// In en, this message translates to:
@@ -1763,6 +2015,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue'**
   String get premiumContinueAction;
+
+  /// No description provided for @paymentContinueViaProviderAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue via {provider}'**
+  String paymentContinueViaProviderAction(Object provider);
+
+  /// No description provided for @paymentChooseAnotherMethodAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another method'**
+  String get paymentChooseAnotherMethodAction;
 
   /// No description provided for @externalCheckoutStripeTitle.
   ///

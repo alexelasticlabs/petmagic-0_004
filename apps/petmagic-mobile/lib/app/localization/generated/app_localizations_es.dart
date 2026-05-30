@@ -210,6 +210,113 @@ class AppLocalizationsEs extends AppLocalizations {
   String get profileSubscriptionTokensLabel => 'Fichas disponibles';
 
   @override
+  String get subscriptionStatusActive => 'Premium activo';
+
+  @override
+  String get subscriptionStatusCancelled =>
+      'Cancelado (activo hasta el final del período)';
+
+  @override
+  String get subscriptionStatusExpired => 'Expirado';
+
+  @override
+  String get subscriptionStatusPaymentFailed => 'Pago fallido';
+
+  @override
+  String get subscriptionStatusPending => 'Pago pendiente';
+
+  @override
+  String get subscriptionStatusInactive => 'Inactivo';
+
+  @override
+  String get subscriptionStartDateLabel => 'Suscripción iniciada';
+
+  @override
+  String get subscriptionPeriodEndLabel => 'Pagado hasta';
+
+  @override
+  String get subscriptionAutoRenewLabel => 'Renovación automática';
+
+  @override
+  String get subscriptionAutoRenewOn => 'Activado';
+
+  @override
+  String get subscriptionAutoRenewOff => 'Desactivado';
+
+  @override
+  String get subscriptionTokensSectionTitle => 'Tokens Premium';
+
+  @override
+  String get subscriptionTokensAvailableLabel => 'Disponibles ahora';
+
+  @override
+  String get subscriptionTokensPerPeriodLabel => 'Cada 7 días';
+
+  @override
+  String get subscriptionTokensNextGrantLabel => 'Próxima concesión';
+
+  @override
+  String subscriptionTokensCountdown(
+    Object days,
+    Object hours,
+    Object minutes,
+  ) {
+    return 'En ${days}d ${hours}h ${minutes}m';
+  }
+
+  @override
+  String get subscriptionTokensExplanation =>
+      'Los tokens se otorgan cada 7 días desde el inicio de la suscripción. El primer bono se otorga inmediatamente después de la compra.';
+
+  @override
+  String get subscriptionBenefitsSectionTitle => 'Ventajas Premium';
+
+  @override
+  String get subscriptionBenefitTokens => '40 tokens cada 7 días';
+
+  @override
+  String get subscriptionBenefitFirstBonus =>
+      'Primer bono otorgado justo después de la compra';
+
+  @override
+  String get subscriptionBenefitTemplates => 'Acceso a plantillas Premium';
+
+  @override
+  String get subscriptionBenefitPriorityGeneration => 'Generación prioritaria';
+
+  @override
+  String get subscriptionBenefitNoWatermark => 'Sin marca de agua';
+
+  @override
+  String get subscriptionPaymentSectionTitle => 'Pago';
+
+  @override
+  String get subscriptionPaymentMethodLabel => 'Método de pago';
+
+  @override
+  String get subscriptionPaymentCardLabel => 'Tarjeta';
+
+  @override
+  String get subscriptionPaymentProviderStripe => 'Tarjeta a través de Stripe';
+
+  @override
+  String get subscriptionPaymentProviderGooglePlay => 'Google Play';
+
+  @override
+  String get subscriptionPaymentProviderAppStore => 'Apple / App Store';
+
+  @override
+  String get subscriptionChangePaymentAction => 'Cambiar método de pago';
+
+  @override
+  String get subscriptionCancelAction => 'Cancelar suscripción';
+
+  @override
+  String subscriptionCancelledHint(Object date) {
+    return 'La suscripción está activa hasta el $date. No se renovará después.';
+  }
+
+  @override
   String get profileWalletTitle => 'Billetera';
 
   @override
@@ -596,6 +703,43 @@ class AppLocalizationsEs extends AppLocalizations {
       'El pago se abre en Stripe Checkout seguro. PetMagic no almacena los datos de su tarjeta.';
 
   @override
+  String get walletCheckoutProductSubtitle =>
+      'Tokens para crear fotos y videos en PetMagic';
+
+  @override
+  String walletCheckoutTokensImmediately(Object count) {
+    return '$count tokens justo después del pago';
+  }
+
+  @override
+  String walletCheckoutBonusTokens(Object count) {
+    return '+$count tokens de bonificación incluidos';
+  }
+
+  @override
+  String get walletCheckoutIncludesTitle => 'Qué está incluido';
+
+  @override
+  String get walletCheckoutFeaturePremiumTemplates => 'Plantillas Premium';
+
+  @override
+  String get walletCheckoutFeaturePriority => 'Generación prioritaria';
+
+  @override
+  String get walletCheckoutFeatureMoreVideos => 'Más opciones de video';
+
+  @override
+  String get walletCheckoutStripeMethodSubtitle =>
+      'Tarjeta, Apple Pay o Google Pay';
+
+  @override
+  String get walletCheckoutTrustText =>
+      'PetMagic no almacena los datos de tu tarjeta. Los pagos se procesan de forma segura a través de Stripe.';
+
+  @override
+  String get walletCheckoutOrderSectionTitle => 'Resumen del pedido';
+
+  @override
   String walletCheckoutSucceeded(int spark) {
     return 'Pago confirmado. +$spark PawSpark ya está en tu billetera.';
   }
@@ -947,6 +1091,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get premiumContinueAction => 'Continuar';
+
+  @override
+  String paymentContinueViaProviderAction(Object provider) {
+    return 'Continuar con $provider';
+  }
+
+  @override
+  String get paymentChooseAnotherMethodAction => 'Elegir otro método de pago';
 
   @override
   String get externalCheckoutStripeTitle => 'Pago a través de Stripe';

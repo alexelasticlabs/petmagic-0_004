@@ -64,6 +64,50 @@
   "profileSubscriptionProviderLabel": "Провайдер",
   "profileSubscriptionNextBillingLabel": "Следующее списание",
   "profileSubscriptionTokensLabel": "Доступно токенов",
+  "subscriptionStatusActive": "Premium активен",
+  "subscriptionStatusCancelled": "Отменён (до конца периода)",
+  "subscriptionStatusExpired": "Истёк",
+  "subscriptionStatusPaymentFailed": "Ошибка оплаты",
+  "subscriptionStatusPending": "Платёж ожидается",
+  "subscriptionStatusInactive": "Неактивна",
+  "subscriptionStartDateLabel": "Начало подписки",
+  "subscriptionPeriodEndLabel": "Оплачено до",
+  "subscriptionAutoRenewLabel": "Автопродление",
+  "subscriptionAutoRenewOn": "Включено",
+  "subscriptionAutoRenewOff": "Отключено",
+  "subscriptionTokensSectionTitle": "Premium-токены",
+  "subscriptionTokensAvailableLabel": "Доступно сейчас",
+  "subscriptionTokensPerPeriodLabel": "Каждые 7 дней",
+  "subscriptionTokensNextGrantLabel": "Следующее начисление",
+  "subscriptionTokensCountdown": "Через {days}д {hours}ч {minutes}м",
+  "@subscriptionTokensCountdown": {
+    "placeholders": {
+      "days": {},
+      "hours": {},
+      "minutes": {}
+    }
+  },
+  "subscriptionTokensExplanation": "Токены начисляются каждые 7 дней с момента покупки подписки. Первый бонус начисляется сразу после покупки.",
+  "subscriptionBenefitsSectionTitle": "Преимущества Premium",
+  "subscriptionBenefitTokens": "40 токенов каждые 7 дней",
+  "subscriptionBenefitFirstBonus": "Первый бонус сразу после покупки",
+  "subscriptionBenefitTemplates": "Доступ к Premium-шаблонам",
+  "subscriptionBenefitPriorityGeneration": "Приоритетная генерация",
+  "subscriptionBenefitNoWatermark": "Без водяного знака",
+  "subscriptionPaymentSectionTitle": "Оплата",
+  "subscriptionPaymentMethodLabel": "Способ оплаты",
+  "subscriptionPaymentCardLabel": "Карта",
+  "subscriptionPaymentProviderStripe": "Карта через Stripe",
+  "subscriptionPaymentProviderGooglePlay": "Google Play",
+  "subscriptionPaymentProviderAppStore": "Apple / App Store",
+  "subscriptionChangePaymentAction": "Изменить способ оплаты",
+  "subscriptionCancelAction": "Отменить подписку",
+  "subscriptionCancelledHint": "Подписка активна до {date}. После этого автопродление не произойдёт.",
+  "@subscriptionCancelledHint": {
+    "placeholders": {
+      "date": {}
+    }
+  },
   "profileWalletTitle": "Кошелек",
   "profileWalletHistoryHint": "Баланс, покупки и история операций.",
   "walletPageTitle": "PawSpark кошелек",
@@ -260,6 +304,26 @@
   "walletPackDetailsAction": "Подробнее",
   "walletPackDetailSubtitle": "Проверьте состав пакета перед переходом к оплате.",
   "walletCheckoutHint": "Оплата откроется в защищенном Stripe Checkout. PetMagic не сохраняет данные карты.",
+  "walletCheckoutProductSubtitle": "Токены для создания фото и видео в PetMagic",
+  "walletCheckoutTokensImmediately": "{count} токенов сразу после оплаты",
+  "@walletCheckoutTokensImmediately": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletCheckoutBonusTokens": "+{count} бонусных токенов в подарок",
+  "@walletCheckoutBonusTokens": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletCheckoutIncludesTitle": "Что входит",
+  "walletCheckoutFeaturePremiumTemplates": "Premium-шаблоны",
+  "walletCheckoutFeaturePriority": "Приоритетная генерация",
+  "walletCheckoutFeatureMoreVideos": "Больше возможностей для видео",
+  "walletCheckoutStripeMethodSubtitle": "Карта, Apple Pay или Google Pay",
+  "walletCheckoutTrustText": "PetMagic не хранит данные вашей карты. Платежи безопасно обрабатываются Stripe.",
+  "walletCheckoutOrderSectionTitle": "Итого сегодня",
   "walletCheckoutSucceeded": "Оплата подтверждена. +{spark} PawSpark уже в вашем кошельке.",
   "@walletCheckoutSucceeded": {
     "placeholders": {
@@ -419,6 +483,13 @@
   "premiumSecurePaymentTitle": "Безопасная оплата",
   "premiumSecurePaymentSubtitle": "Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.",
   "premiumContinueAction": "Продолжить",
+  "paymentContinueViaProviderAction": "Продолжить через {provider}",
+  "@paymentContinueViaProviderAction": {
+    "placeholders": {
+      "provider": {}
+    }
+  },
+  "paymentChooseAnotherMethodAction": "Выбрать другой способ оплаты",
   "externalCheckoutStripeTitle": "Оплата через Stripe",
   "externalCheckoutStripeMessage": "Stripe Checkout откроется в защищенном встроенном браузере. После возврата в PetMagic мы автоматически проверим статус оплаты и только потом обновим подписку или баланс.",
   "externalCheckoutContinueAction": "Продолжить",

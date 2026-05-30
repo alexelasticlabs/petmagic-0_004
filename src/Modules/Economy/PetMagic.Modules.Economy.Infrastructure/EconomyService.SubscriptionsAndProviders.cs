@@ -150,7 +150,7 @@ public sealed partial class EconomyService
         }
 
         var elapsedDays = (now - subscriptionStartUtc).TotalDays;
-        var targetGrantCount = (int)Math.Floor(elapsedDays / 7d) + 1;
+        var targetGrantCount = (int)Math.Floor(elapsedDays / 7d);
 
         var reasonPrefix = $"premium_weekly:{subscription.Id:D}:";
         var grantedCount = await dbContext.WalletLedgerEntries
@@ -179,7 +179,35 @@ public sealed partial class EconomyService
             grantedCount += grantsToApply;
         }
 
-        return subscriptionStartUtc.AddDays(grantedCount * 7d);
+        return subscriptionStartUtc.AddDays((grantedCount + 1) * 7d);
+    }
+
+    private async Task GrantPremiumSubscriptionAllowanceIfDueAsync(
+        UserSubscription subscription,
+        CancellationToken cancellationToken)
+    {
+        if (subscription.MonthlyTokenLimit <= 0
+            || subscription.MonthlyTokensGranted >= subscription.MonthlyTokenLimit)
+        {
+            return;
+        }
+
+        var wallet = await GetOrCreateWalletAsync(subscription.UserId, cancellationToken);
+        var now = DateTime.UtcNow;
+        var allowanceToGrant = subscription.MonthlyTokenLimit - subscription.MonthlyTokensGranted;
+
+        ApplyWalletDelta(
+            wallet,
+            allowanceToGrant,
+            WalletLedgerSource.PremiumSubscriptionGrant,
+            $"premium_subscription:{subscription.Id:D}:{subscription.PlanId}",
+            now);
+
+        subscription.MonthlyTokensGranted += allowanceToGrant;
+        subscription.LastTokenGrantAtUtc = now;
+        subscription.UpdatedAtUtc = now;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string GetManageSubscriptionAction(string? provider)

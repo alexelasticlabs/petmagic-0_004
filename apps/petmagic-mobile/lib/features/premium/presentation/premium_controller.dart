@@ -36,20 +36,28 @@ class PremiumSubscriptionSummaryView {
     required this.manageSubscriptionAction,
     required this.provider,
     this.planName,
+    this.currentPeriodStartUtc,
     this.currentPeriodEndUtc,
     this.cancelAtPeriodEnd,
     this.monthlyTokenLimit,
     this.tokensAvailable,
+    this.lastTokenGrantAtUtc,
+    this.cardBrand,
+    this.cardLast4,
   });
 
   final bool isPremium;
   final bool canManageSubscription;
   final String status;
   final String? planName;
+  final DateTime? currentPeriodStartUtc;
   final DateTime? currentPeriodEndUtc;
+  final DateTime? lastTokenGrantAtUtc;
   final bool? cancelAtPeriodEnd;
   final int? monthlyTokenLimit;
   final int? tokensAvailable;
+  final String? cardBrand;
+  final String? cardLast4;
   final String manageSubscriptionAction;
   final PremiumSubscriptionProviderView provider;
 
@@ -68,10 +76,14 @@ class PremiumSubscriptionSummaryView {
       canManageSubscription: status.canManageSubscription,
       status: status.status,
       planName: status.planName,
+      currentPeriodStartUtc: status.currentPeriodStartUtc,
       currentPeriodEndUtc: status.currentPeriodEndUtc,
+      lastTokenGrantAtUtc: status.lastTokenGrantAtUtc,
       cancelAtPeriodEnd: status.cancelAtPeriodEnd,
       monthlyTokenLimit: status.monthlyTokenLimit,
       tokensAvailable: status.tokensAvailable,
+      cardBrand: status.cardBrand,
+      cardLast4: status.cardLast4,
       manageSubscriptionAction: status.manageSubscriptionAction,
       provider: provider,
     );

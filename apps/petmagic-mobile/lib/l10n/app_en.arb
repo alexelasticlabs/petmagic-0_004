@@ -64,6 +64,50 @@
   "profileSubscriptionProviderLabel": "Provider",
   "profileSubscriptionNextBillingLabel": "Next billing date",
   "profileSubscriptionTokensLabel": "Tokens available",
+  "subscriptionStatusActive": "Premium active",
+  "subscriptionStatusCancelled": "Cancelled (active until period end)",
+  "subscriptionStatusExpired": "Expired",
+  "subscriptionStatusPaymentFailed": "Payment failed",
+  "subscriptionStatusPending": "Payment pending",
+  "subscriptionStatusInactive": "Inactive",
+  "subscriptionStartDateLabel": "Subscription started",
+  "subscriptionPeriodEndLabel": "Paid until",
+  "subscriptionAutoRenewLabel": "Auto-renewal",
+  "subscriptionAutoRenewOn": "Enabled",
+  "subscriptionAutoRenewOff": "Disabled",
+  "subscriptionTokensSectionTitle": "Premium tokens",
+  "subscriptionTokensAvailableLabel": "Available now",
+  "subscriptionTokensPerPeriodLabel": "Every 7 days",
+  "subscriptionTokensNextGrantLabel": "Next grant",
+  "subscriptionTokensCountdown": "In {days}d {hours}h {minutes}m",
+  "@subscriptionTokensCountdown": {
+    "placeholders": {
+      "days": {},
+      "hours": {},
+      "minutes": {}
+    }
+  },
+  "subscriptionTokensExplanation": "Tokens are granted every 7 days from subscription start. The first bonus is granted immediately after purchase.",
+  "subscriptionBenefitsSectionTitle": "Premium benefits",
+  "subscriptionBenefitTokens": "40 tokens every 7 days",
+  "subscriptionBenefitFirstBonus": "First bonus granted right after purchase",
+  "subscriptionBenefitTemplates": "Access to Premium templates",
+  "subscriptionBenefitPriorityGeneration": "Priority generation",
+  "subscriptionBenefitNoWatermark": "No watermark",
+  "subscriptionPaymentSectionTitle": "Payment",
+  "subscriptionPaymentMethodLabel": "Payment method",
+  "subscriptionPaymentCardLabel": "Card",
+  "subscriptionPaymentProviderStripe": "Card via Stripe",
+  "subscriptionPaymentProviderGooglePlay": "Google Play",
+  "subscriptionPaymentProviderAppStore": "Apple / App Store",
+  "subscriptionChangePaymentAction": "Change payment method",
+  "subscriptionCancelAction": "Cancel subscription",
+  "subscriptionCancelledHint": "Subscription is active until {date}. It will not renew after that.",
+  "@subscriptionCancelledHint": {
+    "placeholders": {
+      "date": {}
+    }
+  },
   "profileWalletTitle": "Wallet",
   "profileWalletHistoryHint": "Open balance, purchases and history.",
   "walletPageTitle": "PawSpark wallet",
@@ -260,6 +304,26 @@
   "walletPackDetailsAction": "Details",
   "walletPackDetailSubtitle": "Check what is included before opening checkout.",
   "walletCheckoutHint": "Payment opens in secure Stripe Checkout. PetMagic does not store your card details.",
+  "walletCheckoutProductSubtitle": "Tokens for creating photos and videos in PetMagic",
+  "walletCheckoutTokensImmediately": "{count} tokens right after payment",
+  "@walletCheckoutTokensImmediately": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletCheckoutBonusTokens": "+{count} bonus tokens included",
+  "@walletCheckoutBonusTokens": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "walletCheckoutIncludesTitle": "What's included",
+  "walletCheckoutFeaturePremiumTemplates": "Premium templates",
+  "walletCheckoutFeaturePriority": "Priority generation",
+  "walletCheckoutFeatureMoreVideos": "More video creation options",
+  "walletCheckoutStripeMethodSubtitle": "Card, Apple Pay or Google Pay",
+  "walletCheckoutTrustText": "PetMagic does not store your card details. Payments are securely processed by Stripe.",
+  "walletCheckoutOrderSectionTitle": "Order summary",
   "walletCheckoutSucceeded": "Payment confirmed. +{spark} PawSpark is already in your wallet.",
   "@walletCheckoutSucceeded": {
     "placeholders": {
@@ -419,6 +483,13 @@
   "premiumSecurePaymentTitle": "Secure payment",
   "premiumSecurePaymentSubtitle": "Manage or cancel your subscription from billing settings at any time.",
   "premiumContinueAction": "Continue",
+  "paymentContinueViaProviderAction": "Continue via {provider}",
+  "@paymentContinueViaProviderAction": {
+    "placeholders": {
+      "provider": {}
+    }
+  },
+  "paymentChooseAnotherMethodAction": "Choose another method",
   "externalCheckoutStripeTitle": "Payment via Stripe",
   "externalCheckoutStripeMessage": "Stripe Checkout opens in a secure in-app browser. After you return to PetMagic, we automatically check the payment status before updating your access.",
   "externalCheckoutContinueAction": "Continue",

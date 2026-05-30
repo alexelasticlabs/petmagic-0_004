@@ -26,12 +26,16 @@ public sealed record SubscriptionSummaryResponse(
     string Status,
     string? PlanName,
     string? BillingPeriod,
+    DateTime? CurrentPeriodStartUtc,
     DateTime? CurrentPeriodEndUtc,
     bool CancelAtPeriodEnd,
     int MonthlyTokenLimit,
     int TokensAvailable,
     bool CanManageSubscription,
-    string ManageSubscriptionAction);
+    string ManageSubscriptionAction,
+    DateTime? LastTokenGrantAtUtc,
+    string? CardBrand,
+    string? CardLast4);
 
 public sealed record PaywallPlanResponse(
     string PlanId,

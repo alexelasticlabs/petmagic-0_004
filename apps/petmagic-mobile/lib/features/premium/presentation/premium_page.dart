@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
@@ -114,6 +113,8 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       title: text.premiumPaymentTitle,
       subtitle: text.premiumSecurePaymentSubtitle,
       continueLabel: text.premiumContinueAction,
+      continueLabelBuilder: (option) =>
+          text.paymentContinueViaProviderAction(option.title),
       options: options,
     );
     if (!mounted || selected == null) {
@@ -133,50 +134,57 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     required PremiumCheckoutModel checkout,
     required bool wasPremiumBeforeCheckout,
   }) async {
+    final text = _premiumText(context);
     final clientSecret = checkout.paymentIntentClientSecret;
     final publishableKey = checkout.publishableKey;
     if (clientSecret == null ||
         clientSecret.isEmpty ||
         publishableKey == null ||
         publishableKey.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(text.premiumCheckoutFailed)));
+      }
       return;
     }
 
-    try {
-      final result = await StripePaymentSheetCoordinator.present(
-        context,
-        request: StripePaymentSheetRequest(
-          paymentIntentClientSecret: clientSecret,
-          publishableKey: publishableKey,
-          customerId: checkout.customerId,
-          customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
-        ),
-      );
-      if (!result.completed) {
-        throw result.error ?? Exception('stripe.payment_sheet_failed');
+    final result = await StripePaymentSheetCoordinator.present(
+      context,
+      request: StripePaymentSheetRequest(
+        paymentIntentClientSecret: clientSecret,
+        publishableKey: publishableKey,
+        customerId: checkout.customerId,
+        customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
+      ),
+    );
+    if (!result.completed || !mounted) {
+      if (mounted) {
+        final failureMessage = result.errorMessage?.trim();
+        final resolved = result.cancelled
+            ? text.premiumPurchaseCancelled
+            : (failureMessage == null || failureMessage.isEmpty)
+            ? text.premiumCheckoutFailed
+            : failureMessage;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(resolved)));
       }
-
-      if (!mounted) {
-        return;
-      }
-
-      final controller = ref.read(premiumControllerProvider.notifier);
-      controller.markCheckoutOpened(
-        wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
-      );
-      _shouldReloadOnResume = true;
-      final selectedPlanCode = ref
-          .read(premiumControllerProvider)
-          .selectedPlanCode;
-      await controller.verifyCheckoutStatus(
-        stripePlanCode: selectedPlanCode,
-        stripeExternalSubscriptionId: checkout.externalSubscriptionId,
-      );
-    } on StripeException {
-      // User canceled/dismissed PaymentSheet.
-    } on PlatformException {
-      // Keep page responsive if native Stripe SDK returns an error.
+      return;
     }
+
+    final controller = ref.read(premiumControllerProvider.notifier);
+    controller.markCheckoutOpened(
+      wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
+    );
+    _shouldReloadOnResume = true;
+    final selectedPlanCode = ref
+        .read(premiumControllerProvider)
+        .selectedPlanCode;
+    await controller.verifyCheckoutStatus(
+      stripePlanCode: selectedPlanCode,
+      stripeExternalSubscriptionId: checkout.externalSubscriptionId,
+    );
   }
 
   List<PaymentMethodSheetOption> _buildPaymentMethodOptions(
@@ -305,7 +313,9 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(fallbackText.premiumPurchaseActivated)));
+        ..showSnackBar(
+          SnackBar(content: Text(fallbackText.premiumPurchaseActivated)),
+        );
     });
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -582,7 +592,10 @@ class _HeroBlock extends StatelessWidget {
                     ),
                     children: [
                       TextSpan(text: '${text.premiumHeroTitle}\n'),
-                      TextSpan(text: ' ✦', style: TextStyle(color: accent)),
+                      TextSpan(
+                        text: ' ✦',
+                        style: TextStyle(color: accent),
+                      ),
                     ],
                   ),
                 ),
@@ -946,7 +959,9 @@ class _PlanCard extends StatelessWidget {
     final title =
         '${text.premiumPageTitle} ${isYearly ? text.premiumYearlyPlan : text.premiumMonthlyPlan}';
     final priceStr = '\$${plan.priceAmount.toStringAsFixed(2)}';
-    final interval = isYearly ? text.premiumYearlyPeriod : text.premiumMonthlyPeriod;
+    final interval = isYearly
+        ? text.premiumYearlyPeriod
+        : text.premiumMonthlyPeriod;
 
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 360),
@@ -1263,9 +1278,7 @@ class _BenefitsSection extends StatelessWidget {
                 final item = items[i];
                 return Container(
                   width: 110,
-                  margin: EdgeInsets.only(
-                    right: i < items.length - 1 ? 10 : 0,
-                  ),
+                  margin: EdgeInsets.only(right: i < items.length - 1 ? 10 : 0),
                   decoration: BoxDecoration(
                     color: surface,
                     borderRadius: BorderRadius.circular(16),
@@ -1357,12 +1370,19 @@ class _CtaButtonState extends State<_CtaButton>
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
+    final text = _premiumText(context);
     final isDark = widget.isDark;
     final isCheckoutDisabled =
         state.isBuying ||
         state.isPremium ||
         state.recentlyActivatedPremium ||
         !state.canStartCheckout;
+    final providerLabel = switch (state.selectedProvider) {
+      PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
+      PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
+      PremiumPaymentProvider.appStore => text.premiumPaymentApple,
+    };
+    final ctaLabel = text.paymentContinueViaProviderAction(providerLabel);
     final btnTextColor = isDark ? const Color(0xFF13141F) : Colors.white;
     final glowColor = isDark
         ? const Color(0xFFFFB300)
@@ -1435,7 +1455,7 @@ class _CtaButtonState extends State<_CtaButton>
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Start Premium',
+                    ctaLabel,
                     style: TextStyle(
                       color: btnTextColor,
                       fontSize: 18,

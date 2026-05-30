@@ -33,6 +33,7 @@ Future<PaymentMethodSheetOption?> showPaymentMethodSheet({
   required String title,
   required String continueLabel,
   required List<PaymentMethodSheetOption> options,
+  String Function(PaymentMethodSheetOption selected)? continueLabelBuilder,
   String? subtitle,
 }) async {
   if (options.isEmpty) {
@@ -103,7 +104,9 @@ Future<PaymentMethodSheetOption?> showPaymentMethodSheet({
                     decoration: BoxDecoration(
                       color: colors.gold.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: colors.gold.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: colors.gold.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +166,9 @@ Future<PaymentMethodSheetOption?> showPaymentMethodSheet({
                     onPressed: selected.isEnabled
                         ? () => Navigator.of(modalContext).pop(selected)
                         : null,
-                    child: Text(continueLabel),
+                    child: Text(
+                      continueLabelBuilder?.call(selected) ?? continueLabel,
+                    ),
                   ),
                 ),
               ],
@@ -262,7 +267,8 @@ class _PaymentMethodOptionTile extends StatelessWidget {
                             ),
                         ],
                       ),
-                      if (option.subtitle != null && option.subtitle!.isNotEmpty)
+                      if (option.subtitle != null &&
+                          option.subtitle!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(

@@ -225,6 +225,10 @@ public sealed partial class EconomyService
 
                     if (shouldActivatePremium)
                     {
+                        await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                            subscription,
+                            cancellationToken);
+
                         await SettlePendingReferralBonusAsync(
                             parsedEvent.UserId.Value,
                             $"premium:stripe:{subscription.PlanId}",
