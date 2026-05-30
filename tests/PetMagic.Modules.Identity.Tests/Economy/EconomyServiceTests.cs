@@ -266,6 +266,7 @@ public sealed partial class EconomyServiceTests
         }
 
         public Task<Result> SetUserActiveStatusAsync(SetUserActiveStatusCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> DeleteAdminUserAsync(DeleteAdminUserCommand command, CancellationToken cancellationToken) => NotSupported();
 
         private static Task<Result> NotSupported() => Task.FromException<Result>(new NotSupportedException());
         private static Task<Result<T>> NotSupported<T>() => Task.FromException<Result<T>>(new NotSupportedException());

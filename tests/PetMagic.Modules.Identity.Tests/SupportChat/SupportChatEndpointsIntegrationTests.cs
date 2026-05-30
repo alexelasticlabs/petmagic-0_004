@@ -337,9 +337,107 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         Assert.Equal("New", conversation.Status);
         var reopenedEvent = Assert.Single(
-            conversation.Messages.Where(message =>
-                message.SenderType == "System" && message.Body == "Ticket reopened by user message"));
+            conversation.Messages,
+            message => message.SenderType == "System" && message.Body == "Ticket reopened by user message");
         Assert.Equal("Ticket reopened by user message", reopenedEvent.Body);
+    }
+
+    [Fact]
+    public async Task UserConversationEndpoint_ShouldSupportMessagePagingByTakeAndBeforeCursor()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Seed message", SupportConversationPriority.Normal));
+
+        for (var i = 1; i <= 8; i++)
+        {
+            _ = await PostAsJsonAsync<SupportMessageResponse>(
+                userClient,
+                $"/api/support/conversation/{created.ConversationId}/messages",
+                new SendSupportMessageRequest($"Paged message {i}"));
+
+            await Task.Delay(3);
+        }
+
+        var firstPage = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation?take=3");
+
+        Assert.Equal(3, firstPage.Messages.Count);
+        Assert.True(firstPage.HasOlderMessages);
+        Assert.NotNull(firstPage.OldestLoadedMessageCreatedAtUtc);
+
+        var beforeFirstPage = Uri.EscapeDataString(firstPage.OldestLoadedMessageCreatedAtUtc!.Value.ToString("O"));
+        var secondPage = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            $"/api/support/conversation?take=3&beforeMessageCreatedAtUtc={beforeFirstPage}");
+
+        Assert.Equal(3, secondPage.Messages.Count);
+        Assert.True(secondPage.HasOlderMessages);
+        Assert.NotNull(secondPage.OldestLoadedMessageCreatedAtUtc);
+
+        var overlap = firstPage.Messages
+            .Select(x => x.MessageId)
+            .Intersect(secondPage.Messages.Select(x => x.MessageId))
+            .ToList();
+        Assert.Empty(overlap);
+
+        var beforeSecondPage = Uri.EscapeDataString(secondPage.OldestLoadedMessageCreatedAtUtc!.Value.ToString("O"));
+        var thirdPage = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            $"/api/support/conversation?take=10&beforeMessageCreatedAtUtc={beforeSecondPage}");
+
+        Assert.NotEmpty(thirdPage.Messages);
+        Assert.False(thirdPage.HasOlderMessages);
+    }
+
+    [Fact]
+    public async Task AdminConversationEndpoint_ShouldSupportMessagePagingByTakeAndBeforeCursor()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var adminClient = application.CreateClient(AdminId, "Admin");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Admin paging seed", SupportConversationPriority.Normal));
+
+        for (var i = 1; i <= 6; i++)
+        {
+            _ = await PostAsJsonAsync<SupportMessageResponse>(
+                userClient,
+                $"/api/support/conversation/{created.ConversationId}/messages",
+                new SendSupportMessageRequest($"Admin paged message {i}"));
+
+            await Task.Delay(3);
+        }
+
+        var firstPage = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/conversations/{created.ConversationId}?take=2");
+
+        Assert.Equal(2, firstPage.Messages.Count);
+        Assert.True(firstPage.HasOlderMessages);
+        Assert.NotNull(firstPage.OldestLoadedMessageCreatedAtUtc);
+
+        var beforeFirstPage = Uri.EscapeDataString(firstPage.OldestLoadedMessageCreatedAtUtc!.Value.ToString("O"));
+        var secondPage = await GetFromJsonAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/conversations/{created.ConversationId}?take=2&beforeMessageCreatedAtUtc={beforeFirstPage}");
+
+        Assert.Equal(2, secondPage.Messages.Count);
+        Assert.NotNull(secondPage.OldestLoadedMessageCreatedAtUtc);
+
+        var overlap = firstPage.Messages
+            .Select(x => x.MessageId)
+            .Intersect(secondPage.Messages.Select(x => x.MessageId))
+            .ToList();
+        Assert.Empty(overlap);
     }
 
     [Fact]
@@ -447,9 +545,9 @@ public sealed class SupportChatEndpointsIntegrationTests
             userClient,
             "/api/support/conversation");
 
-        var userMessage = Assert.Single(conversation.Messages.Where(message => message.SenderType == "User"));
+        var userMessage = Assert.Single(conversation.Messages, message => message.SenderType == "User");
         Assert.Equal("Bonjour", userMessage.Body);
-        var botMessage = Assert.Single(conversation.Messages.Where(message => message.SenderType == "Bot"));
+        var botMessage = Assert.Single(conversation.Messages, message => message.SenderType == "Bot");
         Assert.Equal(
             "Message recu. Le support repondra dans ce chat.",
             botMessage.Body);

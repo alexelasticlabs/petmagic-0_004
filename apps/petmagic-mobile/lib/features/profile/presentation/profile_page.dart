@@ -39,6 +39,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         return;
       }
 
+      ref.invalidate(premiumSubscriptionSummaryProvider);
       ref.read(profileControllerProvider.notifier).initialize();
       ref.read(walletControllerProvider.notifier).load();
     });
@@ -67,6 +68,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     final profile = state.profile;
+    final summaryPremium = subscriptionSummary.value?.isPremium;
+    final shouldShowSubscriptionCard = summaryPremium == true;
+    final shouldShowPremiumCta =
+        summaryPremium == false ||
+        (summaryPremium == null && profile?.isPremium != true);
     final legalStatus = profile?.legalAcceptance.isCurrentAccepted == true
         ? text.profileLegalShortcutAccepted
         : text.profileLegalShortcutPending;
@@ -76,7 +82,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         child: state.isLoading
             ? const Center(child: CircularProgressIndicator.adaptive())
             : RefreshIndicator.adaptive(
-                onRefresh: controller.initialize,
+                onRefresh: () async {
+                  ref.invalidate(premiumSubscriptionSummaryProvider);
+                  await controller.initialize();
+                },
                 child: ListView(
                   padding: EdgeInsets.fromLTRB(18, 16, 18, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -136,14 +145,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         onTap: () => context.go(WalletPage.routePath),
                       ),
                       const SizedBox(height: 12),
-                      if (!profile.isPremium) ...[
+                      if (shouldShowPremiumCta) ...[
                         _PremiumBannerCard(
                           onTap: () =>
                               _handlePremiumTap(subscriptionSummary.value),
                         ),
                         const SizedBox(height: 12),
                       ],
-                      if (subscriptionSummary.value?.isPremium == true) ...[
+                      if (shouldShowSubscriptionCard) ...[
                         _SubscriptionSummaryCard(
                           summary: subscriptionSummary.value!,
                           isOpening: _isOpeningSubscription,
@@ -237,6 +246,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     setState(() => _isOpeningSubscription = true);
     await context.push(SubscriptionManagementPage.routePath);
+    ref.invalidate(premiumSubscriptionSummaryProvider);
+    await ref.read(profileControllerProvider.notifier).initialize();
     if (mounted) {
       setState(() => _isOpeningSubscription = false);
     }

@@ -23,6 +23,10 @@ public sealed record ListAdminSupportInboxQuery(
     int PageSize = 50,
     string? Sort = null);
 
+public sealed record SupportConversationMessagesQuery(
+    int Take = 60,
+    DateTime? BeforeMessageCreatedAtUtc = null);
+
 public sealed record SendSupportMessageCommand(
     Guid ConversationId,
     Guid SenderUserId,
@@ -251,6 +255,8 @@ public sealed record SupportConversationDetailResponse(
     bool IsReadOnly,
     bool CanReopen,
     IReadOnlyList<string> AvailableActions,
+    bool HasOlderMessages,
+    DateTime? OldestLoadedMessageCreatedAtUtc,
     IReadOnlyList<SupportMessageResponse> Messages);
 
 public sealed record SupportTicketContextResponse(

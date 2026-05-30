@@ -33,6 +33,7 @@ public static class IdentityApiModule
         services.AddScoped<IValidator<SetPremiumStatusCommand>, SetPremiumStatusCommandValidator>();
         services.AddScoped<IValidator<SetUserActiveStatusCommand>, SetUserActiveStatusCommandValidator>();
         services.AddScoped<IValidator<AdminAdjustUserWalletCommand>, AdminAdjustUserWalletCommandValidator>();
+        services.AddScoped<IValidator<DeleteAdminUserCommand>, DeleteAdminUserCommandValidator>();
 
         return services;
     }

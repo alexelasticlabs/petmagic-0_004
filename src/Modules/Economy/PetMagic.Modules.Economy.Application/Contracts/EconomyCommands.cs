@@ -32,6 +32,8 @@ public sealed record CreatePremiumBillingPortalCommand(Guid UserId, string Payme
 
 public sealed record CancelPremiumSubscriptionCommand(Guid UserId, string PaymentProvider);
 
+public sealed record AdminRevokePremiumSubscriptionCommand(Guid UserId, string PaymentProvider);
+
 public sealed record VerifyPremiumStorePurchaseCommand(
     Guid UserId,
     string PlanCode,

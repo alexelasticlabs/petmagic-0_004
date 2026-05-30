@@ -29,6 +29,8 @@ public sealed record AdminAdjustUserWalletCommand(
     int Amount,
     string Reason);
 
+public sealed record DeleteAdminUserCommand(Guid UserId);
+
 public sealed record AdminUserWalletOperationResponse(
     Guid UserId,
     string Operation,

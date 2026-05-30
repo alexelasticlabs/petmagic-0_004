@@ -82,12 +82,12 @@ class ProfileState {
 class ProfileController extends Notifier<ProfileState> {
   static const _genericActionError = 'profile.action_failed';
 
-  late final ProfileRepository _repository;
   final ImagePicker _imagePicker = ImagePicker();
+
+  ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
   @override
   ProfileState build() {
-    _repository = ref.watch(profileRepositoryProvider);
     return const ProfileState.initial();
   }
 

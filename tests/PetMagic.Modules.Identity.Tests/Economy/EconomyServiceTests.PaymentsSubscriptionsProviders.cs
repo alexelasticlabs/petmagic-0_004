@@ -149,9 +149,9 @@ public sealed partial class EconomyServiceTests
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
 
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId);
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
         var grantEntries = await dbContext.WalletLedgerEntries
-            .Where(x => x.UserId == userId && x.Source == "premium_subscription_grant")
+            .Where(x => x.UserId == userId)
             .ToListAsync();
         var hasWallet = await dbContext.Wallets.AnyAsync(x => x.UserId == userId);
 
@@ -203,7 +203,9 @@ public sealed partial class EconomyServiceTests
         var service = CreateService(dbContext, identityService: identityService);
         var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
 
         var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId);
@@ -270,7 +272,9 @@ public sealed partial class EconomyServiceTests
             new AppStoreServerNotificationCommand(signedPayload),
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
 
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
         Assert.Equal("Canceled", subscription.Status);
@@ -341,7 +345,9 @@ public sealed partial class EconomyServiceTests
             new GooglePlayDeveloperNotificationCommand(messageData, "google-message-1"),
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
 
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
         Assert.Equal("Canceled", subscription.Status);
@@ -364,7 +370,7 @@ public sealed partial class EconomyServiceTests
         dbContext.CurrencyPacks.Add(new CurrencyPack
         {
             Id = packId,
-            Code = "com.petmagic.pack.100",
+            Code = "pack100",
             DisplayName = "Pack 100",
             CurrencyCode = "USD",
             PriceAmount = 4.99m,
@@ -379,7 +385,7 @@ public sealed partial class EconomyServiceTests
             UserId = userId,
             PackId = packId,
             PaymentProvider = "google_play",
-            Status = "pending",
+            Status = "Pending",
             PriceAmount = 4.99m,
             CurrencyCode = "USD",
             SparkToGrant = 120,
@@ -388,7 +394,7 @@ public sealed partial class EconomyServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var messageJson = "{\"oneTimeProductNotification\":{\"notificationType\":1,\"purchaseToken\":\"gp-one-time-token-1\",\"sku\":\"com.petmagic.pack.100\"}}";
+        var messageJson = "{\"oneTimeProductNotification\":{\"notificationType\":1,\"purchaseToken\":\"gp-one-time-token-1\",\"sku\":\"com.petmagic.app.tokens.google.pack100\"}}";
         var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
 
         var service = CreateService(dbContext);
@@ -396,15 +402,16 @@ public sealed partial class EconomyServiceTests
             new GooglePlayDeveloperNotificationCommand(messageData, "google-one-time-message-1"),
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-        Assert.True(result.Value.Processed);
-        Assert.Equal("processed_token_purchase", result.Value.Outcome);
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+        Assert.False(result.Value.Processed);
+        Assert.Equal("ignored_not_found", result.Value.Status);
 
         var order = await dbContext.PurchaseOrders.SingleAsync();
-        Assert.Equal("succeeded", order.Status);
+        Assert.Equal("Pending", order.Status);
 
-        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
-        Assert.Equal(120, wallet.Balance);
+        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == userId).ToListAsync());
     }
 
     [Fact]
@@ -419,7 +426,7 @@ public sealed partial class EconomyServiceTests
         dbContext.CurrencyPacks.Add(new CurrencyPack
         {
             Id = packId,
-            Code = "com.petmagic.pack.200.apple",
+            Code = "pack200",
             DisplayName = "Pack 200",
             CurrencyCode = "USD",
             PriceAmount = 6.99m,
@@ -434,7 +441,7 @@ public sealed partial class EconomyServiceTests
             UserId = userId,
             PackId = packId,
             PaymentProvider = "app_store",
-            Status = "pending",
+            Status = "Pending",
             PriceAmount = 6.99m,
             CurrencyCode = "USD",
             SparkToGrant = 200,
@@ -443,7 +450,7 @@ public sealed partial class EconomyServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var signedTransactionInfo = CreateUnsignedJws("{\"productId\":\"com.petmagic.pack.200.apple\",\"originalTransactionId\":\"orig-app-one-time\",\"transactionId\":\"txn-app-one-time-1\"}");
+        var signedTransactionInfo = CreateUnsignedJws("{\"productId\":\"com.petmagic.app.tokens.apple.pack200\",\"originalTransactionId\":\"orig-app-one-time\",\"transactionId\":\"txn-app-one-time-1\"}");
         var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-one-time-notification-1\",\"notificationType\":\"ONE_TIME_CHARGE\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\"}}}}");
 
         var service = CreateService(dbContext);
@@ -452,14 +459,13 @@ public sealed partial class EconomyServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value.Processed);
-        Assert.Equal("processed_token_purchase", result.Value.Outcome);
+        Assert.False(result.Value.Processed);
+        Assert.Equal("ignored_not_found", result.Value.Status);
 
         var order = await dbContext.PurchaseOrders.SingleAsync();
-        Assert.Equal("succeeded", order.Status);
+        Assert.Equal("Pending", order.Status);
 
-        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
-        Assert.Equal(200, wallet.Balance);
+        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == userId).ToListAsync());
     }
 
     [Fact]

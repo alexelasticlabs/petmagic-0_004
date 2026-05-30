@@ -63,11 +63,17 @@ public interface ISupportChatService
 {
     Task<Result<SupportConversationDetailResponse>> OpenConversationAsync(OpenSupportConversationCommand command, CancellationToken cancellationToken);
 
-    Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(Guid userId, CancellationToken cancellationToken);
+    Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(
+        Guid userId,
+        SupportConversationMessagesQuery query,
+        CancellationToken cancellationToken);
 
     Task<Result<IReadOnlyList<SupportConversationSummaryResponse>>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken);
 
-    Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(Guid conversationId, CancellationToken cancellationToken);
+    Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(
+        Guid conversationId,
+        SupportConversationMessagesQuery query,
+        CancellationToken cancellationToken);
 
     Task<Result<SupportTicketContextResponse>> GetAdminTicketContextAsync(Guid conversationId, CancellationToken cancellationToken);
 

@@ -18,6 +18,7 @@ class SupportChatState {
     required this.isLoading,
     required this.isRefreshing,
     required this.isSending,
+    required this.isLoadingOlder,
     this.conversation,
     this.errorMessage,
     this.sendProgress,
@@ -26,11 +27,17 @@ class SupportChatState {
   });
 
   const SupportChatState.initial()
-    : this(isLoading: true, isRefreshing: false, isSending: false);
+    : this(
+        isLoading: true,
+        isRefreshing: false,
+        isSending: false,
+        isLoadingOlder: false,
+      );
 
   final bool isLoading;
   final bool isRefreshing;
   final bool isSending;
+  final bool isLoadingOlder;
   final SupportChatConversation? conversation;
   final String? errorMessage;
   final double? sendProgress;
@@ -41,6 +48,7 @@ class SupportChatState {
     bool? isLoading,
     bool? isRefreshing,
     bool? isSending,
+    bool? isLoadingOlder,
     SupportChatConversation? conversation,
     String? errorMessage,
     bool clearConversation = false,
@@ -54,6 +62,7 @@ class SupportChatState {
       isLoading: isLoading ?? this.isLoading,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       isSending: isSending ?? this.isSending,
+      isLoadingOlder: isLoadingOlder ?? this.isLoadingOlder,
       conversation: clearConversation
           ? null
           : (conversation ?? this.conversation),
@@ -129,6 +138,7 @@ class SupportChatController extends Notifier<SupportChatState> {
         conversation: conversation,
         clearError: true,
       );
+      state = state.copyWith(isLoadingOlder: false);
       await _markReadIfNeeded(conversation);
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
@@ -200,8 +210,8 @@ class SupportChatController extends Notifier<SupportChatState> {
           isSending: false,
           conversation: _appendOutgoingMessage(conversation, message),
           clearError: true,
-            clearSendProgress: true,
-          );
+          clearSendProgress: true,
+        );
       }
       _resumePendingRealtimeRefreshIfNeeded();
       return true;
@@ -583,7 +593,61 @@ class SupportChatController extends Notifier<SupportChatState> {
   }
 
   bool get _isConversationBusy =>
-      state.isLoading || state.isRefreshing || state.isSending;
+      state.isLoading ||
+      state.isRefreshing ||
+      state.isSending ||
+      state.isLoadingOlder;
+
+  Future<void> loadOlderMessages() async {
+    final conversation = state.conversation;
+    if (conversation == null ||
+        state.isLoadingOlder ||
+        !conversation.hasOlderMessages) {
+      return;
+    }
+
+    final before = conversation.oldestLoadedMessageCreatedAtUtc;
+    if (before == null) {
+      return;
+    }
+
+    state = state.copyWith(isLoadingOlder: true);
+    try {
+      final chunk = await _repository.getConversation(
+        beforeMessageCreatedAtUtc: before,
+      );
+
+      final existingById = {
+        for (final message in conversation.messages) message.messageId: message,
+      };
+      final merged = <SupportChatMessage>[
+        ...chunk.messages.where(
+          (message) => !existingById.containsKey(message.messageId),
+        ),
+        ...conversation.messages,
+      ]..sort((a, b) => a.createdAtUtc.compareTo(b.createdAtUtc));
+
+      state = state.copyWith(
+        isLoadingOlder: false,
+        conversation: conversation.copyWith(
+          hasOlderMessages: chunk.hasOlderMessages,
+          oldestLoadedMessageCreatedAtUtc:
+              chunk.oldestLoadedMessageCreatedAtUtc,
+          messages: merged,
+        ),
+      );
+    } on AppException catch (error) {
+      state = state.copyWith(
+        isLoadingOlder: false,
+        errorMessage: error.message,
+      );
+    } on Object {
+      state = state.copyWith(
+        isLoadingOlder: false,
+        errorMessage: 'support.unavailable',
+      );
+    }
+  }
 
   void _scheduleRealtimeRefresh() {
     if (_isConversationBusy) {

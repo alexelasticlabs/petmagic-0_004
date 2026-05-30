@@ -16,7 +16,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:shared_preferences/shared_preferences.dart';
 
 final templateGenerationSharedPreferencesProvider =
-  Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
+    Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
 
 final templateGenerationRepositoryProvider =
     Provider<TemplateGenerationRepository>((ref) {
@@ -289,7 +289,10 @@ class TemplateGenerationRepository {
     required List<Map<String, Object?>> items,
   }) async {
     try {
-      await _preferences.setString(_cacheKeyForStatus(status), jsonEncode(items));
+      await _preferences.setString(
+        _cacheKeyForStatus(status),
+        jsonEncode(items),
+      );
     } on Object {
       // Ignore local cache write errors to keep network flow stable.
     }
@@ -326,23 +329,25 @@ class TemplateGenerationRepository {
       }
 
       var changed = false;
-      final updated = decoded.map((entry) {
-        if (entry is! Map) {
-          return entry;
-        }
+      final updated = decoded
+          .map((entry) {
+            if (entry is! Map) {
+              return entry;
+            }
 
-        final generation = Map<String, Object?>.from(entry);
-        if (generation['generationId'] != generationId) {
-          return generation;
-        }
+            final generation = Map<String, Object?>.from(entry);
+            if (generation['generationId'] != generationId) {
+              return generation;
+            }
 
-        if (generation['isUnread'] == false) {
-          return generation;
-        }
+            if (generation['isUnread'] == false) {
+              return generation;
+            }
 
-        changed = true;
-        return {...generation, 'isUnread': false};
-      }).toList(growable: false);
+            changed = true;
+            return {...generation, 'isUnread': false};
+          })
+          .toList(growable: false);
 
       if (changed) {
         await _preferences.setString(key, jsonEncode(updated));

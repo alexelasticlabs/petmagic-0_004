@@ -1,16 +1,16 @@
 import {
-  apiRequest,
-  cachedAdminUserAnalytics,
-  cachedAdminUserDetails,
-  cachedGet,
-  cachedUsersLists,
+    apiRequest,
+    cachedAdminUserAnalytics,
+    cachedAdminUserDetails,
+    cachedGet,
+    cachedUsersLists,
 } from "./api-client.core";
 
 import type {
-  AdminUserAnalytics,
-  AdminUserDetail,
-  AdminUserWalletOperation,
-  UserListItem,
+    AdminUserAnalytics,
+    AdminUserDetail,
+    AdminUserWalletOperation,
+    UserListItem,
 } from "./api-client.types";
 
 export async function fetchUsers(): Promise<UserListItem[]> {
@@ -78,10 +78,29 @@ export async function setPremium(userId: string, isPremium: boolean): Promise<vo
   cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
 }
 
+export async function revokePremium(userId: string): Promise<void> {
+  await apiRequest<void>(`/api/admin/economy/users/${userId}/premium/revoke`, {
+    method: "PUT",
+    body: JSON.stringify({ paymentProvider: "stripe" }),
+  });
+  cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+}
+
 export async function setActive(userId: string, isActive: boolean): Promise<void> {
   await apiRequest<void>(`/api/admin/users/${userId}/active`, {
     method: "PUT",
     body: JSON.stringify({ isActive }),
+  });
+  cachedUsersLists.clear();
+  cachedAdminUserDetails.delete(`admin-user:${userId}`);
+  cachedAdminUserAnalytics.delete(`admin-user-analytics:${userId}`);
+}
+
+export async function deleteAdminUser(userId: string): Promise<void> {
+  await apiRequest<void>(`/api/admin/users/${userId}`, {
+    method: "DELETE",
   });
   cachedUsersLists.clear();
   cachedAdminUserDetails.delete(`admin-user:${userId}`);

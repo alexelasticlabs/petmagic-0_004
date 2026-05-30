@@ -58,11 +58,10 @@ class PasswordResetState {
 class PasswordResetController extends Notifier<PasswordResetState> {
   static const _genericActionError = 'profile.action_failed';
 
-  late final ProfileRepository _repository;
+  ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
   @override
   PasswordResetState build() {
-    _repository = ref.watch(profileRepositoryProvider);
     return const PasswordResetState();
   }
 

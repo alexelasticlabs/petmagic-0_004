@@ -52,6 +52,7 @@ type AdminNotificationsContextValue = {
   unreadCount: number;
   addNotification: (input: AddAdminNotificationInput) => void;
   markAsRead: (notificationId: string) => void;
+  markCategoryAsRead: (category: AdminNotificationCategory) => void;
   markAllAsRead: () => void;
   clearRead: () => void;
   removeNotification: (notificationId: string) => void;
@@ -176,9 +177,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       message: input.message,
       category: input.category,
       tone,
-      priority:
-        input.priority ??
-        (tone === "error" || tone === "warning" ? "critical" : "normal"),
+      priority: input.priority ?? (tone === "error" || tone === "warning" ? "critical" : "normal"),
       href: input.href,
       source: input.source,
       createdAt: new Date(now).toISOString(),
@@ -191,6 +190,14 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   const markAsRead = useCallback((notificationId: string) => {
     setItems((current) =>
       current.map((item) => (item.id === notificationId ? { ...item, read: true } : item))
+    );
+  }, []);
+
+  const markCategoryAsRead = useCallback((category: AdminNotificationCategory) => {
+    setItems((current) =>
+      current.map((item) =>
+        item.category === category && !item.read ? { ...item, read: true } : item
+      )
     );
   }, []);
 
@@ -212,11 +219,20 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       unreadCount: items.reduce((count, item) => count + (item.read ? 0 : 1), 0),
       addNotification,
       markAsRead,
+      markCategoryAsRead,
       markAllAsRead,
       clearRead,
       removeNotification,
     }),
-    [addNotification, clearRead, items, markAllAsRead, markAsRead, removeNotification]
+    [
+      addNotification,
+      clearRead,
+      items,
+      markAllAsRead,
+      markAsRead,
+      markCategoryAsRead,
+      removeNotification,
+    ]
   );
 
   return (

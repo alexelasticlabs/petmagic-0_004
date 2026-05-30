@@ -10,6 +10,7 @@ class _SupportConversationViewport extends StatelessWidget {
     required this.showLoadingFallback,
     required this.loadingFallbackMessageCode,
     required this.onRefresh,
+    required this.onLoadOlderMessages,
     required this.onRetryInitialize,
     required this.onQuickActionSelected,
     required this.onOpenImage,
@@ -31,6 +32,7 @@ class _SupportConversationViewport extends StatelessWidget {
   final bool showLoadingFallback;
   final String loadingFallbackMessageCode;
   final Future<void> Function() onRefresh;
+  final Future<void> Function() onLoadOlderMessages;
   final VoidCallback onRetryInitialize;
   final ValueChanged<String> onQuickActionSelected;
   final Future<void> Function({required String imageUrl, String? fileName})
@@ -166,9 +168,43 @@ class _SupportConversationViewport extends StatelessWidget {
       child: ListView.builder(
         controller: scrollController,
         padding: const EdgeInsets.fromLTRB(0, 6, 0, 24),
-        itemCount: messages.length + (state.errorMessage == null ? 0 : 1),
+        itemCount:
+            messages.length +
+            (state.errorMessage == null ? 0 : 1) +
+            ((conversation?.hasOlderMessages ?? false) ? 1 : 0),
         itemBuilder: (context, index) {
-          if (state.errorMessage != null && index == 0) {
+          var currentIndex = index;
+
+          if (conversation?.hasOlderMessages ?? false) {
+            if (currentIndex == 0) {
+              final locale = Localizations.localeOf(context).languageCode;
+              final loadOlderLabel = locale == 'ru'
+                  ? 'Загрузить предыдущие сообщения'
+                  : 'Load previous messages';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Align(
+                  child: TextButton.icon(
+                    onPressed: state.isLoadingOlder
+                        ? null
+                        : onLoadOlderMessages,
+                    icon: state.isLoadingOlder
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.history_rounded, size: 16),
+                    label: Text(loadOlderLabel),
+                  ),
+                ),
+              );
+            }
+
+            currentIndex -= 1;
+          }
+
+          if (state.errorMessage != null && currentIndex == 0) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: ProfileMessageCard(
@@ -178,7 +214,9 @@ class _SupportConversationViewport extends StatelessWidget {
             );
           }
 
-          final messageIndex = state.errorMessage == null ? index : index - 1;
+          final messageIndex = state.errorMessage == null
+              ? currentIndex
+              : currentIndex - 1;
           final message = messages[messageIndex];
           final previousMessage = messageIndex > 0
               ? messages[messageIndex - 1]

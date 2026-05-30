@@ -449,13 +449,10 @@ public sealed partial class EconomyService
 
         try
         {
-            await new SubscriptionService().UpdateAsync(
+            await CancelStripeSubscriptionAsync(
                 subscription.ExternalSubscriptionId,
-                new SubscriptionUpdateOptions
-                {
-                    CancelAtPeriodEnd = true
-                },
-                cancellationToken: cancellationToken);
+                cancelImmediately: false,
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -488,6 +485,87 @@ public sealed partial class EconomyService
             subscription.ExternalSubscriptionId,
             null,
             cancellationToken);
+
+        return await GetSubscriptionSummaryAsync(command.UserId, cancellationToken);
+    }
+
+    public async Task<Result<SubscriptionSummaryResponse>> AdminRevokePremiumSubscriptionAsync(
+        AdminRevokePremiumSubscriptionCommand command,
+        CancellationToken cancellationToken)
+    {
+        var provider = command.PaymentProvider.Trim().ToLowerInvariant();
+        if (!string.Equals(provider, "stripe", StringComparison.Ordinal))
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.UnsupportedPaymentProvider);
+        }
+
+        if (identityService is null)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
+        var subscription = await dbContext.UserSubscriptions
+            .Where(x => x.UserId == command.UserId && x.Provider == "stripe")
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (subscription is not null && !string.IsNullOrWhiteSpace(subscription.ExternalSubscriptionId))
+        {
+            var stripeApiKey = ResolveStripeApiKey();
+            if (string.IsNullOrWhiteSpace(stripeApiKey))
+            {
+                return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
+            }
+
+            StripeConfiguration.ApiKey = stripeApiKey;
+
+            try
+            {
+                await CancelStripeSubscriptionAsync(
+                    subscription.ExternalSubscriptionId,
+                    cancelImmediately: true,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(
+                    ex,
+                    "Failed to immediately cancel Stripe subscription {SubscriptionId} for admin premium revoke.",
+                    subscription.ExternalSubscriptionId);
+
+                return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+
+            subscription.CancelAtPeriodEnd = false;
+            subscription.Status = "Expired";
+            if (subscription.CurrentPeriodEndUtc is null || subscription.CurrentPeriodEndUtc > DateTime.UtcNow)
+            {
+                subscription.CurrentPeriodEndUtc = DateTime.UtcNow;
+            }
+
+            subscription.UpdatedAtUtc = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            await AppendSubscriptionEventAsync(
+                command.UserId,
+                subscription.Id,
+                "stripe",
+                "AdminImmediateCancelRequested",
+                subscription.Status,
+                null,
+                subscription.ExternalSubscriptionId,
+                null,
+                cancellationToken);
+        }
+
+        var premiumResult = await identityService.SetPremiumStatusAsync(
+            new SetPremiumStatusCommand(command.UserId, false),
+            cancellationToken);
+
+        if (premiumResult.IsFailure)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(premiumResult.Error);
+        }
 
         return await GetSubscriptionSummaryAsync(command.UserId, cancellationToken);
     }
@@ -744,6 +822,28 @@ public sealed partial class EconomyService
         return NormalizeStripeUtcDateTime(subscription.TrialEnd)
             ?? NormalizeStripeUtcDateTime(subscription.CancelAt)
             ?? NormalizeStripeUtcDateTime(subscription.EndedAt);
+    }
+
+    private static Task<Subscription> CancelStripeSubscriptionAsync(
+        string externalSubscriptionId,
+        bool cancelImmediately,
+        CancellationToken cancellationToken)
+    {
+        var subscriptionService = new SubscriptionService();
+        if (cancelImmediately)
+        {
+            return subscriptionService.CancelAsync(
+                externalSubscriptionId,
+                cancellationToken: cancellationToken);
+        }
+
+        return subscriptionService.UpdateAsync(
+            externalSubscriptionId,
+            new SubscriptionUpdateOptions
+            {
+                CancelAtPeriodEnd = true
+            },
+            cancellationToken: cancellationToken);
     }
 
     public async Task<Result<PaymentMethodSetupResponse>> CreatePaymentMethodSetupAsync(

@@ -119,6 +119,35 @@ export const statusOptions: SupportConversationStatus[] = [
 ];
 
 const supportPollingIntervalMs = 5_000;
+const supportConversationMessagesTake = 80;
+
+function mergeSupportConversationMessages(
+  currentConversation: AdminSupportConversation,
+  incomingConversation: AdminSupportConversation
+): AdminSupportConversation {
+  const mergedById = new Map<string, AdminSupportConversation["messages"][number]>();
+
+  for (const message of currentConversation.messages) {
+    mergedById.set(message.messageId, message);
+  }
+
+  for (const message of incomingConversation.messages) {
+    mergedById.set(message.messageId, message);
+  }
+
+  const mergedMessages = [...mergedById.values()].sort((left, right) =>
+    left.createdAtUtc.localeCompare(right.createdAtUtc)
+  );
+
+  return {
+    ...incomingConversation,
+    messages: mergedMessages,
+    hasOlderMessages: currentConversation.hasOlderMessages || incomingConversation.hasOlderMessages,
+    oldestLoadedMessageCreatedAtUtc:
+      currentConversation.oldestLoadedMessageCreatedAtUtc ??
+      incomingConversation.oldestLoadedMessageCreatedAtUtc,
+  };
+}
 
 export function useSupportConversationController({
   locale,
@@ -217,9 +246,12 @@ export function useSupportConversationController({
 
   const conversationQuery = useQuery<AdminSupportConversation>({
     queryKey: adminQueryKeys.supportConversation(conversationId),
-    queryFn: () => fetchSupportConversation(conversationId),
+    queryFn: () =>
+      fetchSupportConversation(conversationId, {
+        take: supportConversationMessagesTake,
+      }),
     enabled: Boolean(session),
-    refetchInterval: session ? supportPollingIntervalMs : false,
+    refetchInterval: false,
     refetchIntervalInBackground: false,
   });
 
@@ -256,7 +288,22 @@ export function useSupportConversationController({
       void queryClient
         .fetchQuery({
           queryKey: adminQueryKeys.supportConversation(conversationId),
-          queryFn: () => fetchSupportConversation(conversationId),
+          queryFn: () =>
+            fetchSupportConversation(conversationId, {
+              take: supportConversationMessagesTake,
+            }),
+        })
+        .then((latestConversation) => {
+          queryClient.setQueryData<AdminSupportConversation>(
+            adminQueryKeys.supportConversation(conversationId),
+            (currentConversation) => {
+              if (!currentConversation) {
+                return latestConversation;
+              }
+
+              return mergeSupportConversationMessages(currentConversation, latestConversation);
+            }
+          );
         })
         .catch(() => {
           void queryClient.invalidateQueries({
@@ -327,6 +374,36 @@ export function useSupportConversationController({
     [scheduleMarkRead]
   );
 
+  const loadOlderMessages = useCallback(async () => {
+    const currentConversation = queryClient.getQueryData<AdminSupportConversation>(
+      adminQueryKeys.supportConversation(conversationId)
+    );
+    if (!currentConversation?.hasOlderMessages) {
+      return;
+    }
+
+    const beforeMessageCreatedAtUtc = currentConversation.oldestLoadedMessageCreatedAtUtc;
+    if (!beforeMessageCreatedAtUtc) {
+      return;
+    }
+
+    const olderConversation = await fetchSupportConversation(conversationId, {
+      take: supportConversationMessagesTake,
+      beforeMessageCreatedAtUtc,
+    });
+
+    queryClient.setQueryData<AdminSupportConversation>(
+      adminQueryKeys.supportConversation(conversationId),
+      (latestConversation) => {
+        if (!latestConversation) {
+          return olderConversation;
+        }
+
+        return mergeSupportConversationMessages(latestConversation, olderConversation);
+      }
+    );
+  }, [conversationId, queryClient]);
+
   useEffect(() => {
     if (!conversationQuery.data || conversationQuery.data.adminUnreadCount <= 0) {
       return;
@@ -393,7 +470,9 @@ export function useSupportConversationController({
         conversationId,
         senderUserId: session?.user.userId ?? "admin",
         senderDisplayName:
-          session?.user.displayName?.trim() || session?.user.email || (locale === "ru" ? "Оператор" : "Operator"),
+          session?.user.displayName?.trim() ||
+          session?.user.email ||
+          (locale === "ru" ? "Оператор" : "Operator"),
         isFromAdmin: true,
         senderType: "Admin",
         body: trimmedReply,
@@ -402,7 +481,8 @@ export function useSupportConversationController({
         attachmentUrl: optimisticAttachmentObjectUrl ?? null,
         attachmentFileName: selectedAttachment?.name ?? null,
         attachmentContentType:
-          selectedAttachment?.type?.trim() || (selectedAttachment ? "application/octet-stream" : null),
+          selectedAttachment?.type?.trim() ||
+          (selectedAttachment ? "application/octet-stream" : null),
         attachmentFileSizeBytes: selectedAttachment?.size ?? null,
         attachmentUploadStatus: selectedAttachment ? "uploading" : null,
         attachmentUploadErrorCode: null,
@@ -907,6 +987,7 @@ export function useSupportConversationController({
     setQueueFilter,
     setSelectedAttachment,
     setMessagesViewportVisible,
+    loadOlderMessages,
     sidePanelDescription,
     sidePanelTabs,
     sidePanelTitle,

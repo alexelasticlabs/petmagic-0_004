@@ -53,7 +53,8 @@ export function AdminTopbar({
   onToggleTheme,
 }: AdminTopbarProps) {
   const pathname = usePathname();
-  const { clearRead, items, markAllAsRead, markAsRead, unreadCount } = useAdminNotifications();
+  const { clearRead, items, markAllAsRead, markAsRead, markCategoryAsRead, unreadCount } =
+    useAdminNotifications();
   const [notificationPanelPathname, setNotificationPanelPathname] = useState<string | null>(null);
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>("all");
   const notificationRootRef = useRef<HTMLDivElement | null>(null);
@@ -121,6 +122,17 @@ export function AdminTopbar({
       notificationFilter === "support");
 
   const isNotificationsOpen = notificationPanelPathname === pathname;
+
+  useEffect(() => {
+    const isSupportRoute = /^\/(ru|en)\/support(\/|$)/.test(pathname);
+    if (!isSupportRoute) {
+      return;
+    }
+
+    if (items.some((item) => item.category === "support" && !item.read)) {
+      markCategoryAsRead("support");
+    }
+  }, [items, markCategoryAsRead, pathname]);
 
   useEffect(() => {
     if (!isNotificationsOpen) {

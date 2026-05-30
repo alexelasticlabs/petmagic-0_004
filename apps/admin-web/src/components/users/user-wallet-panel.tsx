@@ -21,6 +21,8 @@ type UserWalletPanelProps = {
   onUpdated?: () => Promise<void> | void;
 };
 
+const LEDGER_ITEMS_LIMIT = 20;
+
 export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWalletPanelProps) {
   const text = getDictionary(locale);
   const [operation, setOperation] = useState<"credit" | "debit">("credit");
@@ -164,7 +166,7 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
 
           {analytics.recentWalletLedger.length ? (
             <div className={styles.list}>
-              {analytics.recentWalletLedger.map((item) => (
+              {analytics.recentWalletLedger.slice(0, LEDGER_ITEMS_LIMIT).map((item) => (
                 <article key={item.entryId} className={styles.card}>
                   <div className={styles.cardHeader}>
                     <strong className={item.delta >= 0 ? styles.positive : styles.negative}>

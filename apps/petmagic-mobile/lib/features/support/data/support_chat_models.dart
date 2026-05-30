@@ -190,8 +190,8 @@ class SupportChatMessage {
       legacyAttachmentUrl: json['attachmentUrl'] as String?,
       legacyAttachmentFileName: json['attachmentFileName'] as String?,
       legacyAttachmentContentType: json['attachmentContentType'] as String?,
-      legacyAttachmentFileSizeBytes:
-          (json['attachmentFileSizeBytes'] as num?)?.toInt(),
+      legacyAttachmentFileSizeBytes: (json['attachmentFileSizeBytes'] as num?)
+          ?.toInt(),
     );
 
     return SupportChatMessage(
@@ -209,14 +209,17 @@ class SupportChatMessage {
       attachmentUrl: json['attachmentUrl'] as String?,
       attachmentFileName: json['attachmentFileName'] as String?,
       attachmentContentType: json['attachmentContentType'] as String?,
-      attachmentFileSizeBytes: (json['attachmentFileSizeBytes'] as num?)?.toInt(),
+      attachmentFileSizeBytes: (json['attachmentFileSizeBytes'] as num?)
+          ?.toInt(),
       attachmentUploadStatus: json['attachmentUploadStatus'] as String?,
       attachmentUploadErrorCode: json['attachmentUploadErrorCode'] as String?,
       createdAtUtc:
           DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       readAtUtc: DateTime.tryParse(json['readAtUtc'] as String? ?? ''),
-      deliveredAtUtc: DateTime.tryParse(json['deliveredAtUtc'] as String? ?? ''),
+      deliveredAtUtc: DateTime.tryParse(
+        json['deliveredAtUtc'] as String? ?? '',
+      ),
     );
   }
 
@@ -227,11 +230,12 @@ class SupportChatMessage {
     required String? legacyAttachmentContentType,
     required int? legacyAttachmentFileSizeBytes,
   }) {
-    final parsedAttachments = (json['attachments'] as List<dynamic>? ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(SupportChatAttachment.fromJson)
-        .where((attachment) => attachment.fileUrl.trim().isNotEmpty)
-        .toList(growable: false);
+    final parsedAttachments =
+        (json['attachments'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(SupportChatAttachment.fromJson)
+            .where((attachment) => attachment.fileUrl.trim().isNotEmpty)
+            .toList(growable: false);
 
     if (parsedAttachments.isNotEmpty) {
       return parsedAttachments;
@@ -279,6 +283,8 @@ class SupportChatConversation {
     required this.updatedAtUtc,
     required this.lastMessageAtUtc,
     required this.messages,
+    this.hasOlderMessages = false,
+    this.oldestLoadedMessageCreatedAtUtc,
     this.assistantScenario,
     this.relatedGenerationId,
     this.relatedPaymentId,
@@ -319,6 +325,8 @@ class SupportChatConversation {
   final DateTime? feedbackSubmittedAtUtc;
   final bool isReadOnly;
   final bool canReopen;
+  final bool hasOlderMessages;
+  final DateTime? oldestLoadedMessageCreatedAtUtc;
   final List<SupportChatMessage> messages;
 
   bool get isFromMobileAssistant => source == 'MobileAssistant';
@@ -339,6 +347,8 @@ class SupportChatConversation {
     DateTime? feedbackSubmittedAtUtc,
     bool? isReadOnly,
     bool? canReopen,
+    bool? hasOlderMessages,
+    DateTime? oldestLoadedMessageCreatedAtUtc,
     List<SupportChatMessage>? messages,
     bool clearAssignedAdmin = false,
     bool clearLastMessageAt = false,
@@ -390,6 +400,10 @@ class SupportChatConversation {
           : (feedbackSubmittedAtUtc ?? this.feedbackSubmittedAtUtc),
       isReadOnly: isReadOnly ?? this.isReadOnly,
       canReopen: canReopen ?? this.canReopen,
+      hasOlderMessages: hasOlderMessages ?? this.hasOlderMessages,
+      oldestLoadedMessageCreatedAtUtc:
+          oldestLoadedMessageCreatedAtUtc ??
+          this.oldestLoadedMessageCreatedAtUtc,
       messages: messages ?? this.messages,
     );
   }
@@ -432,6 +446,10 @@ class SupportChatConversation {
       ),
       isReadOnly: json['isReadOnly'] as bool? ?? false,
       canReopen: json['canReopen'] as bool? ?? false,
+      hasOlderMessages: json['hasOlderMessages'] as bool? ?? false,
+      oldestLoadedMessageCreatedAtUtc: DateTime.tryParse(
+        json['oldestLoadedMessageCreatedAtUtc'] as String? ?? '',
+      ),
       messages: (json['messages'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
           .map(SupportChatMessage.fromJson)

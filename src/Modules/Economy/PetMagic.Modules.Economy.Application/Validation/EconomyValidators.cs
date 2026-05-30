@@ -99,6 +99,19 @@ public sealed class CancelPremiumSubscriptionCommandValidator : AbstractValidato
     }
 }
 
+public sealed class AdminRevokePremiumSubscriptionCommandValidator : AbstractValidator<AdminRevokePremiumSubscriptionCommand>
+{
+    public AdminRevokePremiumSubscriptionCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(value => string.Equals(value.Trim(), "stripe", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("PaymentProvider must be stripe.");
+    }
+}
+
 public sealed class VerifyPremiumStorePurchaseCommandValidator : AbstractValidator<VerifyPremiumStorePurchaseCommand>
 {
     public VerifyPremiumStorePurchaseCommandValidator()

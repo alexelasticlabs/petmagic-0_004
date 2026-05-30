@@ -942,6 +942,12 @@
   padding-right: 6px;
 }
 
+.messagesLoadOlderRow {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 6px;
+}
+
 .messageItem {
   display: grid;
   gap: 5px;
@@ -2684,6 +2690,69 @@
 
 .messages::-webkit-scrollbar-thumb:hover {
   background: rgba(34, 197, 94, 0.38);
+}
+
+/* Keep support workspace fully dark when theme is dark/default-dark. */
+:global(:root:not([data-theme="light"])) .workspaceFullView,
+:global(:root[data-theme="dark"]) .workspaceFullView {
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 1.12rem;
+  overflow: hidden;
+}
+
+:global(:root:not([data-theme="light"])) .inboxPaneFlat,
+:global(:root[data-theme="dark"]) .inboxPaneFlat,
+:global(:root:not([data-theme="light"])) .infoPanelFlat,
+:global(:root[data-theme="dark"]) .infoPanelFlat,
+:global(:root:not([data-theme="light"])) .actionsPanelFlat,
+:global(:root[data-theme="dark"]) .actionsPanelFlat {
+  background: color-mix(in srgb, var(--surface-1) 92%, #05080d 8%);
+}
+
+:global(:root:not([data-theme="light"])) .chatShell,
+:global(:root[data-theme="dark"]) .chatShell {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 94%, #05080d 6%),
+    color-mix(in srgb, var(--surface-2) 92%, #04070c 8%)
+  );
+}
+
+:global(:root:not([data-theme="light"])) .queueSubFilters,
+:global(:root[data-theme="dark"]) .queueSubFilters,
+:global(:root:not([data-theme="light"])) .spTabNav,
+:global(:root[data-theme="dark"]) .spTabNav {
+  background: color-mix(in srgb, var(--surface-2) 88%, #04070c 12%);
+  border-color: color-mix(in srgb, var(--border-soft) 84%, #0b121d 16%);
+}
+
+:global(:root:not([data-theme="light"])) .queueSubFilterActive,
+:global(:root[data-theme="dark"]) .queueSubFilterActive,
+:global(:root:not([data-theme="light"])) .spTabBtnActive,
+:global(:root[data-theme="dark"]) .spTabBtnActive {
+  background: color-mix(in srgb, var(--surface-1) 72%, var(--surface-3) 28%);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+:global(:root:not([data-theme="light"])) .conversationRow,
+:global(:root[data-theme="dark"]) .conversationRow,
+:global(:root:not([data-theme="light"])) .messageItem,
+:global(:root[data-theme="dark"]) .messageItem,
+:global(:root:not([data-theme="light"])) .infoPanelStatTile,
+:global(:root[data-theme="dark"]) .infoPanelStatTile,
+:global(:root:not([data-theme="light"])) .infoPanelStatTileFull,
+:global(:root[data-theme="dark"]) .infoPanelStatTileFull,
+:global(:root:not([data-theme="light"])) .attachmentListItem,
+:global(:root[data-theme="dark"]) .attachmentListItem {
+  background: color-mix(in srgb, var(--surface-2) 86%, #04070c 14%);
+}
+
+:global(:root:not([data-theme="light"])) .systemEventCard,
+:global(:root[data-theme="dark"]) .systemEventCard {
+  background: color-mix(in srgb, var(--surface-2) 82%, #0a1018 18%);
 }
 
 .templateCatalogList,

@@ -136,6 +136,8 @@ public static class SupportChatEndpoints
 
     private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> GetUserConversationAsync(
         HttpContext httpContext,
+        [FromQuery] int? take,
+        [FromQuery] DateTime? beforeMessageCreatedAtUtc,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -144,7 +146,12 @@ public static class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var result = await service.GetUserConversationAsync(userId, cancellationToken);
+        var result = await service.GetUserConversationAsync(
+            userId,
+            new SupportConversationMessagesQuery(
+                Take: take ?? 60,
+                BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc),
+            cancellationToken);
         if (result.IsFailure)
         {
             return ToProblem(result.Error);
@@ -1062,10 +1069,17 @@ public static class SupportChatEndpoints
 
     private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> GetAdminConversationAsync(
         [FromRoute] Guid conversationId,
+        [FromQuery] int? take,
+        [FromQuery] DateTime? beforeMessageCreatedAtUtc,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminConversationAsync(conversationId, cancellationToken);
+        var result = await service.GetAdminConversationAsync(
+            conversationId,
+            new SupportConversationMessagesQuery(
+                Take: take ?? 60,
+                BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc),
+            cancellationToken);
         if (result.IsFailure)
         {
             return ToProblem(result.Error);

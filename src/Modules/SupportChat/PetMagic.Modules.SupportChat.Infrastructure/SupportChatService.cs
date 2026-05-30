@@ -20,6 +20,8 @@ public sealed class SupportChatService(
     ISupportAttachmentStorage attachmentStorage,
     SupportAttachmentStorageOptions attachmentStorageOptions) : ISupportChatService
 {
+    private const int DefaultConversationMessagesTake = 60;
+    private const int MaxConversationMessagesTake = 120;
     private static readonly Guid AutomatedAssistantUserId = Guid.Parse("2F1E3B3B-8A2E-4A8E-9EE5-97BF31B33218");
     private const int LegacyDirectSourceValue = 0;
     private const int LegacyResolvedStatusValue = 2;
@@ -127,7 +129,10 @@ public sealed class SupportChatService(
         return Result.Success(await BuildConversationDetailAsync(conversation.Id, cancellationToken));
     }
 
-    public async Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(
+        Guid userId,
+        SupportConversationMessagesQuery query,
+        CancellationToken cancellationToken)
     {
         var conversationId = await supportChatDbContext.SupportConversations
             .Where(x => x.InitiatorUserId == userId)
@@ -139,8 +144,13 @@ public sealed class SupportChatService(
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
-        return Result.Success(await BuildConversationDetailAsync(conversationId.Value, cancellationToken));
+        return Result.Success(await BuildConversationDetailAsync(conversationId.Value, query, cancellationToken));
     }
+
+    public Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+        => GetUserConversationAsync(userId, new SupportConversationMessagesQuery(), cancellationToken);
 
     public async Task<Result<IReadOnlyList<SupportConversationSummaryResponse>>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken)
     {
@@ -320,7 +330,10 @@ public sealed class SupportChatService(
         return Result.Success<IReadOnlyList<SupportConversationSummaryResponse>>(summaries);
     }
 
-    public async Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(Guid conversationId, CancellationToken cancellationToken)
+    public async Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(
+        Guid conversationId,
+        SupportConversationMessagesQuery query,
+        CancellationToken cancellationToken)
     {
         var exists = await supportChatDbContext.SupportConversations
             .AsNoTracking()
@@ -330,8 +343,13 @@ public sealed class SupportChatService(
             return Result.Failure<SupportConversationDetailResponse>(ConversationNotFound);
         }
 
-        return Result.Success(await BuildConversationDetailAsync(conversationId, cancellationToken));
+        return Result.Success(await BuildConversationDetailAsync(conversationId, query, cancellationToken));
     }
+
+    public Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(
+        Guid conversationId,
+        CancellationToken cancellationToken)
+        => GetAdminConversationAsync(conversationId, new SupportConversationMessagesQuery(), cancellationToken);
 
     public async Task<Result<SupportTicketContextResponse>> GetAdminTicketContextAsync(Guid conversationId, CancellationToken cancellationToken)
     {
@@ -1271,15 +1289,41 @@ public sealed class SupportChatService(
         _ => scenario,
     };
 
-    private async Task<SupportConversationDetailResponse> BuildConversationDetailAsync(Guid conversationId, CancellationToken cancellationToken)
+    private Task<SupportConversationDetailResponse> BuildConversationDetailAsync(
+        Guid conversationId,
+        CancellationToken cancellationToken)
+        => BuildConversationDetailAsync(conversationId, query: null, cancellationToken);
+
+    private async Task<SupportConversationDetailResponse> BuildConversationDetailAsync(
+        Guid conversationId,
+        SupportConversationMessagesQuery? query,
+        CancellationToken cancellationToken)
     {
+        var normalizedTake = Math.Clamp(
+            query?.Take ?? DefaultConversationMessagesTake,
+            1,
+            MaxConversationMessagesTake);
+
         var conversation = await supportChatDbContext.SupportConversations
             .AsNoTracking()
-            .Include(x => x.Messages)
-                .ThenInclude(message => message.Attachments)
             .FirstAsync(x => x.Id == conversationId, cancellationToken);
 
-        var visibleMessages = conversation.Messages.OrderBy(x => x.CreatedAtUtc).ToList();
+        var messagesQuery = supportChatDbContext.ConversationMessages
+            .AsNoTracking()
+            .Where(x => x.ConversationId == conversationId)
+            .Include(x => x.Attachments)
+            .AsQueryable();
+
+        if (query?.BeforeMessageCreatedAtUtc is { } beforeMessageCreatedAtUtc)
+        {
+            messagesQuery = messagesQuery.Where(x => x.CreatedAtUtc < beforeMessageCreatedAtUtc);
+        }
+
+        var visibleMessages = await messagesQuery
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(normalizedTake)
+            .ToListAsync(cancellationToken);
+        visibleMessages.Reverse();
 
         var userIds = visibleMessages
             .Select(x => x.SenderUserId)
@@ -1327,8 +1371,18 @@ public sealed class SupportChatService(
                 message.CreatedAtUtc));
         }
 
-        var userUnreadCount = conversation.Messages.Count(x => x.IsFromAdmin && x.ReadAtUtc is null);
-        var adminUnreadCount = conversation.Messages.Count(x => !x.IsFromAdmin && x.ReadAtUtc is null);
+        var userUnreadCount = await supportChatDbContext.ConversationMessages.CountAsync(
+            x => x.ConversationId == conversationId && x.IsFromAdmin && x.ReadAtUtc == null,
+            cancellationToken);
+        var adminUnreadCount = await supportChatDbContext.ConversationMessages.CountAsync(
+            x => x.ConversationId == conversationId && !x.IsFromAdmin && x.ReadAtUtc == null,
+            cancellationToken);
+
+        var oldestLoadedMessageCreatedAtUtc = visibleMessages.FirstOrDefault()?.CreatedAtUtc;
+        var hasOlderMessages = oldestLoadedMessageCreatedAtUtc.HasValue && await supportChatDbContext.ConversationMessages.AnyAsync(
+            x => x.ConversationId == conversationId && x.CreatedAtUtc < oldestLoadedMessageCreatedAtUtc.Value,
+            cancellationToken);
+
         var now = DateTime.UtcNow;
         var normalizedStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
         var normalizedSource = ToCanonicalSource(conversation.Source);
@@ -1376,6 +1430,8 @@ public sealed class SupportChatService(
             IsConversationReadOnly(normalizedStatus, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, conversation.ClosedAtUtc, now),
             CanReopenConversation(normalizedStatus, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, now),
             ResolveAvailableActions(normalizedStatus, conversation.AssignedAdminId.HasValue),
+            hasOlderMessages,
+            oldestLoadedMessageCreatedAtUtc,
             messages);
     }
 
@@ -1449,7 +1505,7 @@ public sealed class SupportChatService(
                     trimmedBody,
                     StringComparison.OrdinalIgnoreCase)))
             {
-                return Truncate(trimmedBody, 160);
+                return Truncate(trimmedBody, 160) ?? trimmedBody;
             }
 
             if (orderedAttachments.Count > 1)
@@ -1478,7 +1534,7 @@ public sealed class SupportChatService(
 
         if (!string.IsNullOrWhiteSpace(trimmedBody))
         {
-            return Truncate(trimmedBody, 160);
+            return Truncate(trimmedBody, 160) ?? trimmedBody;
         }
 
         if (!string.IsNullOrWhiteSpace(sourceMessage.AttachmentFileName))

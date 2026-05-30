@@ -22,6 +22,8 @@ public static class AdminEconomyEndpoints
         group.MapGet("/ledger", GetWalletLedgerAsync);
         group.MapGet("/purchases", GetPurchasesAsync);
         group.MapGet("/users/{userId:guid}/subscription-summary", GetUserSubscriptionSummaryAsync);
+        group.MapPut("/users/{userId:guid}/premium/revoke", AdminRevokePremiumSubscriptionAsync)
+            .RequireAuthorization("AdminOnly");
         group.MapGet("/subscriptions", GetSubscriptionsAsync);
         group.MapGet("/packs", ListPacksAsync);
         group.MapGet("/subscription-plans", ListSubscriptionPlansAsync);
@@ -96,6 +98,39 @@ public static class AdminEconomyEndpoints
             var statusCode = result.Error.Code switch
             {
                 "users.not_found" => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SubscriptionSummaryResponse>, ValidationProblem, ProblemHttpResult>> AdminRevokePremiumSubscriptionAsync(
+        [FromRoute] Guid userId,
+        [FromBody] AdminRevokePremiumRequest? request,
+        [FromServices] IValidator<AdminRevokePremiumSubscriptionCommand> validator,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new AdminRevokePremiumSubscriptionCommand(
+            userId,
+            string.IsNullOrWhiteSpace(request?.PaymentProvider) ? "stripe" : request.PaymentProvider);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.AdminRevokePremiumSubscriptionAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                "users.not_found" => StatusCodes.Status404NotFound,
+                "economy.payment_gateway_failed" => StatusCodes.Status502BadGateway,
                 _ => StatusCodes.Status400BadRequest,
             };
 
@@ -605,4 +640,6 @@ public static class AdminEconomyEndpoints
         string? CampaignChannel = null,
         int MinimumSuccessfulPurchases = 0,
         string? CreatedBy = null);
+
+    public sealed record AdminRevokePremiumRequest(string? PaymentProvider);
 }

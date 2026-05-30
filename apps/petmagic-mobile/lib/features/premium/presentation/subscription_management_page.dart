@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -30,12 +31,11 @@ class _SubscriptionManagementPageState
     final colors = context.petMagicColors;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(text.profileSubscriptionTitle),
-      ),
+      appBar: AppBar(title: Text(text.profileSubscriptionTitle)),
       body: SafeArea(
         child: summaryAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+          loading: () =>
+              const Center(child: CircularProgressIndicator.adaptive()),
           error: (_, _) => Center(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -48,7 +48,9 @@ class _SubscriptionManagementPageState
                 : DateFormat.yMMMd(
                     Localizations.localeOf(context).toLanguageTag(),
                   ).format(summary.currentPeriodEndUtc!.toLocal());
-            final renewalStatus = summary.cancelAtPeriodEnd == true
+            final renewalStatus = !summary.isPremium
+                ? 'inactive'
+                : summary.cancelAtPeriodEnd == true
                 ? 'cancel_at_period_end'
                 : 'auto_renew';
 
@@ -74,10 +76,7 @@ class _SubscriptionManagementPageState
                         value: nextBilling,
                       ),
                       const SizedBox(height: 8),
-                      _SummaryRow(
-                        label: 'Renewal',
-                        value: renewalStatus,
-                      ),
+                      _SummaryRow(label: 'Renewal', value: renewalStatus),
                       if (summary.planName != null) ...[
                         const SizedBox(height: 8),
                         _SummaryRow(
@@ -90,9 +89,13 @@ class _SubscriptionManagementPageState
                 ),
                 const SizedBox(height: 12),
                 FilledButton(
-                  onPressed: _isProcessing || !summary.canManageSubscription
+                  onPressed:
+                      _isProcessing ||
+                          !summary.canManageSubscription ||
+                          !summary.isPremium
                       ? null
-                      : () => _openManageTarget(summary.manageSubscriptionAction),
+                      : () =>
+                            _openManageTarget(summary.manageSubscriptionAction),
                   child: Text(text.premiumManageAction),
                 ),
                 const SizedBox(height: 8),
@@ -107,23 +110,31 @@ class _SubscriptionManagementPageState
                       : () => context.push(PremiumPage.routePath),
                   child: Text(text.premiumChoosePlanTitle),
                 ),
-                if (summary.provider == PremiumSubscriptionProviderView.stripe) ...[
+                if (summary.provider ==
+                        PremiumSubscriptionProviderView.stripe &&
+                    summary.isPremium) ...[
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: _isProcessing || !summary.canManageSubscription
                         ? null
-                        : () => _openManageTarget(summary.manageSubscriptionAction),
+                        : () => _openManageTarget(
+                            summary.manageSubscriptionAction,
+                          ),
                     child: const Text('Update payment method'),
                   ),
                 ],
-                if (summary.provider == PremiumSubscriptionProviderView.stripe &&
+                if (summary.provider ==
+                        PremiumSubscriptionProviderView.stripe &&
+                    summary.isPremium &&
                     summary.cancelAtPeriodEnd != true) ...[
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: _isProcessing ? null : _cancelAtPeriodEnd,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: colors.danger,
-                      side: BorderSide(color: colors.danger.withValues(alpha: 0.4)),
+                      side: BorderSide(
+                        color: colors.danger.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: const Text('Cancel subscription'),
                   ),
@@ -164,9 +175,13 @@ class _SubscriptionManagementPageState
       final service = ref.read(premiumSubscriptionManagementServiceProvider);
       await service.requestCancelAtPeriodEnd();
       ref.invalidate(premiumSubscriptionSummaryProvider);
+      ref.invalidate(profileControllerProvider);
+      ref.invalidate(premiumControllerProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Auto-renew disabled for current period.')),
+          const SnackBar(
+            content: Text('Auto-renew disabled for current period.'),
+          ),
         );
       }
     } finally {
@@ -181,6 +196,7 @@ class _SubscriptionManagementPageState
     try {
       await ref.read(premiumControllerProvider.notifier).restorePurchases();
       ref.invalidate(premiumSubscriptionSummaryProvider);
+      ref.invalidate(profileControllerProvider);
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);
@@ -194,7 +210,8 @@ class _SubscriptionManagementPageState
   ) {
     return switch (provider) {
       PremiumSubscriptionProviderView.appStore => text.premiumPaymentApple,
-      PremiumSubscriptionProviderView.googlePlay => text.premiumPaymentGooglePlay,
+      PremiumSubscriptionProviderView.googlePlay =>
+        text.premiumPaymentGooglePlay,
       PremiumSubscriptionProviderView.stripe => text.premiumPaymentStripe,
       PremiumSubscriptionProviderView.unknown => text.premiumPaymentStripe,
     };

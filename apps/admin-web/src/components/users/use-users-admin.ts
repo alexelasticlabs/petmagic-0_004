@@ -15,6 +15,11 @@ export type UsersToastState = {
   message: string;
 };
 
+type RunActionOptions = {
+  successMessage?: string;
+  errorMessage?: string;
+};
+
 export function useUsersAdmin(locale: Locale) {
   const text = getDictionary(locale);
   const router = useRouter();
@@ -55,7 +60,7 @@ export function useUsersAdmin(locale: Locale) {
   const isLoading = usersQuery.isLoading || usersQuery.isFetching;
   const error = actionError ?? (usersQuery.isError ? text.errorLoadingUsers : null);
 
-  async function runAction(userId: string, action: () => Promise<void>) {
+  async function runAction(userId: string, action: () => Promise<void>, options?: RunActionOptions) {
     setBusyUserId(userId);
     setActionError(null);
 
@@ -68,11 +73,12 @@ export function useUsersAdmin(locale: Locale) {
 
       setToast({
         type: "success",
-        message: text.usersChangesSaved,
+        message: options?.successMessage ?? text.usersChangesSaved,
       });
     } catch {
-      setActionError(text.errorLoadingUsers);
-      setToast({ type: "error", message: text.errorLoadingUsers });
+      const message = options?.errorMessage ?? text.errorLoadingUsers;
+      setActionError(message);
+      setToast({ type: "error", message });
     } finally {
       setBusyUserId(null);
     }

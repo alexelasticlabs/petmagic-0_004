@@ -22,6 +22,15 @@ export type Dictionary = {
   usersCardDescription: string;
   usersEmptyDescription: string;
   usersChangesSaved: string;
+  usersBalanceCredit: string;
+  usersBalanceDebit: string;
+  usersDeleteAction: string;
+  usersDeleteConfirm: string;
+  usersDeletedSuccess: string;
+  usersBalanceAmountPrompt: string;
+  usersBalanceReasonPrompt: string;
+  usersBalanceReasonDefault: string;
+  usersBalanceInvalidAmount: string;
   avatarLabel: string;
   openLabel: string;
   emailConfirmedLabel: string;

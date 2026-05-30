@@ -70,12 +70,20 @@
 .select,
 .textarea {
   width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--border-soft);
   border-radius: 0.9rem;
-  background: rgba(10, 16, 28, 0.92);
+  background: var(--surface-2);
   color: var(--text-strong);
   padding: 0.8rem 0.95rem;
   font: inherit;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .textarea {
@@ -94,6 +102,9 @@
 
 .list {
   gap: 0.65rem;
+  max-height: min(64vh, 42rem);
+  overflow: auto;
+  padding-right: 0.2rem;
 }
 
 .card {
@@ -101,8 +112,8 @@
   gap: 0.45rem;
   padding: 0.9rem 1rem;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: linear-gradient(180deg, rgba(12, 18, 30, 0.86), rgba(7, 11, 20, 0.94));
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
 }
 
 .cardHeader,
@@ -118,11 +129,11 @@
 }
 
 .positive {
-  color: #4ade80;
+  color: var(--success);
 }
 
 .negative {
-  color: #f87171;
+  color: var(--danger);
 }
 
 @media (max-width: 1360px) {
@@ -136,6 +147,12 @@
   .formGrid {
     grid-template-columns: 1fr;
   }
+
+  .list {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
 }
 
 @media (max-width: 760px) {
@@ -143,4 +160,3 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-

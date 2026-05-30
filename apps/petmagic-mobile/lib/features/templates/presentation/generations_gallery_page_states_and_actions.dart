@@ -136,21 +136,21 @@ class _OfflineCacheBanner extends ConsumerWidget {
     final colors = context.petMagicColors;
 
     final syncedAtLabel = lastSyncedAtUtc == null
-      ? null
-      : (isRecovered
-          ? text.generationStatusOnlineBannerSyncedAt(
-            formattedDate(text, lastSyncedAtUtc!),
-          )
-          : text.generationStatusOfflineBannerSyncedAt(
-            formattedDate(text, lastSyncedAtUtc!),
-          ));
+        ? null
+        : (isRecovered
+              ? text.generationStatusOnlineBannerSyncedAt(
+                  formattedDate(text, lastSyncedAtUtc!),
+                )
+              : text.generationStatusOfflineBannerSyncedAt(
+                  formattedDate(text, lastSyncedAtUtc!),
+                ));
 
     final surfaceColor = isRecovered
-      ? colors.accentSoft.withValues(alpha: 0.16)
-      : colors.gold.withValues(alpha: 0.16);
+        ? colors.accentSoft.withValues(alpha: 0.16)
+        : colors.gold.withValues(alpha: 0.16);
     final borderColor = isRecovered
-      ? colors.accent.withValues(alpha: 0.38)
-      : colors.gold.withValues(alpha: 0.38);
+        ? colors.accent.withValues(alpha: 0.38)
+        : colors.gold.withValues(alpha: 0.38);
     final iconColor = isRecovered ? colors.accent : colors.gold;
 
     return DecoratedBox(

@@ -29,6 +29,10 @@ type UserDetailPageProps = {
   userId: string;
 };
 
+const ACTIVITY_LIMIT = 12;
+const RECENT_ITEMS_LIMIT = 8;
+const AUDIT_ITEMS_LIMIT = 12;
+
 export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
   const router = useRouter();
@@ -203,7 +207,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
       <AdminCard title={text.userActivityTitle}>
         {analytics.recentActivity.length ? (
           <div className={styles.timeline}>
-            {analytics.recentActivity.map((item) => (
+            {analytics.recentActivity.slice(0, ACTIVITY_LIMIT).map((item) => (
               <article
                 key={`${item.kind}:${item.occurredAtUtc}:${item.title}`}
                 className={styles.timelineItem}
@@ -225,7 +229,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         <AdminCard title={text.userPurchasesTitle}>
           <DataList
             emptyTitle={text.userNoPurchases}
-            items={analytics.recentPurchases.map((purchase) => (
+            items={analytics.recentPurchases.slice(0, RECENT_ITEMS_LIMIT).map((purchase) => (
               <article key={purchase.orderId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
                   <strong>{purchase.sparkToGrant} spark</strong>
@@ -247,7 +251,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         <AdminCard title={text.userGenerationsTitle}>
           <DataList
             emptyTitle={text.userNoGenerations}
-            items={analytics.recentGenerations.map((generation) => (
+            items={analytics.recentGenerations.slice(0, RECENT_ITEMS_LIMIT).map((generation) => (
               <article key={generation.generationId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
                   <strong>{generation.templateTitle}</strong>
@@ -279,7 +283,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         <AdminCard title={text.userEventsTitle}>
           <DataList
             emptyTitle={text.userNoEvents}
-            items={analytics.recentTemplateEvents.map((event) => (
+            items={analytics.recentTemplateEvents.slice(0, RECENT_ITEMS_LIMIT).map((event) => (
               <article key={event.eventId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
                   <strong>{event.eventType}</strong>
@@ -312,7 +316,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
       <AdminCard title={text.auditEventsLabel}>
         <DataList
           emptyTitle={text.userNoActivity}
-          items={analytics.recentAuditEvents.map((event) => (
+          items={analytics.recentAuditEvents.slice(0, AUDIT_ITEMS_LIMIT).map((event) => (
             <article key={event.auditEventId} className={styles.dataCard}>
               <div className={styles.dataHeader}>
                 <strong>{event.action}</strong>

@@ -165,12 +165,16 @@ class WalletState {
 
 class WalletController extends Notifier<WalletState> {
   late final WalletRepository _repository;
+  bool _repositoryInitialized = false;
   Future<void>? _loadInFlight;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
   @override
   WalletState build() {
-    _repository = ref.watch(walletRepositoryProvider);
+    if (!_repositoryInitialized) {
+      _repository = ref.read(walletRepositoryProvider);
+      _repositoryInitialized = true;
+    }
     _purchaseSubscription?.cancel();
     _purchaseSubscription = _repository.purchaseUpdates.listen(
       _handlePurchaseUpdates,

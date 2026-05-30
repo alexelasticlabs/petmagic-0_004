@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AdminBadge,
@@ -95,6 +95,7 @@ export function SupportConversationPage({
     hasComposerAttachment,
     inboxQuery,
     isSidePanelOpen,
+    loadOlderMessages,
     primaryStatusAction,
     reply,
     replyToMessage,
@@ -203,6 +204,43 @@ export function SupportConversationPage({
     locale === "ru"
       ? "Единое рабочее пространство для очереди, переписки и действий оператора"
       : "Unified workspace for queue, conversation, and operator actions";
+
+  const groupedConversationFeed = useMemo(
+    () =>
+      conversation
+        ? groupSupportConversationFeed(conversation, {
+            today: text.supportTodayLabel,
+            yesterday: text.supportYesterdayLabel,
+            earlier: text.supportEarlierLabel,
+            ticketCreated: text.supportSystemTicketCreated,
+            ticketResolved: text.supportSystemTicketResolved,
+            ticketReopened: text.supportSystemTicketReopened,
+            ticketClosed: text.supportSystemTicketClosed,
+            ticketClosedByUser: text.supportSystemTicketClosedByUser,
+            ticketClosedByOperator: text.supportSystemTicketClosedByOperator,
+          })
+        : [],
+    [
+      conversation,
+      text.supportEarlierLabel,
+      text.supportSystemTicketClosed,
+      text.supportSystemTicketClosedByOperator,
+      text.supportSystemTicketClosedByUser,
+      text.supportSystemTicketCreated,
+      text.supportSystemTicketReopened,
+      text.supportSystemTicketResolved,
+      text.supportTodayLabel,
+      text.supportYesterdayLabel,
+    ]
+  );
+
+  const messagesById = useMemo(() => {
+    if (!conversation) {
+      return new Map<string, SupportMessage>();
+    }
+
+    return new Map(conversation.messages.map((message) => [message.messageId, message]));
+  }, [conversation]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -1028,17 +1066,22 @@ export function SupportConversationPage({
                 {conversation.messages.length > 0 ? (
                   <div className={styles.messagesWrap}>
                     <div className={styles.messages}>
-                      {groupSupportConversationFeed(conversation, {
-                        today: text.supportTodayLabel,
-                        yesterday: text.supportYesterdayLabel,
-                        earlier: text.supportEarlierLabel,
-                        ticketCreated: text.supportSystemTicketCreated,
-                        ticketResolved: text.supportSystemTicketResolved,
-                        ticketReopened: text.supportSystemTicketReopened,
-                        ticketClosed: text.supportSystemTicketClosed,
-                        ticketClosedByUser: text.supportSystemTicketClosedByUser,
-                        ticketClosedByOperator: text.supportSystemTicketClosedByOperator,
-                      }).map((group) => {
+                      {conversation.hasOlderMessages ? (
+                        <div className={styles.messagesLoadOlderRow}>
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              void loadOlderMessages();
+                            }}
+                            disabled={conversationQuery.isFetching}
+                          >
+                            {locale === "ru"
+                              ? "Загрузить предыдущие сообщения"
+                              : "Load previous messages"}
+                          </Button>
+                        </div>
+                      ) : null}
+                      {groupedConversationFeed.map((group) => {
                         const hasVisibleItems = group.items.some(
                           (item) =>
                             item.kind === "system" ||
@@ -1088,9 +1131,7 @@ export function SupportConversationPage({
                               );
                               const isMediaOnlyBubble = hasMediaMessage && !shouldShowBody;
                               const repliedMessage = message.replyToMessageId
-                                ? (conversation.messages.find(
-                                    (candidate) => candidate.messageId === message.replyToMessageId
-                                  ) ?? null)
+                                ? (messagesById.get(message.replyToMessageId) ?? null)
                                 : null;
                               const repliedAttachment = repliedMessage
                                 ? getMessageAttachments(repliedMessage).find(

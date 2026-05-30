@@ -198,6 +198,14 @@ public sealed class AdminAdjustUserWalletCommandValidator : AbstractValidator<Ad
     }
 }
 
+public sealed class DeleteAdminUserCommandValidator : AbstractValidator<DeleteAdminUserCommand>
+{
+    public DeleteAdminUserCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+    }
+}
+
 public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEmailCommand>
 {
     public SendBulkEmailCommandValidator()

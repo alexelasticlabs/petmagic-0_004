@@ -68,10 +68,21 @@ class SupportChatRepository {
     return SupportChatConversation.fromJson(response.data ?? const {});
   }
 
-  Future<SupportChatConversation> getConversation() async {
+  Future<SupportChatConversation> getConversation({
+    int take = 60,
+    DateTime? beforeMessageCreatedAtUtc,
+  }) async {
+    final query = <String, dynamic>{'take': take};
+    if (beforeMessageCreatedAtUtc != null) {
+      query['beforeMessageCreatedAtUtc'] = beforeMessageCreatedAtUtc
+          .toUtc()
+          .toIso8601String();
+    }
+
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/support/conversation',
+        queryParameters: query,
         options: _authorizedOptions(session),
       ),
     );
@@ -145,7 +156,10 @@ class SupportChatRepository {
     ProgressCallback? onSendProgress,
   }) async {
     if (attachments.isEmpty) {
-      throw const AppException('support.attachment_invalid_upload', statusCode: 400);
+      throw const AppException(
+        'support.attachment_invalid_upload',
+        statusCode: 400,
+      );
     }
 
     final multipartFiles = attachments

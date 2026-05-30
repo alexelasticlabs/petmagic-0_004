@@ -479,51 +479,11 @@ public sealed class IdentityService(
 
     public async Task<Result> DeleteCurrentUserAsync(DeleteCurrentUserCommand command, CancellationToken cancellationToken)
     {
-        var user = await userManager.FindByIdAsync(command.UserId.ToString());
-        if (user is null)
-        {
-            return Result.Failure(IdentityErrors.UserNotFound);
-        }
-
-        var avatarUrl = user.AvatarUrl;
-        var deleteUserResult = await userManager.DeleteAsync(user);
-        if (!deleteUserResult.Succeeded)
-        {
-            return Result.Failure(IdentityErrors.OperationFailed);
-        }
-
-        var refreshSessions = await dbContext.RefreshTokenSessions
-            .Where(x => x.UserId == command.UserId)
-            .ToListAsync(cancellationToken);
-
-        var emailCodes = await dbContext.UserEmailCodes
-            .Where(x => x.UserId == command.UserId)
-            .ToListAsync(cancellationToken);
-
-        var emailJobs = await dbContext.EmailDispatchJobs
-            .Where(x => x.UserId == command.UserId)
-            .ToListAsync(cancellationToken);
-
-        if (refreshSessions.Count > 0)
-        {
-            dbContext.RefreshTokenSessions.RemoveRange(refreshSessions);
-        }
-
-        if (emailCodes.Count > 0)
-        {
-            dbContext.UserEmailCodes.RemoveRange(emailCodes);
-        }
-
-        if (emailJobs.Count > 0)
-        {
-            dbContext.EmailDispatchJobs.RemoveRange(emailJobs);
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await avatarStorage.DeleteAsync(avatarUrl, CancellationToken.None);
-        await WriteAuditAsync(command.UserId, "user.deleted", "User account deleted by owner.", cancellationToken);
-
-        return Result.Success();
+        return await DeleteUserInternalAsync(
+            command.UserId,
+            "user.deleted",
+            "User account deleted by owner.",
+            cancellationToken);
     }
 
     public async Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -777,6 +737,15 @@ public sealed class IdentityService(
             operationResult.Value.OccurredAtUtc));
     }
 
+    public async Task<Result> DeleteAdminUserAsync(DeleteAdminUserCommand command, CancellationToken cancellationToken)
+    {
+        return await DeleteUserInternalAsync(
+            command.UserId,
+            "admin.user.deleted",
+            "User account deleted by admin.",
+            cancellationToken);
+    }
+
     public async Task<Result> SendBulkEmailAsync(SendBulkEmailCommand command, CancellationToken cancellationToken)
     {
         var query = userManager.Users
@@ -909,6 +878,59 @@ public sealed class IdentityService(
         }
 
         await WriteAuditAsync(user.Id, "user.active.updated", $"Active status changed to '{command.IsActive}'.", cancellationToken);
+        return Result.Success();
+    }
+
+    private async Task<Result> DeleteUserInternalAsync(
+        Guid userId,
+        string auditAction,
+        string auditDetails,
+        CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure(IdentityErrors.UserNotFound);
+        }
+
+        var avatarUrl = user.AvatarUrl;
+        var deleteUserResult = await userManager.DeleteAsync(user);
+        if (!deleteUserResult.Succeeded)
+        {
+            return Result.Failure(IdentityErrors.OperationFailed);
+        }
+
+        var refreshSessions = await dbContext.RefreshTokenSessions
+            .Where(x => x.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        var emailCodes = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        var emailJobs = await dbContext.EmailDispatchJobs
+            .Where(x => x.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        if (refreshSessions.Count > 0)
+        {
+            dbContext.RefreshTokenSessions.RemoveRange(refreshSessions);
+        }
+
+        if (emailCodes.Count > 0)
+        {
+            dbContext.UserEmailCodes.RemoveRange(emailCodes);
+        }
+
+        if (emailJobs.Count > 0)
+        {
+            dbContext.EmailDispatchJobs.RemoveRange(emailJobs);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await avatarStorage.DeleteAsync(avatarUrl, CancellationToken.None);
+        await WriteAuditAsync(userId, auditAction, auditDetails, cancellationToken);
+
         return Result.Success();
     }
 

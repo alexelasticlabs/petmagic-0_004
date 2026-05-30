@@ -51,6 +51,8 @@ public interface IEconomyService
 
     Task<Result<SubscriptionSummaryResponse>> CancelPremiumSubscriptionAsync(CancelPremiumSubscriptionCommand command, CancellationToken cancellationToken);
 
+    Task<Result<SubscriptionSummaryResponse>> AdminRevokePremiumSubscriptionAsync(AdminRevokePremiumSubscriptionCommand command, CancellationToken cancellationToken);
+
     Task<Result<PremiumStoreVerificationResponse>> VerifyPremiumStorePurchaseAsync(VerifyPremiumStorePurchaseCommand command, CancellationToken cancellationToken);
 
     Task<Result<SubscriptionSummaryResponse>> VerifyPremiumStripeSubscriptionAsync(VerifyPremiumStripeSubscriptionCommand command, CancellationToken cancellationToken);

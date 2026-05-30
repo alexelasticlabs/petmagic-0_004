@@ -506,6 +506,9 @@ class PremiumController extends Notifier<PremiumState> {
 
       try {
         await _repository.restoreStorePurchases();
+        await _refreshProfile();
+        await load(refresh: true);
+        ref.invalidate(premiumSubscriptionSummaryProvider);
         state = state.copyWith(
           isRestoring: false,
           successMessage: 'premium.restore_started',
@@ -528,6 +531,7 @@ class PremiumController extends Notifier<PremiumState> {
 
     await _refreshProfile();
     await load(refresh: true);
+    ref.invalidate(premiumSubscriptionSummaryProvider);
 
     state = state.copyWith(
       isRestoring: false,

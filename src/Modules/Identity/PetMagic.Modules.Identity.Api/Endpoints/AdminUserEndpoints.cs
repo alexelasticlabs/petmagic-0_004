@@ -27,6 +27,7 @@ public static class AdminUserEndpoints
         group.MapPost("/emails", SendBulkEmailAsync).RequireAuthorization("AdminOnly");
         group.MapPut("/{userId:guid}/role", AssignRoleAsync).RequireAuthorization("AdminOnly");
         group.MapDelete("/{userId:guid}/role", RevokeRoleAsync).RequireAuthorization("AdminOnly");
+        group.MapDelete("/{userId:guid}", DeleteUserAsync).RequireAuthorization("AdminOnly");
         group.MapPut("/{userId:guid}/premium", SetPremiumStatusAsync);
         group.MapPut("/{userId:guid}/active", SetActiveStatusAsync);
 
@@ -210,6 +211,34 @@ public static class AdminUserEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> DeleteUserAsync(
+        [FromRoute] Guid userId,
+        [FromServices] IValidator<DeleteAdminUserCommand> validator,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var command = new DeleteAdminUserCommand(userId);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.DeleteAdminUserAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                "users.not_found" => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
         return TypedResults.NoContent();

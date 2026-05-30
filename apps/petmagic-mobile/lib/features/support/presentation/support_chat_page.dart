@@ -410,6 +410,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
                         showLoadingFallback: _showLoadingFallback,
                         loadingFallbackMessageCode: _loadingFallbackMessageCode,
                         onRefresh: _controller.refresh,
+                        onLoadOlderMessages: _controller.loadOlderMessages,
                         onRetryInitialize: () {
                           _clearLoadingFallback(notify: true);
                           _controller.initialize();

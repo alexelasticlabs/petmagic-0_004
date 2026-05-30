@@ -37,11 +37,29 @@ export async function fetchSupportInbox(
 }
 
 export async function fetchSupportConversation(
-  conversationId: string
+  conversationId: string,
+  options?: {
+    take?: number;
+    beforeMessageCreatedAtUtc?: string | null;
+  }
 ): Promise<AdminSupportConversation> {
-  return apiRequest<AdminSupportConversation>(`/api/admin/support/tickets/${conversationId}`, {
-    method: "GET",
-  });
+  const searchParams = new URLSearchParams();
+  if (options?.take && options.take > 0) {
+    searchParams.set("take", String(options.take));
+  }
+
+  if (options?.beforeMessageCreatedAtUtc) {
+    searchParams.set("beforeMessageCreatedAtUtc", options.beforeMessageCreatedAtUtc);
+  }
+
+  const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
+
+  return apiRequest<AdminSupportConversation>(
+    `/api/admin/support/tickets/${conversationId}${query}`,
+    {
+      method: "GET",
+    }
+  );
 }
 
 export async function sendSupportMessage(
@@ -55,9 +73,7 @@ export async function sendSupportMessage(
       method: "POST",
       body: JSON.stringify({
         body,
-        ...(replyToMessageId?.trim()
-          ? { replyToMessageId: replyToMessageId.trim() }
-          : {}),
+        ...(replyToMessageId?.trim() ? { replyToMessageId: replyToMessageId.trim() } : {}),
       }),
     }
   );

@@ -81,8 +81,8 @@ class GenerationHistoryState {
       unreadCount: unreadCount ?? this.unreadCount,
       isLoading: isLoading ?? this.isLoading,
       syncFailed: syncFailed ?? this.syncFailed,
-        showOfflineBanner: showOfflineBanner ?? this.showOfflineBanner,
-        isConnectionRecovered:
+      showOfflineBanner: showOfflineBanner ?? this.showOfflineBanner,
+      isConnectionRecovered:
           isConnectionRecovered ?? this.isConnectionRecovered,
       lastSyncedAtUtc: clearLastSyncedAtUtc
           ? null

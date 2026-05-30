@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 using PetMagic.Modules.Identity.Application.Contracts;
@@ -294,7 +295,7 @@ public sealed partial class EconomyService
                     (order, pack) => new { order, pack })
                 .Where(x =>
                     x.order.PaymentProvider == "app_store"
-                    && x.order.Status == "pending"
+                    && x.order.Status == PurchaseOrderStatus.Pending
                     && x.order.ExternalPaymentId == parsed.ExternalPurchaseId)
                 .OrderByDescending(x => x.order.CreatedAtUtc)
                 .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "app_store") })
@@ -421,7 +422,7 @@ public sealed partial class EconomyService
                     (order, pack) => new { order, pack })
                 .Where(x =>
                     x.order.PaymentProvider == "google_play"
-                    && x.order.Status == "pending"
+                    && x.order.Status == PurchaseOrderStatus.Pending
                     && !string.IsNullOrWhiteSpace(parsed.PurchaseToken)
                     && x.order.ExternalPaymentId == parsed.PurchaseToken)
                 .OrderByDescending(x => x.order.CreatedAtUtc)

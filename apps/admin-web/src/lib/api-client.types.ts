@@ -463,6 +463,8 @@ export type AdminSupportConversation = {
   isReadOnly: boolean;
   canReopen: boolean;
   availableActions: string[];
+  hasOlderMessages?: boolean;
+  oldestLoadedMessageCreatedAtUtc?: string | null;
   messages: AdminSupportMessage[];
 };
 
