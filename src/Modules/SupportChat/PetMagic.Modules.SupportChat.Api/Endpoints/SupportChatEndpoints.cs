@@ -23,7 +23,16 @@ public static class SupportChatEndpoints
     {
         var userGroup = endpoints.MapGroup("/api/support")
             .WithTags("Support")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context =>
+                    context.User.IsInRole("Admin")
+                    || context.User.IsInRole("Moderator")
+                    || !context.User.HasClaim(c => c.Type == "account_status")
+                    || string.Equals(
+                        context.User.FindFirst("account_status")?.Value,
+                        "Active",
+                        StringComparison.Ordinal)));
 
         userGroup.MapPost("/conversation/open", OpenConversationAsync)
             .RequireRateLimiting("support-chat");

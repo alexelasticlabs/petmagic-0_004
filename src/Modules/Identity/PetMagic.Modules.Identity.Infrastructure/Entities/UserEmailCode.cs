@@ -23,4 +23,8 @@ public sealed class UserEmailCode
     public DateTime? LastSentAtUtc { get; set; }
 
     public int SendCount { get; set; }
+
+    public int FailedAttemptCount { get; set; }
+
+    public DateTime? LockedAtUtc { get; set; }
 }

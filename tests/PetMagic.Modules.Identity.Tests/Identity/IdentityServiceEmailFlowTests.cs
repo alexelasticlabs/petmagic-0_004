@@ -30,7 +30,7 @@ public sealed class IdentityServiceEmailFlowTests
     private const string CurrentLegalVersion = "2026-05-20";
 
     [Fact]
-    public async Task RegisterAsync_ShouldPersistPreferences_And_AllowImmediateLogin()
+    public async Task RegisterAsync_ShouldPersistPreferences_And_RequireEmailVerificationBeforeLogin()
     {
         await using var dbContext = CreateDbContext();
         var service = await CreateServiceAsync(dbContext);
@@ -40,14 +40,15 @@ public sealed class IdentityServiceEmailFlowTests
             CancellationToken.None);
 
         Assert.True(registerResult.IsSuccess);
-        Assert.True(registerResult.Value.EmailConfirmed);
+        Assert.False(registerResult.Value.EmailConfirmed);
+        Assert.Equal("PendingEmailVerification", registerResult.Value.AccountStatus);
         Assert.True(registerResult.Value.TermsOfUseAccepted);
         Assert.True(registerResult.Value.PrivacyPolicyAccepted);
         Assert.True(registerResult.Value.MarketingEmailsEnabled);
         Assert.False(registerResult.Value.LegalAcceptance.RequiresAcceptance);
 
         var persistedUser = await dbContext.Users.SingleAsync();
-        Assert.True(persistedUser.EmailConfirmed);
+        Assert.False(persistedUser.EmailConfirmed);
         Assert.True(persistedUser.TermsOfUseAccepted);
         Assert.NotNull(persistedUser.TermsOfUseAcceptedAtUtc);
         Assert.Equal(CurrentLegalVersion, persistedUser.TermsOfUseAcceptedVersion);
@@ -56,18 +57,18 @@ public sealed class IdentityServiceEmailFlowTests
         Assert.Equal(CurrentLegalVersion, persistedUser.PrivacyPolicyAcceptedVersion);
         Assert.True(persistedUser.MarketingEmailsEnabled);
         Assert.NotNull(persistedUser.MarketingEmailsUpdatedAtUtc);
-        Assert.Empty(await dbContext.UserEmailCodes.ToListAsync());
-        Assert.Empty(await dbContext.EmailDispatchJobs.ToListAsync());
+        Assert.Single(await dbContext.UserEmailCodes.ToListAsync());
+        Assert.Single(await dbContext.EmailDispatchJobs.ToListAsync());
 
         var loginResult = await service.LoginAsync(
             new LoginCommand("demo.user@petmagic.app", "StrongPassword123"),
             CancellationToken.None);
 
-        Assert.True(loginResult.IsSuccess);
+        Assert.True(loginResult.IsFailure);
     }
 
     [Fact]
-    public async Task RequestEmailConfirmationAsync_ShouldBeNoOp_ForAlreadyConfirmedSelfRegistration()
+    public async Task RequestEmailConfirmationAsync_ShouldIssueCode_ForPendingRegistration()
     {
         await using var dbContext = CreateDbContext();
         var service = await CreateServiceAsync(dbContext);
@@ -85,15 +86,15 @@ public sealed class IdentityServiceEmailFlowTests
         Assert.True(requestResult.IsSuccess);
 
         var persistedUser = await dbContext.Users.SingleAsync();
-        Assert.True(persistedUser.EmailConfirmed);
-        Assert.Empty(await dbContext.UserEmailCodes.ToListAsync());
-        Assert.Empty(await dbContext.EmailDispatchJobs.ToListAsync());
+        Assert.False(persistedUser.EmailConfirmed);
+        Assert.NotEmpty(await dbContext.UserEmailCodes.ToListAsync());
+        Assert.NotEmpty(await dbContext.EmailDispatchJobs.ToListAsync());
 
         var loginResult = await service.LoginAsync(
             new LoginCommand("confirm.me@petmagic.app", "StrongPassword123"),
             CancellationToken.None);
 
-        Assert.True(loginResult.IsSuccess);
+        Assert.True(loginResult.IsFailure);
     }
 
     [Fact]
@@ -276,8 +277,8 @@ public sealed class IdentityServiceEmailFlowTests
                 FromAddress = "no-reply@petmagic.app",
                 FromName = "PetMagic",
                 VerificationCodeLength = 6,
-                VerificationCodeTtlMinutes = 15,
-                PasswordResetCodeTtlMinutes = 15
+                VerificationCodeTtlMinutes = 10,
+                PasswordResetCodeTtlMinutes = 10
             },
             new AvatarStorageOptions(),
             Options.Create(new JwtOptions()));

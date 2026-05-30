@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Infrastructure.Data;
@@ -32,6 +33,9 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.AvatarUrl).HasMaxLength(2048);
             entity.Property(x => x.AvatarFileName).HasMaxLength(256);
             entity.Property(x => x.AvatarContentType).HasMaxLength(128);
+            entity.Property(x => x.AccountStatus).HasConversion<int>().HasDefaultValue(AccountStatus.PendingEmailVerification);
+            entity.Property(x => x.AccountStatusUpdatedAtUtc);
+            entity.HasIndex(x => x.AccountStatus);
             entity.HasIndex(x => x.Email).IsUnique();
         });
 
@@ -68,6 +72,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.CodeHash).HasMaxLength(128).IsRequired();
             entity.Property(x => x.Purpose).HasConversion<int>().IsRequired();
             entity.HasIndex(x => new { x.UserId, x.Purpose, x.ExpiresAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.Purpose, x.LockedAtUtc });
             entity.HasIndex(x => new { x.Email, x.Purpose, x.ConsumedAtUtc });
         });
 

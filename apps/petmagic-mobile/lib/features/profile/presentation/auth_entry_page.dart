@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
@@ -459,6 +460,13 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
 
     final nextState = ref.read(profileControllerProvider);
     if (!nextState.isAuthenticated || !context.mounted) {
+      if (_isSignUp &&
+          nextState.successMessage == 'auth.registration_pending_verification') {
+        final email = nextState.email.trim();
+        router.go(
+          '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}',
+        );
+      }
       return;
     }
     router.go(TemplatesPage.routePath);

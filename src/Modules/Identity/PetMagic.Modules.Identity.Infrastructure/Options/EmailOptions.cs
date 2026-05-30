@@ -18,11 +18,11 @@ public sealed class EmailOptions
 
     public string FromName { get; init; } = "PetMagic";
 
-    public int VerificationCodeLength { get; init; } = 8;
+    public int VerificationCodeLength { get; init; } = 6;
 
-    public int VerificationCodeTtlMinutes { get; init; } = 15;
+    public int VerificationCodeTtlMinutes { get; init; } = 10;
 
-    public int PasswordResetCodeTtlMinutes { get; init; } = 15;
+    public int PasswordResetCodeTtlMinutes { get; init; } = 10;
 
     public int ConfirmationResendCooldownSeconds { get; init; } = 60;
 
@@ -42,3 +42,4 @@ public sealed class EmailOptions
         && !string.IsNullOrWhiteSpace(Password)
         && !string.IsNullOrWhiteSpace(FromAddress);
 }
+

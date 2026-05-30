@@ -12,6 +12,8 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authLegalUnavailable;
     case 'auth.password_reset_code_invalid':
       return text.authPasswordResetCodeInvalid;
+    case 'auth.email_code_invalid':
+      return text.authPasswordResetCodeInvalid;
     case 'auth.external_cancelled':
       return text.authExternalCancelled;
     case 'auth.external_callback_failed':
@@ -38,6 +40,10 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authPasswordResetRequestFailed;
     case 'auth.password_reset_failed':
       return text.authPasswordResetFailed;
+    case 'auth.email_verification_failed':
+      return text.authPasswordResetFailed;
+    case 'auth.email_verification_resend_failed':
+      return text.authRequestFailed;
     case 'auth.request_failed':
       return text.authRequestFailed;
     case 'profile.action_failed':

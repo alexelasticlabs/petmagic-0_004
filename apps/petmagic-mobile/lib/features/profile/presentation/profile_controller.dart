@@ -263,7 +263,7 @@ class ProfileController extends Notifier<ProfileState> {
     );
 
     try {
-      final session = await _repository.register(
+      await _repository.register(
         email: state.email,
         password: state.password,
         displayName: state.displayName,
@@ -273,21 +273,14 @@ class ProfileController extends Notifier<ProfileState> {
         privacyPolicyVersion: legalDocuments.privacyPolicy.version,
         marketingEmailsEnabled: marketingEmailsEnabled,
       );
-      final profile = await _repository.fetchProfile();
-      final hydratedSession = AuthSession(
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        expiresAtUtc: session.expiresAtUtc,
-        user: profile,
-      );
       state = state.copyWith(
         isSaving: false,
-        session: hydratedSession,
-        profile: profile,
+        clearSession: true,
+        clearProfile: true,
         password: '',
         confirmPassword: '',
+        successMessage: 'auth.registration_pending_verification',
       );
-      ref.read(appLaunchControllerProvider.notifier).markSignedIn();
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (_) {

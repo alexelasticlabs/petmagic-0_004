@@ -27,7 +27,17 @@ public static class EconomyEndpoints
     {
         var group = endpoints.MapGroup("/api/economy")
             .WithTags("Economy")
-            .RequireRateLimiting("economy");
+            .RequireRateLimiting("economy")
+            .RequireAuthorization(policy => policy
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context =>
+                    context.User.IsInRole("Admin")
+                    || context.User.IsInRole("Moderator")
+                    || !context.User.HasClaim(c => c.Type == "account_status")
+                    || string.Equals(
+                        context.User.FindFirst("account_status")?.Value,
+                        "Active",
+                        StringComparison.Ordinal)));
 
         group.MapGet("/wallet", GetWalletAsync)
             .RequireAuthorization();
@@ -127,7 +137,17 @@ public static class EconomyEndpoints
 
         var stripePaymentsGroup = endpoints.MapGroup("/api/payments/stripe")
             .WithTags("Stripe Payments")
-            .RequireRateLimiting("economy");
+            .RequireRateLimiting("economy")
+            .RequireAuthorization(policy => policy
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context =>
+                    context.User.IsInRole("Admin")
+                    || context.User.IsInRole("Moderator")
+                    || !context.User.HasClaim(c => c.Type == "account_status")
+                    || string.Equals(
+                        context.User.FindFirst("account_status")?.Value,
+                        "Active",
+                        StringComparison.Ordinal)));
 
         stripePaymentsGroup.MapPost("/token-purchase", CreateStripeTokenPurchaseAsync)
             .RequireAuthorization();

@@ -46,7 +46,7 @@ class ProfileRepository {
 
   Future<AuthSession?> readSession() => _sessionStorage.read();
 
-  Future<AuthSession> register({
+  Future<void> register({
     required String email,
     required String password,
     required bool termsOfUseAccepted,
@@ -73,7 +73,7 @@ class ProfileRepository {
         },
       );
 
-      return login(email: email, password: password);
+      return;
     } on DioException catch (error) {
       throw _mapDioException(
         error,
@@ -103,7 +103,7 @@ class ProfileRepository {
   Future<void> requestPasswordReset({required String email}) async {
     try {
       await _dio.post<void>(
-        '/api/auth/password-reset/request',
+        '/api/auth/request-password-reset',
         data: {'email': email.trim()},
       );
     } on DioException catch (error) {
@@ -121,7 +121,7 @@ class ProfileRepository {
   }) async {
     try {
       await _dio.post<void>(
-        '/api/auth/password-reset/confirm',
+        '/api/auth/reset-password',
         data: {
           'email': email.trim(),
           'code': code.trim(),
@@ -132,6 +132,37 @@ class ProfileRepository {
       throw _mapDioException(
         error,
         fallbackMessage: 'auth.password_reset_failed',
+      );
+    }
+  }
+
+  Future<void> resendEmailVerificationCode({required String email}) async {
+    try {
+      await _dio.post<void>(
+        '/api/auth/resend-email-verification-code',
+        data: {'email': email.trim()},
+      );
+    } on DioException catch (error) {
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.email_verification_resend_failed',
+      );
+    }
+  }
+
+  Future<void> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/api/auth/verify-email-code',
+        data: {'email': email.trim(), 'code': code.trim()},
+      );
+    } on DioException catch (error) {
+      throw _mapDioException(
+        error,
+        fallbackMessage: 'auth.email_verification_failed',
       );
     }
   }

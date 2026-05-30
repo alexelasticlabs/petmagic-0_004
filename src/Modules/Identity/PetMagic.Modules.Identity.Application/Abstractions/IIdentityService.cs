@@ -11,11 +11,19 @@ public interface IIdentityService
 
     Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken);
 
+    Task<Result> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken);
+
+    Task<Result> ResendEmailVerificationCodeAsync(ResendEmailVerificationCodeCommand command, CancellationToken cancellationToken);
+
     Task<Result> RequestEmailConfirmationAsync(RequestEmailConfirmationCommand command, CancellationToken cancellationToken);
 
     Task<Result> ConfirmEmailAsync(ConfirmEmailCommand command, CancellationToken cancellationToken);
 
     Task<Result> RequestPasswordResetAsync(RequestPasswordResetCommand command, CancellationToken cancellationToken);
+
+    Task<Result> VerifyPasswordResetCodeAsync(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken);
+
+    Task<Result> ResetPasswordAsync(ResetPasswordCommand command, CancellationToken cancellationToken);
 
     Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken);
 

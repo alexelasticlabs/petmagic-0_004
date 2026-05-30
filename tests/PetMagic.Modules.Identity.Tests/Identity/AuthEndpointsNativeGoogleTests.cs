@@ -185,9 +185,13 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
         public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
+        public Task<Result> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> ResendEmailVerificationCodeAsync(ResendEmailVerificationCodeCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> RequestEmailConfirmationAsync(RequestEmailConfirmationCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> ConfirmEmailAsync(ConfirmEmailCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> RequestPasswordResetAsync(RequestPasswordResetCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> VerifyPasswordResetCodeAsync(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken) => NotSupported();
+        public Task<Result> ResetPasswordAsync(ResetPasswordCommand command, CancellationToken cancellationToken) => NotSupported();
         public Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken) => NotSupported();
 
         public Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
@@ -204,6 +208,7 @@ public sealed class AuthEndpointsNativeGoogleTests
                     command.DisplayName,
                     false,
                     true,
+                    "Active",
                     true,
                     false,
                     false,
@@ -235,6 +240,7 @@ public sealed class AuthEndpointsNativeGoogleTests
                     "Pet Parent",
                     false,
                     true,
+                    "Active",
                     true,
                     false,
                     false,

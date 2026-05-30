@@ -4,6 +4,7 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
@@ -34,8 +35,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = location == AuthEntryPage.routePath;
       final isRegisterRoute = location == RegisterEntryPage.routePath;
       final isPasswordResetRoute = location == PasswordResetPage.routePath;
+      final isVerifyEmailRoute = location == EmailVerificationPage.routePath;
       final isPublicAuthRoute =
-          isAuthRoute || isRegisterRoute || isPasswordResetRoute;
+          isAuthRoute || isRegisterRoute || isPasswordResetRoute || isVerifyEmailRoute;
 
       if (launchState.isLoading) {
         return isStartupRoute ? null : StartupLoadingPage.routePath;
@@ -103,6 +105,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => NoTransitionPage(
           child: PasswordResetPage(
             initialEmail: state.uri.queryParameters['email'],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: EmailVerificationPage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: EmailVerificationPage(
+            email: state.uri.queryParameters['email'] ?? '',
           ),
         ),
       ),

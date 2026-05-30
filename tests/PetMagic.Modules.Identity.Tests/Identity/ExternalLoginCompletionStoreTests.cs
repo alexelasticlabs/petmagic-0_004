@@ -62,6 +62,7 @@ public sealed class ExternalLoginCompletionStoreTests
                 "Pet Parent",
                 false,
                 true,
+                "Active",
                 true,
                 false,
                 false,

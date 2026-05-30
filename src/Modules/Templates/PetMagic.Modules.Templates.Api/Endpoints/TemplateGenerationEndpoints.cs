@@ -26,7 +26,17 @@ public static class TemplateGenerationEndpoints
     {
         var group = endpoints.MapGroup("/api/templates")
             .WithTags("Template Generations")
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("templates")
+            .RequireAuthorization(policy => policy
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context =>
+                    context.User.IsInRole("Admin")
+                    || context.User.IsInRole("Moderator")
+                    || !context.User.HasClaim(c => c.Type == "account_status")
+                    || string.Equals(
+                        context.User.FindFirst("account_status")?.Value,
+                        "Active",
+                        StringComparison.Ordinal)));
 
         group.MapPost("/{templateId:guid}/generations", StartGenerationAsync)
             .RequireAuthorization()

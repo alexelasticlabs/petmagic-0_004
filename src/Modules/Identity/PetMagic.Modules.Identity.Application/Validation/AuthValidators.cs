@@ -54,6 +54,26 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
     }
 }
 
+public sealed class ResendEmailVerificationCodeCommandValidator : AbstractValidator<ResendEmailVerificationCodeCommand>
+{
+    public ResendEmailVerificationCodeCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+    }
+}
+
+public sealed class VerifyEmailCodeCommandValidator : AbstractValidator<VerifyEmailCodeCommand>
+{
+    public VerifyEmailCodeCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Code)
+            .NotEmpty()
+            .Length(6)
+            .Matches("^[0-9]{6}$");
+    }
+}
+
 public sealed class RequestEmailConfirmationCommandValidator : AbstractValidator<RequestEmailConfirmationCommand>
 {
     public RequestEmailConfirmationCommandValidator()
@@ -69,8 +89,8 @@ public sealed class ConfirmEmailCommandValidator : AbstractValidator<ConfirmEmai
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Code)
             .NotEmpty()
-            .MinimumLength(8)
-            .MaximumLength(12);
+            .Length(6)
+            .Matches("^[0-9]{6}$");
     }
 }
 
@@ -82,6 +102,40 @@ public sealed class RequestPasswordResetCommandValidator : AbstractValidator<Req
     }
 }
 
+public sealed class VerifyPasswordResetCodeCommandValidator : AbstractValidator<VerifyPasswordResetCodeCommand>
+{
+    public VerifyPasswordResetCodeCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Code)
+            .NotEmpty()
+            .Length(6)
+            .Matches("^[0-9]{6}$");
+    }
+}
+
+public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordCommand>
+{
+    public ResetPasswordCommandValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Code)
+            .NotEmpty()
+            .Length(6)
+            .Matches("^[0-9]{6}$");
+        RuleFor(x => x.NewPassword)
+            .NotEmpty()
+            .MinimumLength(8)
+            .WithMessage("Password must be at least 8 characters long.")
+            .Matches("[A-Z]")
+            .WithMessage("Password must contain at least one uppercase letter.")
+            .Matches("[a-z]")
+            .WithMessage("Password must contain at least one lowercase letter.")
+            .Matches("[0-9]")
+            .WithMessage("Password must contain at least one digit.");
+    }
+}
+
 public sealed class ConfirmPasswordResetCommandValidator : AbstractValidator<ConfirmPasswordResetCommand>
 {
     public ConfirmPasswordResetCommandValidator()
@@ -89,8 +143,8 @@ public sealed class ConfirmPasswordResetCommandValidator : AbstractValidator<Con
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Code)
             .NotEmpty()
-            .MinimumLength(8)
-            .MaximumLength(12);
+            .Length(6)
+            .Matches("^[0-9]{6}$");
         RuleFor(x => x.NewPassword)
             .NotEmpty()
             .MinimumLength(8)
@@ -198,14 +252,6 @@ public sealed class AdminAdjustUserWalletCommandValidator : AbstractValidator<Ad
     }
 }
 
-public sealed class DeleteAdminUserCommandValidator : AbstractValidator<DeleteAdminUserCommand>
-{
-    public DeleteAdminUserCommandValidator()
-    {
-        RuleFor(x => x.UserId).NotEmpty();
-    }
-}
-
 public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEmailCommand>
 {
     public SendBulkEmailCommandValidator()
@@ -228,5 +274,13 @@ public sealed class SendBulkEmailCommandValidator : AbstractValidator<SendBulkEm
                 !string.Equals(command.Audience, EmailAudiences.Selected, StringComparison.OrdinalIgnoreCase)
                 || (userIds is { Count: > 0 } && userIds.All(id => id != Guid.Empty)))
             .WithMessage("Selected audience requires at least one user id.");
+    }
+}
+
+public sealed class DeleteAdminUserCommandValidator : AbstractValidator<DeleteAdminUserCommand>
+{
+    public DeleteAdminUserCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
     }
 }

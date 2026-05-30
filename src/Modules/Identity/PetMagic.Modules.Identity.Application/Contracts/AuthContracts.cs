@@ -12,11 +12,19 @@ public sealed record RegisterUserCommand(
 
 public sealed record LoginCommand(string Email, string Password);
 
+public sealed record VerifyEmailCodeCommand(string Email, string Code);
+
+public sealed record ResendEmailVerificationCodeCommand(string Email);
+
 public sealed record RequestEmailConfirmationCommand(string Email);
 
 public sealed record ConfirmEmailCommand(string Email, string Code);
 
 public sealed record RequestPasswordResetCommand(string Email);
+
+public sealed record VerifyPasswordResetCodeCommand(string Email, string Code);
+
+public sealed record ResetPasswordCommand(string Email, string Code, string NewPassword);
 
 public sealed record ConfirmPasswordResetCommand(string Email, string Code, string NewPassword);
 
@@ -60,6 +68,7 @@ public sealed record UserProfileResponse(
     string? DisplayName,
     bool IsPremium,
     bool EmailConfirmed,
+    string AccountStatus,
     bool TermsOfUseAccepted,
     bool PrivacyPolicyAccepted,
     bool MarketingEmailsEnabled,
@@ -74,6 +83,7 @@ public sealed record UserListItemResponse(
     bool IsPremium,
     bool IsActive,
     bool EmailConfirmed,
+    string AccountStatus,
     bool TermsOfUseAccepted,
     bool PrivacyPolicyAccepted,
     bool MarketingEmailsEnabled,

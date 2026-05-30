@@ -36,6 +36,9 @@ public sealed class IdentityService(
     AvatarStorageOptions avatarStorageOptions,
     IOptions<JwtOptions> jwtOptions) : IIdentityService
 {
+    private const int MaxCodeAttempts = 5;
+    private const int MaxCodesPerHourPerEmail = 5;
+
     public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken)
     {
         return Task.FromResult(Result.Success(legalDocumentsCatalog.GetCurrentDocuments(locale)));
@@ -46,20 +49,52 @@ public sealed class IdentityService(
         var email = command.Email.Trim();
         var normalizedEmail = email.ToUpperInvariant();
         var existing = await userManager.Users
-            .AnyAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
-
-        if (existing)
-        {
-            return Result.Failure<UserProfileResponse>(IdentityErrors.UserAlreadyExists);
-        }
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
 
         var now = DateTime.UtcNow;
-        var user = new AppUser
+        AppUser user;
+        if (existing is not null)
+        {
+            if (existing.EmailConfirmed || existing.AccountStatus == AccountStatus.Active)
+            {
+                return Result.Failure<UserProfileResponse>(IdentityErrors.UserAlreadyExists);
+            }
+
+            existing.DisplayName = command.DisplayName;
+            existing.TermsOfUseAccepted = command.TermsOfUseAccepted;
+            existing.TermsOfUseAcceptedAtUtc = command.TermsOfUseAccepted ? now : null;
+            existing.TermsOfUseAcceptedVersion = command.TermsOfUseAccepted ? command.TermsOfUseVersion : null;
+            existing.PrivacyPolicyAccepted = command.PrivacyPolicyAccepted;
+            existing.PrivacyPolicyAcceptedAtUtc = command.PrivacyPolicyAccepted ? now : null;
+            existing.PrivacyPolicyAcceptedVersion = command.PrivacyPolicyAccepted ? command.PrivacyPolicyVersion : null;
+            existing.MarketingEmailsEnabled = command.MarketingEmailsEnabled;
+            existing.MarketingEmailsUpdatedAtUtc = now;
+            existing.IsActive = true;
+            existing.EmailConfirmed = false;
+            existing.AccountStatus = AccountStatus.PendingEmailVerification;
+            existing.AccountStatusUpdatedAtUtc = now;
+            existing.PasswordHash = userManager.PasswordHasher.HashPassword(existing, command.Password);
+            existing.SecurityStamp = Guid.NewGuid().ToString("N");
+
+            var updateExistingResult = await userManager.UpdateAsync(existing);
+            if (!updateExistingResult.Succeeded)
+            {
+                return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
+            }
+
+            user = existing;
+            await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
+            await WriteAuditAsync(user.Id, "user.registered.pending.reissue", "Pending registration reissued verification code.", cancellationToken);
+            var existingRoles = await userManager.GetRolesAsync(user);
+            return Result.Success(ToUserProfileResponse(user, existingRoles.Count == 0 ? [SystemRoles.User] : existingRoles));
+        }
+
+        user = new AppUser
         {
             Id = Guid.NewGuid(),
             UserName = email,
             Email = email,
-            EmailConfirmed = true,
+            EmailConfirmed = false,
             DisplayName = command.DisplayName,
             TermsOfUseAccepted = command.TermsOfUseAccepted,
             TermsOfUseAcceptedAtUtc = command.TermsOfUseAccepted ? now : null,
@@ -71,7 +106,9 @@ public sealed class IdentityService(
             MarketingEmailsUpdatedAtUtc = now,
             IsPremium = false,
             IsActive = true,
-            CreatedAtUtc = now
+            CreatedAtUtc = now,
+            AccountStatus = AccountStatus.PendingEmailVerification,
+            AccountStatusUpdatedAtUtc = now
         };
 
         var createResult = await userManager.CreateAsync(user, command.Password);
@@ -86,9 +123,20 @@ public sealed class IdentityService(
             return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
         }
 
-        await WriteAuditAsync(user.Id, "user.registered", "User self-registration completed.", cancellationToken);
+        await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
+        await WriteAuditAsync(user.Id, "user.registered.pending", "User self-registration completed and email verification required.", cancellationToken);
 
         return Result.Success(ToUserProfileResponse(user, [SystemRoles.User]));
+    }
+
+    public Task<Result> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken)
+    {
+        return ConfirmEmailAsync(new ConfirmEmailCommand(command.Email, command.Code), cancellationToken);
+    }
+
+    public Task<Result> ResendEmailVerificationCodeAsync(ResendEmailVerificationCodeCommand command, CancellationToken cancellationToken)
+    {
+        return RequestEmailConfirmationAsync(new RequestEmailConfirmationCommand(command.Email), cancellationToken);
     }
 
     public async Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken)
@@ -146,6 +194,16 @@ public sealed class IdentityService(
             return Result.Success();
         }
 
+        var sentInWindow = await dbContext.UserEmailCodes
+            .Where(x => x.Email == user.Email
+                && x.Purpose == EmailCodePurpose.EmailConfirmation
+                && x.RequestedAtUtc > now.AddHours(-1))
+            .CountAsync(cancellationToken);
+        if (sentInWindow >= MaxCodesPerHourPerEmail)
+        {
+            return Result.Success();
+        }
+
         await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
         await WriteAuditAsync(user.Id, "user.email_confirmation.requested", "Email confirmation code requested.", cancellationToken);
         return Result.Success();
@@ -171,11 +229,14 @@ public sealed class IdentityService(
         var codeEntity = await FindMatchingCodeAsync(user.Id, EmailCodePurpose.EmailConfirmation, command.Code, now, cancellationToken);
         if (codeEntity is null)
         {
+            await RegisterCodeFailureAsync(user.Id, EmailCodePurpose.EmailConfirmation, now, cancellationToken);
             return Result.Failure(IdentityErrors.EmailCodeInvalid);
         }
 
         codeEntity.ConsumedAtUtc = now;
         user.EmailConfirmed = true;
+        user.AccountStatus = AccountStatus.Active;
+        user.AccountStatusUpdatedAtUtc = now;
 
         var updateResult = await userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
@@ -198,9 +259,47 @@ public sealed class IdentityService(
             return Result.Success();
         }
 
+        var now = DateTime.UtcNow;
+        var sentInWindow = await dbContext.UserEmailCodes
+            .Where(x => x.Email == user.Email
+                && x.Purpose == EmailCodePurpose.PasswordReset
+                && x.RequestedAtUtc > now.AddHours(-1))
+            .CountAsync(cancellationToken);
+        if (sentInWindow >= MaxCodesPerHourPerEmail)
+        {
+            return Result.Success();
+        }
+
         await QueueEmailCodeAsync(user, EmailCodePurpose.PasswordReset, cancellationToken);
         await WriteAuditAsync(user.Id, "auth.password_reset.requested", "Password reset requested.", cancellationToken);
         return Result.Success();
+    }
+
+    public async Task<Result> VerifyPasswordResetCodeAsync(VerifyPasswordResetCodeCommand command, CancellationToken cancellationToken)
+    {
+        var email = command.Email.Trim();
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == email.ToUpperInvariant(), cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return Result.Failure(IdentityErrors.PasswordResetCodeInvalid);
+        }
+
+        var now = DateTime.UtcNow;
+        var codeEntity = await FindMatchingCodeAsync(user.Id, EmailCodePurpose.PasswordReset, command.Code, now, cancellationToken);
+        if (codeEntity is null)
+        {
+            await RegisterCodeFailureAsync(user.Id, EmailCodePurpose.PasswordReset, now, cancellationToken);
+            return Result.Failure(IdentityErrors.PasswordResetCodeInvalid);
+        }
+
+        return Result.Success();
+    }
+
+    public Task<Result> ResetPasswordAsync(ResetPasswordCommand command, CancellationToken cancellationToken)
+    {
+        return ConfirmPasswordResetAsync(new ConfirmPasswordResetCommand(command.Email, command.Code, command.NewPassword), cancellationToken);
     }
 
     public async Task<Result> ConfirmPasswordResetAsync(ConfirmPasswordResetCommand command, CancellationToken cancellationToken)
@@ -218,6 +317,7 @@ public sealed class IdentityService(
         var codeEntity = await FindMatchingCodeAsync(user.Id, EmailCodePurpose.PasswordReset, command.Code, now, cancellationToken);
         if (codeEntity is null)
         {
+            await RegisterCodeFailureAsync(user.Id, EmailCodePurpose.PasswordReset, now, cancellationToken);
             return Result.Failure(IdentityErrors.PasswordResetCodeInvalid);
         }
 
@@ -655,6 +755,7 @@ public sealed class IdentityService(
                 user.IsPremium,
                 user.IsActive,
                 user.EmailConfirmed,
+                user.AccountStatus.ToString(),
                 user.TermsOfUseAccepted,
                 user.PrivacyPolicyAccepted,
                 user.MarketingEmailsEnabled,
@@ -943,7 +1044,8 @@ public sealed class IdentityService(
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-            new("premium", user.IsPremium ? "true" : "false")
+            new("premium", user.IsPremium ? "true" : "false"),
+            new("account_status", user.AccountStatus.ToString())
         };
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
@@ -1076,9 +1178,40 @@ public sealed class IdentityService(
                 && x.Purpose == purpose
                 && x.ConsumedAtUtc == null
                 && x.ExpiresAtUtc > now
+                && x.LockedAtUtc == null
+                && x.FailedAttemptCount < MaxCodeAttempts
                 && x.CodeHash == codeHash)
             .OrderByDescending(x => x.RequestedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task RegisterCodeFailureAsync(
+        Guid userId,
+        EmailCodePurpose purpose,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var activeCode = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == userId
+                && x.Purpose == purpose
+                && x.ConsumedAtUtc == null
+                && x.ExpiresAtUtc > now
+                && x.LockedAtUtc == null)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (activeCode is null)
+        {
+            return;
+        }
+
+        activeCode.FailedAttemptCount++;
+        if (activeCode.FailedAttemptCount >= MaxCodeAttempts)
+        {
+            activeCode.LockedAtUtc = now;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task RevokeRefreshTokensAsync(Guid userId, DateTime revokedAtUtc, CancellationToken cancellationToken)
@@ -1095,7 +1228,7 @@ public sealed class IdentityService(
 
     private static string CreateVerificationCode(int length)
     {
-        var size = Math.Clamp(length, 6, 12);
+        var size = 6;
         var chars = new char[size];
         for (var index = 0; index < size; index++)
         {
@@ -1229,6 +1362,7 @@ public sealed class IdentityService(
             user.DisplayName,
             user.IsPremium,
             user.EmailConfirmed,
+            user.AccountStatus.ToString(),
             user.TermsOfUseAccepted,
             user.PrivacyPolicyAccepted,
             user.MarketingEmailsEnabled,

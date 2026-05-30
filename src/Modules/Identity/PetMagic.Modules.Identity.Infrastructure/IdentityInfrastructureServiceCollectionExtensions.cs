@@ -102,7 +102,18 @@ public static class IdentityInfrastructureServiceCollectionExtensions
 
         services.AddAuthorizationBuilder()
             .AddPolicy("AdminOnly", policy => policy.RequireRole(SystemRoles.Admin))
-            .AddPolicy("ModeratorOrAdmin", policy => policy.RequireRole(SystemRoles.Moderator, SystemRoles.Admin));
+            .AddPolicy("ModeratorOrAdmin", policy => policy.RequireRole(SystemRoles.Moderator, SystemRoles.Admin))
+            .AddPolicy("ActiveAccount", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireAssertion(context =>
+                    context.User.IsInRole(SystemRoles.Admin)
+                    || context.User.IsInRole(SystemRoles.Moderator)
+                    || string.Equals(
+                        context.User.FindFirst("account_status")?.Value,
+                        AccountStatus.Active.ToString(),
+                        StringComparison.Ordinal));
+            });
 
         ValidateProductionEmailConfiguration(emailOptions, environment);
 
@@ -117,6 +128,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<EmailDispatchProcessor>();
         services.AddHostedService<EmailDispatchWorker>();
+        services.AddHostedService<AccountLifecycleCleanupWorker>();
         services.AddScoped<IIdentityService, IdentityService>();
 
         return services;
@@ -263,9 +275,9 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             UseSsl = ParseBool(ReadValue(section, "UseSsl", "EMAIL_USE_SSL"), true),
             FromAddress = ReadValue(section, "FromAddress", "EMAIL_FROM_ADDRESS") ?? "no-reply@petmagic.local",
             FromName = ReadValue(section, "FromName", "EMAIL_FROM_NAME") ?? "PetMagic",
-            VerificationCodeLength = Math.Clamp(ParseInt(section["VerificationCodeLength"], 8), 8, 12),
-            VerificationCodeTtlMinutes = ParseInt(section["VerificationCodeTtlMinutes"], 15),
-            PasswordResetCodeTtlMinutes = ParseInt(section["PasswordResetCodeTtlMinutes"], 15),
+            VerificationCodeLength = Math.Clamp(ParseInt(section["VerificationCodeLength"], 6), 6, 6),
+            VerificationCodeTtlMinutes = ParseInt(section["VerificationCodeTtlMinutes"], 10),
+            PasswordResetCodeTtlMinutes = ParseInt(section["PasswordResetCodeTtlMinutes"], 10),
             ConfirmationResendCooldownSeconds = ParseInt(section["ConfirmationResendCooldownSeconds"], 60),
             DispatchWorkerEnabled = ParseBool(section["DispatchWorkerEnabled"], true),
             DispatchPollIntervalMilliseconds = ParseInt(section["DispatchPollIntervalMilliseconds"], 1_000),
@@ -385,3 +397,4 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         }
     }
 }
+

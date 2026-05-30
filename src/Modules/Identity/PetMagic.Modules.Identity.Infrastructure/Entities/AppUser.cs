@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using PetMagic.Modules.Identity.Domain.Enums;
 
 namespace PetMagic.Modules.Identity.Infrastructure.Entities;
 
@@ -37,4 +38,8 @@ public sealed class AppUser : IdentityUser<Guid>
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public AccountStatus AccountStatus { get; set; } = AccountStatus.PendingEmailVerification;
+
+    public DateTime? AccountStatusUpdatedAtUtc { get; set; }
 }
