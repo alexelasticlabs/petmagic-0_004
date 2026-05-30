@@ -81,30 +81,38 @@ class ProfileGlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final borderRadius = BorderRadius.circular(24);
 
     return RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceGlass.withValues(alpha: isLight ? 0.98 : 1),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: colors.border.withValues(alpha: isLight ? 0.92 : 1),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.shadow.withValues(alpha: isLight ? 0.24 : 1),
-                  blurRadius: isLight ? 20 : 24,
-                  offset: const Offset(0, 14),
-                ),
-              ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow.withValues(alpha: isLight ? 0.28 : 1),
+              blurRadius: isLight ? 22 : 24,
+              offset: const Offset(0, 12),
             ),
-            child: Padding(
-              padding: padding ?? const EdgeInsets.all(16),
-              child: child,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: borderRadius,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surfaceGlass.withValues(
+                  alpha: isLight ? 0.98 : 1,
+                ),
+                borderRadius: borderRadius,
+                border: Border.all(
+                  color: colors.border.withValues(alpha: isLight ? 0.98 : 1),
+                ),
+              ),
+              child: Padding(
+                padding: padding ?? const EdgeInsets.all(16),
+                child: child,
+              ),
             ),
           ),
         ),
@@ -313,10 +321,17 @@ class ProfileStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final bg = backgroundColor ?? colors.accentSoft;
-    final fg = foregroundColor ?? colors.textStrong;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final baseBg = backgroundColor ?? colors.accentSoft;
+    final baseFg = foregroundColor ?? colors.textStrong;
+    final bg = isLight
+        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.22), baseBg)
+        : baseBg;
+    final fg = isLight
+        ? Color.alphaBlend(Colors.black.withValues(alpha: 0.24), baseFg)
+        : baseFg;
     final borderColor = (foregroundColor ?? colors.border).withValues(
-      alpha: foregroundColor != null ? 0.24 : 0.8,
+      alpha: foregroundColor != null ? (isLight ? 0.52 : 0.38) : 0.9,
     );
 
     return DecoratedBox(
@@ -326,8 +341,8 @@ class ProfileStatusPill extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: colors.shadow.withValues(alpha: 0.18),
-            blurRadius: 14,
+            color: colors.shadow.withValues(alpha: isLight ? 0.12 : 0.18),
+            blurRadius: isLight ? 10 : 14,
             offset: const Offset(0, 6),
           ),
         ],
@@ -479,7 +494,7 @@ class ProfileSettingsRow extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: iconTone.withValues(alpha: 0.14),
+              color: iconTone.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: iconTone, size: 19),
@@ -506,7 +521,7 @@ class ProfileSettingsRow extends StatelessWidget {
                         : colors.textSoft,
                     fontSize: 12.5,
                     height: 1.35,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -534,7 +549,7 @@ class ProfileSettingsRow extends StatelessWidget {
           else
             Icon(
               Icons.chevron_right_rounded,
-              color: isDestructive ? colors.danger : colors.textMuted,
+              color: isDestructive ? colors.danger : colors.textSoft,
               size: 24,
             ),
         ],
@@ -552,7 +567,9 @@ class ProfileSettingsRow extends StatelessWidget {
       decoration: BoxDecoration(
         border: showDivider
             ? Border(
-                bottom: BorderSide(color: colors.border.withValues(alpha: 0.7)),
+                bottom: BorderSide(
+                  color: colors.border.withValues(alpha: 0.82),
+                ),
               )
             : null,
       ),

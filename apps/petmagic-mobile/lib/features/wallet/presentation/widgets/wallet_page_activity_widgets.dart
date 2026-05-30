@@ -95,9 +95,9 @@ class _FeaturedPackTile extends StatelessWidget {
           color: isBestOffer
               ? badgeColor.withValues(alpha: 0.55)
               : isPopular
-                  ? colors.accent.withValues(alpha: 0.35)
-                  : colors.border.withValues(alpha: 0.9),
-          width: isBestOffer ? 1.5 : 1.0,
+              ? colors.accent.withValues(alpha: 0.46)
+              : colors.border.withValues(alpha: 0.98),
+          width: isBestOffer ? 1.5 : 1.1,
         ),
         boxShadow: isBestOffer
             ? [
@@ -163,7 +163,10 @@ class _FeaturedPackTile extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
-                            color: badgeColor.withValues(alpha: 0.15),
+                            color: badgeColor.withValues(alpha: 0.22),
+                            border: Border.all(
+                              color: badgeColor.withValues(alpha: 0.42),
+                            ),
                           ),
                           child: Text(
                             badgeLabelWithIcon!,
@@ -223,7 +226,9 @@ class _FeaturedPackTile extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(104, 36),
                     backgroundColor: colors.accent,
-                    disabledBackgroundColor: colors.surfaceStrong,
+                    disabledBackgroundColor: colors.surfaceStrong.withValues(
+                      alpha: 0.95,
+                    ),
                     foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     disabledForegroundColor: colors.textMuted,
                     textStyle: const TextStyle(
@@ -244,7 +249,7 @@ class _FeaturedPackTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: colors.textMuted,
+                color: colors.textSoft,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
               ),
@@ -268,7 +273,7 @@ class _FeaturedPackTile extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 0),
                   minimumSize: const Size(0, 30),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  foregroundColor: colors.textMuted,
+                  foregroundColor: colors.textSoft,
                   textStyle: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

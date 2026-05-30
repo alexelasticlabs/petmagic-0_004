@@ -133,6 +133,22 @@ extension PetMagicTheme on BuildContext {
   }
 }
 
+extension PetMagicSemanticTokens on PetMagicColors {
+  Color get background => backgroundBottom;
+  Color get surfaceVariant => surfaceStrong;
+  Color get cardBackground => surface;
+  Color get primaryText => textStrong;
+  Color get secondaryText => textSoft;
+  Color get mutedText => textMuted;
+  Color get divider => border;
+  Color get primary => accent;
+  Color get primaryContainer => accentSoft;
+  Color get success => accent;
+  Color get warning => gold;
+  Color get error => danger;
+  Color get disabled => surfaceStrong;
+}
+
 class AppTheme {
   static const Duration motionFast = Duration(milliseconds: 160);
   static const Duration motionMedium = Duration(milliseconds: 260);
@@ -146,22 +162,24 @@ class AppTheme {
   static const _onAccentLight = Color(0xFFF8FBFF);
 
   static const PetMagicColors _lightColors = PetMagicColors(
-    backgroundTop: Color(0xFFFFFFFF),
-    backgroundBottom: Color(0xFFF0F4FA),
-    surface: Color(0xFFFFFFFF),
-    surfaceGlass: Color(0xFFF7FAFF),
-    surfaceStrong: Color(0xFFF0F4FA),
-    border: Color(0xFFC9D5E2),
+    backgroundTop: Color(0xFFF9FAFC), // off-white top — cards (white) stand out
+    backgroundBottom: Color(
+      0xFFE7EDF5,
+    ), // tinted bottom — stronger page gradient
+    surface: Color(0xFFFFFFFF), // pure white cards on tinted background
+    surfaceGlass: Color(0xFFF0F4FA), // glass containers — noticeably tinted
+    surfaceStrong: Color(0xFFDCE5F0), // strong surfaces — clear hierarchy
+    border: Color(0xFFA8B9CC), // stronger border — cards don't blend
     textStrong: Color(0xFF0F1D35),
-    textSoft: Color(0xFF2A3A52),
-    textMuted: Color(0xFF5C6D83),
+    textSoft: Color(0xFF22354D),
+    textMuted: Color(0xFF3F5268), // darker muted — meets AA on small text
     accent: _accent,
-    accentSoft: Color(0xFFDCF6E9),
+    accentSoft: Color(0xFFB4E5CF), // deeper soft-accent for readable badges
     gold: Color(0xFFFFB703),
     purple: Color(0xFFA855F7),
     blue: Color(0xFF0284C7),
     danger: Color(0xFFEF4444),
-    shadow: Color(0x2410203A),
+    shadow: Color(0x4210203A), // stronger shadow — card elevation visible
   );
 
   static const PetMagicColors _darkColors = PetMagicColors(
@@ -262,6 +280,7 @@ class AppTheme {
           onPrimary: _onColor(colors.accent),
           surface: colors.surface,
           onSurface: colors.textStrong,
+          onSurfaceVariant: colors.textSoft,
           outline: colors.border,
           shadow: colors.shadow,
           surfaceContainerHighest: colors.surfaceStrong,
@@ -289,17 +308,18 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: colors.surface,
         surfaceTintColor: Colors.transparent,
-        elevation: brightness == Brightness.light ? 0.7 : 0.3,
+        elevation: brightness == Brightness.light ? 2.2 : 0.3,
+        shadowColor: colors.shadow,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: colors.border),
+          side: BorderSide(color: colors.border, width: 1.05),
         ),
       ),
       dividerTheme: DividerThemeData(
         color: colors.border,
         space: 1,
-        thickness: 1,
+        thickness: 1.05,
       ),
       listTileTheme: ListTileThemeData(
         iconColor: colors.textSoft,
@@ -312,8 +332,8 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           backgroundColor: colors.accent,
           foregroundColor: _onColor(colors.accent),
-          disabledBackgroundColor: colors.border,
-          disabledForegroundColor: colors.textMuted,
+          disabledBackgroundColor: colors.surfaceStrong,
+          disabledForegroundColor: colors.textMuted.withValues(alpha: 0.88),
           elevation: 0.8,
           shadowColor: colors.accent.withValues(alpha: 0.22),
           textStyle: textTheme.labelLarge?.copyWith(
@@ -331,7 +351,7 @@ class AppTheme {
           minimumSize: const Size.fromHeight(52),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           foregroundColor: colors.textStrong,
-          backgroundColor: colors.surfaceGlass,
+          backgroundColor: colors.surface,
           side: BorderSide(color: colors.border),
           textStyle: textTheme.labelLarge?.copyWith(
             fontSize: 12.8,
@@ -358,9 +378,9 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colors.surfaceStrong.withValues(alpha: 0.92),
+        fillColor: colors.surface,
         hintStyle: TextStyle(
-          color: colors.textMuted,
+          color: colors.textMuted.withValues(alpha: 0.88),
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
@@ -375,6 +395,10 @@ class AppTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide(color: colors.accent, width: 1.4),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: colors.border.withValues(alpha: 0.7)),
         ),
       ),
     );

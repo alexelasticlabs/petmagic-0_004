@@ -696,6 +696,29 @@ public sealed class IdentityService(
         return Result.Success(ToUserProfileResponse(user, roles));
     }
 
+    public async Task<Result<UserProfileResponse>> UpdateCurrentUserProfileAsync(Guid userId, UpdateCurrentUserProfileCommand command, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.UserNotFound);
+        }
+
+        var normalizedDisplayName = command.DisplayName?.Trim();
+        user.DisplayName = string.IsNullOrWhiteSpace(normalizedDisplayName) ? null : normalizedDisplayName;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
+        }
+
+        await WriteAuditAsync(user.Id, "user.profile.updated", "User profile updated by owner.", cancellationToken);
+
+        var roles = await userManager.GetRolesAsync(user);
+        return Result.Success(ToUserProfileResponse(user, roles));
+    }
+
     public async Task<Result<UserProfileResponse>> AcceptLegalDocumentsAsync(Guid userId, AcceptLegalDocumentsCommand command, CancellationToken cancellationToken)
     {
         if (!legalDocumentsCatalog.MatchesCurrentVersions(command.TermsOfUseVersion, command.PrivacyPolicyVersion))

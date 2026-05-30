@@ -20,13 +20,13 @@ const _kDarkAccent = Color(0xFFF7CD5A);
 const _kDarkBorder = Color(0xFF232431);
 const _kDarkFreeBg = Color(0xFF0F1019);
 
-const _kLightBg = Color(0xFFF6F7FB);
+const _kLightBg = Color(0xFFEFF4FA);
 const _kLightSurface = Color(0xFFFFFFFF);
-const _kLightText = Color(0xFF171723);
-const _kLightSubtitle = Color(0xFF595C70);
-const _kLightAccent = Color(0xFF7C4DFF);
-const _kLightBorder = Color(0xFFEBEDF5);
-const _kLightFreeBg = Color(0xFFF0F1F7);
+const _kLightText = Color(0xFF0F1D35);
+const _kLightSubtitle = Color(0xFF2A3E56);
+const _kLightAccent = Color(0xFF10C878);
+const _kLightBorder = Color(0xFFA8B9CC);
+const _kLightFreeBg = Color(0xFFE9F0F8);
 
 AppLocalizations _premiumText(BuildContext context) {
   return Localizations.of<AppLocalizations>(context, AppLocalizations) ??
@@ -663,7 +663,7 @@ class _ComparisonCard extends StatelessWidget {
         color: surface,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(19),
+        borderRadius: BorderRadius.circular(20),
         child: IntrinsicHeight(
           child: Stack(
             alignment: Alignment.center,
@@ -815,7 +815,7 @@ class _ComparisonCard extends StatelessWidget {
             size: 15,
             color: premium
                 ? accent
-                : (isDark ? const Color(0xFF3A3B4E) : const Color(0xFFBEC0D0)),
+                : (isDark ? const Color(0xFF3A3B4E) : const Color(0xFF97A8BD)),
           ),
           const SizedBox(width: 7),
           Expanded(
@@ -974,6 +974,7 @@ class _PlanCard extends StatelessWidget {
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
     final surface = isDark ? _kDarkSurface : _kLightSurface;
     final border = isDark ? _kDarkBorder : _kLightBorder;
+    final borderRadius = BorderRadius.circular(18);
 
     final isYearly = _isYearlyPlan(plan);
     final title =
@@ -1013,8 +1014,10 @@ class _PlanCard extends StatelessWidget {
       },
       child: Material(
         color: Colors.transparent,
+        borderRadius: borderRadius,
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: borderRadius,
           splashColor: accent.withValues(alpha: 0.16),
           highlightColor: accent.withValues(alpha: 0.08),
           onTap: () {
@@ -1026,14 +1029,14 @@ class _PlanCard extends StatelessWidget {
             margin: EdgeInsets.zero,
             decoration: BoxDecoration(
               color: isSelected ? accent.withValues(alpha: 0.05) : surface,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: borderRadius,
               border: Border.all(
                 color: isSelected ? accent : border,
                 width: isSelected ? 2 : 1,
               ),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: borderRadius,
               child: Stack(
                 children: [
                   if (isSelected)
@@ -1073,7 +1076,7 @@ class _PlanCard extends StatelessWidget {
                                     ? accent
                                     : (isDark
                                           ? const Color(0xFF3A3B4E)
-                                          : const Color(0xFFBEC0D0)),
+                                          : const Color(0xFF97A8BD)),
                                 size: 22,
                               ),
                             ),
@@ -1404,9 +1407,7 @@ class _CtaButtonState extends State<_CtaButton>
     };
     final ctaLabel = text.paymentContinueViaProviderAction(providerLabel);
     final btnTextColor = isDark ? const Color(0xFF13141F) : Colors.white;
-    final glowColor = isDark
-        ? const Color(0xFFFFB300)
-        : const Color(0xFF7C4DFF);
+    final glowColor = isDark ? const Color(0xFFFFB300) : _kLightAccent;
 
     return AnimatedBuilder(
       animation: _pulseController,
@@ -1424,7 +1425,7 @@ class _CtaButtonState extends State<_CtaButton>
                       colors: [Color(0xFFFFE07C), Color(0xFFFFB300)],
                     )
                   : const LinearGradient(
-                      colors: [Color(0xFF9D6FFF), Color(0xFF6D28D9)],
+                      colors: [Color(0xFF23D48B), Color(0xFF10C878)],
                     ),
               boxShadow: [
                 BoxShadow(
@@ -1636,7 +1637,7 @@ class _Footer extends StatelessWidget {
           text.premiumStorePaymentDisclaimerBody,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: sub.withValues(alpha: 0.7),
+            color: sub.withValues(alpha: 0.84),
             fontSize: 10,
             height: 1.4,
           ),

@@ -93,9 +93,9 @@ Future<void> showProfileThemeSheet({
   final text = AppLocalizations.of(context);
 
   final options = [
-    (mode: ThemeMode.system, label: text.profileSettingsThemeSystem),
-    (mode: ThemeMode.light, label: text.profileSettingsThemeLight),
-    (mode: ThemeMode.dark, label: text.profileSettingsThemeDark),
+    (mode: ThemeMode.system, label: text.profileSettingsThemeSystem, icon: Icons.brightness_auto_rounded),
+    (mode: ThemeMode.light, label: text.profileSettingsThemeLight, icon: Icons.light_mode_rounded),
+    (mode: ThemeMode.dark, label: text.profileSettingsThemeDark, icon: Icons.dark_mode_rounded),
   ];
 
   return showPetMagicModalBottomSheet<void>(
@@ -136,6 +136,7 @@ Future<void> showProfileThemeSheet({
                     Expanded(
                       child: _ThemeChip(
                         label: option.label,
+                        icon: option.icon,
                         isSelected: selectedThemeMode == option.mode,
                         onTap: () async {
                           await onSelect(option.mode);
@@ -412,11 +413,13 @@ class _LanguageTile extends StatelessWidget {
 class _ThemeChip extends StatelessWidget {
   const _ThemeChip({
     required this.label,
+    required this.icon,
     required this.isSelected,
     required this.onTap,
   });
 
   final String label;
+  final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -432,7 +435,7 @@ class _ThemeChip extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
@@ -444,14 +447,25 @@ class _ThemeChip extends StatelessWidget {
                 ? colors.accent.withValues(alpha: 0.18)
                 : Colors.transparent,
           ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? colors.accent : colors.textSoft,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? colors.accent : colors.textMuted,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isSelected ? colors.accent : colors.textSoft,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ),

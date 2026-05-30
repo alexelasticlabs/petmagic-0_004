@@ -34,19 +34,22 @@ internal sealed class LegalDocumentsCatalog : ILegalDocumentsCatalog
                 "Пользовательское соглашение PetMagic",
                 CurrentVersion,
                 PublishedAtUtc,
-                "Короткие правила использования аккаунта, контента и платных функций PetMagic.",
+                "Правила использования сервиса, аккаунта, контента и платных возможностей PetMagic.",
                 [
-                    new LegalDocumentSectionResponse("1. Использование сервиса", [
-                        "PetMagic помогает создавать и обрабатывать контент о питомцах. Пользуясь приложением, вы подтверждаете, что можете заключать обязательные соглашения и соблюдаете эти правила."
+                    new LegalDocumentSectionResponse("1. Общие условия использования", [
+                        "Используя PetMagic, вы подтверждаете, что действуете законно и вправе принимать условия этого соглашения. Если вы не согласны с условиями, использование сервиса должно быть прекращено."
                     ]),
                     new LegalDocumentSectionResponse("2. Аккаунт и безопасность", [
-                        "Вы обязаны указывать актуальный email, защищать данные входа и не передавать аккаунт третьим лицам. Мы можем ограничить доступ при злоупотреблениях, нарушениях правил или угрозе безопасности платформы."
+                        "Вы обязаны указывать достоверные данные, хранить в тайне данные входа и не передавать доступ к аккаунту третьим лицам. Вы несете ответственность за действия, совершенные через ваш аккаунт."
                     ]),
-                    new LegalDocumentSectionResponse("3. Контент и ограничения", [
-                        "Вы отвечаете за законность загружаемого и создаваемого контента. Нельзя использовать сервис для незаконных, оскорбительных, мошеннических или нарушающих чужие права материалов."
+                    new LegalDocumentSectionResponse("3. Контент пользователя", [
+                        "Вы отвечаете за законность, корректность и права на загружаемый и создаваемый контент. Запрещено использовать сервис для незаконных, оскорбительных, мошеннических или нарушающих права третьих лиц материалов."
                     ]),
-                    new LegalDocumentSectionResponse("4. Платные функции и обновления", [
-                        "Некоторые функции могут требовать внутренние цифровые единицы или платный доступ. Стоимость и лимиты могут меняться, а при существенном обновлении условий мы можем запросить повторное принятие текущей версии документа."
+                    new LegalDocumentSectionResponse("4. Платные функции и изменения условий", [
+                        "Часть функций может предоставляться за плату или с использованием внутренних цифровых единиц. Стоимость, лимиты и функциональность могут обновляться. При существенных изменениях условий мы вправе запросить повторное подтверждение актуальной версии документов."
+                    ]),
+                    new LegalDocumentSectionResponse("5. Ограничение доступа и ответственность", [
+                        "Мы можем ограничить или прекратить доступ к сервису при нарушении правил, злоупотреблениях или угрозе безопасности платформы. PetMagic не гарантирует бесперебойную работу сервиса и несет ответственность в пределах, установленных применимым правом."
                     ])
                 ]),
             new LegalDocumentResponse(
@@ -54,19 +57,22 @@ internal sealed class LegalDocumentsCatalog : ILegalDocumentsCatalog
                 "Политика конфиденциальности PetMagic",
                 CurrentVersion,
                 PublishedAtUtc,
-                "Кратко о том, какие данные мы используем и как их защищаем.",
+                "Информация о том, какие данные мы обрабатываем, зачем это делаем и как защищаем вашу информацию.",
                 [
-                    new LegalDocumentSectionResponse("1. Какие данные нужны", [
-                        "Мы обрабатываем данные аккаунта, настройки, сведения о согласиях и технические данные сеанса. При использовании функций сервиса также могут обрабатываться медиафайлы, события использования и обращения в поддержку."
+                    new LegalDocumentSectionResponse("1. Какие данные мы собираем", [
+                        "Мы можем обрабатывать данные аккаунта (email, имя), настройки, сведения о согласиях, технические данные сеанса, а также данные, связанные с использованием функций сервиса: загруженные медиафайлы, события использования и обращения в поддержку."
                     ]),
-                    new LegalDocumentSectionResponse("2. Зачем они используются", [
-                        "Данные нужны для входа, работы приложения, генераций, поддержки, защиты от злоупотреблений и выполнения юридических обязанностей. Маркетинговые письма отправляются только при отдельном выборе пользователя."
+                    new LegalDocumentSectionResponse("2. Цели обработки данных", [
+                        "Данные используются для работы аккаунта и функций приложения, обеспечения безопасности, обработки запросов в поддержку, предотвращения злоупотреблений и выполнения требований закона. Маркетинговые сообщения отправляются только при отдельном согласии пользователя."
                     ]),
-                    new LegalDocumentSectionResponse("3. Передача и защита", [
-                        "Мы не продаем персональные данные. Передача возможна только поставщикам инфраструктуры, аутентификации, платежей и коммуникаций, когда это необходимо для работы сервиса, при этом используются технические и организационные меры защиты."
+                    new LegalDocumentSectionResponse("3. Передача данных третьим лицам", [
+                        "Мы не продаем персональные данные. Передача возможна только проверенным поставщикам инфраструктуры, аутентификации, платежей и коммуникаций в объеме, необходимом для работы сервиса и исполнения обязательств."
                     ]),
-                    new LegalDocumentSectionResponse("4. Ваши права", [
-                        "Вы можете запросить доступ, исправление или удаление данных там, где это допускает закон. Мы также фиксируем версию документа и дату принятия, чтобы подтверждать актуальное состояние согласия."
+                    new LegalDocumentSectionResponse("4. Хранение и защита информации", [
+                        "Мы применяем разумные технические и организационные меры для защиты данных от несанкционированного доступа, утраты или изменения. Данные хранятся не дольше, чем это необходимо для целей обработки или требований законодательства."
+                    ]),
+                    new LegalDocumentSectionResponse("5. Ваши права", [
+                        "Вы можете запросить доступ к своим данным, их исправление или удаление в случаях, предусмотренных законом. Мы также фиксируем версии юридических документов и дату их принятия для подтверждения статуса согласия."
                     ])
                 ]));
     }
@@ -79,19 +85,22 @@ internal sealed class LegalDocumentsCatalog : ILegalDocumentsCatalog
                 "PetMagic Terms of Use",
                 CurrentVersion,
                 PublishedAtUtc,
-                "Short rules for account usage, user content, and paid PetMagic features.",
+                "Rules for using the service, your account, content, and paid PetMagic features.",
                 [
-                    new LegalDocumentSectionResponse("1. Using the service", [
-                        "PetMagic helps create and process pet-related content. By using the app, you confirm that you can enter binding agreements and follow these rules."
+                    new LegalDocumentSectionResponse("1. General terms of use", [
+                        "By using PetMagic, you confirm that you are legally able to accept these terms and that you will use the service lawfully. If you do not agree with these terms, you must stop using the service."
                     ]),
                     new LegalDocumentSectionResponse("2. Account and security", [
-                        "You must provide a valid email address, keep credentials secure, and not share account access. PetMagic may restrict access if rules are violated, abuse is detected, or platform security is at risk."
+                        "You must provide accurate account information, keep your credentials secure, and not share account access with others. You are responsible for actions performed through your account."
                     ]),
-                    new LegalDocumentSectionResponse("3. Content and limits", [
-                        "You are responsible for the lawfulness of uploaded or generated content. The service must not be used for unlawful, abusive, fraudulent, or rights-infringing materials."
+                    new LegalDocumentSectionResponse("3. User content", [
+                        "You are responsible for the legality of uploaded and generated content and for having the rights to use it. The service must not be used for unlawful, abusive, fraudulent, or rights-infringing materials."
                     ]),
                     new LegalDocumentSectionResponse("4. Paid features and updates", [
-                        "Some features may require internal digital units or paid access. Pricing and limits may change over time, and a material update may require accepting the current document version again."
+                        "Some features may require paid access or internal digital units. Pricing, limits, and functionality may change over time. Material updates may require you to accept the latest legal document version again."
+                    ]),
+                    new LegalDocumentSectionResponse("5. Access limits and liability", [
+                        "We may limit or suspend access if these terms are violated, abuse is detected, or platform security is at risk. PetMagic is provided on an \"as available\" basis, with liability limited as permitted by applicable law."
                     ])
                 ]),
             new LegalDocumentResponse(
@@ -99,19 +108,22 @@ internal sealed class LegalDocumentsCatalog : ILegalDocumentsCatalog
                 "PetMagic Privacy Policy",
                 CurrentVersion,
                 PublishedAtUtc,
-                "A short overview of what data we use and how we protect it.",
+                "How we collect, use, share, and protect your personal information.",
                 [
-                    new LegalDocumentSectionResponse("1. What data we need", [
-                        "We process account details, preferences, consent records, and technical session data. When you use app features, we may also process media uploads, usage events, and support messages."
+                    new LegalDocumentSectionResponse("1. What data we collect", [
+                        "We may process account data (such as email and display name), preferences, consent records, technical session data, and feature-related data such as media uploads, usage events, and support messages."
                     ]),
-                    new LegalDocumentSectionResponse("2. Why we use it", [
-                        "Data is used for sign-in, app functionality, generations, support, abuse prevention, and legal compliance. Marketing communication is sent only when the user separately opts in."
+                    new LegalDocumentSectionResponse("2. Why we process data", [
+                        "We use data to operate your account, provide app functionality, maintain security, support users, prevent abuse, and comply with legal obligations. Marketing messages are sent only if you explicitly opt in."
                     ]),
-                    new LegalDocumentSectionResponse("3. Sharing and protection", [
-                        "We do not sell personal data. Sharing is limited to infrastructure, authentication, payment, and communication providers when required to run the service, and we apply technical and organizational safeguards."
+                    new LegalDocumentSectionResponse("3. Data sharing", [
+                        "We do not sell personal data. We share data only with trusted infrastructure, authentication, payment, and communication providers when necessary to operate the service and fulfill legal or contractual obligations."
                     ]),
-                    new LegalDocumentSectionResponse("4. Your rights", [
-                        "You may request access, correction, or deletion where allowed by law. We also store the accepted legal version and timestamp so the active consent state can be verified."
+                    new LegalDocumentSectionResponse("4. Storage and protection", [
+                        "We apply reasonable technical and organizational safeguards to protect personal data from unauthorized access, loss, or alteration. Data is retained only as long as needed for processing purposes or as required by law."
+                    ]),
+                    new LegalDocumentSectionResponse("5. Your rights", [
+                        "Where permitted by law, you may request access, correction, or deletion of your personal data. We also store accepted legal document versions and timestamps to verify your consent status."
                     ])
                 ]));
     }

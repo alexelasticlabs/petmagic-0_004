@@ -274,6 +274,34 @@ class ProfileRepository {
     return profile;
   }
 
+  Future<MobileUserProfile> updateProfile({
+    required String? displayName,
+  }) async {
+    try {
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) => _dio.put<Map<String, dynamic>>(
+          '/api/auth/me/profile',
+          data: {
+            'displayName': displayName?.trim().isEmpty ?? true
+                ? null
+                : displayName!.trim(),
+          },
+          options: Options(
+            headers: {
+              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
+            },
+          ),
+        ),
+      );
+
+      final profile = MobileUserProfile.fromJson(response.data ?? const {});
+      await _replaceStoredUser(profile);
+      return profile;
+    } on DioException catch (error) {
+      throw _mapDioException(error, fallbackMessage: 'profile.action_failed');
+    }
+  }
+
   Future<List<MobileLinkedAccount>> fetchLinkedAccounts() async {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(

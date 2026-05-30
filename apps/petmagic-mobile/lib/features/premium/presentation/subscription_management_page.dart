@@ -360,7 +360,10 @@ class _TokensCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: colors.gold.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
@@ -412,9 +415,9 @@ class _TokensCard extends StatelessWidget {
                 child: Text(
                   text.subscriptionTokensAvailableLabel,
                   style: TextStyle(
-                    color: colors.textMuted,
+                    color: colors.textSoft,
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -430,9 +433,10 @@ class _TokensCard extends StatelessWidget {
           Text(
             text.subscriptionTokensExplanation,
             style: TextStyle(
-              color: colors.textMuted,
+              color: colors.textSoft,
               fontSize: 11,
               height: 1.4,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -479,8 +483,10 @@ class _TokenGrantProgressBarState extends State<_TokenGrantProgressBar>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _progressAnim = Tween<double>(begin: 0, end: _currentProgress)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _progressAnim = Tween<double>(
+      begin: 0,
+      end: _currentProgress,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _controller.addListener(() {
       if (mounted) setState(() {});
     });
@@ -517,8 +523,8 @@ class _TokenGrantProgressBarState extends State<_TokenGrantProgressBar>
     final colors = context.petMagicColors;
     final p = _controller.isCompleted ? _currentProgress : _progressAnim.value;
     final countdown = _buildCountdown();
-    final isReady = widget.nextGrantUtc != null &&
-        _now.isAfter(widget.nextGrantUtc!);
+    final isReady =
+        widget.nextGrantUtc != null && _now.isAfter(widget.nextGrantUtc!);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -824,9 +830,10 @@ class _PaymentCard extends StatelessWidget {
                   child: Text(
                     text.subscriptionPaymentTrustText,
                     style: TextStyle(
-                      color: colors.textMuted,
+                      color: colors.textSoft,
                       fontSize: 12,
                       height: 1.5,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -901,7 +908,7 @@ class _ActionsSection extends StatelessWidget {
               Text(
                 text.subscriptionDangerZoneTitle,
                 style: TextStyle(
-                  color: colors.danger.withValues(alpha: 0.7),
+                  color: colors.danger.withValues(alpha: 0.82),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.8,
@@ -988,9 +995,9 @@ class _CancelledHintBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.08),
+        color: colors.danger.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.danger.withValues(alpha: 0.2)),
+        border: Border.all(color: colors.danger.withValues(alpha: 0.32)),
       ),
       child: Text(
         text.subscriptionCancelledHint(dateStr),
@@ -1049,13 +1056,13 @@ class _GlowStatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.42)),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.25),
-            blurRadius: 8,
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 10,
             offset: Offset.zero,
           ),
         ],

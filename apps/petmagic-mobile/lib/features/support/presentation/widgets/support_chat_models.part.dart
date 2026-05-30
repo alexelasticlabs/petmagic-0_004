@@ -1,11 +1,50 @@
 part of 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
-const _supportSecondaryGreen = Color(0xFF76DBAE);
-const _supportMessageGreen = Color(0xFF2F8068);
-const _supportMessageGreenBorder = Color(0xFF4A9D83);
-const _supportComposerSendGreen = Color(0xFF34BC81);
-const _supportComposerIconColor = Color(0xFFA0AEC0);
-const _supportComposerHintColor = Color(0xFF8A97A8);
+Color _supportSecondaryGreen(BuildContext context) {
+  final colors = context.petMagicColors;
+  final isLight = Theme.of(context).brightness == Brightness.light;
+  return Color.lerp(
+    colors.accent,
+    colors.blue,
+    isLight ? 0.18 : 0.28,
+  )!.withValues(alpha: isLight ? 0.98 : 0.9);
+}
+
+Color _supportMessageGreen(BuildContext context) {
+  final colors = context.petMagicColors;
+  final isLight = Theme.of(context).brightness == Brightness.light;
+  final base = Color.lerp(colors.accent, colors.blue, isLight ? 0.22 : 0.3)!;
+  return Color.alphaBlend(
+    Colors.black.withValues(alpha: isLight ? 0.34 : 0.2),
+    base,
+  );
+}
+
+Color _supportMessageGreenBorder(BuildContext context) {
+  final colors = context.petMagicColors;
+  final isLight = Theme.of(context).brightness == Brightness.light;
+  final bubble = _supportMessageGreen(context);
+  final softLift = isLight ? Colors.white : colors.surface;
+  return Color.alphaBlend(
+    softLift.withValues(alpha: isLight ? 0.2 : 0.12),
+    bubble,
+  );
+}
+
+Color _supportComposerSendGreen(BuildContext context) {
+  return context.petMagicColors.accent;
+}
+
+Color _supportComposerIconColor(BuildContext context) {
+  final colors = context.petMagicColors;
+  return Color.lerp(colors.textMuted, colors.textSoft, 0.42)!;
+}
+
+Color _supportComposerHintColor(BuildContext context) {
+  final colors = context.petMagicColors;
+  return Color.lerp(colors.textMuted, colors.textSoft, 0.28)!;
+}
+
 const _supportAttachmentMaxCount = 5;
 const _supportMediaGroupVisibleCellCount = 6;
 const _supportAttachmentRecentAssetCount = 48;

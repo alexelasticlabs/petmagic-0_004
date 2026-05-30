@@ -1149,10 +1149,10 @@ class _SupportAttachmentPickerSheetState
                             const SizedBox(width: 6),
                             Material(
                               color: _isSendingSelection
-                                  ? _supportComposerSendGreen.withValues(
-                                      alpha: 0.85,
-                                    )
-                                  : _supportComposerSendGreen,
+                                  ? _supportComposerSendGreen(
+                                      context,
+                                    ).withValues(alpha: 0.85)
+                                  : _supportComposerSendGreen(context),
                               shape: const CircleBorder(),
                               child: InkWell(
                                 customBorder: const CircleBorder(),
@@ -1346,7 +1346,7 @@ class _SupportRecentAssetTileState extends State<_SupportRecentAssetTile> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isSelected
-                          ? _supportComposerSendGreen
+                          ? _supportComposerSendGreen(context)
                           : Colors.black.withValues(alpha: 0.38),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.9),

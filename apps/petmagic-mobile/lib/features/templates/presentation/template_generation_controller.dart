@@ -233,11 +233,23 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   String _mapGenerationError(Object error) {
+    if (error is AppException && error.statusCode == 401) {
+      return 'auth.sign_in_required';
+    }
+
     if (error is AppException && error.statusCode == 402) {
       return 'templates.insufficient_balance';
     }
 
     final message = error.toString();
+    if (message.contains('auth.sign_in_required')) {
+      return 'auth.sign_in_required';
+    }
+
+    if (message.contains('auth.session_expired')) {
+      return 'auth.session_expired';
+    }
+
     if (message.contains('economy.insufficient_balance')) {
       return 'templates.insufficient_balance';
     }

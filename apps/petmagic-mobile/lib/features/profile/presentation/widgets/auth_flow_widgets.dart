@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
+enum _AuthIconPreset { minimal, brand, contrast }
+
+const _authIconPreset = _AuthIconPreset.brand;
+
 class AuthBackdrop extends StatelessWidget {
   const AuthBackdrop({super.key});
 
@@ -195,6 +199,8 @@ class AuthWordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final style = _resolveAuthIconStyle(colors, isLight: isLight);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -206,17 +212,18 @@ class AuthWordmark extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [colors.accentSoft, colors.gold.withValues(alpha: 0.28)],
+              colors: style.badgeGradient,
             ),
+            border: Border.all(color: style.badgeBorder),
             boxShadow: [
               BoxShadow(
-                color: colors.accent.withValues(alpha: isDark ? 0.2 : 0.12),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                color: style.badgeShadow,
+                blurRadius: style.badgeShadowBlur,
+                offset: Offset(0, style.badgeShadowOffsetY),
               ),
             ],
           ),
-          child: Icon(Icons.pets_rounded, color: colors.accent, size: 30),
+          child: Icon(Icons.pets_rounded, color: style.iconColor, size: 30),
         ),
         const SizedBox(height: 8),
         Text(
@@ -321,6 +328,8 @@ class AuthField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.obscureText = false,
+    this.enabled = true,
+    this.errorText,
   });
 
   final TextEditingController controller;
@@ -331,25 +340,30 @@ class AuthField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final bool obscureText;
+  final bool enabled;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final labelStyle = Theme.of(context).textTheme.bodyMedium;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final style = _resolveAuthIconStyle(colors, isLight: !isDark);
 
     return TextField(
       controller: controller,
       onChanged: onChanged,
+      enabled: enabled,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       obscureText: obscureText,
       style: labelStyle?.copyWith(
-        color: colors.textStrong,
+        color: enabled ? colors.textStrong : colors.textMuted,
         fontSize: 13.4,
         fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(
+        errorText: errorText,
         hintText: hintText,
         hintStyle: labelStyle?.copyWith(
           color: colors.textMuted,
@@ -363,14 +377,21 @@ class AuthField extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  colors.accentSoft,
-                  colors.gold.withValues(alpha: 0.14),
-                ],
+                colors: style.badgeGradient,
               ),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: style.badgeBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: style.badgeShadow.withValues(
+                    alpha: isDark ? 0.14 : 0.08,
+                  ),
+                  blurRadius: isDark ? style.badgeShadowBlur : 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: Icon(prefixIcon, color: colors.accent, size: 17),
+            child: Icon(prefixIcon, color: style.iconColor, size: 17),
           ),
         ),
         prefixIconConstraints: const BoxConstraints(
@@ -379,7 +400,9 @@ class AuthField extends StatelessWidget {
         ),
         suffixIcon: trailing,
         filled: true,
-        fillColor: colors.surface.withValues(alpha: isDark ? 0.92 : 0.98),
+        fillColor: enabled
+            ? colors.surface.withValues(alpha: isDark ? 0.92 : 0.98)
+            : colors.surface.withValues(alpha: isDark ? 0.64 : 0.92),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
@@ -397,12 +420,109 @@ class AuthField extends StatelessWidget {
             width: 1.4,
           ),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: colors.border.withValues(alpha: isDark ? 0.48 : 0.55),
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: colors.danger.withValues(alpha: 0.72),
+            width: 1.2,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: colors.danger.withValues(alpha: 0.9),
+            width: 1.4,
+          ),
+        ),
+        errorStyle: TextStyle(
+          color: colors.danger,
+          fontSize: 11.2,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 14,
         ),
       ),
     );
+  }
+}
+
+typedef _GradientPair = List<Color>;
+
+class _AuthIconStyle {
+  const _AuthIconStyle({
+    required this.badgeGradient,
+    required this.badgeBorder,
+    required this.badgeShadow,
+    required this.badgeShadowBlur,
+    required this.badgeShadowOffsetY,
+    required this.iconColor,
+  });
+
+  final _GradientPair badgeGradient;
+  final Color badgeBorder;
+  final Color badgeShadow;
+  final double badgeShadowBlur;
+  final double badgeShadowOffsetY;
+  final Color iconColor;
+}
+
+_AuthIconStyle _resolveAuthIconStyle(
+  PetMagicColors colors, {
+  required bool isLight,
+}) {
+  switch (_authIconPreset) {
+    case _AuthIconPreset.minimal:
+      return _AuthIconStyle(
+        badgeGradient: isLight
+            ? const [Color(0xFFF4F7FB), Color(0xFFF1F5F9)]
+            : [
+                colors.surfaceStrong,
+                colors.surfaceStrong.withValues(alpha: 0.82),
+              ],
+        badgeBorder: isLight
+            ? const Color(0xFFD2DCE8)
+            : colors.border.withValues(alpha: 0.78),
+        badgeShadow: colors.shadow.withValues(alpha: isLight ? 0.08 : 0.14),
+        badgeShadowBlur: isLight ? 8 : 10,
+        badgeShadowOffsetY: isLight ? 4 : 5,
+        iconColor: isLight ? const Color(0xFF3B4E68) : colors.textSoft,
+      );
+    case _AuthIconPreset.contrast:
+      return _AuthIconStyle(
+        badgeGradient: isLight
+            ? const [Color(0xFFE3F7EC), Color(0xFFEFFBF4)]
+            : [colors.accentSoft.withValues(alpha: 0.95), colors.surfaceStrong],
+        badgeBorder: isLight ? const Color(0xFF8CCFAE) : colors.accent,
+        badgeShadow: colors.accent.withValues(alpha: isLight ? 0.16 : 0.22),
+        badgeShadowBlur: isLight ? 12 : 14,
+        badgeShadowOffsetY: isLight ? 6 : 7,
+        iconColor: isLight ? const Color(0xFF0B955A) : colors.accent,
+      );
+    case _AuthIconPreset.brand:
+      return _AuthIconStyle(
+        badgeGradient: isLight
+            ? const [Color(0xFFE9F7EF), Color(0xFFF5F9EE)]
+            : [
+                colors.accentSoft.withValues(alpha: 0.95),
+                colors.gold.withValues(alpha: 0.22),
+              ],
+        badgeBorder: isLight
+            ? const Color(0xFFBEDFCC)
+            : colors.border.withValues(alpha: 0.75),
+        badgeShadow: colors.shadow.withValues(alpha: isLight ? 0.12 : 0.2),
+        badgeShadowBlur: isLight ? 12 : 16,
+        badgeShadowOffsetY: isLight ? 6 : 8,
+        iconColor: isLight ? const Color(0xFF0EA764) : colors.accent,
+      );
   }
 }
 
@@ -580,19 +700,45 @@ class LightPrivacyPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [colors.accentSoft.withValues(alpha: 0.9), colors.surface],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.accentSoft.withValues(alpha: isDark ? 0.26 : 0.86),
+            colors.surface.withValues(alpha: isDark ? 0.78 : 0.98),
+          ],
         ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colors.border),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border.withValues(alpha: 0.9)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.2 : 0.1),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.verified_user_outlined, color: colors.accent, size: 28),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: colors.accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.verified_user_outlined,
+              color: colors.accent,
+              size: 18,
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -604,7 +750,7 @@ class LightPrivacyPanel extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.textStrong,
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -613,14 +759,14 @@ class LightPrivacyPanel extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     color: colors.textSoft,
-                    fontSize: 12.5,
+                    fontSize: 12,
                     height: 1.35,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
-          Icon(Icons.arrow_forward_ios_rounded, color: colors.accent, size: 14),
         ],
       ),
     );

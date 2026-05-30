@@ -121,8 +121,6 @@ class _DecorativeSpark extends StatelessWidget {
 class _RewardsHero extends StatelessWidget {
   const _RewardsHero({required this.balance, required this.onHistoryTap});
 
-  static const _balanceImage = 'assets/rewards/balance.png';
-
   final int? balance;
   final VoidCallback onHistoryTap;
 
@@ -138,9 +136,7 @@ class _RewardsHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final heroWidth = constraints.maxWidth;
-        final imageWidth = (heroWidth * 0.42).clamp(132.0, 176.0);
         final subtitleWidth = heroWidth * 0.52;
-        final balanceRightInset = (imageWidth * 0.74).clamp(104.0, 130.0);
 
         return SizedBox(
           height: 238,
@@ -200,29 +196,10 @@ class _RewardsHero extends StatelessWidget {
                 bottom: 0,
                 child: SizedBox(
                   height: 104,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned.fill(
-                        child: _BalancePanel(
-                          balanceValue: balanceValue,
-                          unit: text.walletBalanceUnit,
-                          rightInset: balanceRightInset,
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: -2,
-                        child: IgnorePointer(
-                          child: Image.asset(
-                            _balanceImage,
-                            width: imageWidth,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: _BalancePanel(
+                    balanceValue: balanceValue,
+                    unit: text.walletBalanceUnit,
+                    rightInset: 16,
                   ),
                 ),
               ),
@@ -246,18 +223,21 @@ class _HistoryButton extends StatelessWidget {
     final buttonBackground = colors.surfaceGlass;
     final buttonBorder = colors.border;
     final accentColor = colors.accent;
+    final borderRadius = BorderRadius.circular(14);
 
     return Material(
       color: Colors.transparent,
+      borderRadius: borderRadius,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: borderRadius,
         child: Ink(
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: buttonBackground,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: borderRadius,
             border: Border.all(color: buttonBorder),
             boxShadow: [
               BoxShadow(
@@ -405,34 +385,43 @@ class _RewardsGlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final borderRadius = BorderRadius.circular(_radius);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(_radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(_radius),
-            gradient:
-                gradient ??
-                LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    colors.surfaceGlass,
-                    colors.surfaceStrong.withValues(alpha: 0.94),
-                  ],
-                ),
-            border: Border.all(color: borderColor ?? colors.border, width: 1.1),
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow.withValues(alpha: 0.26),
-                blurRadius: 20,
-                offset: const Offset(0, 12),
-              ),
-            ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.26),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
           ),
-          child: Padding(padding: padding, child: child),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: borderRadius,
+              gradient:
+                  gradient ??
+                  LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colors.surfaceGlass,
+                      colors.surfaceStrong.withValues(alpha: 0.94),
+                    ],
+                  ),
+              border: Border.all(
+                color: borderColor ?? colors.border,
+                width: 1.1,
+              ),
+            ),
+            child: Padding(padding: padding, child: child),
+          ),
         ),
       ),
     );

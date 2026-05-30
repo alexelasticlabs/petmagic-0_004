@@ -291,7 +291,9 @@ class _ProfileNotificationsSettingsSectionState
                 child: Column(
                   children: [
                     _NotificationToggleRow(
+                      icon: Icons.image_outlined,
                       label: text.profileNotificationsPushPhotoReady,
+                      subtitle: 'Когда AI-фото готово к просмотру',
                       value: _preferences!.pushPhotoReady,
                       enabled: !_isSaving,
                       onChanged: (value) => _update(
@@ -299,7 +301,9 @@ class _ProfileNotificationsSettingsSectionState
                       ),
                     ),
                     _NotificationToggleRow(
+                      icon: Icons.video_camera_back_outlined,
                       label: text.profileNotificationsPushVideoReady,
+                      subtitle: 'Когда AI-видео завершило обработку',
                       value: _preferences!.pushVideoReady,
                       enabled: !_isSaving,
                       onChanged: (value) => _update(
@@ -307,7 +311,9 @@ class _ProfileNotificationsSettingsSectionState
                       ),
                     ),
                     _NotificationToggleRow(
+                      icon: Icons.error_outline_rounded,
                       label: text.profileNotificationsPushGenerationErrors,
+                      subtitle: 'Если генерация завершилась с ошибкой',
                       value: _preferences!.pushGenerationErrors,
                       enabled: !_isSaving,
                       onChanged: (value) => _update(
@@ -315,14 +321,18 @@ class _ProfileNotificationsSettingsSectionState
                       ),
                     ),
                     _NotificationToggleRow(
+                      icon: Icons.alarm_outlined,
                       label: text.profileNotificationsPushReminders,
+                      subtitle: 'Напоминания об использовании приложения',
                       value: _preferences!.pushReminders,
                       enabled: !_isSaving,
                       onChanged: (value) =>
                           _update(_preferences!.copyWith(pushReminders: value)),
                     ),
                     _NotificationToggleRow(
+                      icon: Icons.auto_awesome_outlined,
                       label: text.profileNotificationsPushNewTemplates,
+                      subtitle: 'Новые стили и шаблоны генерации',
                       value: _preferences!.pushNewTemplates,
                       enabled: !_isSaving,
                       onChanged: (value) => _update(
@@ -330,8 +340,9 @@ class _ProfileNotificationsSettingsSectionState
                       ),
                     ),
                     _NotificationToggleRow(
-                      label: text
-                          .profileNotificationsPushPurchasesAndSubscriptions,
+                      icon: Icons.receipt_long_outlined,
+                      label: text.profileNotificationsPushPurchasesAndSubscriptions,
+                      subtitle: 'Подтверждения оплат и статус подписки',
                       value: _preferences!.pushPurchasesAndSubscriptions,
                       enabled: !_isSaving,
                       onChanged: (value) => _update(
@@ -352,7 +363,9 @@ class _ProfileNotificationsSettingsSectionState
                 child: Column(
                   children: [
                     _NotificationToggleRow(
+                      icon: Icons.local_offer_outlined,
                       label: text.profileNotificationsEmailOffers,
+                      subtitle: 'Скидки, акции и промо-предложения',
                       value: _preferences!.emailOffersAndDiscounts,
                       enabled: !_isSaving,
                       onChanged: (value) => _update(
@@ -360,14 +373,18 @@ class _ProfileNotificationsSettingsSectionState
                       ),
                     ),
                     _NotificationToggleRow(
+                      icon: Icons.newspaper_rounded,
                       label: text.profileNotificationsEmailNews,
+                      subtitle: 'Обновления приложения и новые функции',
                       value: _preferences!.emailNews,
                       enabled: !_isSaving,
                       onChanged: (value) =>
                           _update(_preferences!.copyWith(emailNews: value)),
                     ),
                     _NotificationToggleRow(
+                      icon: Icons.notifications_active_outlined,
                       label: text.profileNotificationsEmailAccountAlerts,
+                      subtitle: 'Уведомления безопасности и о смене данных',
                       value: _preferences!.emailAccountAlerts,
                       enabled: !_isSaving,
                       onChanged: (value) => _update(
@@ -387,11 +404,46 @@ class _ProfileNotificationsSettingsSectionState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _NotificationsInfoRow(
+                    _PushPermissionStatusCard(
                       label: text.profileNotificationsPushPermissionLabel,
                       value: _pushPermissionLabel(text),
+                      status: _pushAuthorizationStatus,
                     ),
-                    const SizedBox(height: 8),
+                    if (_devicePermissions.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: colors.border.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Column(
+                            children: [
+                              for (final permission in _devicePermissions)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: _DevicePermissionRow(
+                                    name: _devicePermissionName(
+                                      text,
+                                      permission.type,
+                                    ),
+                                    stateLabel: _devicePermissionStateLabel(
+                                      text,
+                                      permission.state,
+                                    ),
+                                    state: permission.state,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -430,20 +482,6 @@ class _ProfileNotificationsSettingsSectionState
                         ),
                       ],
                     ),
-                    if (_devicePermissions.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      for (final permission in _devicePermissions)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: _NotificationsInfoRow(
-                            label: _devicePermissionName(text, permission.type),
-                            value: _devicePermissionStateLabel(
-                              text,
-                              permission.state,
-                            ),
-                          ),
-                        ),
-                    ],
                   ],
                 ),
               ),
@@ -516,57 +554,20 @@ class _NotificationsDetailHeader extends StatelessWidget {
   }
 }
 
-class _NotificationsInfoRow extends StatelessWidget {
-  const _NotificationsInfoRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: colors.textMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(width: 18),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: colors.textStrong,
-              fontSize: 14,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _NotificationToggleRow extends StatelessWidget {
   const _NotificationToggleRow({
     required this.label,
     required this.value,
     required this.onChanged,
+    required this.icon,
+    this.subtitle,
     this.enabled = true,
     this.showDivider = true,
   });
 
   final String label;
+  final String? subtitle;
+  final IconData icon;
   final bool value;
   final ValueChanged<bool> onChanged;
   final bool enabled;
@@ -575,6 +576,7 @@ class _NotificationToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final activeColor = value ? colors.accent : colors.textMuted;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -587,27 +589,194 @@ class _NotificationToggleRow extends StatelessWidget {
             : null,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
         child: Row(
           children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: activeColor.withValues(alpha: 0.13),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(icon, size: 18, color: activeColor),
+            ),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 14,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 14.5,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        color: colors.textMuted,
+                        fontSize: 11.5,
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
+            const SizedBox(width: 6),
             Switch.adaptive(
               value: value,
               onChanged: enabled ? onChanged : null,
+              activeThumbColor: colors.accent,
+              activeTrackColor: colors.accent.withValues(alpha: 0.45),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PushPermissionStatusCard extends StatelessWidget {
+  const _PushPermissionStatusCard({
+    required this.label,
+    required this.value,
+    required this.status,
+  });
+
+  final String label;
+  final String value;
+  final AuthorizationStatus? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final isAllowed = status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
+    final isDenied = status == AuthorizationStatus.denied;
+    final chipColor = isAllowed
+        ? colors.accent
+        : isDenied
+            ? colors.danger
+            : colors.textMuted;
+    final chipIcon = isAllowed
+        ? Icons.notifications_active_rounded
+        : isDenied
+            ? Icons.notifications_off_outlined
+            : Icons.notifications_none_rounded;
+
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: chipColor.withValues(alpha: 0.13),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(chipIcon, size: 20, color: chipColor),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                style: TextStyle(
+                  color: chipColor,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: chipColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: chipColor.withValues(alpha: 0.3)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Text(
+              isAllowed ? '✓' : isDenied ? '✗' : '?',
+              style: TextStyle(
+                color: chipColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DevicePermissionRow extends StatelessWidget {
+  const _DevicePermissionRow({
+    required this.name,
+    required this.stateLabel,
+    required this.state,
+  });
+
+  final String name;
+  final String stateLabel;
+  final AppPermissionState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final isOk = state == AppPermissionState.granted ||
+        state == AppPermissionState.limited;
+    final chipColor = isOk ? colors.accent : colors.textMuted;
+
+    return Row(
+      children: [
+        Icon(
+          isOk ? Icons.check_circle_outline_rounded : Icons.radio_button_unchecked_rounded,
+          size: 16,
+          color: chipColor,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            name,
+            style: TextStyle(
+              color: colors.textStrong,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          stateLabel,
+          style: TextStyle(
+            color: chipColor,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

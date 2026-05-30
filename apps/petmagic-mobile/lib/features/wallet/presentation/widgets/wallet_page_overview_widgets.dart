@@ -4,66 +4,6 @@ const int _kPhotoCostSpark = 6;
 const int _kVideoCostSpark = 33;
 const String _kWalletBalanceCoinAsset =
     'assets/rewards/wallet-balance-coin.png';
-const String _kWalletCompanionAsset = 'assets/rewards/invite-friend.png';
-
-class _WalletCompanionHero extends StatelessWidget {
-  const _WalletCompanionHero();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return ProfileGlassCard(
-      padding: EdgeInsets.zero,
-      child: Container(
-        height: 92,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: colors.border.withValues(alpha: 0.78)),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colors.surfaceStrong,
-              colors.surfaceStrong.withValues(alpha: 0.75),
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              left: -24,
-              top: 8,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.accent.withValues(alpha: 0.2),
-                      blurRadius: 34,
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                child: const SizedBox(width: 1, height: 1),
-              ),
-            ),
-            Positioned(
-              right: -10,
-              bottom: -22,
-              child: Image.asset(
-                _kWalletCompanionAsset,
-                height: 124,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _WalletHeader extends StatelessWidget {
   const _WalletHeader({required this.title, required this.subtitle});
@@ -219,6 +159,11 @@ class _BalanceCard extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 360;
+              // The card has a hardcoded dark gradient; always use light-on-dark
+              // text regardless of the current app theme brightness.
+              const cardTextPrimary = Colors.white;
+              final kCardTextSecondary = Colors.white.withValues(alpha: 0.78);
+
               final overview = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -228,7 +173,7 @@ class _BalanceCard extends StatelessWidget {
                         child: Text(
                           text.walletBalanceEyebrow,
                           style: TextStyle(
-                            color: colors.textSoft,
+                            color: kCardTextSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                           ),
@@ -246,6 +191,8 @@ class _BalanceCard extends StatelessWidget {
                         style: IconButton.styleFrom(
                           padding: EdgeInsets.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          foregroundColor: kCardTextSecondary,
+                          backgroundColor: Colors.white.withValues(alpha: 0.12),
                         ),
                       ),
                     ],
@@ -259,8 +206,8 @@ class _BalanceCard extends StatelessWidget {
                       children: [
                         Text(
                           NumberFormat.decimalPattern().format(balance),
-                          style: TextStyle(
-                            color: colors.textStrong,
+                          style: const TextStyle(
+                            color: cardTextPrimary,
                             fontSize: 50,
                             fontWeight: FontWeight.w900,
                             height: 0.96,
@@ -285,7 +232,7 @@ class _BalanceCard extends StatelessWidget {
                     Text(
                       text.walletWhatYouCanCreateTitle,
                       style: TextStyle(
-                        color: colors.textSoft,
+                        color: kCardTextSecondary,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                       ),
@@ -310,7 +257,7 @@ class _BalanceCard extends StatelessWidget {
                     Text(
                       text.walletInsufficientBalanceError,
                       style: TextStyle(
-                        color: colors.textSoft,
+                        color: kCardTextSecondary,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                       ),
@@ -356,13 +303,13 @@ class _BalanceUsageChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-
+    // Always rendered inside the dark balance card gradient.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.border.withValues(alpha: 0.9)),
-        color: colors.surfaceStrong.withValues(alpha: 0.45),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+        color: Colors.white.withValues(alpha: 0.14),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -371,8 +318,8 @@ class _BalanceUsageChip extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: TextStyle(
-              color: colors.textStrong,
+            style: const TextStyle(
+              color: Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -780,10 +727,10 @@ class _PromoCodeFormState extends State<_PromoCodeForm> {
                 child: Container(
                   height: 44,
                   decoration: BoxDecoration(
-                    color: colors.surfaceStrong.withValues(alpha: 0.5),
+                    color: colors.surfaceStrong.withValues(alpha: 0.72),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: colors.border.withValues(alpha: 0.8),
+                      color: colors.border.withValues(alpha: 0.9),
                     ),
                   ),
                   child: TextField(
@@ -823,7 +770,9 @@ class _PromoCodeFormState extends State<_PromoCodeForm> {
                   style: FilledButton.styleFrom(
                     backgroundColor: colors.accent,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: colors.surfaceStrong,
+                    disabledBackgroundColor: colors.surfaceStrong.withValues(
+                      alpha: 0.95,
+                    ),
                     disabledForegroundColor: colors.textMuted,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     shape: RoundedRectangleBorder(

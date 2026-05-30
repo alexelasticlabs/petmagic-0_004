@@ -288,6 +288,7 @@ class _ProfileHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final displayName = profile.displayName?.trim().isNotEmpty == true
         ? profile.displayName!
         : profile.email;
@@ -335,7 +336,7 @@ class _ProfileHeroCard extends StatelessWidget {
                               : Icons.pets_rounded,
                           backgroundColor:
                               (profile.isPremium ? colors.gold : colors.accent)
-                                  .withValues(alpha: 0.14),
+                                  .withValues(alpha: isLight ? 0.26 : 0.2),
                           foregroundColor: profile.isPremium
                               ? colors.gold
                               : colors.accent,
@@ -349,7 +350,7 @@ class _ProfileHeroCard extends StatelessWidget {
                               (profile.emailConfirmed
                                       ? colors.blue
                                       : colors.textMuted)
-                                  .withValues(alpha: 0.14),
+                                  .withValues(alpha: isLight ? 0.26 : 0.2),
                           foregroundColor: profile.emailConfirmed
                               ? colors.blue
                               : colors.textSoft,
@@ -377,6 +378,7 @@ class _WalletHighlightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final wallet = walletState.wallet;
     final weeklyReady =
         wallet?.nextWeeklyGrantAtUtc == null ||
@@ -405,21 +407,30 @@ class _WalletHighlightCard extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colors.border),
+            border: Border.all(
+              color: colors.border.withValues(alpha: isLight ? 1 : 0.95),
+              width: isLight ? 1.2 : 1.1,
+            ),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                colors.accent.withValues(alpha: 0.26),
-                colors.blue.withValues(alpha: 0.2),
-                colors.surfaceGlass,
+                if (isLight) ...[
+                  const Color(0xFFE7F5EE),
+                  const Color(0xFFE5F1FB),
+                  const Color(0xFFF7FAFF),
+                ] else ...[
+                  colors.accent.withValues(alpha: 0.26),
+                  colors.blue.withValues(alpha: 0.2),
+                  colors.surfaceGlass,
+                ],
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.shadow,
-                blurRadius: 24,
-                offset: const Offset(0, 16),
+                color: colors.shadow.withValues(alpha: isLight ? 0.2 : 0.34),
+                blurRadius: isLight ? 20 : 26,
+                offset: Offset(0, isLight ? 10 : 14),
               ),
             ],
           ),
@@ -434,7 +445,9 @@ class _WalletHighlightCard extends StatelessWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: colors.backgroundBottom.withValues(alpha: 0.2),
+                        color: isLight
+                            ? Colors.white.withValues(alpha: 0.55)
+                            : colors.backgroundBottom.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(
@@ -470,7 +483,7 @@ class _WalletHighlightCard extends StatelessWidget {
                     ),
                     Icon(
                       Icons.arrow_forward_rounded,
-                      color: colors.textMuted,
+                      color: colors.textSoft,
                       size: 18,
                     ),
                   ],
@@ -531,6 +544,7 @@ class _PremiumBannerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return Material(
       color: Colors.transparent,
@@ -540,21 +554,29 @@ class _PremiumBannerCard extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colors.gold.withValues(alpha: 0.28)),
+            border: Border.all(
+              color: colors.gold.withValues(alpha: isLight ? 0.42 : 0.28),
+            ),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                colors.gold.withValues(alpha: 0.18),
-                const Color(0xFF8A5A12).withValues(alpha: 0.22),
-                colors.surfaceGlass,
+                if (isLight) ...[
+                  const Color(0xFFFFF3CD),
+                  const Color(0xFFFFF7E5),
+                  const Color(0xFFFEFCF5),
+                ] else ...[
+                  colors.gold.withValues(alpha: 0.18),
+                  const Color(0xFF8A5A12).withValues(alpha: 0.22),
+                  colors.surfaceGlass,
+                ],
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.shadow,
-                blurRadius: 24,
-                offset: const Offset(0, 16),
+                color: colors.shadow.withValues(alpha: isLight ? 0.2 : 1),
+                blurRadius: isLight ? 18 : 24,
+                offset: Offset(0, isLight ? 10 : 16),
               ),
             ],
           ),
@@ -566,10 +588,14 @@ class _PremiumBannerCard extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: colors.gold.withValues(alpha: 0.16),
+                    color: isLight
+                        ? colors.gold.withValues(alpha: 0.24)
+                        : colors.gold.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(
-                      color: colors.gold.withValues(alpha: 0.22),
+                      color: colors.gold.withValues(
+                        alpha: isLight ? 0.4 : 0.22,
+                      ),
                     ),
                   ),
                   child: Icon(
@@ -930,12 +956,20 @@ class _ProfileActionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final chipBg = isLight
+        ? const Color(0xFFDCF6EA)
+        : colors.accent.withValues(alpha: 0.12);
+    final chipBorder = isLight
+        ? const Color(0xFF8FD6B8)
+        : colors.accent.withValues(alpha: 0.24);
+    final chipText = isLight ? const Color(0xFF0A7A4D) : colors.accent;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.12),
+        color: chipBg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.accent.withValues(alpha: 0.24)),
+        border: Border.all(color: chipBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
@@ -945,13 +979,13 @@ class _ProfileActionChip extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: colors.accent,
+                color: chipText,
                 fontSize: 11.8,
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(width: 5),
-            Icon(Icons.arrow_forward_rounded, color: colors.accent, size: 14),
+            Icon(Icons.arrow_forward_rounded, color: chipText, size: 14),
           ],
         ),
       ),

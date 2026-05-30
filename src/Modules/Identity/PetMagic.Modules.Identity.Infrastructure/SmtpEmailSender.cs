@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mail;
+using System.Text;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -20,15 +21,36 @@ internal sealed class SmtpEmailSender(EmailOptions options) : IEmailSender
         {
             From = new MailAddress(options.FromAddress, options.FromName),
             Subject = job.Subject,
-            Body = job.HtmlBody,
-            IsBodyHtml = true
+            SubjectEncoding = Encoding.UTF8
         };
         message.To.Add(job.RecipientEmail);
 
+        var textBody = string.IsNullOrWhiteSpace(job.TextBody)
+            ? StripHtml(job.HtmlBody)
+            : job.TextBody;
+        message.AlternateViews.Add(
+            AlternateView.CreateAlternateViewFromString(
+                textBody,
+                Encoding.UTF8,
+                "text/plain"));
+
+        message.AlternateViews.Add(
+            AlternateView.CreateAlternateViewFromString(
+                job.HtmlBody,
+                Encoding.UTF8,
+                "text/html"));
+
         if (!string.IsNullOrWhiteSpace(job.TextBody))
         {
-            var plainView = AlternateView.CreateAlternateViewFromString(job.TextBody, null, "text/plain");
-            message.AlternateViews.Add(plainView);
+            message.Body = job.TextBody;
+            message.IsBodyHtml = false;
+            message.BodyEncoding = Encoding.UTF8;
+        }
+        else
+        {
+            message.Body = job.HtmlBody;
+            message.IsBodyHtml = true;
+            message.BodyEncoding = Encoding.UTF8;
         }
 
         using var client = new SmtpClient(options.Host, options.Port)
@@ -51,5 +73,21 @@ internal sealed class SmtpEmailSender(EmailOptions options) : IEmailSender
         {
             return Result.Failure(IdentityErrors.EmailDispatchFailed);
         }
+    }
+
+    private static string StripHtml(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return string.Empty;
+        }
+
+        return html
+            .Replace("<p>", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("</p>", "\n", StringComparison.OrdinalIgnoreCase)
+            .Replace("<br>", "\n", StringComparison.OrdinalIgnoreCase)
+            .Replace("<br/>", "\n", StringComparison.OrdinalIgnoreCase)
+            .Replace("<br />", "\n", StringComparison.OrdinalIgnoreCase)
+            .Trim();
     }
 }

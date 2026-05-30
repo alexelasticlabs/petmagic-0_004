@@ -100,14 +100,17 @@ class _StatusHero extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             statusTitle(text, generation),
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: colors.textSoft,
-              fontWeight: FontWeight.w700,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: generation.isCompleted
+                  ? colors.accent
+                  : generation.isFailed
+                      ? colors.danger
+                      : colors.textSoft,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 12),
-          if (!generation.isTerminal)
-            Row(
+          if (!generation.isTerminal) ...[            Row(
               children: [
                 SizedBox(
                   width: 84,
@@ -145,27 +148,60 @@ class _StatusHero extends StatelessWidget {
                   ),
                 ),
               ],
-            )
-          else
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                minHeight: 9,
-                value: progress / 100,
-                color: generationStatusColor(colors, generation),
-                backgroundColor: colors.border.withValues(alpha: 0.6),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              text.generationStatusNonTerminalHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textMuted,
+                height: 1.35,
               ),
             ),
-          const SizedBox(height: 8),
-          Text(
-            generation.isTerminal
-                ? terminalHint(text, generation)
-                : text.generationStatusNonTerminalHint,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colors.textMuted,
-              height: 1.35,
+          ] else if (generation.isCompleted) ...[            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colors.accent.withValues(alpha: 0.14),
+                    colors.accent.withValues(alpha: 0.04),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: colors.accent.withValues(alpha: 0.28),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    color: colors.accent,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      terminalHint(text, generation),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textSoft,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ] else ...[            Text(
+              terminalHint(text, generation),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textMuted,
+                height: 1.35,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -243,94 +279,160 @@ class _StageRow extends StatelessWidget {
   }
 }
 
-class _ResultCard extends StatelessWidget {
+class _ResultCard extends StatefulWidget {
   const _ResultCard({required this.generation, required this.onOpenViewer});
 
   final TemplateGenerationResult generation;
   final VoidCallback onOpenViewer;
 
   @override
+  State<_ResultCard> createState() => _ResultCardState();
+}
+
+class _ResultCardState extends State<_ResultCard> {
+  double? _aspectRatio;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!isVideoGeneration(widget.generation)) {
+      _resolveImageAspectRatio();
+    }
+  }
+
+  void _resolveImageAspectRatio() {
+    final url = widget.generation.outputUrl ?? '';
+    if (url.isEmpty) return;
+    NetworkImage(url).resolve(const ImageConfiguration()).addListener(
+      ImageStreamListener(
+        (info, _) {
+          if (!mounted) return;
+          final w = info.image.width.toDouble();
+          final h = info.image.height.toDouble();
+          if (h > 0) setState(() => _aspectRatio = w / h);
+        },
+        onError: (_, __) {},
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final outputUrl = generation.outputUrl ?? '';
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Material(
+    final outputUrl = widget.generation.outputUrl ?? '';
+    final isVideo = isVideoGeneration(widget.generation);
+    final aspectRatio = _aspectRatio ?? (isVideo ? 9.0 / 16.0 : 3.0 / 4.0);
+    final borderRadius = BorderRadius.circular(22);
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceStrong,
+          borderRadius: borderRadius,
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+        ),
+        child: ClipRRect(
+          borderRadius: borderRadius,
+          child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: outputUrl.isEmpty ? null : onOpenViewer,
+              borderRadius: borderRadius,
+              onTap: outputUrl.isEmpty ? null : widget.onOpenViewer,
               child: AspectRatio(
-                aspectRatio: 9 / 16,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: outputUrl.isEmpty
-                      ? _MediaPlaceholder(
-                          label: text.templateFlowResultUnavailable,
-                        )
-                      : Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ColoredBox(
-                              color: colors.surfaceStrong,
-                              child: isVideoGeneration(generation)
-                                  ? _InlineVideoPreview(url: outputUrl)
-                                  : CachedNetworkImage(
-                                      imageUrl: outputUrl,
-                                      fit: BoxFit.contain,
-                                      memCacheWidth: 1080,
-                                      errorWidget: (context, url, error) =>
-                                          _MediaPlaceholder(
-                                            label: text
-                                                .templateFlowResultLoadFailed,
-                                          ),
-                                    ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.56),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.fullscreen_rounded,
-                                        color: Colors.white,
-                                        size: 14,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        text.templateFlowPreviewFallback,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                aspectRatio: aspectRatio,
+                child: outputUrl.isEmpty
+                    ? _MediaPlaceholder(
+                        label: text.templateFlowResultUnavailable,
+                      )
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ColoredBox(
+                            color: colors.surfaceStrong,
+                            child: isVideo
+                                ? _InlineVideoPreview(
+                                    url: outputUrl,
+                                    onAspectRatioResolved: (ar) {
+                                      if (mounted) {
+                                        setState(() => _aspectRatio = ar);
+                                      }
+                                    },
+                                  )
+                                : CachedNetworkImage(
+                                    imageUrl: outputUrl,
+                                    fit: BoxFit.cover,
+                                    memCacheWidth: 1080,
+                                    errorWidget: (context, url, error) =>
+                                        _MediaPlaceholder(
+                                          label:
+                                              text.templateFlowResultLoadFailed,
                                         ),
-                                      ),
-                                    ],
                                   ),
+                          ),
+                          const Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: 96,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Color(0xB5000000),
+                                  ],
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                ),
+                          ),
+                          Positioned(
+                            bottom: 14,
+                            right: 14,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.52),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.fullscreen_rounded,
+                                      color: Colors.white,
+                                      size: 15,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      text.templateFlowPreviewFallback,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -427,16 +529,20 @@ class _ReadyActionsRow extends StatelessWidget {
     final text = AppLocalizations.of(context);
     return Row(
       children: [
-        _ActionTile(
-          icon: Icons.download_rounded,
-          label: text.generationStatusDownloadAction,
-          onTap: onSave,
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: onShare,
+            icon: const Icon(Icons.share_rounded, size: 18),
+            label: Text(text.supportChatShareAction),
+          ),
         ),
-        const SizedBox(width: 8),
-        _ActionTile(
-          icon: Icons.share_rounded,
-          label: text.supportChatShareAction,
-          onTap: onShare,
+        const SizedBox(width: 10),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: onSave,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: Text(text.generationStatusDownloadAction),
+          ),
         ),
       ],
     );
@@ -614,9 +720,10 @@ class _DetailsCard extends StatelessWidget {
 }
 
 class _InlineVideoPreview extends StatefulWidget {
-  const _InlineVideoPreview({required this.url});
+  const _InlineVideoPreview({required this.url, this.onAspectRatioResolved});
 
   final String url;
+  final ValueChanged<double>? onAspectRatioResolved;
 
   @override
   State<_InlineVideoPreview> createState() => _InlineVideoPreviewState();
@@ -680,6 +787,11 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
       if (!mounted || _controller != controller) {
         await controller.dispose();
         return;
+      }
+
+      final size = controller.value.size;
+      if (size.width > 0 && size.height > 0) {
+        widget.onAspectRatioResolved?.call(size.width / size.height);
       }
 
       await controller.play();
@@ -751,6 +863,7 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
   VideoPlayerController? _videoController;
   bool _videoFailed = false;
   bool _showControls = true;
+  bool _isMuted = false;
   Timer? _controlsTimer;
 
   bool get _isVideo => isVideoGeneration(widget.generation);
@@ -817,6 +930,12 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
     });
   }
 
+  void _toggleMute() {
+    setState(() => _isMuted = !_isMuted);
+    _videoController?.setVolume(_isMuted ? 0.0 : 1.0);
+    _startControlsTimer();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
@@ -874,7 +993,17 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          if (_isVideo)
+                            IconButton(
+                              onPressed: _toggleMute,
+                              icon: Icon(
+                                _isMuted
+                                    ? Icons.volume_off_rounded
+                                    : Icons.volume_up_rounded,
+                              ),
+                              color: Colors.white,
+                            ),
+                          const SizedBox(width: 4),
                         ],
                       ),
                     ),

@@ -71,18 +71,20 @@ class _MessageBubble extends StatelessWidget {
         hasRichMedia && !hasFileAttachment && !hasFailedAttachment;
     final horizontalBubblePadding = compactMediaBubble ? 2.0 : 12.0;
     final mediaContentWidth = maxBubbleWidth - (horizontalBubblePadding * 2);
+        final userBubbleColor = _supportMessageGreen(context);
+        final userBubbleBorderColor = _supportMessageGreenBorder(context);
     final bubbleColor = message.isFromAdmin
         ? (isBotMessage
               ? colors.surfaceStrong.withValues(alpha: 0.98)
               : colors.surfaceStrong.withValues(alpha: 0.95))
         : (isMediaOnlyBubble
               ? colors.surfaceStrong.withValues(alpha: 0.18)
-              : _supportMessageGreen);
+          : userBubbleColor);
     final borderColor = message.isFromAdmin
         ? colors.border
         : (isMediaOnlyBubble
               ? colors.border.withValues(alpha: isLight ? 0.72 : 0.45)
-              : _supportMessageGreenBorder);
+          : userBubbleBorderColor);
     final alignment = message.isFromAdmin
         ? Alignment.centerLeft
         : Alignment.centerRight;
@@ -881,6 +883,7 @@ class _MessageDeliveryStatusIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconColor =
         tintColor ?? (compact ? Colors.white.withValues(alpha: 0.88) : null);
+    final composerTone = _supportComposerSendGreen(context);
     final iconSize = compact ? 12.2 : 13.0;
     Widget statusIcon;
     if (message.isAttachmentUploading) {
@@ -907,7 +910,7 @@ class _MessageDeliveryStatusIcon extends StatelessWidget {
         key: const ValueKey<String>('read'),
         Icons.done_all_rounded,
         size: iconSize,
-        color: iconColor ?? _supportComposerSendGreen,
+        color: iconColor ?? composerTone,
       );
     } else {
       statusIcon = Icon(
@@ -1771,6 +1774,7 @@ class _SupportAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final avatarTone = _supportSecondaryGreen(context);
     final initial = label.trim().isEmpty ? 'P' : label.trim().substring(0, 1);
 
     return Container(
@@ -1785,7 +1789,7 @@ class _SupportAvatar extends StatelessWidget {
         child: Text(
           initial.toUpperCase(),
           style: TextStyle(
-            color: _supportSecondaryGreen,
+            color: avatarTone,
             fontSize: 12,
             fontWeight: FontWeight.w900,
           ),

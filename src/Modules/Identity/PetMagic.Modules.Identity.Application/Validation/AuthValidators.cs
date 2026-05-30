@@ -54,6 +54,16 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
     }
 }
 
+public sealed class UpdateCurrentUserProfileCommandValidator : AbstractValidator<UpdateCurrentUserProfileCommand>
+{
+    public UpdateCurrentUserProfileCommandValidator()
+    {
+        RuleFor(x => x.DisplayName)
+            .MaximumLength(120)
+            .WithMessage("Display name cannot exceed 120 characters.");
+    }
+}
+
 public sealed class ResendEmailVerificationCodeCommandValidator : AbstractValidator<ResendEmailVerificationCodeCommand>
 {
     public ResendEmailVerificationCodeCommandValidator()

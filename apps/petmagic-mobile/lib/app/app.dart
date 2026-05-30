@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart'
 import 'package:petmagic_mobile/app/router/app_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/notifications/push_notifications_bootstrap.dart';
+import 'package:petmagic_mobile/core/startup/session_scope_reset.dart';
 
 const _supportedAppLocales = <Locale>[
   Locale('ru'),
@@ -23,6 +24,7 @@ class PetMagicApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(sessionScopeResetProvider);
     final router = ref.watch(appRouterProvider);
     final preferences = ref.watch(appPreferencesControllerProvider);
 

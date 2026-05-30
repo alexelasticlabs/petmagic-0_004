@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 
-const _kSelectedGreen = Color(0xFF34C759);
-
 class PaymentMethodSheetOption {
   const PaymentMethodSheetOption({
     required this.id,
@@ -148,20 +146,21 @@ class _TrustCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedColor = colors.accent;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: _kSelectedGreen.withValues(alpha: 0.07),
+        color: selectedColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kSelectedGreen.withValues(alpha: 0.25)),
+        border: Border.all(color: selectedColor.withValues(alpha: 0.34)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 1),
-            child: Icon(Icons.shield_rounded, color: _kSelectedGreen, size: 18),
+            child: Icon(Icons.shield_rounded, color: selectedColor, size: 18),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -190,7 +189,7 @@ class _TrustCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 1),
                           child: Icon(
                             Icons.check_rounded,
-                            color: _kSelectedGreen,
+                            color: selectedColor,
                             size: 13,
                           ),
                         ),
@@ -234,6 +233,7 @@ class _PaymentMethodOptionTile extends StatelessWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final isEnabled = option.isEnabled;
+    final selectedColor = colors.accent;
 
     return Opacity(
       opacity: isEnabled ? 1 : 0.45,
@@ -250,11 +250,11 @@ class _PaymentMethodOptionTile extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               color: isSelected
-                  ? _kSelectedGreen.withValues(alpha: 0.09)
+                  ? selectedColor.withValues(alpha: 0.11)
                   : colors.surfaceStrong.withValues(alpha: isLight ? 0.8 : 0.3),
               border: Border.all(
                 color: isSelected
-                    ? _kSelectedGreen
+                    ? selectedColor
                     : colors.border.withValues(alpha: isLight ? 0.74 : 0.45),
                 width: isSelected ? 1.8 : 1.0,
               ),
@@ -266,13 +266,13 @@ class _PaymentMethodOptionTile extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? _kSelectedGreen.withValues(alpha: 0.12)
+                        ? selectedColor.withValues(alpha: 0.16)
                         : colors.surface,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     option.icon,
-                    color: isSelected ? _kSelectedGreen : colors.textSoft,
+                    color: isSelected ? selectedColor : colors.textSoft,
                     size: 20,
                   ),
                 ),
@@ -287,9 +287,7 @@ class _PaymentMethodOptionTile extends StatelessWidget {
                             child: Text(
                               option.title,
                               style: TextStyle(
-                                color: isSelected
-                                    ? colors.textStrong
-                                    : colors.textSoft,
+                                color: colors.textStrong,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -303,13 +301,16 @@ class _PaymentMethodOptionTile extends StatelessWidget {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: _kSelectedGreen.withValues(alpha: 0.14),
+                                color: selectedColor.withValues(alpha: 0.16),
                                 borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: selectedColor.withValues(alpha: 0.34),
+                                ),
                               ),
                               child: Text(
                                 option.badge!,
-                                style: const TextStyle(
-                                  color: _kSelectedGreen,
+                                style: TextStyle(
+                                  color: selectedColor,
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -329,7 +330,7 @@ class _PaymentMethodOptionTile extends StatelessWidget {
                                   : colors.textMuted,
                               fontSize: 12,
                               height: 1.3,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -341,7 +342,7 @@ class _PaymentMethodOptionTile extends StatelessWidget {
                   isSelected
                       ? Icons.check_circle_rounded
                       : Icons.radio_button_unchecked_rounded,
-                  color: isSelected ? _kSelectedGreen : colors.textMuted,
+                  color: isSelected ? selectedColor : colors.textMuted,
                   size: 22,
                 ),
               ],

@@ -148,6 +148,25 @@ class TemplateGenerationRepository {
     }
   }
 
+  Future<void> clearLocalCache() async {
+    for (final status in _cacheStatuses) {
+      final key = _cacheKeyForStatus(
+        status == _cacheAllStatusKey ? null : status,
+      );
+      try {
+        await _preferences.remove(key);
+      } on Object {
+        // Keep best-effort semantics for logout cleanup.
+      }
+    }
+
+    try {
+      await _preferences.remove(_unreadCountCacheKey);
+    } on Object {
+      // Keep best-effort semantics for logout cleanup.
+    }
+  }
+
   Future<List<TemplateGenerationResult>> fetchGenerations({
     String? status,
     int? skip,

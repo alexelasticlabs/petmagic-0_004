@@ -120,12 +120,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                       generation: generation,
                       onOpenViewer: () => _openFullscreenPreview(generation),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     _ReadyActionsRow(
                       onSave: () => unawaited(_saveToGallery(generation)),
                       onShare: () => unawaited(_shareResult(generation)),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     _DetailsCard(
                       title: text.generationStatusDetailsTitle,
                       rows: [
@@ -151,7 +151,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     _FeedbackCard(
                       isSubmitting: _isSubmittingFeedback,
                       title: text.generationStatusFeedbackTitle,

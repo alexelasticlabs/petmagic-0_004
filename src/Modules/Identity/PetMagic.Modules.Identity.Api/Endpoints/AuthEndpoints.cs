@@ -99,6 +99,9 @@ public static class AuthEndpoints
         group.MapGet("/me", MeAsync)
             .RequireAuthorization();
 
+        group.MapPut("/me/profile", UpdateMeProfileAsync)
+            .RequireAuthorization();
+
         group.MapDelete("/me", DeleteMeAsync)
             .RequireAuthorization();
 
@@ -742,6 +745,40 @@ public static class AuthEndpoints
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<UserProfileResponse>, ValidationProblem, ProblemHttpResult>> UpdateMeProfileAsync(
+        HttpContext context,
+        UpdateCurrentUserProfileCommand command,
+        IValidator<UpdateCurrentUserProfileCommand> validator,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
+        {
+            return invalidSubjectProblem!;
+        }
+
+        var result = await service.UpdateCurrentUserProfileAsync(userId, command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: statusCode);
         }
 
         return TypedResults.Ok(result.Value);

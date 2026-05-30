@@ -21,7 +21,7 @@ internal sealed class IdentityEmailTemplateRenderer : IIdentityEmailTemplateRend
         var htmlBody = $"""
             <p>Hello {WebUtility.HtmlEncode(safeName)},</p>
             <p>Your PetMagic email confirmation code is:</p>
-            <p style=\"font-size:24px;font-weight:bold;letter-spacing:4px;\">{WebUtility.HtmlEncode(code)}</p>
+            <p style="font-size:24px;font-weight:bold;letter-spacing:4px;">{WebUtility.HtmlEncode(code)}</p>
             <p>This code expires at {WebUtility.HtmlEncode(expiryText)}.</p>
             """;
         var textBody = $"Hello {safeName},\n\nYour PetMagic email confirmation code is: {code}\nIt expires at {expiryText}.";
@@ -37,7 +37,7 @@ internal sealed class IdentityEmailTemplateRenderer : IIdentityEmailTemplateRend
         var htmlBody = $"""
             <p>Hello {WebUtility.HtmlEncode(safeName)},</p>
             <p>Your PetMagic password reset code is:</p>
-            <p style=\"font-size:24px;font-weight:bold;letter-spacing:4px;\">{WebUtility.HtmlEncode(code)}</p>
+            <p style="font-size:24px;font-weight:bold;letter-spacing:4px;">{WebUtility.HtmlEncode(code)}</p>
             <p>This code expires at {WebUtility.HtmlEncode(expiryText)}.</p>
             """;
         var textBody = $"Hello {safeName},\n\nYour PetMagic password reset code is: {code}\nIt expires at {expiryText}.";

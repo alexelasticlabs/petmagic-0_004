@@ -494,6 +494,9 @@ class _SupportComposerPanel extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final composerSendColor = _supportComposerSendGreen(context);
+    final composerIconColor = _supportComposerIconColor(context);
+    final composerHintColor = _supportComposerHintColor(context);
 
     final isKeyboardVisible = keyboardInset > 0;
     final sendProgress = state.sendProgress;
@@ -611,16 +614,16 @@ class _SupportComposerPanel extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 2, right: 4),
                     decoration: BoxDecoration(
                       color: colors.surfaceStrong.withValues(
-                        alpha: isLight ? 0.98 : 0.9,
+                        alpha: isLight ? 0.99 : 0.9,
                       ),
                       borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: colors.border.withValues(
                           alpha: composerHasFocus
-                              ? (isLight ? 0.88 : 0.55)
-                              : (isLight ? 0.62 : 0.28),
+                              ? (isLight ? 0.98 : 0.55)
+                              : (isLight ? 0.78 : 0.28),
                         ),
-                        width: isLight ? 1.0 : 0.8,
+                        width: isLight ? 1.1 : 0.8,
                       ),
                     ),
                     child: Row(
@@ -642,7 +645,7 @@ class _SupportComposerPanel extends StatelessWidget {
                             size: 21,
                             color: state.isSending || isReadOnly
                                 ? colors.textMuted.withValues(alpha: 0.46)
-                                : _supportComposerIconColor,
+                                : composerIconColor,
                           ),
                         ),
                         Expanded(
@@ -664,12 +667,12 @@ class _SupportComposerPanel extends StatelessWidget {
                                   ? text.supportChatReadOnlyHint
                                   : text.supportChatInputHint,
                               hintStyle: TextStyle(
-                                color: _supportComposerHintColor.withValues(
+                                color: composerHintColor.withValues(
                                   alpha: 0.98,
                                 ),
                                 fontSize: 14.5,
                                 height: 1.26,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
@@ -720,7 +723,7 @@ class _SupportComposerPanel extends StatelessWidget {
                                             strokeWidth: 2,
                                             valueColor:
                                                 AlwaysStoppedAnimation<Color>(
-                                                  _supportComposerSendGreen,
+                                                  composerSendColor,
                                                 ),
                                           ),
                                         )
@@ -728,7 +731,7 @@ class _SupportComposerPanel extends StatelessWidget {
                                           Icons.arrow_upward_rounded,
                                           size: 22,
                                           color: effectiveCanSend
-                                              ? _supportComposerSendGreen
+                                              ? composerSendColor
                                               : colors.textMuted.withValues(
                                                   alpha: 0.5,
                                                 ),
@@ -754,8 +757,8 @@ class _SupportComposerPanel extends StatelessWidget {
                     value: sendProgress,
                     minHeight: 4,
                     backgroundColor: colors.surface.withValues(alpha: 0.7),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      _supportComposerSendGreen,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      composerSendColor,
                     ),
                   ),
                 ),
@@ -871,13 +874,14 @@ class _SupportPromptButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final actionTone = _supportSecondaryGreen(context);
 
     return TextButton.icon(
       style: TextButton.styleFrom(
         visualDensity: VisualDensity.compact,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        foregroundColor: _supportSecondaryGreen,
+        foregroundColor: actionTone,
         textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         backgroundColor: colors.surfaceStrong.withValues(alpha: 0.72),
@@ -902,12 +906,13 @@ class _SupportClosedConversationBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final actionTone = _supportComposerSendGreen(context);
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.72),
+        color: colors.surface.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border.withValues(alpha: 0.48)),
+        border: Border.all(color: colors.border.withValues(alpha: 0.72)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
@@ -935,7 +940,7 @@ class _SupportClosedConversationBanner extends StatelessWidget {
                   horizontal: 12,
                   vertical: 6,
                 ),
-                foregroundColor: _supportComposerSendGreen,
+                foregroundColor: actionTone,
                 textStyle: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -943,9 +948,7 @@ class _SupportClosedConversationBanner extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
-                backgroundColor: _supportComposerSendGreen.withValues(
-                  alpha: 0.1,
-                ),
+                backgroundColor: actionTone.withValues(alpha: 0.1),
               ),
               onPressed: isBusy ? null : onReopen,
               child: Text(text.supportChatReopenAction),

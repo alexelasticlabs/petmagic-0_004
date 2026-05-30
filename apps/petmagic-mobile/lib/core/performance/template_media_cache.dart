@@ -44,6 +44,20 @@ class TemplateMediaCache {
     return previewVideoCache.removeFile(url);
   }
 
+  static Future<void> clearAll() async {
+    try {
+      await thumbnailCache.emptyCache();
+    } catch (_) {
+      // Keep best-effort semantics for logout cleanup.
+    }
+
+    try {
+      await previewVideoCache.emptyCache();
+    } catch (_) {
+      // Keep best-effort semantics for logout cleanup.
+    }
+  }
+
   static void _schedulePreviewBudgetCleanup(Directory previewCacheDirectory) {
     if (_isPreviewBudgetCleanupRunning) {
       return;

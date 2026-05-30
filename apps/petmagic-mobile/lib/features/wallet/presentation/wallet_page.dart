@@ -280,9 +280,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         items: state.purchases,
                         highlightedOrderId: state.highlightedPurchaseOrderId,
                       ),
-                      if (state.purchases.isNotEmpty)
-                        const SizedBox(height: 16),
-                      const _WalletCompanionHero(),
                     ],
                   ],
                 ),

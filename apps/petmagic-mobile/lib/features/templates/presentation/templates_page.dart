@@ -7,8 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
@@ -94,6 +97,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(templatesControllerProvider);
     final wallet = ref.watch(walletControllerProvider).wallet;
+    final launchState = ref.watch(appLaunchControllerProvider);
     final controller = ref.read(templatesControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
@@ -131,7 +135,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _TopBar(
+                        isAuthenticated: launchState.isAuthenticated,
                         tokenBalance: wallet?.balance ?? 0,
+                        onAuthPressed: () =>
+                            context.go(AuthEntryPage.routePath),
                         onRewardsPressed: () =>
                             context.go(RewardsPage.routePath),
                         onTopUpPressed: () =>
@@ -290,6 +297,11 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   Future<void> _startTemplateUploadFlow(TemplateItem template) async {
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      await showAuthRequiredSheet(context);
+      return;
+    }
+
     final photo = await _pickPetPhoto();
     if (!mounted || photo == null) {
       return;
@@ -357,6 +369,11 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       final errorMessage = ref
           .read(templateGenerationControllerProvider)
           .errorMessage;
+      if (_isAuthRequiredError(errorMessage)) {
+        await showAuthRequiredSheet(context);
+        return;
+      }
+
       messenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -439,6 +456,14 @@ String _mapTemplatesError(AppLocalizations text, String raw) {
 }
 
 String _generationStartErrorText(AppLocalizations text, String raw) {
+  if (raw.contains('auth.sign_in_required')) {
+    return text.authSignInRequired;
+  }
+
+  if (raw.contains('auth.session_expired')) {
+    return text.authSessionExpired;
+  }
+
   if (raw.contains('templates.premium_required')) {
     return text.templateFlowPremiumRequiredError;
   }
@@ -458,6 +483,15 @@ String _generationStartErrorText(AppLocalizations text, String raw) {
   return raw;
 }
 
+bool _isAuthRequiredError(String? raw) {
+  if (raw == null || raw.isEmpty) {
+    return false;
+  }
+
+  return raw.contains('auth.sign_in_required') ||
+      raw.contains('auth.session_expired');
+}
+
 class _TemplatesLifecycleObserver with WidgetsBindingObserver {
   _TemplatesLifecycleObserver({required this.onStateChanged});
 
@@ -471,13 +505,17 @@ class _TemplatesLifecycleObserver with WidgetsBindingObserver {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
+    required this.isAuthenticated,
     required this.tokenBalance,
+    required this.onAuthPressed,
     required this.onRewardsPressed,
     required this.onTopUpPressed,
     required this.onWalletPressed,
   });
 
+  final bool isAuthenticated;
   final int tokenBalance;
+  final VoidCallback onAuthPressed;
   final VoidCallback onRewardsPressed;
   final VoidCallback onTopUpPressed;
   final VoidCallback onWalletPressed;
@@ -504,14 +542,27 @@ class _TopBar extends StatelessWidget {
             ),
           ),
         ),
-        _GiftButton(tooltip: text.giftTooltip, onPressed: onRewardsPressed),
-        const SizedBox(width: 8),
-        _TokenBalance(
-          balance: tokenBalance,
-          addTooltip: text.addTokensTooltip,
-          onAddPressed: onTopUpPressed,
-          onPressed: onWalletPressed,
-        ),
+        if (!isAuthenticated)
+          OutlinedButton.icon(
+            onPressed: onAuthPressed,
+            icon: const Icon(Icons.login_rounded, size: 17),
+            label: Text(text.profileSignInAction),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              foregroundColor: colors.accent,
+              side: BorderSide(color: colors.accent.withValues(alpha: 0.5)),
+            ),
+          )
+        else ...[
+          _GiftButton(tooltip: text.giftTooltip, onPressed: onRewardsPressed),
+          const SizedBox(width: 8),
+          _TokenBalance(
+            balance: tokenBalance,
+            addTooltip: text.addTokensTooltip,
+            onAddPressed: onTopUpPressed,
+            onPressed: onWalletPressed,
+          ),
+        ],
       ],
     );
   }

@@ -14,6 +14,7 @@ class _SupportHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final statusColor = _supportSecondaryGreen(context);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 6, 12, 4),
@@ -72,9 +73,9 @@ class _SupportHeader extends StatelessWidget {
                       width: 8,
                       height: 8,
                       margin: const EdgeInsets.only(top: 4),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _supportSecondaryGreen,
+                        color: statusColor,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -140,16 +141,16 @@ class _SupportSecurityCardState extends State<_SupportSecurityCard> {
             padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
             decoration: BoxDecoration(
               color: colors.surfaceStrong.withValues(
-                alpha: isLight ? 0.9 : 0.54,
+                alpha: isLight ? 0.96 : 0.54,
               ),
               borderRadius: borderRadius,
               border: Border.all(
-                color: colors.border.withValues(alpha: isLight ? 0.84 : 0.58),
+                color: colors.border.withValues(alpha: isLight ? 0.94 : 0.58),
               ),
             ),
             child: Row(
               children: [
-                Icon(Icons.shield_rounded, color: colors.textMuted, size: 12),
+                Icon(Icons.shield_rounded, color: colors.textSoft, size: 12),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -159,9 +160,9 @@ class _SupportSecurityCardState extends State<_SupportSecurityCard> {
                         ? TextOverflow.visible
                         : TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: colors.textMuted,
+                      color: colors.textSoft,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       height: 1.3,
                     ),
                   ),
@@ -203,9 +204,9 @@ class _SupportConversationStatusStrip extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.62),
+        color: colors.surfaceStrong.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: descriptor.color.withValues(alpha: 0.35)),
+        border: Border.all(color: descriptor.color.withValues(alpha: 0.48)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
@@ -237,7 +238,7 @@ class _SupportConversationStatusStrip extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final normalizedStatus = conversation.status.trim().toLowerCase();
     const mutedColor = Color(0xFF8A94A6);
-    const activeColor = _supportSecondaryGreen;
+    final activeColor = _supportSecondaryGreen(context);
 
     if (normalizedStatus == 'resolved') {
       return (

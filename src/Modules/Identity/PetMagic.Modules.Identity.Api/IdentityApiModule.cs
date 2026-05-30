@@ -19,6 +19,7 @@ public static class IdentityApiModule
         services.AddScoped<IValidator<RegisterUserCommand>, RegisterUserCommandValidator>();
         services.AddScoped<IValidator<AcceptLegalDocumentsCommand>, AcceptLegalDocumentsCommandValidator>();
         services.AddScoped<IValidator<LoginCommand>, LoginCommandValidator>();
+        services.AddScoped<IValidator<UpdateCurrentUserProfileCommand>, UpdateCurrentUserProfileCommandValidator>();
         services.AddScoped<IValidator<ResendEmailVerificationCodeCommand>, ResendEmailVerificationCodeCommandValidator>();
         services.AddScoped<IValidator<VerifyEmailCodeCommand>, VerifyEmailCodeCommandValidator>();
         services.AddScoped<IValidator<RequestEmailConfirmationCommand>, RequestEmailConfirmationCommandValidator>();

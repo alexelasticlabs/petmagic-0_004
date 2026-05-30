@@ -464,6 +464,27 @@ class ProfileController extends Notifier<ProfileState> {
     }
   }
 
+  Future<void> updateCurrentProfile({required String? displayName}) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    try {
+      final profile = await _repository.updateProfile(displayName: displayName);
+      state = state.copyWith(
+        isSaving: false,
+        profile: profile,
+        session: _replaceSessionUser(profile),
+        displayName: profile.displayName ?? '',
+      );
+    } on AppException catch (error) {
+      _setFailure(message: error.message);
+    } catch (_) {
+      _setFailure(message: _genericActionError);
+    }
+  }
+
   Future<void> acceptCurrentLegalDocuments(
     MobileLegalDocuments legalDocuments,
   ) async {

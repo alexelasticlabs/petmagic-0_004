@@ -36,6 +36,8 @@ public sealed record LogoutCommand(Guid UserId, string RefreshToken);
 
 public sealed record DeleteCurrentUserCommand(Guid UserId);
 
+public sealed record UpdateCurrentUserProfileCommand(string? DisplayName);
+
 public sealed record ExternalLoginCallbackCommand(
     string Provider,
     string ProviderSubject,

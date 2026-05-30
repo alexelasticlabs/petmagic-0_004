@@ -264,14 +264,12 @@ class _BottomNavBackdrop extends StatelessWidget {
                 colors: [
                   colors.backgroundBottom.withValues(alpha: 0),
                   colors.backgroundBottom.withValues(
-                    alpha: isLight ? 0.3 : 0.18,
+                    alpha: isLight ? 0.50 : 0.18,
                   ),
                   colors.backgroundBottom.withValues(
-                    alpha: isLight ? 0.62 : 0.42,
+                    alpha: isLight ? 0.86 : 0.42,
                   ),
-                  colors.backgroundBottom.withValues(
-                    alpha: isLight ? 0.9 : 0.74,
-                  ),
+                  colors.backgroundBottom.withValues(alpha: isLight ? 1 : 0.74),
                 ],
                 stops: const [0, 0.34, 0.68, 1],
               ),
@@ -334,15 +332,17 @@ class _FloatingBottomNav extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(15),
                     boxShadow: [
                       BoxShadow(
-                        color: colors.shadow.withValues(alpha: 0.3),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
+                        color: colors.shadow.withValues(
+                          alpha: isLight ? 0.50 : 0.3,
+                        ),
+                        blurRadius: isLight ? 20 : 14,
+                        offset: const Offset(0, 5),
                       ),
                       BoxShadow(
                         color: colors.backgroundBottom.withValues(
-                          alpha: isLight ? 0.28 : 0.18,
+                          alpha: isLight ? 0.42 : 0.18,
                         ),
-                        blurRadius: isLight ? 22 : 18,
+                        blurRadius: isLight ? 30 : 18,
                         offset: const Offset(0, 8),
                       ),
                     ],
@@ -352,17 +352,18 @@ class _FloatingBottomNav extends ConsumerWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(15),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: colors.surfaceGlass.withValues(
-                        alpha: isLight ? 0.92 : 0.68,
+                        alpha: isLight ? 0.99 : 0.68,
                       ),
                       borderRadius: BorderRadius.circular(15),
                       border: Border.all(
                         color: colors.border.withValues(
-                          alpha: isLight ? 0.6 : 0.22,
+                          alpha: isLight ? 0.92 : 0.22,
                         ),
+                        width: isLight ? 1.1 : 1,
                       ),
                     ),
                     child: Padding(
@@ -556,7 +557,7 @@ class _BottomNavButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final inactiveColor = Color.lerp(colors.textMuted, colors.textSoft, 0.34)!;
+    final inactiveColor = Color.lerp(colors.textMuted, colors.textSoft, 0.62)!;
 
     return Semantics(
       selected: selected,
@@ -573,13 +574,14 @@ class _BottomNavButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             color: selected
-                ? colors.accent.withValues(alpha: isLight ? 0.14 : 0.1)
+                ? colors.accent.withValues(alpha: isLight ? 0.26 : 0.1)
                 : Colors.transparent,
             border: selected
                 ? Border.all(
                     color: colors.accent.withValues(
-                      alpha: isLight ? 0.22 : 0.08,
+                      alpha: isLight ? 0.48 : 0.08,
                     ),
+                    width: isLight ? 1.05 : 1,
                   )
                 : null,
           ),
