@@ -505,6 +505,8 @@ class _HeroBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isCompactScreen = screenWidth < 380;
     final accent = isDark ? _kDarkAccent : _kLightAccent;
     final textColor = isDark ? _kDarkText : _kLightText;
     final sub = isDark ? _kDarkSubtitle : _kLightSubtitle;
@@ -589,13 +591,15 @@ class _HeroBlock extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Monthly generations, premium templates, priority queue & no watermark.',
+                  'Premium templates, priority queue, no watermark & 40 tokens every week.',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: isCompactScreen ? 12 : 13,
                     color: sub,
                     height: 1.4,
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: isCompactScreen ? 4 : 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -656,9 +660,9 @@ class _ComparisonCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 14),
                           _cmpRow(false, 'Limited templates', isDark, sub),
+                          _cmpRow(false, 'Limited generations', isDark, sub),
                           _cmpRow(false, 'Standard queue', isDark, sub),
                           _cmpRow(false, 'Watermark on videos', isDark, sub),
-                          _cmpRow(false, 'Lower rewards', isDark, sub),
                         ],
                       ),
                     ),
@@ -705,7 +709,7 @@ class _ComparisonCard extends StatelessWidget {
                           ),
                           _cmpRow(
                             true,
-                            'Bigger rewards',
+                            '40 tokens every week',
                             isDark,
                             textColor,
                             accent: accent,

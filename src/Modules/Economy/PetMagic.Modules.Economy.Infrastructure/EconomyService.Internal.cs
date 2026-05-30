@@ -286,9 +286,12 @@ public sealed partial class EconomyService
             adRewardsRemainingToday);
     }
 
-    private WalletStateResponse ToWalletState(Wallet wallet, bool isPremium)
+    private WalletStateResponse ToWalletState(
+        Wallet wallet,
+        bool isPremium,
+        DateTime? nextPremiumWeeklyGrantAtUtc = null)
     {
-        var nextWeeklyGrantAtUtc = wallet.LastWeeklyGrantAtUtc?.AddDays(7);
+        var nextWeeklyGrantAtUtc = nextPremiumWeeklyGrantAtUtc ?? wallet.LastWeeklyGrantAtUtc?.AddDays(7);
 
         if (wallet.AdRewardWindowStartedAtUtc is null || wallet.AdRewardWindowStartedAtUtc.Value.Date != DateTime.UtcNow.Date)
         {

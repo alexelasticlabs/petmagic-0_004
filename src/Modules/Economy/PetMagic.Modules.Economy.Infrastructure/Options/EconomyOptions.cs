@@ -6,7 +6,7 @@ public sealed class EconomyOptions
 
     public int WeeklyFreeSpark { get; init; } = 100;
 
-    public int WeeklyPremiumSpark { get; init; } = 250;
+    public int WeeklyPremiumSpark { get; init; } = 40;
 
     public int AdRewardSpark { get; init; } = 15;
 

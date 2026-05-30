@@ -145,6 +145,61 @@ public sealed partial class EconomyService
         return subscription.CurrentPeriodEndUtc is null || subscription.CurrentPeriodEndUtc >= DateTime.UtcNow;
     }
 
+    private async Task<DateTime?> GrantPremiumWeeklyTokensIfDueAsync(
+        Guid userId,
+        Wallet wallet,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var subscription = await GetLatestUserSubscriptionAsync(userId, cancellationToken);
+        if (!IsActivePremiumSubscription(subscription))
+        {
+            return null;
+        }
+
+        var subscriptionStartUtc = subscription!.CurrentPeriodStartUtc ?? subscription.CreatedAtUtc;
+        if (subscriptionStartUtc > now)
+        {
+            return subscriptionStartUtc.AddDays(7);
+        }
+
+        var elapsedDays = (now - subscriptionStartUtc).TotalDays;
+        var eligibleGrantCount = (int)Math.Floor(elapsedDays / 7d);
+        if (eligibleGrantCount <= 0)
+        {
+            return subscriptionStartUtc.AddDays(7);
+        }
+
+        var reasonPrefix = $"premium_weekly:{subscription.Id:D}:";
+        var grantedCount = await dbContext.WalletLedgerEntries
+            .AsNoTracking()
+            .CountAsync(
+                x => x.UserId == userId
+                    && x.Source == WalletLedgerSource.PremiumSubscriptionWeeklyGrant
+                    && x.Reason.StartsWith(reasonPrefix),
+                cancellationToken);
+
+        var grantsToApply = eligibleGrantCount - grantedCount;
+        if (grantsToApply > 0)
+        {
+            for (var index = 0; index < grantsToApply; index++)
+            {
+                var sequence = grantedCount + index + 1;
+                ApplyWalletDelta(
+                    wallet,
+                    options.Value.WeeklyPremiumSpark,
+                    WalletLedgerSource.PremiumSubscriptionWeeklyGrant,
+                    $"{reasonPrefix}{sequence}",
+                    now);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            grantedCount += grantsToApply;
+        }
+
+        return subscriptionStartUtc.AddDays((grantedCount + 1) * 7d);
+    }
+
     private static string GetManageSubscriptionAction(string? provider)
     {
         return provider switch

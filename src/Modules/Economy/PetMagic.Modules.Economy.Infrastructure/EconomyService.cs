@@ -42,13 +42,46 @@ public sealed partial class EconomyService(
     {
         var wallet = await GetOrCreateWalletAsync(userId, cancellationToken);
         var resolvedPremium = await ResolvePremiumStatusAsync(userId, isPremium, cancellationToken);
-        return Result.Success(ToWalletState(wallet, resolvedPremium));
+        DateTime? premiumNextGrantAtUtc = null;
+        if (resolvedPremium)
+        {
+            premiumNextGrantAtUtc = await GrantPremiumWeeklyTokensIfDueAsync(
+                userId,
+                wallet,
+                DateTime.UtcNow,
+                cancellationToken);
+        }
+
+        return Result.Success(ToWalletState(wallet, resolvedPremium, premiumNextGrantAtUtc));
     }
 
     public async Task<Result<WalletOperationResponse>> ClaimWeeklyGrantAsync(ClaimWeeklyGrantCommand command, CancellationToken cancellationToken)
     {
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         var now = DateTime.UtcNow;
+        var resolvedPremium = await ResolvePremiumStatusAsync(command.UserId, command.IsPremium, cancellationToken);
+
+        if (resolvedPremium)
+        {
+            var balanceBefore = wallet.Balance;
+            var nextGrantAtUtc = await GrantPremiumWeeklyTokensIfDueAsync(command.UserId, wallet, now, cancellationToken);
+            var delta = wallet.Balance - balanceBefore;
+
+            if (delta <= 0)
+            {
+                return Result.Failure<WalletOperationResponse>(EconomyErrors.WeeklyGrantCooldown);
+            }
+
+            var adRewardsRemainingToday = Math.Max(0, options.Value.AdRewardDailyLimit - wallet.AdRewardsClaimedInWindow);
+            return Result.Success(new WalletOperationResponse(
+                wallet.UserId,
+                delta,
+                wallet.Balance,
+                WalletLedgerSource.PremiumSubscriptionWeeklyGrant,
+                now,
+                nextGrantAtUtc,
+                adRewardsRemainingToday));
+        }
 
         if (wallet.LastWeeklyGrantAtUtc is DateTime lastWeeklyGrantAtUtc)
         {
@@ -59,8 +92,7 @@ public sealed partial class EconomyService(
             }
         }
 
-        var resolvedPremium = await ResolvePremiumStatusAsync(command.UserId, command.IsPremium, cancellationToken);
-        var amount = resolvedPremium ? options.Value.WeeklyPremiumSpark : options.Value.WeeklyFreeSpark;
+        var amount = options.Value.WeeklyFreeSpark;
         var response = ApplyWalletDelta(wallet, amount, WalletLedgerSource.WeeklyGrant, "weekly payout", now);
         wallet.LastWeeklyGrantAtUtc = now;
 

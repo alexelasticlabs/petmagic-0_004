@@ -23,7 +23,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         var economyOptions = new EconomyOptions
         {
             WeeklyFreeSpark = ParseInt(section["WeeklyFreeSpark"], 100),
-            WeeklyPremiumSpark = ParseInt(section["WeeklyPremiumSpark"], 250),
+            WeeklyPremiumSpark = ParseInt(section["WeeklyPremiumSpark"], 40),
             AdRewardSpark = ParseInt(section["AdRewardSpark"], 15),
             AdRewardDailyLimit = ParseInt(section["AdRewardDailyLimit"], 5),
             StripeSecretKey = legacyStripeSecretKey,

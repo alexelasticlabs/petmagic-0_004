@@ -1,0 +1,552 @@
+.page {
+  width: 100%;
+  max-width: var(--admin-page-max-wide);
+  margin: 0 auto;
+  display: grid;
+  gap: clamp(0.78rem, 0.68rem + 0.24vw, 0.92rem);
+}
+
+.summaryGrid {
+  gap: 0.56rem;
+}
+
+.filtersBar {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1.4fr) repeat(6, minmax(9rem, 1fr)) auto;
+  gap: 0.42rem;
+  align-items: center;
+  margin-bottom: 0.58rem;
+}
+
+.searchInput,
+.filterSelect {
+  height: 2.2rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0 0.58rem;
+}
+
+.searchInput:focus,
+.filterSelect:focus {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 46%, transparent);
+}
+
+.message {
+  grid-template-columns: 1fr;
+}
+
+.emptyState {
+  grid-template-columns: 1fr;
+  place-items: center;
+  min-height: 8.5rem;
+  text-align: center;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.emailCell {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.userAnchor {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.userAnchor:hover,
+.userAnchorActive {
+  color: var(--text-strong);
+}
+
+.userMeta {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.roleList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+
+.rolePill {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.stackCell {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.numericCell {
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.actionsCell {
+  min-width: 28rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.26rem;
+}
+
+.quickActionBtn {
+  appearance: none;
+  height: 2rem;
+  min-width: 4.6rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.quickActionBtn:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+.quickActionBtn:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.actionMenuTrigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.actionMenuTrigger[data-menu-open="true"],
+.actionMenuTrigger:hover {
+  border-color: var(--border-accent);
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+.actionMenuPortal {
+  position: fixed;
+  z-index: 240;
+  pointer-events: auto;
+}
+
+.actionMenuList {
+  min-width: 15.5rem;
+  display: grid;
+  gap: 0.14rem;
+  padding: 0.34rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
+  box-shadow: 0 18px 32px -14px rgba(0, 0, 0, 0.5);
+  animation: actionMenuFade 130ms ease;
+}
+
+.actionMenuListUpward {
+  transform-origin: bottom right;
+}
+
+@keyframes actionMenuFade {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.actionMenuItem,
+.actionMenuLink {
+  appearance: none;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-soft);
+  padding: 0.45rem 0.5rem;
+  text-align: left;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.actionMenuItem:hover:not(:disabled),
+.actionMenuLink:hover {
+  border-color: var(--border-accent);
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+.actionMenuItem:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.actionMenuItemDanger {
+  color: var(--danger);
+}
+
+.actionMenuItemDanger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--border-soft));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-2));
+}
+
+.buttonIcon {
+  width: 0.88rem;
+  height: 0.88rem;
+  flex: 0 0 auto;
+}
+
+.pagination {
+  margin-top: 0.64rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.paginationControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.44rem;
+}
+
+.walletDialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 245;
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+  background: rgba(2, 4, 7, 0.52);
+  backdrop-filter: blur(2px);
+}
+
+.walletDialog {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.76rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.9rem;
+  background: var(--surface-1);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.walletDialogTitle {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.walletField {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.walletField span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.walletInput,
+.walletTextarea {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.5rem 0.56rem;
+}
+
+.walletInput:focus,
+.walletTextarea:focus {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 46%, transparent);
+}
+
+.walletTextarea {
+  resize: vertical;
+}
+
+.walletError {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.walletActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.42rem;
+}
+
+.sidePanelBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.76rem;
+  background: rgba(2, 4, 7, 0.68);
+  backdrop-filter: blur(2px);
+}
+
+.sidePanel {
+  width: min(42rem, 100%);
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border: 1px solid var(--border-soft);
+  border-radius: 1rem;
+  background: var(--surface-1);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.5);
+}
+
+.sidePanelHeader {
+  padding: 0.72rem 0.82rem;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.sidePanelHeader h3 {
+  margin: 0;
+  color: var(--text-strong);
+}
+
+.sidePanelHeader p {
+  margin: 0.22rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.closeBtn {
+  appearance: none;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.36rem 0.58rem;
+  cursor: pointer;
+}
+
+.sidePanelContent {
+  overflow: auto;
+  display: grid;
+  gap: 0.54rem;
+  padding: 0.74rem;
+}
+
+.panelSection {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 0.56rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.panelSection h4 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 0.79rem;
+}
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 0.58rem;
+}
+
+.profileTitle {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.profileSub {
+  margin: 0.16rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.listBlock {
+  display: grid;
+  gap: 0.32rem;
+}
+
+.listCard {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  padding: 0.42rem;
+  display: grid;
+  gap: 0.14rem;
+}
+
+.listCard strong {
+  color: var(--text-strong);
+  font-size: 0.75rem;
+}
+
+.listCard span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.dangerZone {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border-soft));
+}
+
+.dangerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+}
+
+.dangerBtn,
+.profileLinkBtn {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-1));
+  color: color-mix(in srgb, var(--danger) 88%, var(--text-strong));
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.36rem 0.5rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.profileLinkBtn {
+  border-color: var(--border-soft);
+  background: var(--surface-1);
+  color: var(--text-soft);
+}
+
+.skeletonStack {
+  display: grid;
+  gap: 0.58rem;
+}
+
+.skeletonLine {
+  height: 2.2rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-1) 0%,
+    var(--surface-3) 50%,
+    var(--surface-1) 100%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@media (max-width: 1440px) {
+  .filtersBar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .actionsCell {
+    min-width: 25rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .filtersBar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pagination {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .sidePanelBackdrop {
+    padding: 0.46rem;
+  }
+
+  .sidePanel {
+    width: 100%;
+  }
+}

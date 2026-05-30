@@ -10,6 +10,92 @@ namespace PetMagic.Modules.Identity.Tests.Economy;
 public sealed partial class EconomyServiceTests
 {
     [Fact]
+    public async Task GetWalletAsync_ShouldGrantPremiumWeeklyTokensPerElapsedSubscriptionWeeks()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var subscriptionStartUtc = now.AddDays(-15);
+
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            CurrentPeriodStartUtc = subscriptionStartUtc,
+            CurrentPeriodEndUtc = now.AddDays(15),
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = subscriptionStartUtc,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var walletResult = await service.GetWalletAsync(userId, false, CancellationToken.None);
+
+        Assert.True(walletResult.IsSuccess);
+        Assert.Equal(80, walletResult.Value.Balance);
+        Assert.NotNull(walletResult.Value.NextWeeklyGrantAtUtc);
+        Assert.Equal(
+            subscriptionStartUtc.AddDays(21).Date,
+            walletResult.Value.NextWeeklyGrantAtUtc!.Value.Date);
+
+        var weeklyEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.PremiumSubscriptionWeeklyGrant)
+            .ToListAsync();
+
+        Assert.Equal(2, weeklyEntries.Count);
+        Assert.All(weeklyEntries, entry => Assert.Equal(40, entry.Delta));
+    }
+
+    [Fact]
+    public async Task GetWalletAsync_ShouldNotDuplicatePremiumWeeklyGrantWithinSameInterval()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var subscriptionStartUtc = now.AddDays(-8);
+
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            CurrentPeriodStartUtc = subscriptionStartUtc,
+            CurrentPeriodEndUtc = now.AddDays(20),
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = subscriptionStartUtc,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+
+        var first = await service.GetWalletAsync(userId, false, CancellationToken.None);
+        var second = await service.GetWalletAsync(userId, false, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(40, first.Value.Balance);
+        Assert.Equal(40, second.Value.Balance);
+
+        var weeklyEntriesCount = await dbContext.WalletLedgerEntries
+            .CountAsync(x => x.UserId == userId && x.Source == WalletLedgerSource.PremiumSubscriptionWeeklyGrant);
+
+        Assert.Equal(1, weeklyEntriesCount);
+    }
+
+    [Fact]
     public async Task CreditAsync_ShouldIncreaseWalletAndAppendLedgerEntry()
     {
         await using var dbContext = CreateDbContext();

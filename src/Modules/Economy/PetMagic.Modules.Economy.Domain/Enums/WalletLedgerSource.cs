@@ -14,6 +14,8 @@ public static class WalletLedgerSource
 
     public const string PremiumSubscriptionGrant = "premium_subscription_grant";
 
+    public const string PremiumSubscriptionWeeklyGrant = "premium_subscription_weekly_grant";
+
     public const string RedeemCode = "redeem_code";
 
     public const string ReferralBonus = "referral_bonus";

@@ -28,7 +28,7 @@ public sealed partial class EconomyServiceTests
         var options = Options.Create(new EconomyOptions
         {
             WeeklyFreeSpark = 100,
-            WeeklyPremiumSpark = 250,
+            WeeklyPremiumSpark = 40,
             AdRewardSpark = 15,
             AdRewardDailyLimit = 5,
             ReferralBonusSpark = 15,
