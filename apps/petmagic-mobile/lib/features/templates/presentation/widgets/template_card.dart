@@ -336,7 +336,6 @@ class _TemplateMedia extends StatelessWidget {
       builder: (context, constraints) {
         final pixelRatio = MediaQuery.devicePixelRatioOf(context);
         final cacheWidth = _cacheDimension(constraints.maxWidth, pixelRatio);
-        final cacheHeight = _cacheDimension(constraints.maxHeight, pixelRatio);
 
         return Stack(
           fit: StackFit.expand,
@@ -354,7 +353,6 @@ class _TemplateMedia extends StatelessWidget {
               _TemplateImageWithFallback(
                 imageUrl: imageUrl,
                 cacheWidth: cacheWidth,
-                cacheHeight: cacheHeight,
               )
             else
               const _MediaPlaceholder(),
@@ -377,12 +375,10 @@ class _TemplateImageWithFallback extends StatelessWidget {
   const _TemplateImageWithFallback({
     required this.imageUrl,
     required this.cacheWidth,
-    required this.cacheHeight,
   });
 
   final String imageUrl;
   final int? cacheWidth;
-  final int? cacheHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -391,41 +387,14 @@ class _TemplateImageWithFallback extends StatelessWidget {
         imageUrl: imageUrl,
         cacheManager: TemplateMediaCache.thumbnailCache,
         memCacheWidth: cacheWidth,
-        memCacheHeight: cacheHeight,
         maxWidthDiskCache: cacheWidth,
-        maxHeightDiskCache: cacheHeight,
         placeholder: (context, url) => const _MediaPlaceholder(),
         imageBuilder: (context, imageProvider) =>
             _CoverImageFill(imageProvider: imageProvider),
         errorWidget: (context, url, error) {
           debugPrint('Template image preview failed for $url: $error');
           unawaited(TemplateMediaCache.thumbnailCache.removeFile(url));
-          return Image.network(
-            url,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            width: double.infinity,
-            height: double.infinity,
-            cacheWidth: cacheWidth,
-            cacheHeight: cacheHeight,
-            filterQuality: FilterQuality.medium,
-            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-              return SizedBox.expand(child: child);
-            },
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) {
-                return child;
-              }
-
-              return const _MediaPlaceholder();
-            },
-            errorBuilder: (context, error, stackTrace) {
-              debugPrint(
-                'Template direct image fallback failed for $url: $error',
-              );
-              return const _MediaPlaceholder();
-            },
-          );
+          return _CoverNetworkImageFill(imageUrl: url, cacheWidth: cacheWidth);
         },
       ),
     );
@@ -450,6 +419,45 @@ class _CoverImageFill extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CoverNetworkImageFill extends StatelessWidget {
+  const _CoverNetworkImageFill({
+    required this.imageUrl,
+    required this.cacheWidth,
+  });
+
+  final String imageUrl;
+  final int? cacheWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      width: double.infinity,
+      height: double.infinity,
+      cacheWidth: cacheWidth,
+      filterQuality: FilterQuality.medium,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        return SizedBox.expand(child: child);
+      },
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) {
+          return child;
+        }
+
+        return const _MediaPlaceholder();
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint(
+          'Template direct image fallback failed for $imageUrl: $error',
+        );
+        return const _MediaPlaceholder();
+      },
     );
   }
 }
