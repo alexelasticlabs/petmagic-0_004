@@ -588,6 +588,164 @@ public sealed partial class EconomyService
             "pending_webhook"));
     }
 
+    public async Task<Result<SubscriptionSummaryResponse>> VerifyPremiumStripeSubscriptionAsync(
+        VerifyPremiumStripeSubscriptionCommand command,
+        CancellationToken cancellationToken)
+    {
+        var stripeApiKey = ResolveStripeApiKey();
+        if (string.IsNullOrWhiteSpace(stripeApiKey))
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
+        var normalizedPlanCode = command.PlanCode.Trim().ToLowerInvariant();
+        var normalizedSubscriptionId = command.ExternalSubscriptionId.Trim();
+
+        var plan = await ResolveConfiguredPremiumPlanAsync(normalizedPlanCode, cancellationToken);
+        if (plan is null)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumPlanNotFound);
+        }
+
+        var customer = await dbContext.PaymentCustomers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.UserId == command.UserId && x.Provider == "stripe",
+                cancellationToken);
+
+        if (customer is null || string.IsNullOrWhiteSpace(customer.ExternalCustomerId))
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
+        StripeConfiguration.ApiKey = stripeApiKey;
+
+        Subscription stripeSubscription;
+        try
+        {
+            stripeSubscription = await new SubscriptionService().GetAsync(
+                normalizedSubscriptionId,
+                new SubscriptionGetOptions
+                {
+                    Expand = ["items.data.price"]
+                },
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(
+                ex,
+                "Failed to verify Stripe subscription {SubscriptionId} for user {UserId}.",
+                normalizedSubscriptionId,
+                command.UserId);
+
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        if (!string.Equals(stripeSubscription.CustomerId, customer.ExternalCustomerId, StringComparison.Ordinal))
+        {
+            logger?.LogWarning(
+                "Stripe subscription {SubscriptionId} belongs to customer {CustomerId}, but user {UserId} is linked to {ExpectedCustomerId}.",
+                normalizedSubscriptionId,
+                stripeSubscription.CustomerId,
+                command.UserId,
+                customer.ExternalCustomerId);
+
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        var mappedStatus = MapStripeSubscriptionStatusForVerification(stripeSubscription.Status);
+        var currentPeriodStartUtc = NormalizeStripeUtcDateTime(stripeSubscription.StartDate);
+        var currentPeriodEndUtc = ResolveStripeCurrentPeriodEndUtc(stripeSubscription);
+        var isPremium = string.Equals(mappedStatus, "Active", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(mappedStatus, "Trialing", StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(mappedStatus, "Canceled", StringComparison.OrdinalIgnoreCase)
+            && currentPeriodEndUtc.HasValue
+            && currentPeriodEndUtc.Value >= DateTime.UtcNow);
+
+        if (identityService is null)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
+        var premiumResult = await identityService.SetPremiumStatusAsync(
+            new SetPremiumStatusCommand(command.UserId, isPremium),
+            cancellationToken);
+
+        if (premiumResult.IsFailure)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(premiumResult.Error);
+        }
+
+        var subscription = await UpsertUserSubscriptionAsync(
+            command.UserId,
+            "stripe",
+            "mobile",
+            string.Empty,
+            plan.PlanCode,
+            mappedStatus,
+            customer.ExternalCustomerId,
+            stripeSubscription.Id,
+            null,
+            currentPeriodStartUtc ?? DeriveCurrentPeriodStartUtc(plan.BillingPeriod, currentPeriodEndUtc, DateTime.UtcNow),
+            currentPeriodEndUtc,
+            stripeSubscription.CancelAtPeriodEnd,
+            plan.MonthlyTokenLimit,
+            cancellationToken);
+
+        await AppendSubscriptionEventAsync(
+            command.UserId,
+            subscription.Id,
+            "stripe",
+            "ManualStripeVerification",
+            mappedStatus,
+            null,
+            stripeSubscription.Id,
+            null,
+            cancellationToken);
+
+        return await GetSubscriptionSummaryAsync(command.UserId, cancellationToken);
+    }
+
+    private static string MapStripeSubscriptionStatusForVerification(string? providerStatus)
+    {
+        return providerStatus?.Trim().ToLowerInvariant() switch
+        {
+            "trialing" => "Trialing",
+            "active" => "Active",
+            "past_due" => "PastDue",
+            "unpaid" => "PastDue",
+            "canceled" => "Canceled",
+            "cancelled" => "Canceled",
+            "incomplete" => "Pending",
+            "incomplete_expired" => "Expired",
+            "paused" => "Paused",
+            _ => "Pending"
+        };
+    }
+
+    private static DateTime? NormalizeStripeUtcDateTime(DateTime? value)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        return value.Value.Kind switch
+        {
+            DateTimeKind.Utc => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
+    }
+
+    private static DateTime? ResolveStripeCurrentPeriodEndUtc(Subscription subscription)
+    {
+        return NormalizeStripeUtcDateTime(subscription.TrialEnd)
+            ?? NormalizeStripeUtcDateTime(subscription.CancelAt)
+            ?? NormalizeStripeUtcDateTime(subscription.EndedAt);
+    }
+
     public async Task<Result<PaymentMethodSetupResponse>> CreatePaymentMethodSetupAsync(
         CreatePaymentMethodSetupCommand command,
         CancellationToken cancellationToken)

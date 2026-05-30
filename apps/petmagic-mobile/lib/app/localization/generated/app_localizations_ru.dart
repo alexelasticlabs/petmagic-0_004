@@ -2786,6 +2786,30 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusSubtitleFailed => 'Проблемы с генерацией';
 
   @override
+  String get generationStatusOfflineBannerTitle => 'Вы офлайн';
+
+  @override
+  String get generationStatusOfflineBannerMessage =>
+      'Показываем ранее сохраненные результаты на этом устройстве.';
+
+  @override
+  String generationStatusOfflineBannerSyncedAt(Object value) {
+    return 'Последняя синхронизация: $value';
+  }
+
+  @override
+  String get generationStatusOnlineBannerTitle => 'Сеть восстановлена';
+
+  @override
+  String get generationStatusOnlineBannerMessage =>
+      'Загружены актуальные данные.';
+
+  @override
+  String generationStatusOnlineBannerSyncedAt(Object value) {
+    return 'Обновлено: $value';
+  }
+
+  @override
   String generationStatusDateToday(Object time) {
     return 'Сегодня, $time';
   }

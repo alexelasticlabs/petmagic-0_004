@@ -5043,6 +5043,42 @@ abstract class AppLocalizations {
   /// **'Generation issues'**
   String get generationStatusSubtitleFailed;
 
+  /// No description provided for @generationStatusOfflineBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You are offline'**
+  String get generationStatusOfflineBannerTitle;
+
+  /// No description provided for @generationStatusOfflineBannerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing previously saved creations from this device.'**
+  String get generationStatusOfflineBannerMessage;
+
+  /// No description provided for @generationStatusOfflineBannerSyncedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last sync: {value}'**
+  String generationStatusOfflineBannerSyncedAt(Object value);
+
+  /// No description provided for @generationStatusOnlineBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection restored'**
+  String get generationStatusOnlineBannerTitle;
+
+  /// No description provided for @generationStatusOnlineBannerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh data has been loaded.'**
+  String get generationStatusOnlineBannerMessage;
+
+  /// No description provided for @generationStatusOnlineBannerSyncedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated: {value}'**
+  String generationStatusOnlineBannerSyncedAt(Object value);
+
   /// No description provided for @generationStatusDateToday.
   ///
   /// In en, this message translates to:

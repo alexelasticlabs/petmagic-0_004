@@ -2804,6 +2804,30 @@ class AppLocalizationsIt extends AppLocalizations {
   String get generationStatusSubtitleFailed => 'Problemi di generazione';
 
   @override
+  String get generationStatusOfflineBannerTitle => 'You are offline';
+
+  @override
+  String get generationStatusOfflineBannerMessage =>
+      'Showing previously saved creations from this device.';
+
+  @override
+  String generationStatusOfflineBannerSyncedAt(Object value) {
+    return 'Last sync: $value';
+  }
+
+  @override
+  String get generationStatusOnlineBannerTitle => 'Connection restored';
+
+  @override
+  String get generationStatusOnlineBannerMessage =>
+      'Fresh data has been loaded.';
+
+  @override
+  String generationStatusOnlineBannerSyncedAt(Object value) {
+    return 'Updated: $value';
+  }
+
+  @override
   String generationStatusDateToday(Object time) {
     return 'Oggi, $time';
   }

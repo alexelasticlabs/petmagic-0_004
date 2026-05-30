@@ -1013,6 +1013,22 @@
   "generationStatusSubtitleActive": "Active generations",
   "generationStatusSubtitleReady": "Your ready results",
   "generationStatusSubtitleFailed": "Generation issues",
+  "generationStatusOfflineBannerTitle": "You are offline",
+  "generationStatusOfflineBannerMessage": "Showing previously saved creations from this device.",
+  "generationStatusOfflineBannerSyncedAt": "Last sync: {value}",
+  "@generationStatusOfflineBannerSyncedAt": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "generationStatusOnlineBannerTitle": "Connection restored",
+  "generationStatusOnlineBannerMessage": "Fresh data has been loaded.",
+  "generationStatusOnlineBannerSyncedAt": "Updated: {value}",
+  "@generationStatusOnlineBannerSyncedAt": {
+    "placeholders": {
+      "value": {}
+    }
+  },
   "generationStatusDateToday": "Today, {time}",
   "@generationStatusDateToday": {
     "placeholders": {

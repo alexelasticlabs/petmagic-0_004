@@ -121,6 +121,109 @@ class _ErrorState extends ConsumerWidget {
   }
 }
 
+class _OfflineCacheBanner extends ConsumerWidget {
+  const _OfflineCacheBanner({
+    required this.lastSyncedAtUtc,
+    required this.isRecovered,
+  });
+
+  final DateTime? lastSyncedAtUtc;
+  final bool isRecovered;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    final syncedAtLabel = lastSyncedAtUtc == null
+      ? null
+      : (isRecovered
+          ? text.generationStatusOnlineBannerSyncedAt(
+            formattedDate(text, lastSyncedAtUtc!),
+          )
+          : text.generationStatusOfflineBannerSyncedAt(
+            formattedDate(text, lastSyncedAtUtc!),
+          ));
+
+    final surfaceColor = isRecovered
+      ? colors.accentSoft.withValues(alpha: 0.16)
+      : colors.gold.withValues(alpha: 0.16);
+    final borderColor = isRecovered
+      ? colors.accent.withValues(alpha: 0.38)
+      : colors.gold.withValues(alpha: 0.38);
+    final iconColor = isRecovered ? colors.accent : colors.gold;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              isRecovered ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+              color: iconColor,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isRecovered
+                        ? text.generationStatusOnlineBannerTitle
+                        : text.generationStatusOfflineBannerTitle,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isRecovered
+                        ? text.generationStatusOnlineBannerMessage
+                        : text.generationStatusOfflineBannerMessage,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textSoft,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (syncedAtLabel != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      syncedAtLabel,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colors.textMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (!isRecovered) ...[
+              const SizedBox(width: 8),
+              FilledButton.tonal(
+                onPressed: () => ref
+                    .read(generationHistoryControllerProvider.notifier)
+                    .load(refresh: true),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: Text(text.retryAction),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TypeBadge extends StatelessWidget {
   const _TypeBadge({required this.generation});
 

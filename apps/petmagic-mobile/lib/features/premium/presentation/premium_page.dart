@@ -93,6 +93,10 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     final text = AppLocalizations.of(context);
     final controller = ref.read(premiumControllerProvider.notifier);
     final currentState = ref.read(premiumControllerProvider);
+    if (currentState.isPremium || currentState.recentlyActivatedPremium) {
+      return;
+    }
+
     final options = _buildPaymentMethodOptions(currentState, text);
     if (options.isEmpty) {
       return;
@@ -155,7 +159,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
         wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
       );
       _shouldReloadOnResume = true;
-      await controller.verifyCheckoutStatus();
+      final selectedPlanCode = ref
+          .read(premiumControllerProvider)
+          .selectedPlanCode;
+      await controller.verifyCheckoutStatus(
+        stripePlanCode: selectedPlanCode,
+        stripeExternalSubscriptionId: checkout.externalSubscriptionId,
+      );
     } on StripeException {
       // User canceled/dismissed PaymentSheet.
     } on PlatformException {
@@ -188,15 +198,14 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
       final legalNotice = switch (provider) {
         PremiumPaymentProvider.stripe => state.legalTexts?.stripeNotice,
-        PremiumPaymentProvider.googlePlay || PremiumPaymentProvider.appStore =>
-          state.legalTexts?.storeNotice,
+        PremiumPaymentProvider.googlePlay ||
+        PremiumPaymentProvider.appStore => state.legalTexts?.storeNotice,
       };
 
       options.add(
         PaymentMethodSheetOption(
           id: provider.value,
-          title:
-              method.displayLabel?.trim().isNotEmpty == true
+          title: method.displayLabel?.trim().isNotEmpty == true
               ? method.displayLabel!.trim()
               : _providerLabel(provider, text),
           icon: _providerIcon(provider),
@@ -224,7 +233,10 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     return null;
   }
 
-  String _providerLabel(PremiumPaymentProvider provider, AppLocalizations text) {
+  String _providerLabel(
+    PremiumPaymentProvider provider,
+    AppLocalizations text,
+  ) {
     return switch (provider) {
       PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
       PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
@@ -265,6 +277,29 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
       controller.consumeExternalUrl();
       _openExternalUrl(externalUrl);
+    });
+
+    ref.listen(premiumControllerProvider, (previous, next) {
+      final justActivated =
+          previous?.checkoutVerificationState !=
+              PremiumCheckoutVerificationState.activated &&
+          next.checkoutVerificationState ==
+              PremiumCheckoutVerificationState.activated;
+      if (!justActivated || !mounted) {
+        return;
+      }
+
+      final text = AppLocalizations.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
+
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(text.premiumPurchaseActivated)));
     });
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -778,6 +813,8 @@ class _PlansSection extends StatelessWidget {
 
     final selectedIsYearly =
         selectedPlan != null && _isYearlyPlan(selectedPlan);
+    final canChangePlan =
+        !state.isPremium && !state.recentlyActivatedPremium && !state.isBuying;
 
     if (state.plans.isEmpty) return const SizedBox.shrink();
 
@@ -808,6 +845,10 @@ class _PlansSection extends StatelessWidget {
                 onTap: monthlyPlans.isEmpty
                     ? null
                     : () {
+                        if (!canChangePlan) {
+                          return;
+                        }
+
                         HapticFeedback.selectionClick();
                         controller.selectPlan(monthlyPlans.first.planCode);
                       },
@@ -825,6 +866,10 @@ class _PlansSection extends StatelessWidget {
                 onTap: yearlyPlans.isEmpty
                     ? null
                     : () {
+                        if (!canChangePlan) {
+                          return;
+                        }
+
                         HapticFeedback.selectionClick();
                         controller.selectPlan(yearlyPlans.first.planCode);
                       },
@@ -838,7 +883,13 @@ class _PlansSection extends StatelessWidget {
             plan: plan,
             isSelected: state.selectedPlanCode == plan.planCode,
             isDark: isDark,
-            onTap: () => controller.selectPlan(plan.planCode),
+            onTap: () {
+              if (!canChangePlan) {
+                return;
+              }
+
+              controller.selectPlan(plan.planCode);
+            },
           ),
         ),
       ],
@@ -1282,6 +1333,11 @@ class _CtaButtonState extends State<_CtaButton>
   Widget build(BuildContext context) {
     final state = widget.state;
     final isDark = widget.isDark;
+    final isCheckoutDisabled =
+        state.isBuying ||
+        state.isPremium ||
+        state.recentlyActivatedPremium ||
+        !state.canStartCheckout;
     final btnTextColor = isDark ? const Color(0xFF13141F) : Colors.white;
     final glowColor = isDark
         ? const Color(0xFFFFB300)
@@ -1320,7 +1376,7 @@ class _CtaButtonState extends State<_CtaButton>
         );
       },
       child: ElevatedButton(
-        onPressed: state.isBuying
+        onPressed: isCheckoutDisabled
             ? null
             : () {
                 HapticFeedback.lightImpact();

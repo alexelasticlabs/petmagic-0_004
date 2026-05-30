@@ -491,11 +491,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
       });
     }
 
+    final repository = ref.read(templateGenerationRepositoryProvider);
+
     try {
       final previousGeneration = _generation;
-      final generation = await ref
-          .read(templateGenerationRepositoryProvider)
-          .fetchGeneration(widget.generationId);
+      final generation = await repository.fetchGeneration(widget.generationId);
       if (!mounted) {
         return;
       }
@@ -525,9 +525,23 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
         }
       }
     } catch (error) {
+      final cachedGeneration = await repository.readCachedGeneration(
+        widget.generationId,
+      );
+
       if (!mounted) {
         return;
       }
+
+      if (cachedGeneration != null) {
+        setState(() {
+          _generation = cachedGeneration;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+        return;
+      }
+
       setState(() {
         _isLoading = false;
         _errorMessage = error.toString();

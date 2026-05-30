@@ -191,6 +191,10 @@ class PremiumState {
   }
 
   bool get canStartCheckout {
+    if (isPremium || recentlyActivatedPremium) {
+      return false;
+    }
+
     final plan = selectedPlan;
     if (plan == null) {
       return false;
@@ -545,9 +549,26 @@ class PremiumController extends Notifier<PremiumState> {
     );
   }
 
-  Future<void> verifyCheckoutStatus() async {
+  Future<void> verifyCheckoutStatus({
+    String? stripePlanCode,
+    String? stripeExternalSubscriptionId,
+  }) async {
     if (!state.isAwaitingCheckoutVerification) {
       return;
+    }
+
+    final normalizedPlanCode = stripePlanCode?.trim();
+    final normalizedSubscriptionId = stripeExternalSubscriptionId?.trim();
+    if ((normalizedPlanCode?.isNotEmpty ?? false) &&
+        (normalizedSubscriptionId?.isNotEmpty ?? false)) {
+      try {
+        await _repository.verifyStripeSubscriptionCheckout(
+          planCode: normalizedPlanCode!,
+          externalSubscriptionId: normalizedSubscriptionId!,
+        );
+      } catch (_) {
+        // Keep polling fallback even when explicit Stripe verification fails.
+      }
     }
 
     state = state.copyWith(
@@ -693,18 +714,23 @@ class PremiumController extends Notifier<PremiumState> {
       await load(refresh: true);
 
       if (verified.isActive) {
+        final recentlyActivated = !wasPremiumBeforeCheckout && state.isPremium;
         state = state.copyWith(
           isBuying: false,
           isRestoring: false,
           successMessage: 'premium.purchase_activated',
+          checkoutVerificationState: recentlyActivated
+              ? PremiumCheckoutVerificationState.activated
+              : PremiumCheckoutVerificationState.idle,
+          isAwaitingCheckoutVerification: false,
+          recentlyActivatedPremium: recentlyActivated,
+          clearCheckoutError: true,
         );
         return;
       }
 
       state = state.copyWith(isBuying: false, isRestoring: false);
-      markCheckoutOpened(
-        wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
-      );
+      markCheckoutOpened(wasPremiumBeforeCheckout: wasPremiumBeforeCheckout);
       await verifyCheckoutStatus();
     } catch (error) {
       if (purchase.pendingCompletePurchase) {

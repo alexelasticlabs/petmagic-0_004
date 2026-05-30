@@ -29,6 +29,10 @@ class GenerationHistoryState {
     this.filter = GenerationHistoryFilter.all,
     this.unreadCount = 0,
     this.isLoading = false,
+    this.syncFailed = false,
+    this.showOfflineBanner = false,
+    this.isConnectionRecovered = false,
+    this.lastSyncedAtUtc,
     this.errorMessage,
     this.cachedItemsByFilter = const {},
   });
@@ -37,9 +41,15 @@ class GenerationHistoryState {
   final GenerationHistoryFilter filter;
   final int unreadCount;
   final bool isLoading;
+  final bool syncFailed;
+  final bool showOfflineBanner;
+  final bool isConnectionRecovered;
+  final DateTime? lastSyncedAtUtc;
   final String? errorMessage;
   final Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
   cachedItemsByFilter;
+
+  bool get shouldShowOfflineBanner => showOfflineBanner && items.isNotEmpty;
 
   TemplateGenerationResult? get activeGeneration {
     for (final item in items) {
@@ -55,6 +65,11 @@ class GenerationHistoryState {
     GenerationHistoryFilter? filter,
     int? unreadCount,
     bool? isLoading,
+    bool? syncFailed,
+    bool? showOfflineBanner,
+    bool? isConnectionRecovered,
+    DateTime? lastSyncedAtUtc,
+    bool clearLastSyncedAtUtc = false,
     String? errorMessage,
     Map<GenerationHistoryFilter, List<TemplateGenerationResult>>?
     cachedItemsByFilter,
@@ -65,6 +80,13 @@ class GenerationHistoryState {
       filter: filter ?? this.filter,
       unreadCount: unreadCount ?? this.unreadCount,
       isLoading: isLoading ?? this.isLoading,
+      syncFailed: syncFailed ?? this.syncFailed,
+        showOfflineBanner: showOfflineBanner ?? this.showOfflineBanner,
+        isConnectionRecovered:
+          isConnectionRecovered ?? this.isConnectionRecovered,
+      lastSyncedAtUtc: clearLastSyncedAtUtc
+          ? null
+          : lastSyncedAtUtc ?? this.lastSyncedAtUtc,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       cachedItemsByFilter: cachedItemsByFilter ?? this.cachedItemsByFilter,
     );
@@ -75,6 +97,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   late final TemplateGenerationRepository _repository;
   late final RealtimeClient _realtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+  Timer? _offlineBannerTimer;
   bool _isScreenVisible = true;
   bool _isRealtimeConnected = false;
 
@@ -83,9 +106,17 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     _repository = ref.watch(templateGenerationRepositoryProvider);
     _realtimeClient = ref.watch(realtimeClientProvider);
     ref.onDispose(() {
+      _offlineBannerTimer?.cancel();
+      _offlineBannerTimer = null;
       _pauseRealtime();
     });
-    Future.microtask(refreshUnreadCount);
+    Future.microtask(() async {
+      final cachedUnread = await _repository.readCachedUnreadGenerationCount();
+      if (cachedUnread != null) {
+        state = state.copyWith(unreadCount: cachedUnread);
+      }
+      await refreshUnreadCount();
+    });
     return const GenerationHistoryState();
   }
 
@@ -125,14 +156,35 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       return;
     }
 
+    List<TemplateGenerationResult>? persistedItems;
+    if (!refresh) {
+      persistedItems = await _repository.readCachedGenerations(
+        status: nextFilter.apiStatus,
+      );
+    }
+
+    final seedItems = refresh
+        ? (cachedItems ?? state.items)
+        : (persistedItems ?? const []);
+
     state = state.copyWith(
-      items: cachedItems ?? const [],
+      items: seedItems,
       filter: nextFilter,
       isLoading: true,
+      syncFailed: false,
       clearError: true,
     );
 
+    if (persistedItems != null) {
+      final persistedCache =
+          Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
+            state.cachedItemsByFilter,
+          )..[nextFilter] = persistedItems;
+      state = state.copyWith(cachedItemsByFilter: persistedCache);
+    }
+
     try {
+      final wasOffline = state.syncFailed;
       final items = await _repository.fetchGenerations(
         status: nextFilter.apiStatus,
         take: 50,
@@ -142,16 +194,49 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
             state.cachedItemsByFilter,
           )..[nextFilter] = items;
+      final nowUtc = DateTime.now().toUtc();
       state = state.copyWith(
         items: items,
         unreadCount: unreadCount,
         isLoading: false,
+        syncFailed: false,
+        showOfflineBanner: wasOffline && items.isNotEmpty,
+        isConnectionRecovered: wasOffline && items.isNotEmpty,
+        lastSyncedAtUtc: nowUtc,
         cachedItemsByFilter: updatedCache,
         clearError: true,
       );
+
+      if (wasOffline && items.isNotEmpty) {
+        _scheduleOfflineBannerHide();
+      }
     } catch (error) {
+      if (state.items.isNotEmpty) {
+        _offlineBannerTimer?.cancel();
+        _offlineBannerTimer = null;
+        state = state.copyWith(
+          isLoading: false,
+          syncFailed: true,
+          showOfflineBanner: true,
+          isConnectionRecovered: false,
+        );
+        return;
+      }
+
+      _offlineBannerTimer?.cancel();
+      _offlineBannerTimer = null;
       state = state.copyWith(isLoading: false, errorMessage: error.toString());
     }
+  }
+
+  void _scheduleOfflineBannerHide() {
+    _offlineBannerTimer?.cancel();
+    _offlineBannerTimer = Timer(const Duration(seconds: 3), () {
+      state = state.copyWith(
+        showOfflineBanner: false,
+        isConnectionRecovered: false,
+      );
+    });
   }
 
   Future<void> refreshUnreadCount() async {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -12,12 +13,17 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+final templateGenerationSharedPreferencesProvider =
+  Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
 
 final templateGenerationRepositoryProvider =
     Provider<TemplateGenerationRepository>((ref) {
       return TemplateGenerationRepository(
         dio: ref.watch(dioProvider),
         sessionStorage: ref.watch(authSessionStorageProvider),
+        preferences: ref.watch(templateGenerationSharedPreferencesProvider),
         authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
       );
     });
@@ -26,13 +32,26 @@ class TemplateGenerationRepository {
   TemplateGenerationRepository({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
+    required SharedPreferencesAsync preferences,
     AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
+       _preferences = preferences,
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
+  static const _generationsCachePrefix = 'templates_generations_v1:';
+  static const _unreadCountCacheKey = 'templates_generations_unread_v1';
+  static const _cacheAllStatusKey = 'all';
+  static const _cacheStatuses = <String>[
+    _cacheAllStatusKey,
+    'active',
+    'ready',
+    'failed',
+  ];
+
   final Dio _dio;
+  final SharedPreferencesAsync _preferences;
   final AuthSessionCoordinator _authSessionCoordinator;
 
   Future<TemplateGenerationResult> startGeneration({
@@ -73,6 +92,62 @@ class TemplateGenerationRepository {
     return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
   }
 
+  Future<List<TemplateGenerationResult>?> readCachedGenerations({
+    String? status,
+  }) async {
+    try {
+      final raw = await _preferences.getString(_cacheKeyForStatus(status));
+      if (raw == null || raw.isEmpty) {
+        return null;
+      }
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return null;
+      }
+
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) => TemplateGenerationDto.fromJson(
+              Map<String, dynamic>.from(item),
+            ).toDomain(),
+          )
+          .toList(growable: false);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<TemplateGenerationResult?> readCachedGeneration(
+    String generationId,
+  ) async {
+    for (final status in _cacheStatuses) {
+      final items = await readCachedGenerations(
+        status: status == _cacheAllStatusKey ? null : status,
+      );
+      if (items == null || items.isEmpty) {
+        continue;
+      }
+
+      for (final item in items) {
+        if (item.generationId == generationId) {
+          return item;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  Future<int?> readCachedUnreadGenerationCount() async {
+    try {
+      return await _preferences.getInt(_unreadCountCacheKey);
+    } on Object {
+      return null;
+    }
+  }
+
   Future<List<TemplateGenerationResult>> fetchGenerations({
     String? status,
     int? skip,
@@ -97,7 +172,14 @@ class TemplateGenerationRepository {
       ),
     );
 
-    return (response.data ?? const [])
+    final itemsJson = (response.data ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, Object?>.from(item))
+        .toList(growable: false);
+
+    await _writeCachedGenerations(status: status, items: itemsJson);
+
+    return itemsJson
         .whereType<Map>()
         .map(
           (item) => TemplateGenerationDto.fromJson(
@@ -115,7 +197,9 @@ class TemplateGenerationRepository {
       ),
     );
 
-    return (response.data?['count'] as num?)?.toInt() ?? 0;
+    final count = (response.data?['count'] as num?)?.toInt() ?? 0;
+    await _writeCachedUnreadGenerationCount(count);
+    return count;
   }
 
   Future<void> markGenerationRead(String generationId) async {
@@ -125,6 +209,8 @@ class TemplateGenerationRepository {
         options: _authOptions(session.accessToken),
       ),
     );
+
+    await _markCachedGenerationRead(generationId);
   }
 
   Future<void> deleteGeneration(String generationId) async {
@@ -134,6 +220,8 @@ class TemplateGenerationRepository {
         options: _authOptions(session.accessToken),
       ),
     );
+
+    await _removeCachedGeneration(generationId);
   }
 
   Future<void> submitGenerationFeedback({
@@ -194,6 +282,121 @@ class TemplateGenerationRepository {
         options: _authOptions(session.accessToken),
       ),
     );
+  }
+
+  Future<void> _writeCachedGenerations({
+    required String? status,
+    required List<Map<String, Object?>> items,
+  }) async {
+    try {
+      await _preferences.setString(_cacheKeyForStatus(status), jsonEncode(items));
+    } on Object {
+      // Ignore local cache write errors to keep network flow stable.
+    }
+  }
+
+  Future<void> _writeCachedUnreadGenerationCount(int count) async {
+    try {
+      await _preferences.setInt(_unreadCountCacheKey, count);
+    } on Object {
+      // Ignore local cache write errors to keep network flow stable.
+    }
+  }
+
+  String _cacheKeyForStatus(String? status) {
+    final normalized = (status == null || status.trim().isEmpty)
+        ? _cacheAllStatusKey
+        : status.trim().toLowerCase();
+    return '$_generationsCachePrefix$normalized';
+  }
+
+  Future<void> _markCachedGenerationRead(String generationId) async {
+    for (final status in _cacheStatuses) {
+      final key = _cacheKeyForStatus(
+        status == _cacheAllStatusKey ? null : status,
+      );
+      final raw = await _preferences.getString(key);
+      if (raw == null || raw.isEmpty) {
+        continue;
+      }
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        continue;
+      }
+
+      var changed = false;
+      final updated = decoded.map((entry) {
+        if (entry is! Map) {
+          return entry;
+        }
+
+        final generation = Map<String, Object?>.from(entry);
+        if (generation['generationId'] != generationId) {
+          return generation;
+        }
+
+        if (generation['isUnread'] == false) {
+          return generation;
+        }
+
+        changed = true;
+        return {...generation, 'isUnread': false};
+      }).toList(growable: false);
+
+      if (changed) {
+        await _preferences.setString(key, jsonEncode(updated));
+      }
+    }
+
+    final unread = await readCachedUnreadGenerationCount();
+    if (unread != null && unread > 0) {
+      await _writeCachedUnreadGenerationCount(unread - 1);
+    }
+  }
+
+  Future<void> _removeCachedGeneration(String generationId) async {
+    var removedUnread = false;
+
+    for (final status in _cacheStatuses) {
+      final key = _cacheKeyForStatus(
+        status == _cacheAllStatusKey ? null : status,
+      );
+      final raw = await _preferences.getString(key);
+      if (raw == null || raw.isEmpty) {
+        continue;
+      }
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        continue;
+      }
+
+      var changed = false;
+      final updated = <Map<String, Object?>>[];
+      for (final entry in decoded.whereType<Map>()) {
+        final generation = Map<String, Object?>.from(entry);
+        if (generation['generationId'] == generationId) {
+          changed = true;
+          if (generation['isUnread'] == true) {
+            removedUnread = true;
+          }
+          continue;
+        }
+        updated.add(generation);
+      }
+
+      if (changed) {
+        await _preferences.setString(key, jsonEncode(updated));
+      }
+    }
+
+    if (removedUnread) {
+      final unread = await readCachedUnreadGenerationCount();
+      if (unread != null && unread > 0) {
+        await _writeCachedUnreadGenerationCount(unread - 1);
+      }
+    }
   }
 
   Future<Response<T>> _authorizedRequest<T>(

@@ -1013,6 +1013,22 @@
   "generationStatusSubtitleActive": "Активные генерации",
   "generationStatusSubtitleReady": "Ваши готовые результаты",
   "generationStatusSubtitleFailed": "Проблемы с генерацией",
+  "generationStatusOfflineBannerTitle": "Вы офлайн",
+  "generationStatusOfflineBannerMessage": "Показываем ранее сохраненные результаты на этом устройстве.",
+  "generationStatusOfflineBannerSyncedAt": "Последняя синхронизация: {value}",
+  "@generationStatusOfflineBannerSyncedAt": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "generationStatusOnlineBannerTitle": "Сеть восстановлена",
+  "generationStatusOnlineBannerMessage": "Загружены актуальные данные.",
+  "generationStatusOnlineBannerSyncedAt": "Обновлено: {value}",
+  "@generationStatusOnlineBannerSyncedAt": {
+    "placeholders": {
+      "value": {}
+    }
+  },
   "generationStatusDateToday": "Сегодня, {time}",
   "@generationStatusDateToday": {
     "placeholders": {

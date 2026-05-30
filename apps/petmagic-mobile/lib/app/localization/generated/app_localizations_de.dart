@@ -208,7 +208,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileSubscriptionTokensLabel => 'Verfügbare Token';
 
   @override
-  String get profileWalletTitle => 'Wallet';
+  String get profileWalletTitle => 'Geldbörse';
 
   @override
   String get profileWalletHistoryHint => 'Guthaben, Käufe und Verlauf öffnen.';
@@ -865,7 +865,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumPaymentTitle => 'Zahlungsmethode';
 
   @override
-  String get premiumPaymentStripe => 'Card via Stripe';
+  String get premiumPaymentStripe => 'Karte über Stripe';
 
   @override
   String get premiumPaymentGooglePlay => 'Google Play';
@@ -891,7 +891,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumFreeColumn => 'Kostenlos';
 
   @override
-  String get premiumPremiumColumn => 'Premium';
+  String get premiumPremiumColumn => 'Prämie';
 
   @override
   String get premiumComparisonFreeTemplates => 'Kostenlose Vorlagen';
@@ -1524,7 +1524,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wir schützen Ihre Daten und halten Ihre Informationen privat.';
 
   @override
-  String get supportChatTeamTitle => 'PetMagic Support';
+  String get supportChatTeamTitle => 'PetMagic-Unterstützung';
 
   @override
   String get supportChatTeamStatus =>
@@ -1849,7 +1849,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get supportHomeSubtitle => 'Womit können wir Ihnen helfen?';
 
   @override
-  String get supportHomeOpenChatAction => 'Open chat';
+  String get supportHomeOpenChatAction => 'Chat öffnen';
 
   @override
   String get supportHomeTopicGenerationIssue =>
@@ -2822,6 +2822,31 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get generationStatusSubtitleFailed => 'Generierungsprobleme';
+
+  @override
+  String get generationStatusOfflineBannerTitle => 'Du bist offline';
+
+  @override
+  String get generationStatusOfflineBannerMessage =>
+      'Zeigt zuvor gespeicherte Kreationen von diesem Gerät an.';
+
+  @override
+  String generationStatusOfflineBannerSyncedAt(Object value) {
+    return 'Letzte Synchronisierung: $value';
+  }
+
+  @override
+  String get generationStatusOnlineBannerTitle =>
+      'Verbindung wiederhergestellt';
+
+  @override
+  String get generationStatusOnlineBannerMessage =>
+      'Neue Daten wurden geladen.';
+
+  @override
+  String generationStatusOnlineBannerSyncedAt(Object value) {
+    return 'Aktualisiert: $value';
+  }
 
   @override
   String generationStatusDateToday(Object time) {

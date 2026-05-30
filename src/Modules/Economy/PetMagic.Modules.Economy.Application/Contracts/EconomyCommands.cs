@@ -42,6 +42,11 @@ public sealed record VerifyPremiumStorePurchaseCommand(
     string? PurchaseId,
     string? TransactionDate);
 
+public sealed record VerifyPremiumStripeSubscriptionCommand(
+    Guid UserId,
+    string PlanCode,
+    string ExternalSubscriptionId);
+
 public sealed record VerifyPackStorePurchaseCommand(
     Guid UserId,
     Guid OrderId,

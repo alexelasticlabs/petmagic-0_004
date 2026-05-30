@@ -138,6 +138,48 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
                         ),
                       ),
                     ),
+                    SliverToBoxAdapter(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 260),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          final offsetAnimation = Tween<Offset>(
+                            begin: const Offset(0, -0.08),
+                            end: Offset.zero,
+                          ).animate(animation);
+
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: offsetAnimation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: state.shouldShowOfflineBanner
+                            ? Padding(
+                                key: ValueKey<String>(
+                                  state.isConnectionRecovered
+                                      ? 'gallery-banner-online'
+                                      : 'gallery-banner-offline',
+                                ),
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  0,
+                                  18,
+                                  10,
+                                ),
+                                child: _OfflineCacheBanner(
+                                  lastSyncedAtUtc: state.lastSyncedAtUtc,
+                                  isRecovered: state.isConnectionRecovered,
+                                ),
+                              )
+                            : const SizedBox.shrink(
+                                key: ValueKey<String>('gallery-banner-hidden'),
+                              ),
+                      ),
+                    ),
                     ..._buildContentSlivers(context, text, state),
                   ],
                 ),

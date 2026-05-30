@@ -120,6 +120,20 @@ public sealed class VerifyPremiumStorePurchaseCommandValidator : AbstractValidat
     }
 }
 
+public sealed class VerifyPremiumStripeSubscriptionCommandValidator : AbstractValidator<VerifyPremiumStripeSubscriptionCommand>
+{
+    public VerifyPremiumStripeSubscriptionCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.PlanCode)
+            .NotEmpty()
+            .MaximumLength(40);
+        RuleFor(x => x.ExternalSubscriptionId)
+            .NotEmpty()
+            .MaximumLength(160);
+    }
+}
+
 public sealed class VerifyPackStorePurchaseCommandValidator : AbstractValidator<VerifyPackStorePurchaseCommand>
 {
     public VerifyPackStorePurchaseCommandValidator()

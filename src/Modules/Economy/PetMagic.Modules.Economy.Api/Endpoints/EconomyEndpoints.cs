@@ -86,6 +86,9 @@ public static class EconomyEndpoints
         group.MapPost("/premium/store/verify", VerifyPremiumStorePurchaseAsync)
             .RequireAuthorization();
 
+        group.MapPost("/premium/verify-stripe", VerifyPremiumStripeSubscriptionAsync)
+            .RequireAuthorization();
+
         group.MapGet("/payment-methods", ListPaymentMethodsAsync)
             .RequireAuthorization();
 
@@ -940,6 +943,46 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<SubscriptionSummaryResponse>, ValidationProblem, ProblemHttpResult>> VerifyPremiumStripeSubscriptionAsync(
+        HttpContext context,
+        VerifyPremiumStripeSubscriptionRequest request,
+        IValidator<VerifyPremiumStripeSubscriptionCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new VerifyPremiumStripeSubscriptionCommand(
+            userId!.Value,
+            request.PlanCode,
+            request.ExternalSubscriptionId);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.VerifyPremiumStripeSubscriptionAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                "economy.premium_plan_not_found" => StatusCodes.Status404NotFound,
+                "economy.premium_billing_unavailable" => StatusCodes.Status503ServiceUnavailable,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> VerifyStripeCheckoutAsync(
         HttpContext context,
         Guid orderId,
@@ -1314,6 +1357,10 @@ public static class EconomyEndpoints
         string? LocalVerificationData,
         string? PurchaseId,
         string? TransactionDate);
+
+    public sealed record VerifyPremiumStripeSubscriptionRequest(
+        string PlanCode,
+        string ExternalSubscriptionId);
 
     public sealed record VerifyPackStorePurchaseRequest(
         string PaymentProvider,

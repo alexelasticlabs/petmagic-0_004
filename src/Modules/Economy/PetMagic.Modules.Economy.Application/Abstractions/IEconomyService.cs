@@ -53,6 +53,8 @@ public interface IEconomyService
 
     Task<Result<PremiumStoreVerificationResponse>> VerifyPremiumStorePurchaseAsync(VerifyPremiumStorePurchaseCommand command, CancellationToken cancellationToken);
 
+    Task<Result<SubscriptionSummaryResponse>> VerifyPremiumStripeSubscriptionAsync(VerifyPremiumStripeSubscriptionCommand command, CancellationToken cancellationToken);
+
     Task<Result<PurchaseOrderResponse>> VerifyPackStorePurchaseAsync(VerifyPackStorePurchaseCommand command, CancellationToken cancellationToken);
 
     Task<Result<OffsetPagedResponse<PurchaseHistoryItemResponse>>> GetPurchaseHistoryAsync(Guid userId, int skip, int take, CancellationToken cancellationToken);

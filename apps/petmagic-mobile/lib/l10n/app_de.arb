@@ -172,12 +172,12 @@
   },
   "premiumSocialProof": "Am häufigsten gewählter Tarif für regelmäßige PetMagic Creator.",
   "premiumPaymentTitle": "Zahlungsmethode",
-  "premiumPaymentStripe": "Card via Stripe",
+  "premiumPaymentStripe": "Karte über Stripe",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
   "premiumComparisonTitle": "Was sich mit Premium ändert",
   "premiumFreeColumn": "Kostenlos",
-  "premiumPremiumColumn": "Premium",
+  "premiumPremiumColumn": "Prämie",
   "premiumComparisonFreeTemplates": "Kostenlose Vorlagen",
   "premiumComparisonPremiumTemplates": "Premium-Vorlagen",
   "premiumComparisonTokens": "Token pro Monat",
@@ -190,7 +190,6 @@
   "premiumSecurePaymentTitle": "Sichere Zahlung",
   "premiumSecurePaymentSubtitle": "Verwalte oder kündige dein Abo jederzeit in den Zahlungseinstellungen.",
   "premiumContinueAction": "Weiter",
-  "premiumContinueWithPlan": "Mit {plan} fortfahren — {price} {period}",
   "premiumManageAction": "Abo verwalten",
   "premiumRestoreAction": "Käufe wiederherstellen",
   "premiumTermsNotice": "Wenn du fortfährst, stimmst du den Nutzungsbedingungen und der Datenschutzrichtlinie zu.",
@@ -200,10 +199,6 @@
   "premiumStorePurchaseInvalid": "Der Kauf konnte nicht verifiziert werden.",
   "premiumStorePurchaseInactive": "Dieses Abo ist nicht mehr aktiv.",
   "premiumPurchaseActivated": "Premium ist jetzt aktiv.",
-  "premiumPurchaseCancelled": "Der Kauf wurde abgebrochen.",
-  "premiumCheckoutFailed": "Premium Checkout ist vorübergehend nicht verfügbar.",
-  "premiumManageFailed": "Die Abrechnungsverwaltung ist für dieses Konto noch nicht verfügbar.",
-  "premiumRestoreStarted": "Der Premium-Status wurde auf diesem Gerät aktualisiert.",
   "profileCommunicationsTitle": "PetMagic-Updates",
   "profileCommunicationsEnabled": "Sie haben Produktaktualisierungen und Angebote abonniert.",
   "profileCommunicationsDisabled": "Marketing-Updates sind derzeit deaktiviert.",
@@ -338,7 +333,6 @@
   "profileSettingsLanguageFrench": "Französisch",
   "profileSettingsLanguageItalian": "Italienisch",
   "profileSettingsLanguagePolish": "Polnisch",
-  "profileSettingsVersionLabel": "App-Version {version}",
   "authAcceptTermsLabel": "Ich stimme den Nutzungsbedingungen und Datenschutzbestimmungen zu",
   "authReceiveUpdatesLabel": "Ich möchte Updates und Angebote von PetMagic erhalten",
   "authAcceptTermsRequired": "Um ein Konto zu erstellen, müssen Sie die Nutzungsbedingungen und Datenschutzrichtlinien akzeptieren.",
@@ -523,7 +517,7 @@
   "profileSubscriptionProviderLabel": "Anbieter",
   "profileSubscriptionNextBillingLabel": "Nächste Abrechnung",
   "profileSubscriptionTokensLabel": "Verfügbare Token",
-  "profileWalletTitle": "Wallet",
+  "profileWalletTitle": "Geldbörse",
   "profileWalletHistoryHint": "Guthaben, Käufe und Verlauf öffnen.",
   "walletPageTitle": "PawSpark-Wallet",
   "walletPageSubtitle": "Guthaben, Promo-Codes, Werbebonus und PawSpark-Aufladungen.",
@@ -867,7 +861,7 @@
   "profilePrivacyQuickRightsBody": "• Kopie Ihrer Daten anfordern\n• Konto- und Datenlöschung anfordern\n• Einwilligung wo zutreffend widerrufen",
   "supportChatSecureTitle": "Ihr Gespräch ist geschützt. Wir verwenden es nur für den Support.",
   "supportChatSecureSubtitle": "Wir schützen Ihre Daten und halten Ihre Informationen privat.",
-  "supportChatTeamTitle": "PetMagic Support",
+  "supportChatTeamTitle": "PetMagic-Unterstützung",
   "supportChatTeamStatus": "Wir antworten normalerweise innerhalb von 24 Stunden",
   "supportChatTodayLabel": "Heute",
   "supportChatWelcomeTitle": "Hallo! Beschreiben Sie Ihr Problem und wir helfen Ihnen.",
@@ -1016,6 +1010,42 @@
   "templateFlowNetworkError": "Keine Verbindung. Überprüfen Sie Ihr Netzwerk und versuchen Sie es erneut.",
   "templateFlowServerError": "Dienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",
   "templateFlowStartFailedError": "Generierung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
-
-  "shellActiveGenerationFallback": "Ergebnis"
+  "shellActiveGenerationFallback": "Ergebnis",
+  "@premiumTokensPerWeek": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@premiumTokensPerMonth": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@premiumDiscountLabel": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "@premiumComparisonPremiumTokens": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "supportHomeOpenChatAction": "Chat öffnen",
+  "generationStatusOfflineBannerTitle": "Du bist offline",
+  "generationStatusOfflineBannerMessage": "Zeigt zuvor gespeicherte Kreationen von diesem Gerät an.",
+  "generationStatusOfflineBannerSyncedAt": "Letzte Synchronisierung: {value}",
+  "@generationStatusOfflineBannerSyncedAt": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "generationStatusOnlineBannerTitle": "Verbindung wiederhergestellt",
+  "generationStatusOnlineBannerMessage": "Neue Daten wurden geladen.",
+  "generationStatusOnlineBannerSyncedAt": "Aktualisiert: {value}",
+  "@generationStatusOnlineBannerSyncedAt": {
+    "placeholders": {
+      "value": {}
+    }
+  }
 }

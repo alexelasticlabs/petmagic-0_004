@@ -257,6 +257,22 @@ class PremiumRepository {
     return PremiumStoreVerificationModel.fromJson(response.data ?? const {});
   }
 
+  Future<void> verifyStripeSubscriptionCheckout({
+    required String planCode,
+    required String externalSubscriptionId,
+  }) async {
+    await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/economy/premium/verify-stripe',
+        data: {
+          'planCode': planCode,
+          'externalSubscriptionId': externalSubscriptionId,
+        },
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
   String _platformValue() {
     if (Platform.isIOS) {
       return 'ios';
@@ -297,9 +313,7 @@ class PremiumRepository {
       if (extraHeaders != null) ...extraHeaders,
     };
 
-    return Options(
-      headers: headers,
-    );
+    return Options(headers: headers);
   }
 
   AppException _mapDioException(
