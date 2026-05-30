@@ -52,10 +52,19 @@ double petMagicBottomSheetOffset(BuildContext context) {
 }
 
 class PetMagicShell extends ConsumerStatefulWidget {
-  const PetMagicShell({required this.location, required this.child, super.key});
+  const PetMagicShell({
+    required this.location,
+    this.navigationShell,
+    this.child,
+    super.key,
+  }) : assert(
+         navigationShell != null || child != null,
+         'Either navigationShell or child must be provided.',
+       );
 
   final String location;
-  final Widget child;
+  final StatefulNavigationShell? navigationShell;
+  final Widget? child;
 
   @override
   ConsumerState<PetMagicShell> createState() => _PetMagicShellState();
@@ -69,9 +78,8 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
     final location = widget.location;
-    final hideBottomNavForRoute = location.startsWith('/profile/support');
-    final showBottomNav =
-        !hasKeyboard && isCurrentRoute && !hideBottomNavForRoute;
+    final navigationShell = widget.navigationShell;
+    final showBottomNav = !hasKeyboard && isCurrentRoute;
     final activeGeneration = ref.watch(
       generationHistoryControllerProvider.select(
         (state) => state.activeGeneration,
@@ -83,12 +91,18 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
         !activeGeneration.isTerminal &&
         _dismissedGenerationId != activeGeneration.generationId &&
         !location.startsWith(GenerationStatusPage.routePrefix);
+    final currentIndex =
+        navigationShell?.currentIndex ??
+        _resolveCurrentIndexFromLocation(location);
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          widget.child,
+          _ShellTabFadeTransition(
+            tabIndex: currentIndex,
+            child: navigationShell ?? widget.child!,
+          ),
           if (showBottomNav) const _BottomNavBackdrop(),
           if (showActiveBanner)
             _ActiveGenerationBanner(
@@ -99,10 +113,128 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
                 });
               },
             ),
-          if (showBottomNav) _FloatingBottomNav(location: location),
+          if (showBottomNav)
+            _FloatingBottomNav(
+              currentIndex: currentIndex,
+              onItemSelected: (index) {
+                if (index == currentIndex) {
+                  return;
+                }
+
+                if (navigationShell != null) {
+                  navigationShell.goBranch(index);
+                  return;
+                }
+
+                switch (index) {
+                  case 0:
+                    context.go('/templates');
+                  case 1:
+                    context.go(GenerationsGalleryPage.routePath);
+                  case 2:
+                    context.go(RewardsPage.routePath);
+                  case 3:
+                    context.go('/profile');
+                }
+              },
+            ),
         ],
       ),
     );
+  }
+
+  int _resolveCurrentIndexFromLocation(String location) {
+    if (location.startsWith('/profile')) {
+      return 3;
+    }
+    if (location.startsWith(RewardsPage.routePath)) {
+      return 2;
+    }
+    if (location == GenerationsGalleryPage.routePath ||
+        location.startsWith(GenerationStatusPage.routePrefix)) {
+      return 1;
+    }
+    return 0;
+  }
+}
+
+class _ShellTabFadeTransition extends StatefulWidget {
+  const _ShellTabFadeTransition({required this.tabIndex, required this.child});
+
+  final int tabIndex;
+  final Widget child;
+
+  @override
+  State<_ShellTabFadeTransition> createState() =>
+      _ShellTabFadeTransitionState();
+}
+
+class _ShellTabFadeTransitionState extends State<_ShellTabFadeTransition>
+    with SingleTickerProviderStateMixin {
+  static const _duration = Duration(milliseconds: 120);
+  static const _curve = Curves.easeOut;
+
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+  late int _lastTabIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastTabIndex = widget.tabIndex;
+    _controller = AnimationController(
+      vsync: this,
+      duration: _duration,
+      value: 1,
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: _curve);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShellTabFadeTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_lastTabIndex == widget.tabIndex) {
+      return;
+    }
+
+    _lastTabIndex = widget.tabIndex;
+    if (_disableAnimations(context)) {
+      _controller.value = 1;
+      return;
+    }
+
+    _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_disableAnimations(context)) {
+      return widget.child;
+    }
+
+    return AnimatedBuilder(
+      animation: _animation,
+      child: widget.child,
+      builder: (context, child) {
+        final opacity = 0.9 + (_animation.value * 0.1);
+        return Opacity(opacity: opacity, child: child);
+      },
+    );
+  }
+
+  bool _disableAnimations(BuildContext context) {
+    final media = MediaQuery.maybeOf(context);
+    if (media == null) {
+      return false;
+    }
+
+    return media.disableAnimations || media.accessibleNavigation;
   }
 }
 
@@ -145,9 +277,13 @@ class _BottomNavBackdrop extends StatelessWidget {
 }
 
 class _FloatingBottomNav extends ConsumerWidget {
-  const _FloatingBottomNav({required this.location});
+  const _FloatingBottomNav({
+    required this.currentIndex,
+    required this.onItemSelected,
+  });
 
-  final String location;
+  final int currentIndex;
+  final ValueChanged<int> onItemSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -158,19 +294,15 @@ class _FloatingBottomNav extends ConsumerWidget {
       generationHistoryControllerProvider.select((state) => state.unreadCount),
     );
     final items = [
-      _NavItem('/templates', Icons.play_arrow_rounded, text.navTemplates),
+      _NavItem(0, Icons.play_arrow_rounded, text.navTemplates),
       _NavItem(
-        GenerationsGalleryPage.routePath,
+        1,
         Icons.photo_library_outlined,
         text.navCreations,
         badgeCount: unreadCount,
       ),
-      _NavItem(
-        RewardsPage.routePath,
-        Icons.card_giftcard_rounded,
-        text.navRewards,
-      ),
-      _NavItem('/profile', Icons.person_outline_rounded, text.navProfile),
+      _NavItem(2, Icons.card_giftcard_rounded, text.navRewards),
+      _NavItem(3, Icons.person_outline_rounded, text.navProfile),
     ];
 
     return RepaintBoundary(
@@ -235,10 +367,10 @@ class _FloatingBottomNav extends ConsumerWidget {
                                   ),
                                   child: _BottomNavButton(
                                     item: item,
-                                    selected: _isSelected(item.path, location),
-                                    onTap: _isSelected(item.path, location)
+                                    selected: currentIndex == item.index,
+                                    onTap: currentIndex == item.index
                                         ? null
-                                        : () => context.go(item.path),
+                                        : () => onItemSelected(item.index),
                                   ),
                                 ),
                               ),
@@ -254,17 +386,6 @@ class _FloatingBottomNav extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  bool _isSelected(String path, String location) {
-    return switch (path) {
-      '/profile' => location.startsWith('/profile'),
-      RewardsPage.routePath => location.startsWith(RewardsPage.routePath),
-      GenerationsGalleryPage.routePath =>
-        location == GenerationsGalleryPage.routePath ||
-            location.startsWith(GenerationStatusPage.routePrefix),
-      _ => location == path,
-    };
   }
 }
 
@@ -297,7 +418,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
         child: PressableScale(
           borderRadius: BorderRadius.circular(18),
           haptic: PressableScaleHaptic.selection,
-          onTap: () => context.go(
+          onTap: () => context.push(
             '${GenerationStatusPage.routePrefix}/${generation.generationId}',
           ),
           child: DecoratedBox(
@@ -493,9 +614,9 @@ class _BottomNavButton extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem(this.path, this.icon, this.label, {this.badgeCount = 0});
+  const _NavItem(this.index, this.icon, this.label, {this.badgeCount = 0});
 
-  final String path;
+  final int index;
   final IconData icon;
   final String label;
   final int badgeCount;

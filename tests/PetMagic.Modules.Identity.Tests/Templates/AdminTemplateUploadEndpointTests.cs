@@ -200,6 +200,66 @@ public sealed class AdminTemplateUploadEndpointTests
         Assert.Contains("maximum allowed size of 10 bytes", body);
     }
 
+    [Fact]
+    public async Task UploadMediaAsync_ShouldRejectPreviewVideo_WhenDurationIsTooLong()
+    {
+        await using var dbContext = CreateDbContext();
+        var lifecycleService = CreateLifecycleService(dbContext);
+        var file = CreateFormFile("preview.mp4", "video/mp4", Encoding.UTF8.GetBytes("video-bytes"));
+        var storage = new RecordingMediaStorage(new StoredMediaResponse(
+            "https://cdn.example.com/templates/preview.mp4",
+            "templates/preview.mp4",
+            "preview.mp4",
+            "video/mp4",
+            file.Length,
+            "c:/temp/preview.mp4"));
+        var metadataReader = new RecordingMediaMetadataReader(28.0);
+
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            file,
+            TemplateAssetKind.Preview.ToString(),
+            storage,
+            lifecycleService,
+            new FixedTemplateMediaUploadPolicy(2048),
+            metadataReader,
+            CancellationToken.None);
+
+        var (statusCode, body) = await ExecuteAsync(result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
+        Assert.Contains("Preview video duration must be between", body);
+    }
+
+    [Fact]
+    public async Task UploadMediaAsync_ShouldRejectPreviewVideo_WhenDurationMetadataMissing()
+    {
+        await using var dbContext = CreateDbContext();
+        var lifecycleService = CreateLifecycleService(dbContext);
+        var file = CreateFormFile("preview.mp4", "video/mp4", Encoding.UTF8.GetBytes("video-bytes"));
+        var storage = new RecordingMediaStorage(new StoredMediaResponse(
+            "https://cdn.example.com/templates/preview.mp4",
+            "templates/preview.mp4",
+            "preview.mp4",
+            "video/mp4",
+            file.Length,
+            "c:/temp/preview.mp4"));
+        var metadataReader = new RecordingMediaMetadataReader(null);
+
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            file,
+            TemplateAssetKind.Preview.ToString(),
+            storage,
+            lifecycleService,
+            new FixedTemplateMediaUploadPolicy(2048),
+            metadataReader,
+            CancellationToken.None);
+
+        var (statusCode, body) = await ExecuteAsync(result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, statusCode);
+        Assert.Contains("Preview video duration metadata is required", body);
+    }
+
     private static FormFile CreateFormFile(string fileName, string contentType, byte[] content)
     {
         var stream = new MemoryStream(content);

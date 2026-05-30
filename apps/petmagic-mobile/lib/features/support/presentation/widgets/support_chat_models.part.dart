@@ -42,9 +42,23 @@ bool _isSupportSystemMessage(SupportChatMessage message) {
 List<SupportChatMessage> _visibleSupportThreadMessages(
   Iterable<SupportChatMessage> messages,
 ) {
-  return messages
-      .where((message) => !_isSupportSystemMessage(message))
-      .toList(growable: false);
+  final visibleMessages = <SupportChatMessage>[];
+  final seenMessageIds = <String>{};
+
+  for (final message in messages) {
+    if (_isSupportSystemMessage(message)) {
+      continue;
+    }
+
+    final messageId = message.messageId.trim();
+    if (messageId.isNotEmpty && !seenMessageIds.add(messageId)) {
+      continue;
+    }
+
+    visibleMessages.add(message);
+  }
+
+  return visibleMessages;
 }
 
 String _mapSupportError(AppLocalizations text, String raw) {

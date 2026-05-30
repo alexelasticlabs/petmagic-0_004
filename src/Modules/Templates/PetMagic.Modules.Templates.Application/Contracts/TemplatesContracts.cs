@@ -463,6 +463,43 @@ public sealed record PublicTemplateListItemResponse(
 public sealed record PublicTemplateCategoryResponse(
     string Name);
 
+public sealed record PublicTemplatesCatalogQuery(
+    int? Page,
+    int? PageSize,
+    TemplateType? Type,
+    string? Category);
+
+public sealed record PublicTemplateCatalogMetadataResponse(
+    Guid Id,
+    string Title,
+    string Category,
+    string Type,
+    string? ThumbnailUrl,
+    string? PreviewUrl,
+    int PriceTokens,
+    string[] Tags,
+    long Version,
+    DateTime UpdatedAtUtc);
+
+public sealed record PublicTemplatesCatalogPageResponse(
+    IReadOnlyList<PublicTemplateCatalogMetadataResponse> Items,
+    int Page,
+    int PageSize,
+    bool HasMore,
+    long TotalCount,
+    DateTime GeneratedAtUtc);
+
+public sealed record PublicTemplatesCatalogVersionResponse(
+    long Version,
+    DateTime? UpdatedAtUtc);
+
+public sealed record PublicTemplatesCatalogChangesResponse(
+    long FromVersion,
+    long ToVersion,
+    IReadOnlyList<PublicTemplateCatalogMetadataResponse> Upserts,
+    IReadOnlyList<Guid> DeletedIds,
+    bool NeedsFullResync);
+
 public sealed record PublicTemplatesFeedQuery(
     TemplateType? Type,
     string? Category,

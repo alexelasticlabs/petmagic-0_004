@@ -317,7 +317,7 @@ Future<void> _showReadyCardActions(
                       .read(generationHistoryControllerProvider.notifier)
                       .markRead(generation.generationId);
                 }
-                context.go(
+                context.push(
                   '${GenerationStatusPage.routePrefix}/${generation.generationId}',
                 );
               },
@@ -359,7 +359,7 @@ Future<void> _showReadyCardActions(
               title: Text(text.generationStatusReportProblemAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                context.go(SupportChatPage.routePath);
+                context.push(SupportChatPage.routePath);
               },
             ),
           ],
@@ -395,7 +395,7 @@ Future<void> _showFailedCardActions(
                       .read(generationHistoryControllerProvider.notifier)
                       .markRead(generation.generationId);
                 }
-                context.go(
+                context.push(
                   '${GenerationStatusPage.routePrefix}/${generation.generationId}',
                 );
               },
@@ -413,7 +413,7 @@ Future<void> _showFailedCardActions(
               title: Text(text.generationStatusContactSupportAction),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                context.go(SupportChatPage.routePath);
+                context.push(SupportChatPage.routePath);
               },
             ),
           ],

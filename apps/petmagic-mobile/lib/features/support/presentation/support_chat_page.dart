@@ -252,18 +252,28 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   }
 
   GlobalKey _messageItemKeyForId(String messageId) {
+    final normalizedMessageId = messageId.trim();
     return _messageKeys.putIfAbsent(
-      messageId,
-      () => GlobalKey(debugLabel: 'support-message-$messageId'),
+      normalizedMessageId,
+      () => GlobalKey(debugLabel: 'support-message-$normalizedMessageId'),
     );
   }
 
+  void _retainMessageKeys(Iterable<SupportChatMessage> messages) {
+    final activeIds = <String>{
+      for (final message in messages)
+        if (message.messageId.trim().isNotEmpty) message.messageId.trim(),
+    };
+    _messageKeys.removeWhere((messageId, _) => !activeIds.contains(messageId));
+  }
+
   Future<void> _jumpToMessage(String messageId) async {
-    if (!mounted || messageId.trim().isEmpty) {
+    final normalizedMessageId = messageId.trim();
+    if (!mounted || normalizedMessageId.isEmpty) {
       return;
     }
 
-    final targetKey = _messageKeys[messageId];
+    final targetKey = _messageKeys[normalizedMessageId];
     final targetContext = targetKey?.currentContext;
     if (targetContext == null) {
       final text = AppLocalizations.of(context);
@@ -285,10 +295,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
 
     _messageHighlightTimer?.cancel();
     _applyState(() {
-      _highlightedMessageId = messageId;
+      _highlightedMessageId = normalizedMessageId;
     });
     _messageHighlightTimer = Timer(const Duration(milliseconds: 1300), () {
-      if (!mounted || _highlightedMessageId != messageId) {
+      if (!mounted || _highlightedMessageId != normalizedMessageId) {
         return;
       }
 
@@ -358,6 +368,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     final messages = _visibleSupportThreadMessages(
       conversation?.messages ?? const <SupportChatMessage>[],
     );
+    _retainMessageKeys(messages);
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     _keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomNavInset = _keyboardInset > 0

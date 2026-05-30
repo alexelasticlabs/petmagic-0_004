@@ -22,6 +22,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateMediaRecord> TemplateMediaRecords => Set<TemplateMediaRecord>();
 
+    public DbSet<TemplateCatalogChange> TemplateCatalogChanges => Set<TemplateCatalogChange>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<TemplateCategory>(entity =>
@@ -38,6 +40,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
         {
             entity.ToTable("templates_items");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.Version).HasDefaultValue(0L);
             entity.Property(x => x.Title).HasMaxLength(120).IsRequired();
             entity.Property(x => x.ShortDescription).HasMaxLength(240).IsRequired();
             entity.Property(x => x.PetPhotoRequirements).HasMaxLength(1000);
@@ -51,8 +54,20 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.PreprocessingPrompt).HasMaxLength(1000);
             entity.Property(x => x.KlingModel).HasMaxLength(128);
             entity.Property(x => x.KlingPrompt).HasMaxLength(1000);
+            entity.HasIndex(x => x.Version);
+            entity.HasIndex(x => x.DeletedAtUtc);
             entity.HasIndex(x => new { x.TemplateType, x.Status, x.UpdatedAtUtc });
             entity.HasIndex(x => new { x.Status, x.Category });
+        });
+
+        builder.Entity<TemplateCatalogChange>(entity =>
+        {
+            entity.ToTable("templates_catalog_changes");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ChangeType).HasConversion<int>();
+            entity.HasIndex(x => x.Version).IsUnique();
+            entity.HasIndex(x => x.TemplateId);
+            entity.HasIndex(x => new { x.TemplateId, x.Version });
         });
 
         builder.Entity<TemplateAsset>(entity =>

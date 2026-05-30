@@ -54,9 +54,12 @@ class TemplateItemDto {
     required this.tags,
     required this.isPremium,
     required this.tokenCost,
+    required this.thumbnailUrl,
     required this.previewAsset,
     required this.musicDescription,
     required this.referenceVideoDurationSeconds,
+    required this.version,
+    required this.updatedAtUtc,
   });
 
   final String templateId;
@@ -69,16 +72,45 @@ class TemplateItemDto {
   final List<String> tags;
   final bool isPremium;
   final int tokenCost;
+  final String? thumbnailUrl;
   final TemplateAssetDto? previewAsset;
   final String? musicDescription;
   final double? referenceVideoDurationSeconds;
+  final int version;
+  final DateTime? updatedAtUtc;
 
   factory TemplateItemDto.fromJson(Map<String, Object?> json) {
     final rawAsset = json['previewAsset'];
+    final previewUrl = json['previewUrl'] as String?;
+
+    TemplateAssetDto? parsedAsset;
+    if (rawAsset is Map) {
+      parsedAsset = TemplateAssetDto.fromJson(
+        Map<String, Object?>.from(rawAsset),
+      );
+    } else if (previewUrl != null && previewUrl.trim().isNotEmpty) {
+      final normalizedPreviewUrl = previewUrl.trim();
+      final inferredContentType = _inferContentTypeFromUrl(
+        normalizedPreviewUrl,
+      );
+      parsedAsset = TemplateAssetDto(
+        url: normalizedPreviewUrl,
+        fileName: normalizedPreviewUrl.split('/').last,
+        contentType: inferredContentType,
+        fileSizeBytes: null,
+        durationSeconds: null,
+      );
+    }
+
+    final templateId =
+        (json['templateId'] as String? ?? json['id'] as String? ?? '').trim();
+    final templateType =
+        (json['templateType'] as String? ?? json['type'] as String? ?? 'Image')
+            .trim();
 
     return TemplateItemDto(
-      templateId: json['templateId'] as String? ?? '',
-      templateType: json['templateType'] as String? ?? 'Image',
+      templateId: templateId,
+      templateType: templateType,
       title: json['title'] as String? ?? '',
       shortDescription: json['shortDescription'] as String? ?? '',
       petPhotoRequirements:
@@ -93,14 +125,51 @@ class TemplateItemDto {
           .whereType<String>()
           .toList(growable: false),
       isPremium: json['isPremium'] as bool? ?? false,
-      tokenCost: (json['tokenCost'] as num?)?.toInt() ?? 0,
-      previewAsset: rawAsset is Map
-          ? TemplateAssetDto.fromJson(Map<String, Object?>.from(rawAsset))
-          : null,
+      tokenCost:
+          (json['tokenCost'] as num?)?.toInt() ??
+          (json['priceTokens'] as num?)?.toInt() ??
+          0,
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      previewAsset: parsedAsset,
       musicDescription: json['musicDescription'] as String?,
       referenceVideoDurationSeconds:
           (json['referenceVideoDurationSeconds'] as num?)?.toDouble(),
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      updatedAtUtc: _parseDateTime(
+        json['updatedAtUtc'] as String? ?? json['updatedAt'] as String?,
+      ),
     );
+  }
+
+  static DateTime? _parseDateTime(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  static String _inferContentTypeFromUrl(String url) {
+    final normalized = url.toLowerCase();
+    final uri = Uri.tryParse(normalized);
+    final path = (uri?.path ?? normalized).toLowerCase();
+
+    if (isVideoUrl(normalized)) {
+      return 'video/mp4';
+    }
+    if (path.endsWith('.webm')) {
+      return 'video/webm';
+    }
+    if (path.endsWith('.mov')) {
+      return 'video/quicktime';
+    }
+    if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (path.endsWith('.png')) {
+      return 'image/png';
+    }
+    return 'application/octet-stream';
   }
 
   Map<String, Object?> toJson() => {
@@ -114,9 +183,12 @@ class TemplateItemDto {
     'tags': tags,
     'isPremium': isPremium,
     'tokenCost': tokenCost,
+    'thumbnailUrl': thumbnailUrl,
     'previewAsset': previewAsset?.toJson(),
     'musicDescription': musicDescription,
     'referenceVideoDurationSeconds': referenceVideoDurationSeconds,
+    'version': version,
+    'updatedAtUtc': updatedAtUtc?.toIso8601String(),
   };
 
   TemplateItem toDomain() => TemplateItem(
@@ -130,9 +202,12 @@ class TemplateItemDto {
     tags: tags,
     isPremium: isPremium,
     tokenCost: tokenCost,
+    thumbnailUrl: thumbnailUrl,
     previewAsset: previewAsset?.toDomain(),
     musicDescription: musicDescription,
     referenceVideoDurationSeconds: referenceVideoDurationSeconds,
+    version: version,
+    updatedAtUtc: updatedAtUtc,
   );
 }
 
@@ -141,11 +216,13 @@ class TemplatesFeedDto {
     required this.items,
     required this.hasMore,
     this.nextCursor,
+    required this.page,
   });
 
   final List<TemplateItemDto> items;
-  final String? nextCursor;
   final bool hasMore;
+  final String? nextCursor;
+  final int page;
 
   factory TemplatesFeedDto.fromJson(Map<String, Object?> json) {
     final rawItems = json['items'] as List<dynamic>? ?? const [];
@@ -158,6 +235,7 @@ class TemplatesFeedDto {
           )
           .toList(growable: false),
       nextCursor: json['nextCursor'] as String?,
+      page: (json['page'] as num?)?.toInt() ?? 1,
       hasMore: json['hasMore'] as bool? ?? false,
     );
   }
@@ -165,6 +243,7 @@ class TemplatesFeedDto {
   Map<String, Object?> toJson() => {
     'items': items.map((item) => item.toJson()).toList(growable: false),
     'nextCursor': nextCursor,
+    'page': page,
     'hasMore': hasMore,
   };
 
@@ -172,5 +251,62 @@ class TemplatesFeedDto {
     items: items.map((item) => item.toDomain()).toList(growable: false),
     nextCursor: nextCursor,
     hasMore: hasMore,
+    page: page,
   );
+}
+
+class TemplatesCatalogVersionDto {
+  const TemplatesCatalogVersionDto({required this.version});
+
+  final int version;
+
+  factory TemplatesCatalogVersionDto.fromJson(Map<String, Object?> json) {
+    return TemplatesCatalogVersionDto(
+      version: (json['version'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class TemplatesCatalogChangesDto {
+  const TemplatesCatalogChangesDto({
+    required this.fromVersion,
+    required this.toVersion,
+    required this.upserts,
+    required this.deletedIds,
+    required this.needsFullResync,
+  });
+
+  final int fromVersion;
+  final int toVersion;
+  final List<TemplateItemDto> upserts;
+  final List<String> deletedIds;
+  final bool needsFullResync;
+
+  factory TemplatesCatalogChangesDto.fromJson(Map<String, Object?> json) {
+    final rawUpserts = json['upserts'] as List<dynamic>? ?? const [];
+    final rawDeletedIds = json['deletedIds'] as List<dynamic>? ?? const [];
+
+    return TemplatesCatalogChangesDto(
+      fromVersion: (json['fromVersion'] as num?)?.toInt() ?? 0,
+      toVersion: (json['toVersion'] as num?)?.toInt() ?? 0,
+      upserts: rawUpserts
+          .whereType<Map>()
+          .map(
+            (item) => TemplateItemDto.fromJson(Map<String, Object?>.from(item)),
+          )
+          .toList(growable: false),
+      deletedIds: rawDeletedIds.map((item) => item.toString()).toList(),
+      needsFullResync: json['needsFullResync'] as bool? ?? false,
+    );
+  }
+
+  TemplatesCatalogChanges toDomain() {
+    return TemplatesCatalogChanges(
+      fromVersion: fromVersion,
+      toVersion: toVersion,
+      upserts: upserts.map((item) => item.toDomain()).toList(growable: false),
+      deletedIds: deletedIds,
+      needsFullResync: needsFullResync,
+    );
+  }
 }

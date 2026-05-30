@@ -26,9 +26,8 @@ class TemplatesRemoteDataSource {
 
     try {
       final response = await _dio.get<Map<String, Object?>>(
-        '/api/templates/feed',
+        '/api/templates',
         queryParameters: query.toQueryParameters(),
-        options: Options(listFormat: ListFormat.multi),
         cancelToken: cancelToken,
       );
 
@@ -38,7 +37,7 @@ class TemplatesRemoteDataSource {
 
       final data = response.data;
       if (data == null) {
-        throw const AppException('templates.feed_response_empty');
+        throw const AppException('templates.catalog_page_response_empty');
       }
 
       return TemplatesFeedDto.fromJson(data);
@@ -77,6 +76,55 @@ class TemplatesRemoteDataSource {
             ..sort();
 
       return categories;
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
+
+      throw AppException(
+        _mapMessage(error),
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    }
+  }
+
+  Future<TemplatesCatalogVersionDto> fetchCatalogVersion() async {
+    try {
+      final response = await _dio.get<Map<String, Object?>>(
+        '/api/templates/catalog-version',
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const AppException('templates.catalog_version_response_empty');
+      }
+
+      return TemplatesCatalogVersionDto.fromJson(data);
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
+
+      throw AppException(
+        _mapMessage(error),
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    }
+  }
+
+  Future<TemplatesCatalogChangesDto> fetchCatalogChanges(int sinceVersion) async {
+    try {
+      final response = await _dio.get<Map<String, Object?>>(
+        '/api/templates/changes',
+        queryParameters: {'sinceVersion': sinceVersion},
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const AppException('templates.catalog_changes_response_empty');
+      }
+
+      return TemplatesCatalogChangesDto.fromJson(data);
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         throw const RequestCancelledException();

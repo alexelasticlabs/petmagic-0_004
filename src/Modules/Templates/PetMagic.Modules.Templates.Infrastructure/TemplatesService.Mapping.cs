@@ -7,6 +7,40 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplatesService
 {
+    private static bool IsVideoAssetUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+
+        var normalized = url.Trim().ToLowerInvariant();
+        return normalized.EndsWith(".mp4", StringComparison.Ordinal)
+            || normalized.EndsWith(".webm", StringComparison.Ordinal)
+            || normalized.EndsWith(".mov", StringComparison.Ordinal)
+            || normalized.EndsWith(".m4v", StringComparison.Ordinal);
+    }
+
+    private static PublicTemplateCatalogMetadataResponse MapPublicCatalogMetadataItem(TemplateItem template)
+    {
+        var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
+        var previewUrl = previewAsset?.Url;
+        var contentType = previewAsset?.ContentType?.Trim().ToLowerInvariant() ?? string.Empty;
+        var isPreviewVideo = contentType.StartsWith("video/", StringComparison.Ordinal) || IsVideoAssetUrl(previewUrl);
+
+        return new PublicTemplateCatalogMetadataResponse(
+            template.Id,
+            template.Title,
+            template.Category,
+            template.TemplateType.ToString(),
+            isPreviewVideo ? null : previewUrl,
+            previewUrl,
+            template.TokenCost,
+            DeserializeTags(template.Tags),
+            template.Version,
+            template.UpdatedAtUtc);
+    }
+
     private static TemplateAssetResponse? GetAsset(TemplateItem template, TemplateAssetKind assetKind)
     {
         var asset = template.Assets.FirstOrDefault(x => x.AssetKind == assetKind);

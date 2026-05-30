@@ -167,7 +167,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                       onPickAnotherPhoto: () =>
                           context.go(TemplatesPage.routePath),
                       onRetry: _retrySoon,
-                      onSupport: () => context.go(SupportChatPage.routePath),
+                      onSupport: () => context.push(SupportChatPage.routePath),
                     ),
                     const SizedBox(height: 14),
                     _DetailsCard(
@@ -270,7 +270,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                   title: Text(text.generationStatusReportProblemAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    context.go(SupportChatPage.routePath);
+                    context.push(SupportChatPage.routePath);
                   },
                 ),
               ] else if (generation.isFailed) ...[
@@ -295,7 +295,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
                   title: Text(text.generationStatusContactSupportAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    context.go(SupportChatPage.routePath);
+                    context.push(SupportChatPage.routePath);
                   },
                 ),
               ] else ...[

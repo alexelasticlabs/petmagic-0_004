@@ -351,7 +351,7 @@ packages:
     source: hosted
     version: "4.5.2"
   flutter_cache_manager:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: flutter_cache_manager
       sha256: "400b6592f16a4409a7f2bb929a9a7e38c72cceb8ffb99ee57bbf2cb2cecf8386"
@@ -1515,7 +1515,7 @@ packages:
     source: hosted
     version: "2.9.6"
   video_player_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: video_player_platform_interface
       sha256: "16eaed5268c571c31840dc58ef8da5f0cd4db2a98490c3b8f1cf70122546c6e0"

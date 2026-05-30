@@ -6,6 +6,10 @@ public sealed class TemplateItem
 {
     public Guid Id { get; set; }
 
+    public long Version { get; set; }
+
+    public DateTime? DeletedAtUtc { get; set; }
+
     public TemplateType TemplateType { get; set; }
 
     public string Title { get; set; } = string.Empty;

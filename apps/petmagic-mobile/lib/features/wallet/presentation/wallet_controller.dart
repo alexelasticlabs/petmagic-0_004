@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 
@@ -315,10 +316,9 @@ class WalletController extends Notifier<WalletState> {
           return null;
         }
 
-        final availability = await _repository.fetchStoreAvailability(
-          [pack],
-          paymentMethod,
-        );
+        final availability = await _repository.fetchStoreAvailability([
+          pack,
+        ], paymentMethod);
         if (!availability.isAvailable ||
             !availability.productIds.contains(expectedProductId)) {
           state = state.copyWith(
@@ -420,7 +420,7 @@ class WalletController extends Notifier<WalletState> {
     } catch (error) {
       state = state.copyWith(
         isClaimingAd: false,
-        errorMessage: error.toString(),
+        errorMessage: _errorMessage(error),
       );
     }
   }
@@ -445,11 +445,9 @@ class WalletController extends Notifier<WalletState> {
       );
       return null;
     } catch (error) {
-      state = state.copyWith(
-        isRedeeming: false,
-        errorMessage: error.toString(),
-      );
-      return error.toString();
+      final message = _errorMessage(error);
+      state = state.copyWith(isRedeeming: false, errorMessage: message);
+      return message;
     }
   }
 
@@ -469,11 +467,9 @@ class WalletController extends Notifier<WalletState> {
       );
       return null;
     } catch (error) {
-      state = state.copyWith(
-        isApplyingReferral: false,
-        errorMessage: error.toString(),
-      );
-      return error.toString();
+      final message = _errorMessage(error);
+      state = state.copyWith(isApplyingReferral: false, errorMessage: message);
+      return message;
     }
   }
 
@@ -654,7 +650,8 @@ class WalletController extends Notifier<WalletState> {
             checkoutVerificationState: WalletCheckoutVerificationState.error,
             checkoutErrorMessage:
                 purchase.error?.message ?? 'wallet.payment_unavailable',
-            errorMessage: purchase.error?.message ?? 'wallet.payment_unavailable',
+            errorMessage:
+                purchase.error?.message ?? 'wallet.payment_unavailable',
           );
           break;
         case PurchaseStatus.canceled:
@@ -755,4 +752,23 @@ class WalletController extends Notifier<WalletState> {
       );
     }
   }
+}
+
+String _errorMessage(Object error) {
+  if (error is AppException) {
+    if (error.message.trim().isNotEmpty) {
+      return error.message;
+    }
+
+    return switch (error.statusCode) {
+      400 => 'wallet.request_failed',
+      401 => 'auth.session_expired',
+      403 => 'wallet.payment_unavailable',
+      404 => 'wallet.request_failed',
+      409 => 'wallet.request_failed',
+      _ => 'wallet.server_unavailable',
+    };
+  }
+
+  return error.toString();
 }

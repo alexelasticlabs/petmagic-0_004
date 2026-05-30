@@ -643,7 +643,15 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(2, storage.DeletedUrls.Count);
         Assert.Contains("http://localhost:5000/templates-media/2026/05/preview.mp4", storage.DeletedUrls);
         Assert.Contains("http://localhost:5000/templates-media/2026/05/reference.mp4", storage.DeletedUrls);
-        Assert.False(await dbContext.TemplateItems.AnyAsync(x => x.Id == created.Value.TemplateId));
+        var deletedTemplate = await dbContext.TemplateItems.SingleOrDefaultAsync(x => x.Id == created.Value.TemplateId);
+        Assert.NotNull(deletedTemplate);
+        Assert.NotNull(deletedTemplate!.DeletedAtUtc);
+
+        var publicCatalog = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(1, 20, null, null),
+            CancellationToken.None);
+        Assert.True(publicCatalog.IsSuccess);
+        Assert.DoesNotContain(publicCatalog.Value.Items, item => item.Id == created.Value.TemplateId);
     }
 
     [Fact]
@@ -674,6 +682,91 @@ public sealed partial class TemplatesServiceTests
         Assert.True(deleted.IsFailure);
         Assert.Equal("templates.media_storage_failed", deleted.Error.Code);
         Assert.True(await dbContext.TemplateItems.AnyAsync(x => x.Id == created.Value.TemplateId));
+    }
+
+    [Fact]
+    public async Task CatalogVersionAndChanges_ShouldReturnUpsertsAndDeletedIds()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var initialVersion = await service.GetPublicCatalogVersionAsync(CancellationToken.None);
+        Assert.True(initialVersion.IsSuccess);
+        Assert.True(initialVersion.Value.Version > 0);
+
+        var firstChanges = await service.GetPublicCatalogChangesAsync(0, CancellationToken.None);
+        Assert.True(firstChanges.IsSuccess);
+        Assert.Single(firstChanges.Value.Upserts);
+        Assert.Empty(firstChanges.Value.DeletedIds);
+        Assert.Equal(created.Value.TemplateId, firstChanges.Value.Upserts[0].Id);
+
+        var deleted = await service.DeleteAsync(created.Value.TemplateId, CancellationToken.None);
+        Assert.True(deleted.IsSuccess);
+
+        var afterDeleteVersion = await service.GetPublicCatalogVersionAsync(CancellationToken.None);
+        Assert.True(afterDeleteVersion.IsSuccess);
+        Assert.True(afterDeleteVersion.Value.Version > initialVersion.Value.Version);
+
+        var delta = await service.GetPublicCatalogChangesAsync(initialVersion.Value.Version, CancellationToken.None);
+        Assert.True(delta.IsSuccess);
+        Assert.Empty(delta.Value.Upserts);
+        Assert.Contains(created.Value.TemplateId, delta.Value.DeletedIds);
+    }
+
+    [Fact]
+    public async Task CatalogChanges_ShouldRequestFullResync_WhenChangeHistoryIsMissing()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId);
+        template.Version = 25;
+        template.UpdatedAtUtc = DateTime.UtcNow;
+        dbContext.TemplateCatalogChanges.RemoveRange(dbContext.TemplateCatalogChanges);
+        await dbContext.SaveChangesAsync(CancellationToken.None);
+
+        var changes = await service.GetPublicCatalogChangesAsync(0, CancellationToken.None);
+
+        Assert.True(changes.IsSuccess);
+        Assert.True(changes.Value.NeedsFullResync);
+        Assert.Empty(changes.Value.Upserts);
+        Assert.Empty(changes.Value.DeletedIds);
+        Assert.Equal(0, changes.Value.FromVersion);
+        Assert.Equal(25, changes.Value.ToVersion);
     }
 
 

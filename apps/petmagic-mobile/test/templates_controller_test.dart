@@ -182,6 +182,7 @@ class _FakeTemplatesRepository implements TemplatesRepository {
   final Completer<void>? firstFetchCompleter;
   final Completer<void>? videoFetchCompleter;
   final Map<String, TemplatesFeedPage> pagesByKey;
+  int _catalogVersion = 0;
   int fetchFeedCalls = 0;
   int fetchCategoriesCalls = 0;
 
@@ -209,6 +210,39 @@ class _FakeTemplatesRepository implements TemplatesRepository {
   Future<List<String>> fetchCategories() async {
     fetchCategoriesCalls++;
     return const ['Portrait'];
+  }
+
+  @override
+  Future<int> fetchCatalogVersion() async {
+    _catalogVersion += 1;
+    return _catalogVersion;
+  }
+
+  @override
+  Future<int> readLocalCatalogVersion() async {
+    return _catalogVersion;
+  }
+
+  @override
+  Future<TemplatesCatalogChanges> fetchCatalogChanges(int sinceVersion) async {
+    return TemplatesCatalogChanges(
+      fromVersion: sinceVersion,
+      toVersion: _catalogVersion,
+      upserts: const [],
+      deletedIds: const [],
+      needsFullResync: false,
+    );
+  }
+
+  @override
+  Future<int> syncCatalog({int? knownRemoteVersion}) async {
+    if (knownRemoteVersion != null) {
+      _catalogVersion = knownRemoteVersion;
+      return _catalogVersion;
+    }
+
+    _catalogVersion += 1;
+    return _catalogVersion;
   }
 
   void completeFirstFetch() {

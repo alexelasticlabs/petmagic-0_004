@@ -18,6 +18,7 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_page.
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -90,127 +91,154 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   padding: EdgeInsets.fromLTRB(18, 16, 18, bottomNavInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                text.profileTitle,
-                                style: TextStyle(
-                                  color: colors.textStrong,
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.w900,
+                    MotionEntrance(
+                      delay: const Duration(milliseconds: 20),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  text.profileTitle,
+                                  style: TextStyle(
+                                    color: colors.textStrong,
+                                    fontSize: 25,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        _HeaderActionIcon(
-                          icon: Icons.settings_outlined,
-                          onTap: () =>
-                              context.push(ProfileSettingsPage.routePath),
-                        ),
-                      ],
+                          const SizedBox(width: 12),
+                          _HeaderActionIcon(
+                            icon: Icons.settings_outlined,
+                            onTap: () =>
+                                context.push(ProfileSettingsPage.routePath),
+                          ),
+                        ],
+                      ),
                     ),
                     if (state.errorMessage != null) ...[
                       const SizedBox(height: 18),
-                      ProfileMessageCard(
-                        message: mapProfileFeedbackMessage(
-                          state.errorMessage!,
-                          text,
+                      MotionEntrance(
+                        delay: const Duration(milliseconds: 60),
+                        child: ProfileMessageCard(
+                          message: mapProfileFeedbackMessage(
+                            state.errorMessage!,
+                            text,
+                          ),
+                          tone: colors.danger,
                         ),
-                        tone: colors.danger,
                       ),
                     ],
                     if (state.successMessage == 'logout') ...[
                       const SizedBox(height: 18),
-                      ProfileMessageCard(
-                        message: text.profileSignedOut,
-                        tone: colors.accent,
+                      MotionEntrance(
+                        delay: const Duration(milliseconds: 60),
+                        child: ProfileMessageCard(
+                          message: text.profileSignedOut,
+                          tone: colors.accent,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 18),
                     if (profile != null) ...[
-                      _ProfileHeroCard(
-                        profile: profile,
-                        walletBalance: walletState.wallet?.balance,
+                      MotionEntrance(
+                        delay: const Duration(milliseconds: 100),
+                        child: _ProfileHeroCard(
+                          profile: profile,
+                          walletBalance: walletState.wallet?.balance,
+                        ),
                       ),
                       const SizedBox(height: 12),
-                      _WalletHighlightCard(
-                        walletState: walletState,
-                        onTap: () => context.go(WalletPage.routePath),
+                      MotionEntrance(
+                        delay: const Duration(milliseconds: 150),
+                        child: _WalletHighlightCard(
+                          walletState: walletState,
+                          onTap: () => context.push(WalletPage.routePath),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       if (shouldShowPremiumCta) ...[
-                        _PremiumBannerCard(
-                          onTap: () =>
-                              _handlePremiumTap(subscriptionSummary.value),
+                        MotionEntrance(
+                          delay: const Duration(milliseconds: 200),
+                          child: _PremiumBannerCard(
+                            onTap: () =>
+                                _handlePremiumTap(subscriptionSummary.value),
+                          ),
                         ),
                         const SizedBox(height: 12),
                       ],
                       if (shouldShowSubscriptionCard) ...[
-                        _SubscriptionSummaryCard(
-                          summary: subscriptionSummary.value!,
-                          isOpening: _isOpeningSubscription,
-                          onManageTap: () => _handleSubscriptionAction(
-                            subscriptionSummary.value,
+                        MotionEntrance(
+                          delay: const Duration(milliseconds: 240),
+                          child: _SubscriptionSummaryCard(
+                            summary: subscriptionSummary.value!,
+                            isOpening: _isOpeningSubscription,
+                            onManageTap: () => _handleSubscriptionAction(
+                              subscriptionSummary.value,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
                       ],
-                      ProfileGlassCard(
-                        padding: EdgeInsets.zero,
-                        child: Column(
-                          children: [
-                            ProfileSettingsRow(
-                              icon: Icons.privacy_tip_outlined,
-                              title: text.profileLegalShortcutTitle,
-                              subtitle: legalStatus,
-                              iconColor: colors.accent,
-                              onTap: () => context.push(
-                                ProfileSettingsDetailPage.location(
-                                  ProfileSettingsDetailKind.terms,
+                      MotionEntrance(
+                        delay: const Duration(milliseconds: 280),
+                        child: ProfileGlassCard(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            children: [
+                              ProfileSettingsRow(
+                                icon: Icons.privacy_tip_outlined,
+                                title: text.profileLegalShortcutTitle,
+                                subtitle: legalStatus,
+                                iconColor: colors.accent,
+                                onTap: () => context.push(
+                                  ProfileSettingsDetailPage.location(
+                                    ProfileSettingsDetailKind.terms,
+                                  ),
                                 ),
                               ),
-                            ),
-                            ProfileSettingsRow(
-                              icon: Icons.support_agent_rounded,
-                              title: text.profileSupportTitle,
-                              subtitle: text.profileSupportCompactSubtitle,
-                              iconColor: colors.blue,
-                              onTap: () =>
-                                  context.push(SupportChatPage.routePath),
-                            ),
-                            ProfileSettingsRow(
-                              icon: Icons.settings_outlined,
-                              title: text.profileSettingsShortcutTitle,
-                              subtitle: text.profileSettingsCompactSubtitle,
-                              showDivider: false,
-                              onTap: () =>
-                                  context.push(ProfileSettingsPage.routePath),
-                            ),
-                          ],
+                              ProfileSettingsRow(
+                                icon: Icons.support_agent_rounded,
+                                title: text.profileSupportTitle,
+                                subtitle: text.profileSupportCompactSubtitle,
+                                iconColor: colors.blue,
+                                onTap: () =>
+                                    context.push(SupportChatPage.routePath),
+                              ),
+                              ProfileSettingsRow(
+                                icon: Icons.settings_outlined,
+                                title: text.profileSettingsShortcutTitle,
+                                subtitle: text.profileSettingsCompactSubtitle,
+                                showDivider: false,
+                                onTap: () =>
+                                    context.push(ProfileSettingsPage.routePath),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                        onPressed: state.isSaving ? null : controller.logout,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                          foregroundColor: colors.danger,
-                          side: BorderSide(
-                            color: colors.danger.withValues(alpha: 0.3),
+                      MotionEntrance(
+                        delay: const Duration(milliseconds: 320),
+                        child: OutlinedButton.icon(
+                          onPressed: state.isSaving ? null : controller.logout,
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                            foregroundColor: colors.danger,
+                            side: BorderSide(
+                              color: colors.danger.withValues(alpha: 0.3),
+                            ),
+                            backgroundColor: colors.danger.withValues(
+                              alpha: 0.08,
+                            ),
                           ),
-                          backgroundColor: colors.danger.withValues(
-                            alpha: 0.08,
-                          ),
+                          icon: const Icon(Icons.logout_rounded),
+                          label: Text(text.profileSignOutAction),
                         ),
-                        icon: const Icon(Icons.logout_rounded),
-                        label: Text(text.profileSignOutAction),
                       ),
                     ],
                   ],

@@ -62,6 +62,7 @@ internal sealed partial class TemplatesService
 
         dbContext.TemplateItems.Add(template);
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
+        await StampCatalogUpsertAsync(template, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await PublishFeedInvalidatedAsync(cancellationToken);
 
@@ -110,7 +111,7 @@ internal sealed partial class TemplatesService
         template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
         template.ImageModel = command.ImageModel.Trim();
         template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
-        template.UpdatedAtUtc = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
             SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset)
@@ -126,6 +127,7 @@ internal sealed partial class TemplatesService
         }
 
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
+        await StampCatalogUpsertAsync(template, now, cancellationToken);
 
         try
         {
@@ -146,7 +148,17 @@ internal sealed partial class TemplatesService
             template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
             template.ImageModel = command.ImageModel.Trim();
             template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
-            template.UpdatedAtUtc = DateTime.UtcNow;
+
+            var staleChanges = dbContext.ChangeTracker
+                .Entries<TemplateCatalogChange>()
+                .Where(entry => entry.State == EntityState.Added)
+                .ToArray();
+            foreach (var staleChange in staleChanges)
+            {
+                staleChange.State = EntityState.Detached;
+            }
+
+            await StampCatalogUpsertAsync(template, DateTime.UtcNow, cancellationToken);
 
             // Try to save again
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -219,6 +231,7 @@ internal sealed partial class TemplatesService
         dbContext.TemplateItems.Add(template);
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
+        await StampCatalogUpsertAsync(template, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await PublishFeedInvalidatedAsync(cancellationToken);
 
@@ -275,7 +288,7 @@ internal sealed partial class TemplatesService
         template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
         template.KeepOriginalSound = command.KeepOriginalSound;
         template.Status = statusResult.Value;
-        template.UpdatedAtUtc = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
             SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset),
@@ -293,6 +306,7 @@ internal sealed partial class TemplatesService
 
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
+        await StampCatalogUpsertAsync(template, now, cancellationToken);
 
         try
         {
@@ -319,7 +333,17 @@ internal sealed partial class TemplatesService
             template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
             template.KeepOriginalSound = command.KeepOriginalSound;
             template.Status = statusResult.Value;
-            template.UpdatedAtUtc = DateTime.UtcNow;
+
+            var staleChanges = dbContext.ChangeTracker
+                .Entries<TemplateCatalogChange>()
+                .Where(entry => entry.State == EntityState.Added)
+                .ToArray();
+            foreach (var staleChange in staleChanges)
+            {
+                staleChange.State = EntityState.Detached;
+            }
+
+            await StampCatalogUpsertAsync(template, DateTime.UtcNow, cancellationToken);
 
             // Try to save again
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -353,7 +377,7 @@ internal sealed partial class TemplatesService
         }
 
         template.Status = status;
-        template.UpdatedAtUtc = DateTime.UtcNow;
+        await StampCatalogUpsertAsync(template, DateTime.UtcNow, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await PublishFeedInvalidatedAsync(cancellationToken);
 
@@ -368,6 +392,11 @@ internal sealed partial class TemplatesService
             return Result.Failure(TemplatesErrors.NotFound);
         }
 
+        if (template.DeletedAtUtc is not null)
+        {
+            return Result.Success();
+        }
+
         var assetUrls = CollectObsoleteAssetUrls(template.Assets.Select(asset => asset.Url));
         var cleanupResult = await DeleteTemplateAssetsAsync(assetUrls, cancellationToken);
         if (cleanupResult.IsFailure)
@@ -375,7 +404,8 @@ internal sealed partial class TemplatesService
             return cleanupResult;
         }
 
-        dbContext.TemplateItems.Remove(template);
+        template.Status = TemplateStatus.Archived;
+        await StampCatalogDeleteAsync(template, DateTime.UtcNow, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await PublishFeedInvalidatedAsync(cancellationToken);
 

@@ -130,15 +130,26 @@ class _ProfileNotificationsSettingsSectionState
   }
 
   Future<void> _refreshPushPermissionStatus() async {
-    final settings = await FirebaseMessaging.instance.getNotificationSettings();
+    try {
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
 
-    if (!mounted) {
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pushAuthorizationStatus = settings.authorizationStatus;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pushAuthorizationStatus = null;
+      });
     }
-
-    setState(() {
-      _pushAuthorizationStatus = settings.authorizationStatus;
-    });
   }
 
   Future<void> _requestPushPermission() async {
@@ -146,20 +157,30 @@ class _ProfileNotificationsSettingsSectionState
       _isRequestingPermission = true;
     });
 
-    final settings = await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      final settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
-    if (!mounted) {
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isRequestingPermission = false;
+        _pushAuthorizationStatus = settings.authorizationStatus;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isRequestingPermission = false;
+      });
     }
-
-    setState(() {
-      _isRequestingPermission = false;
-      _pushAuthorizationStatus = settings.authorizationStatus;
-    });
   }
 
   String _pushPermissionLabel(AppLocalizations text) {
@@ -211,10 +232,7 @@ class _ProfileNotificationsSettingsSectionState
     };
   }
 
-  String _devicePermissionName(
-    AppLocalizations text,
-    AppPermissionType type,
-  ) {
+  String _devicePermissionName(AppLocalizations text, AppPermissionType type) {
     return switch (type) {
       AppPermissionType.notifications =>
         text.profileNotificationsDeviceNotifications,
@@ -398,28 +416,31 @@ class _ProfileNotificationsSettingsSectionState
                           onPressed: _isRequestingPermission
                               ? null
                               : _requestCorePermissions,
-                        child: Text(
-                          _isRequestingPermission
-                              ? text.profileLoadingAction
-                              : text.profileNotificationsRequestDevicePermissions,
+                          child: Text(
+                            _isRequestingPermission
+                                ? text.profileLoadingAction
+                                : text.profileNotificationsRequestDevicePermissions,
+                          ),
                         ),
-                      ),
-                      FilledButton.tonal(
-                        onPressed: _isRequestingPermission
-                            ? null
-                            : () => _permissionCoordinator.openSettings(),
-                        child: Text(text.supportChatOpenSettingsAction),
-                      ),
+                        FilledButton.tonal(
+                          onPressed: _isRequestingPermission
+                              ? null
+                              : () => _permissionCoordinator.openSettings(),
+                          child: Text(text.supportChatOpenSettingsAction),
+                        ),
                       ],
                     ),
                     if (_devicePermissions.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                    for (final permission in _devicePermissions)
+                      for (final permission in _devicePermissions)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4),
                           child: _NotificationsInfoRow(
                             label: _devicePermissionName(text, permission.type),
-                            value: _devicePermissionStateLabel(text, permission.state),
+                            value: _devicePermissionStateLabel(
+                              text,
+                              permission.state,
+                            ),
                           ),
                         ),
                     ],

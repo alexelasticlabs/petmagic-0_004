@@ -298,6 +298,49 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task PublicTemplateCatalogEndpoints_ShouldReturnVersionedMetadataAndDeletedIds()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await CreateActiveImageTemplateAsync(application.Client, "Catalog Portrait", "Catalog", ["meta"]);
+
+        var page = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
+            application.Client,
+            "/api/templates?page=1&pageSize=20");
+
+        Assert.True(page.TotalCount >= 1);
+        Assert.Contains(page.Items, item => item.Id == created.TemplateId);
+
+        var version = await GetFromJsonAsync<PublicTemplatesCatalogVersionResponse>(
+            application.Client,
+            "/api/templates/catalog-version");
+
+        Assert.True(version.Version > 0);
+
+        var initialChanges = await GetFromJsonAsync<PublicTemplatesCatalogChangesResponse>(
+            application.Client,
+            "/api/templates/changes?sinceVersion=0");
+
+        Assert.Contains(initialChanges.Upserts, item => item.Id == created.TemplateId);
+        Assert.DoesNotContain(created.TemplateId, initialChanges.DeletedIds);
+
+        using var deleteResponse = await application.Client.DeleteAsync($"/api/admin/templates/{created.TemplateId}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var afterDeleteVersion = await GetFromJsonAsync<PublicTemplatesCatalogVersionResponse>(
+            application.Client,
+            "/api/templates/catalog-version");
+
+        Assert.True(afterDeleteVersion.Version > version.Version);
+
+        var deleteDelta = await GetFromJsonAsync<PublicTemplatesCatalogChangesResponse>(
+            application.Client,
+            $"/api/templates/changes?sinceVersion={version.Version}");
+
+        Assert.Contains(created.TemplateId, deleteDelta.DeletedIds);
+    }
+
+    [Fact]
     public async Task PublicTemplateCategories_ShouldReturnNonArchivedCategoriesForAnonymousUsers()
     {
         await using var application = await TestApplication.CreateAsync();

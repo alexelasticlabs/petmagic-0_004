@@ -36,6 +36,7 @@ dependencies:
   go_router: ^17.2.3
   dio: ^5.9.2
   cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
   video_player: ^2.11.1
   visibility_detector: ^0.4.0+2
   flutter_animate: ^4.5.2
@@ -67,6 +68,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  video_player_platform_interface: ^6.5.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

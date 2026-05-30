@@ -17,9 +17,10 @@ class TemplatesState {
     this.items = const [],
     this.categories = const [],
     this.query = const TemplatesQuery(),
+    this.catalogVersion = 0,
+    this.currentPage = 1,
     this.itemsQueryKey,
     this.cachedPagesByQueryKey = const {},
-    this.nextCursor,
     this.hasMore = true,
     this.isLoading = false,
     this.isRefreshing = false,
@@ -31,9 +32,10 @@ class TemplatesState {
   final List<TemplateItem> items;
   final List<String> categories;
   final TemplatesQuery query;
+  final int catalogVersion;
+  final int currentPage;
   final String? itemsQueryKey;
   final Map<String, TemplatesFeedPage> cachedPagesByQueryKey;
-  final String? nextCursor;
   final bool hasMore;
   final bool isLoading;
   final bool isRefreshing;
@@ -49,11 +51,11 @@ class TemplatesState {
     List<TemplateItem>? items,
     List<String>? categories,
     TemplatesQuery? query,
+    int? catalogVersion,
+    int? currentPage,
     String? itemsQueryKey,
     bool clearItemsQueryKey = false,
     Map<String, TemplatesFeedPage>? cachedPagesByQueryKey,
-    String? nextCursor,
-    bool clearNextCursor = false,
     bool? hasMore,
     bool? isLoading,
     bool? isRefreshing,
@@ -66,12 +68,13 @@ class TemplatesState {
       items: items ?? this.items,
       categories: categories ?? this.categories,
       query: query ?? this.query,
+      catalogVersion: catalogVersion ?? this.catalogVersion,
+      currentPage: currentPage ?? this.currentPage,
       itemsQueryKey: clearItemsQueryKey
           ? null
           : itemsQueryKey ?? this.itemsQueryKey,
       cachedPagesByQueryKey:
           cachedPagesByQueryKey ?? this.cachedPagesByQueryKey,
-      nextCursor: clearNextCursor ? null : nextCursor ?? this.nextCursor,
       hasMore: hasMore ?? this.hasMore,
       isLoading: isLoading ?? this.isLoading,
       isRefreshing: isRefreshing ?? this.isRefreshing,
@@ -183,7 +186,27 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
 
     _hasPendingRealtimeRefresh = false;
-    unawaited(loadInitial(forceRefresh: true));
+    unawaited(_refreshFromRealtimeInvalidation());
+  }
+
+  Future<void> _refreshFromRealtimeInvalidation() async {
+    try {
+      final latestVersion = await _repository.fetchCatalogVersion();
+      if (!_isScreenVisible) {
+        return;
+      }
+
+      if (latestVersion <= state.catalogVersion) {
+        return;
+      }
+
+      await loadInitial(
+        forceRefresh: true,
+        knownCatalogVersion: latestVersion,
+      );
+    } on Object {
+      await loadInitial(forceRefresh: true);
+    }
   }
 
   void _resumePendingRealtimeRefreshIfNeeded() {
@@ -224,9 +247,12 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
   }
 
-  Future<void> loadInitial({bool forceRefresh = false}) async {
+  Future<void> loadInitial({
+    bool forceRefresh = false,
+    int? knownCatalogVersion,
+  }) async {
     final requestVersion = ++_requestVersion;
-    final query = state.query.copyWith(clearCursor: true);
+    final query = state.query.copyWith(clearCursor: true, resetPage: true);
     final queryKey = query.cacheKey;
     final isStaleVisibleItems = state.itemsQueryKey != null
         ? state.itemsQueryKey != queryKey
@@ -238,8 +264,8 @@ class TemplatesController extends Notifier<TemplatesState> {
         state = state.copyWith(
           query: query,
           items: inMemoryCached.items,
+          currentPage: inMemoryCached.page,
           itemsQueryKey: queryKey,
-          nextCursor: inMemoryCached.nextCursor,
           hasMore: inMemoryCached.hasMore,
           loadedFromCache: true,
           isLoading: false,
@@ -259,7 +285,7 @@ class TemplatesController extends Notifier<TemplatesState> {
       isRefreshing: forceRefresh,
       loadedFromCache: false,
       clearError: true,
-      clearNextCursor: true,
+      currentPage: 1,
       hasMore: true,
     );
 
@@ -271,9 +297,9 @@ class TemplatesController extends Notifier<TemplatesState> {
         )..[queryKey] = cached;
         state = state.copyWith(
           items: cached.items,
+          currentPage: cached.page,
           itemsQueryKey: queryKey,
           cachedPagesByQueryKey: updatedCache,
-          nextCursor: cached.nextCursor,
           hasMore: cached.hasMore,
           loadedFromCache: true,
           isLoading: false,
@@ -282,6 +308,10 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
 
     try {
+      final resolvedCatalogVersion = await _repository.syncCatalog(
+        knownRemoteVersion: knownCatalogVersion,
+      );
+
       if (state.categories.isEmpty || forceRefresh) {
         final categories = _normalizeCategories(
           await _repository.fetchCategories(),
@@ -293,14 +323,16 @@ class TemplatesController extends Notifier<TemplatesState> {
 
       final page = await _repository.fetchFeed(query);
       if (requestVersion != _requestVersion) return;
+
       final updatedCache = Map<String, TemplatesFeedPage>.from(
         state.cachedPagesByQueryKey,
       )..[queryKey] = page;
       state = state.copyWith(
         items: page.items,
+        catalogVersion: resolvedCatalogVersion,
+        currentPage: page.page,
         itemsQueryKey: queryKey,
         cachedPagesByQueryKey: updatedCache,
-        nextCursor: page.nextCursor,
         hasMore: page.hasMore,
         loadedFromCache: false,
         isLoading: false,
@@ -330,15 +362,15 @@ class TemplatesController extends Notifier<TemplatesState> {
   }
 
   Future<void> loadMore() async {
-    if (state.isLoadingMore ||
-        state.isLoading ||
-        !state.hasMore ||
-        state.nextCursor == null) {
+    if (state.isLoadingMore || state.isLoading || !state.hasMore) {
       return;
     }
 
     final requestVersion = _requestVersion;
-    final query = state.query.copyWith(cursor: state.nextCursor);
+    final query = state.query.copyWith(
+      page: state.currentPage + 1,
+      clearCursor: true,
+    );
     state = state.copyWith(isLoadingMore: true, clearError: true);
 
     try {
@@ -352,20 +384,20 @@ class TemplatesController extends Notifier<TemplatesState> {
         (item) => !existingIds.contains(item.templateId),
       );
       final mergedItems = [...state.items, ...appended];
-      final queryKey = state.query.copyWith(clearCursor: true).cacheKey;
+      final queryKey = state.query.copyWith(resetPage: true).cacheKey;
       final updatedCache =
           Map<String, TemplatesFeedPage>.from(state.cachedPagesByQueryKey)
             ..[queryKey] = TemplatesFeedPage(
               items: mergedItems,
-              nextCursor: page.nextCursor,
               hasMore: page.hasMore,
+              page: page.page,
             );
 
       state = state.copyWith(
         items: mergedItems,
+        currentPage: page.page,
         itemsQueryKey: queryKey,
         cachedPagesByQueryKey: updatedCache,
-        nextCursor: page.nextCursor,
         hasMore: page.hasMore,
         isLoadingMore: false,
         clearError: true,
@@ -408,8 +440,9 @@ class TemplatesController extends Notifier<TemplatesState> {
         type: type,
         clearType: type == null,
         clearCursor: true,
+        resetPage: true,
       ),
-      clearNextCursor: true,
+      currentPage: 1,
     );
     loadInitial();
   }
@@ -426,8 +459,9 @@ class TemplatesController extends Notifier<TemplatesState> {
         category: normalized,
         clearCategory: normalized == null,
         clearCursor: true,
+        resetPage: true,
       ),
-      clearNextCursor: true,
+      currentPage: 1,
     );
     loadInitial();
   }
@@ -445,8 +479,9 @@ class TemplatesController extends Notifier<TemplatesState> {
         search: nextSearch,
         clearSearch: normalized.isEmpty,
         clearCursor: true,
+        resetPage: true,
       ),
-      clearNextCursor: true,
+      currentPage: 1,
     );
     loadInitial();
   }

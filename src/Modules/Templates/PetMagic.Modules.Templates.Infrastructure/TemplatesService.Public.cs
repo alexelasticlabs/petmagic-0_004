@@ -9,12 +9,163 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplatesService
 {
+    public async Task<Result<PublicTemplatesCatalogPageResponse>> ListPublicCatalogAsync(PublicTemplatesCatalogQuery query, CancellationToken cancellationToken)
+    {
+        var page = NormalizePublicCatalogPage(query.Page);
+        var pageSize = NormalizePublicCatalogPageSize(query.PageSize);
+        var normalizedCategory = query.Category?.Trim();
+
+        var baseQuery = dbContext.TemplateItems
+            .AsNoTracking()
+            .Include(x => x.Assets)
+            .Where(x => x.DeletedAtUtc == null)
+            .Where(x => x.Status == TemplateStatus.Active)
+            .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value);
+
+        if (!string.IsNullOrWhiteSpace(normalizedCategory))
+        {
+            var normalizedCategoryUpper = normalizedCategory.ToUpperInvariant();
+            baseQuery = baseQuery.Where(template => (template.Category ?? string.Empty).ToUpper() == normalizedCategoryUpper);
+        }
+
+        var totalCount = await baseQuery.LongCountAsync(cancellationToken);
+        var offset = (page - 1) * pageSize;
+
+        var pageItems = await baseQuery
+            .OrderByDescending(template => template.UpdatedAtUtc)
+            .ThenByDescending(template => template.Id)
+            .Skip(offset)
+            .Take(pageSize)
+            .ToArrayAsync(cancellationToken);
+
+        var hasMore = totalCount > offset + pageItems.Length;
+
+        return Result.Success(new PublicTemplatesCatalogPageResponse(
+            [.. pageItems.Select(MapPublicCatalogMetadataItem)],
+            page,
+            pageSize,
+            hasMore,
+            totalCount,
+            DateTime.UtcNow));
+    }
+
+    public async Task<Result<PublicTemplatesCatalogVersionResponse>> GetPublicCatalogVersionAsync(CancellationToken cancellationToken)
+    {
+        var version = await GetCurrentCatalogVersionAsync(cancellationToken);
+        DateTime? updatedAtUtc = null;
+
+        if (version > 0)
+        {
+            updatedAtUtc = await dbContext.TemplateCatalogChanges
+                .AsNoTracking()
+                .Where(change => change.Version == version)
+                .Select(change => (DateTime?)change.UpdatedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        return Result.Success(new PublicTemplatesCatalogVersionResponse(version, updatedAtUtc));
+    }
+
+    public async Task<Result<PublicTemplatesCatalogChangesResponse>> GetPublicCatalogChangesAsync(long sinceVersion, CancellationToken cancellationToken)
+    {
+        var normalizedSinceVersion = Math.Max(0L, sinceVersion);
+        var toVersion = await GetCurrentCatalogVersionAsync(cancellationToken);
+
+        if (normalizedSinceVersion >= toVersion)
+        {
+            return Result.Success(new PublicTemplatesCatalogChangesResponse(
+                normalizedSinceVersion,
+                toVersion,
+                [],
+                [],
+                false));
+        }
+
+        var changes = await dbContext.TemplateCatalogChanges
+            .AsNoTracking()
+            .Where(change => change.Version > normalizedSinceVersion)
+            .OrderBy(change => change.Version)
+            .Take(PublicCatalogMaxDeltaChanges + 1)
+            .ToArrayAsync(cancellationToken);
+
+        if (changes.Length == 0)
+        {
+            return Result.Success(new PublicTemplatesCatalogChangesResponse(
+                normalizedSinceVersion,
+                toVersion,
+                [],
+                [],
+                true));
+        }
+
+        var firstAvailableVersion = changes[0].Version;
+        if (firstAvailableVersion > normalizedSinceVersion + 1)
+        {
+            return Result.Success(new PublicTemplatesCatalogChangesResponse(
+                normalizedSinceVersion,
+                toVersion,
+                [],
+                [],
+                true));
+        }
+
+        if (changes.Length > PublicCatalogMaxDeltaChanges)
+        {
+            return Result.Success(new PublicTemplatesCatalogChangesResponse(
+                normalizedSinceVersion,
+                toVersion,
+                [],
+                [],
+                true));
+        }
+
+        var changedTemplateIds = changes.Select(change => change.TemplateId).Distinct().ToArray();
+        var changedTemplates = await dbContext.TemplateItems
+            .AsNoTracking()
+            .Include(template => template.Assets)
+            .Where(template => changedTemplateIds.Contains(template.Id))
+            .ToDictionaryAsync(template => template.Id, cancellationToken);
+
+        var deletedIds = new HashSet<Guid>();
+        var upserts = new Dictionary<Guid, PublicTemplateCatalogMetadataResponse>();
+
+        foreach (var change in changes)
+        {
+            if (change.ChangeType == TemplateCatalogChangeType.Delete)
+            {
+                upserts.Remove(change.TemplateId);
+                deletedIds.Add(change.TemplateId);
+                continue;
+            }
+
+            if (!changedTemplates.TryGetValue(change.TemplateId, out var template)
+                || template.DeletedAtUtc is not null
+                || template.Status != TemplateStatus.Active)
+            {
+                upserts.Remove(change.TemplateId);
+                deletedIds.Add(change.TemplateId);
+                continue;
+            }
+
+            deletedIds.Remove(change.TemplateId);
+            upserts[change.TemplateId] = MapPublicCatalogMetadataItem(template);
+        }
+
+        return Result.Success(new PublicTemplatesCatalogChangesResponse(
+            normalizedSinceVersion,
+            toVersion,
+            [.. upserts.Values.OrderByDescending(item => item.UpdatedAtUtc).ThenByDescending(item => item.Id)],
+            [.. deletedIds],
+            false));
+    }
+
     public async Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, CancellationToken cancellationToken)
     {
         var normalizedTags = NormalizeTags(tags ?? []);
         var items = await dbContext.TemplateItems
             .AsNoTracking()
             .Include(x => x.Assets)
+            .Where(x => x.DeletedAtUtc == null)
             .Where(x => x.Status == TemplateStatus.Active)
             .Where(x => !type.HasValue || x.TemplateType == type.Value)
             .Where(x => string.IsNullOrWhiteSpace(category) || string.Equals(x.Category, category.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -54,6 +205,7 @@ internal sealed partial class TemplatesService
         var filteredQuery = dbContext.TemplateItems
             .AsNoTracking()
             .Include(x => x.Assets)
+            .Where(x => x.DeletedAtUtc == null)
             .Where(x => x.Status == TemplateStatus.Active)
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
             .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium);
@@ -117,7 +269,7 @@ internal sealed partial class TemplatesService
     public async Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, CancellationToken cancellationToken)
     {
         var template = await FindTemplateAsync(templateId, cancellationToken);
-        if (template is null || template.Status != TemplateStatus.Active)
+        if (template is null || template.DeletedAtUtc is not null || template.Status != TemplateStatus.Active)
         {
             return Result.Failure<PublicTemplateResponse>(TemplatesErrors.NotFound);
         }

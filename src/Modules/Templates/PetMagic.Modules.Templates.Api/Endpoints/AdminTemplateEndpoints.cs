@@ -14,6 +14,9 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 
 public static class AdminTemplateEndpoints
 {
+    private const double PreviewMinDurationSeconds = 0.5;
+    private const double PreviewMaxDurationSeconds = 18.0;
+
     public static IEndpointRouteBuilder MapAdminTemplateEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/templates")
@@ -528,6 +531,27 @@ public static class AdminTemplateEndpoints
             }
 
             duration = durationResult.Value;
+
+            if (kind == TemplateAssetKind.Preview)
+            {
+                if (!duration.HasValue || duration.Value <= 0)
+                {
+                    await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+                    return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [nameof(file)] = ["Preview video duration metadata is required."]
+                    });
+                }
+
+                if (duration.Value < PreviewMinDurationSeconds || duration.Value > PreviewMaxDurationSeconds)
+                {
+                    await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+                    return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [nameof(file)] = [$"Preview video duration must be between {PreviewMinDurationSeconds:0.0} and {PreviewMaxDurationSeconds:0.0} seconds."]
+                    });
+                }
+            }
         }
 
         await mediaLifecycleService.RegisterTemporaryUploadAsync(

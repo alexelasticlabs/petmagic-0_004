@@ -156,6 +156,76 @@ internal sealed partial class TemplatesService
         return Math.Min(take.Value, PublicFeedMaxTake);
     }
 
+    private static int NormalizePublicCatalogPage(int? page)
+    {
+        if (!page.HasValue || page.Value <= 0)
+        {
+            return PublicCatalogDefaultPage;
+        }
+
+        return page.Value;
+    }
+
+    private static int NormalizePublicCatalogPageSize(int? pageSize)
+    {
+        if (!pageSize.HasValue || pageSize.Value <= 0)
+        {
+            return PublicCatalogDefaultPageSize;
+        }
+
+        return Math.Min(pageSize.Value, PublicCatalogMaxPageSize);
+    }
+
+    private async Task<long> GetCurrentCatalogVersionAsync(CancellationToken cancellationToken)
+    {
+        var templateVersion = await dbContext.TemplateItems
+            .Select(template => (long?)template.Version)
+            .MaxAsync(cancellationToken) ?? 0L;
+
+        var changeVersion = await dbContext.TemplateCatalogChanges
+            .Select(change => (long?)change.Version)
+            .MaxAsync(cancellationToken) ?? 0L;
+
+        return Math.Max(templateVersion, changeVersion);
+    }
+
+    private async Task<long> GetNextCatalogVersionAsync(CancellationToken cancellationToken)
+    {
+        var currentVersion = await GetCurrentCatalogVersionAsync(cancellationToken);
+        return currentVersion + 1;
+    }
+
+    private async Task StampCatalogUpsertAsync(TemplateItem template, DateTime updatedAtUtc, CancellationToken cancellationToken)
+    {
+        var nextVersion = await GetNextCatalogVersionAsync(cancellationToken);
+        template.Version = nextVersion;
+        template.UpdatedAtUtc = updatedAtUtc;
+        dbContext.TemplateCatalogChanges.Add(new TemplateCatalogChange
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = template.Id,
+            Version = nextVersion,
+            ChangeType = TemplateCatalogChangeType.Upsert,
+            UpdatedAtUtc = updatedAtUtc,
+        });
+    }
+
+    private async Task StampCatalogDeleteAsync(TemplateItem template, DateTime updatedAtUtc, CancellationToken cancellationToken)
+    {
+        var nextVersion = await GetNextCatalogVersionAsync(cancellationToken);
+        template.Version = nextVersion;
+        template.UpdatedAtUtc = updatedAtUtc;
+        template.DeletedAtUtc = updatedAtUtc;
+        dbContext.TemplateCatalogChanges.Add(new TemplateCatalogChange
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = template.Id,
+            Version = nextVersion,
+            ChangeType = TemplateCatalogChangeType.Delete,
+            UpdatedAtUtc = updatedAtUtc,
+        });
+    }
+
     private static PublicFeedCursor? TryParsePublicFeedCursor(string? rawCursor)
     {
         if (string.IsNullOrWhiteSpace(rawCursor))

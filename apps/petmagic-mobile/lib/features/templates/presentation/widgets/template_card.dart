@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
+import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -15,29 +18,30 @@ class TemplateCard extends StatefulWidget {
     required this.template,
     this.onPressed,
     this.showGuestPreview = false,
-    this.enableAggressiveVideoPrewarm = false,
+    this.previewControllerFactory,
     super.key,
   });
 
   final TemplateItem template;
   final VoidCallback? onPressed;
   final bool showGuestPreview;
-  final bool enableAggressiveVideoPrewarm;
+  final Future<VideoPlayerController> Function(String previewUrl)?
+  previewControllerFactory;
 
   @override
   State<TemplateCard> createState() => _TemplateCardState();
 }
 
 class _TemplateCardState extends State<TemplateCard> {
-  static const Duration _disposeDelay = Duration(seconds: 8);
-  static const double _prewarmVisibilityFraction = 0.32;
-  static const double _aggressivePrewarmVisibilityFraction = 0.12;
+  static const Duration _disposeDelay = Duration(milliseconds: 120);
+  static const double _prewarmVisibilityFraction = 0.28;
   static const double _playVisibilityFraction = 0.58;
 
   VideoPlayerController? _videoController;
   Timer? _disposeTimer;
   bool _isPreviewActive = false;
   bool _hasPreviewSlot = false;
+  bool _isPressed = false;
 
   @override
   void didUpdateWidget(covariant TemplateCard oldWidget) {
@@ -71,74 +75,86 @@ class _TemplateCardState extends State<TemplateCard> {
         ? colors.gold.withValues(alpha: 0.16)
         : colors.shadow;
     final cardRadius = BorderRadius.circular(24);
+    final scaleDuration = PetMotion.effectiveDuration(context, PetMotion.fast);
 
-    return RepaintBoundary(
-      child: VisibilityDetector(
-        key: ValueKey('template-card-${widget.template.templateId}'),
-        onVisibilityChanged: _handleVisibility,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: cardRadius,
-            border: Border.all(color: premiumBorder, width: 1.15),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                colors.surfaceGlass.withValues(alpha: 0.28),
-                colors.surfaceStrong.withValues(alpha: 0.12),
+    return AnimatedScale(
+      duration: scaleDuration,
+      curve: PetMotion.emphasized,
+      scale: _isPressed ? 0.986 : 1,
+      child: RepaintBoundary(
+        child: VisibilityDetector(
+          key: ValueKey('template-card-${widget.template.templateId}'),
+          onVisibilityChanged: _handleVisibility,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: cardRadius,
+              border: Border.all(color: premiumBorder, width: 1.15),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  colors.surfaceGlass.withValues(alpha: 0.28),
+                  colors.surfaceStrong.withValues(alpha: 0.12),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: premiumGlow,
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
               ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: premiumGlow,
-                blurRadius: 22,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: cardRadius,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onPressed,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _TemplateMedia(
-                      template: widget.template,
-                      controller: _videoController,
-                    ),
-                    const _TemplateShadeOverlay(),
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      right: 8,
-                      child: Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        runSpacing: 6,
-                        children: [
-                          if (widget.template.effectivePromoBadge != null)
-                            _PromoBadge(
-                              value: widget.template.effectivePromoBadge!,
-                            )
-                          else
-                            const SizedBox.shrink(),
-                          _MediaTypeBadge(type: widget.template.templateType),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      left: 8,
-                      right: 8,
-                      bottom: 8,
-                      child: _TemplateDetails(
+            child: ClipRRect(
+              borderRadius: cardRadius,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.onPressed,
+                  onHighlightChanged: (value) {
+                    if (_isPressed == value) {
+                      return;
+                    }
+                    setState(() => _isPressed = value);
+                  },
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _TemplateMedia(
                         template: widget.template,
-                        showGuestPreview: widget.showGuestPreview,
-                        onPressed: widget.onPressed,
+                        controller: _videoController,
                       ),
-                    ),
-                  ],
+                      const _TemplateShadeOverlay(),
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        right: 8,
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          runSpacing: 6,
+                          children: [
+                            if (widget.template.effectivePromoBadge != null)
+                              _PromoBadge(
+                                value: widget.template.effectivePromoBadge!,
+                              )
+                            else
+                              const SizedBox.shrink(),
+                            _MediaTypeBadge(type: widget.template.templateType),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        left: 8,
+                        right: 8,
+                        bottom: 8,
+                        child: _TemplateDetails(
+                          template: widget.template,
+                          showGuestPreview: widget.showGuestPreview,
+                          onPressed: widget.onPressed,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -159,16 +175,22 @@ class _TemplateCardState extends State<TemplateCard> {
     }
 
     final visibleFraction = info.visibleFraction;
-    final prewarmThreshold = widget.enableAggressiveVideoPrewarm
-        ? _aggressivePrewarmVisibilityFraction
-        : _prewarmVisibilityFraction;
-    final shouldPrewarm = visibleFraction > prewarmThreshold;
+    if (visibleFraction <= 0) {
+      _isPreviewActive = false;
+      _disposeTimer?.cancel();
+      unawaited(_videoController?.pause());
+      unawaited(_disposeVideoController());
+      return;
+    }
+
+    final shouldPrewarm = visibleFraction > _prewarmVisibilityFraction;
     final shouldPlay = visibleFraction > _playVisibilityFraction;
 
     if (shouldPrewarm) {
       _disposeTimer?.cancel();
       unawaited(_ensureVideoController());
     } else {
+      unawaited(_videoController?.pause());
       _scheduleVideoDispose();
     }
 
@@ -195,6 +217,10 @@ class _TemplateCardState extends State<TemplateCard> {
     _disposeTimer?.cancel();
     final controller = _videoController;
     if (controller == null) {
+      if (_hasPreviewSlot) {
+        MediaLifecyclePolicy.releaseVideoPreviewSlot();
+        _hasPreviewSlot = false;
+      }
       return;
     }
 
@@ -214,19 +240,23 @@ class _TemplateCardState extends State<TemplateCard> {
       if (_videoController?.value.isInitialized ?? false) {
         if (_isPreviewActive) {
           await _videoController?.play();
+        } else {
+          await _videoController?.pause();
         }
       }
       return;
     }
 
-    if (!_hasPreviewSlot && !MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
+    if (!_hasPreviewSlot &&
+        !MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
       return;
     }
     _hasPreviewSlot = true;
 
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.template.previewAsset!.url),
-    );
+    final previewUrl = widget.template.previewAsset!.url;
+    final controller = widget.previewControllerFactory != null
+        ? await widget.previewControllerFactory!(previewUrl)
+        : await _createVideoController(previewUrl);
     _videoController = controller;
     controller.setLooping(true);
     controller.setVolume(0);
@@ -242,7 +272,11 @@ class _TemplateCardState extends State<TemplateCard> {
         return;
       }
       setState(() {});
-      await controller.play();
+      if (_isPreviewActive) {
+        await controller.play();
+      } else {
+        await controller.pause();
+      }
     } catch (_) {
       await controller.dispose();
       _isPreviewActive = false;
@@ -255,6 +289,24 @@ class _TemplateCardState extends State<TemplateCard> {
       }
     }
   }
+
+  Future<VideoPlayerController> _createVideoController(
+    String previewUrl,
+  ) async {
+    File? cachedFile;
+    try {
+      cachedFile = await TemplateMediaCache.getCachedPreviewFile(previewUrl);
+      cachedFile ??= await TemplateMediaCache.fetchPreviewFile(previewUrl);
+    } catch (_) {
+      cachedFile = null;
+    }
+
+    if (cachedFile != null) {
+      return VideoPlayerController.file(cachedFile);
+    }
+
+    return VideoPlayerController.networkUrl(Uri.parse(previewUrl));
+  }
 }
 
 class _TemplateMedia extends StatelessWidget {
@@ -266,8 +318,15 @@ class _TemplateMedia extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final asset = template.previewAsset;
+    final thumbnailUrl = template.thumbnailUrl?.trim();
     final showVideo = controller != null && controller!.value.isInitialized;
     final assetIsVideo = asset != null && isVideoPreview(asset);
+    final renderableThumbnailUrl =
+        thumbnailUrl != null &&
+            thumbnailUrl.isNotEmpty &&
+            !isVideoUrl(thumbnailUrl)
+        ? thumbnailUrl
+        : null;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -287,10 +346,23 @@ class _TemplateMedia extends StatelessWidget {
                   child: VideoPlayer(controller!),
                 ),
               )
+            else if (renderableThumbnailUrl != null)
+              CachedNetworkImage(
+                imageUrl: renderableThumbnailUrl,
+                fit: BoxFit.cover,
+                cacheManager: TemplateMediaCache.thumbnailCache,
+                memCacheWidth: cacheWidth,
+                memCacheHeight: cacheHeight,
+                maxWidthDiskCache: cacheWidth,
+                maxHeightDiskCache: cacheHeight,
+                placeholder: (context, url) => const _MediaPlaceholder(),
+                errorWidget: (context, url, error) => const _MediaPlaceholder(),
+              )
             else if (asset != null && asset.url.isNotEmpty && !assetIsVideo)
               CachedNetworkImage(
                 imageUrl: asset.url,
                 fit: BoxFit.cover,
+                cacheManager: TemplateMediaCache.thumbnailCache,
                 memCacheWidth: cacheWidth,
                 memCacheHeight: cacheHeight,
                 maxWidthDiskCache: cacheWidth,

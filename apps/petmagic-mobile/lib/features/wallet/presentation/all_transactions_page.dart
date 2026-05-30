@@ -14,7 +14,8 @@ class AllTransactionsPage extends ConsumerStatefulWidget {
   const AllTransactionsPage({super.key});
 
   static const routeName = 'wallet-all-transactions';
-  static const routePath = '/wallet/transactions';
+  static const routePath = '/profile/wallet/transactions';
+  static const legacyRoutePath = '/wallet/transactions';
 
   @override
   ConsumerState<AllTransactionsPage> createState() =>

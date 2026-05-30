@@ -22,6 +22,8 @@ public static class PublicTemplateEndpoints
             .RequireRateLimiting("templates");
 
         group.MapGet("/", ListAsync).AllowAnonymous();
+        group.MapGet("/catalog-version", GetCatalogVersionAsync).AllowAnonymous();
+        group.MapGet("/changes", GetCatalogChangesAsync).AllowAnonymous();
         group.MapGet("/categories", ListCategoriesAsync).AllowAnonymous();
         group.MapGet("/feed", ListFeedAsync).AllowAnonymous();
         group.MapGet("/events", StreamEventsAsync).AllowAnonymous();
@@ -31,7 +33,9 @@ public static class PublicTemplateEndpoints
         return endpoints;
     }
 
-    private static async Task<Ok<IReadOnlyList<PublicTemplateListItemResponse>>> ListAsync(
+    private static async Task<IResult> ListAsync(
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
         [FromQuery] string? type,
         [FromQuery] string? category,
         [FromQuery] string[]? tags,
@@ -42,7 +46,41 @@ public static class PublicTemplateEndpoints
         TemplateType? templateType = Enum.TryParse<TemplateType>(type, true, out var parsedType)
             ? parsedType
             : null;
+
+        if (page.HasValue || pageSize.HasValue)
+        {
+            var pagedResult = await service.ListPublicCatalogAsync(
+                new PublicTemplatesCatalogQuery(page, pageSize, templateType, category),
+                cancellationToken);
+            return TypedResults.Ok(pagedResult.Value);
+        }
+
         var result = await service.ListPublicAsync(templateType, category, tags, premiumOnly, cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<PublicTemplatesCatalogVersionResponse>> GetCatalogVersionAsync(
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetPublicCatalogVersionAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<PublicTemplatesCatalogChangesResponse>, ProblemHttpResult>> GetCatalogChangesAsync(
+        [FromQuery] long? sinceVersion,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        if (!sinceVersion.HasValue || sinceVersion.Value < 0)
+        {
+            return TypedResults.Problem(
+                title: "templates.invalid_since_version",
+                detail: "Query parameter sinceVersion must be a non-negative integer.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var result = await service.GetPublicCatalogChangesAsync(sinceVersion.Value, cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 

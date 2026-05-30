@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -14,21 +15,61 @@ import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart'
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_assistant_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_home_page.dart';
+import 'package:petmagic_mobile/features/support/presentation/support_ticket_form_page.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
-final appRouterProvider = Provider<GoRouter>((ref) {
-  final launchState = ref.watch(appLaunchControllerProvider);
+final _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'rootNavigator',
+);
+final _templatesNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'templatesNavigator',
+);
+final _creationsNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'creationsNavigator',
+);
+final _rewardsNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'rewardsNavigator',
+);
+final _profileNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'profileNavigator',
+);
 
-  return GoRouter(
+final _routerRefreshListenableProvider = Provider<RouterRefreshListenable>((
+  ref,
+) {
+  final listenable = RouterRefreshListenable();
+  ref.listen<AppLaunchState>(appLaunchControllerProvider, (previous, next) {
+    listenable.notify();
+  });
+  ref.onDispose(listenable.dispose);
+  return listenable;
+});
+
+class RouterRefreshListenable extends ChangeNotifier {
+  void notify() {
+    notifyListeners();
+  }
+}
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final refreshListenable = ref.watch(_routerRefreshListenableProvider);
+
+  final router = GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    refreshListenable: refreshListenable,
     initialLocation: StartupLoadingPage.routePath,
     redirect: (context, state) {
+      final launchState = ref.read(appLaunchControllerProvider);
       final location = state.uri.path;
       final isStartupRoute = location == StartupLoadingPage.routePath;
       final isOnboardingRoute = location == OnboardingPage.routePath;
@@ -38,7 +79,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isPasswordResetRoute = location == PasswordResetPage.routePath;
       final isVerifyEmailRoute = location == EmailVerificationPage.routePath;
       final isPublicAuthRoute =
-          isAuthRoute || isRegisterRoute || isPasswordResetRoute || isVerifyEmailRoute;
+          isAuthRoute ||
+          isRegisterRoute ||
+          isPasswordResetRoute ||
+          isVerifyEmailRoute;
 
       if (launchState.isLoading) {
         return isStartupRoute ? null : StartupLoadingPage.routePath;
@@ -118,99 +162,168 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: StripePaymentSheetSmokeTestPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: StripePaymentSheetSmokeTestPage()),
+      ),
+      StatefulShellRoute.indexedStack(
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state, navigationShell) => PetMagicShell(
+          location: state.uri.path,
+          navigationShell: navigationShell,
+        ),
+        branches: [
+          StatefulShellBranch(
+            navigatorKey: _templatesNavigatorKey,
+            routes: [
+              GoRoute(
+                path: TemplatesPage.routePath,
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: TemplatesPage()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _creationsNavigatorKey,
+            routes: [
+              GoRoute(
+                path: GenerationsGalleryPage.routePath,
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: GenerationsGalleryPage()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _rewardsNavigatorKey,
+            routes: [
+              GoRoute(
+                path: RewardsPage.routePath,
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: RewardsPage()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _profileNavigatorKey,
+            routes: [
+              GoRoute(
+                path: ProfilePage.routePath,
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: ProfilePage()),
+              ),
+            ],
+          ),
+        ],
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: PremiumPage.routePath,
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: PremiumPage()),
       ),
       GoRoute(
-        path: StripePaymentSheetSmokeTestPage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: StripePaymentSheetSmokeTestPage()),
+        parentNavigatorKey: _rootNavigatorKey,
+        path: TemplatePreviewPage.routePath,
+        redirect: (context, state) =>
+            state.extra is TemplateItem ? null : TemplatesPage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: TemplatePreviewPage(template: state.extra! as TemplateItem),
+        ),
       ),
-      ShellRoute(
-        builder: (context, state, child) =>
-            PetMagicShell(location: state.uri.path, child: child),
-        routes: [
-          GoRoute(
-            path: TemplatesPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: TemplatesPage()),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '${GenerationStatusPage.routePrefix}/:generationId',
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: GenerationStatusPage(
+            generationId: state.pathParameters['generationId'] ?? '',
           ),
-          GoRoute(
-            path: GenerationsGalleryPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: GenerationsGalleryPage()),
-          ),
-          GoRoute(
-            path: '${GenerationStatusPage.routePrefix}/:generationId',
-            pageBuilder: (context, state) => NoTransitionPage(
-              child: GenerationStatusPage(
-                generationId: state.pathParameters['generationId'] ?? '',
-              ),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: SubscriptionManagementPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SubscriptionManagementPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: WalletPage.legacyRoutePath,
+        redirect: (context, state) => WalletPage.routePath,
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: WalletPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: WalletPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AllTransactionsPage.legacyRoutePath,
+        redirect: (context, state) => AllTransactionsPage.routePath,
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        name: AllTransactionsPage.routeName,
+        path: AllTransactionsPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: AllTransactionsPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: ProfileSettingsPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: ProfileSettingsPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: ProfileAccountInfoPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: ProfileAccountInfoPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: ProfileSettingsDetailPage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: ProfileSettingsDetailPage(
+            kind: ProfileSettingsDetailKind.fromSlug(
+              state.pathParameters['kind'] ?? 'help-center',
             ),
           ),
-          GoRoute(
-            path: ProfilePage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: ProfilePage()),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: SupportHomePage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SupportHomePage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: SupportChatPage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SupportChatPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: SupportAssistantPage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: SupportAssistantPage(
+            scenario: state.uri.queryParameters['scenario'] ?? 'Other',
           ),
-          GoRoute(
-            path: SubscriptionManagementPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: SubscriptionManagementPage()),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: SupportTicketFormPage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: SupportTicketFormPage(
+            scenario: state.uri.queryParameters['scenario'] ?? 'Other',
           ),
-          GoRoute(
-            path: WalletPage.legacyRoutePath,
-            redirect: (context, state) => WalletPage.routePath,
-          ),
-          GoRoute(
-            path: WalletPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: WalletPage()),
-          ),
-          GoRoute(
-            name: AllTransactionsPage.routeName,
-            path: AllTransactionsPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: AllTransactionsPage()),
-          ),
-          GoRoute(
-            path: RewardsPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: RewardsPage()),
-          ),
-          GoRoute(
-            path: ProfileSettingsPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: ProfileSettingsPage()),
-          ),
-          GoRoute(
-            path: ProfileAccountInfoPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: ProfileAccountInfoPage()),
-          ),
-          GoRoute(
-            path: ProfileSettingsDetailPage.routePath,
-            pageBuilder: (context, state) => NoTransitionPage(
-              child: ProfileSettingsDetailPage(
-                kind: ProfileSettingsDetailKind.fromSlug(
-                  state.pathParameters['kind'] ?? 'help-center',
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: SupportHomePage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: SupportHomePage()),
-          ),
-          GoRoute(
-            path: SupportChatPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: SupportChatPage()),
-          ),
-        ],
+        ),
       ),
     ],
   );
+
+  ref.onDispose(router.dispose);
+  return router;
 });

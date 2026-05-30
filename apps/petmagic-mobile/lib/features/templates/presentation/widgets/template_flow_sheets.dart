@@ -43,7 +43,7 @@ Future<TemplateDetailAction?> showTemplateDetailSheet(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             border: Border.all(color: colors.border.withValues(alpha: 0.72)),
           ),
-          child: _TemplateDetailContent(
+          child: TemplateDetailContent(
             template: template,
             scrollController: scrollController,
           ),
@@ -360,10 +360,11 @@ Future<void> showTemplateGenerationProgressSheet({
   );
 }
 
-class _TemplateDetailContent extends StatelessWidget {
-  const _TemplateDetailContent({
+class TemplateDetailContent extends StatelessWidget {
+  const TemplateDetailContent({
     required this.template,
     required this.scrollController,
+    super.key,
   });
 
   final TemplateItem template;
@@ -739,7 +740,7 @@ class _GenerationWorkingView extends ConsumerWidget {
               onPressed: () {
                 final router = GoRouter.of(context);
                 Navigator.of(context).pop();
-                router.go(WalletPage.routePath);
+                router.push(WalletPage.routePath);
               },
               icon: const Icon(Icons.account_balance_wallet_rounded),
               label: Text(text.templateFlowTopUpBalanceAction),

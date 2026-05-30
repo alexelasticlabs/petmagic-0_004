@@ -38,9 +38,12 @@ class TemplateItem {
     required this.isPremium,
     required this.tokenCost,
     this.effectivePromoBadge,
+    this.thumbnailUrl,
     this.previewAsset,
     this.musicDescription,
     this.referenceVideoDurationSeconds,
+    this.version = 0,
+    this.updatedAtUtc,
   });
 
   final String templateId;
@@ -53,9 +56,12 @@ class TemplateItem {
   final bool isPremium;
   final int tokenCost;
   final String? effectivePromoBadge;
+  final String? thumbnailUrl;
   final TemplateAsset? previewAsset;
   final String? musicDescription;
   final double? referenceVideoDurationSeconds;
+  final int version;
+  final DateTime? updatedAtUtc;
 
   bool get isVideo => templateType == TemplateType.video;
 
@@ -83,21 +89,60 @@ class TemplatesFeedPage {
     required this.items,
     required this.hasMore,
     this.nextCursor,
+    this.page = 1,
   });
 
   final List<TemplateItem> items;
-  final String? nextCursor;
   final bool hasMore;
+  final String? nextCursor;
+  final int page;
+}
+
+class TemplatesCatalogChanges {
+  const TemplatesCatalogChanges({
+    required this.fromVersion,
+    required this.toVersion,
+    required this.upserts,
+    required this.deletedIds,
+    required this.needsFullResync,
+  });
+
+  final int fromVersion;
+  final int toVersion;
+  final List<TemplateItem> upserts;
+  final List<String> deletedIds;
+  final bool needsFullResync;
 }
 
 bool isVideoPreview(TemplateAsset? asset) {
   if (asset == null) return false;
   final contentType = asset.contentType.toLowerCase();
-  final url = asset.url.toLowerCase();
   return contentType.startsWith('video/') ||
-      url.endsWith('.mp4') ||
-      url.endsWith('.webm') ||
-      url.endsWith('.mov');
+      isVideoUrl(asset.url) ||
+      isVideoUrl(asset.fileName);
+}
+
+bool isVideoUrl(String? rawUrl) {
+  if (rawUrl == null || rawUrl.trim().isEmpty) {
+    return false;
+  }
+
+  final normalized = rawUrl.trim().toLowerCase();
+  final uri = Uri.tryParse(normalized);
+  final path = (uri?.path ?? normalized).toLowerCase();
+  final query = (uri?.query ?? '').toLowerCase();
+
+  return path.endsWith('.mp4') ||
+      path.endsWith('.webm') ||
+      path.endsWith('.mov') ||
+      path.endsWith('.m4v') ||
+      normalized.contains('.mp4?') ||
+      normalized.contains('.webm?') ||
+      normalized.contains('.mov?') ||
+      normalized.contains('.m4v?') ||
+      query.contains('format=mp4') ||
+      query.contains('ext=mp4') ||
+      query.contains('contenttype=video');
 }
 
 String formatDuration(double? durationSeconds) {

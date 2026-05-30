@@ -5,15 +5,17 @@ class TemplatesQuery {
     this.type,
     this.category,
     this.search,
-    this.take = 20,
     this.cursor,
+    this.page = 1,
+    this.pageSize = 20,
   });
 
   final TemplateType? type;
   final String? category;
   final String? search;
-  final int take;
   final String? cursor;
+  final int page;
+  final int pageSize;
 
   TemplatesQuery copyWith({
     TemplateType? type,
@@ -22,16 +24,19 @@ class TemplatesQuery {
     bool clearCategory = false,
     String? search,
     bool clearSearch = false,
-    int? take,
     String? cursor,
     bool clearCursor = false,
+    int? page,
+    int? pageSize,
+    bool resetPage = false,
   }) {
     return TemplatesQuery(
       type: clearType ? null : type ?? this.type,
       category: clearCategory ? null : category ?? this.category,
       search: clearSearch ? null : search ?? this.search,
-      take: take ?? this.take,
       cursor: clearCursor ? null : cursor ?? this.cursor,
+      page: resetPage ? 1 : page ?? this.page,
+      pageSize: pageSize ?? this.pageSize,
     );
   }
 
@@ -39,7 +44,7 @@ class TemplatesQuery {
     type?.apiValue ?? 'all',
     category?.trim().toLowerCase() ?? 'all',
     search?.trim().toLowerCase() ?? '',
-    take.toString(),
+    pageSize.toString(),
   ].join('|');
 
   Map<String, Object?> toQueryParameters() {
@@ -47,9 +52,8 @@ class TemplatesQuery {
       if (type != null) 'type': type!.apiValue,
       if (category != null && category!.trim().isNotEmpty)
         'category': category!.trim(),
-      if (search != null && search!.trim().isNotEmpty) 'search': search!.trim(),
-      'take': take,
-      if (cursor != null) 'cursor': cursor,
+      'page': page,
+      'pageSize': pageSize,
     };
   }
 }

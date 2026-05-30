@@ -1251,6 +1251,28 @@ class _FakeTemplatesRepository implements TemplatesRepository {
   @override
   Future<TemplatesFeedPage> fetchFeed(TemplatesQuery query) async =>
       TemplatesFeedPage(items: items, nextCursor: null, hasMore: false);
+
+  @override
+  Future<int> fetchCatalogVersion() async => 1;
+
+  @override
+  Future<int> readLocalCatalogVersion() async => 1;
+
+  @override
+  Future<TemplatesCatalogChanges> fetchCatalogChanges(int sinceVersion) async {
+    return TemplatesCatalogChanges(
+      fromVersion: sinceVersion,
+      toVersion: 1,
+      upserts: const [],
+      deletedIds: const [],
+      needsFullResync: false,
+    );
+  }
+
+  @override
+  Future<int> syncCatalog({int? knownRemoteVersion}) async {
+    return knownRemoteVersion ?? 1;
+  }
 }
 
 class _FakeProfileRepository extends ProfileRepository {

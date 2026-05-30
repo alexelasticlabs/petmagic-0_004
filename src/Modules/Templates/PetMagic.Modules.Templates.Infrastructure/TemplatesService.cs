@@ -20,6 +20,10 @@ internal sealed partial class TemplatesService(
 
     private const int PublicFeedDefaultTake = 20;
     private const int PublicFeedMaxTake = 50;
+    private const int PublicCatalogDefaultPage = 1;
+    private const int PublicCatalogDefaultPageSize = 20;
+    private const int PublicCatalogMaxPageSize = 100;
+    private const int PublicCatalogMaxDeltaChanges = 500;
 
     private sealed record PublicFeedCursor(DateTime UpdatedAtUtc, Guid TemplateId);
 }

@@ -114,18 +114,29 @@ Color statusColor(PetMagicColors colors, TemplateGenerationResult generation) {
 }
 
 String? previewUrl(TemplateGenerationResult generation) {
-  if (generation.isCompleted &&
-      generation.outputUrl != null &&
-      generation.outputUrl!.isNotEmpty) {
-    return generation.outputUrl;
+  final output = _cleanUrl(generation.outputUrl);
+  final source = _cleanUrl(generation.sourceImageAsset?.url);
+  final normalized = _cleanUrl(generation.normalizedImageUrl);
+  final generationIsVideo = isVideoGeneration(generation);
+
+  if (generationIsVideo) {
+    if (source != null) {
+      return source;
+    }
+    if (normalized != null) {
+      return normalized;
+    }
+    return output != null && !_isLikelyVideoUrl(output) ? output : null;
   }
-  if (generation.sourceImageAsset?.url != null &&
-      generation.sourceImageAsset!.url.isNotEmpty) {
-    return generation.sourceImageAsset!.url;
+
+  if (output != null && !_isLikelyVideoUrl(output)) {
+    return output;
   }
-  if (generation.normalizedImageUrl != null &&
-      generation.normalizedImageUrl!.isNotEmpty) {
-    return generation.normalizedImageUrl;
+  if (source != null) {
+    return source;
+  }
+  if (normalized != null) {
+    return normalized;
   }
   return null;
 }
@@ -133,5 +144,43 @@ String? previewUrl(TemplateGenerationResult generation) {
 bool isVideoGeneration(TemplateGenerationResult generation) {
   final type = generation.templateType?.toLowerCase() ?? '';
   return type.contains('video') ||
-      generation.outputVideoDurationSeconds != null;
+      generation.outputVideoDurationSeconds != null ||
+      _isLikelyVideoUrl(generation.outputUrl);
+}
+
+bool canRenderImagePreview(String? url) {
+  final normalized = _cleanUrl(url);
+  return normalized != null && !_isLikelyVideoUrl(normalized);
+}
+
+String? _cleanUrl(String? raw) {
+  final value = raw?.trim();
+  if (value == null || value.isEmpty) {
+    return null;
+  }
+  return value;
+}
+
+bool _isLikelyVideoUrl(String? rawUrl) {
+  final url = _cleanUrl(rawUrl);
+  if (url == null) {
+    return false;
+  }
+
+  final normalized = url.toLowerCase();
+  final uri = Uri.tryParse(normalized);
+  final path = (uri?.path ?? normalized).toLowerCase();
+  final query = (uri?.query ?? '').toLowerCase();
+
+  return path.endsWith('.mp4') ||
+      path.endsWith('.webm') ||
+      path.endsWith('.mov') ||
+      path.endsWith('.m4v') ||
+      normalized.contains('.mp4?') ||
+      normalized.contains('.webm?') ||
+      normalized.contains('.mov?') ||
+      normalized.contains('.m4v?') ||
+      query.contains('format=mp4') ||
+      query.contains('ext=mp4') ||
+      query.contains('contenttype=video');
 }

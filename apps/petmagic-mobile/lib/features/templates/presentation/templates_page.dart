@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart'
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
@@ -59,7 +60,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
 
       _templatesController.setScreenVisible(true);
-      _refreshFeed(forceRefresh: true);
+      _refreshFeed();
       if (shouldLoadWallet) {
         unawaited(_walletController.load());
       }
@@ -133,8 +134,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                         tokenBalance: wallet?.balance ?? 0,
                         onRewardsPressed: () =>
                             context.go(RewardsPage.routePath),
-                        onTopUpPressed: () => context.go(WalletPage.routePath),
-                        onWalletPressed: () => context.go(WalletPage.routePath),
+                        onTopUpPressed: () =>
+                            context.push(WalletPage.routePath),
+                        onWalletPressed: () =>
+                            context.push(WalletPage.routePath),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -212,8 +215,6 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     final template = state.items[index];
                     return TemplateCard(
                       template: template,
-                      enableAggressiveVideoPrewarm:
-                          template.isVideo && index < 4,
                       onPressed: () => _handleTemplateSelected(template),
                     );
                   },
@@ -273,11 +274,14 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     }
 
     _lastRefreshAt = now;
-    await _templatesController.loadInitial(forceRefresh: true);
+    await _templatesController.loadInitial(forceRefresh: forceRefresh);
   }
 
   Future<void> _handleTemplateSelected(TemplateItem template) async {
-    final action = await showTemplateDetailSheet(context, template);
+    final action = await context.push<TemplateDetailAction>(
+      TemplatePreviewPage.routePath,
+      extra: template,
+    );
     if (!mounted || action != TemplateDetailAction.upload) {
       return;
     }
@@ -313,7 +317,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
       switch (blockerAction) {
         case TemplateBlockedAction.wallet:
-          context.go(WalletPage.routePath);
+          context.push(WalletPage.routePath);
         case TemplateBlockedAction.premium:
           context.push(PremiumPage.routePath);
         case TemplateBlockedAction.chooseAnother:
@@ -365,7 +369,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       return;
     }
 
-    router.go('${GenerationStatusPage.routePrefix}/${generation.generationId}');
+    router.push(
+      '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+    );
   }
 
   Future<XFile?> _pickPetPhoto() async {
@@ -410,6 +416,10 @@ String _mapTemplatesError(AppLocalizations text, String raw) {
   final value = raw.toLowerCase();
 
   if (value.contains('templates.feed_response_empty')) {
+    return text.templatesFeedEmptyError;
+  }
+
+  if (value.contains('templates.catalog_page_response_empty')) {
     return text.templatesFeedEmptyError;
   }
 

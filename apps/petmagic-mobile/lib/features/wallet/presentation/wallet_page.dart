@@ -26,8 +26,8 @@ part 'widgets/wallet_page_overview_widgets.dart';
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
 
-  static const routePath = '/wallet';
-  static const legacyRoutePath = '/profile/wallet';
+  static const routePath = '/profile/wallet';
+  static const legacyRoutePath = '/wallet';
 
   @override
   ConsumerState<WalletPage> createState() => _WalletPageState();
@@ -826,7 +826,9 @@ Future<void> _showPackDetailSheet(
                               ? Icons.hourglass_top_rounded
                               : Icons.credit_card_rounded,
                         ),
-                        label: Text(text.walletCheckoutPayAction(selectedPrice)),
+                        label: Text(
+                          text.walletCheckoutPayAction(selectedPrice),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1242,6 +1244,15 @@ String _friendlyError(AppLocalizations text, String value) {
 
   if (value.contains('wallet.server_unavailable')) {
     return text.walletRedeemServerError;
+  }
+
+  if (value.contains('wallet.request_failed') ||
+      value.contains('appexception(400)')) {
+    return text.walletRedeemServerError;
+  }
+
+  if (value.toLowerCase().contains('debugpaintbaselinesenabled')) {
+    return text.walletDataUnavailableFallback;
   }
 
   if (value.contains('AppException(500)') ||

@@ -38,6 +38,7 @@ internal sealed partial class TemplatesService
         var items = await dbContext.TemplateItems
             .AsNoTracking()
             .Include(x => x.Assets)
+            .Where(x => x.DeletedAtUtc == null)
             .Where(x => !type.HasValue || x.TemplateType == type.Value)
             .Where(x => !status.HasValue || x.Status == status.Value)
             .OrderByDescending(x => x.UpdatedAtUtc)
@@ -49,7 +50,7 @@ internal sealed partial class TemplatesService
     public async Task<Result<AdminTemplateResponse>> GetAdminAsync(Guid templateId, CancellationToken cancellationToken)
     {
         var template = await FindTemplateAsync(templateId, cancellationToken);
-        return template is null
+        return template is null || template.DeletedAtUtc is not null
             ? Result.Failure<AdminTemplateResponse>(TemplatesErrors.NotFound)
             : Result.Success(MapAdminResponse(template));
     }
