@@ -303,6 +303,7 @@ public sealed partial class TemplatesApiIntegrationTests
         await using var application = await TestApplication.CreateAsync();
 
         var created = await CreateActiveImageTemplateAsync(application.Client, "Catalog Portrait", "Catalog", ["meta"]);
+        var premiumCreated = await CreateActivePremiumImageTemplateAsync(application.Client, "Catalog Premium", "Catalog", ["premium"]);
 
         var page = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
             application.Client,
@@ -310,6 +311,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.True(page.TotalCount >= 1);
         Assert.Contains(page.Items, item => item.Id == created.TemplateId);
+        Assert.Contains(page.Items, item => item.Id == premiumCreated.TemplateId && item.IsPremium);
 
         var version = await GetFromJsonAsync<PublicTemplatesCatalogVersionResponse>(
             application.Client,
@@ -322,6 +324,7 @@ public sealed partial class TemplatesApiIntegrationTests
             "/api/templates/changes?sinceVersion=0");
 
         Assert.Contains(initialChanges.Upserts, item => item.Id == created.TemplateId);
+        Assert.Contains(initialChanges.Upserts, item => item.Id == premiumCreated.TemplateId && item.IsPremium);
         Assert.DoesNotContain(created.TemplateId, initialChanges.DeletedIds);
 
         using var deleteResponse = await application.Client.DeleteAsync($"/api/admin/templates/{created.TemplateId}");
@@ -338,6 +341,42 @@ public sealed partial class TemplatesApiIntegrationTests
             $"/api/templates/changes?sinceVersion={version.Version}");
 
         Assert.Contains(created.TemplateId, deleteDelta.DeletedIds);
+    }
+
+    private static async Task<AdminTemplateResponse> CreateActivePremiumImageTemplateAsync(
+        HttpClient client,
+        string title,
+        string category,
+        string[] tags)
+    {
+        var slug = title.ToLowerInvariant().Replace(' ', '-');
+        var previewAsset = await UploadMediaAsync(
+            client,
+            $"{slug}.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            Encoding.UTF8.GetBytes($"{slug}-image-content"));
+
+        return await PostAsJsonAsync<AdminTemplateResponse>(
+            client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                title,
+                $"{title} description",
+                category,
+                tags,
+                true,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(
+                    previewAsset.Url,
+                    previewAsset.FileName,
+                    previewAsset.ContentType,
+                    previewAsset.FileSizeBytes,
+                    previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()));
     }
 
     [Fact]

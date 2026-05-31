@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PetMagic.Modules.Economy.Infrastructure.Data;
 namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(EconomyDbContext))]
-    partial class EconomyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260531132601_AddEconomyPushDeviceTokens")]
+    partial class AddEconomyPushDeviceTokens
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -63,8 +63,6 @@ class WalletState {
     this.checkoutGrantedSpark,
     this.checkoutErrorMessage,
     this.highlightedPurchaseOrderId,
-    this.checkoutProgressMessage,
-    this.checkoutVerificationStartedAt,
   });
 
   final WalletStateModel? wallet;
@@ -87,8 +85,6 @@ class WalletState {
   final int? checkoutGrantedSpark;
   final String? checkoutErrorMessage;
   final String? highlightedPurchaseOrderId;
-  final String? checkoutProgressMessage;
-  final DateTime? checkoutVerificationStartedAt;
 
   bool get isInitialLoading => isLoading && wallet == null;
 
@@ -132,8 +128,6 @@ class WalletState {
     int? checkoutGrantedSpark,
     String? checkoutErrorMessage,
     String? highlightedPurchaseOrderId,
-    String? checkoutProgressMessage,
-    DateTime? checkoutVerificationStartedAt,
     bool clearError = false,
     bool clearCheckoutUrl = false,
     bool clearPendingCheckout = false,
@@ -141,8 +135,6 @@ class WalletState {
     bool clearCheckoutGrantedSpark = false,
     bool clearCheckoutError = false,
     bool clearHighlightedPurchaseOrderId = false,
-    bool clearCheckoutProgressMessage = false,
-    bool clearCheckoutVerificationStartedAt = false,
   }) {
     return WalletState(
       wallet: wallet ?? this.wallet,
@@ -176,12 +168,6 @@ class WalletState {
       highlightedPurchaseOrderId: clearHighlightedPurchaseOrderId
           ? null
           : highlightedPurchaseOrderId ?? this.highlightedPurchaseOrderId,
-      checkoutProgressMessage: clearCheckoutProgressMessage
-          ? null
-          : checkoutProgressMessage ?? this.checkoutProgressMessage,
-      checkoutVerificationStartedAt: clearCheckoutVerificationStartedAt
-          ? null
-          : checkoutVerificationStartedAt ?? this.checkoutVerificationStartedAt,
     );
   }
 }
@@ -330,8 +316,6 @@ class WalletController extends Notifier<WalletState> {
       clearCheckoutGrantedSpark: true,
       clearCheckoutError: true,
       clearHighlightedPurchaseOrderId: true,
-      clearCheckoutProgressMessage: true,
-      clearCheckoutVerificationStartedAt: true,
     );
 
     try {
@@ -517,8 +501,6 @@ class WalletController extends Notifier<WalletState> {
       clearCheckoutGrantedSpark: true,
       clearCheckoutError: true,
       clearHighlightedPurchaseOrderId: true,
-      clearCheckoutProgressMessage: true,
-      clearCheckoutVerificationStartedAt: true,
     );
   }
 
@@ -533,17 +515,10 @@ class WalletController extends Notifier<WalletState> {
       clearCheckoutGrantedSpark: true,
       clearCheckoutError: true,
       clearHighlightedPurchaseOrderId: true,
-      checkoutProgressMessage: 'Checking payment status...',
-      checkoutVerificationStartedAt: DateTime.now().toUtc(),
     );
 
     const maxAttempts = 6;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      state = state.copyWith(
-        checkoutProgressMessage:
-            'Checking payment status: attempt ${attempt + 1}/$maxAttempts',
-      );
-
       try {
         final purchase = await _repository.fetchPurchase(pendingOrderId);
         if (purchase.status == 'succeeded') {
@@ -556,8 +531,6 @@ class WalletController extends Notifier<WalletState> {
             clearPendingCheckout: true,
             clearPendingStoreProvider: true,
             clearCheckoutError: true,
-            clearCheckoutProgressMessage: true,
-            clearCheckoutVerificationStartedAt: true,
           );
           return;
         }
@@ -565,8 +538,6 @@ class WalletController extends Notifier<WalletState> {
         state = state.copyWith(
           checkoutVerificationState: WalletCheckoutVerificationState.error,
           checkoutErrorMessage: error.toString(),
-          clearCheckoutProgressMessage: true,
-          clearCheckoutVerificationStartedAt: true,
         );
         return;
       }
@@ -579,7 +550,6 @@ class WalletController extends Notifier<WalletState> {
     state = state.copyWith(
       checkoutVerificationState: WalletCheckoutVerificationState.pending,
       clearCheckoutError: true,
-      checkoutProgressMessage: 'Payment confirmation is still processing.',
     );
   }
 
@@ -594,19 +564,12 @@ class WalletController extends Notifier<WalletState> {
       clearCheckoutGrantedSpark: true,
       clearCheckoutError: true,
       clearHighlightedPurchaseOrderId: true,
-      checkoutProgressMessage: 'Checking payment at Stripe...',
-      checkoutVerificationStartedAt: DateTime.now().toUtc(),
     );
 
     const maxAttempts = 5;
     final normalizedReference = stripeReferenceId?.trim();
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      state = state.copyWith(
-        checkoutProgressMessage:
-            'Checking payment at Stripe: attempt ${attempt + 1}/$maxAttempts',
-      );
-
       try {
         final purchase = await _repository.verifyStripeCheckoutSession(
           orderId: pendingOrderId,
@@ -623,8 +586,6 @@ class WalletController extends Notifier<WalletState> {
             clearPendingCheckout: true,
             clearPendingStoreProvider: true,
             clearCheckoutError: true,
-            clearCheckoutProgressMessage: true,
-            clearCheckoutVerificationStartedAt: true,
           );
           return;
         }
@@ -654,8 +615,6 @@ class WalletController extends Notifier<WalletState> {
             clearPendingCheckout: true,
             clearPendingStoreProvider: true,
             clearCheckoutError: true,
-            clearCheckoutProgressMessage: true,
-            clearCheckoutVerificationStartedAt: true,
           );
           return;
         }
@@ -766,23 +725,20 @@ class WalletController extends Notifier<WalletState> {
         await load(refresh: true);
         state = state.copyWith(
           isBuying: false,
-          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
-          checkoutGrantedSpark: verified.sparkToGrant,
-          highlightedPurchaseOrderId: verified.orderId,
-          clearPendingCheckout: true,
-          clearPendingStoreProvider: true,
-          clearCheckoutError: true,
-          clearCheckoutProgressMessage: true,
-          clearCheckoutVerificationStartedAt: true,
-        );
-        return;
-      }
+        checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+        checkoutGrantedSpark: verified.sparkToGrant,
+        highlightedPurchaseOrderId: verified.orderId,
+        clearPendingCheckout: true,
+        clearPendingStoreProvider: true,
+        clearCheckoutError: true,
+      );
+      return;
+    }
 
       state = state.copyWith(
         isBuying: false,
         checkoutVerificationState: WalletCheckoutVerificationState.pending,
         clearCheckoutError: true,
-        checkoutProgressMessage: 'Waiting for payment provider confirmation...',
       );
       await verifyCheckoutStatus();
     } catch (error) {

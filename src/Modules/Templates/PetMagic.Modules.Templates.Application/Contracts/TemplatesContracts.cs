@@ -492,6 +492,7 @@ public sealed record PublicTemplateCatalogMetadataResponse(
     string? ThumbnailUrl,
     string? PreviewUrl,
     int PriceTokens,
+    bool IsPremium,
     string[] Tags,
     long Version,
     DateTime UpdatedAtUtc);

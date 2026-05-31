@@ -97,6 +97,7 @@ Widget _buildHost(
           height: 240,
           child: TemplateCard(
             template: template,
+            hasPremiumAccess: true,
             previewControllerFactory: previewControllerFactory,
           ),
         ),

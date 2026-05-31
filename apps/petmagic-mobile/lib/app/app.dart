@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/app/router/app_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/notifications/push_notifications_bootstrap.dart';
 import 'package:petmagic_mobile/core/startup/session_scope_reset.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_notification_host.dart';
 
 const _supportedAppLocales = <Locale>[
   Locale('ru'),
@@ -44,12 +45,13 @@ class PetMagicApp extends ConsumerWidget {
           router: router,
           child: child ?? const SizedBox.shrink(),
         );
+        final hostedChild = PetMagicNotificationHost(child: appChild);
         if (!AppConfig.enableFrameTelemetry &&
             !AppConfig.enableImageCacheTelemetry) {
-          return appChild;
+          return hostedChild;
         }
 
-        return AppPerformanceMonitor(child: appChild);
+        return AppPerformanceMonitor(child: hostedChild);
       },
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: _supportedAppLocales,

@@ -1129,7 +1129,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.';
 
   @override
-  String get premiumContinueAction => 'Продолжить';
+  String get premiumContinueAction => 'Разблокировать Premium';
 
   @override
   String paymentContinueViaProviderAction(Object provider) {
@@ -2565,6 +2565,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateTryAction => 'Попробовать шаблон';
 
   @override
+  String get templateUnlockPremiumAction => 'Разблокировать Premium';
+
+  @override
   String get templateGuestPreview => 'Гостевой просмотр';
 
   @override
@@ -2613,7 +2616,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get templateFlowPremiumTemplateMessage =>
-      'Этот шаблон доступен с Premium.';
+      'Этот шаблон доступен только с Premium.';
+
+  @override
+  String get templateFlowPremiumLockedTitle => 'Этот шаблон доступен в Premium';
+
+  @override
+  String get templateFlowPremiumLockedMessage =>
+      'Оформите подписку, чтобы использовать эксклюзивные стили, эффекты и Premium-шаблоны.';
 
   @override
   String get templateFlowInsufficientBalanceTitle => 'Недостаточно PawSpark';
@@ -2693,6 +2703,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get templateFlowUploadPetPhotoAction => 'Загрузить фото питомца';
+
+  @override
+  String get templateFlowUploadPetPhotoLockedAction =>
+      'Загрузка фото доступна в Premium';
 
   @override
   String get templateFlowPremiumRequiredError =>

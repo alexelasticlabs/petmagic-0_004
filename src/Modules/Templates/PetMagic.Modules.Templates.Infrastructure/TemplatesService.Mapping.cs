@@ -36,6 +36,7 @@ internal sealed partial class TemplatesService
             isPreviewVideo ? null : previewUrl,
             previewUrl,
             template.TokenCost,
+            template.IsPremium,
             DeserializeTags(template.Tags),
             template.Version,
             template.UpdatedAtUtc);

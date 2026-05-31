@@ -24,8 +24,10 @@ enum TemplateBlockedAction { wallet, premium, chooseAnother }
 
 Future<TemplateDetailAction?> showTemplateDetailSheet(
   BuildContext context,
-  TemplateItem template,
-) {
+  TemplateItem template, {
+  bool isPremiumLocked = false,
+  VoidCallback? onUnlockPremium,
+}) {
   final colors = context.petMagicColors;
   return showPetMagicModalBottomSheet<TemplateDetailAction>(
     context: context,
@@ -47,6 +49,8 @@ Future<TemplateDetailAction?> showTemplateDetailSheet(
           child: TemplateDetailContent(
             template: template,
             scrollController: scrollController,
+            isPremiumLocked: isPremiumLocked,
+            onUnlockPremium: onUnlockPremium,
           ),
         );
       },

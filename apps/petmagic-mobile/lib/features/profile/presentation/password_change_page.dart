@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/features/profile/presentation/password_change_co
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class PasswordChangePage extends ConsumerStatefulWidget {
   const PasswordChangePage({super.key, required this.email});
@@ -49,6 +50,31 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
     final controller = ref.read(passwordChangeControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+
+    ref.listen(passwordChangeControllerProvider, (previous, next) {
+      if (!mounted) {
+        return;
+      }
+
+      final previousError = previous?.errorMessage;
+      if (next.errorMessage != null && next.errorMessage != previousError) {
+        PetMagicToast.show(
+          context,
+          message: _mapErrorMessage(next.errorMessage!, text),
+          tone: PetMagicToastTone.warning,
+        );
+      }
+
+      final previousSuccess = previous?.successMessage;
+      if (next.successMessage != null &&
+          next.successMessage != previousSuccess) {
+        PetMagicToast.show(
+          context,
+          message: _mapSuccessMessage(next.successMessage!, text),
+          tone: PetMagicToastTone.success,
+        );
+      }
+    });
 
     _syncController(_codeController, state.code);
     _syncController(_passwordController, state.newPassword);
@@ -156,20 +182,6 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
                     ],
                   ),
                 ),
-                if (state.errorMessage != null) ...[
-                  const SizedBox(height: 12),
-                  ProfileMessageCard(
-                    message: _mapErrorMessage(state.errorMessage!, text),
-                    tone: colors.danger,
-                  ),
-                ],
-                if (state.successMessage != null) ...[
-                  const SizedBox(height: 12),
-                  ProfileMessageCard(
-                    message: _mapSuccessMessage(state.successMessage!, text),
-                    tone: colors.accent,
-                  ),
-                ],
                 const SizedBox(height: 12),
                 if (state.codeRequested)
                   ProfileGlassCard(

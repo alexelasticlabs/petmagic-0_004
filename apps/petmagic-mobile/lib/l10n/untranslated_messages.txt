@@ -5,7 +5,11 @@
     "profileAvatarCropCancelAction",
     "profileAvatarCropSaveAction",
     "profileAvatarCropLoading",
-    "profileAvatarCropError"
+    "profileAvatarCropError",
+    "templateUnlockPremiumAction",
+    "templateFlowPremiumLockedTitle",
+    "templateFlowPremiumLockedMessage",
+    "templateFlowUploadPetPhotoLockedAction"
   ],
 
   "es": [
@@ -14,7 +18,11 @@
     "profileAvatarCropCancelAction",
     "profileAvatarCropSaveAction",
     "profileAvatarCropLoading",
-    "profileAvatarCropError"
+    "profileAvatarCropError",
+    "templateUnlockPremiumAction",
+    "templateFlowPremiumLockedTitle",
+    "templateFlowPremiumLockedMessage",
+    "templateFlowUploadPetPhotoLockedAction"
   ],
 
   "fr": [
@@ -23,7 +31,11 @@
     "profileAvatarCropCancelAction",
     "profileAvatarCropSaveAction",
     "profileAvatarCropLoading",
-    "profileAvatarCropError"
+    "profileAvatarCropError",
+    "templateUnlockPremiumAction",
+    "templateFlowPremiumLockedTitle",
+    "templateFlowPremiumLockedMessage",
+    "templateFlowUploadPetPhotoLockedAction"
   ],
 
   "it": [
@@ -32,7 +44,11 @@
     "profileAvatarCropCancelAction",
     "profileAvatarCropSaveAction",
     "profileAvatarCropLoading",
-    "profileAvatarCropError"
+    "profileAvatarCropError",
+    "templateUnlockPremiumAction",
+    "templateFlowPremiumLockedTitle",
+    "templateFlowPremiumLockedMessage",
+    "templateFlowUploadPetPhotoLockedAction"
   ],
 
   "pl": [
@@ -41,6 +57,10 @@
     "profileAvatarCropCancelAction",
     "profileAvatarCropSaveAction",
     "profileAvatarCropLoading",
-    "profileAvatarCropError"
+    "profileAvatarCropError",
+    "templateUnlockPremiumAction",
+    "templateFlowPremiumLockedTitle",
+    "templateFlowPremiumLockedMessage",
+    "templateFlowUploadPetPhotoLockedAction"
   ]
 }

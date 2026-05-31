@@ -497,7 +497,7 @@
   "premiumFreeSummaryQuality": "Стандартное качество",
   "premiumSecurePaymentTitle": "Безопасная оплата",
   "premiumSecurePaymentSubtitle": "Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.",
-  "premiumContinueAction": "Продолжить",
+  "premiumContinueAction": "Разблокировать Premium",
   "paymentContinueViaProviderAction": "Продолжить через {provider}",
   "@paymentContinueViaProviderAction": {
     "placeholders": {
@@ -946,6 +946,7 @@
   "authRequiredMessage": "Гость может изучать приложение, но действия с шаблонами, наградами и PawSpark требуют аккаунт PetMagic.",
   "authRequiredContinueBrowsing": "Продолжить просмотр",
   "templateTryAction": "Попробовать шаблон",
+  "templateUnlockPremiumAction": "Разблокировать Premium",
   "templateGuestPreview": "Гостевой просмотр",
   "templateActionComingSoon": "Студия шаблонов скоро появится.",
   "tokensActionComingSoon": "Кошелёк PawSpark скоро появится.",
@@ -961,7 +962,9 @@
   "templateFlowCreateMagicAction": "Создать магию",
   "templateFlowChangePhotoAction": "Изменить фото",
   "templateFlowPremiumTemplateTitle": "Premium-шаблон",
-  "templateFlowPremiumTemplateMessage": "Этот шаблон доступен с Premium.",
+  "templateFlowPremiumTemplateMessage": "Этот шаблон доступен только с Premium.",
+  "templateFlowPremiumLockedTitle": "Этот шаблон доступен в Premium",
+  "templateFlowPremiumLockedMessage": "Оформите подписку, чтобы использовать эксклюзивные стили, эффекты и Premium-шаблоны.",
   "templateFlowInsufficientBalanceTitle": "Недостаточно PawSpark",
   "templateFlowInsufficientBalanceMessage": "Шаблон стоит {tokenCost} PawSpark. Ваш баланс: {balance} PawSpark.",
   "@templateFlowInsufficientBalanceMessage": {
@@ -992,6 +995,7 @@
   "templateFlowLoadingVideo": "Загружаем видео...",
   "templateFlowBestPhotoTitle": "Лучшее фото для этого шаблона:",
   "templateFlowUploadPetPhotoAction": "Загрузить фото питомца",
+  "templateFlowUploadPetPhotoLockedAction": "Загрузка фото доступна в Premium",
   "templateFlowPremiumRequiredError": "Этот шаблон доступен только с Premium.",
   "templateFlowInsufficientBalanceError": "Недостаточно PawSpark для запуска генерации.",
   "templateFlowNetworkError": "Нет соединения. Проверьте интернет и попробуйте снова.",

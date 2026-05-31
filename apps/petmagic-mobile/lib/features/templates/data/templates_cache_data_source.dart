@@ -19,9 +19,9 @@ final templatesCacheDataSourceProvider = Provider<TemplatesCacheDataSource>((
 class TemplatesCacheDataSource {
   const TemplatesCacheDataSource(this._preferences);
 
-  static const _catalogItemsKey = 'templates_catalog_items_v1';
-  static const _catalogVersionKey = 'templates_catalog_version_v1';
-  static const _catalogLastSyncAtKey = 'templates_catalog_last_sync_at_v1';
+  static const _catalogItemsKey = 'templates_catalog_items_v2';
+  static const _catalogVersionKey = 'templates_catalog_version_v2';
+  static const _catalogLastSyncAtKey = 'templates_catalog_last_sync_at_v2';
 
   final SharedPreferencesAsync _preferences;
 

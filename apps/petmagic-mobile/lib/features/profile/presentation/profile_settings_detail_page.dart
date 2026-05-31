@@ -80,6 +80,21 @@ class _ProfileAccountInfoPageState
       extraSpacing: kPetMagicBottomContentInsetRelaxed,
     );
 
+    ref.listen(profileControllerProvider, (previous, next) {
+      if (!mounted) {
+        return;
+      }
+
+      final previousError = previous?.errorMessage;
+      if (next.errorMessage != null && next.errorMessage != previousError) {
+        PetMagicToast.show(
+          context,
+          message: mapProfileFeedbackMessage(next.errorMessage!, text),
+          tone: PetMagicToastTone.warning,
+        );
+      }
+    });
+
     return ProfileScreenBackground(
       child: SafeArea(
         child: ListView(
@@ -102,13 +117,6 @@ class _ProfileAccountInfoPageState
                 ),
               )
             else ...[
-              if (state.errorMessage != null) ...[
-                ProfileMessageCard(
-                  message: mapProfileFeedbackMessage(state.errorMessage!, text),
-                  tone: colors.danger,
-                ),
-                const SizedBox(height: 14),
-              ],
               _AccountProfileHeroCard(
                 profile: profile,
                 displayName: _resolvedDisplayName(profile),

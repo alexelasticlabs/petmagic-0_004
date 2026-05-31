@@ -181,24 +181,72 @@ class _WalletPageState extends ConsumerState<WalletPage>
           )
         : MediaQuery.viewPaddingOf(context).bottom +
               kPetMagicBottomContentInsetCompact;
-    final checkoutStatusMessage = _checkoutStatusMessage(text, state);
-    final checkoutCheckingMessage = _checkoutCheckingMessage(text, state);
 
     ref.listen(walletControllerProvider, (previous, next) {
-      final justSucceeded =
-          previous?.checkoutVerificationState !=
-              WalletCheckoutVerificationState.succeeded &&
-          next.checkoutVerificationState ==
-              WalletCheckoutVerificationState.succeeded;
-      if (!justSucceeded || !mounted) {
+      if (!mounted) {
         return;
       }
 
-      final grantedSpark = next.checkoutGrantedSpark ?? 0;
+      final previousState =
+          previous?.checkoutVerificationState ?? WalletCheckoutVerificationState.idle;
+      final nextState = next.checkoutVerificationState;
+      if (previousState == nextState) {
+        return;
+      }
+
+      if (nextState == WalletCheckoutVerificationState.succeeded) {
+        final grantedSpark = next.checkoutGrantedSpark ?? 0;
+        PetMagicToast.show(
+          context,
+          message: text.walletCheckoutSucceeded(grantedSpark),
+          tone: PetMagicToastTone.success,
+        );
+        return;
+      }
+
+      if (nextState == WalletCheckoutVerificationState.pending) {
+        PetMagicToast.show(
+          context,
+          message: text.externalCheckoutPendingVerificationMessage,
+          tone: PetMagicToastTone.info,
+        );
+        return;
+      }
+
+      if (nextState == WalletCheckoutVerificationState.error) {
+        PetMagicToast.show(
+          context,
+          message: _friendlyError(
+            text,
+            next.checkoutErrorMessage ??
+                next.errorMessage ??
+                text.walletDataUnavailableFallback,
+          ),
+          tone: PetMagicToastTone.warning,
+        );
+      }
+    });
+
+    ref.listen(walletControllerProvider, (previous, next) {
+      if (!mounted) {
+        return;
+      }
+
+      final previousError = previous?.errorMessage?.trim();
+      final nextError = next.errorMessage?.trim();
+      if (nextError == null || nextError.isEmpty || nextError == previousError) {
+        return;
+      }
+
+      // Keep full-page unavailable card for hard failures when wallet is absent.
+      if (next.wallet == null) {
+        return;
+      }
+
       PetMagicToast.show(
         context,
-        message: text.walletCheckoutSucceeded(grantedSpark),
-        tone: PetMagicToastTone.success,
+        message: _friendlyError(text, nextError),
+        tone: PetMagicToastTone.warning,
       );
     });
 
@@ -220,27 +268,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       title: text.walletPageTitle,
                       subtitle: text.walletPageSubtitle,
                     ),
-                    if (state.checkoutVerificationState ==
-                        WalletCheckoutVerificationState.checking) ...[
-                      const SizedBox(height: 16),
-                      ProfileProgressCard(
-                        title: text.externalCheckoutCheckingTitle,
-                        message: checkoutCheckingMessage,
-                        tone: colors.accent,
-                        isLoading: true,
-                      ),
-                    ],
-                    if (checkoutStatusMessage != null) ...[
-                      const SizedBox(height: 16),
-                      ProfileMessageCard(
-                        message: checkoutStatusMessage,
-                        tone:
-                            state.checkoutVerificationState ==
-                                WalletCheckoutVerificationState.error
-                            ? colors.gold
-                            : colors.accent,
-                      ),
-                    ],
                     if (state.wallet == null) ...[
                       const SizedBox(height: 22),
                       _WalletUnavailableCard(
@@ -252,13 +279,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         onRetry: () => controller.load(refresh: true),
                       ),
                     ] else ...[
-                      if (state.errorMessage != null) ...[
-                        const SizedBox(height: 16),
-                        ProfileMessageCard(
-                          message: _friendlyError(text, state.errorMessage!),
-                          tone: colors.gold,
-                        ),
-                      ],
                       const SizedBox(height: 16),
                       _BalanceCard(
                         wallet: state.wallet,
@@ -697,49 +717,6 @@ Color _ledgerTone(WalletLedgerItem item, PetMagicColors colors) {
     'generation_refund' => colors.textMuted,
     _ => item.delta >= 0 ? colors.accent : colors.danger,
   };
-}
-
-String? _checkoutStatusMessage(AppLocalizations text, WalletState state) {
-  return switch (state.checkoutVerificationState) {
-    WalletCheckoutVerificationState.idle => null,
-    WalletCheckoutVerificationState.checking => null,
-    WalletCheckoutVerificationState.succeeded => text.walletCheckoutSucceeded(
-      state.checkoutGrantedSpark ?? 0,
-    ),
-    WalletCheckoutVerificationState.pending =>
-      text.externalCheckoutPendingVerificationMessage,
-    WalletCheckoutVerificationState.error => _friendlyError(
-      text,
-      state.checkoutErrorMessage ??
-          state.errorMessage ??
-          text.walletDataUnavailableFallback,
-    ),
-  };
-}
-
-String _checkoutCheckingMessage(AppLocalizations text, WalletState state) {
-  final progressMessage = state.checkoutProgressMessage;
-  final startedAt = state.checkoutVerificationStartedAt;
-  final elapsed = startedAt == null
-      ? null
-      : DateTime.now().toUtc().difference(startedAt);
-  final elapsedLabel = elapsed == null
-      ? null
-      : '${elapsed.isNegative ? 0 : elapsed.inSeconds}s';
-
-  if (progressMessage == null || progressMessage.isEmpty) {
-    if (elapsedLabel == null) {
-      return text.externalCheckoutCheckingMessage;
-    }
-
-    return '${text.externalCheckoutCheckingMessage} ($elapsedLabel)';
-  }
-
-  if (elapsedLabel == null) {
-    return progressMessage;
-  }
-
-  return '$progressMessage ($elapsedLabel)';
 }
 
 String _friendlyError(AppLocalizations text, String value) {

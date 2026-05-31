@@ -4,11 +4,15 @@ class TemplateDetailContent extends StatelessWidget {
   const TemplateDetailContent({
     required this.template,
     required this.scrollController,
+    this.isPremiumLocked = false,
+    this.onUnlockPremium,
     super.key,
   });
 
   final TemplateItem template;
   final ScrollController scrollController;
+  final bool isPremiumLocked;
+  final VoidCallback? onUnlockPremium;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +54,7 @@ class TemplateDetailContent extends StatelessWidget {
                     if (template.isPremium)
                       _Pill(
                         icon: Icons.workspace_premium_rounded,
-                        label: 'Premium',
+                        label: text.premiumLabel,
                         color: colors.gold,
                       ),
                   ],
@@ -287,23 +291,114 @@ class TemplateDetailContent extends StatelessWidget {
               // ── CTA ──────────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-                child: FilledButton.icon(
-                  onPressed: () =>
-                      Navigator.of(context).pop(TemplateDetailAction.upload),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isPremiumLocked) ...[
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              colors.gold.withValues(alpha: 0.16),
+                              colors.surfaceStrong.withValues(alpha: 0.9),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: colors.gold.withValues(alpha: 0.34),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.workspace_premium_rounded,
+                                    color: colors.gold,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      text.templateFlowPremiumLockedTitle,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            color: colors.textStrong,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                text.templateFlowPremiumLockedMessage,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: colors.textSoft,
+                                      height: 1.4,
+                                    ),
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                onPressed: onUnlockPremium,
+                                icon: const Icon(
+                                  Icons.workspace_premium_rounded,
+                                ),
+                                label: Text(text.templateUnlockPremiumAction),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                  textStyle: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.1,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    FilledButton.icon(
+                      onPressed: isPremiumLocked
+                          ? null
+                          : () => Navigator.of(
+                              context,
+                            ).pop(TemplateDetailAction.upload),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.1,
+                            ),
+                      ),
+                      icon: Icon(
+                        isPremiumLocked
+                            ? Icons.lock_outline_rounded
+                            : Icons.add_photo_alternate_outlined,
+                      ),
+                      label: Text(
+                        isPremiumLocked
+                            ? text.templateFlowUploadPetPhotoLockedAction
+                            : _templateUploadActionLabel(
+                                locale,
+                                isVideo: template.isVideo,
+                              ),
+                      ),
                     ),
-                  ),
-                  icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: Text(
-                    _templateUploadActionLabel(
-                      locale,
-                      isVideo: template.isVideo,
-                    ),
-                  ),
+                  ],
                 ),
               ),
             ],

@@ -1,33 +1,29 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class NotificationCoordinator {
   NotificationCoordinator({
     required TemplateGenerationRepository templateRepository,
     required SupportChatRepository supportRepository,
+    required WalletRepository walletRepository,
     required void Function(String route) onRouteRequested,
   }) : _templateRepository = templateRepository,
        _supportRepository = supportRepository,
+       _walletRepository = walletRepository,
        _onRouteRequested = onRouteRequested;
-
-  static const _androidChannelId = 'petmagic_updates';
-  static const _androidChannelName = 'PetMagic Updates';
-  static const _androidChannelDescription =
-      'Support and generation status updates';
 
   final TemplateGenerationRepository _templateRepository;
   final SupportChatRepository _supportRepository;
+  final WalletRepository _walletRepository;
   final void Function(String route) _onRouteRequested;
-  final FlutterLocalNotificationsPlugin _localNotifications =
-      FlutterLocalNotificationsPlugin();
 
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
@@ -102,45 +98,40 @@ class NotificationCoordinator {
     } catch (error, stackTrace) {
       _logNotificationFailure('unregister_support_token', error, stackTrace);
     }
+    try {
+      await _walletRepository.unregisterPushToken(token);
+    } catch (error, stackTrace) {
+      _logNotificationFailure('unregister_economy_token', error, stackTrace);
+    }
     _lastRegisteredToken = null;
   }
 
-  Future<void> handleForegroundMessage(RemoteMessage message) async {
+  void handleForegroundMessage(RemoteMessage message) {
     if (_isDisposed || !_shouldDisplayForeground(message)) {
       return;
     }
 
-    final title =
-        message.notification?.title ??
-        _fallbackTitle(message.data['type'] as String?);
-    final body =
-        message.notification?.body ??
-        _fallbackBody(message.data['type'] as String?);
-    if (title.isEmpty && body.isEmpty) {
-      return;
-    }
+    final type = message.data['type'] as String?;
+    final rawTitle = message.notification?.title?.trim();
+    final rawBody = message.notification?.body?.trim();
 
-    final payload = _payloadForRoute(message);
-    final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        _androidChannelId,
-        _androidChannelName,
-        channelDescription: _androidChannelDescription,
-        importance: Importance.max,
-        priority: Priority.high,
-      ),
-      iOS: const DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
-    );
-    await _localNotifications.show(
-      DateTime.now().microsecondsSinceEpoch % 2147483647,
-      title,
-      body,
-      details,
-      payload: payload,
+    final title = rawTitle == null || rawTitle.isEmpty ? null : rawTitle;
+    final body = rawBody == null || rawBody.isEmpty
+        ? _fallbackBody(type)
+        : rawBody;
+    final messageText = body.isEmpty ? (title ?? _fallbackTitle(type)) : body;
+    final dedupeKey =
+        message.data['dedupe_key'] as String? ??
+        message.data['dedupeKey'] as String? ??
+        message.messageId ??
+        '${type ?? 'update'}:${messageText.hashCode}:${title ?? ''}';
+
+    PetMagicToast.show(
+      null,
+      title: title,
+      message: messageText,
+      tone: _foregroundMessageTone(message),
+      dedupeKey: dedupeKey,
     );
   }
 
@@ -161,12 +152,10 @@ class NotificationCoordinator {
     final messaging = FirebaseMessaging.instance;
     await messaging.requestPermission(alert: true, badge: true, sound: true);
     await messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
+      alert: false,
+      badge: false,
+      sound: false,
     );
-
-    await _initializeLocalNotifications();
 
     _tokenRefreshSubscription ??= messaging.onTokenRefresh.listen((token) {
       if (token.isEmpty) {
@@ -180,43 +169,9 @@ class NotificationCoordinator {
       _handleRemoteMessageRoute,
     );
     _foregroundMessageSubscription ??= FirebaseMessaging.onMessage.listen(
-      (message) => unawaited(handleForegroundMessage(message)),
+      handleForegroundMessage,
     );
     _initialized = true;
-  }
-
-  Future<void> _initializeLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
-    const iosSettings = DarwinInitializationSettings();
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _localNotifications.initialize(
-      settings,
-      onDidReceiveNotificationResponse: (response) {
-        if (response.payload == null || response.payload!.isEmpty) {
-          return;
-        }
-        _openRouteFromPayload(response.payload!);
-      },
-    );
-
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(
-          const AndroidNotificationChannel(
-            _androidChannelId,
-            _androidChannelName,
-            description: _androidChannelDescription,
-            importance: Importance.high,
-          ),
-        );
   }
 
   Future<void> _registerTokenWithRetry(String token) async {
@@ -231,6 +186,11 @@ class NotificationCoordinator {
           locale: Platform.localeName,
         );
         await _supportRepository.registerPushToken(
+          token: token,
+          platform: Platform.operatingSystem,
+          locale: Platform.localeName,
+        );
+        await _walletRepository.registerPushToken(
           token: token,
           platform: Platform.operatingSystem,
           locale: Platform.localeName,
@@ -293,7 +253,44 @@ class NotificationCoordinator {
       return status == 'completed' || status == 'failed';
     }
 
+    if (type == 'wallet') {
+      final status = (message.data['status'] as String?)?.toLowerCase();
+      return status == 'succeeded' ||
+          status == 'success' ||
+          status == 'completed' ||
+          status == 'pending' ||
+          status == 'failed' ||
+          status == 'error';
+    }
+
+    if (type == 'premium') {
+      final status = (message.data['status'] as String?)?.toLowerCase();
+      return status == 'active' ||
+          status == 'inactive' ||
+          status == 'succeeded' ||
+          status == 'success' ||
+          status == 'failed' ||
+          status == 'error';
+    }
+
     return false;
+  }
+
+  PetMagicToastTone _foregroundMessageTone(RemoteMessage message) {
+    final type = message.data['type'] as String?;
+    if (type == 'support_chat') {
+      return PetMagicToastTone.info;
+    }
+
+    final status = (message.data['status'] as String?)?.toLowerCase();
+    if (status == 'succeeded' || status == 'success' || status == 'completed') {
+      return PetMagicToastTone.success;
+    }
+    if (status == 'failed' || status == 'error') {
+      return PetMagicToastTone.warning;
+    }
+
+    return PetMagicToastTone.info;
   }
 
   String _fallbackTitle(String? type) {
@@ -302,6 +299,12 @@ class NotificationCoordinator {
     }
     if (type == 'template_generation') {
       return 'PetMagic generation update';
+    }
+    if (type == 'wallet') {
+      return 'PetMagic wallet update';
+    }
+    if (type == 'premium') {
+      return 'PetMagic premium update';
     }
     return 'PetMagic update';
   }
@@ -313,35 +316,10 @@ class NotificationCoordinator {
     if (type == 'template_generation') {
       return 'Your generation status has changed.';
     }
+    if (type == 'wallet') {
+      return 'Open your wallet to review the latest balance update.';
+    }
     return '';
-  }
-
-  String _payloadForRoute(RemoteMessage message) {
-    final route = _routeFromMap(message.data);
-    if (route == null) {
-      return '';
-    }
-    return jsonEncode({'route': route});
-  }
-
-  void _openRouteFromPayload(String payload) {
-    try {
-      final decoded = jsonDecode(payload);
-      if (decoded is! Map<String, dynamic>) {
-        return;
-      }
-      final route = decoded['route'];
-      if (route is String && route.isNotEmpty) {
-        _onRouteRequested(route);
-      }
-    } catch (error, stackTrace) {
-      _logNotificationFailure(
-        'decode_notification_payload',
-        error,
-        stackTrace,
-        context: {'payload_length': payload.length},
-      );
-    }
   }
 
   void _logNotificationFailure(

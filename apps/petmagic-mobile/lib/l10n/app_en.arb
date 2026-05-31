@@ -497,7 +497,7 @@
   "premiumFreeSummaryQuality": "Standard quality",
   "premiumSecurePaymentTitle": "Secure payment",
   "premiumSecurePaymentSubtitle": "Manage or cancel your subscription from billing settings at any time.",
-  "premiumContinueAction": "Continue",
+  "premiumContinueAction": "Unlock Premium",
   "paymentContinueViaProviderAction": "Continue via {provider}",
   "@paymentContinueViaProviderAction": {
     "placeholders": {
@@ -946,6 +946,7 @@
   "authRequiredMessage": "Guests can explore the app, but template actions, rewards and PawSpark features require a PetMagic account.",
   "authRequiredContinueBrowsing": "Continue browsing",
   "templateTryAction": "Try template",
+  "templateUnlockPremiumAction": "Unlock Premium",
   "templateGuestPreview": "Guest preview",
   "templateActionComingSoon": "Template studio is coming soon.",
   "tokensActionComingSoon": "PawSpark wallet is coming soon.",
@@ -961,7 +962,9 @@
   "templateFlowCreateMagicAction": "Create magic",
   "templateFlowChangePhotoAction": "Change photo",
   "templateFlowPremiumTemplateTitle": "Premium template",
-  "templateFlowPremiumTemplateMessage": "This template is available with Premium.",
+  "templateFlowPremiumTemplateMessage": "This template is available only with Premium.",
+  "templateFlowPremiumLockedTitle": "This template is available in Premium",
+  "templateFlowPremiumLockedMessage": "Subscribe to unlock exclusive styles, effects, and Premium templates.",
   "templateFlowInsufficientBalanceTitle": "Not enough PawSpark",
   "templateFlowInsufficientBalanceMessage": "This template costs {tokenCost} PawSpark. Your balance: {balance} PawSpark.",
   "@templateFlowInsufficientBalanceMessage": {
@@ -992,6 +995,7 @@
   "templateFlowLoadingVideo": "Loading video...",
   "templateFlowBestPhotoTitle": "Best photo for this template:",
   "templateFlowUploadPetPhotoAction": "Upload a pet photo",
+  "templateFlowUploadPetPhotoLockedAction": "Photo upload is available in Premium",
   "templateFlowPremiumRequiredError": "This template is available only with Premium.",
   "templateFlowInsufficientBalanceError": "Not enough PawSpark to start generation.",
   "templateFlowNetworkError": "No connection. Check your network and try again.",

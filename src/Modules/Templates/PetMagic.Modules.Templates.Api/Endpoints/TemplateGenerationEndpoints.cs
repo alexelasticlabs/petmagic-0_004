@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -97,7 +99,8 @@ public static class TemplateGenerationEndpoints
                     : StatusCodes.Status400BadRequest);
         }
 
-        if (templateLookup.Value.IsPremium && TryGetPremiumClaim(context.User, out var isPremium) && !isPremium)
+        if (templateLookup.Value.IsPremium
+            && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
         {
             return TypedResults.Problem(
                 title: PremiumRequiredCode,
@@ -402,6 +405,37 @@ public static class TemplateGenerationEndpoints
 
         isPremium = string.Equals(premiumRaw, "true", StringComparison.OrdinalIgnoreCase);
         return true;
+    }
+
+    private static bool IsPrivilegedTemplateUser(ClaimsPrincipal principal)
+    {
+        return principal.IsInRole("Admin") || principal.IsInRole("Moderator");
+    }
+
+    private static async Task<bool> HasPremiumTemplateAccessAsync(
+        HttpContext context,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (IsPrivilegedTemplateUser(context.User))
+        {
+            return true;
+        }
+
+        var hasPremiumClaim = TryGetPremiumClaim(context.User, out var claimPremiumValue);
+        if (hasPremiumClaim && claimPremiumValue)
+        {
+            return true;
+        }
+
+        var identityService = context.RequestServices.GetService<IIdentityService>();
+        if (identityService is null)
+        {
+            return hasPremiumClaim && claimPremiumValue;
+        }
+
+        var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
+        return profile.IsSuccess && profile.Value.IsPremium;
     }
 
     private static (Guid? UserId, Error? Error) TryGetSubject(HttpContext context)

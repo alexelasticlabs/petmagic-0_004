@@ -22,6 +22,8 @@ public sealed partial class EconomyService(
     IPaymentGateway paymentGateway,
     IStoreSubscriptionVerifier storeSubscriptionVerifier,
     IOptions<EconomyOptions> options,
+    IEconomyPushTokenService? pushTokenService = null,
+    IEconomyPushNotificationSender? pushNotificationSender = null,
     IIdentityService? identityService = null,
     ILogger<EconomyService>? logger = null) : IEconomyService
 {
@@ -38,6 +40,12 @@ public sealed partial class EconomyService(
     private readonly EconomyAdminRedeemCodeService _adminRedeemCodeService =
         new(dbContext);
 
+    private readonly IEconomyPushTokenService _pushTokenService =
+        pushTokenService ?? new EconomyPushTokenService(dbContext);
+
+    private readonly IEconomyPushNotificationSender _pushNotificationSender =
+        pushNotificationSender ?? new NoopEconomyPushNotificationSender();
+
     public async Task<Result<WalletStateResponse>> GetWalletAsync(Guid userId, bool isPremium, CancellationToken cancellationToken)
     {
         var wallet = await GetOrCreateWalletAsync(userId, cancellationToken);
@@ -53,6 +61,16 @@ public sealed partial class EconomyService(
         }
 
         return Result.Success(ToWalletState(wallet, resolvedPremium, premiumNextGrantAtUtc));
+    }
+
+    public Task<Result> RegisterPushTokenAsync(RegisterEconomyPushTokenCommand command, CancellationToken cancellationToken)
+    {
+        return _pushTokenService.RegisterAsync(command, cancellationToken);
+    }
+
+    public Task<Result> UnregisterPushTokenAsync(UnregisterEconomyPushTokenCommand command, CancellationToken cancellationToken)
+    {
+        return _pushTokenService.UnregisterAsync(command, cancellationToken);
     }
 
     public async Task<Result<WalletOperationResponse>> ClaimWeeklyGrantAsync(ClaimWeeklyGrantCommand command, CancellationToken cancellationToken)

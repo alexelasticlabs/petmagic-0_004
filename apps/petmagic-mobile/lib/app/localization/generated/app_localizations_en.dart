@@ -1128,7 +1128,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manage or cancel your subscription from billing settings at any time.';
 
   @override
-  String get premiumContinueAction => 'Continue';
+  String get premiumContinueAction => 'Unlock Premium';
 
   @override
   String paymentContinueViaProviderAction(Object provider) {
@@ -2553,6 +2553,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templateTryAction => 'Try template';
 
   @override
+  String get templateUnlockPremiumAction => 'Unlock Premium';
+
+  @override
   String get templateGuestPreview => 'Guest preview';
 
   @override
@@ -2601,7 +2604,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get templateFlowPremiumTemplateMessage =>
-      'This template is available with Premium.';
+      'This template is available only with Premium.';
+
+  @override
+  String get templateFlowPremiumLockedTitle =>
+      'This template is available in Premium';
+
+  @override
+  String get templateFlowPremiumLockedMessage =>
+      'Subscribe to unlock exclusive styles, effects, and Premium templates.';
 
   @override
   String get templateFlowInsufficientBalanceTitle => 'Not enough PawSpark';
@@ -2682,6 +2693,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get templateFlowUploadPetPhotoAction => 'Upload a pet photo';
+
+  @override
+  String get templateFlowUploadPetPhotoLockedAction =>
+      'Photo upload is available in Premium';
 
   @override
   String get templateFlowPremiumRequiredError =>

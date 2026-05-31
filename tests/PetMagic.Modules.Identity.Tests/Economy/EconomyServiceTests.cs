@@ -43,6 +43,8 @@ public sealed partial class EconomyServiceTests
             gateway ?? new FakePaymentGateway(),
             storeVerifier ?? new FakeStoreSubscriptionVerifier(),
             options,
+            null,
+            null,
             identityService);
     }
 

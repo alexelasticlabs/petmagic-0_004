@@ -169,3 +169,13 @@ public sealed record StripeWebhookCommand(string RawBody, string StripeSignature
 public sealed record AppStoreServerNotificationCommand(string SignedPayload);
 
 public sealed record GooglePlayDeveloperNotificationCommand(string MessageData, string? MessageId);
+
+public sealed record RegisterEconomyPushTokenCommand(
+    Guid UserId,
+    string Token,
+    string Platform,
+    string? DeviceId,
+    string? AppVersion,
+    string? Locale);
+
+public sealed record UnregisterEconomyPushTokenCommand(Guid UserId, string Token);

@@ -2593,6 +2593,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get templateTryAction => 'Pruebe la plantilla';
 
   @override
+  String get templateUnlockPremiumAction => 'Unlock Premium';
+
+  @override
   String get templateGuestPreview => 'Vista previa de invitado';
 
   @override
@@ -2645,6 +2648,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get templateFlowPremiumTemplateMessage =>
       'Esta plantilla está disponible con Premium.';
+
+  @override
+  String get templateFlowPremiumLockedTitle =>
+      'This template is available in Premium';
+
+  @override
+  String get templateFlowPremiumLockedMessage =>
+      'Subscribe to unlock exclusive styles, effects, and Premium templates.';
 
   @override
   String get templateFlowInsufficientBalanceTitle =>
@@ -2726,6 +2737,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get templateFlowUploadPetPhotoAction => 'Sube una foto de mascota';
+
+  @override
+  String get templateFlowUploadPetPhotoLockedAction =>
+      'Photo upload is available in Premium';
 
   @override
   String get templateFlowPremiumRequiredError =>

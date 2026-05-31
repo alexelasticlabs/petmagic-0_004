@@ -15,17 +15,23 @@ import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class AuthEntryPage extends StatelessWidget {
-  const AuthEntryPage({super.key, this.initialEmail});
+  const AuthEntryPage({super.key, this.initialEmail, this.redirectPath});
 
   static const routePath = '/auth';
 
   final String? initialEmail;
+  final String? redirectPath;
 
   @override
   Widget build(BuildContext context) {
-    return _AuthFlowPage(mode: _AuthMode.signIn, initialEmail: initialEmail);
+    return _AuthFlowPage(
+      mode: _AuthMode.signIn,
+      initialEmail: initialEmail,
+      redirectPath: redirectPath,
+    );
   }
 }
 
@@ -43,10 +49,15 @@ class RegisterEntryPage extends StatelessWidget {
 enum _AuthMode { signIn, signUp }
 
 class _AuthFlowPage extends ConsumerStatefulWidget {
-  const _AuthFlowPage({required this.mode, this.initialEmail});
+  const _AuthFlowPage({
+    required this.mode,
+    this.initialEmail,
+    this.redirectPath,
+  });
 
   final _AuthMode mode;
   final String? initialEmail;
+  final String? redirectPath;
 
   @override
   ConsumerState<_AuthFlowPage> createState() => _AuthFlowPageState();
@@ -127,6 +138,34 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final submitDisabled =
         state.isSaving || (_isSignUp && confirmPasswordMismatch);
 
+    ref.listen(profileControllerProvider, (previous, next) {
+      if (!mounted) {
+        return;
+      }
+
+      final previousError = previous?.errorMessage;
+      if (next.errorMessage != null && next.errorMessage != previousError) {
+        PetMagicToast.show(
+          context,
+          message: _mapErrorMessage(next.errorMessage!, text),
+          tone: PetMagicToastTone.warning,
+        );
+      }
+
+      final previousSuccess = previous?.successMessage;
+      if (next.successMessage != null &&
+          next.successMessage != previousSuccess) {
+        final successMessage = _mapSuccessMessage(next.successMessage!, text);
+        if (successMessage != null) {
+          PetMagicToast.show(
+            context,
+            message: successMessage,
+            tone: PetMagicToastTone.success,
+          );
+        }
+      }
+    });
+
     return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
@@ -178,16 +217,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                             ),
                           ],
                           const SizedBox(height: 2),
-                          if (state.errorMessage != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: ErrorCard(
-                                message: _mapErrorMessage(
-                                  state.errorMessage!,
-                                  text,
-                                ),
-                              ),
-                            ),
                           if (_consentErrorMessage != null)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 10),
@@ -489,7 +518,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       }
       return;
     }
-    router.go(TemplatesPage.routePath);
+    router.go(_resolvePostAuthRoute());
   }
 
   Future<void> _submitExternal(ExternalAuthProvider provider) async {
@@ -506,7 +535,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       return;
     }
 
-    router.go(TemplatesPage.routePath);
+    router.go(_resolvePostAuthRoute());
   }
 
   void _handleBack(AppLaunchState launchState) {
@@ -538,8 +567,32 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     );
   }
 
+  String _resolvePostAuthRoute() {
+    final redirectPath = widget.redirectPath?.trim();
+    if (redirectPath == null || redirectPath.isEmpty) {
+      return TemplatesPage.routePath;
+    }
+
+    if (!redirectPath.startsWith('/')) {
+      return TemplatesPage.routePath;
+    }
+
+    return redirectPath;
+  }
+
   String _mapErrorMessage(String raw, AppLocalizations text) {
     return mapProfileFeedbackMessage(raw, text);
+  }
+
+  String? _mapSuccessMessage(String raw, AppLocalizations text) {
+    switch (raw) {
+      case 'logout':
+        return text.profileSignedOut;
+      case 'auth.registration_pending_verification':
+        return null;
+      default:
+        return raw;
+    }
   }
 
   Future<void> _openLegalDocument({

@@ -1,6 +1,7 @@
 using System.Data;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -184,11 +185,23 @@ public sealed partial class EconomyService
 
     private async Task GrantPremiumSubscriptionAllowanceIfDueAsync(
         UserSubscription subscription,
+        string providerContext,
         CancellationToken cancellationToken)
     {
         if (subscription.MonthlyTokenLimit <= 0
             || subscription.MonthlyTokensGranted >= subscription.MonthlyTokenLimit)
         {
+            logger?.LogInformation(
+                "Premium allowance skipped ({Reason}). Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} MonthlyTokenLimit={MonthlyTokenLimit} MonthlyTokensGranted={MonthlyTokensGranted}.",
+                subscription.MonthlyTokenLimit <= 0 ? "limit_not_configured" : "allowance_already_granted",
+                providerContext,
+                subscription.UserId,
+                subscription.Id,
+                subscription.PlanId,
+                subscription.CurrentPeriodStartUtc,
+                subscription.CurrentPeriodEndUtc,
+                subscription.MonthlyTokenLimit,
+                subscription.MonthlyTokensGranted);
             return;
         }
 
@@ -206,6 +219,18 @@ public sealed partial class EconomyService
         subscription.MonthlyTokensGranted += allowanceToGrant;
         subscription.LastTokenGrantAtUtc = now;
         subscription.UpdatedAtUtc = now;
+
+        logger?.LogInformation(
+            "Premium allowance granted. Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} Granted={Granted} MonthlyTokenLimit={MonthlyTokenLimit} MonthlyTokensGranted={MonthlyTokensGranted}.",
+            providerContext,
+            subscription.UserId,
+            subscription.Id,
+            subscription.PlanId,
+            subscription.CurrentPeriodStartUtc,
+            subscription.CurrentPeriodEndUtc,
+            allowanceToGrant,
+            subscription.MonthlyTokenLimit,
+            subscription.MonthlyTokensGranted);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

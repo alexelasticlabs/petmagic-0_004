@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -24,6 +24,7 @@ type RunActionOptions = {
 export function useUsersAdmin(locale: Locale) {
   const text = getDictionary(locale);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const session = useAuthSession();
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -75,6 +76,14 @@ export function useUsersAdmin(locale: Locale) {
       if (refreshedUsers.isError) {
         throw refreshedUsers.error;
       }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(userId) }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(userId) }),
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.economyUserSubscriptionSummary(userId),
+        }),
+      ]);
 
       setToast({
         type: "success",

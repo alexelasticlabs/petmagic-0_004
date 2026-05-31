@@ -230,19 +230,20 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               )
             else ...[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
                 sliver: SliverGrid.builder(
                   itemCount: state.items.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 5,
+                    mainAxisSpacing: 6,
                     childAspectRatio: 0.72,
                   ),
                   itemBuilder: (context, index) {
                     final template = state.items[index];
                     return TemplateCard(
                       template: template,
+                      hasPremiumAccess: wallet?.isPremium ?? false,
                       onPressed: () => _handleTemplateSelected(template),
                     );
                   },
@@ -306,9 +307,18 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   Future<void> _handleTemplateSelected(TemplateItem template) async {
+    final isAuthenticated = ref
+        .read(appLaunchControllerProvider)
+        .isAuthenticated;
+    final hasPremiumAccess =
+        ref.read(walletControllerProvider).wallet?.isPremium ?? false;
     final action = await context.push<TemplateDetailAction>(
       TemplatePreviewPage.routePath,
-      extra: template,
+      extra: TemplatePreviewRouteArgs(
+        template: template,
+        hasPremiumAccess: hasPremiumAccess,
+        isAuthenticated: isAuthenticated,
+      ),
     );
     if (!mounted || action != TemplateDetailAction.upload) {
       return;
@@ -428,7 +438,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final permission = await _permissionCoordinator.requestOnDemand(
       requiredPermission,
     );
-      if (!permission.granted) {
+    if (!permission.granted) {
       if (mounted) {
         PetMagicToast.show(
           context,

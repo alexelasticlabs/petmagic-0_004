@@ -36,6 +36,8 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
 
     public DbSet<SubscriptionEventLog> SubscriptionEventLogs => Set<SubscriptionEventLog>();
 
+    public DbSet<EconomyPushDeviceToken> EconomyPushDeviceTokens => Set<EconomyPushDeviceToken>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<Wallet>(entity =>
@@ -249,6 +251,21 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.Provider, x.ExternalEventId });
             entity.HasIndex(x => new { x.Provider, x.ExternalSubscriptionId });
+        });
+
+        builder.Entity<EconomyPushDeviceToken>(entity =>
+        {
+            entity.ToTable("economy_push_device_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Token).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.Platform).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.DeviceId).HasMaxLength(160);
+            entity.Property(x => x.AppVersion).HasMaxLength(64);
+            entity.Property(x => x.Locale).HasMaxLength(32);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(x => x.Token).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc, x.LastSeenAtUtc });
         });
     }
 }

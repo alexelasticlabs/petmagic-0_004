@@ -7,7 +7,10 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 
-Future<void> showAuthRequiredSheet(BuildContext context) {
+Future<void> showAuthRequiredSheet(
+  BuildContext context, {
+  String? redirectPath,
+}) {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   final router = GoRouter.of(context);
@@ -90,7 +93,13 @@ Future<void> showAuthRequiredSheet(BuildContext context) {
                       child: FilledButton(
                         onPressed: () {
                           Navigator.of(sheetContext).pop();
-                          router.go(AuthEntryPage.routePath);
+                          final redirectQuery =
+                              redirectPath != null &&
+                                  redirectPath.isNotEmpty &&
+                                  redirectPath.startsWith('/')
+                              ? '?redirect=${Uri.encodeQueryComponent(redirectPath)}'
+                              : '';
+                          router.go('${AuthEntryPage.routePath}$redirectQuery');
                         },
                         child: Text(text.profileSignInAction),
                       ),

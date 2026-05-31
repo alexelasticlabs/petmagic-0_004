@@ -521,7 +521,7 @@ public sealed class IdentityServiceEmailFlowTests
                 $"user-avatars/{avatar.FileName}",
                 avatar.FileName,
                 avatar.ContentType,
-                avatar.Content.LongLength,
+                avatar.Content?.LongLength ?? avatar.ContentLengthBytes ?? 0,
                 null)));
         }
 

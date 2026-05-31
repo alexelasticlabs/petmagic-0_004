@@ -20,6 +20,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -86,6 +87,34 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ? text.profileLegalShortcutAccepted
         : text.profileLegalShortcutPending;
 
+    ref.listen(profileControllerProvider, (previous, next) {
+      if (!mounted) {
+        return;
+      }
+
+      final previousError = previous?.errorMessage;
+      if (next.errorMessage != null && next.errorMessage != previousError) {
+        PetMagicToast.show(
+          context,
+          message: mapProfileFeedbackMessage(next.errorMessage!, text),
+          tone: PetMagicToastTone.warning,
+        );
+      }
+
+      final previousSuccess = previous?.successMessage;
+      if (next.successMessage != null &&
+          next.successMessage != previousSuccess) {
+        final message = next.successMessage == 'logout'
+            ? text.profileSignedOut
+            : mapProfileFeedbackMessage(next.successMessage!, text);
+        PetMagicToast.show(
+          context,
+          message: message,
+          tone: PetMagicToastTone.success,
+        );
+      }
+    });
+
     return ProfileScreenBackground(
       child: SafeArea(
         child: state.isLoading
@@ -128,29 +157,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         ],
                       ),
                     ),
-                    if (state.errorMessage != null) ...[
-                      const SizedBox(height: 18),
-                      MotionEntrance(
-                        delay: const Duration(milliseconds: 60),
-                        child: ProfileMessageCard(
-                          message: mapProfileFeedbackMessage(
-                            state.errorMessage!,
-                            text,
-                          ),
-                          tone: colors.danger,
-                        ),
-                      ),
-                    ],
-                    if (state.successMessage == 'logout') ...[
-                      const SizedBox(height: 18),
-                      MotionEntrance(
-                        delay: const Duration(milliseconds: 60),
-                        child: ProfileMessageCard(
-                          message: text.profileSignedOut,
-                          tone: colors.accent,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 18),
                     if (profile != null) ...[
                       MotionEntrance(

@@ -118,6 +118,10 @@ public interface IEconomyService
     Task<Result<StoreWebhookResultResponse>> HandleAppStoreServerNotificationAsync(AppStoreServerNotificationCommand command, CancellationToken cancellationToken);
 
     Task<Result<StoreWebhookResultResponse>> HandleGooglePlayDeveloperNotificationAsync(GooglePlayDeveloperNotificationCommand command, CancellationToken cancellationToken);
+
+    Task<Result> RegisterPushTokenAsync(RegisterEconomyPushTokenCommand command, CancellationToken cancellationToken);
+
+    Task<Result> UnregisterPushTokenAsync(UnregisterEconomyPushTokenCommand command, CancellationToken cancellationToken);
 }
 
 public interface IStoreWebhookSecurityValidator
@@ -125,4 +129,11 @@ public interface IStoreWebhookSecurityValidator
     Result ValidateAppStoreSignedPayload(string signedPayload);
 
     Task<Result> ValidateGooglePlayPushAsync(string? authorizationHeader, CancellationToken cancellationToken);
+}
+
+public interface IEconomyPushTokenService
+{
+    Task<Result> RegisterAsync(RegisterEconomyPushTokenCommand command, CancellationToken cancellationToken);
+
+    Task<Result> UnregisterAsync(UnregisterEconomyPushTokenCommand command, CancellationToken cancellationToken);
 }

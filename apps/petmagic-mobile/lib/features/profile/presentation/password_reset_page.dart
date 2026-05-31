@@ -54,6 +54,31 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     final controller = ref.read(passwordResetControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+
+    ref.listen(passwordResetControllerProvider, (previous, next) {
+      if (!mounted) {
+        return;
+      }
+
+      final previousError = previous?.errorMessage;
+      if (next.errorMessage != null && next.errorMessage != previousError) {
+        PetMagicToast.show(
+          context,
+          message: _mapErrorMessage(next.errorMessage!, text),
+          tone: PetMagicToastTone.warning,
+        );
+      }
+
+      final previousSuccess = previous?.successMessage;
+      if (next.successMessage != null &&
+          next.successMessage != previousSuccess) {
+        PetMagicToast.show(
+          context,
+          message: _mapSuccessMessage(next.successMessage!, text),
+          tone: PetMagicToastTone.success,
+        );
+      }
+    });
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     _syncController(_emailController, state.email);
@@ -98,23 +123,6 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                     const SizedBox(height: 4),
                     AuthHero(title: title, subtitle: subtitle, isDark: isDark),
                     const SizedBox(height: 6),
-                    if (state.errorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: ErrorCard(
-                          message: _mapErrorMessage(state.errorMessage!, text),
-                        ),
-                      ),
-                    if (state.successMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _StatusCard(
-                          message: _mapSuccessMessage(
-                            state.successMessage!,
-                            text,
-                          ),
-                        ),
-                      ),
                     AuthFormCard(
                       isDark: isDark,
                       child: Column(
@@ -300,33 +308,5 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
       default:
         return raw;
     }
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.accent.withValues(alpha: 0.24)),
-      ),
-      child: Text(
-        message,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: colors.textStrong,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
   }
 }

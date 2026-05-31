@@ -73,4 +73,6 @@ public static class EconomyErrors
     public static readonly Error ReferralAlreadyLinked = new("economy.referral_already_linked", "Referral code is already activated for this user.");
 
     public static readonly Error ReferralPaidUserIneligible = new("economy.referral_paid_user_ineligible", "Referral code must be activated before the first paid purchase.");
+
+    public static readonly Error InvalidPushToken = new("economy.push_token_invalid", "Economy push token is invalid.");
 }

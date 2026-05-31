@@ -341,6 +341,13 @@ public sealed partial class EconomyService
         wallet.UpdatedAtUtc = now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await _pushNotificationSender.NotifyWalletUpdateAsync(
+            order.UserId,
+            new WalletPushNotification(
+                Status: "succeeded",
+                OrderId: order.Id,
+                SparkDelta: order.SparkToGrant),
+            cancellationToken);
         return Result.Success(order);
     }
 

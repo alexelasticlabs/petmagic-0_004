@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -145,6 +145,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => NoTransitionPage(
           child: AuthEntryPage(
             initialEmail: state.uri.queryParameters['email'],
+            redirectPath: state.uri.queryParameters['redirect'],
           ),
         ),
       ),
@@ -248,10 +249,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: TemplatePreviewPage.routePath,
         redirect: (context, state) =>
-            state.extra is TemplateItem ? null : TemplatesPage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
-          child: TemplatePreviewPage(template: state.extra! as TemplateItem),
-        ),
+            state.extra is TemplateItem ||
+                state.extra is TemplatePreviewRouteArgs
+            ? null
+            : TemplatesPage.routePath,
+        pageBuilder: (context, state) {
+          final extra = state.extra!;
+          final args = switch (extra) {
+            final TemplatePreviewRouteArgs value => value,
+            final TemplateItem value => TemplatePreviewRouteArgs(
+              template: value,
+              hasPremiumAccess: false,
+              isAuthenticated: false,
+            ),
+            _ => throw StateError(
+              'Unexpected template preview route args type.',
+            ),
+          };
+
+          return NoTransitionPage(
+            child: TemplatePreviewPage(
+              template: args.template,
+              hasPremiumAccess: args.hasPremiumAccess,
+              isAuthenticated: args.isAuthenticated,
+            ),
+          );
+        },
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

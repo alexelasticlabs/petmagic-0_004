@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/features/support/data/support_chat_repository.da
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 
@@ -43,6 +44,7 @@ class _PushNotificationsBootstrapState
     _coordinator = NotificationCoordinator(
       templateRepository: ref.read(templateGenerationRepositoryProvider),
       supportRepository: ref.read(supportChatRepositoryProvider),
+      walletRepository: ref.read(walletRepositoryProvider),
       onRouteRequested: _openRoute,
     );
   }
@@ -88,7 +90,10 @@ class _PushNotificationsBootstrapState
   }
 
   void _openRoute(String route) {
-    if (_isGenerationRoute(route) || _isSupportRoute(route)) {
+    if (_isGenerationRoute(route) ||
+        _isSupportRoute(route) ||
+        _isWalletRoute(route) ||
+        _isProfileRoute(route)) {
       widget.router.go(route);
       return;
     }
@@ -145,5 +150,13 @@ class _PushNotificationsBootstrapState
 
   bool _isSupportRoute(String route) {
     return route == SupportChatPage.routePath || route == '/profile/support';
+  }
+
+  bool _isWalletRoute(String route) {
+    return route == WalletPage.routePath || route == WalletPage.legacyRoutePath;
+  }
+
+  bool _isProfileRoute(String route) {
+    return route == '/profile';
   }
 }

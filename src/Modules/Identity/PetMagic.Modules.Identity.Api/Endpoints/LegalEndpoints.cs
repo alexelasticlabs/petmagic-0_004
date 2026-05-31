@@ -5,6 +5,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 using PetMagic.Modules.Identity.Application.Abstractions;
@@ -30,11 +31,11 @@ public static class LegalEndpoints
     }
 
     private static Task<Ok<LegalDocumentsResponse>> GetCurrentAsync(
-        [AsParameters] GetLegalDocumentsRequest request,
+        [FromQuery(Name = "locale")] string? locale,
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        return ExecuteGetCurrentAsync(request.Locale, service, cancellationToken);
+        return ExecuteGetCurrentAsync(locale, service, cancellationToken);
     }
 
     private static async Task<Ok<LegalDocumentsResponse>> ExecuteGetCurrentAsync(
@@ -77,6 +78,4 @@ public static class LegalEndpoints
 
         return TypedResults.Ok(result.Value);
     }
-
-    private sealed record GetLegalDocumentsRequest(string? Locale);
 }

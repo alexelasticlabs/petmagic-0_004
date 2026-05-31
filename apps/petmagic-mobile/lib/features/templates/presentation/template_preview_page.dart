@@ -1,20 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 
-class TemplatePreviewPage extends StatefulWidget {
-  const TemplatePreviewPage({required this.template, super.key});
+class TemplatePreviewRouteArgs {
+  const TemplatePreviewRouteArgs({
+    required this.template,
+    required this.hasPremiumAccess,
+    required this.isAuthenticated,
+  });
+
+  final TemplateItem template;
+  final bool hasPremiumAccess;
+  final bool isAuthenticated;
+}
+
+class TemplatePreviewPage extends ConsumerStatefulWidget {
+  const TemplatePreviewPage({
+    required this.template,
+    this.hasPremiumAccess = false,
+    this.isAuthenticated = false,
+    super.key,
+  });
 
   static const routePath = '/templates/preview';
 
   final TemplateItem template;
+  final bool hasPremiumAccess;
+  final bool isAuthenticated;
 
   @override
-  State<TemplatePreviewPage> createState() => _TemplatePreviewPageState();
+  ConsumerState<TemplatePreviewPage> createState() =>
+      _TemplatePreviewPageState();
 }
 
-class _TemplatePreviewPageState extends State<TemplatePreviewPage> {
+class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -25,6 +51,17 @@ class _TemplatePreviewPageState extends State<TemplatePreviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final livePremiumAccess = ref.watch(
+      walletControllerProvider.select(
+        (state) => state.wallet?.isPremium ?? widget.hasPremiumAccess,
+      ),
+    );
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select(
+        (state) => state.isAuthenticated || widget.isAuthenticated,
+      ),
+    );
+    final isPremiumLocked = widget.template.isPremium && !livePremiumAccess;
     final colors = context.petMagicColors;
 
     return DecoratedBox(
@@ -41,9 +78,26 @@ class _TemplatePreviewPageState extends State<TemplatePreviewPage> {
           child: TemplateDetailContent(
             template: widget.template,
             scrollController: _scrollController,
+            isPremiumLocked: isPremiumLocked,
+            onUnlockPremium: isPremiumLocked
+                ? () => _handleUnlockPremium(isAuthenticated)
+                : null,
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _handleUnlockPremium(bool isAuthenticated) async {
+    if (isAuthenticated) {
+      if (!mounted) {
+        return;
+      }
+
+      context.push(PremiumPage.routePath);
+      return;
+    }
+
+    await showAuthRequiredSheet(context, redirectPath: PremiumPage.routePath);
   }
 }

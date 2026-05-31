@@ -2594,6 +2594,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get templateTryAction => 'Prova il modello';
 
   @override
+  String get templateUnlockPremiumAction => 'Unlock Premium';
+
+  @override
   String get templateGuestPreview => 'Anteprima degli ospiti';
 
   @override
@@ -2646,6 +2649,14 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get templateFlowPremiumTemplateMessage =>
       'Questo modello è disponibile con Premium.';
+
+  @override
+  String get templateFlowPremiumLockedTitle =>
+      'This template is available in Premium';
+
+  @override
+  String get templateFlowPremiumLockedMessage =>
+      'Subscribe to unlock exclusive styles, effects, and Premium templates.';
 
   @override
   String get templateFlowInsufficientBalanceTitle => 'Non abbastanza PawSpark';
@@ -2731,6 +2742,10 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get templateFlowUploadPetPhotoAction =>
       'Carica la foto di un animale domestico';
+
+  @override
+  String get templateFlowUploadPetPhotoLockedAction =>
+      'Photo upload is available in Premium';
 
   @override
   String get templateFlowPremiumRequiredError =>

@@ -266,4 +266,114 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Contains(queued.GenerationId, application.Billing.RefundedGenerationIds);
     }
 
+    [Fact]
+    public async Task PremiumTemplateGeneration_ShouldReturnForbidden_WhenUserHasNoPremiumAccess()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "premium-lock.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            "premium-lock-preview"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Premium Lock",
+                "Premium lock test template",
+                "Portrait",
+                ["premium", "lock"],
+                true,
+                25,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(
+                    previewAsset.Url,
+                    previewAsset.FileName,
+                    previewAsset.ContentType,
+                    previewAsset.FileSizeBytes,
+                    previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()));
+
+        using var response = await UploadGenerationSourceWithClaimsAsync(
+            application.Client,
+            created.TemplateId,
+            premiumClaim: false,
+            role: "User");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains("templates.premium_required", body);
+    }
+
+    [Fact]
+    public async Task PremiumTemplateGeneration_ShouldSucceed_WhenPremiumClaimIsTrue()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "premium-open.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            "premium-open-preview"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Premium Open",
+                "Premium access test template",
+                "Portrait",
+                ["premium", "open"],
+                true,
+                25,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(
+                    previewAsset.Url,
+                    previewAsset.FileName,
+                    previewAsset.ContentType,
+                    previewAsset.FileSizeBytes,
+                    previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()));
+
+        using var response = await UploadGenerationSourceWithClaimsAsync(
+            application.Client,
+            created.TemplateId,
+            premiumClaim: true,
+            role: "User");
+        await EnsureSuccessStatusCodeAsync(response, $"/api/templates/{created.TemplateId}/generations");
+        var queued = await ReadJsonAsync<TemplateGenerationResponse>(response);
+
+        Assert.Equal(created.TemplateId, queued.TemplateId);
+        Assert.Equal("Queued", queued.Status);
+    }
+
+    private static async Task<HttpResponseMessage> UploadGenerationSourceWithClaimsAsync(
+        HttpClient client,
+        Guid templateId,
+        bool premiumClaim,
+        string role)
+    {
+        using var multipart = new MultipartFormDataContent();
+        using var fileContent = new ByteArrayContent("source-pet-image"u8.ToArray());
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        multipart.Add(fileContent, "sourceImage", "pet.jpg");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/templates/{templateId}/generations")
+        {
+            Content = multipart
+        };
+        request.Headers.Add("X-Test-Role", role);
+        request.Headers.Add("X-Test-Premium", premiumClaim ? "true" : "false");
+
+        return await client.SendAsync(request);
+    }
+
 }

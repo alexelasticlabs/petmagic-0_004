@@ -277,9 +277,12 @@ public sealed partial class EconomyServiceTests
             result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
 
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
         Assert.Equal("Canceled", subscription.Status);
         Assert.True(subscription.CancelAtPeriodEnd);
         Assert.Equal("txn-app-2", subscription.ExternalTransactionId);
+        Assert.Equal(500, subscription.MonthlyTokensGranted);
+        Assert.Equal(500, wallet.Balance);
         Assert.Single(identityService.SetPremiumStatusCalls);
         Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
     }
@@ -350,10 +353,13 @@ public sealed partial class EconomyServiceTests
             result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
 
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
         Assert.Equal("Canceled", subscription.Status);
         Assert.True(subscription.CancelAtPeriodEnd);
         Assert.Equal("gp-token-1", subscription.ExternalTransactionId);
         Assert.Equal("order-1", subscription.ExternalSubscriptionId);
+        Assert.Equal(500, subscription.MonthlyTokensGranted);
+        Assert.Equal(500, wallet.Balance);
         Assert.Single(identityService.SetPremiumStatusCalls);
         Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
     }

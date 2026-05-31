@@ -157,6 +157,23 @@ public sealed partial class EconomyService
                     {
                         return Result.Failure<StripeWebhookResultResponse>(premiumResult.Error);
                     }
+
+                    logger?.LogInformation(
+                        "Premium entitlement updated from Stripe webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Activated={Activated} Status={Status}.",
+                        "stripe",
+                        parsedEvent.UserId.Value,
+                        eventId,
+                        eventType,
+                        shouldActivatePremium,
+                        parsedEvent.Status);
+
+                    await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                        parsedEvent.UserId.Value,
+                        new PremiumPushNotification(
+                            Status: shouldActivatePremium ? "active" : "inactive",
+                            Provider: "stripe",
+                            PlanCode: parsedEvent.PlanCode),
+                        cancellationToken);
                 }
 
                 if (!string.IsNullOrWhiteSpace(parsedEvent.PlanCode) || !string.IsNullOrWhiteSpace(parsedEvent.SubscriptionId))
@@ -227,6 +244,7 @@ public sealed partial class EconomyService
                     {
                         await GrantPremiumSubscriptionAllowanceIfDueAsync(
                             subscription,
+                            "stripe",
                             cancellationToken);
 
                         await SettlePendingReferralBonusAsync(
@@ -359,6 +377,23 @@ public sealed partial class EconomyService
             return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
         }
 
+        logger?.LogInformation(
+            "Premium entitlement updated from App Store webhook. Provider={Provider} UserId={UserId} EventId={EventId} NotificationType={NotificationType} Status={Status} IsPremium={IsPremium}.",
+            "app_store",
+            existingSubscription.UserId,
+            parsed.EventId,
+            parsed.NotificationType,
+            status,
+            isPremium);
+
+        await _pushNotificationSender.NotifyPremiumUpdateAsync(
+            existingSubscription.UserId,
+            new PremiumPushNotification(
+                Status: isPremium ? "active" : "inactive",
+                Provider: "app_store",
+                PlanCode: plan.PlanCode),
+            cancellationToken);
+
         var subscription = await UpsertUserSubscriptionAsync(
             existingSubscription.UserId,
             "app_store",
@@ -385,6 +420,14 @@ public sealed partial class EconomyService
             subscription.ExternalSubscriptionId,
             command.SignedPayload,
             cancellationToken);
+
+        if (isPremium)
+        {
+            await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                subscription,
+                "app_store",
+                cancellationToken);
+        }
 
         return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, true, "processed"));
     }
@@ -512,6 +555,23 @@ public sealed partial class EconomyService
             return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
         }
 
+        logger?.LogInformation(
+            "Premium entitlement updated from Google Play webhook. Provider={Provider} UserId={UserId} EventId={EventId} NotificationType={NotificationType} Status={Status} IsPremium={IsPremium}.",
+            "google_play",
+            existingSubscription.UserId,
+            parsed.EventId,
+            parsed.NotificationType,
+            status,
+            isPremium);
+
+        await _pushNotificationSender.NotifyPremiumUpdateAsync(
+            existingSubscription.UserId,
+            new PremiumPushNotification(
+                Status: isPremium ? "active" : "inactive",
+                Provider: "google_play",
+                PlanCode: plan.PlanCode),
+            cancellationToken);
+
         var subscription = await UpsertUserSubscriptionAsync(
             existingSubscription.UserId,
             "google_play",
@@ -538,6 +598,14 @@ public sealed partial class EconomyService
             subscription.ExternalSubscriptionId,
             command.MessageData,
             cancellationToken);
+
+        if (isPremium)
+        {
+            await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                subscription,
+                "google_play",
+                cancellationToken);
+        }
 
         return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));
     }

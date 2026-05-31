@@ -6,6 +6,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -55,6 +56,12 @@ public static class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapPost("/wallet/redeem", RedeemCodeAsync)
+            .RequireAuthorization();
+
+        group.MapPut("/notifications/push-token", RegisterPushTokenAsync)
+            .RequireAuthorization();
+
+        group.MapDelete("/notifications/push-token", UnregisterPushTokenAsync)
             .RequireAuthorization();
 
         group.MapGet("/rewards", GetRewardsSummaryAsync)
@@ -260,6 +267,58 @@ public static class EconomyEndpoints
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> RegisterPushTokenAsync(
+        HttpContext context,
+        [FromBody] RegisterPushTokenRequest request,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.RegisterPushTokenAsync(
+            new RegisterEconomyPushTokenCommand(
+                userId!.Value,
+                request.Token,
+                request.Platform,
+                request.DeviceId,
+                request.AppVersion,
+                request.Locale),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> UnregisterPushTokenAsync(
+        HttpContext context,
+        [FromBody] UnregisterPushTokenRequest request,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await service.UnregisterPushTokenAsync(
+            new UnregisterEconomyPushTokenCommand(userId!.Value, request.Token),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.NoContent();
     }
 
     private static async Task<Results<Ok<WalletOperationResponse>, ValidationProblem, ProblemHttpResult>> SpendAsync(
@@ -1318,6 +1377,10 @@ public static class EconomyEndpoints
     public sealed record RedeemCodeRequest(string Code);
 
     public sealed record ReferralCodeRequest(string Code);
+
+    public sealed record RegisterPushTokenRequest(string Token, string Platform, string? DeviceId, string? AppVersion, string? Locale);
+
+    public sealed record UnregisterPushTokenRequest(string Token);
 
     public sealed record PaymentMethodSetupRequest(string PaymentProvider = "stripe");
 

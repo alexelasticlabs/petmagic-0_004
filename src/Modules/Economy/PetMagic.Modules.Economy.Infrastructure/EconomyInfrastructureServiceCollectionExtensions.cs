@@ -77,7 +77,31 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             GooglePlayPubSubAudience = ReadValue(section, "GooglePlayPubSubAudience", "GOOGLE_PLAY_PUBSUB_AUDIENCE") ?? string.Empty,
             GooglePlayPubSubExpectedEmail = ReadValue(section, "GooglePlayPubSubExpectedEmail", "GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL") ?? string.Empty,
             AppStoreBundleId = section["AppStoreBundleId"] ?? "com.petmagic.app",
-            AppStoreSharedSecret = ReadValue(section, "AppStoreSharedSecret", "APP_STORE_SHARED_SECRET") ?? string.Empty
+            AppStoreSharedSecret = ReadValue(section, "AppStoreSharedSecret", "APP_STORE_SHARED_SECRET") ?? string.Empty,
+            FirebasePushEnabled =
+                bool.TryParse(
+                    ReadValue(
+                        section,
+                        "FirebasePushEnabled",
+                        "ECONOMY_FIREBASE_PUSH_ENABLED",
+                        "FIREBASE_PUSH_ENABLED"),
+                    out var firebasePushEnabled)
+                && firebasePushEnabled,
+            FirebaseProjectId = ReadValue(
+                section,
+                "FirebaseProjectId",
+                "ECONOMY_FIREBASE_PROJECT_ID",
+                "FIREBASE_PROJECT_ID") ?? string.Empty,
+            FirebaseServiceAccountJson = ReadValue(
+                section,
+                "FirebaseServiceAccountJson",
+                "ECONOMY_FIREBASE_SERVICE_ACCOUNT_JSON",
+                "FIREBASE_SERVICE_ACCOUNT_JSON") ?? string.Empty,
+            FirebaseServiceAccountJsonPath = ReadValue(
+                section,
+                "FirebaseServiceAccountJsonPath",
+                "ECONOMY_FIREBASE_SERVICE_ACCOUNT_JSON_PATH",
+                "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty
         };
 
         services.AddSingleton<IOptions<EconomyOptions>>(Microsoft.Extensions.Options.Options.Create(economyOptions));
@@ -94,6 +118,14 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddSingleton<IGoogleStoreWebhookTokenVerifier, GoogleStoreWebhookTokenVerifier>();
         services.AddSingleton<IStoreWebhookSecurityValidator, StoreWebhookSecurityValidator>();
         services.AddSingleton<IPaymentGateway>(_ => new StripePaymentGateway(economyOptions));
+        services.AddScoped<IEconomyPushTokenService, EconomyPushTokenService>();
+        services.AddScoped<NoopEconomyPushNotificationSender>();
+        services.AddSingleton<HttpClient>();
+        services.AddScoped<FcmEconomyPushNotificationSender>();
+        services.AddScoped<IEconomyPushNotificationSender>(serviceProvider =>
+            economyOptions.IsFirebasePushConfigured
+                ? serviceProvider.GetRequiredService<FcmEconomyPushNotificationSender>()
+                : serviceProvider.GetRequiredService<NoopEconomyPushNotificationSender>());
         services.AddSingleton<IStoreSubscriptionVerifier>(serviceProvider =>
             new StoreSubscriptionVerifier(
                 new HttpClient(),

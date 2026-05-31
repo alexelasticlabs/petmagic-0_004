@@ -2103,7 +2103,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumContinueAction.
   ///
   /// In en, this message translates to:
-  /// **'Continue'**
+  /// **'Unlock Premium'**
   String get premiumContinueAction;
 
   /// No description provided for @paymentContinueViaProviderAction.
@@ -4626,6 +4626,12 @@ abstract class AppLocalizations {
   /// **'Try template'**
   String get templateTryAction;
 
+  /// No description provided for @templateUnlockPremiumAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Premium'**
+  String get templateUnlockPremiumAction;
+
   /// No description provided for @templateGuestPreview.
   ///
   /// In en, this message translates to:
@@ -4719,8 +4725,20 @@ abstract class AppLocalizations {
   /// No description provided for @templateFlowPremiumTemplateMessage.
   ///
   /// In en, this message translates to:
-  /// **'This template is available with Premium.'**
+  /// **'This template is available only with Premium.'**
   String get templateFlowPremiumTemplateMessage;
+
+  /// No description provided for @templateFlowPremiumLockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This template is available in Premium'**
+  String get templateFlowPremiumLockedTitle;
+
+  /// No description provided for @templateFlowPremiumLockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe to unlock exclusive styles, effects, and Premium templates.'**
+  String get templateFlowPremiumLockedMessage;
 
   /// No description provided for @templateFlowInsufficientBalanceTitle.
   ///
@@ -4868,6 +4886,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Upload a pet photo'**
   String get templateFlowUploadPetPhotoAction;
+
+  /// No description provided for @templateFlowUploadPetPhotoLockedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo upload is available in Premium'**
+  String get templateFlowUploadPetPhotoLockedAction;
 
   /// No description provided for @templateFlowPremiumRequiredError.
   ///

@@ -124,7 +124,7 @@ class TemplateItemDto {
       tags: (json['tags'] as List<dynamic>? ?? const [])
           .whereType<String>()
           .toList(growable: false),
-      isPremium: json['isPremium'] as bool? ?? false,
+      isPremium: _readPremiumFlag(json),
       tokenCost:
           (json['tokenCost'] as num?)?.toInt() ??
           (json['priceTokens'] as num?)?.toInt() ??
@@ -147,6 +147,35 @@ class TemplateItemDto {
     }
 
     return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  static bool _readPremiumFlag(Map<String, Object?> json) {
+    return _toBool(json['isPremium']) ??
+        _toBool(json['premium']) ??
+        _toBool(json['isPro']) ??
+        false;
+  }
+
+  static bool? _toBool(Object? value) {
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is num) {
+      return value != 0;
+    }
+
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+        return false;
+      }
+    }
+
+    return null;
   }
 
   static String _inferContentTypeFromUrl(String url) {

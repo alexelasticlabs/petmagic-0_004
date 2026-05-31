@@ -17,6 +17,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 class TemplateCard extends StatefulWidget {
   const TemplateCard({
     required this.template,
+    required this.hasPremiumAccess,
     this.onPressed,
     this.showGuestPreview = false,
     this.previewControllerFactory,
@@ -24,6 +25,7 @@ class TemplateCard extends StatefulWidget {
   });
 
   final TemplateItem template;
+  final bool hasPremiumAccess;
   final VoidCallback? onPressed;
   final bool showGuestPreview;
   final Future<VideoPlayerController> Function(String previewUrl)?
@@ -73,10 +75,10 @@ class _TemplateCardState extends State<TemplateCard> {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final premiumBorder = widget.template.isPremium
-        ? colors.gold.withValues(alpha: 0.58)
+        ? const Color(0xFFE6B75D).withValues(alpha: 0.9)
         : colors.border.withValues(alpha: isLight ? 0.62 : 0.28);
     final premiumGlow = widget.template.isPremium
-        ? colors.gold.withValues(alpha: 0.16)
+        ? const Color(0xFFF0C875).withValues(alpha: 0.34)
         : colors.shadow;
     final cardRadius = BorderRadius.circular(24);
     final scaleDuration = PetMotion.effectiveDuration(context, PetMotion.fast);
@@ -90,74 +92,120 @@ class _TemplateCardState extends State<TemplateCard> {
           key: ValueKey('template-card-${widget.template.templateId}'),
           onVisibilityChanged: _handleVisibility,
           child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: cardRadius,
-              border: Border.all(color: premiumBorder, width: 1.15),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colors.surfaceGlass.withValues(alpha: isLight ? 0.58 : 0.28),
-                  colors.surfaceStrong.withValues(alpha: isLight ? 0.28 : 0.12),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: premiumGlow,
-                  blurRadius: 22,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: cardRadius,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: widget.onPressed,
-                  onHighlightChanged: (value) {
-                    if (_isPressed == value) {
-                      return;
-                    }
-                    setState(() => _isPressed = value);
-                  },
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _TemplateMedia(
-                        template: widget.template,
-                        controller: _videoController,
-                      ),
-                      const _TemplateShadeOverlay(),
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        right: 8,
-                        child: Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          runSpacing: 6,
-                          children: [
-                            if (widget.template.effectivePromoBadge != null)
-                              _PromoBadge(
-                                value: widget.template.effectivePromoBadge!,
-                              )
-                            else
-                              const SizedBox.shrink(),
-                            _MediaTypeBadge(type: widget.template.templateType),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        left: 8,
-                        right: 8,
-                        bottom: 8,
-                        child: _TemplateDetails(
-                          template: widget.template,
-                          showGuestPreview: widget.showGuestPreview,
-                          onPressed: widget.onPressed,
-                        ),
+            decoration: widget.template.isPremium
+                ? BoxDecoration(
+                    borderRadius: cardRadius,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFF6E8C0),
+                        Color(0xFFE6BB64),
+                        Color(0xFFC1851E),
+                      ],
+                      stops: [0, 0.56, 1],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: premiumGlow.withValues(alpha: 0.14),
+                        blurRadius: 10,
+                        offset: const Offset(0, 8),
                       ),
                     ],
+                  )
+                : const BoxDecoration(),
+            child: Padding(
+              padding: widget.template.isPremium
+                  ? const EdgeInsets.all(1.15)
+                  : EdgeInsets.zero,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: widget.template.isPremium
+                      ? BorderRadius.circular(22.85)
+                      : cardRadius,
+                  border: Border.all(color: premiumBorder, width: 1.15),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      widget.template.isPremium
+                          ? const Color(0x5A664412)
+                          : colors.surfaceGlass.withValues(
+                              alpha: isLight ? 0.58 : 0.28,
+                            ),
+                      widget.template.isPremium
+                          ? const Color(0x2E2B1A08)
+                          : colors.surfaceStrong.withValues(
+                              alpha: isLight ? 0.28 : 0.12,
+                            ),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.template.isPremium
+                          ? premiumGlow.withValues(alpha: 0.15)
+                          : premiumGlow,
+                      blurRadius: widget.template.isPremium ? 12 : 22,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: widget.template.isPremium
+                      ? BorderRadius.circular(22.85)
+                      : cardRadius,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: widget.onPressed,
+                      onHighlightChanged: (value) {
+                        if (_isPressed == value) {
+                          return;
+                        }
+                        setState(() => _isPressed = value);
+                      },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _TemplateMedia(
+                            template: widget.template,
+                            controller: _videoController,
+                          ),
+                          const _TemplateShadeOverlay(),
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            right: 8,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              runSpacing: 6,
+                              children: [
+                                if (widget.template.effectivePromoBadge != null)
+                                  _PromoBadge(
+                                    value: widget.template.effectivePromoBadge!,
+                                  )
+                                else
+                                  const SizedBox.shrink(),
+                                _MediaTypeBadge(
+                                  type: widget.template.templateType,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            left: 8,
+                            right: 8,
+                            bottom: 8,
+                            child: _TemplateDetails(
+                              template: widget.template,
+                              hasPremiumAccess: widget.hasPremiumAccess,
+                              showGuestPreview: widget.showGuestPreview,
+                              onPressed: widget.onPressed,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -533,11 +581,13 @@ class _TemplateShadeOverlay extends StatelessWidget {
 class _TemplateDetails extends StatelessWidget {
   const _TemplateDetails({
     required this.template,
+    required this.hasPremiumAccess,
     required this.showGuestPreview,
     required this.onPressed,
   });
 
   final TemplateItem template;
+  final bool hasPremiumAccess;
   final bool showGuestPreview;
   final VoidCallback? onPressed;
 
@@ -552,6 +602,10 @@ class _TemplateDetails extends StatelessWidget {
         template.isVideo &&
         musicDescription != null &&
         musicDescription.isNotEmpty;
+    final isPremiumLocked = template.isPremium && !hasPremiumAccess;
+    final actionLabel = isPremiumLocked
+        ? text.templateUnlockPremiumAction
+        : text.templateTryAction;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,7 +698,8 @@ class _TemplateDetails extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         _TemplateActionButton(
-          label: text.templateTryAction,
+          label: actionLabel,
+          isPremiumLockCta: isPremiumLocked,
           onPressed: onPressed,
         ),
       ],
@@ -652,63 +707,149 @@ class _TemplateDetails extends StatelessWidget {
   }
 }
 
-class _TemplateActionButton extends StatelessWidget {
-  const _TemplateActionButton({required this.label, required this.onPressed});
+class _TemplateActionButton extends StatefulWidget {
+  const _TemplateActionButton({
+    required this.label,
+    required this.onPressed,
+    this.isPremiumLockCta = false,
+  });
 
   final String label;
   final VoidCallback? onPressed;
+  final bool isPremiumLockCta;
+
+  @override
+  State<_TemplateActionButton> createState() => _TemplateActionButtonState();
+}
+
+class _TemplateActionButtonState extends State<_TemplateActionButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1700),
+    );
+    _pulse = CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut);
+    _pulseController.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.labelLarge;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onPressed,
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [Color(0xD910C878), Color(0xCCF2C96A)],
-            ),
+    const premiumTextColor = Color(0xFF251102);
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) {
+        final glowPulse = widget.isPremiumLockCta
+            ? 0.36 + (_pulse.value * 0.38)
+            : 0.22;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF10C878).withValues(alpha: 0.22),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textStyle?.copyWith(
-                    color: const Color(0xFF082313),
-                    fontSize: 11.2,
-                    fontWeight: FontWeight.w700,
-                  ),
+            onTap: widget.onPressed,
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                gradient: widget.isPremiumLockCta
+                    ? const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Color(0xFFF0A41C),
+                          Color(0xFFF3C65A),
+                          Color(0xFFF9E18C),
+                        ],
+                        stops: [0, 0.54, 1],
+                      )
+                    : const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [Color(0xD910C878), Color(0xCCF2C96A)],
+                      ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: widget.isPremiumLockCta
+                      ? const Color(0xFFF9E8B6).withValues(alpha: 0.88)
+                      : Colors.white.withValues(alpha: 0.14),
+                  width: widget.isPremiumLockCta ? 1.3 : 1,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        (widget.isPremiumLockCta
+                                ? const Color(0xFFE4901F)
+                                : const Color(0xFF10C878))
+                            .withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                  if (widget.isPremiumLockCta)
+                    BoxShadow(
+                      color: const Color(
+                        0xFFF7D67A,
+                      ).withValues(alpha: glowPulse),
+                      blurRadius: 24,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 0),
+                    ),
+                ],
               ),
-              const SizedBox(width: 6),
-              const Icon(
-                Icons.arrow_forward_rounded,
-                color: Color(0xFF082313),
-                size: 16,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textStyle?.copyWith(
+                        color: widget.isPremiumLockCta
+                            ? premiumTextColor
+                            : const Color(0xFF082313),
+                        fontSize: 11.2,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    width: widget.isPremiumLockCta ? 22 : null,
+                    height: widget.isPremiumLockCta ? 22 : null,
+                    decoration: widget.isPremiumLockCta
+                        ? BoxDecoration(
+                            color: const Color(0x3DFFF3D2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xAAFFF0C0)),
+                          )
+                        : null,
+                    child: Icon(
+                      widget.isPremiumLockCta
+                          ? Icons.workspace_premium_rounded
+                          : Icons.arrow_forward_rounded,
+                      color: widget.isPremiumLockCta
+                          ? premiumTextColor
+                          : const Color(0xFF082313),
+                      size: widget.isPremiumLockCta ? 14 : 16,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -1033,8 +1174,8 @@ class _AccessTag extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              Icons.hexagon_outlined,
-              size: 10,
+              Icons.workspace_premium_rounded,
+              size: 11,
               color: Color(0xFFF2C96A),
             ),
             const SizedBox(width: 3),

@@ -425,12 +425,28 @@ public sealed partial class TemplatesApiIntegrationTests
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var claims = new[]
+            var role = Request.Headers.TryGetValue("X-Test-Role", out var roleValues)
+                ? roleValues.ToString()
+                : "Admin";
+            var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, TestUserId.ToString()),
-                new Claim(ClaimTypes.Name, "integration-test-user"),
-                new Claim(ClaimTypes.Role, "Admin"),
+                new(ClaimTypes.NameIdentifier, TestUserId.ToString()),
+                new(ClaimTypes.Name, "integration-test-user"),
             };
+
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            if (Request.Headers.TryGetValue("X-Test-Premium", out var premiumValues))
+            {
+                var premiumRaw = premiumValues.ToString();
+                if (bool.TryParse(premiumRaw, out var isPremium))
+                {
+                    claims.Add(new Claim("premium", isPremium ? "true" : "false"));
+                }
+            }
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);

@@ -340,6 +340,36 @@ class WalletRepository {
     return PurchaseHistoryItem.fromJson(response.data ?? const {});
   }
 
+  Future<void> registerPushToken({
+    required String token,
+    required String platform,
+    String? locale,
+  }) async {
+    await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.put<Map<String, dynamic>>(
+        '/api/economy/notifications/push-token',
+        data: {
+          'token': token,
+          'platform': platform,
+          'deviceId': null,
+          'appVersion': AppConfig.appVersion,
+          'locale': locale,
+        },
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
+  Future<void> unregisterPushToken(String token) async {
+    await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.delete<Map<String, dynamic>>(
+        '/api/economy/notifications/push-token',
+        data: {'token': token},
+        options: _authOptions(session.accessToken),
+      ),
+    );
+  }
+
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request,
   ) async {

@@ -51,4 +51,18 @@ public sealed class EconomyOptions
     public string AppStoreBundleId { get; init; } = "com.petmagic.app";
 
     public string AppStoreSharedSecret { get; init; } = string.Empty;
+
+    public bool FirebasePushEnabled { get; init; }
+
+    public string FirebaseProjectId { get; init; } = string.Empty;
+
+    public string FirebaseServiceAccountJson { get; init; } = string.Empty;
+
+    public string FirebaseServiceAccountJsonPath { get; init; } = string.Empty;
+
+    public bool IsFirebasePushConfigured =>
+        FirebasePushEnabled
+        && !string.IsNullOrWhiteSpace(FirebaseProjectId)
+        && (!string.IsNullOrWhiteSpace(FirebaseServiceAccountJson)
+            || !string.IsNullOrWhiteSpace(FirebaseServiceAccountJsonPath));
 }
