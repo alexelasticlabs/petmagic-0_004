@@ -1,4 +1,4 @@
-part of '../support_chat_page.dart';
+part of 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
 class _SupportConversationViewport extends StatelessWidget {
   const _SupportConversationViewport({

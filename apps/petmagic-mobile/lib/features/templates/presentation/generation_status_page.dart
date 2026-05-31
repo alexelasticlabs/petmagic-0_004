@@ -72,6 +72,19 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     super.dispose();
   }
 
+  @override
+  void deactivate() {
+    _stopPolling();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _startPolling();
+    unawaited(_load(silent: true));
+  }
+
   void _startPolling() {
     if (_pollTimer != null) {
       return;

@@ -130,7 +130,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileEmailVerifiedShort => 'Email подтвержден';
 
   @override
-  String get profileEmailPendingShort => 'Подтвердите Email';
+  String get profileEmailPendingShort => 'Подтвердите email';
 
   @override
   String get profileSignedOut => 'Вы вышли на этом устройстве.';
@@ -149,7 +149,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileMarketingStat => 'Новости и офферы';
 
   @override
-  String get profileEmailStat => 'Статус Email';
+  String get profileEmailStat => 'Статус email';
 
   @override
   String get profileStatOn => 'Вкл';
@@ -170,23 +170,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profilePetsSubtitle => 'Ваши любимцы и их профили в приложении.';
 
   @override
-  String get profilePremiumTitle => 'Перейти на Премиум';
+  String get profilePremiumTitle => 'Перейти на Premium';
 
   @override
   String get profilePremiumSubtitle =>
-      'Откройте все шаблоны и премиум-сценарии редактирования.';
+      'Откройте все шаблоны и premium-сценарии редактирования.';
 
   @override
-  String get profilePremiumPlanLabel => 'Тариф Премиум';
+  String get profilePremiumPlanLabel => 'Premium тариф';
 
   @override
   String get profileFreePlanLabel => 'Бесплатный тариф';
 
   @override
-  String get profilePremiumBannerTitle => 'Перейти на Премиум';
+  String get profilePremiumBannerTitle => 'Перейти на Premium';
 
   @override
-  String get profilePremiumBannerActiveTitle => 'Премиум активен';
+  String get profilePremiumBannerActiveTitle => 'Premium активен';
 
   @override
   String get profilePremiumBenefitUnlimitedTemplates => 'Безлимитные шаблоны';
@@ -199,7 +199,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profilePremiumBenefitNoWatermark => 'Без водяного знака';
 
   @override
-  String get profilePremiumOpenAction => 'Открыть Премиум';
+  String get profilePremiumOpenAction => 'Открыть Premium';
 
   @override
   String get profileSubscriptionTitle => 'Моя подписка';
@@ -217,7 +217,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileSubscriptionTokensLabel => 'Доступно PawSpark';
 
   @override
-  String get subscriptionStatusActive => 'Премиум активен';
+  String get subscriptionStatusActive => 'Premium активен';
 
   @override
   String get subscriptionStatusCancelled => 'Отменён (до конца периода)';
@@ -250,7 +250,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionAutoRenewOff => 'Отключено';
 
   @override
-  String get subscriptionTokensSectionTitle => 'PawSpark Премиум';
+  String get subscriptionTokensSectionTitle => 'Premium PawSpark';
 
   @override
   String get subscriptionTokensAvailableLabel => 'Доступно сейчас';
@@ -275,7 +275,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'PawSpark начисляются каждые 7 дней с момента покупки подписки. Первый бонус начисляется сразу после покупки.';
 
   @override
-  String get subscriptionBenefitsSectionTitle => 'Преимущества Премиум';
+  String get subscriptionBenefitsSectionTitle => 'Преимущества Premium';
 
   @override
   String get subscriptionBenefitTokens => '40 PawSpark каждые 7 дней';
@@ -285,7 +285,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Первый бонус сразу после покупки';
 
   @override
-  String get subscriptionBenefitTemplates => 'Доступ к премиум-шаблонам';
+  String get subscriptionBenefitTemplates => 'Доступ к Premium-шаблонам';
 
   @override
   String get subscriptionBenefitPriorityGeneration => 'Приоритетная генерация';
@@ -371,7 +371,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get walletBalanceTitle =>
-      'Доступно для создания фото, видео и премиум-шаблонов.';
+      'Доступно для создания фото, видео и premium-шаблонов.';
 
   @override
   String get walletBalanceEyebrow => 'Ваш баланс';
@@ -384,7 +384,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'PawSpark — внутренняя валюта PetMagic. Используйте её для создания фото, видео и доступа к премиум-шаблонам.';
 
   @override
-  String get walletPremiumStatus => 'Премиум-кошелек';
+  String get walletPremiumStatus => 'Premium-кошелек';
 
   @override
   String get walletFreeStatus => 'Базовый кошелек';
@@ -446,10 +446,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get walletPremiumUpsellMessage =>
-      'Премиум дает ежемесячные PawSpark, премиум-шаблоны и приоритетную очередь.';
+      'Premium дает ежемесячные PawSpark, premium-шаблоны и приоритетную очередь.';
 
   @override
-  String get walletViewPremiumAction => 'Посмотреть Премиум';
+  String get walletViewPremiumAction => 'Посмотреть Premium';
 
   @override
   String get walletWhatYouCanCreateTitle => 'Хватит примерно на:';
@@ -471,7 +471,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletSpendVideoSubtitle => 'Видео\nот 50 Spark';
 
   @override
-  String get walletSpendPremiumSubtitle => 'Премиум\nот 80 Spark';
+  String get walletSpendPremiumSubtitle => 'Premium\nот 80 Spark';
 
   @override
   String get walletContactSupportAction => 'Связаться с поддержкой';
@@ -636,7 +636,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsSourceWeekly => 'Еженедельная награда';
 
   @override
-  String get rewardsSourcePremium => 'Премиум-начисление';
+  String get rewardsSourcePremium => 'Premium начисление';
 
   @override
   String get rewardsSourceBonus => 'Бонус';
@@ -719,7 +719,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletCheckoutIncludesTitle => 'Что вы получите';
 
   @override
-  String get walletCheckoutFeaturePremiumTemplates => 'Премиум-шаблоны';
+  String get walletCheckoutFeaturePremiumTemplates => 'Premium-шаблоны';
 
   @override
   String get walletCheckoutFeaturePriority => 'Приоритетная генерация';
@@ -921,24 +921,24 @@ class AppLocalizationsRu extends AppLocalizations {
       'Создайте что-то яркое для своих питомцев всего за пару касаний.';
 
   @override
-  String get premiumPageTitle => 'PetMagic Премиум';
+  String get premiumPageTitle => 'PetMagic Premium';
 
   @override
   String get premiumPageSubtitle =>
-      'Безлимитная магия для питомцев, быстрая генерация и премиум-шаблоны в одном тарифе.';
+      'Безлимитная магия для питомцев, быстрая генерация и premium-шаблоны в одном тарифе.';
 
   @override
-  String get premiumHeroEyebrow => 'Премиум-магия';
+  String get premiumHeroEyebrow => 'Premium магия';
 
   @override
   String get premiumHeroTitle => 'Откройте вирусные видео с питомцами';
 
   @override
   String get premiumHeroSubtitle =>
-      'Больше генераций, премиум-шаблоны, более быстрая обработка и без водяного знака.';
+      'Больше генераций, premium-шаблоны, более быстрая обработка и без водяного знака.';
 
   @override
-  String get premiumAlreadyActive => 'Премиум активен';
+  String get premiumAlreadyActive => 'Premium активен';
 
   @override
   String get premiumBenefitUnlimitedTemplates => 'Безлимитные шаблоны';
@@ -995,7 +995,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumCancelAnytime => 'Можно отменить в любой момент';
 
   @override
-  String get premiumIncludesTitle => 'Что входит в Премиум';
+  String get premiumIncludesTitle => 'Что входит в Premium';
 
   @override
   String premiumTokenEstimate(Object videos, Object photos) {
@@ -1053,19 +1053,19 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get premiumComparisonTitle => 'Что меняется с Премиум';
+  String get premiumComparisonTitle => 'Что меняется с Premium';
 
   @override
   String get premiumFreeColumn => 'Бесплатно';
 
   @override
-  String get premiumPremiumColumn => 'Премиум';
+  String get premiumPremiumColumn => 'Premium';
 
   @override
   String get premiumComparisonFreeTemplates => 'Бесплатные шаблоны';
 
   @override
-  String get premiumComparisonPremiumTemplates => 'Премиум-шаблоны';
+  String get premiumComparisonPremiumTemplates => 'Premium-шаблоны';
 
   @override
   String get premiumComparisonTokens => 'PawSpark в месяц';
@@ -1139,7 +1139,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get externalCheckoutPendingVerificationMessage =>
-      'Оплата еще не подтверждена. Мы обновим Премиум или баланс сразу после подтверждения от Stripe.';
+      'Оплата еще не подтверждена. Мы обновим Premium или баланс сразу после подтверждения от Stripe.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -1175,23 +1175,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumStorePurchaseInactive => 'Эта подписка больше не активна.';
 
   @override
-  String get premiumPurchaseActivated => 'Премиум уже активен.';
+  String get premiumPurchaseActivated => 'Premium уже активен.';
 
   @override
   String get premiumRecentlyActivatedBadge => 'Только что активирован';
 
   @override
-  String get premiumRecentlyActivatedTitle => 'Премиум подтвержден';
+  String get premiumRecentlyActivatedTitle => 'Premium подтвержден';
 
   @override
   String get premiumRecentlyActivatedMessage =>
-      'Доступ Премиум уже активен на этом устройстве и готов к использованию.';
+      'Доступ Premium уже активен на этом устройстве и готов к использованию.';
 
   @override
   String get premiumPurchaseCancelled => 'Покупка была отменена.';
 
   @override
-  String get premiumCheckoutFailed => 'Оформление Премиум временно недоступно.';
+  String get premiumCheckoutFailed => 'Оформление Premium временно недоступно.';
 
   @override
   String get premiumManageFailed =>
@@ -1199,7 +1199,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get premiumRestoreStarted =>
-      'Статус Премиум обновлен на этом устройстве.';
+      'Premium-статус обновлен на этом устройстве.';
 
   @override
   String get profileCommunicationsTitle => 'Обновления PetMagic';
@@ -1311,7 +1311,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileSettingsNotificationsSubtitle =>
-      'Управляйте push- и Email-предпочтениями в приложении.';
+      'Управляйте push и email-предпочтениями в приложении.';
 
   @override
   String get profileSettingsLanguageTitle => 'Язык приложения';
@@ -1463,7 +1463,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsNotificationsNext =>
-      'Вы можете менять push- и Email-настройки в любой момент.';
+      'Вы можете менять push и email-настройки в любой момент.';
 
   @override
   String get profileNotificationsLoading =>
@@ -1558,7 +1558,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsSupportNext =>
-      'Далее здесь появится полноценная форма обращения или передача обращения по Email с обработкой в системе поддержки.';
+      'Далее здесь появится полноценная форма обращения или передача обращения по email с обработкой в системе поддержки.';
 
   @override
   String get profileDetailsTermsBody =>
@@ -2046,7 +2046,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportHomeTopicTokensNotArrived => 'PawSpark не пришли';
 
   @override
-  String get supportHomeTopicPremiumIssue => 'Проблема с Премиум';
+  String get supportHomeTopicPremiumIssue => 'Проблема с Premium';
 
   @override
   String get supportHomeTopicPaymentRefund => 'Оплата / Возврат';
@@ -2080,7 +2080,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get supportAssistantRecommendationPremiumIssue =>
-      'Если Премиум уже оплачен, но не отображается в приложении, попробуйте перезапустить приложение. Если проблема сохраняется, мы проверим статус подписки.';
+      'Если Premium уже оплачен, но не отображается в приложении, попробуйте перезапустить приложение. Если проблема сохраняется, мы проверим статус подписки.';
 
   @override
   String get supportAssistantRecommendationPaymentRefund =>
@@ -2247,7 +2247,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get startupOnboardingPageTwoSubtitle =>
-      'Листайте каталог как гость, а вход выполните тогда, когда захотите рендерить, сохранять и открывать Премиум.';
+      'Листайте каталог как гость, а вход выполните тогда, когда захотите рендерить, сохранять и открывать premium.';
 
   @override
   String get startupOnboardingPageTwoHighlightOne => 'Гостевой просмотр';
@@ -2259,14 +2259,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupOnboardingPageTwoHighlightThree => 'Плавный переход';
 
   @override
-  String get startupOnboardingPageThreeTitle => 'PawSpark и Премиум ждут позже';
+  String get startupOnboardingPageThreeTitle => 'PawSpark и premium ждут позже';
 
   @override
   String get startupOnboardingPageThreeSubtitle =>
-      'Первое знакомство должно быть лёгким. PawSpark, награды и Премиум-функции откроются после аккуратной авторизации.';
+      'Первое знакомство должно быть лёгким. PawSpark, награды и premium-действия откроются после аккуратной авторизации.';
 
   @override
-  String get startupOnboardingPageThreeHighlightOne => 'Премиум-функции';
+  String get startupOnboardingPageThreeHighlightOne => 'Premium-фишки';
 
   @override
   String get startupOnboardingPageThreeHighlightTwo => 'Баланс PawSpark';
@@ -2334,7 +2334,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authRegisterSubtitle =>
-      'Присоединяйтесь к PetMagic и откройте шаблоны, PawSpark и Премиум-возможности.';
+      'Присоединяйтесь к PetMagic и откройте шаблоны, PawSpark и premium-возможности.';
 
   @override
   String get authRegisterAction => 'Зарегистрироваться';
@@ -2364,7 +2364,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authPasswordResetSubtitle =>
-      'Введите Email, и мы отправим код для сброса пароля.';
+      'Введите email, и мы отправим код для сброса пароля.';
 
   @override
   String get authPasswordResetCodeTitle => 'Введите код из письма';
@@ -2590,11 +2590,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowChangePhotoAction => 'Изменить фото';
 
   @override
-  String get templateFlowPremiumTemplateTitle => 'Премиум-шаблон';
+  String get templateFlowPremiumTemplateTitle => 'Premium-шаблон';
 
   @override
   String get templateFlowPremiumTemplateMessage =>
-      'Этот шаблон доступен с Премиум.';
+      'Этот шаблон доступен с Premium.';
 
   @override
   String get templateFlowInsufficientBalanceTitle => 'Недостаточно PawSpark';
@@ -2677,7 +2677,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get templateFlowPremiumRequiredError =>
-      'Этот шаблон доступен только с Премиум.';
+      'Этот шаблон доступен только с Premium.';
 
   @override
   String get templateFlowInsufficientBalanceError =>
@@ -3054,7 +3054,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get emailVerificationTitle => 'Подтверждение Email';
+  String get emailVerificationTitle => 'Подтверждение email';
 
   @override
   String emailVerificationCodeSentMessage(Object email) {
@@ -3074,7 +3074,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get emailVerificationResendAction => 'Отправить код еще раз';
 
   @override
-  String get emailVerificationChangeEmailAction => 'Изменить Email';
+  String get emailVerificationChangeEmailAction => 'Изменить email';
 
   @override
   String get emailVerificationConfirmedMessage =>
@@ -3153,7 +3153,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get debugStripeSmokeTestSubtitle =>
-      'Минимальный экран для диагностики нажатий и фокуса PaymentSheet.';
+      'Минимальный экран для диагностики касаний и фокуса в PaymentSheet.';
 
   @override
   String get debugStripeSmokeTestOpenAction => 'Открыть Stripe PaymentSheet';
@@ -3163,11 +3163,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get debugStripeSmokeTestMethodUnavailable =>
-      'Способ оплаты Stripe недоступен.';
+      'Метод оплаты Stripe недоступен.';
 
   @override
   String get debugStripeSmokeTestNoPlans =>
-      'Не найдены премиум-тарифы с поддержкой Stripe.';
+      'Планы Premium с включенным Stripe не найдены.';
 
   @override
   String get debugStripeSmokeTestPrepareFailed =>
@@ -3179,10 +3179,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get debugStripeSmokeTestDismissedOrFailed =>
-      'PaymentSheet был закрыт или завершился с ошибкой.';
+      'PaymentSheet был закрыт или завершился ошибкой.';
 
   @override
-  String get debugStripeSmokeTestVerifyFailed => 'Проверка оплаты не удалась.';
+  String get debugStripeSmokeTestVerifyFailed => 'Не удалось проверить оплату.';
 
   @override
   String get premiumBenefitAiGenerationsTitle => '30 AI-генераций';
@@ -3191,7 +3191,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumBenefitAiGenerationsSubtitle => 'каждый месяц';
 
   @override
-  String get premiumBenefitPremiumTemplatesTitle => 'Премиум-шаблоны';
+  String get premiumBenefitPremiumTemplatesTitle => 'Premium-шаблоны';
 
   @override
   String get premiumBenefitPremiumTemplatesSubtitle => 'эксклюзивные';
@@ -3223,14 +3223,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String subscriptionCancelConfirmBody(String date) {
-    return 'Премиум останется активным до $date. Новые списания будут отключены.';
+    return 'Premium останется активным до $date. Новые списания будут отключены.';
   }
 
   @override
   String get subscriptionCancelConfirmAction => 'Подтвердить';
 
   @override
-  String get subscriptionCancelConfirmKeep => 'Сохранить Премиум';
+  String get subscriptionCancelConfirmKeep => 'Сохранить Premium';
 
   @override
   String get subscriptionRestoreSuccessMessage => 'Покупки восстановлены';

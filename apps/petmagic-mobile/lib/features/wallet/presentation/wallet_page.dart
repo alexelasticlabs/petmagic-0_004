@@ -68,28 +68,50 @@ class _WalletPageState extends ConsumerState<WalletPage>
   }
 
   @override
+  void deactivate() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _scheduleNextAutoRefresh();
+    unawaited(_walletController.load(refresh: true));
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
+      _autoRefreshTimer?.cancel();
+      _autoRefreshTimer = null;
       return;
     }
 
     if (state == AppLifecycleState.resumed && _shouldReloadOnResume) {
       _shouldReloadOnResume = false;
-      unawaited(() async {
-        final controller = ref.read(walletControllerProvider.notifier);
-        await controller.verifyCheckoutStatus();
+      unawaited(
+        () async {
+          final controller = ref.read(walletControllerProvider.notifier);
+          await controller.verifyCheckoutStatus();
 
-        final verificationState = ref
-            .read(walletControllerProvider)
-            .checkoutVerificationState;
-        if (verificationState != WalletCheckoutVerificationState.succeeded) {
-          await controller.verifyStripeCheckout(null);
-        }
-      }());
+          final verificationState = ref
+              .read(walletControllerProvider)
+              .checkoutVerificationState;
+          if (verificationState != WalletCheckoutVerificationState.succeeded) {
+            await controller.verifyStripeCheckout(null);
+          }
+        }().whenComplete(_scheduleNextAutoRefresh),
+      );
       return;
     }
 
-    unawaited(_walletController.load(refresh: true));
+    unawaited(
+      _walletController
+          .load(refresh: true)
+          .whenComplete(_scheduleNextAutoRefresh),
+    );
   }
 
   void _startAutoRefresh() {

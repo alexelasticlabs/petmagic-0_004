@@ -1,4 +1,4 @@
-part of '../support_chat_page.dart';
+part of 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 
 extension _SupportChatPageActions on _SupportChatPageState {
   Future<void> _pickCameraPhotoAttachmentImpl() async {
@@ -939,7 +939,8 @@ class _SupportAttachmentPickerSheetState
     final text = AppLocalizations.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     final hasAccess = _permissionState?.hasAccess ?? false;
-    final isLimitedAccess = Platform.isIOS && (_permissionState?.isLimited ?? false);
+    final isLimitedAccess =
+        Platform.isIOS && (_permissionState?.isLimited ?? false);
 
     return Container(
       decoration: BoxDecoration(

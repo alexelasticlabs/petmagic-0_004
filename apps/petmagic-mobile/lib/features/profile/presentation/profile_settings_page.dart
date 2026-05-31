@@ -89,6 +89,12 @@ class ProfileSettingsPage extends ConsumerWidget {
               child: Column(
                 children: [
                   ProfileSettingsRow(
+                    icon: Icons.person_outline_rounded,
+                    title: text.profileSettingsAccountInfoTitle,
+                    subtitle: text.profileAccountDetailsSubtitle,
+                    onTap: () => context.push(ProfileAccountInfoPage.routePath),
+                  ),
+                  ProfileSettingsRow(
                     icon: Icons.link_rounded,
                     title: text.profileSettingsLinkedAccountsTitle,
                     subtitle: text.profileSettingsLinkedAccountsSubtitle,

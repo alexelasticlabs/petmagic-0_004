@@ -15,6 +15,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_d
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
@@ -49,9 +50,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(profileControllerProvider);
-    final walletState = ref.watch(walletControllerProvider);
+    final wallet = ref.watch(
+      walletControllerProvider.select((walletState) => walletState.wallet),
+    );
+    final walletIsLoading = ref.watch(
+      walletControllerProvider.select((walletState) => walletState.isLoading),
+    );
     final controller = ref.read(profileControllerProvider.notifier);
-    final subscriptionSummary = ref.watch(premiumSubscriptionSummaryProvider);
+    final subscriptionSummary = ref.watch(
+      premiumSubscriptionSummaryProvider.select((summary) => summary.value),
+    );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomNavInset = petMagicScrollableBottomInset(context);
@@ -69,7 +77,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     final profile = state.profile;
-    final summaryPremium = subscriptionSummary.value?.isPremium;
+    final summaryPremium = subscriptionSummary?.isPremium;
     final shouldShowSubscriptionCard = summaryPremium == true;
     final shouldShowPremiumCta =
         summaryPremium == false ||
@@ -153,7 +161,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       MotionEntrance(
                         delay: const Duration(milliseconds: 150),
                         child: _WalletHighlightCard(
-                          walletState: walletState,
+                          wallet: wallet,
+                          isWalletLoading: walletIsLoading,
                           onTap: () => context.push(WalletPage.routePath),
                         ),
                       ),
@@ -162,8 +171,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         MotionEntrance(
                           delay: const Duration(milliseconds: 200),
                           child: _PremiumBannerCard(
-                            onTap: () =>
-                                _handlePremiumTap(subscriptionSummary.value),
+                            onTap: () => _handlePremiumTap(subscriptionSummary),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -172,11 +180,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         MotionEntrance(
                           delay: const Duration(milliseconds: 240),
                           child: _SubscriptionSummaryCard(
-                            summary: subscriptionSummary.value!,
+                            summary: subscriptionSummary!,
                             isOpening: _isOpeningSubscription,
-                            onManageTap: () => _handleSubscriptionAction(
-                              subscriptionSummary.value,
-                            ),
+                            onManageTap: () =>
+                                _handleSubscriptionAction(subscriptionSummary),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -369,9 +376,14 @@ class _ProfileHeroCard extends StatelessWidget {
 }
 
 class _WalletHighlightCard extends StatelessWidget {
-  const _WalletHighlightCard({required this.walletState, required this.onTap});
+  const _WalletHighlightCard({
+    required this.wallet,
+    required this.isWalletLoading,
+    required this.onTap,
+  });
 
-  final WalletState walletState;
+  final WalletStateModel? wallet;
+  final bool isWalletLoading;
   final VoidCallback onTap;
 
   @override
@@ -379,21 +391,22 @@ class _WalletHighlightCard extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final wallet = walletState.wallet;
+    final walletValue = wallet;
+    final nextWeeklyGrantAtUtc = walletValue?.nextWeeklyGrantAtUtc;
     final weeklyReady =
-        wallet?.nextWeeklyGrantAtUtc == null ||
-        wallet!.nextWeeklyGrantAtUtc!.isBefore(DateTime.now().toUtc());
-    final balanceText = wallet == null
-        ? (walletState.isLoading
+        nextWeeklyGrantAtUtc == null ||
+        nextWeeklyGrantAtUtc.isBefore(DateTime.now().toUtc());
+    final balanceText = walletValue == null
+        ? (isWalletLoading
               ? text.profileWalletLoadingHint
               : text.profileWalletEmptyHint)
-        : '${_formatProfileNumber(context, wallet.balance)} PawSpark';
-    final rewardLabel = wallet == null
+        : '${_formatProfileNumber(context, walletValue.balance)} PawSpark';
+    final rewardLabel = walletValue == null
         ? text.profileWalletPreviewLoadingStatus
         : weeklyReady
         ? text.profileWalletPreviewWeeklyReady
-        : text.profileWalletPreviewAdCount(wallet.adRewardsRemainingToday);
-    final rewardColor = wallet == null
+        : text.profileWalletPreviewAdCount(walletValue.adRewardsRemainingToday);
+    final rewardColor = walletValue == null
         ? colors.textMuted
         : weeklyReady
         ? colors.gold

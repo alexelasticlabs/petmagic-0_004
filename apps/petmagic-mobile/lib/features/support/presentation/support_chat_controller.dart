@@ -108,7 +108,18 @@ class SupportChatController extends Notifier<SupportChatState> {
   }
 
   void setScreenVisible(bool visible) {
+    if (_isScreenVisible == visible) {
+      return;
+    }
+
     _isScreenVisible = visible;
+    if (_isScreenVisible) {
+      _resumePendingRealtimeRefreshIfNeeded();
+      return;
+    }
+
+    _realtimeRefreshTimer?.cancel();
+    _realtimeRefreshTimer = null;
   }
 
   Future<void> start() async {
@@ -476,6 +487,11 @@ class SupportChatController extends Notifier<SupportChatState> {
       return;
     }
 
+    if (!_isScreenVisible) {
+      _hasPendingRealtimeRefresh = true;
+      return;
+    }
+
     _hasPendingRealtimeRefresh = true;
     _scheduleRealtimeRefresh();
   }
@@ -650,7 +666,7 @@ class SupportChatController extends Notifier<SupportChatState> {
   }
 
   void _scheduleRealtimeRefresh() {
-    if (_isConversationBusy) {
+    if (!_isScreenVisible || _isConversationBusy) {
       return;
     }
 
@@ -672,7 +688,7 @@ class SupportChatController extends Notifier<SupportChatState> {
   }
 
   void _resumePendingRealtimeRefreshIfNeeded() {
-    if (_hasPendingRealtimeRefresh) {
+    if (_isScreenVisible && _hasPendingRealtimeRefresh) {
       _scheduleRealtimeRefresh();
     }
   }

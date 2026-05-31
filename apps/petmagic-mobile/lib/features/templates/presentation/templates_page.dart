@@ -94,6 +94,19 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   @override
+  void deactivate() {
+    _templatesController.setScreenVisible(false);
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _templatesController.setScreenVisible(true);
+    unawaited(_refreshFeed());
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(templatesControllerProvider);
     final wallet = ref.watch(

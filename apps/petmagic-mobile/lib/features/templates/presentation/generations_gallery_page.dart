@@ -65,6 +65,19 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   }
 
   @override
+  void deactivate() {
+    _historyController.setScreenVisible(false);
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _historyController.setScreenVisible(true);
+    unawaited(_historyController.load(refresh: true));
+  }
+
+  @override
   void dispose() {
     _historyController.setScreenVisible(false);
     WidgetsBinding.instance.removeObserver(this);

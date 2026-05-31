@@ -128,6 +128,14 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   }
 
   @override
+  void activate() {
+    super.activate();
+    _controller.setScreenVisible(true);
+    _scheduleLoadingFallbackIfNeeded();
+    unawaited(_controller.start());
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _controller.setScreenVisible(true);

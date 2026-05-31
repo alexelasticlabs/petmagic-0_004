@@ -174,7 +174,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profilePremiumSubtitle =>
-      'Unlock all templates and premium editing features.';
+      'Unlock all templates and premium editing flows.';
 
   @override
   String get profilePremiumPlanLabel => 'Premium Plan';
@@ -1138,7 +1138,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get externalCheckoutPendingVerificationMessage =>
-      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe confirms the payment.';
+      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -1193,7 +1193,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumCheckoutFailed =>
-      'Premium purchase is temporarily unavailable.';
+      'Premium checkout is temporarily unavailable.';
 
   @override
   String get premiumManageFailed =>
@@ -1541,11 +1541,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsHelpStatus =>
-      'The help center is still being prepared, so this screen shows the current status.';
+      'The in-app knowledge base is still being assembled, so this screen shows the current rollout status.';
 
   @override
   String get profileDetailsHelpNext =>
-      'The first help articles and troubleshooting guides will appear here as soon as they are available.';
+      'The first help articles and troubleshooting guides will appear here as the mobile support content is published.';
 
   @override
   String get profileDetailsSupportBody =>
@@ -1553,11 +1553,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsSupportStatus =>
-      'Direct support contact in the app is not available yet. For now, this screen is your support entry point.';
+      'Direct in-app contact is not wired yet. For now, keep this screen as the support entry point for the next slice.';
 
   @override
   String get profileDetailsSupportNext =>
-      'Next, this screen will include a full support form or an email handoff.';
+      'The next step is a real support form or email handoff connected to the backend support flow.';
 
   @override
   String get profileDetailsTermsBody =>
@@ -1581,7 +1581,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsPrivacyStatus =>
-      'Privacy details are currently shown as a short summary while the full legal document is being prepared.';
+      'Privacy details are currently represented as an in-app summary screen while the full legal document flow is prepared.';
 
   @override
   String get profileDetailsPrivacyNext =>
@@ -1608,7 +1608,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileLegalAcceptedAtLabel => 'Accepted at';
 
   @override
-  String get profileLegalLoading => 'Loading the current legal document...';
+  String get profileLegalLoading =>
+      'Loading the current legal document from the backend...';
 
   @override
   String get profileLegalUnavailable =>
@@ -1675,11 +1676,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Account deletion is not available as a one-tap action right now. This prevents accidental destructive actions until secure confirmation is ready.';
+      'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'When full account deletion is available, this screen will become the confirmation and verification step.';
+      'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.';
 
   @override
   String get supportChatTitle => 'Support chat';
@@ -1934,7 +1935,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportChatCameraPermissionVideoError =>
-      'Camera permission is required to record video.';
+      'Camera permission is required to record a video.';
 
   @override
   String get supportChatFilesPermissionError =>
@@ -3135,11 +3136,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.';
 
   @override
-  String get debugStripeSmokeTestTitle => 'Stripe PaymentSheet Smoke Test';
+  String get debugStripeSmokeTestTitle => 'Stripe PaymentSheet Test';
 
   @override
   String get debugStripeSmokeTestSubtitle =>
-      'Minimal screen for PaymentSheet tap/focus diagnostics.';
+      'Minimal screen to diagnose tap and focus behavior in PaymentSheet.';
 
   @override
   String get debugStripeSmokeTestOpenAction => 'Open Stripe PaymentSheet';
@@ -3149,15 +3150,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get debugStripeSmokeTestMethodUnavailable =>
-      'Stripe payment method is not available.';
+      'Stripe payment method is unavailable.';
 
   @override
   String get debugStripeSmokeTestNoPlans =>
-      'No Stripe-enabled premium plans found.';
+      'No Premium plans with Stripe enabled were found.';
 
   @override
   String get debugStripeSmokeTestPrepareFailed =>
-      'Unable to prepare PaymentSheet checkout.';
+      'Failed to prepare PaymentSheet checkout.';
 
   @override
   String get debugStripeSmokeTestOpenedSuccess =>
@@ -3168,8 +3169,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'PaymentSheet was dismissed or failed.';
 
   @override
-  String get debugStripeSmokeTestVerifyFailed =>
-      'Checkout verification failed.';
+  String get debugStripeSmokeTestVerifyFailed => 'Payment verification failed.';
 
   @override
   String get premiumBenefitAiGenerationsTitle => '30 AI generations';
