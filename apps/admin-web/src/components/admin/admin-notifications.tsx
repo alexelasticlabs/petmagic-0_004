@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { isActionableAdminNotification } from "@/lib/admin-notification-policy";
+import { clientLogger } from "@/lib/client-logger";
 
 export type AdminNotificationCategory =
   | "support"
@@ -87,10 +88,128 @@ const DEDUPE_WINDOW_MS = 4000;
 const ADMIN_NOTIFICATIONS_STORAGE_KEY = "petmagic.admin.notifications.v1";
 const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+const notificationCategories = new Set<AdminNotificationCategory>([
+  "support",
+  "users",
+  "templates",
+  "economy",
+  "promo",
+  "system",
+]);
+const notificationTones = new Set<AdminNotificationTone>(["info", "success", "warning", "error"]);
+const notificationPriorities = new Set<AdminNotificationPriority>(["normal", "critical"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function sanitizeNotificationHref(href: unknown): string | undefined {
+  if (typeof href !== "string") {
+    return undefined;
+  }
+
+  const trimmed = href.trim();
+  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
+function toHydratedNotificationItem(
+  rawValue: unknown,
+  now: number
+): AdminNotificationItem | null {
+  if (!isRecord(rawValue)) {
+    return null;
+  }
+
+  const id = typeof rawValue.id === "string" ? rawValue.id : "";
+  const title = typeof rawValue.title === "string" ? rawValue.title : "";
+  const message = typeof rawValue.message === "string" ? rawValue.message : "";
+  const source = typeof rawValue.source === "string" ? rawValue.source : "";
+  const createdAt = typeof rawValue.createdAt === "string" ? rawValue.createdAt : "";
+  const read = typeof rawValue.read === "boolean" ? rawValue.read : false;
+  const category = rawValue.category;
+  const tone = rawValue.tone;
+  const priority = rawValue.priority;
+
+  if (!id || !title || !message || !source || !createdAt) {
+    return null;
+  }
+
+  if (!notificationCategories.has(category as AdminNotificationCategory)) {
+    return null;
+  }
+
+  const createdAtTs = new Date(createdAt).getTime();
+  if (!Number.isFinite(createdAtTs) || now - createdAtTs > MAX_PERSISTED_AGE_MS) {
+    return null;
+  }
+
+  const resolvedTone: AdminNotificationTone = notificationTones.has(tone as AdminNotificationTone)
+    ? (tone as AdminNotificationTone)
+    : "info";
+  const resolvedPriority: AdminNotificationPriority = notificationPriorities.has(
+    priority as AdminNotificationPriority
+  )
+    ? (priority as AdminNotificationPriority)
+    : resolvedTone === "error" || resolvedTone === "warning"
+      ? "critical"
+      : "normal";
+
+  return {
+    id,
+    title,
+    message,
+    source,
+    createdAt,
+    read,
+    category: category as AdminNotificationCategory,
+    tone: resolvedTone,
+    priority: resolvedPriority,
+    href: sanitizeNotificationHref(rawValue.href),
+  };
+}
+
+function readInitialAdminNotifications(): AdminNotificationItem[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const now = Date.now();
+    return parsed
+      .map((item) => toHydratedNotificationItem(item, now))
+      .filter((item): item is AdminNotificationItem => item !== null)
+      .filter((item) =>
+        isActionableAdminNotification({
+          source: item.source,
+          tone: item.tone,
+        })
+      )
+      .slice(0, MAX_ADMIN_NOTIFICATIONS);
+  } catch (error) {
+    clientLogger.warn("admin.notifications_hydrate_failed", { error });
+    window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
+    return [];
+  }
+}
+
 const AdminNotificationsContext = createContext<AdminNotificationsContextValue | null>(null);
 
 export function AdminNotificationsProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<AdminNotificationItem[]>([]);
+  const [items, setItems] = useState<AdminNotificationItem[]>(readInitialAdminNotifications);
   const dedupeMapRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -99,55 +218,15 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     }
 
     try {
-      const raw = window.localStorage.getItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
-      if (!raw) {
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as AdminNotificationItem[];
-      if (!Array.isArray(parsed)) {
-        return;
-      }
-
-      const now = Date.now();
-      const hydratedItems = parsed
-        .filter((item) => {
-          const createdAt = new Date(item.createdAt).getTime();
-          return Number.isFinite(createdAt) && now - createdAt <= MAX_PERSISTED_AGE_MS;
-        })
-        .map((item) => {
-          const tone = item.tone ?? "info";
-          return {
-            ...item,
-            tone,
-            priority:
-              item.priority ?? (tone === "error" || tone === "warning" ? "critical" : "normal"),
-          };
-        })
-        .filter((item) =>
-          isActionableAdminNotification({
-            source: item.source,
-            tone: item.tone,
-          })
-        )
-        .slice(0, MAX_ADMIN_NOTIFICATIONS);
-
-      setItems(hydratedItems);
-    } catch {
-      window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
+      window.localStorage.setItem(ADMIN_NOTIFICATIONS_STORAGE_KEY, JSON.stringify(items));
+    } catch (error) {
+      clientLogger.warn("admin.notifications_persist_failed", { error });
     }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem(ADMIN_NOTIFICATIONS_STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
   const addNotification = useCallback((input: AddAdminNotificationInput) => {
     const tone = input.tone ?? "info";
+    const safeHref = sanitizeNotificationHref(input.href);
     if (
       !isActionableAdminNotification({
         source: input.source,
@@ -160,7 +239,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     const now = Date.now();
     const dedupeKey =
       input.dedupeKey ??
-      [input.source, input.category, tone, input.title, input.message, input.href]
+      [input.source, input.category, tone, input.title, input.message, safeHref]
         .filter(Boolean)
         .join("::");
     const previousTimestamp = dedupeMapRef.current.get(dedupeKey);
@@ -178,7 +257,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       category: input.category,
       tone,
       priority: input.priority ?? (tone === "error" || tone === "warning" ? "critical" : "normal"),
-      href: input.href,
+      href: safeHref,
       source: input.source,
       createdAt: new Date(now).toISOString(),
       read: false,

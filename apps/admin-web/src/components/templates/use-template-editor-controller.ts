@@ -27,6 +27,7 @@ import {
   type TemplateStatus,
   type TemplateType,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 
 type TemplateEditorControllerOptions = {
@@ -178,7 +179,12 @@ export function useTemplateEditorController({
         if (!isCancelled) {
           setIsInitializing(false);
         }
-      } catch {
+      } catch (error) {
+        clientLogger.error("templates.editor_initialize_failed", {
+          initialTemplateId,
+          templateType,
+          error,
+        });
         if (!isCancelled) {
           setToast({ type: "error", message: text.errorLoadingTemplates });
         }
@@ -194,7 +200,7 @@ export function useTemplateEditorController({
     return () => {
       isCancelled = true;
     };
-  }, [initialTemplateId, locale, router, text.errorLoadingTemplates]);
+  }, [initialTemplateId, locale, router, templateType, text.errorLoadingTemplates]);
 
   function resetForm() {
     setSelectedTemplate(null);

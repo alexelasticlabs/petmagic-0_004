@@ -6,6 +6,7 @@ import { useEffect } from "react";
 
 import { AdminPage, AdminPageHero, AdminStateCard } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, isLocale } from "@/lib/i18n";
 
 type ErrorPageProps = {
@@ -20,7 +21,12 @@ export default function Error({ error, reset }: ErrorPageProps) {
   const text = getDictionary(locale);
 
   useEffect(() => {
-    console.error(error);
+    clientLogger.error("admin.error_boundary_triggered", {
+      name: error.name,
+      message: error.message,
+      digest: error.digest,
+      error,
+    });
   }, [error]);
 
   return (

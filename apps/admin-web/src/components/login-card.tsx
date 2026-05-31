@@ -4,7 +4,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import styles from "@/components/login-card.module.css";
-import { isAuthSessionExpired, login, useAuthSession } from "@/lib/api-client";
+import {
+  acceptCurrentLegalDocuments,
+  fetchCurrentLegalDocuments,
+  isAuthSessionExpired,
+  login,
+  logout,
+  useAuthSession,
+  type AuthSession,
+  type LegalAcceptanceStatus,
+} from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { type Locale, getDictionary } from "@/lib/i18n";
 
 /* ── SVG icons ────────────────────────────────────────────────────── */
@@ -86,6 +96,44 @@ function IconEyeOff() {
 /* ── Component ────────────────────────────────────────────────────── */
 type LoginCardProps = { locale: Locale };
 
+function hasAdminAccess(roles: string[] | undefined): boolean {
+  return (roles ?? []).some((role) => role === "Admin" || role === "Moderator");
+}
+
+function hasAcceptanceVersions(legalAcceptance: LegalAcceptanceStatus | undefined): boolean {
+  return Boolean(
+    legalAcceptance?.currentTermsOfUseVersion && legalAcceptance.currentPrivacyPolicyVersion
+  );
+}
+
+async function ensureLegalAcceptance(locale: Locale, session: AuthSession): Promise<void> {
+  const legalAcceptance = session.user.legalAcceptance;
+  if (!legalAcceptance?.requiresAcceptance) {
+    return;
+  }
+
+  if (hasAcceptanceVersions(legalAcceptance)) {
+    try {
+      await acceptCurrentLegalDocuments({
+        termsOfUseVersion: legalAcceptance.currentTermsOfUseVersion,
+        privacyPolicyVersion: legalAcceptance.currentPrivacyPolicyVersion,
+      });
+      return;
+    } catch (error) {
+      clientLogger.warn("auth.legal_acceptance_with_session_versions_failed", {
+        locale,
+        error,
+      });
+    }
+  }
+
+  const legalDocuments = await fetchCurrentLegalDocuments(locale);
+  await acceptCurrentLegalDocuments({
+    termsOfUseVersion: legalDocuments.termsOfUse.version,
+    privacyPolicyVersion: legalDocuments.privacyPolicy.version,
+  });
+}
+
 export function LoginCard({ locale }: LoginCardProps) {
   const text = getDictionary(locale);
   const router = useRouter();
@@ -136,9 +184,26 @@ export function LoginCard({ locale }: LoginCardProps) {
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
     try {
-      await login(email, password);
+      const session = await login(email, password);
+
+      if (!hasAdminAccess(session.user.roles)) {
+        await logout();
+        setError(
+          locale === "ru"
+            ? "Доступ к админ-панели есть только у ролей Admin или Moderator."
+            : "Admin panel access is available only for Admin or Moderator roles."
+        );
+        return;
+      }
+
+      await ensureLegalAcceptance(locale, session);
       router.replace(`/${locale}/dashboard`);
-    } catch {
+    } catch (error) {
+      clientLogger.warn("auth.login_failed", {
+        locale,
+        email,
+        error,
+      });
       setError(text.loginFailed);
     } finally {
       setIsSubmitting(false);

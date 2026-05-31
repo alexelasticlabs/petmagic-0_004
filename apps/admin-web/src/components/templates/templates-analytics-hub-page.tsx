@@ -45,6 +45,7 @@ import {
   type TemplateStatus,
   type TemplateType,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale as AppLocale } from "@/lib/i18n";
 
 type TemplatesAnalyticsHubPageProps = {
@@ -112,7 +113,11 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         if (!isCancelled) {
           setOverview(response);
         }
-      } catch {
+      } catch (error) {
+        clientLogger.error("templates.analytics_hub_load_failed", {
+          query,
+          error,
+        });
         if (!isCancelled) {
           setError(text.loadError);
         }

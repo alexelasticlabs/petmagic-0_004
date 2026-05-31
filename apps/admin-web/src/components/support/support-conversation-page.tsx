@@ -39,6 +39,7 @@ import type {
   SupportConversationPriority,
   SupportConversationStatus,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 
 type SupportConversationPageProps = {
@@ -371,8 +372,12 @@ export function SupportConversationPage({
       link.click();
       link.remove();
       URL.revokeObjectURL(objectUrl);
-    } catch {
-      // Keep the dialog actionable even if browser download API is blocked.
+    } catch (error) {
+      clientLogger.warn("support.fullscreen_download_failed", {
+        messageId: fullscreenImage.messageId,
+        url: fullscreenImage.url,
+        error,
+      });
     }
   };
 
@@ -402,8 +407,12 @@ export function SupportConversationPage({
       if (browserNavigator.clipboard) {
         await browserNavigator.clipboard.writeText(fullscreenImage.url);
       }
-    } catch {
-      // Ignore action errors to avoid breaking message rendering.
+    } catch (error) {
+      clientLogger.warn("support.fullscreen_share_failed", {
+        messageId: fullscreenImage.messageId,
+        url: fullscreenImage.url,
+        error,
+      });
     }
   };
 

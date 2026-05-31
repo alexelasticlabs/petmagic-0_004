@@ -379,8 +379,13 @@ async function fetchDashboardPurchases(): Promise<AdminEconomyPurchase[]> {
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
   const items: AdminEconomyPurchase[] = [];
 
-  for (let page = 0; page < maxPages; page += 1) {
-    const response = await fetchAdminEconomyPurchases({ skip: page * take, take });
+  const pageResponses = await Promise.all(
+    Array.from({ length: maxPages }, (_, page) =>
+      fetchAdminEconomyPurchases({ skip: page * take, take })
+    )
+  );
+
+  for (const response of pageResponses) {
     items.push(...response.items);
 
     if (!response.hasMore) {

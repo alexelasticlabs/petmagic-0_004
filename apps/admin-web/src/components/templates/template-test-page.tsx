@@ -35,6 +35,7 @@ import {
   type AdminTemplate,
   type AdminTemplateTestRun,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type TemplateTestPageProps = {
@@ -106,12 +107,20 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
             setRun(historyResponse[0] ?? null);
             setSelectedHistoryGenerationId(null);
           }
-        } catch {
+        } catch (error) {
+          clientLogger.warn("templates.test_history_load_failed", {
+            templateId,
+            error,
+          });
           if (!isCancelled) {
             setHistory([]);
           }
         }
-      } catch {
+      } catch (error) {
+        clientLogger.error("templates.test_template_load_failed", {
+          templateId,
+          error,
+        });
         if (!isCancelled) {
           setLoadError(
             isRu
@@ -148,7 +157,12 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
             12
           )
         );
-      } catch {
+      } catch (error) {
+        clientLogger.warn("templates.test_polling_failed", {
+          templateId,
+          generationId: run.generationId,
+          error,
+        });
         setRunError(isRu ? "Не удалось обновить статус теста." : "Failed to refresh test status.");
       }
     }, 2500);
@@ -156,7 +170,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [isRu, run]);
+  }, [isRu, run, templateId]);
 
   useEffect(
     () => () => {
@@ -274,7 +288,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       ? "Fal inference time"
       : "Fal image inference";
   const internalTokenCost = activeRun?.tokenCost ?? template?.tokenCost ?? 0;
-  const internalBillingText = formatTokenCost(internalTokenCost, isRu);
+  const internalBillingText = formatTokenCost(internalTokenCost);
   const providerCostText = formatProviderCost(activeRun, locale);
   const providerInferenceText = formatProviderInference(activeRun, isRu, isVideoTemplate);
   const statusText = activeRun?.status ?? (isRu ? "Ожидает запуска" : "Waiting to start");
@@ -955,7 +969,11 @@ function MediaPreviewCard({
     const isSameOrigin = (() => {
       try {
         return new URL(previewUrl, window.location.href).origin === window.location.origin;
-      } catch {
+      } catch (error) {
+        clientLogger.warn("templates.media_preview_origin_check_failed", {
+          previewUrl,
+          error,
+        });
         return false;
       }
     })();
@@ -1203,7 +1221,7 @@ function formatGenerationDuration(run: AdminTemplateTestRun | null, isRu: boolea
   return formatReferenceDuration(seconds, isRu);
 }
 
-function formatTokenCost(value: number, isRu: boolean) {
+function formatTokenCost(value: number) {
   return `${value} PawSpark`;
 }
 

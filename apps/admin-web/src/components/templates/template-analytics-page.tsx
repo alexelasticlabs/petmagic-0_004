@@ -53,6 +53,7 @@ import {
   type AdminTemplateEventAnalytics,
   type AdminTemplateRecentGeneration,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 
 type TemplateAnalyticsPageProps = {
@@ -229,7 +230,12 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       setIsRecentRunsLoading(true);
       const response = await fetchAdminTemplateRecentGenerations(templateId);
       setAllRecentRuns(response);
-    } catch {
+    } catch (error) {
+      clientLogger.warn("templates.analytics_recent_runs_load_failed", {
+        templateId,
+        mode,
+        error,
+      });
       setRecentRunsMode("latest");
       setRecentRunsError(text.recentRunsExpandError);
     } finally {

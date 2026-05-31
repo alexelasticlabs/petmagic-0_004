@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
       import: importPlugin,
     },
     rules: {
+      "no-console": [
+        "warn",
+        {
+          allow: ["error", "warn", "info", "debug"],
+        },
+      ],
       "import/no-duplicates": "error",
       "import/newline-after-import": "warn",
       "import/order": [

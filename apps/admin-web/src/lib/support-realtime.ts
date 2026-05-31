@@ -3,6 +3,8 @@
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { useEffect, useEffectEvent } from "react";
 
+import { clientLogger } from "@/lib/client-logger";
+
 export type SupportConversationUpdatedEvent = {
   conversationId: string;
   initiatorUserId: string;
@@ -41,9 +43,20 @@ export function useSupportRealtime(
     let isDisposed = false;
 
     connection.onclose((error: Error | undefined) => {
-      if (!isDisposed && isExpectedConnectionFailure(error)) {
+      if (isDisposed) {
+        return;
+      }
+
+      const expectedFailure = isExpectedConnectionFailure(error);
+      if (expectedFailure) {
         supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
       }
+
+      clientLogger.warn("support.realtime_closed", {
+        expectedFailure,
+        blockedUntil: supportRealtimeBlockedUntil,
+        error,
+      });
     });
 
     connection.on("conversation-updated", (payload: unknown) => {
@@ -61,9 +74,20 @@ export function useSupportRealtime(
         }
       })
       .catch((error: unknown) => {
-        if (!isDisposed && isExpectedConnectionFailure(error)) {
+        if (isDisposed) {
+          return;
+        }
+
+        const expectedFailure = isExpectedConnectionFailure(error);
+        if (expectedFailure) {
           supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
         }
+
+        clientLogger.warn("support.realtime_start_failed", {
+          expectedFailure,
+          blockedUntil: supportRealtimeBlockedUntil,
+          error,
+        });
       });
 
     return () => {
@@ -98,10 +122,15 @@ function normalizeConversationUpdated(payload: unknown): SupportConversationUpda
     conversationId: candidate.conversationId,
     initiatorUserId: candidate.initiatorUserId,
     updatedAtUtc: candidate.updatedAtUtc,
-    lastMessagePreview: typeof candidate.lastMessagePreview === "string" ? candidate.lastMessagePreview : null,
-    lastMessageAtUtc: typeof candidate.lastMessageAtUtc === "string" ? candidate.lastMessageAtUtc : null,
-    lastMessageSenderType: typeof candidate.lastMessageSenderType === "string" ? candidate.lastMessageSenderType : null,
-    adminUnreadCount: typeof candidate.adminUnreadCount === "number" ? candidate.adminUnreadCount : undefined,
-    userUnreadCount: typeof candidate.userUnreadCount === "number" ? candidate.userUnreadCount : undefined,
+    lastMessagePreview:
+      typeof candidate.lastMessagePreview === "string" ? candidate.lastMessagePreview : null,
+    lastMessageAtUtc:
+      typeof candidate.lastMessageAtUtc === "string" ? candidate.lastMessageAtUtc : null,
+    lastMessageSenderType:
+      typeof candidate.lastMessageSenderType === "string" ? candidate.lastMessageSenderType : null,
+    adminUnreadCount:
+      typeof candidate.adminUnreadCount === "number" ? candidate.adminUnreadCount : undefined,
+    userUnreadCount:
+      typeof candidate.userUnreadCount === "number" ? candidate.userUnreadCount : undefined,
   };
 }

@@ -8,6 +8,7 @@ import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notif
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { fetchUsers, useAuthSession, type UserListItem } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 export type UsersToastState = {
@@ -60,7 +61,11 @@ export function useUsersAdmin(locale: Locale) {
   const isLoading = usersQuery.isLoading || usersQuery.isFetching;
   const error = actionError ?? (usersQuery.isError ? text.errorLoadingUsers : null);
 
-  async function runAction(userId: string, action: () => Promise<void>, options?: RunActionOptions) {
+  async function runAction(
+    userId: string,
+    action: () => Promise<void>,
+    options?: RunActionOptions
+  ) {
     setBusyUserId(userId);
     setActionError(null);
 
@@ -75,7 +80,11 @@ export function useUsersAdmin(locale: Locale) {
         type: "success",
         message: options?.successMessage ?? text.usersChangesSaved,
       });
-    } catch {
+    } catch (error) {
+      clientLogger.error("users.run_action_failed", {
+        userId,
+        error,
+      });
       const message = options?.errorMessage ?? text.errorLoadingUsers;
       setActionError(message);
       setToast({ type: "error", message });

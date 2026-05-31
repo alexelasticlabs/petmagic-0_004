@@ -1,3 +1,5 @@
+import { clientLogger } from "@/lib/client-logger";
+
 export type AdminTheme = "dark" | "light";
 
 export const ADMIN_THEME_STORAGE_KEY = "petmagic_admin_theme";
@@ -26,7 +28,8 @@ export function readStoredAdminTheme(): AdminTheme | null {
   try {
     const raw = window.localStorage.getItem(ADMIN_THEME_STORAGE_KEY);
     return isAdminTheme(raw) ? raw : null;
-  } catch {
+  } catch (error) {
+    clientLogger.warn("theme.storage_read_failed", { error });
     return null;
   }
 }
@@ -38,8 +41,8 @@ export function storeAdminTheme(theme: AdminTheme): void {
 
   try {
     window.localStorage.setItem(ADMIN_THEME_STORAGE_KEY, theme);
-  } catch {
-    // Ignore storage write issues in restrictive environments.
+  } catch (error) {
+    clientLogger.warn("theme.storage_write_failed", { error });
   }
 }
 

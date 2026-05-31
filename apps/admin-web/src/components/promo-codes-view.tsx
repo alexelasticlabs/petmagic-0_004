@@ -52,6 +52,7 @@ import {
   type AdminRedeemRewardKind,
   type AdminUserDetail,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -130,9 +131,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const promoCodesQuery = useQuery({
     queryKey: adminQueryKeys.economyRedeemCodes,
     queryFn: fetchAdminRedeemCodes,
+    staleTime: PROMO_CODES_AUTO_REFRESH_MS,
     refetchInterval: PROMO_CODES_AUTO_REFRESH_MS,
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const promoCodes = promoCodesQuery.data ?? EMPTY_PROMO_CODES;
@@ -501,7 +503,8 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     try {
       await copyTextToClipboard(code);
       setFeedback({ tone: "info", message: text.promoCodesCopied });
-    } catch {
+    } catch (error) {
+      clientLogger.warn("promo.copy_failed", { error });
       setFeedback({ tone: "danger", message: text.promoCodesUpdateError });
     }
     closeActionsMenu();

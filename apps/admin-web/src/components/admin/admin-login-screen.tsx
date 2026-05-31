@@ -19,6 +19,7 @@ export function AdminLoginScreen({
   onToggleTheme,
   children,
 }: AdminLoginScreenProps) {
+  void _theme;
   const welcomeTitle = locale === "ru" ? "Добро пожаловать!" : "Welcome!";
   const welcomeSubtitle =
     locale === "ru"

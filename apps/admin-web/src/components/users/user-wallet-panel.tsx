@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import styles from "@/components/users/user-wallet-panel.module.css";
 import { adjustAdminUserWallet, type AdminUserAnalytics } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
@@ -48,7 +49,13 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
       setReason("");
       setFeedback({ tone: "success", message: text.walletOperationSaved });
       await onUpdated?.();
-    } catch {
+    } catch (error) {
+      clientLogger.error("users.wallet_adjust_failed", {
+        userId,
+        operation,
+        amount: parsedAmount,
+        error,
+      });
       setFeedback({ tone: "danger", message: text.walletOperationError });
     } finally {
       setIsSubmitting(false);

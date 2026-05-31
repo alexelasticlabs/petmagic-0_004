@@ -25,10 +25,10 @@ import {
 } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
-import styles from "@/components/users-management-page.module.css";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { useUsersAdmin } from "@/components/users/use-users-admin";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import styles from "@/components/users-management-page.module.css";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   adjustAdminUserWallet,
@@ -77,6 +77,7 @@ type StatusFilter = "all" | "active" | "blocked" | "unconfirmed";
 type UserRoleText = Pick<Dictionary, "userRoleAdmin" | "userRoleModerator" | "userRoleUser">;
 
 const PAGE_SIZE = 12;
+const LIVE_METRICS_UPDATE_INTERVAL_MS = 60_000;
 
 function getUserRoleLabel(role: string, text: UserRoleText) {
   return role === "Admin"
@@ -281,6 +282,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const [sortMode, setSortMode] = useState<SortMode>("created-desc");
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
   const [page, setPage] = useState(1);
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   const [openActionsUserId, setOpenActionsUserId] = useState<string | null>(null);
   const [actionsMenuPosition, setActionsMenuPosition] = useState<ActionsMenuPosition | null>(null);
@@ -294,6 +296,16 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const closeActionsMenu = useCallback(() => {
     setOpenActionsUserId(null);
     setActionsMenuPosition(null);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, LIVE_METRICS_UPDATE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(timer);
+    };
   }, []);
 
   const supportInboxQuery = useQuery({
@@ -450,10 +462,12 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   }, [filteredUsersBase, sortMode]);
 
   const sortByLastActivity = sortMode === "last-activity-asc" || sortMode === "last-activity-desc";
+  const preSortedTotalPages = Math.max(1, Math.ceil(preSortedUsers.length / PAGE_SIZE));
+  const preSortedCurrentPage = Math.min(page, preSortedTotalPages);
 
   const analyticsTargetUsers = sortByLastActivity
     ? filteredUsersBase
-    : preSortedUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    : preSortedUsers.slice((preSortedCurrentPage - 1) * PAGE_SIZE, preSortedCurrentPage * PAGE_SIZE);
 
   const analyticsQueries = useQueries({
     queries: analyticsTargetUsers.map((user) => ({
@@ -493,20 +507,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   }, [analyticsByUserId, filteredUsersBase, preSortedUsers, sortByLastActivity, sortMode]);
 
   const totalPages = Math.max(1, Math.ceil(sortedUsers.length / PAGE_SIZE));
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search, roleFilter, premiumFilter, activityFilter, statusFilter, sortMode]);
+  const currentPage = Math.min(page, totalPages);
 
   const pagedUsers = useMemo(
-    () => sortedUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [page, sortedUsers]
+    () => sortedUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, sortedUsers]
   );
 
   const pageSubscriptionQueries = useQueries({
@@ -532,7 +537,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     return map;
   }, [pageSubscriptionQueries, pagedUsers]);
 
-  const supportTickets = supportInboxQuery.data ?? [];
+  const supportTickets = useMemo(() => supportInboxQuery.data ?? [], [supportInboxQuery.data]);
   const openSupportUserCount = useMemo(() => {
     const unique = new Set(
       supportTickets
@@ -542,7 +547,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     return unique.size;
   }, [supportTickets]);
 
-  const nowTs = Date.now();
   const rangeMs = rangeDays * 24 * 60 * 60 * 1000;
   const newUsersCount = users.filter((user) => {
     const createdTs = new Date(user.createdAtUtc).getTime();
@@ -742,13 +746,19 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             className={styles.searchInput}
             placeholder={ui.searchPlaceholder}
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
           />
 
           <select
             className={styles.filterSelect}
             value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value as RoleFilter)}
+            onChange={(event) => {
+              setRoleFilter(event.target.value as RoleFilter);
+              setPage(1);
+            }}
             aria-label={ui.filterRole}
           >
             <option value="all">
@@ -762,7 +772,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           <select
             className={styles.filterSelect}
             value={premiumFilter}
-            onChange={(event) => setPremiumFilter(event.target.value as PremiumFilter)}
+            onChange={(event) => {
+              setPremiumFilter(event.target.value as PremiumFilter);
+              setPage(1);
+            }}
             aria-label={ui.filterPremium}
           >
             <option value="all">
@@ -775,7 +788,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           <select
             className={styles.filterSelect}
             value={activityFilter}
-            onChange={(event) => setActivityFilter(event.target.value as ActivityFilter)}
+            onChange={(event) => {
+              setActivityFilter(event.target.value as ActivityFilter);
+              setPage(1);
+            }}
             aria-label={ui.filterActivity}
           >
             <option value="all">
@@ -788,7 +804,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           <select
             className={styles.filterSelect}
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            onChange={(event) => {
+              setStatusFilter(event.target.value as StatusFilter);
+              setPage(1);
+            }}
             aria-label={ui.filterStatus}
           >
             <option value="all">
@@ -802,7 +821,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           <select
             className={styles.filterSelect}
             value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as SortMode)}
+            onChange={(event) => {
+              setSortMode(event.target.value as SortMode);
+              setPage(1);
+            }}
             aria-label={ui.sortLabel}
           >
             <option value="created-desc">{ui.sortCreatedDesc}</option>
@@ -814,7 +836,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           <select
             className={styles.filterSelect}
             value={String(rangeDays)}
-            onChange={(event) => setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays)}
+            onChange={(event) => {
+              setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays);
+              setPage(1);
+            }}
             aria-label={ui.periodLabel}
           >
             <option value="7">{ui.period7}</option>
@@ -832,6 +857,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
               setActivityFilter("all");
               setStatusFilter("all");
               setSortMode("created-desc");
+              setPage(1);
             }}
           >
             {ui.resetFilters}
@@ -870,8 +896,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                 <tbody>
                   {pagedUsers.map((user) => {
                     const isBusy = busyUserId === user.userId;
-                    const isModerator = user.roles.includes("Moderator");
-                    const isAdmin = user.roles.includes("Admin");
                     const status = getAccountStatus(user);
                     const rowAnalytics = analyticsByUserId.get(user.userId);
                     const rowSubscription = pageSubscriptionsByUserId.get(user.userId);
@@ -1033,18 +1057,18 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={page <= 1}
+                  disabled={currentPage <= 1}
                 >
                   {ui.prevPage}
                 </Button>
                 <span>
-                  {ui.pageInfo} {page} / {totalPages}
+                  {ui.pageInfo} {currentPage} / {totalPages}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                  disabled={page >= totalPages}
+                  disabled={currentPage >= totalPages}
                 >
                   {ui.nextPage}
                 </Button>

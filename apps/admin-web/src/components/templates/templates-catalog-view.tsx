@@ -46,6 +46,7 @@ import {
   type TemplateStatus,
   type TemplateType,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type TemplatesCatalogViewProps = {
@@ -173,7 +174,12 @@ export function TemplatesCatalogView({
     try {
       await changeTemplateStatus(templateId, status);
       await refresh();
-    } catch {
+    } catch (error) {
+      clientLogger.error("templates.catalog_status_change_failed", {
+        templateId,
+        status,
+        error,
+      });
       setActionError(text.errorSavingTemplate);
     } finally {
       setBusyTemplateId(null);
@@ -192,7 +198,11 @@ export function TemplatesCatalogView({
     try {
       await deleteTemplate(templateId);
       await refresh();
-    } catch {
+    } catch (error) {
+      clientLogger.error("templates.catalog_delete_failed", {
+        templateId,
+        error,
+      });
       setActionError(text.errorDeletingTemplate);
     } finally {
       setBusyTemplateId(null);

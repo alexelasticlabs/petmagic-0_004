@@ -50,7 +50,9 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
       ? "Доля успешных jobs среди запусков."
       : "Completed jobs as a share of started jobs.",
     tokenSpend: isRu ? "Потрачено PawSpark" : "PawSpark spend",
-    tokenSpendHint: isRu ? "Суммарная стоимость запусков в PawSpark." : "Total PawSpark cost of runs.",
+    tokenSpendHint: isRu
+      ? "Суммарная стоимость запусков в PawSpark."
+      : "Total PawSpark cost of runs.",
     complaints: isRu ? "Жалобы" : "Complaints",
     complaintsHint: isRu
       ? "События complaint из публичного analytics endpoint."

@@ -31,6 +31,7 @@ import {
 import { useSupportConversationController } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import { type AdminSupportMessage } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 
 type SupportConversationSidePanelProps = {
@@ -109,7 +110,7 @@ export function SupportConversationSidePanel({
       return;
     }
 
-    console.error("Failed to load support user context", {
+    clientLogger.error("support.user_context_load_failed", {
       analyticsError: analyticsQuery.error,
       purchasesError: purchasesQuery.error,
       subscriptionError: subscriptionQuery.error,

@@ -2,7 +2,10 @@
 
 import { useSyncExternalStore } from "react";
 
+import { clientLogger } from "./client-logger";
+
 import type {
+  AcceptLegalDocumentsCommand,
   AdminSupportConversation,
   AdminSupportConversationSummary,
   AdminSupportReplyTemplate,
@@ -19,7 +22,9 @@ import type {
   AdminUserAnalytics,
   AdminUserDetail,
   AuthSession,
+  LegalDocumentsResponse,
   TemplateType,
+  UserProfile,
   UserListItem,
 } from "./api-client.types";
 
@@ -202,7 +207,8 @@ export function getSession(): AuthSession | null {
 
     cachedAuthSession = parsed;
     return cachedAuthSession;
-  } catch {
+  } catch (error) {
+    clientLogger.warn("auth.session_parse_failed", { error });
     cachedAuthSession = null;
     return null;
   }
@@ -335,8 +341,17 @@ export async function apiRequest<TResponse>(
     if (isTimedOut) {
       const timeoutError = new Error("API request timed out") as ApiError;
       timeoutError.code = "request.timeout";
-      timeoutError.detail = `Request exceeded ${API_REQUEST_TIMEOUT_MS / 1000} seconds.`;
+      timeoutError.detail = "Request timed out.";
       throw timeoutError;
+    }
+
+    const wasManuallyAborted = abortController.signal.aborted;
+    if (!wasManuallyAborted) {
+      clientLogger.warn("api.request_failed", {
+        path,
+        method: init.method ?? "GET",
+        error,
+      });
     }
 
     throw error;
@@ -383,8 +398,12 @@ export async function apiRequest<TResponse>(
       } else if (problem.title) {
         error.message = problem.title;
       }
-    } catch {
-      // Ignore invalid or empty error payloads and fall back to the generic message.
+    } catch (parseError) {
+      clientLogger.warn("api.error_payload_parse_failed", {
+        path,
+        status: response.status,
+        error: parseError,
+      });
     }
 
     throw error;
@@ -417,7 +436,11 @@ async function refreshSession(): Promise<boolean> {
 
     saveSession(refreshed);
     return true;
-  } catch {
+  } catch (error) {
+    clientLogger.warn("auth.refresh_failed", {
+      hasRefreshToken: Boolean(volatileRefreshToken?.trim()),
+      error,
+    });
     clearSession();
     return false;
   }
@@ -438,6 +461,36 @@ export async function login(email: string, password: string): Promise<AuthSessio
 
   saveSession(session);
   return session;
+}
+
+export async function fetchCurrentLegalDocuments(locale?: string): Promise<LegalDocumentsResponse> {
+  const suffix = locale ? `?locale=${encodeURIComponent(locale)}` : "";
+  return apiRequest<LegalDocumentsResponse>(
+    `/api/legal/current${suffix}`,
+    {
+      method: "GET",
+    },
+    {
+      requireAuth: false,
+      allowRefresh: false,
+    }
+  );
+}
+
+export async function acceptCurrentLegalDocuments(
+  command: AcceptLegalDocumentsCommand
+): Promise<UserProfile> {
+  return apiRequest<UserProfile>(
+    "/api/legal/accept",
+    {
+      method: "POST",
+      body: JSON.stringify(command),
+    },
+    {
+      requireAuth: true,
+      allowRefresh: true,
+    }
+  );
 }
 
 export async function logout(): Promise<void> {
@@ -463,8 +516,8 @@ export async function logout(): Promise<void> {
       headers,
       body: requestBody,
       credentials: "include",
-    }).catch(() => {
-      // Logout must stay locally instant even when the API is slow or unavailable.
+    }).catch((error: unknown) => {
+      clientLogger.warn("auth.logout_failed", { error });
     });
   }
 }

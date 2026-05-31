@@ -43,6 +43,7 @@ import {
   type SupportConversationStatus,
   type SupportInboxAssignmentScope,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { useSupportRealtime } from "@/lib/support-realtime";
 
@@ -131,7 +132,7 @@ export const statusOptions: SupportConversationStatus[] = [
   "Closed",
 ];
 
-const supportPollingIntervalMs = 5_000;
+const supportPollingIntervalMs = 8_000;
 const supportConversationMessagesTake = 80;
 
 function mergeSupportConversationMessages(
@@ -189,13 +190,14 @@ export function useSupportConversationController({
   const messagesViewportVisibleRef = useRef(false);
   const lastConversationRealtimeFetchRef = useRef(0);
   const optimisticAttachmentObjectUrlsRef = useRef(new Map<string, string>());
+  const optimisticMessageCounterRef = useRef(0);
 
   const resetSelectedAttachment = useCallback(() => {
     setSelectedAttachment(null);
     if (attachmentInputRef.current) {
       attachmentInputRef.current.value = "";
     }
-  }, []);
+  }, [setSelectedAttachment]);
 
   const refreshConversationData = useCallback(async () => {
     await Promise.all([
@@ -318,7 +320,11 @@ export function useSupportConversationController({
             }
           );
         })
-        .catch(() => {
+        .catch((error) => {
+          clientLogger.warn("support.realtime_fetch_conversation_failed", {
+            conversationId,
+            error,
+          });
           void queryClient.invalidateQueries({
             queryKey: adminQueryKeys.supportConversation(conversationId),
           });
@@ -359,7 +365,12 @@ export function useSupportConversationController({
 
     markReadRequestRef.current = markSupportConversationRead(conversationId)
       .then(refreshConversationData)
-      .catch(() => undefined)
+      .catch((error) => {
+        clientLogger.warn("support.mark_read_failed", {
+          conversationId,
+          error,
+        });
+      })
       .finally(() => {
         markReadRequestRef.current = null;
       });
@@ -466,7 +477,8 @@ export function useSupportConversationController({
         return {};
       }
 
-      const optimisticMessageId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      optimisticMessageCounterRef.current += 1;
+      const optimisticMessageId = `optimistic-${conversationId}-${optimisticMessageCounterRef.current}`;
       const nowUtc = new Date().toISOString();
       const optimisticAttachmentObjectUrl = selectedAttachment
         ? URL.createObjectURL(selectedAttachment)
@@ -804,10 +816,13 @@ export function useSupportConversationController({
     [conversation?.messages, replyToMessageId]
   );
 
-  const selectReplyToMessage = useCallback((messageId: string | null, preview?: string | null) => {
-    setReplyToMessageId(messageId);
-    setReplyToPreview(messageId ? preview?.trim() || null : null);
-  }, []);
+  const selectReplyToMessage = useCallback(
+    (messageId: string | null, preview?: string | null) => {
+      setReplyToMessageId(messageId);
+      setReplyToPreview(messageId ? preview?.trim() || null : null);
+    },
+    [setReplyToMessageId, setReplyToPreview]
+  );
 
   const operatorPriority: SupportConversationPriority = conversation?.priority ?? "Normal";
 
@@ -872,20 +887,12 @@ export function useSupportConversationController({
     [conversation, metadataMutation]
   );
 
-  const sidePanelTabs = useMemo<ReadonlyArray<{ value: SidePanelTab; label: string }>>(
-    () => [
-      { value: "user", label: text.supportViewUserTab },
-      { value: "activity", label: text.supportViewActivityTab },
-      { value: "dialog", label: text.supportViewDialogTab },
-      { value: "attachments", label: text.supportViewAttachmentsTab },
-    ],
-    [
-      text.supportViewActivityTab,
-      text.supportViewAttachmentsTab,
-      text.supportViewDialogTab,
-      text.supportViewUserTab,
-    ]
-  );
+  const sidePanelTabs: ReadonlyArray<{ value: SidePanelTab; label: string }> = [
+    { value: "user", label: text.supportViewUserTab },
+    { value: "activity", label: text.supportViewActivityTab },
+    { value: "dialog", label: text.supportViewDialogTab },
+    { value: "attachments", label: text.supportViewAttachmentsTab },
+  ];
 
   const sidePanelTitle =
     activeSidePanelTab === "user"
