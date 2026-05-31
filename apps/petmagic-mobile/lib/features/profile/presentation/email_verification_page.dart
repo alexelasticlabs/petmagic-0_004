@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
 class EmailVerificationPage extends ConsumerStatefulWidget {
-  const EmailVerificationPage({super.key, required this.email});
+  const EmailVerificationPage({
+    super.key,
+    required this.email,
+    this.initialPassword,
+  });
 
   static const routePath = '/verify-email';
 
   final String email;
+  final String? initialPassword;
 
   @override
   ConsumerState<EmailVerificationPage> createState() => _EmailVerificationPageState();
@@ -87,6 +94,24 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       final repository = ref.read(profileRepositoryProvider);
       await repository.verifyEmailCode(email: widget.email, code: _codeController.text);
       if (!mounted) return;
+
+      final password = widget.initialPassword;
+      if (password != null && password.isNotEmpty) {
+        final session = await repository.login(
+          email: widget.email,
+          password: password,
+        );
+        if (!mounted) return;
+        ref
+            .read(appLaunchControllerProvider.notifier)
+            .markSignedInWithLegalStatus(
+              requiresLegalAcceptance:
+                  session.user.legalAcceptance.requiresAcceptance,
+            );
+        context.go(TemplatesPage.routePath);
+        return;
+      }
+
       setState(() {
         _info = text.emailVerificationConfirmedMessage;
       });

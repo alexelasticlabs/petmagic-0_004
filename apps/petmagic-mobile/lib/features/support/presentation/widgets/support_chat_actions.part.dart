@@ -306,6 +306,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
+    FocusScope.of(context).unfocus();
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     final action = await showModalBottomSheet<_SupportAttachmentQuickAction>(
       context: context,
@@ -314,33 +315,43 @@ extension _SupportChatPageActions on _SupportChatPageState {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          minChildSize: 0.45,
-          initialChildSize: 0.52,
-          maxChildSize: 0.98,
-          snap: true,
-          snapSizes: const [0.52, 0.98],
-          builder: (context, scrollController) {
-            return _SupportAttachmentPickerSheet(
-              scrollController: scrollController,
-              selectedAssetIds: _pendingAttachments
-                  .map((attachment) => attachment.sourceAssetId)
-                  .whereType<String>()
-                  .toSet(),
-              selectedAssetOrderById: {
-                for (var index = 0; index < _pendingAttachments.length; index++)
-                  if (_pendingAttachments[index].sourceAssetId != null)
-                    _pendingAttachments[index].sourceAssetId!: index + 1,
-              },
-              onSendSelected: (assets, caption) =>
-                  _sendSelectedAssetsFromPickerImpl(
-                    assets: assets,
-                    localeTag: localeTag,
-                    caption: caption,
-                  ),
-            );
-          },
+        final keyboardInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.only(bottom: keyboardInset),
+          child: DraggableScrollableSheet(
+            expand: false,
+            minChildSize: 0.45,
+            initialChildSize: 0.52,
+            maxChildSize: 0.98,
+            snap: true,
+            snapSizes: const [0.52, 0.98],
+            builder: (context, scrollController) {
+              return _SupportAttachmentPickerSheet(
+                scrollController: scrollController,
+                selectedAssetIds: _pendingAttachments
+                    .map((attachment) => attachment.sourceAssetId)
+                    .whereType<String>()
+                    .toSet(),
+                selectedAssetOrderById: {
+                  for (
+                    var index = 0;
+                    index < _pendingAttachments.length;
+                    index++
+                  )
+                    if (_pendingAttachments[index].sourceAssetId != null)
+                      _pendingAttachments[index].sourceAssetId!: index + 1,
+                },
+                onSendSelected: (assets, caption) =>
+                    _sendSelectedAssetsFromPickerImpl(
+                      assets: assets,
+                      localeTag: localeTag,
+                      caption: caption,
+                    ),
+              );
+            },
+          ),
         );
       },
     );
@@ -931,9 +942,7 @@ class _SupportAttachmentPickerSheetState
     final text = AppLocalizations.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     final hasAccess = _permissionState?.hasAccess ?? false;
-    final isLimitedAccess =
-        (_permissionState?.toString().toLowerCase().contains('limited') ??
-        false);
+    final isLimitedAccess = Platform.isIOS && (_permissionState?.isLimited ?? false);
 
     return Container(
       decoration: BoxDecoration(

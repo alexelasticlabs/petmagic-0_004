@@ -2279,32 +2279,39 @@ class AppLocalizationsPl extends AppLocalizations {
   String get startupWelcomeViewOnboarding => 'Zobacz wprowadzenie';
 
   @override
-  String get startupWelcomeTitle => 'Witamy ponownie w PetMagic';
+  String get startupWelcomeTitle => 'Twórz magiczne wideo ze swoim pupilem';
 
   @override
   String get startupWelcomeSubtitle =>
-      'Kontynuuj eksplorację jako gość lub zaloguj się, zanim zaczniesz renderować szablony, odblokowywać nagrody i zapisywać swoje dzieła.';
+      'Wybierz szablon, dodaj zdjęcie pupila i otrzymaj gotowe wideo AI w kilka minut.';
 
   @override
   String get startupWelcomeContinueGuest => 'Kontynuuj jako gość';
 
   @override
-  String get startupWelcomeTemplatesTitle => 'Szablony wirusowe';
+  String get startupWelcomeTemplatesTitle => 'Wybierz szablon';
 
   @override
-  String get startupWelcomeTemplatesSubtitle => 'Podgląd pełnego kanału';
+  String get startupWelcomeTemplatesSubtitle =>
+      'Trendy, memy i sezonowe sceny na każdy nastrój.';
 
   @override
-  String get startupWelcomeAiTitle => 'Magia AI';
+  String get startupWelcomeAiTitle => 'Dodaj zdjęcie pupila';
 
   @override
-  String get startupWelcomeAiSubtitle => 'Odblokuj po zalogowaniu';
+  String get startupWelcomeAiSubtitle =>
+      'Jedno zdjęcie wystarczy, aby AI stworzyło styl i ruch.';
 
   @override
-  String get startupWelcomeShareTitle => 'Udostępnij i ciesz się';
+  String get startupWelcomeShareTitle => 'Odbierz gotowe wideo';
 
   @override
-  String get startupWelcomeShareSubtitle => 'Zapisz swoje ulubione później';
+  String get startupWelcomeShareSubtitle =>
+      'Twój klip jest gotowy do udostępnienia lub zapisania jednym dotknięciem.';
+
+  @override
+  String get startupWelcomeGuestHint =>
+      'Możesz zacząć bez konta. Rejestracja jest potrzebna tylko do zapisu historii i dostępu do zakupów.';
 
   @override
   String get authEntryTitle => 'Witamy ponownie!';

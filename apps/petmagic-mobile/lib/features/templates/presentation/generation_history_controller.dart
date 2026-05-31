@@ -97,8 +97,9 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   static const Duration _autoRefreshMinInterval = Duration(seconds: 8);
   static const Duration _autoRefreshMaxInterval = Duration(seconds: 30);
 
-  late final TemplateGenerationRepository _repository;
-  late final RealtimeClient _realtimeClient;
+  TemplateGenerationRepository get _repository =>
+      ref.read(templateGenerationRepositoryProvider);
+  RealtimeClient get _realtimeClient => ref.read(realtimeClientProvider);
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Timer? _offlineBannerTimer;
   Timer? _autoRefreshTimer;
@@ -109,8 +110,8 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
   @override
   GenerationHistoryState build() {
-    _repository = ref.watch(templateGenerationRepositoryProvider);
-    _realtimeClient = ref.watch(realtimeClientProvider);
+    ref.watch(templateGenerationRepositoryProvider);
+    ref.watch(realtimeClientProvider);
     _startAutoRefresh();
     ref.onDispose(() {
       _offlineBannerTimer?.cancel();

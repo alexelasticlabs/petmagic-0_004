@@ -2266,32 +2266,40 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupWelcomeViewOnboarding => 'Показать onboarding';
 
   @override
-  String get startupWelcomeTitle => 'С возвращением в PetMagic';
+  String get startupWelcomeTitle =>
+      'Создавайте магические видео с вашим питомцем';
 
   @override
   String get startupWelcomeSubtitle =>
-      'Продолжайте как гость или войдите перед рендером шаблонов, наградами и сохранением своих созданий.';
+      'Выберите шаблон, добавьте фото питомца и получите готовое AI-видео за пару минут.';
 
   @override
   String get startupWelcomeContinueGuest => 'Продолжить как гость';
 
   @override
-  String get startupWelcomeTemplatesTitle => 'Вирусные шаблоны';
+  String get startupWelcomeTemplatesTitle => 'Выберите шаблон';
 
   @override
-  String get startupWelcomeTemplatesSubtitle => 'Смотрите весь каталог';
+  String get startupWelcomeTemplatesSubtitle =>
+      'Тренды, мемы и сезонные сцены для любого настроения.';
 
   @override
-  String get startupWelcomeAiTitle => 'AI магия';
+  String get startupWelcomeAiTitle => 'Добавьте фото питомца';
 
   @override
-  String get startupWelcomeAiSubtitle => 'Откроется после входа';
+  String get startupWelcomeAiSubtitle =>
+      'Одного фото достаточно, чтобы AI собрал стиль и движение.';
 
   @override
-  String get startupWelcomeShareTitle => 'Делитесь и радуйтесь';
+  String get startupWelcomeShareTitle => 'Получите готовое видео';
 
   @override
-  String get startupWelcomeShareSubtitle => 'Сохраняйте избранное позже';
+  String get startupWelcomeShareSubtitle =>
+      'Ролик будет готов для публикации и сохранения в один тап.';
+
+  @override
+  String get startupWelcomeGuestHint =>
+      'Можно начать без аккаунта. Регистрация понадобится для сохранения истории и доступа к покупкам.';
 
   @override
   String get authEntryTitle => 'С возвращением!';

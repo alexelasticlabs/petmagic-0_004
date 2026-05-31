@@ -5,12 +5,12 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
@@ -303,15 +303,13 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                               value: _acceptedTerms,
                               label: text.authAcceptTermsLabel,
                               locale: Localizations.localeOf(context),
-                              onOpenTerms: () => context.push(
-                                ProfileSettingsDetailPage.location(
-                                  ProfileSettingsDetailKind.terms,
-                                ),
+                              onOpenTerms: () => _openLegalDocument(
+                                legalDocuments: legalDocumentsAsync.value,
+                                documentSelector: (docs) => docs.termsOfUse,
                               ),
-                              onOpenPrivacy: () => context.push(
-                                ProfileSettingsDetailPage.location(
-                                  ProfileSettingsDetailKind.privacy,
-                                ),
+                              onOpenPrivacy: () => _openLegalDocument(
+                                legalDocuments: legalDocumentsAsync.value,
+                                documentSelector: (docs) => docs.privacyPolicy,
                               ),
                               showError:
                                   _consentErrorMessage ==
@@ -440,6 +438,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   Future<void> _submit() async {
     final controller = ref.read(profileControllerProvider.notifier);
     final router = GoRouter.of(context);
+    final initialPassword = _passwordController.text;
     if (_isSignUp) {
       final locale = Localizations.localeOf(context).toLanguageTag();
       final legalDocuments = switch (ref.read(
@@ -485,6 +484,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         final email = nextState.email.trim();
         router.go(
           '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}',
+          extra: <String, dynamic>{'initialPassword': initialPassword},
         );
       }
       return;
@@ -540,6 +540,89 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
 
   String _mapErrorMessage(String raw, AppLocalizations text) {
     return mapProfileFeedbackMessage(raw, text);
+  }
+
+  Future<void> _openLegalDocument({
+    required MobileLegalDocuments? legalDocuments,
+    required MobileLegalDocument Function(MobileLegalDocuments docs)
+    documentSelector,
+  }) async {
+    if (legalDocuments == null) {
+      return;
+    }
+
+    final document = documentSelector(legalDocuments);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _LegalDocumentSheet(document: document),
+    );
+  }
+}
+
+class _LegalDocumentSheet extends StatelessWidget {
+  const _LegalDocumentSheet({required this.document});
+
+  final MobileLegalDocument document;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FractionallySizedBox(
+      heightFactor: 0.9,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    document.title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                if (document.summary.isNotEmpty) ...[
+                  Text(document.summary, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 12),
+                ],
+                for (final section in document.sections) ...[
+                  if (section.heading.isNotEmpty) ...[
+                    Text(
+                      section.heading,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  for (final paragraph in section.paragraphs) ...[
+                    Text(paragraph, style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 10),
+                  ],
+                  const SizedBox(height: 6),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

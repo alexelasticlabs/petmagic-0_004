@@ -11,6 +11,7 @@ class AppLaunchState {
   const AppLaunchState({
     required this.isLoading,
     required this.isAuthenticated,
+    required this.requiresLegalAcceptance,
     required this.hasSeenOnboarding,
     required this.guestSessionReady,
   });
@@ -19,24 +20,29 @@ class AppLaunchState {
     : this(
         isLoading: true,
         isAuthenticated: false,
+        requiresLegalAcceptance: false,
         hasSeenOnboarding: false,
         guestSessionReady: false,
       );
 
   final bool isLoading;
   final bool isAuthenticated;
+  final bool requiresLegalAcceptance;
   final bool hasSeenOnboarding;
   final bool guestSessionReady;
 
   AppLaunchState copyWith({
     bool? isLoading,
     bool? isAuthenticated,
+    bool? requiresLegalAcceptance,
     bool? hasSeenOnboarding,
     bool? guestSessionReady,
   }) {
     return AppLaunchState(
       isLoading: isLoading ?? this.isLoading,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      requiresLegalAcceptance:
+          requiresLegalAcceptance ?? this.requiresLegalAcceptance,
       hasSeenOnboarding: hasSeenOnboarding ?? this.hasSeenOnboarding,
       guestSessionReady: guestSessionReady ?? this.guestSessionReady,
     );
@@ -65,6 +71,8 @@ class AppLaunchController extends Notifier<AppLaunchState> {
     state = AppLaunchState(
       isLoading: false,
       isAuthenticated: session != null,
+      requiresLegalAcceptance:
+          session?.user.legalAcceptance.requiresAcceptance ?? false,
       hasSeenOnboarding: hasSeenOnboarding,
       guestSessionReady: session != null,
     );
@@ -72,7 +80,15 @@ class AppLaunchController extends Notifier<AppLaunchState> {
 
   Future<void> continueAsGuest() async {
     if (!state.hasSeenOnboarding) {
-      await _guestLaunchStorage.saveOnboardingSeen(true);
+      try {
+        await _guestLaunchStorage.saveOnboardingSeen(true);
+      } catch (_) {
+        // Do not block guest entry when local persistence fails.
+      }
+    }
+
+    if (!ref.mounted) {
+      return;
     }
 
     state = state.copyWith(
@@ -92,6 +108,19 @@ class AppLaunchController extends Notifier<AppLaunchState> {
     state = state.copyWith(
       isLoading: false,
       isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+
+  void markSignedInWithLegalStatus({
+    required bool requiresLegalAcceptance,
+  }) {
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: requiresLegalAcceptance,
       hasSeenOnboarding: true,
       guestSessionReady: true,
     );
@@ -101,6 +130,7 @@ class AppLaunchController extends Notifier<AppLaunchState> {
     state = state.copyWith(
       isLoading: false,
       isAuthenticated: false,
+      requiresLegalAcceptance: false,
       guestSessionReady: false,
     );
   }

@@ -2300,32 +2300,40 @@ class AppLocalizationsFr extends AppLocalizations {
   String get startupWelcomeViewOnboarding => 'Voir l\'intégration';
 
   @override
-  String get startupWelcomeTitle => 'Bienvenue à PetMagic';
+  String get startupWelcomeTitle =>
+      'Créez des vidéos magiques avec votre animal';
 
   @override
   String get startupWelcomeSubtitle =>
-      'Continuez à explorer en tant qu\'invité ou connectez-vous avant de créer des modèles, de débloquer des récompenses et d\'enregistrer vos créations.';
+      'Choisissez un modèle, ajoutez la photo de votre animal et obtenez une vidéo IA prête en quelques minutes.';
 
   @override
   String get startupWelcomeContinueGuest => 'Continuer en tant qu\'invité';
 
   @override
-  String get startupWelcomeTemplatesTitle => 'Modèles viraux';
+  String get startupWelcomeTemplatesTitle => 'Choisissez un modèle';
 
   @override
-  String get startupWelcomeTemplatesSubtitle => 'Aperçu du flux complet';
+  String get startupWelcomeTemplatesSubtitle =>
+      'Tendances, mèmes et scènes de saison pour chaque ambiance.';
 
   @override
-  String get startupWelcomeAiTitle => 'Magie de l\'IA';
+  String get startupWelcomeAiTitle => 'Ajoutez la photo de votre animal';
 
   @override
-  String get startupWelcomeAiSubtitle => 'Déverrouiller lors de la connexion';
+  String get startupWelcomeAiSubtitle =>
+      'Une seule photo suffit pour que l\'IA crée le style et le mouvement.';
 
   @override
-  String get startupWelcomeShareTitle => 'Partagez et profitez';
+  String get startupWelcomeShareTitle => 'Obtenez une vidéo prête';
 
   @override
-  String get startupWelcomeShareSubtitle => 'Enregistrez vos favoris plus tard';
+  String get startupWelcomeShareSubtitle =>
+      'Votre clip est prêt à être partagé ou enregistré en un geste.';
+
+  @override
+  String get startupWelcomeGuestHint =>
+      'Vous pouvez commencer sans compte. L\'inscription n\'est nécessaire que pour enregistrer l\'historique et accéder aux achats.';
 
   @override
   String get authEntryTitle => 'Content de te revoir!';

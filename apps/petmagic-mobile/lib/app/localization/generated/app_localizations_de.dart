@@ -2288,34 +2288,40 @@ class AppLocalizationsDe extends AppLocalizations {
   String get startupWelcomeViewOnboarding => 'Onboarding anzeigen';
 
   @override
-  String get startupWelcomeTitle => 'Willkommen zurück bei PetMagic';
+  String get startupWelcomeTitle =>
+      'Erstelle magische Videos mit deinem Haustier';
 
   @override
   String get startupWelcomeSubtitle =>
-      'Entdecken Sie als Gast weiter oder melden Sie sich an, bevor Sie Vorlagen rendern, Belohnungen freischalten und Ihre Kreationen speichern.';
+      'Wähle eine Vorlage, füge ein Foto deines Haustiers hinzu und erhalte in wenigen Minuten ein fertiges KI-Video.';
 
   @override
   String get startupWelcomeContinueGuest => 'Als Gast fortfahren';
 
   @override
-  String get startupWelcomeTemplatesTitle => 'Virale Vorlagen';
+  String get startupWelcomeTemplatesTitle => 'Vorlage auswählen';
 
   @override
   String get startupWelcomeTemplatesSubtitle =>
-      'Vorschau des vollständigen Feeds';
+      'Trends, Memes und saisonale Szenen für jede Stimmung.';
 
   @override
-  String get startupWelcomeAiTitle => 'KI-Magie';
+  String get startupWelcomeAiTitle => 'Haustierfoto hinzufügen';
 
   @override
-  String get startupWelcomeAiSubtitle => 'Beim Anmelden entsperren';
+  String get startupWelcomeAiSubtitle =>
+      'Ein Foto reicht aus, damit die KI Stil und Bewegung erstellt.';
 
   @override
-  String get startupWelcomeShareTitle => 'Teilen und genießen';
+  String get startupWelcomeShareTitle => 'Fertiges Video erhalten';
 
   @override
   String get startupWelcomeShareSubtitle =>
-      'Speichern Sie Ihre Favoriten später';
+      'Dein Clip ist mit einem Tipp bereit zum Teilen oder Speichern.';
+
+  @override
+  String get startupWelcomeGuestHint =>
+      'Du kannst ohne Konto starten. Eine Registrierung ist nur nötig, um Verlauf zu speichern und Einkäufe zu nutzen.';
 
   @override
   String get authEntryTitle => 'Willkommen zurück!';

@@ -4101,13 +4101,13 @@ abstract class AppLocalizations {
   /// No description provided for @startupWelcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Welcome back to PetMagic'**
+  /// **'Create magical videos with your pet'**
   String get startupWelcomeTitle;
 
   /// No description provided for @startupWelcomeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Keep exploring as a guest or sign in before you render templates, unlock rewards and save your creations.'**
+  /// **'Pick a template, add your pet photo, and get an AI video ready in minutes.'**
   String get startupWelcomeSubtitle;
 
   /// No description provided for @startupWelcomeContinueGuest.
@@ -4119,38 +4119,44 @@ abstract class AppLocalizations {
   /// No description provided for @startupWelcomeTemplatesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Viral Templates'**
+  /// **'Choose a template'**
   String get startupWelcomeTemplatesTitle;
 
   /// No description provided for @startupWelcomeTemplatesSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Preview the full feed'**
+  /// **'Trends, memes, and seasonal scenes for every mood.'**
   String get startupWelcomeTemplatesSubtitle;
 
   /// No description provided for @startupWelcomeAiTitle.
   ///
   /// In en, this message translates to:
-  /// **'AI Magic'**
+  /// **'Add your pet photo'**
   String get startupWelcomeAiTitle;
 
   /// No description provided for @startupWelcomeAiSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Unlock on sign in'**
+  /// **'One photo is enough for AI to build style and motion.'**
   String get startupWelcomeAiSubtitle;
 
   /// No description provided for @startupWelcomeShareTitle.
   ///
   /// In en, this message translates to:
-  /// **'Share & Enjoy'**
+  /// **'Get a ready video'**
   String get startupWelcomeShareTitle;
 
   /// No description provided for @startupWelcomeShareSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Save your favorites later'**
+  /// **'Your clip is ready to share or save in one tap.'**
   String get startupWelcomeShareSubtitle;
+
+  /// No description provided for @startupWelcomeGuestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can start without an account. Sign up is only needed to save history and access purchases.'**
+  String get startupWelcomeGuestHint;
 
   /// No description provided for @authEntryTitle.
   ///

@@ -2,8 +2,7 @@ part of 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 
 const int _kPhotoCostSpark = 6;
 const int _kVideoCostSpark = 33;
-const String _kWalletBalanceCoinAsset =
-    'assets/rewards/wallet-balance-coin.png';
+const String _kWalletHeroLogoAsset = 'assets/rewards/wallet-hero-logo.png';
 
 class _WalletHeader extends StatelessWidget {
   const _WalletHeader({required this.title, required this.subtitle});
@@ -125,169 +124,231 @@ class _BalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final balance = wallet?.balance ?? 0;
     final photosApprox = (balance / _kPhotoCostSpark).floor();
     final videosApprox = (balance / _kVideoCostSpark).floor();
+    final cardTextPrimary = isDark ? Colors.white : const Color(0xFF19142A);
+    final cardTextSecondary = isDark
+        ? Colors.white.withValues(alpha: 0.78)
+        : const Color(0xFF5E5876);
+    final cardGradientColors = isDark
+        ? const [Color(0xFF04131E), Color(0xFF071E2D), Color(0xFF0A1628)]
+        : const [Color(0xFFF6F1FF), Color(0xFFEDE5FF), Color(0xFFF9F6FF)];
+    final cardBorderColor = isDark
+        ? colors.border.withValues(alpha: 0.84)
+        : const Color(0xFFD6CFFF);
+    final refreshBackground = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.92);
+    final refreshForeground = isDark
+        ? cardTextSecondary
+        : const Color(0xFF635A8A);
+    final chipBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.24)
+        : const Color(0xFFCFC4FF);
+    final chipBackground = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.white.withValues(alpha: 0.86);
 
     return ProfileGlassCard(
       padding: EdgeInsets.zero,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+          border: Border.all(color: cardBorderColor),
           boxShadow: [
             BoxShadow(
-              color: colors.accent.withValues(alpha: 0.07),
-              blurRadius: 28,
-              spreadRadius: 2,
-              offset: const Offset(0, 6),
+              color: isDark
+                  ? const Color(0xCC00B6A8).withValues(alpha: 0.12)
+                  : const Color(0xFFA88FFF).withValues(alpha: 0.2),
+              blurRadius: isDark ? 34 : 26,
+              spreadRadius: isDark ? 3 : 1,
+              offset: const Offset(0, 10),
             ),
           ],
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             stops: const [0.0, 0.55, 1.0],
-            colors: [
-              const Color(0xFF031018),
-              const Color(0xFF061C28),
-              const Color(0xFF081A26),
-            ],
+            colors: cardGradientColors,
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 360;
-              // The card has a hardcoded dark gradient; always use light-on-dark
-              // text regardless of the current app theme brightness.
-              const cardTextPrimary = Colors.white;
-              final kCardTextSecondary = Colors.white.withValues(alpha: 0.78);
+        child: Stack(
+          children: [
+            Positioned(
+              top: -44,
+              left: -24,
+              child: _WalletGlowOrb(
+                size: isDark ? 150 : 120,
+                color: isDark
+                    ? const Color(0xFF16D3B3).withValues(alpha: 0.22)
+                    : const Color(0xFFB89BFF).withValues(alpha: 0.26),
+              ),
+            ),
+            Positioned(
+              right: -50,
+              top: -12,
+              child: _WalletGlowOrb(
+                size: isDark ? 180 : 160,
+                color: isDark
+                    ? const Color(0xFF2B66FF).withValues(alpha: 0.18)
+                    : const Color(0xFFE9DAFF).withValues(alpha: 0.35),
+              ),
+            ),
+            Positioned(
+              right: 108,
+              bottom: 38,
+              child: _WalletGlowOrb(
+                size: 82,
+                color: isDark
+                    ? const Color(0xFF13E5BD).withValues(alpha: 0.16)
+                    : const Color(0xFFD7CBFF).withValues(alpha: 0.22),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 360;
 
-              final overview = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  final overview = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          text.walletBalanceEyebrow,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              text.walletBalanceEyebrow,
+                              style: TextStyle(
+                                color: cardTextSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton.filledTonal(
+                            onPressed: onRefresh,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            tooltip: text.walletRefreshTooltip,
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 34,
+                              height: 34,
+                            ),
+                            style: IconButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              foregroundColor: refreshForeground,
+                              backgroundColor: refreshBackground,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              NumberFormat.decimalPattern().format(balance),
+                              style: TextStyle(
+                                color: cardTextPrimary,
+                                fontSize: 50,
+                                fontWeight: FontWeight.w900,
+                                height: 0.96,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const PawSparkIcon(size: 22),
+                            const SizedBox(width: 6),
+                            Text(
+                              text.walletBalanceUnit,
+                              style: TextStyle(
+                                color: colors.accent,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (balance > 0) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          text.walletWhatYouCanCreateTitle,
                           style: TextStyle(
-                            color: kCardTextSecondary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
+                            color: cardTextSecondary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ),
-                      IconButton.filledTonal(
-                        onPressed: onRefresh,
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        tooltip: text.walletRefreshTooltip,
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 34,
-                          height: 34,
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _BalanceUsageChip(
+                              icon: Icons.photo_camera_outlined,
+                              label: text.walletApproxPhotos(photosApprox),
+                              iconColor: colors.accent,
+                              textColor: cardTextPrimary,
+                              borderColor: chipBorderColor,
+                              backgroundColor: chipBackground,
+                            ),
+                            _BalanceUsageChip(
+                              icon: Icons.play_arrow_rounded,
+                              label: text.walletApproxVideos(videosApprox),
+                              iconColor: colors.accent,
+                              textColor: cardTextPrimary,
+                              borderColor: chipBorderColor,
+                              backgroundColor: chipBackground,
+                            ),
+                          ],
                         ),
-                        style: IconButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          foregroundColor: kCardTextSecondary,
-                          backgroundColor: Colors.white.withValues(alpha: 0.12),
+                      ] else ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          text.walletInsufficientBalanceError,
+                          style: TextStyle(
+                            color: cardTextSecondary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                  );
+                  final heroArtwork = _BalanceHeroArtwork(isDark: isDark);
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          NumberFormat.decimalPattern().format(balance),
-                          style: const TextStyle(
-                            color: cardTextPrimary,
-                            fontSize: 50,
-                            fontWeight: FontWeight.w900,
-                            height: 0.96,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const PawSparkIcon(size: 22),
-                        const SizedBox(width: 6),
-                        Text(
-                          text.walletBalanceUnit,
-                          style: TextStyle(
-                            color: colors.accent,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        overview,
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: heroArtwork,
                         ),
                       ],
-                    ),
-                  ),
-                  if (balance > 0) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      text.walletWhatYouCanCreateTitle,
-                      style: TextStyle(
-                        color: kCardTextSecondary,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _BalanceUsageChip(
-                          icon: Icons.photo_camera_outlined,
-                          label: text.walletApproxPhotos(photosApprox),
-                        ),
-                        _BalanceUsageChip(
-                          icon: Icons.play_arrow_rounded,
-                          label: text.walletApproxVideos(videosApprox),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      text.walletInsufficientBalanceError,
-                      style: TextStyle(
-                        color: kCardTextSecondary,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ],
-              );
-              final coin = const _BalanceCoinGlow();
+                    );
+                  }
 
-              if (compact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    overview,
-                    const SizedBox(height: 12),
-                    Align(alignment: Alignment.centerRight, child: coin),
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: overview),
-                  const SizedBox(width: 12),
-                  coin,
-                ],
-              );
-            },
-          ),
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: overview),
+                      const SizedBox(width: 12),
+                      heroArtwork,
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -295,31 +356,40 @@ class _BalanceCard extends StatelessWidget {
 }
 
 class _BalanceUsageChip extends StatelessWidget {
-  const _BalanceUsageChip({required this.icon, required this.label});
+  const _BalanceUsageChip({
+    required this.icon,
+    required this.label,
+    required this.iconColor,
+    required this.textColor,
+    required this.borderColor,
+    required this.backgroundColor,
+  });
 
   final IconData icon;
   final String label;
+  final Color iconColor;
+  final Color textColor;
+  final Color borderColor;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    // Always rendered inside the dark balance card gradient.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-        color: Colors.white.withValues(alpha: 0.14),
+        border: Border.all(color: borderColor),
+        color: backgroundColor,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: colors.accent, size: 18),
+          Icon(icon, color: iconColor, size: 18),
           const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -330,46 +400,85 @@ class _BalanceUsageChip extends StatelessWidget {
   }
 }
 
-class _BalanceCoinGlow extends StatelessWidget {
-  const _BalanceCoinGlow();
+class _BalanceHeroArtwork extends StatelessWidget {
+  const _BalanceHeroArtwork({required this.isDark});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Container(
-      width: 96,
-      height: 96,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            colors.accent.withValues(alpha: 0.5),
-            colors.accent.withValues(alpha: 0.15),
-            Colors.transparent,
-          ],
-        ),
-      ),
-      child: Center(
-        child: Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: colors.accent.withValues(alpha: 0.35),
-                blurRadius: 18,
-                spreadRadius: 2,
+    return SizedBox(
+      width: 152,
+      height: 152,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomRight,
+        children: [
+          Positioned(
+            right: 6,
+            bottom: 8,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.18)
+                    : const Color(0xFFBAA6FF).withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark
+                        ? const Color(0x33000000)
+                        : const Color(0x80C7B8FF),
+                    blurRadius: isDark ? 18 : 14,
+                    spreadRadius: 1,
+                    offset: Offset(0, 8),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              _kWalletBalanceCoinAsset,
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.medium,
+              child: const SizedBox(width: 78, height: 26),
             ),
+          ),
+          Positioned(
+            right: -18,
+            bottom: -30,
+            child: Image.asset(
+              _kWalletHeroLogoAsset,
+              width: 170,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+          Positioned(
+            right: 24,
+            bottom: 70,
+            child: _WalletGlowOrb(
+              size: 36,
+              color: isDark
+                  ? const Color(0xFFB793FF).withValues(alpha: 0.24)
+                  : const Color(0xFFDBC7FF).withValues(alpha: 0.3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletGlowOrb extends StatelessWidget {
+  const _WalletGlowOrb({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [color, color.withValues(alpha: 0)],
           ),
         ),
       ),

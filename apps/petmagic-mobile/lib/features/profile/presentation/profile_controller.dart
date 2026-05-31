@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -83,6 +84,7 @@ class ProfileController extends Notifier<ProfileState> {
   static const _genericActionError = 'profile.action_failed';
 
   final ImagePicker _imagePicker = ImagePicker();
+  final ImageCropper _imageCropper = ImageCropper();
 
   ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
@@ -124,6 +126,12 @@ class ProfileController extends Notifier<ProfileState> {
         email: hydratedSession.user.email,
         clearError: true,
       );
+      ref
+          .read(appLaunchControllerProvider.notifier)
+          .markSignedInWithLegalStatus(
+            requiresLegalAcceptance:
+                hydratedSession.user.legalAcceptance.requiresAcceptance,
+          );
     } on AppException catch (error) {
       final storedSession = await _repository.readSession();
       if (storedSession != null && error.statusCode != 401) {
@@ -226,7 +234,12 @@ class ProfileController extends Notifier<ProfileState> {
         password: '',
         confirmPassword: '',
       );
-      ref.read(appLaunchControllerProvider.notifier).markSignedIn();
+      ref
+          .read(appLaunchControllerProvider.notifier)
+          .markSignedInWithLegalStatus(
+            requiresLegalAcceptance:
+                hydratedSession.user.legalAcceptance.requiresAcceptance,
+          );
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (_) {
@@ -306,7 +319,12 @@ class ProfileController extends Notifier<ProfileState> {
         password: '',
         confirmPassword: '',
       );
-      ref.read(appLaunchControllerProvider.notifier).markSignedIn();
+      ref
+          .read(appLaunchControllerProvider.notifier)
+          .markSignedInWithLegalStatus(
+            requiresLegalAcceptance:
+                session.user.legalAcceptance.requiresAcceptance,
+          );
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (_) {
@@ -425,18 +443,52 @@ class ProfileController extends Notifier<ProfileState> {
       return;
     }
 
+    final croppedFile = await _imageCropper.cropImage(
+      sourcePath: file.path,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      compressQuality: 92,
+      compressFormat: ImageCompressFormat.jpg,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'PetMagic',
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+          hideBottomControls: false,
+          cropStyle: CropStyle.circle,
+        ),
+        IOSUiSettings(
+          title: 'PetMagic',
+          aspectRatioLockEnabled: true,
+          aspectRatioPickerButtonHidden: true,
+          resetAspectRatioEnabled: false,
+          rotateButtonsHidden: false,
+          cropStyle: CropStyle.circle,
+        ),
+      ],
+    );
+    if (croppedFile == null) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
     try {
-      final profile = await _repository.uploadAvatar(file.path);
+      final profile = await _repository.uploadAvatar(croppedFile.path);
       state = state.copyWith(
         isSaving: false,
         profile: profile,
         session: _replaceSessionUser(profile),
       );
+      ref
+          .read(appLaunchControllerProvider.notifier)
+          .markSignedInWithLegalStatus(
+            requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
+          );
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (_) {

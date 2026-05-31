@@ -10,6 +10,7 @@ using OpenTelemetry.Trace;
 
 using PetMagic.Modules.Economy.Api;
 using PetMagic.Modules.Economy.Infrastructure;
+using PetMagic.Host.Api.Security;
 using PetMagic.Modules.Identity.Api;
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.SupportChat.Api;
@@ -253,6 +254,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<LegalAcceptanceEnforcementMiddleware>();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))

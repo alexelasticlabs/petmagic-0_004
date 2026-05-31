@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/features/premium/presentation/stripe_paymentshee
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
@@ -79,6 +80,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isRegisterRoute = location == RegisterEntryPage.routePath;
       final isPasswordResetRoute = location == PasswordResetPage.routePath;
       final isVerifyEmailRoute = location == EmailVerificationPage.routePath;
+      final isLegalGateRoute = location == LegalAcceptanceGatePage.routePath;
       final isPublicLegalRoute =
           location ==
               ProfileSettingsDetailPage.location(
@@ -100,10 +102,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (launchState.isAuthenticated) {
+        if (launchState.requiresLegalAcceptance) {
+          return isLegalGateRoute ? null : LegalAcceptanceGatePage.routePath;
+        }
+
         if (isStartupRoute ||
             isOnboardingRoute ||
             isWelcomeRoute ||
-            isPublicAuthRoute) {
+            isPublicAuthRoute ||
+            isLegalGateRoute) {
           return TemplatesPage.routePath;
         }
         return null;
@@ -166,11 +173,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: EmailVerificationPage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
-          child: EmailVerificationPage(
-            email: state.uri.queryParameters['email'] ?? '',
-          ),
-        ),
+        pageBuilder: (context, state) {
+          final extra = state.extra is Map<String, dynamic>
+              ? state.extra! as Map<String, dynamic>
+              : null;
+          final initialPassword = extra == null
+              ? null
+              : extra['initialPassword'] as String?;
+
+          return NoTransitionPage(
+            child: EmailVerificationPage(
+              email: state.uri.queryParameters['email'] ?? '',
+              initialPassword: initialPassword,
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: LegalAcceptanceGatePage.routePath,
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: LegalAcceptanceGatePage()),
       ),
       GoRoute(
         path: StripePaymentSheetSmokeTestPage.routePath,

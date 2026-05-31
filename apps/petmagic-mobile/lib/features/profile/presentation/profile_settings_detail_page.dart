@@ -98,314 +98,33 @@ class _ProfileAccountInfoPageState
                 ),
               )
             else ...[
-              // Hero-карточка профиля
-              ProfileGlassCard(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ProfileAvatarBadge(
-                          imageUrl: profile.avatar?.url,
-                          fallbackLabel:
-                              profile.displayName?.trim().isNotEmpty == true
-                              ? profile.displayName!
-                              : profile.email,
-                          size: 72,
-                        ),
-                        Positioned(
-                          bottom: -2,
-                          right: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: profile.isPremium
-                                  ? const Color(0xFFFFC107)
-                                  : colors.surfaceStrong,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: colors.border,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Icon(
-                              profile.isPremium
-                                  ? Icons.workspace_premium_rounded
-                                  : Icons.person_outline_rounded,
-                              size: 13,
-                              color: profile.isPremium
-                                  ? Colors.white
-                                  : colors.textMuted,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _isEditingDisplayName
-                                    ? TextField(
-                                        controller: _displayNameController,
-                                        textInputAction: TextInputAction.done,
-                                        maxLength: 120,
-                                        decoration: InputDecoration(
-                                          counterText: '',
-                                          hintText: text
-                                              .profileAccountDisplayNameLabel,
-                                        ),
-                                        onSubmitted: (_) async {
-                                          await ref
-                                              .read(
-                                                profileControllerProvider
-                                                    .notifier,
-                                              )
-                                              .updateCurrentProfile(
-                                                displayName:
-                                                    _displayNameController.text,
-                                              );
-                                          if (!mounted) {
-                                            return;
-                                          }
-                                          setState(
-                                            () => _isEditingDisplayName = false,
-                                          );
-                                        },
-                                      )
-                                    : Text(
-                                        profile.displayName
-                                                    ?.trim()
-                                                    .isNotEmpty ==
-                                                true
-                                            ? profile.displayName!
-                                            : profile.email,
-                                        style: TextStyle(
-                                          color: colors.textStrong,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w900,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                              ),
-                              if (_isEditingDisplayName) ...[
-                                IconButton(
-                                  tooltip: MaterialLocalizations.of(
-                                    context,
-                                  ).cancelButtonLabel,
-                                  onPressed: state.isSaving
-                                      ? null
-                                      : () => setState(
-                                          () => _isEditingDisplayName = false,
-                                        ),
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 20,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: MaterialLocalizations.of(
-                                    context,
-                                  ).saveButtonLabel,
-                                  onPressed: state.isSaving
-                                      ? null
-                                      : () async {
-                                          await ref
-                                              .read(
-                                                profileControllerProvider
-                                                    .notifier,
-                                              )
-                                              .updateCurrentProfile(
-                                                displayName:
-                                                    _displayNameController.text,
-                                              );
-                                          if (!mounted) {
-                                            return;
-                                          }
-                                          setState(
-                                            () => _isEditingDisplayName = false,
-                                          );
-                                        },
-                                  icon: const Icon(
-                                    Icons.check_rounded,
-                                    size: 20,
-                                  ),
-                                ),
-                              ] else
-                                IconButton(
-                                  tooltip: text.profileAccountDisplayNameLabel,
-                                  onPressed: state.isSaving
-                                      ? null
-                                      : () => setState(() {
-                                          _displayNameController.text =
-                                              profile.displayName ?? '';
-                                          _isEditingDisplayName = true;
-                                        }),
-                                  icon: const Icon(
-                                    Icons.edit_rounded,
-                                    size: 20,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          if (profile.displayName?.trim().isNotEmpty ==
-                              true) ...[
-                            const SizedBox(height: 3),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.alternate_email_rounded,
-                                  size: 13,
-                                  color: colors.textMuted,
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    profile.email,
-                                    style: TextStyle(
-                                      color: colors.textSoft,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              ProfileStatusPill(
-                                label: profile.isPremium
-                                    ? text.premiumLabel
-                                    : text.freeLabel,
-                                leading: profile.isPremium
-                                    ? Icons.workspace_premium_rounded
-                                    : Icons.person_outline_rounded,
-                                backgroundColor: profile.isPremium
-                                    ? const Color(
-                                        0xFFFFC107,
-                                      ).withValues(alpha: 0.18)
-                                    : null,
-                                foregroundColor: profile.isPremium
-                                    ? const Color(0xFFF59E0B)
-                                    : null,
-                              ),
-                              ProfileStatusPill(
-                                label: profile.emailConfirmed
-                                    ? text.profileEmailVerifiedShort
-                                    : text.profileEmailPendingShort,
-                                leading: profile.emailConfirmed
-                                    ? Icons.verified_rounded
-                                    : Icons.mail_outline_rounded,
-                                foregroundColor: profile.emailConfirmed
-                                    ? colors.accent
-                                    : colors.textMuted,
-                              ),
-                              if (profile.roles.isNotEmpty)
-                                ProfileStatusPill(
-                                  label: profile.roles.first,
-                                  leading: Icons.shield_outlined,
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              FilledButton.tonalIcon(
-                                onPressed: state.isSaving
-                                    ? null
-                                    : () async {
-                                        await ref
-                                            .read(
-                                              profileControllerProvider
-                                                  .notifier,
-                                            )
-                                            .uploadAvatar();
-                                        if (!context.mounted) {
-                                          return;
-                                        }
-
-                                        final nextState = ref.read(
-                                          profileControllerProvider,
-                                        );
-                                        if (nextState.errorMessage == null) {
-                                          return;
-                                        }
-
-                                        ScaffoldMessenger.of(context)
-                                          ..hideCurrentSnackBar()
-                                          ..showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                mapProfileFeedbackMessage(
-                                                  nextState.errorMessage!,
-                                                  text,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                      },
-                                icon: const Icon(Icons.upload_rounded),
-                                label: Text(text.profileAvatarUpload),
-                              ),
-                              if (profile.avatar != null)
-                                OutlinedButton.icon(
-                                  onPressed: state.isSaving
-                                      ? null
-                                      : () async {
-                                          await ref
-                                              .read(
-                                                profileControllerProvider
-                                                    .notifier,
-                                              )
-                                              .removeAvatar();
-                                          if (!context.mounted) {
-                                            return;
-                                          }
-
-                                          final nextState = ref.read(
-                                            profileControllerProvider,
-                                          );
-                                          if (nextState.errorMessage == null) {
-                                            return;
-                                          }
-
-                                          ScaffoldMessenger.of(context)
-                                            ..hideCurrentSnackBar()
-                                            ..showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  mapProfileFeedbackMessage(
-                                                    nextState.errorMessage!,
-                                                    text,
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                        },
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
-                                  ),
-                                  label: Text(text.profileAvatarRemove),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              if (state.errorMessage != null) ...[
+                ProfileMessageCard(
+                  message: mapProfileFeedbackMessage(state.errorMessage!, text),
+                  tone: colors.danger,
                 ),
+                const SizedBox(height: 14),
+              ],
+              _ProfileHeroSummaryCard(
+                profile: profile,
+                displayName: _resolvedDisplayName(profile),
+              ),
+              const SizedBox(height: 14),
+              _ProfileEditableNameCard(
+                controller: _displayNameController,
+                isEditing: _isEditingDisplayName,
+                isSaving: state.isSaving,
+                currentValue: _resolvedDisplayName(profile),
+                onStartEditing: () => _startEditingDisplayName(profile),
+                onCancelEditing: () => _cancelEditingDisplayName(profile),
+                onSave: () => _saveDisplayName(profile),
+              ),
+              const SizedBox(height: 14),
+              _ProfileAvatarManagerCard(
+                profile: profile,
+                isSaving: state.isSaving,
+                onUpload: _uploadAvatar,
+                onRemove: profile.avatar != null ? _removeAvatar : null,
               ),
               const SizedBox(height: 14),
               ProfileSectionLabel(label: text.profileAccountDetailsSection),
@@ -415,60 +134,28 @@ class _ProfileAccountInfoPageState
                   children: [
                     _AccountInfoRow(
                       icon: Icons.badge_outlined,
-                      label: text.profileAccountDisplayNameLabel,
-                      value: profile.displayName?.trim().isNotEmpty == true
-                          ? profile.displayName!
-                          : text.profileAccountDisplayNameMissing,
-                      valueFaded:
-                          profile.displayName?.trim().isNotEmpty != true,
+                      label: text.profileAccountUserIdLabel,
+                      value: profile.userId,
                     ),
                     _AccountInfoRow(
                       icon: Icons.alternate_email_rounded,
                       label: text.profileEmailLabel,
                       value: profile.email,
                     ),
-                    _AccountInfoRow(
-                      icon: profile.isPremium
-                          ? Icons.workspace_premium_rounded
-                          : Icons.person_outline_rounded,
-                      label: text.profileAccountMembershipLabel,
-                      value: profile.isPremium
-                          ? text.premiumLabel
-                          : text.freeLabel,
-                      valueColor: profile.isPremium
-                          ? const Color(0xFFF59E0B)
-                          : null,
-                    ),
-                    _AccountInfoRow(
-                      icon: profile.emailConfirmed
-                          ? Icons.mark_email_read_outlined
-                          : Icons.mail_outline_rounded,
-                      label: text.profileEmailStat,
-                      value: profile.emailConfirmed
-                          ? text.profileEmailConfirmed
-                          : text.profileEmailPending,
-                      valueColor: profile.emailConfirmed
-                          ? colors.accent
-                          : colors.danger,
-                    ),
-                    _AccountInfoRow(
-                      icon: profile.avatar != null
-                          ? Icons.image_rounded
-                          : Icons.image_not_supported_outlined,
-                      label: text.profileAccountAvatarLabel,
-                      value: profile.avatar != null
-                          ? text.profileAccountAvatarUploaded
-                          : text.profileAccountAvatarMissing,
-                      valueFaded: profile.avatar == null,
-                    ),
+                    if (profile.roles.isNotEmpty)
+                      _AccountInfoRow(
+                        icon: Icons.shield_outlined,
+                        label: text.profileAccountRolesLabel,
+                        value: profile.roles.join(', '),
+                      ),
                     _AccountInfoRow(
                       icon: profile.legalAcceptance.isCurrentAccepted
                           ? Icons.verified_user_outlined
                           : Icons.gavel_rounded,
                       label: text.profileAccountConsentLabel,
                       value: profile.legalAcceptance.isCurrentAccepted
-                          ? text.profileLegalAcceptanceCurrent
-                          : text.profileLegalAcceptanceRequired,
+                          ? text.profileStatReady
+                          : text.profileStatPending,
                       valueColor: profile.legalAcceptance.isCurrentAccepted
                           ? colors.accent
                           : colors.danger,
@@ -480,6 +167,415 @@ class _ProfileAccountInfoPageState
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  String _resolvedDisplayName(MobileUserProfile profile) {
+    final trimmed = profile.displayName?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      return trimmed;
+    }
+
+    return profile.email;
+  }
+
+  void _startEditingDisplayName(MobileUserProfile profile) {
+    _displayNameController
+      ..text = profile.displayName ?? ''
+      ..selection = TextSelection.fromPosition(
+        TextPosition(offset: (profile.displayName ?? '').length),
+      );
+    setState(() => _isEditingDisplayName = true);
+  }
+
+  void _cancelEditingDisplayName(MobileUserProfile profile) {
+    _displayNameController.text = profile.displayName ?? '';
+    setState(() => _isEditingDisplayName = false);
+  }
+
+  Future<void> _saveDisplayName(MobileUserProfile profile) async {
+    await ref
+        .read(profileControllerProvider.notifier)
+        .updateCurrentProfile(displayName: _displayNameController.text.trim());
+    if (!mounted) {
+      return;
+    }
+
+    final nextState = ref.read(profileControllerProvider);
+    if (nextState.errorMessage != null) {
+      _showActionFeedback(nextState.errorMessage!);
+      return;
+    }
+
+    _displayNameController.text = nextState.profile?.displayName ?? '';
+    setState(() => _isEditingDisplayName = false);
+  }
+
+  Future<void> _uploadAvatar() async {
+    await ref.read(profileControllerProvider.notifier).uploadAvatar();
+    if (!mounted) {
+      return;
+    }
+
+    final nextState = ref.read(profileControllerProvider);
+    if (nextState.errorMessage != null) {
+      _showActionFeedback(nextState.errorMessage!);
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    await ref.read(profileControllerProvider.notifier).removeAvatar();
+    if (!mounted) {
+      return;
+    }
+
+    final nextState = ref.read(profileControllerProvider);
+    if (nextState.errorMessage != null) {
+      _showActionFeedback(nextState.errorMessage!);
+    }
+  }
+
+  void _showActionFeedback(String message) {
+    final text = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(mapProfileFeedbackMessage(message, text))),
+      );
+  }
+}
+
+class _ProfileHeroSummaryCard extends StatelessWidget {
+  const _ProfileHeroSummaryCard({
+    required this.profile,
+    required this.displayName,
+  });
+
+  final MobileUserProfile profile;
+  final String displayName;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return ProfileGlassCard(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colors.accent.withValues(alpha: 0.08),
+              colors.blue.withValues(alpha: 0.08),
+              colors.purple.withValues(alpha: 0.08),
+            ],
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ProfileAvatarBadge(
+              imageUrl: profile.avatar?.url,
+              fallbackLabel: displayName,
+              size: 78,
+              bottomBadge: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: profile.isPremium
+                      ? const Color(0xFFFFC107)
+                      : colors.surfaceStrong,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.border, width: 1.5),
+                ),
+                child: Icon(
+                  profile.isPremium
+                      ? Icons.workspace_premium_rounded
+                      : Icons.person_outline_rounded,
+                  size: 14,
+                  color: profile.isPremium ? Colors.white : colors.textMuted,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    profile.email,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ProfileStatusPill(
+                        label: profile.isPremium
+                            ? text.premiumLabel
+                            : text.freeLabel,
+                        leading: profile.isPremium
+                            ? Icons.workspace_premium_rounded
+                            : Icons.person_outline_rounded,
+                        backgroundColor: profile.isPremium
+                            ? const Color(0xFFFFC107).withValues(alpha: 0.18)
+                            : null,
+                        foregroundColor: profile.isPremium
+                            ? const Color(0xFFF59E0B)
+                            : null,
+                      ),
+                      ProfileStatusPill(
+                        label: profile.emailConfirmed
+                            ? text.profileEmailVerifiedShort
+                            : text.profileEmailPendingShort,
+                        leading: profile.emailConfirmed
+                            ? Icons.verified_rounded
+                            : Icons.mail_outline_rounded,
+                        foregroundColor: profile.emailConfirmed
+                            ? colors.accent
+                            : colors.textMuted,
+                      ),
+                      if (profile.roles.isNotEmpty)
+                        ProfileStatusPill(
+                          label: profile.roles.first,
+                          leading: Icons.shield_outlined,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileEditableNameCard extends StatelessWidget {
+  const _ProfileEditableNameCard({
+    required this.controller,
+    required this.isEditing,
+    required this.isSaving,
+    required this.currentValue,
+    required this.onStartEditing,
+    required this.onCancelEditing,
+    required this.onSave,
+  });
+
+  final TextEditingController controller;
+  final bool isEditing;
+  final bool isSaving;
+  final String currentValue;
+  final VoidCallback onStartEditing;
+  final VoidCallback onCancelEditing;
+  final Future<void> Function() onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final material = MaterialLocalizations.of(context);
+
+    return ProfileGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colors.accentSoft.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.badge_outlined, color: colors.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  text.profileAccountDisplayNameLabel,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (!isEditing)
+                IconButton(
+                  onPressed: isSaving ? null : onStartEditing,
+                  tooltip: text.profileAccountDisplayNameLabel,
+                  icon: const Icon(Icons.edit_rounded),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (isEditing) ...[
+            TextField(
+              controller: controller,
+              textInputAction: TextInputAction.done,
+              maxLength: 120,
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: text.profileAccountDisplayNameLabel,
+              ),
+              onSubmitted: (_) => onSave(),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isSaving ? null : onCancelEditing,
+                    child: Text(material.cancelButtonLabel),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: isSaving ? null : onSave,
+                    child: Text(
+                      isSaving
+                          ? text.profileLoadingAction
+                          : material.saveButtonLabel,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Text(
+              currentValue,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileAvatarManagerCard extends StatelessWidget {
+  const _ProfileAvatarManagerCard({
+    required this.profile,
+    required this.isSaving,
+    required this.onUpload,
+    required this.onRemove,
+  });
+
+  final MobileUserProfile profile;
+  final bool isSaving;
+  final Future<void> Function() onUpload;
+  final Future<void> Function()? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final hasAvatar = profile.avatar != null;
+
+    return ProfileGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colors.blue.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.photo_camera_back_outlined,
+                  color: colors.blue,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      text.profileAccountAvatarLabel,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasAvatar
+                          ? text.profileAccountAvatarUploaded
+                          : text.profileAccountAvatarMissing,
+                      style: TextStyle(
+                        color: hasAvatar ? colors.textSoft : colors.textMuted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: ProfileAvatarBadge(
+              imageUrl: profile.avatar?.url,
+              fallbackLabel: profile.displayName?.trim().isNotEmpty == true
+                  ? profile.displayName!
+                  : profile.email,
+              size: 96,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: isSaving ? null : onUpload,
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: Text(text.profileAvatarUpload),
+              ),
+              if (onRemove != null)
+                OutlinedButton.icon(
+                  onPressed: isSaving ? null : onRemove,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: Text(text.profileAvatarRemove),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -980,7 +1076,6 @@ class _AccountInfoRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.valueColor,
-    this.valueFaded = false,
     this.showDivider = true,
   });
 
@@ -988,14 +1083,12 @@ class _AccountInfoRow extends StatelessWidget {
   final String label;
   final String value;
   final Color? valueColor;
-  final bool valueFaded;
   final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final resolvedValueColor =
-        valueColor ?? (valueFaded ? colors.textMuted : colors.textStrong);
+    final resolvedValueColor = valueColor ?? colors.textStrong;
 
     return DecoratedBox(
       decoration: BoxDecoration(
