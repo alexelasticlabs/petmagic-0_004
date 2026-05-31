@@ -321,83 +321,107 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      backgroundColor: colors.surface,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
+        final bottomInset = petMagicScrollableBottomInset(sheetContext);
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (generation.isCompleted) ...[
-                ListTile(
-                  leading: const Icon(Icons.link_rounded),
-                  title: Text(text.generationStatusCopyLinkAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    unawaited(_copyResultLink(generation));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: Text(text.generationStatusDeleteAction),
-                  onTap: _isDeleting
-                      ? null
-                      : () {
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.shadow.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (generation.isCompleted) ...[
+                      _StatusSheetActionTile(
+                        icon: Icons.link_rounded,
+                        label: text.generationStatusCopyLinkAction,
+                        onTap: () {
                           Navigator.of(sheetContext).pop();
-                          unawaited(_deleteGeneration(generation));
+                          unawaited(_copyResultLink(generation));
                         },
+                      ),
+                      _StatusSheetActionTile(
+                        icon: Icons.delete_outline_rounded,
+                        label: text.generationStatusDeleteAction,
+                        onTap: _isDeleting
+                            ? null
+                            : () {
+                                Navigator.of(sheetContext).pop();
+                                unawaited(_deleteGeneration(generation));
+                              },
+                        isDestructive: true,
+                      ),
+                      _StatusSheetActionTile(
+                        icon: Icons.flag_outlined,
+                        label: text.generationStatusReportProblemAction,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          context.push(SupportChatPage.routePath);
+                        },
+                      ),
+                    ] else if (generation.isFailed) ...[
+                      _StatusSheetActionTile(
+                        icon: Icons.image_search_rounded,
+                        label: text.generationStatusPickAnotherPhotoAction,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          context.go(TemplatesPage.routePath);
+                        },
+                      ),
+                      _StatusSheetActionTile(
+                        icon: Icons.refresh_rounded,
+                        label: text.generationStatusRetryAction,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          _retrySoon();
+                        },
+                      ),
+                      _StatusSheetActionTile(
+                        icon: Icons.support_agent_rounded,
+                        label: text.generationStatusContactSupportAction,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          context.push(SupportChatPage.routePath);
+                        },
+                      ),
+                    ] else ...[
+                      _StatusSheetActionTile(
+                        icon: Icons.photo_library_outlined,
+                        label: text.generationStatusOpenGalleryAction,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          context.go('/creations');
+                        },
+                      ),
+                      _StatusSheetActionTile(
+                        icon: Icons.close_rounded,
+                        label: text.generationStatusCancelGenerationAction,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          _cancelSoon();
+                        },
+                        isDestructive: true,
+                      ),
+                    ],
+                  ],
                 ),
-                ListTile(
-                  leading: const Icon(Icons.flag_outlined),
-                  title: Text(text.generationStatusReportProblemAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.push(SupportChatPage.routePath);
-                  },
-                ),
-              ] else if (generation.isFailed) ...[
-                ListTile(
-                  leading: const Icon(Icons.image_search_rounded),
-                  title: Text(text.generationStatusPickAnotherPhotoAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go(TemplatesPage.routePath);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.refresh_rounded),
-                  title: Text(text.generationStatusRetryAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _retrySoon();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.support_agent_rounded),
-                  title: Text(text.generationStatusContactSupportAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.push(SupportChatPage.routePath);
-                  },
-                ),
-              ] else ...[
-                ListTile(
-                  leading: const Icon(Icons.photo_library_outlined),
-                  title: Text(text.generationStatusOpenGalleryAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go('/creations');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.close_rounded),
-                  title: Text(text.generationStatusCancelGenerationAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _cancelSoon();
-                  },
-                ),
-              ],
-            ],
+              ),
+            ),
           ),
         );
       },
@@ -694,5 +718,67 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         setState(() => _isSubmittingFeedback = false);
       }
     }
+  }
+}
+
+class _StatusSheetActionTile extends StatelessWidget {
+  const _StatusSheetActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final tone = isDestructive ? colors.danger : colors.accent;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border.withValues(alpha: 0.75)),
+              color: colors.surfaceStrong.withValues(alpha: 0.72),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 18, color: tone),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

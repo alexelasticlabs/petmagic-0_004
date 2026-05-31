@@ -17,7 +17,6 @@ internal sealed partial class TemplatesService
 
         var baseQuery = dbContext.TemplateItems
             .AsNoTracking()
-            .Include(x => x.Assets)
             .Where(x => x.DeletedAtUtc == null)
             .Where(x => x.Status == TemplateStatus.Active)
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value);
@@ -36,12 +35,43 @@ internal sealed partial class TemplatesService
             .ThenByDescending(template => template.Id)
             .Skip(offset)
             .Take(pageSize)
+            .Select(template => new
+            {
+                template.Id,
+                template.Title,
+                template.Category,
+                template.TemplateType,
+                template.TokenCost,
+                template.IsPremium,
+                template.Tags,
+                template.Version,
+                template.UpdatedAtUtc,
+                Preview = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Preview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType
+                    })
+                    .FirstOrDefault()
+            })
             .ToArrayAsync(cancellationToken);
 
         var hasMore = totalCount > offset + pageItems.Length;
 
         return Result.Success(new PublicTemplatesCatalogPageResponse(
-            [.. pageItems.Select(MapPublicCatalogMetadataItem)],
+            [.. pageItems.Select(item => MapPublicCatalogMetadataItem(
+                item.Id,
+                item.Title,
+                item.Category,
+                item.TemplateType,
+                item.Preview?.Url,
+                item.Preview?.ContentType,
+                item.TokenCost,
+                item.IsPremium,
+                item.Tags,
+                item.Version,
+                item.UpdatedAtUtc))],
             page,
             pageSize,
             hasMore,
@@ -122,8 +152,29 @@ internal sealed partial class TemplatesService
         var changedTemplateIds = changes.Select(change => change.TemplateId).Distinct().ToArray();
         var changedTemplates = await dbContext.TemplateItems
             .AsNoTracking()
-            .Include(template => template.Assets)
             .Where(template => changedTemplateIds.Contains(template.Id))
+            .Where(template => template.DeletedAtUtc == null)
+            .Where(template => template.Status == TemplateStatus.Active)
+            .Select(template => new
+            {
+                template.Id,
+                template.Title,
+                template.Category,
+                template.TemplateType,
+                template.TokenCost,
+                template.IsPremium,
+                template.Tags,
+                template.Version,
+                template.UpdatedAtUtc,
+                Preview = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Preview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.ContentType
+                    })
+                    .FirstOrDefault()
+            })
             .ToDictionaryAsync(template => template.Id, cancellationToken);
 
         var deletedIds = new HashSet<Guid>();
@@ -138,9 +189,7 @@ internal sealed partial class TemplatesService
                 continue;
             }
 
-            if (!changedTemplates.TryGetValue(change.TemplateId, out var template)
-                || template.DeletedAtUtc is not null
-                || template.Status != TemplateStatus.Active)
+            if (!changedTemplates.TryGetValue(change.TemplateId, out var template))
             {
                 upserts.Remove(change.TemplateId);
                 deletedIds.Add(change.TemplateId);
@@ -148,7 +197,18 @@ internal sealed partial class TemplatesService
             }
 
             deletedIds.Remove(change.TemplateId);
-            upserts[change.TemplateId] = MapPublicCatalogMetadataItem(template);
+            upserts[change.TemplateId] = MapPublicCatalogMetadataItem(
+                template.Id,
+                template.Title,
+                template.Category,
+                template.TemplateType,
+                template.Preview?.Url,
+                template.Preview?.ContentType,
+                template.TokenCost,
+                template.IsPremium,
+                template.Tags,
+                template.Version,
+                template.UpdatedAtUtc);
         }
 
         return Result.Success(new PublicTemplatesCatalogChangesResponse(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 @immutable
@@ -299,6 +300,17 @@ class AppTheme {
         foregroundColor: colors.textStrong,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        systemOverlayStyle: brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              )
+            : SystemUiOverlayStyle.dark.copyWith(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.dark,
+                statusBarBrightness: Brightness.light,
+              ),
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge?.copyWith(
           color: colors.textStrong,

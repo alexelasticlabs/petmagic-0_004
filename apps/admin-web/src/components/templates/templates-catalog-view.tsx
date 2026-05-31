@@ -214,8 +214,10 @@ export function TemplatesCatalogView({
   const analyticsBasePath = `/${locale}/templates/${templateType === "Video" ? "video" : "image"}/analytics`;
   const categoriesPath = `/${locale}/templates/categories`;
   const catalog = useMemo(() => buildCatalogModel(templates), [templates]);
-  const visiblePool =
-    archiveFilter === "archived" ? catalog.archivedTemplates : catalog.activeTemplates;
+  const visiblePool = useMemo(
+    () => (archiveFilter === "archived" ? catalog.archivedTemplates : catalog.activeTemplates),
+    [archiveFilter, catalog]
+  );
   const deferredSearch = useDeferredValue(search);
   const categoryOptions: SelectOption[] = useMemo(
     () => [

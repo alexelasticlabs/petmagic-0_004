@@ -1,5 +1,6 @@
 "use client";
 
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,7 @@ import {
 import styles from "@/components/templates/templates-analytics-hub-page.module.css";
 import {
   fetchAdminTemplatesAnalyticsOverview,
+  useAuthSession,
   type AdminTemplateAnalyticsDimension,
   type AdminTemplatesAnalyticsBreakdown,
   type AdminTemplatesAnalyticsFeedbackItem,
@@ -73,7 +75,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   const text = useMemo(() => getCopy(locale), [locale]);
   const dictionary = useMemo(() => getDictionary(locale), [locale]);
   const router = useRouter();
-  const [overview, setOverview] = useState<AdminTemplatesAnalyticsOverview | null>(null);
+  const session = useAuthSession();
   const [period, setPeriod] = useState<PeriodKey>("30");
   const [templateType, setTemplateType] = useState<TemplateType | "All">("All");
   const [category, setCategory] = useState("");
@@ -81,8 +83,6 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   const [access, setAccess] = useState<"all" | "free" | "premium">("all");
   const [sort, setSort] = useState<NonNullable<AdminTemplatesAnalyticsQuery["sort"]>>("views");
   const [chartMetric, setChartMetric] = useState<TrendMetricKey>("totalViews");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const query = useMemo<AdminTemplatesAnalyticsQuery>(
     () => ({
@@ -98,42 +98,51 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   );
 
   useEffect(() => {
-    let isCancelled = false;
+    if (!session) {
+      ensureAdminSession(locale, router);
+    }
+  }, [locale, router, session]);
 
-    async function loadOverview() {
-      setIsLoading(true);
-      setError(null);
+  const overviewQuery = useQuery<AdminTemplatesAnalyticsOverview>({
+    queryKey: [
+      "admin",
+      "templates",
+      "analytics-overview",
+      query.periodDays ?? null,
+      query.templateType ?? null,
+      query.category ?? null,
+      query.status ?? null,
+      query.access ?? null,
+      query.sort ?? null,
+      query.take ?? null,
+    ],
+    queryFn: () => fetchAdminTemplatesAnalyticsOverview(query),
+    enabled: Boolean(session),
+    placeholderData: keepPreviousData,
+  });
 
-      try {
-        if (!ensureAdminSession(locale, router)) {
-          return;
-        }
-
-        const response = await fetchAdminTemplatesAnalyticsOverview(query);
-        if (!isCancelled) {
-          setOverview(response);
-        }
-      } catch (error) {
-        clientLogger.error("templates.analytics_hub_load_failed", {
-          query,
-          error,
-        });
-        if (!isCancelled) {
-          setError(text.loadError);
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
+  useEffect(() => {
+    if (!overviewQuery.error) {
+      return;
     }
 
-    void loadOverview();
+    clientLogger.error("templates.analytics_hub_load_failed", {
+      query,
+      error: overviewQuery.error,
+    });
+  }, [overviewQuery.error, query]);
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [locale, query, router, text.loadError]);
+  const overview = overviewQuery.data ?? null;
+  const isLoading = overviewQuery.isPending && !overview;
+  const error = overviewQuery.isError ? text.loadError : null;
+
+  if (!session) {
+    return (
+      <AdminPage className={styles.page}>
+        <AdminStateCard tone="info" title={text.loading} />
+      </AdminPage>
+    );
+  }
 
   function handleExport() {
     if (!overview) {
@@ -151,7 +160,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     URL.revokeObjectURL(url);
   }
 
-  if (isLoading && !overview) {
+  if (isLoading) {
     return (
       <AdminPage className={styles.page}>
         <AdminStateCard tone="info" title={text.loading} />
@@ -433,7 +442,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             </h2>
             <p>{text.tableHint}</p>
           </div>
-          {isLoading ? <span className={styles.refreshPill}>{text.refreshing}</span> : null}
+          {overviewQuery.isFetching ? <span className={styles.refreshPill}>{text.refreshing}</span> : null}
         </div>
         <TemplatesTable rows={overview.templates} locale={locale} text={text} />
       </section>

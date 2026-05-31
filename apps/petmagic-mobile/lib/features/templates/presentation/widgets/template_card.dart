@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -880,17 +881,15 @@ class _TemplateActionButton extends StatelessWidget {
                         border: Border.all(color: const Color(0xAAFFF0C0)),
                       )
                     : null,
-                child: Icon(
-                  isPremiumLockCta
-                      ? Icons.workspace_premium_rounded
-                      : useSoftPremiumStyle
-                      ? Icons.arrow_forward_rounded
-                      : Icons.arrow_forward_rounded,
-                  color: usePremiumStyle
-                      ? premiumTextColor
-                      : const Color(0xFF082313),
-                  size: usePremiumStyle ? 13.5 : 16,
-                ),
+                child: isPremiumLockCta
+                    ? const PremiumCrownIcon(size: 13.5)
+                    : Icon(
+                        Icons.arrow_forward_rounded,
+                        color: usePremiumStyle
+                            ? premiumTextColor
+                            : const Color(0xFF082313),
+                        size: usePremiumStyle ? 13.5 : 16,
+                      ),
               ),
             ],
           ),
@@ -1334,11 +1333,7 @@ class _AccessTag extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.workspace_premium_rounded,
-              size: 11,
-              color: Color(0xFFF2C96A),
-            ),
+            const PremiumCrownIcon(size: 11),
             const SizedBox(width: 3),
             Text(
               label,

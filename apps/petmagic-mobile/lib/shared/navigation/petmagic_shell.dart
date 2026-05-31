@@ -171,8 +171,8 @@ class _ShellTabFadeTransition extends StatefulWidget {
 
 class _ShellTabFadeTransitionState extends State<_ShellTabFadeTransition>
     with SingleTickerProviderStateMixin {
-  static const _duration = Duration(milliseconds: 120);
-  static const _curve = Curves.easeOut;
+  static const _duration = Duration(milliseconds: 220);
+  static const _curve = Curves.easeOutCubic;
 
   late final AnimationController _controller;
   late final Animation<double> _animation;
@@ -222,8 +222,16 @@ class _ShellTabFadeTransitionState extends State<_ShellTabFadeTransition>
       animation: _animation,
       child: widget.child,
       builder: (context, child) {
-        final opacity = 0.9 + (_animation.value * 0.1);
-        return Opacity(opacity: opacity, child: child);
+        final opacity = 0.82 + (_animation.value * 0.18);
+        final translateY = (1 - _animation.value) * 10;
+        final scale = 0.992 + (_animation.value * 0.008);
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(0, translateY),
+            child: Transform.scale(scale: scale, child: child),
+          ),
+        );
       },
     );
   }

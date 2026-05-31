@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
 import 'support_assistant_page.dart';
 import 'support_assistant_scenarios.dart';
@@ -251,6 +252,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
         .map(
           (scenario) => _SupportTopic(
             icon: scenario.icon,
+            isPremium: scenario.isPremium,
             label: scenario.topicLabel,
             scenario: scenario.key,
           ),
@@ -371,11 +373,13 @@ class _ConversationCard extends StatelessWidget {
 class _SupportTopic {
   const _SupportTopic({
     required this.icon,
+    this.isPremium = false,
     required this.label,
     required this.scenario,
   });
 
   final IconData icon;
+  final bool isPremium;
   final String label;
   final String scenario;
 }
@@ -409,7 +413,9 @@ class _TopicCard extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: colors.accent.withValues(alpha: 0.12),
                   ),
-                  child: Icon(topic.icon, color: colors.accent, size: 20),
+                  child: topic.isPremium
+                      ? const PremiumCrownIcon(size: 20)
+                      : Icon(topic.icon, color: colors.accent, size: 20),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

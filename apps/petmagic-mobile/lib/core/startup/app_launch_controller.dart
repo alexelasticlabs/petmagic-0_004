@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/startup/guest_launch_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
@@ -53,6 +55,9 @@ class AppLaunchState {
 
 class AppLaunchController extends Notifier<AppLaunchState> {
   late final GuestLaunchStorage _guestLaunchStorage;
+  static const _onboardingReadTimeout = Duration(seconds: 3);
+  bool _didScheduleInitialize = false;
+  bool _isInitializing = false;
 
   void _logAppLaunchFailure(String stage, Object error, StackTrace stackTrace) {
     developer.Timeline.instantSync(
@@ -70,27 +75,65 @@ class AppLaunchController extends Notifier<AppLaunchState> {
   @override
   AppLaunchState build() {
     _guestLaunchStorage = ref.watch(guestLaunchStorageProvider);
-    Future.microtask(initialize);
+    if (!_didScheduleInitialize) {
+      _didScheduleInitialize = true;
+      Future.microtask(initialize);
+    }
     return const AppLaunchState.loading();
   }
 
   Future<void> initialize() async {
-    final sessionStorage = ref.read(authSessionStorageProvider);
-    final session = await sessionStorage.read();
-    final hasSeenOnboarding = await _guestLaunchStorage.readOnboardingSeen();
-
-    if (!ref.mounted) {
+    if (_isInitializing) {
       return;
     }
 
-    state = AppLaunchState(
-      isLoading: false,
-      isAuthenticated: session != null,
-      requiresLegalAcceptance:
-          session?.user.legalAcceptance.requiresAcceptance ?? false,
-      hasSeenOnboarding: hasSeenOnboarding,
-      guestSessionReady: session != null,
-    );
+    _isInitializing = true;
+    try {
+      final sessionStorage = ref.read(authSessionStorageProvider);
+      var isAuthenticated = false;
+      var requiresLegalAcceptance = false;
+      var hasSeenOnboarding = false;
+      var guestSessionReady = false;
+
+      try {
+        final session = await sessionStorage.read();
+        isAuthenticated = session != null;
+        requiresLegalAcceptance =
+            session?.user.legalAcceptance.requiresAcceptance ?? false;
+        guestSessionReady = session != null;
+      } catch (error, stackTrace) {
+        _logAppLaunchFailure('read_session', error, stackTrace);
+        AppLogger.warn(
+          feature: 'Startup',
+          operation: 'app_launch_session_fallback',
+          message: 'Falling back to guest launch because session read failed',
+        );
+      }
+
+      try {
+        hasSeenOnboarding = await _guestLaunchStorage
+            .readOnboardingSeen()
+            .timeout(_onboardingReadTimeout);
+      } on TimeoutException catch (error, stackTrace) {
+        _logAppLaunchFailure('read_onboarding_timeout', error, stackTrace);
+      } catch (error, stackTrace) {
+        _logAppLaunchFailure('read_onboarding', error, stackTrace);
+      }
+
+      if (!ref.mounted) {
+        return;
+      }
+
+      state = AppLaunchState(
+        isLoading: false,
+        isAuthenticated: isAuthenticated,
+        requiresLegalAcceptance: requiresLegalAcceptance,
+        hasSeenOnboarding: hasSeenOnboarding,
+        guestSessionReady: guestSessionReady,
+      );
+    } finally {
+      _isInitializing = false;
+    }
   }
 
   Future<void> continueAsGuest() async {

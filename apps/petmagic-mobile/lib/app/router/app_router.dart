@@ -133,16 +133,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: OnboardingPage.routePath,
         pageBuilder: (context, state) =>
-            const NoTransitionPage(child: OnboardingPage()),
+            _buildFadeSlidePage(state: state, child: const OnboardingPage()),
       ),
       GoRoute(
         path: GuestWelcomePage.routePath,
         pageBuilder: (context, state) =>
-            const NoTransitionPage(child: GuestWelcomePage()),
+            _buildFadeSlidePage(state: state, child: const GuestWelcomePage()),
       ),
       GoRoute(
         path: AuthEntryPage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
           child: AuthEntryPage(
             initialEmail: state.uri.queryParameters['email'],
             redirectPath: state.uri.queryParameters['redirect'],
@@ -152,11 +153,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RegisterEntryPage.routePath,
         pageBuilder: (context, state) =>
-            const NoTransitionPage(child: RegisterEntryPage()),
+            _buildFadeSlidePage(state: state, child: const RegisterEntryPage()),
       ),
       GoRoute(
         path: PasswordResetPage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
           child: PasswordResetPage(
             initialEmail: state.uri.queryParameters['email'],
           ),
@@ -172,7 +174,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ? null
               : extra['initialPassword'] as String?;
 
-          return NoTransitionPage(
+          return _buildFadeSlidePage(
+            state: state,
             child: EmailVerificationPage(
               email: state.uri.queryParameters['email'] ?? '',
               initialPassword: initialPassword,
@@ -182,13 +185,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: LegalAcceptanceGatePage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: LegalAcceptanceGatePage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: const LegalAcceptanceGatePage(),
+        ),
       ),
       GoRoute(
         path: StripePaymentSheetSmokeTestPage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: StripePaymentSheetSmokeTestPage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: const StripePaymentSheetSmokeTestPage(),
+        ),
       ),
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: _rootNavigatorKey,

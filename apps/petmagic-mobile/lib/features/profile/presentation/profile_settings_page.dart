@@ -24,6 +24,7 @@ class ProfileSettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final state = ref.watch(profileControllerProvider);
     final bottomNavInset = petMagicScrollableBottomInset(context);
     final preferences = ref.watch(appPreferencesControllerProvider);
@@ -270,19 +271,27 @@ class ProfileSettingsPage extends ConsumerWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      colors.danger.withValues(alpha: 0.2),
-                      colors.surfaceGlass,
+                      isLight
+                          ? const Color(0xFFF7EEF0)
+                          : const Color(0xFF151A29),
+                      isLight
+                          ? const Color(0xFFFDF7F8)
+                          : const Color(0xFF1A2236),
                     ],
                   ),
                   border: Border.all(
-                    color: colors.danger.withValues(alpha: 0.45),
+                    color: colors.danger.withValues(
+                      alpha: isLight ? 0.42 : 0.36,
+                    ),
                   ),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: colors.danger.withValues(alpha: 0.18),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
+                      color: colors.danger.withValues(
+                        alpha: isLight ? 0.10 : 0.12,
+                      ),
+                      blurRadius: isLight ? 10 : 14,
+                      offset: Offset(0, isLight ? 4 : 6),
                     ),
                   ],
                 ),

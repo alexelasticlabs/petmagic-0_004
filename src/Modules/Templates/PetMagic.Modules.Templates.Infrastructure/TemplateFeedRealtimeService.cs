@@ -10,8 +10,10 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class TemplateFeedRealtimeService : ITemplateFeedRealtimeService
 {
     private static readonly JsonSerializerOptions RealtimeJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan TemplatesInvalidationThrottleWindow = TimeSpan.FromSeconds(2);
 
     private readonly ConcurrentDictionary<Guid, Channel<TemplateFeedRealtimeEvent>> subscribers = new();
+    private long _lastTemplatesInvalidationTicks;
 
     public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
     {
@@ -29,6 +31,22 @@ internal sealed class TemplateFeedRealtimeService : ITemplateFeedRealtimeService
 
     public ValueTask PublishTemplatesFeedInvalidatedAsync(CancellationToken cancellationToken = default)
     {
+        var nowTicks = DateTime.UtcNow.Ticks;
+
+        while (true)
+        {
+            var previousTicks = Interlocked.Read(ref _lastTemplatesInvalidationTicks);
+            if (nowTicks - previousTicks < TemplatesInvalidationThrottleWindow.Ticks)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            if (Interlocked.CompareExchange(ref _lastTemplatesInvalidationTicks, nowTicks, previousTicks) == previousTicks)
+            {
+                break;
+            }
+        }
+
         return PublishAsync(new TemplateFeedRealtimeEvent(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated), cancellationToken);
     }
 

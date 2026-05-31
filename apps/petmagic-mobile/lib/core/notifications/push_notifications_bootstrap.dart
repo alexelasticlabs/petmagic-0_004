@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/notifications/notification_coordinator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
@@ -32,6 +33,7 @@ class PushNotificationsBootstrap extends ConsumerStatefulWidget {
 
 class _PushNotificationsBootstrapState
     extends ConsumerState<PushNotificationsBootstrap> {
+  static const _initialLinkTimeout = Duration(seconds: 3);
   final AppLinks _appLinks = AppLinks();
   NotificationCoordinator? _coordinator;
   StreamSubscription<Uri>? _deepLinkSubscription;
@@ -83,9 +85,30 @@ class _PushNotificationsBootstrapState
       return;
     }
 
-    final initialLink = await _appLinks.getInitialLink();
-    if (initialLink != null) {
-      _openDeepLink(initialLink);
+    try {
+      final initialLink = await _appLinks
+          .getInitialLink()
+          .timeout(_initialLinkTimeout);
+      if (initialLink != null) {
+        _openDeepLink(initialLink);
+      }
+    } on TimeoutException catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Startup',
+        operation: 'deep_link_initial_timeout',
+        message: 'Initial deep link read timed out, continue without blocking startup',
+        context: {'timeout_ms': _initialLinkTimeout.inMilliseconds},
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        feature: 'Startup',
+        operation: 'deep_link_initial_failed',
+        message: 'Initial deep link read failed, continue without blocking startup',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 

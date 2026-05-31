@@ -301,68 +301,80 @@ Future<void> _showReadyCardActions(
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    backgroundColor: colors.surface,
+    backgroundColor: Colors.transparent,
     builder: (sheetContext) {
+      final bottomInset = petMagicScrollableBottomInset(sheetContext);
       return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.open_in_new_rounded),
-              title: Text(text.generationStatusOpenStatusAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                if (generation.isUnread) {
-                  ref
-                      .read(generationHistoryControllerProvider.notifier)
-                      .markRead(generation.generationId);
-                }
-                context.push(
-                  '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-                );
-              },
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.border.withValues(alpha: 0.85)),
             ),
-            ListTile(
-              leading: const Icon(Icons.download_rounded),
-              title: Text(text.generationStatusSaveAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                unawaited(_saveGenerationToGallery(context, text, generation));
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.open_in_new_rounded),
+                  title: Text(text.generationStatusOpenStatusAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    if (generation.isUnread) {
+                      ref
+                          .read(generationHistoryControllerProvider.notifier)
+                          .markRead(generation.generationId);
+                    }
+                    context.push(
+                      '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.download_rounded),
+                  title: Text(text.generationStatusSaveAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    unawaited(_saveGenerationToGallery(context, text, generation));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.share_rounded),
+                  title: Text(text.supportChatShareAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    unawaited(_shareGenerationFile(context, text, generation));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.link_rounded),
+                  title: Text(text.generationStatusCopyLinkAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    unawaited(_copyGenerationLink(context, text, generation));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: Text(text.generationStatusDeleteAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    unawaited(_deleteGeneration(context, text, ref, generation));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: Text(text.generationStatusReportProblemAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push(SupportChatPage.routePath);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.share_rounded),
-              title: Text(text.supportChatShareAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                unawaited(_shareGenerationFile(context, text, generation));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.link_rounded),
-              title: Text(text.generationStatusCopyLinkAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                unawaited(_copyGenerationLink(context, text, generation));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline_rounded),
-              title: Text(text.generationStatusDeleteAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                unawaited(_deleteGeneration(context, text, ref, generation));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.flag_outlined),
-              title: Text(text.generationStatusReportProblemAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                context.push(SupportChatPage.routePath);
-              },
-            ),
-          ],
+          ),
         ),
       );
     },
@@ -379,44 +391,56 @@ Future<void> _showFailedCardActions(
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    backgroundColor: colors.surface,
+    backgroundColor: Colors.transparent,
     builder: (sheetContext) {
+      final bottomInset = petMagicScrollableBottomInset(sheetContext);
       return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.open_in_new_rounded),
-              title: Text(text.generationStatusOpenStatusAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                if (generation.isUnread) {
-                  ref
-                      .read(generationHistoryControllerProvider.notifier)
-                      .markRead(generation.generationId);
-                }
-                context.push(
-                  '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-                );
-              },
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.border.withValues(alpha: 0.85)),
             ),
-            ListTile(
-              leading: const Icon(Icons.image_search_rounded),
-              title: Text(text.generationStatusPickAnotherPhotoAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                context.go(TemplatesPage.routePath);
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.open_in_new_rounded),
+                  title: Text(text.generationStatusOpenStatusAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    if (generation.isUnread) {
+                      ref
+                          .read(generationHistoryControllerProvider.notifier)
+                          .markRead(generation.generationId);
+                    }
+                    context.push(
+                      '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.image_search_rounded),
+                  title: Text(text.generationStatusPickAnotherPhotoAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.go(TemplatesPage.routePath);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.support_agent_rounded),
+                  title: Text(text.generationStatusContactSupportAction),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push(SupportChatPage.routePath);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.support_agent_rounded),
-              title: Text(text.generationStatusContactSupportAction),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                context.push(SupportChatPage.routePath);
-              },
-            ),
-          ],
+          ),
         ),
       );
     },

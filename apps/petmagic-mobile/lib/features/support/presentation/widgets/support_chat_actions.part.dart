@@ -78,27 +78,40 @@ extension _SupportChatPageActions on _SupportChatPageState {
     final action = await showModalBottomSheet<_SupportAttachmentQuickAction>(
       context: context,
       useSafeArea: true,
-      backgroundColor: context.petMagicColors.surfaceStrong,
+      backgroundColor: Colors.transparent,
       builder: (dialogContext) {
+        final colors = context.petMagicColors;
+        final bottomInset = petMagicScrollableBottomInset(dialogContext);
         final text = AppLocalizations.of(dialogContext);
         return SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_camera_outlined),
-                title: Text(text.supportChatTakePhotoAction),
-                onTap: () => Navigator.of(
-                  dialogContext,
-                ).pop(_SupportAttachmentQuickAction.camera),
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.border.withValues(alpha: 0.85)),
               ),
-              ListTile(
-                leading: const Icon(Icons.videocam_outlined),
-                title: Text(text.supportChatRecordVideoAction),
-                onTap: () => Navigator.of(
-                  dialogContext,
-                ).pop(_SupportAttachmentQuickAction.video),
+              child: Wrap(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_camera_outlined),
+                    title: Text(text.supportChatTakePhotoAction),
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_SupportAttachmentQuickAction.camera),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.videocam_outlined),
+                    title: Text(text.supportChatRecordVideoAction),
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_SupportAttachmentQuickAction.video),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },

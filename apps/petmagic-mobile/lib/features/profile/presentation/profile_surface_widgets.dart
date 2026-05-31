@@ -279,6 +279,7 @@ class ProfileStatusPill extends StatelessWidget {
   const ProfileStatusPill({
     required this.label,
     this.leading,
+    this.leadingWidget,
     this.backgroundColor,
     this.foregroundColor,
     super.key,
@@ -286,6 +287,7 @@ class ProfileStatusPill extends StatelessWidget {
 
   final String label;
   final IconData? leading;
+  final Widget? leadingWidget;
   final Color? backgroundColor;
   final Color? foregroundColor;
 
@@ -336,8 +338,8 @@ class ProfileStatusPill extends StatelessWidget {
             return Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (leading != null) ...[
-                  Icon(leading, size: 13, color: fg),
+                if (leadingWidget != null || leading != null) ...[
+                  leadingWidget ?? Icon(leading, size: 13, color: fg),
                   const SizedBox(width: 6),
                 ],
                 if (constraints.hasBoundedWidth)

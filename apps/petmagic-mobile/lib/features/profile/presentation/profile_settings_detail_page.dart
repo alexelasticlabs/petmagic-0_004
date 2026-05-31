@@ -15,6 +15,7 @@ import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_no
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
 enum ProfileSettingsDetailKind {
   linkedAccounts,
@@ -230,35 +231,50 @@ class _ProfileAccountInfoPageState
       context: context,
       useRootNavigator: true,
       showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
+        final colors = context.petMagicColors;
+        final bottomInset = petMagicScrollableBottomInset(ctx);
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-                child: Text(
-                  text.profileAvatarSheetTitle,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                    child: Text(
+                      text.profileAvatarSheetTitle,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
+                  ListTile(
+                    leading: const Icon(Icons.add_a_photo_outlined),
+                    title: Text(text.profileAvatarPickFromGallery),
+                    onTap: () =>
+                        Navigator.of(ctx).pop(_AvatarSheetAction.pickFromGallery),
+                  ),
+                  if (hasAvatar)
+                    ListTile(
+                      leading: const Icon(Icons.delete_outline_rounded),
+                      title: Text(text.profileAvatarRemove),
+                      onTap: () =>
+                          Navigator.of(ctx).pop(_AvatarSheetAction.remove),
+                    ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.add_a_photo_outlined),
-                title: Text(text.profileAvatarPickFromGallery),
-                onTap: () =>
-                    Navigator.of(ctx).pop(_AvatarSheetAction.pickFromGallery),
-              ),
-              if (hasAvatar)
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: Text(text.profileAvatarRemove),
-                  onTap: () => Navigator.of(ctx).pop(_AvatarSheetAction.remove),
-                ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         );
       },
@@ -385,8 +401,11 @@ class _AccountProfileHeroCard extends StatelessWidget {
               ProfileStatusPill(
                 label: profile.isPremium ? text.premiumLabel : text.freeLabel,
                 leading: profile.isPremium
-                    ? Icons.workspace_premium_rounded
+                    ? null
                     : Icons.person_outline_rounded,
+                leadingWidget: profile.isPremium
+                    ? const PremiumCrownIcon(size: 13)
+                    : null,
                 backgroundColor: profile.isPremium
                     ? const Color(0xFFFFC107).withValues(alpha: 0.18)
                     : null,

@@ -3301,4 +3301,17 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get subscriptionBillingPeriodYearly => 'Roczny';
+
+  @override
+  String get globalOfflineBannerTitle => 'Brak połączenia z internetem';
+
+  @override
+  String get globalOfflineBannerMessage =>
+      'Niektóre funkcje są niedostępne, dopóki połączenie nie zostanie przywrócone.';
+
+  @override
+  String get globalOnlineRestoredBannerTitle => 'Połączenie przywrócone';
+
+  @override
+  String get globalOnlineRestoredBannerMessage => 'Znów jesteś online.';
 }

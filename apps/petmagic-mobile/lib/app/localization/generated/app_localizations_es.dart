@@ -3323,4 +3323,17 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get subscriptionBillingPeriodYearly => 'Anual';
+
+  @override
+  String get globalOfflineBannerTitle => 'Sin conexión a internet';
+
+  @override
+  String get globalOfflineBannerMessage =>
+      'Algunas funciones no estarán disponibles hasta que se restablezca la conexión.';
+
+  @override
+  String get globalOnlineRestoredBannerTitle => 'Conexión restablecida';
+
+  @override
+  String get globalOnlineRestoredBannerMessage => 'Ya estás en línea.';
 }

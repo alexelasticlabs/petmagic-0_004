@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 part 'premium_page_content.part.dart';
@@ -27,7 +29,7 @@ const _kLightBg = Color(0xFFEFF4FA);
 const _kLightSurface = Color(0xFFFFFFFF);
 const _kLightText = Color(0xFF0F1D35);
 const _kLightSubtitle = Color(0xFF2A3E56);
-const _kLightAccent = Color(0xFF10C878);
+const _kLightAccent = Color(0xFFCC9A2D);
 const _kLightBorder = Color(0xFFA8B9CC);
 const _kLightFreeBg = Color(0xFFE9F0F8);
 
@@ -371,23 +373,32 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: bg,
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 320),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          child: state.isLoading
-              ? Center(
-                  key: const ValueKey('premium-loading'),
-                  child: CircularProgressIndicator(color: accent),
-                )
-              : _PremiumBody(
-                  key: const ValueKey('premium-content'),
-                  state: state,
-                  controller: controller,
-                  isDark: isDark,
-                  onOpenUrl: _openExternalUrl,
-                  onStartCheckout: _openPaymentMethodSheetAndCheckout,
-                ),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _PremiumGoldenBackground(isDark: isDark),
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: state.isLoading
+                  ? Center(
+                      key: const ValueKey('premium-loading'),
+                      child: CircularProgressIndicator(color: accent),
+                    )
+                  : _PremiumBody(
+                      key: const ValueKey('premium-content'),
+                      state: state,
+                      controller: controller,
+                      isDark: isDark,
+                      onOpenUrl: _openExternalUrl,
+                      onStartCheckout: _openPaymentMethodSheetAndCheckout,
+                    ),
+            ),
+          ],
         ),
       ),
     );

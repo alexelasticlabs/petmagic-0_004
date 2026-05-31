@@ -54,7 +54,7 @@ class TemplateDetailContent extends StatelessWidget {
                     const Spacer(),
                     if (template.isPremium)
                       _Pill(
-                        icon: Icons.workspace_premium_rounded,
+                        leading: const PremiumCrownIcon(size: 15),
                         label: text.premiumLabel,
                         color: colors.gold,
                       ),
@@ -332,23 +332,28 @@ class TemplateDetailContent extends StatelessWidget {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              const Color(0x40F3C65A),
-                              colors.surfaceStrong.withValues(alpha: 0.96),
-                              const Color(0x2AA46B12),
+                              ...PremiumBannerStyle.gradient(
+                                Theme.of(context).brightness ==
+                                    Brightness.light,
+                              ),
                             ],
-                            stops: const [0, 0.64, 1],
+                            stops: const [0, 0.55, 1],
                           ),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: const Color(0xBFE6BB64),
+                            color: const Color(0xFFE0A91E).withValues(
+                              alpha: 0.76,
+                            ),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0x66D9A741),
-                              blurRadius: 20,
+                              color: const Color(0xFF081538).withValues(
+                                alpha: 0.26,
+                              ),
+                              blurRadius: 14,
                               spreadRadius: 0.5,
-                              offset: const Offset(0, 10),
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
@@ -359,11 +364,7 @@ class TemplateDetailContent extends StatelessWidget {
                             children: [
                               Row(
                                 children: [
-                                  Icon(
-                                    Icons.workspace_premium_rounded,
-                                    color: colors.gold,
-                                    size: 18,
-                                  ),
+                                  const PremiumCrownIcon(size: 18),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -544,11 +545,7 @@ class _PremiumUnlockCtaButtonState extends State<_PremiumUnlockCtaButton>
                           shape: BoxShape.circle,
                           border: Border.all(color: const Color(0xAAFFF0C0)),
                         ),
-                        child: const Icon(
-                          Icons.workspace_premium_rounded,
-                          color: ctaTextColor,
-                          size: 14,
-                        ),
+                        child: const PremiumCrownIcon(size: 14),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -668,18 +665,43 @@ class _PremiumTemplateUploadButton extends StatelessWidget {
   }
 }
 
-class _TemplateGenerationProgressContent extends ConsumerWidget {
+const _kGenerationPremiumMascotAsset = 'assets/rewards/premium-upsell-dog.png';
+
+class _TemplateGenerationProgressContent extends ConsumerStatefulWidget {
   const _TemplateGenerationProgressContent({required this.template});
 
   final TemplateItem template;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TemplateGenerationProgressContent> createState() =>
+      _TemplateGenerationProgressContentState();
+}
+
+class _TemplateGenerationProgressContentState
+    extends ConsumerState<_TemplateGenerationProgressContent> {
+  String? _lastCompletedGenerationId;
+  bool _isPremiumGateDismissed = false;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final state = ref.watch(templateGenerationControllerProvider);
+    final wallet = ref.watch(
+      walletControllerProvider.select((walletState) => walletState.wallet),
+    );
     final generation = state.generation;
     final isCompleted = generation?.isCompleted == true;
     final isFailed = generation?.isFailed == true || state.errorMessage != null;
+    final shouldShowPremiumGate =
+        widget.template.isVideo && !(wallet?.isPremium ?? false);
+    final completedGenerationId = generation?.generationId;
+
+    if (isCompleted &&
+        completedGenerationId != null &&
+        completedGenerationId != _lastCompletedGenerationId) {
+      _lastCompletedGenerationId = completedGenerationId;
+      _isPremiumGateDismissed = false;
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -700,12 +722,24 @@ class _TemplateGenerationProgressContent extends ConsumerWidget {
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
               child: isCompleted
-                  ? _GenerationResultView(
-                      template: template,
-                      generation: generation!,
-                    )
+                  ? shouldShowPremiumGate && !_isPremiumGateDismissed
+                        ? _GenerationCompletedPremiumGate(
+                            key: ValueKey<String>(
+                              'generation-premium-gate-${generation!.generationId}',
+                            ),
+                            onClose: () => setState(
+                              () => _isPremiumGateDismissed = true,
+                            ),
+                            onLater: () => setState(
+                              () => _isPremiumGateDismissed = true,
+                            ),
+                          )
+                        : _GenerationResultView(
+                            template: widget.template,
+                            generation: generation!,
+                          )
                   : _GenerationWorkingView(
-                      template: template,
+                      template: widget.template,
                       generation: generation,
                       isFailed: isFailed,
                       errorMessage:
@@ -714,6 +748,269 @@ class _TemplateGenerationProgressContent extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GenerationCompletedPremiumGate extends StatelessWidget {
+  const _GenerationCompletedPremiumGate({
+    required this.onClose,
+    required this.onLater,
+    super.key,
+  });
+
+  final VoidCallback onClose;
+  final VoidCallback onLater;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final isRu = Localizations.localeOf(context).languageCode.toLowerCase() ==
+        'ru';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 390;
+        final rightInset = compact ? 124.0 : 162.0;
+        final mascotHeight = compact ? 176.0 : 200.0;
+        return DecoratedBox(
+          key: const ValueKey('generation-completed-premium-gate'),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: const Color(0xFFE0A91E).withValues(
+                alpha: isLight ? 0.78 : 0.9,
+              ),
+              width: 1.15,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: PremiumBannerStyle.gradient(isLight),
+            ),
+          ),
+          child: Stack(
+            children: [
+          Positioned(
+            right: 12,
+            top: 8,
+            child: IconButton(
+              onPressed: onClose,
+              icon: Icon(
+                Icons.close_rounded,
+                color: isLight
+                    ? const Color(0xFF514325)
+                    : const Color(0xFFE1DED4),
+              ),
+            ),
+          ),
+              Positioned(
+                right: 8,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: Image.asset(
+                    _kGenerationPremiumMascotAsset,
+                    height: mascotHeight,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(18, 20, rightInset, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(
+                  isRu ? 'Видео готово! 🎉' : 'Video is ready! 🎉',
+                  style: TextStyle(
+                    color: isLight
+                        ? const Color(0xFF1E1608)
+                        : const Color(0xFFEDE7D8),
+                    fontSize: compact ? 27 : 32,
+                    fontWeight: FontWeight.w900,
+                    height: 1.02,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  isRu ? 'Хотите создавать больше?' : 'Want to create more?',
+                  style: TextStyle(
+                    color: isLight
+                        ? const Color(0xFF3C3222)
+                        : const Color(0xFFD2D8E5),
+                    fontSize: compact ? 15.5 : 17.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  isRu
+                      ? 'Premium даёт 40 PowSpark каждую неделю,\nPremium-шаблоны и экспорт без водяного знака.'
+                      : 'Premium gives 40 PowSpark every week,\nPremium templates and watermark-free export.',
+                  style: TextStyle(
+                    color: isLight
+                        ? const Color(0xFF3B3324)
+                        : const Color(0xFFE3DFD2),
+                    fontSize: compact ? 13.4 : 15.2,
+                    height: 1.3,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                PremiumShimmerButton(
+                  label: text.premiumContinueAction,
+                  onTap: () => context.push(PremiumPage.routePath),
+                  height: 46,
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton(
+                    onPressed: onLater,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color: isLight
+                            ? const Color(0xFFBCB29B)
+                            : const Color(0xFF2A3651),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      text.templateFlowChooseAnotherTemplateAction,
+                      style: TextStyle(
+                        color: isLight
+                            ? const Color(0xFF3C3324)
+                            : const Color(0xFFC6CEDD),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GenerationGoldShimmerButton extends StatefulWidget {
+  const _GenerationGoldShimmerButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_GenerationGoldShimmerButton> createState() =>
+      _GenerationGoldShimmerButtonState();
+}
+
+class _GenerationGoldShimmerButtonState
+    extends State<_GenerationGoldShimmerButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: widget.onTap,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE0A91E).withValues(alpha: 0.34),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              clipBehavior: Clip.antiAlias,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  final t = _controller.value;
+                  final shimmerStart = -1.6 + (t * 2.8);
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFF4C64D), Color(0xFFEAB13A)],
+                          ),
+                        ),
+                        child: child,
+                      ),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment(shimmerStart, -1),
+                                end: Alignment(shimmerStart + 0.9, 1),
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.white.withValues(alpha: 0.68),
+                                  Colors.transparent,
+                                ],
+                                stops: const [0.23, 0.5, 0.77],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      widget.label,
+                      style: const TextStyle(
+                        color: Color(0xFF261903),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

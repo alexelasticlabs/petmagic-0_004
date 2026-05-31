@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_types.dart';
 
-class PetMagicNotificationHost extends StatefulWidget {
+class PetMagicNotificationHost extends ConsumerStatefulWidget {
   const PetMagicNotificationHost({required this.child, super.key});
 
   final Widget child;
 
   @override
-  State<PetMagicNotificationHost> createState() =>
+  ConsumerState<PetMagicNotificationHost> createState() =>
       _PetMagicNotificationHostState();
 }
 
-class _PetMagicNotificationHostState extends State<PetMagicNotificationHost> {
-  final PetMagicNotificationCenter _center = PetMagicNotificationCenter.instance;
+class _PetMagicNotificationHostState
+    extends ConsumerState<PetMagicNotificationHost> {
+  final PetMagicNotificationCenter _center =
+      PetMagicNotificationCenter.instance;
 
   void _handleChanged() {
     if (mounted) {
@@ -36,6 +40,11 @@ class _PetMagicNotificationHostState extends State<PetMagicNotificationHost> {
 
   @override
   Widget build(BuildContext context) {
+    final hasNetworkBanner = ref.watch(
+      networkStatusControllerProvider.select(
+        (state) => state.bannerPhase != NetworkBannerPhase.hidden,
+      ),
+    );
     final notification = _center.current;
     if (notification == null) {
       return widget.child;
@@ -50,7 +59,12 @@ class _PetMagicNotificationHostState extends State<PetMagicNotificationHost> {
             child: Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                padding: EdgeInsets.fromLTRB(
+                  14,
+                  hasNetworkBanner ? 78 : 10,
+                  14,
+                  0,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 560),
                   child: AnimatedSwitcher(
@@ -100,23 +114,23 @@ class _NotificationBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final toneColors = switch (notification.tone) {
       PetMagicToastTone.success => (
-          base: const Color(0xFF0F2C22),
-          border: const Color(0xFF2B8C67),
-          accent: const Color(0xFF27D38A),
-          iconBg: const Color(0xFF163F31),
-        ),
+        base: const Color(0xFF0F2C22),
+        border: const Color(0xFF2B8C67),
+        accent: const Color(0xFF27D38A),
+        iconBg: const Color(0xFF163F31),
+      ),
       PetMagicToastTone.warning => (
-          base: const Color(0xFF30201F),
-          border: const Color(0xFFAD5762),
-          accent: const Color(0xFFFF7A8C),
-          iconBg: const Color(0xFF4A2A2F),
-        ),
+        base: const Color(0xFF30201F),
+        border: const Color(0xFFAD5762),
+        accent: const Color(0xFFFF7A8C),
+        iconBg: const Color(0xFF4A2A2F),
+      ),
       PetMagicToastTone.info => (
-          base: const Color(0xFF162636),
-          border: const Color(0xFF3A6FB2),
-          accent: const Color(0xFF6FA8FF),
-          iconBg: const Color(0xFF1C3550),
-        ),
+        base: const Color(0xFF162636),
+        border: const Color(0xFF3A6FB2),
+        accent: const Color(0xFF6FA8FF),
+        iconBg: const Color(0xFF1C3550),
+      ),
     };
 
     final icon = switch (notification.tone) {

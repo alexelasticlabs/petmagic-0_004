@@ -8,17 +8,24 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generations_gallery_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 
 part 'generations_gallery_page_cards.dart';
 part 'generations_gallery_page_filters_and_chrome.dart';
@@ -38,15 +45,23 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     with WidgetsBindingObserver {
   bool _readyExpanded = false;
   late final GenerationHistoryController _historyController;
+  late final WalletController _walletController;
 
   @override
   void initState() {
     super.initState();
     _historyController = ref.read(generationHistoryControllerProvider.notifier);
+    _walletController = ref.read(walletControllerProvider.notifier);
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       if (!mounted) {
         return;
+      }
+
+      final launch = ref.read(appLaunchControllerProvider);
+      final hasWallet = ref.read(walletControllerProvider).wallet != null;
+      if (launch.isAuthenticated && !hasWallet) {
+        unawaited(_walletController.load());
       }
 
       _historyController.setScreenVisible(true);
@@ -90,6 +105,17 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final state = ref.watch(generationHistoryControllerProvider);
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
+    final hasPremiumAccess = ref.watch(
+      walletControllerProvider.select(
+        (walletState) => walletState.wallet?.isPremium,
+      ),
+    );
+    final shouldShowPremiumUpsell = isAuthenticated
+        ? hasPremiumAccess == false
+        : true;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -150,6 +176,24 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
                             ),
                             const SizedBox(height: 16),
                             _FilterBar(selected: state.filter),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              child: shouldShowPremiumUpsell
+                                  ? Padding(
+                                      key: const ValueKey<String>(
+                                        'gallery-premium-upsell',
+                                      ),
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: _GalleryPremiumUpsellCard(
+                                        onOpenPremium: _openPremiumUpsell,
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(
+                                      key: ValueKey<String>(
+                                        'gallery-premium-upsell-hidden',
+                                      ),
+                                    ),
+                            ),
                           ],
                         ),
                       ),
@@ -363,6 +407,15 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
       GenerationHistoryFilter.failed =>
         items.where((item) => item.isFailed).toList(growable: false),
     };
+  }
+
+  Future<void> _openPremiumUpsell() async {
+    if (ref.read(appLaunchControllerProvider).isAuthenticated) {
+      await context.push(PremiumPage.routePath);
+      return;
+    }
+
+    await showAuthRequiredSheet(context, redirectPath: PremiumPage.routePath);
   }
 
   Widget _sectionHeaderSliver(String title, int count) {

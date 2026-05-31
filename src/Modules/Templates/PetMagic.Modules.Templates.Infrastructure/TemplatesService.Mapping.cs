@@ -24,22 +24,48 @@ internal sealed partial class TemplatesService
     private static PublicTemplateCatalogMetadataResponse MapPublicCatalogMetadataItem(TemplateItem template)
     {
         var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
-        var previewUrl = previewAsset?.Url;
-        var contentType = previewAsset?.ContentType?.Trim().ToLowerInvariant() ?? string.Empty;
-        var isPreviewVideo = contentType.StartsWith("video/", StringComparison.Ordinal) || IsVideoAssetUrl(previewUrl);
-
-        return new PublicTemplateCatalogMetadataResponse(
+        return MapPublicCatalogMetadataItem(
             template.Id,
             template.Title,
             template.Category,
-            template.TemplateType.ToString(),
-            isPreviewVideo ? null : previewUrl,
-            previewUrl,
+            template.TemplateType,
+            previewAsset?.Url,
+            previewAsset?.ContentType,
             template.TokenCost,
             template.IsPremium,
-            DeserializeTags(template.Tags),
+            template.Tags,
             template.Version,
             template.UpdatedAtUtc);
+    }
+
+    private static PublicTemplateCatalogMetadataResponse MapPublicCatalogMetadataItem(
+        Guid templateId,
+        string title,
+        string category,
+        TemplateType templateType,
+        string? previewUrl,
+        string? previewContentType,
+        int tokenCost,
+        bool isPremium,
+        string tags,
+        long version,
+        DateTime updatedAtUtc)
+    {
+        var contentType = previewContentType?.Trim().ToLowerInvariant() ?? string.Empty;
+        var isPreviewVideo = contentType.StartsWith("video/", StringComparison.Ordinal) || IsVideoAssetUrl(previewUrl);
+
+        return new PublicTemplateCatalogMetadataResponse(
+            templateId,
+            title,
+            category,
+            templateType.ToString(),
+            isPreviewVideo ? null : previewUrl,
+            previewUrl,
+            tokenCost,
+            isPremium,
+            DeserializeTags(tags),
+            version,
+            updatedAtUtc);
     }
 
     private static TemplateAssetResponse? GetAsset(TemplateItem template, TemplateAssetKind assetKind)

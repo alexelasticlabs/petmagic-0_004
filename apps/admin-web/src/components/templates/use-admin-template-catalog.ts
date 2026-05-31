@@ -49,24 +49,21 @@ export function useAdminTemplateCatalog({
 
       return rowsByTemplateId;
     },
-    enabled,
+    enabled: enabled && templatesQuery.isSuccess && (templatesQuery.data?.length ?? 0) > 0,
   });
 
   async function refresh() {
-    const [templatesResult, analyticsResult] = await Promise.all([
-      templatesQuery.refetch(),
-      analyticsRowsQuery.refetch(),
-    ]);
+    const templatesResult = await templatesQuery.refetch();
 
     if (templatesResult.isError) {
       throw templatesResult.error;
     }
 
-    if (analyticsResult.isError) {
-      throw analyticsResult.error;
+    if ((templatesResult.data?.length ?? 0) > 0) {
+      await analyticsRowsQuery.refetch();
     }
 
-    return analyticsResult;
+    return templatesResult;
   }
 
   const analyticsRows = analyticsRowsQuery.data ?? {};
@@ -78,8 +75,10 @@ export function useAdminTemplateCatalog({
   return {
     analyticsRows,
     getAnalyticsRow,
-    hasError: templatesQuery.isError || analyticsRowsQuery.isError,
-    isLoading: templatesQuery.isLoading || analyticsRowsQuery.isLoading,
+    hasError: templatesQuery.isError,
+    hasSecondaryError: analyticsRowsQuery.isError,
+    isLoading: templatesQuery.isLoading,
+    isSecondaryLoading: analyticsRowsQuery.isLoading,
     refresh,
     templates: templatesQuery.data ?? [],
   };

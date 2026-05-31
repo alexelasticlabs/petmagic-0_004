@@ -153,7 +153,9 @@ class _SupportStarterState extends StatelessWidget {
               for (final action in quickActions)
                 ActionChip(
                   onPressed: () => onQuickActionSelected(action.prompt),
-                  avatar: Icon(action.icon, size: 14, color: colors.accent),
+                  avatar: action.isPremium
+                      ? const PremiumCrownIcon(size: 14)
+                      : Icon(action.icon, size: 14, color: colors.accent),
                   label: Text(action.label),
                   side: BorderSide(color: colors.border.withValues(alpha: 0.7)),
                   backgroundColor: colors.surfaceStrong.withValues(alpha: 0.72),

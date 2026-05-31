@@ -3,6 +3,10 @@ part of 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 const int _kPhotoCostSpark = 6;
 const int _kVideoCostSpark = 33;
 const String _kWalletHeroLogoAsset = 'assets/rewards/wallet-hero-logo.png';
+const String _kWalletPremiumUpsellMascotAsset =
+    'assets/rewards/premium-upsell-dog.png';
+bool _isRuLocale(BuildContext context) =>
+    Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
 
 class _WalletHeader extends StatelessWidget {
   const _WalletHeader({required this.title, required this.subtitle});
@@ -123,227 +127,260 @@ class _BalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final balance = wallet?.balance ?? 0;
-    final photosApprox = (balance / _kPhotoCostSpark).floor();
-    final videosApprox = (balance / _kVideoCostSpark).floor();
-    final cardTextPrimary = isDark ? Colors.white : const Color(0xFF19142A);
+    final cardTextPrimary = isDark ? Colors.white : const Color(0xFF1E1631);
     final cardTextSecondary = isDark
-        ? Colors.white.withValues(alpha: 0.78)
-        : const Color(0xFF5E5876);
+        ? Colors.white.withValues(alpha: 0.80)
+        : const Color(0xFF61537F);
+    final cardAccent = isDark
+        ? const Color(0xFFC4A7FF)
+        : const Color(0xFF8C67FF);
     final cardGradientColors = isDark
-        ? const [Color(0xFF04131E), Color(0xFF071E2D), Color(0xFF0A1628)]
-        : const [Color(0xFFF6F1FF), Color(0xFFEDE5FF), Color(0xFFF9F6FF)];
+        ? const [Color(0xFF130E22), Color(0xFF2A1F45), Color(0xFF171028)]
+        : const [Color(0xFFF7F0FF), Color(0xFFF0E5FF), Color(0xFFFBF8FF)];
     final cardBorderColor = isDark
-        ? colors.border.withValues(alpha: 0.84)
-        : const Color(0xFFD6CFFF);
+        ? const Color(0xFF514173)
+        : const Color(0xFFD6C8FA);
     final refreshBackground = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.white.withValues(alpha: 0.92);
-    final refreshForeground = isDark
-        ? cardTextSecondary
-        : const Color(0xFF635A8A);
-    final chipBorderColor = isDark
-        ? Colors.white.withValues(alpha: 0.24)
-        : const Color(0xFFCFC4FF);
-    final chipBackground = isDark
         ? Colors.white.withValues(alpha: 0.14)
-        : Colors.white.withValues(alpha: 0.86);
+        : Colors.white.withValues(alpha: 0.88);
+    final refreshForeground = isDark
+        ? Colors.white.withValues(alpha: 0.90)
+        : const Color(0xFF685695);
 
     return ProfileGlassCard(
       padding: EdgeInsets.zero,
       child: Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(26),
           border: Border.all(color: cardBorderColor),
           boxShadow: [
             BoxShadow(
               color: isDark
-                  ? const Color(0xCC00B6A8).withValues(alpha: 0.12)
-                  : const Color(0xFFA88FFF).withValues(alpha: 0.2),
-              blurRadius: isDark ? 34 : 26,
-              spreadRadius: isDark ? 3 : 1,
-              offset: const Offset(0, 10),
+                  ? const Color(0xFF7E5BEE).withValues(alpha: 0.24)
+                  : const Color(0xFFA77CFF).withValues(alpha: 0.28),
+              blurRadius: isDark ? 34 : 28,
+              spreadRadius: isDark ? 2 : 1.2,
+              offset: const Offset(0, 12),
             ),
           ],
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            stops: const [0.0, 0.55, 1.0],
+            stops: const [0.0, 0.52, 1.0],
             colors: cardGradientColors,
           ),
         ),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Positioned(
-              top: -44,
-              left: -24,
-              child: _WalletGlowOrb(
-                size: isDark ? 150 : 120,
-                color: isDark
-                    ? const Color(0xFF16D3B3).withValues(alpha: 0.22)
-                    : const Color(0xFFB89BFF).withValues(alpha: 0.26),
+              top: -24,
+              left: -34,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFB794FF).withValues(alpha: 0.30),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: const SizedBox(width: 180, height: 180),
               ),
             ),
             Positioned(
-              right: -50,
-              top: -12,
-              child: _WalletGlowOrb(
-                size: isDark ? 180 : 160,
-                color: isDark
-                    ? const Color(0xFF2B66FF).withValues(alpha: 0.18)
-                    : const Color(0xFFE9DAFF).withValues(alpha: 0.35),
+              right: -28,
+              bottom: -34,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF9765FF).withValues(alpha: 0.24),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: const SizedBox(width: 190, height: 190),
               ),
             ),
             Positioned(
-              right: 108,
-              bottom: 38,
-              child: _WalletGlowOrb(
-                size: 82,
-                color: isDark
-                    ? const Color(0xFF13E5BD).withValues(alpha: 0.16)
-                    : const Color(0xFFD7CBFF).withValues(alpha: 0.22),
+              right: 86,
+              top: 70,
+              child: IgnorePointer(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _SparkleDot(
+                      size: 4,
+                      color: cardAccent.withValues(alpha: 0.65),
+                    ),
+                    _SparkleDot(
+                      size: 3,
+                      color: Colors.white.withValues(alpha: 0.65),
+                    ),
+                    _SparkleDot(
+                      size: 5,
+                      color: const Color(0xFFD5BEFF).withValues(alpha: 0.70),
+                    ),
+                    _SparkleDot(
+                      size: 2.8,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                  ],
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 360;
+                  final compact = constraints.maxWidth < 380;
+                  final contentRightInset = compact ? 132.0 : 172.0;
+                  final heroHeight = compact ? 156.0 : 184.0;
 
-                  final overview = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              text.walletBalanceEyebrow,
-                              style: TextStyle(
-                                color: cardTextSecondary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          IconButton.filledTonal(
-                            onPressed: onRefresh,
-                            icon: const Icon(Icons.refresh_rounded, size: 18),
-                            tooltip: text.walletRefreshTooltip,
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 34,
-                              height: 34,
-                            ),
-                            style: IconButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              foregroundColor: refreshForeground,
-                              backgroundColor: refreshBackground,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              NumberFormat.decimalPattern().format(balance),
-                              style: TextStyle(
-                                color: cardTextPrimary,
-                                fontSize: 50,
-                                fontWeight: FontWeight.w900,
-                                height: 0.96,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const PawSparkIcon(size: 22),
-                            const SizedBox(width: 6),
-                            Text(
-                              text.walletBalanceUnit,
-                              style: TextStyle(
-                                color: colors.accent,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (balance > 0) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          text.walletWhatYouCanCreateTitle,
-                          style: TextStyle(
-                            color: cardTextSecondary,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _BalanceUsageChip(
-                              icon: Icons.photo_camera_outlined,
-                              label: text.walletApproxPhotos(photosApprox),
-                              iconColor: colors.accent,
-                              textColor: cardTextPrimary,
-                              borderColor: chipBorderColor,
-                              backgroundColor: chipBackground,
-                            ),
-                            _BalanceUsageChip(
-                              icon: Icons.play_arrow_rounded,
-                              label: text.walletApproxVideos(videosApprox),
-                              iconColor: colors.accent,
-                              textColor: cardTextPrimary,
-                              borderColor: chipBorderColor,
-                              backgroundColor: chipBackground,
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          text.walletInsufficientBalanceError,
-                          style: TextStyle(
-                            color: cardTextSecondary,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                  final heroArtwork = _BalanceHeroArtwork(isDark: isDark);
-
-                  if (compact) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  return SizedBox(
+                    height: compact ? 152 : 164,
+                    child: Stack(
                       children: [
-                        overview,
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: heroArtwork,
+                        Positioned.fill(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: contentRightInset),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              text.walletBalanceEyebrow,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: cardTextSecondary,
+                                                fontSize: compact ? 15 : 16,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Icon(
+                                            Icons.help_outline_rounded,
+                                            size: 15,
+                                            color: cardTextSecondary,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton.filledTonal(
+                                      onPressed: onRefresh,
+                                      icon: const Icon(
+                                        Icons.refresh_rounded,
+                                        size: 20,
+                                      ),
+                                      tooltip: text.walletRefreshTooltip,
+                                      visualDensity: const VisualDensity(
+                                        horizontal: -2,
+                                        vertical: -2,
+                                      ),
+                                      constraints:
+                                          const BoxConstraints.tightFor(
+                                            width: 38,
+                                            height: 38,
+                                          ),
+                                      style: IconButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        foregroundColor: refreshForeground,
+                                        backgroundColor: refreshBackground,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 9),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: compact ? 38 : 42,
+                                        height: compact ? 38 : 42,
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFFB7A0FF,
+                                          ).withValues(alpha: 0.35),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(
+                                              0xFFD9C8FF,
+                                            ).withValues(alpha: 0.8),
+                                          ),
+                                        ),
+                                        child: const Center(
+                                          child: PawSparkIcon(size: 22),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        NumberFormat.decimalPattern().format(
+                                          balance,
+                                        ),
+                                        style: TextStyle(
+                                          color: cardTextPrimary,
+                                          fontSize: compact ? 60 : 68,
+                                          fontWeight: FontWeight.w900,
+                                          height: 0.88,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  text.walletBalanceUnit,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: cardTextSecondary,
+                                    fontSize: compact ? 24 : 28,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const Spacer(),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: compact ? 4 : 2,
+                          bottom: compact ? -7 : -8,
+                          child: IgnorePointer(
+                            child: SizedBox(
+                              height: heroHeight,
+                              child: Image.asset(
+                                _kWalletHeroLogoAsset,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
-                    );
-                  }
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: overview),
-                      const SizedBox(width: 12),
-                      heroArtwork,
-                    ],
+                    ),
                   );
                 },
               ),
@@ -355,133 +392,378 @@ class _BalanceCard extends StatelessWidget {
   }
 }
 
-class _BalanceUsageChip extends StatelessWidget {
-  const _BalanceUsageChip({
-    required this.icon,
-    required this.label,
-    required this.iconColor,
-    required this.textColor,
-    required this.borderColor,
-    required this.backgroundColor,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color iconColor;
-  final Color textColor;
-  final Color borderColor;
-  final Color backgroundColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
-        color: backgroundColor,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: iconColor, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BalanceHeroArtwork extends StatelessWidget {
-  const _BalanceHeroArtwork({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 152,
-      height: 152,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomRight,
-        children: [
-          Positioned(
-            right: 6,
-            bottom: 8,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.black.withValues(alpha: 0.18)
-                    : const Color(0xFFBAA6FF).withValues(alpha: 0.24),
-                borderRadius: BorderRadius.circular(999),
-                boxShadow: [
-                  BoxShadow(
-                    color: isDark
-                        ? const Color(0x33000000)
-                        : const Color(0x80C7B8FF),
-                    blurRadius: isDark ? 18 : 14,
-                    spreadRadius: 1,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: const SizedBox(width: 78, height: 26),
-            ),
-          ),
-          Positioned(
-            right: -18,
-            bottom: -30,
-            child: Image.asset(
-              _kWalletHeroLogoAsset,
-              width: 170,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
-          ),
-          Positioned(
-            right: 24,
-            bottom: 70,
-            child: _WalletGlowOrb(
-              size: 36,
-              color: isDark
-                  ? const Color(0xFFB793FF).withValues(alpha: 0.24)
-                  : const Color(0xFFDBC7FF).withValues(alpha: 0.3),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WalletGlowOrb extends StatelessWidget {
-  const _WalletGlowOrb({required this.size, required this.color});
+class _SparkleDot extends StatelessWidget {
+  const _SparkleDot({required this.size, required this.color});
 
   final double size;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 4),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumUpsellCard extends StatelessWidget {
+  const _PremiumUpsellCard({required this.onOpenPremium});
+
+  final VoidCallback onOpenPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isRu = _isRuLocale(context);
+    final gradientColors = PremiumBannerStyle.gradient(!isDark);
+    final borderColor = const Color(
+      0xFFE1AF54,
+    ).withValues(alpha: isDark ? 0.82 : 0.90);
+    final textPrimary = isDark ? const Color(0xFFF7C96A) : const Color(0xFF735018);
+    final textSecondary = isDark
+        ? Colors.white.withValues(alpha: 0.90)
+        : const Color(0xFF2D3B54);
+    final chipBg = isDark
+        ? const Color(0xFF1A2F61).withValues(alpha: 0.72)
+        : const Color(0xFFF4E7CB).withValues(alpha: 0.95);
+    final chipBorder = const Color(0xFFE1AF54).withValues(alpha: 0.72);
+    return ProfileGlassCard(
+      padding: EdgeInsets.zero,
       child: Container(
-        width: size,
-        height: size,
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withValues(alpha: 0)],
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor, width: 1.25),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF081538).withValues(alpha: 0.36),
+              blurRadius: 18,
+              spreadRadius: 0.7,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0.0, 0.55, 1.0],
+            colors: gradientColors,
           ),
         ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -18,
+              left: -22,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFF3C464).withValues(alpha: 0.18),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: const SizedBox(width: 120, height: 120),
+              ),
+            ),
+            Positioned(
+              right: 62,
+              top: 24,
+              child: _SparkleDot(
+                size: 3,
+                color: const Color(0xFFF3C464).withValues(alpha: 0.6),
+              ),
+            ),
+            Positioned(
+              right: 36,
+              top: 54,
+              child: _SparkleDot(
+                size: 2.4,
+                color: Colors.white.withValues(alpha: 0.56),
+              ),
+            ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 390;
+                final mascotWidth = compact ? 136.0 : 162.0;
+                final contentRightInset = compact
+                    ? mascotWidth * 0.72
+                    : mascotWidth * 0.78;
+
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          color: chipBg,
+                          border: Border.all(color: chipBorder),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const PremiumCrownIcon(size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              isRu ? 'Premium-кошелек' : 'Premium wallet',
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontSize: 11.6,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: EdgeInsets.only(right: contentRightInset),
+                        child: Text(
+                          isRu ? 'Premium выгоднее' : 'Premium is better',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: textPrimary,
+                            fontSize: compact ? 24 : 26,
+                            fontWeight: FontWeight.w900,
+                            height: 1.02,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Padding(
+                        padding: EdgeInsets.only(right: contentRightInset),
+                        child: Text(
+                          isRu
+                              ? '40 PowSpark каждую неделю\nбез водяного знака, экспорт высокого качества'
+                              : '40 PowSpark every week\nno watermark, high-quality export',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: textSecondary,
+                            fontSize: compact ? 12.4 : 13.0,
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _PremiumFeaturePill(
+                            icon: Icons.card_giftcard_rounded,
+                            label: isRu
+                                ? '40 PowSpark каждую неделю'
+                                : '40 PowSpark every week',
+                            foregroundColor: textPrimary,
+                            backgroundColor: chipBg,
+                            borderColor: chipBorder,
+                          ),
+                          _PremiumFeaturePill(
+                            icon: Icons.auto_awesome_rounded,
+                            label: isRu ? 'Без водяного знака' : 'No watermark',
+                            foregroundColor: textPrimary,
+                            backgroundColor: chipBg,
+                            borderColor: chipBorder,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: compact ? 196 : 214,
+                        child: PremiumShimmerButton(
+                          label: text.profilePremiumOpenAction,
+                          onTap: onOpenPremium,
+                          height: 46,
+                          borderRadius: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              right: -6,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Image.asset(
+                  _kWalletPremiumUpsellMascotAsset,
+                  width: 162,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _PremiumFeaturePill extends StatelessWidget {
+  const _PremiumFeaturePill({
+    required this.icon,
+    required this.label,
+    required this.foregroundColor,
+    required this.backgroundColor,
+    required this.borderColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color foregroundColor;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
+        color: backgroundColor,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11.5, color: foregroundColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: foregroundColor,
+              fontSize: 10.8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoldShimmerButton extends StatefulWidget {
+  const _GoldShimmerButton({
+    required this.label,
+    required this.onPressed,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  State<_GoldShimmerButton> createState() => _GoldShimmerButtonState();
+}
+
+class _GoldShimmerButtonState extends State<_GoldShimmerButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        final shimmerStart = -1.6 + (t * 2.8);
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              FilledButton(
+                onPressed: widget.onPressed,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 46),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  backgroundColor: widget.backgroundColor,
+                  foregroundColor: widget.foregroundColor,
+                  textStyle: const TextStyle(
+                    fontSize: 13.8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(widget.label),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment(shimmerStart, -1),
+                          end: Alignment(shimmerStart + 0.9, 1),
+                          colors: [
+                            Colors.transparent,
+                            const Color(0xFFFFF3C9).withValues(alpha: 0.0),
+                            const Color(0xFFFFF3C9).withValues(alpha: 0.42),
+                            const Color(0xFFFFF3C9).withValues(alpha: 0.0),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.30, 0.5, 0.70, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

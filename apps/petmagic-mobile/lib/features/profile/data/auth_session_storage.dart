@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 
 final authSessionStorageProvider = Provider<AuthSessionStorage>((ref) {
@@ -18,11 +20,49 @@ class AuthSessionStorage {
           );
 
   static const sessionKey = 'petmagic_mobile_auth_session';
+  static const _readTimeout = Duration(seconds: 5);
+  static const _slowReadThreshold = Duration(milliseconds: 1200);
 
   final FlutterSecureStorage _secureStorage;
 
   Future<AuthSession?> read() async {
-    final raw = await _secureStorage.read(key: sessionKey);
+    final stopwatch = Stopwatch()..start();
+    String? raw;
+    try {
+      raw = await _secureStorage
+          .read(key: sessionKey)
+          .timeout(_readTimeout);
+    } on TimeoutException catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Startup',
+        operation: 'auth_session_read_timeout',
+        message: 'Secure storage read timed out during app startup',
+        context: {'timeout_ms': _readTimeout.inMilliseconds},
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        feature: 'Startup',
+        operation: 'auth_session_read_failed',
+        message: 'Secure storage read failed during app startup',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    } finally {
+      stopwatch.stop();
+      if (stopwatch.elapsed >= _slowReadThreshold) {
+        AppLogger.warn(
+          feature: 'Startup',
+          operation: 'auth_session_read_slow',
+          message: 'Secure storage read is slower than expected',
+          context: {'elapsed_ms': stopwatch.elapsedMilliseconds},
+        );
+      }
+    }
+
     if (raw == null || raw.isEmpty) {
       return null;
     }

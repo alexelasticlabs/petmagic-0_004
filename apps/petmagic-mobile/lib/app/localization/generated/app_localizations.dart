@@ -5900,6 +5900,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Yearly'**
   String get subscriptionBillingPeriodYearly;
+
+  /// No description provided for @globalOfflineBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No internet connection'**
+  String get globalOfflineBannerTitle;
+
+  /// No description provided for @globalOfflineBannerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Some features are unavailable until your connection is restored.'**
+  String get globalOfflineBannerMessage;
+
+  /// No description provided for @globalOnlineRestoredBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection restored'**
+  String get globalOnlineRestoredBannerTitle;
+
+  /// No description provided for @globalOnlineRestoredBannerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re back online.'**
+  String get globalOnlineRestoredBannerMessage;
 }
 
 class _AppLocalizationsDelegate

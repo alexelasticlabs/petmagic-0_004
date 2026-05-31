@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
@@ -336,7 +337,8 @@ class _OnboardingHero extends StatelessWidget {
                           ),
                           const SizedBox(width: 12),
                           _MiniFeature(
-                            icon: Icons.workspace_premium_outlined,
+                            icon: null,
+                            leading: const PremiumCrownIcon(size: 22),
                             label: upgradeLaterLabel,
                             accent: colors.gold,
                           ),
@@ -465,12 +467,14 @@ class _HighlightChip extends StatelessWidget {
 
 class _MiniFeature extends StatelessWidget {
   const _MiniFeature({
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.label,
     required this.accent,
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String label;
   final Color accent;
 
@@ -481,7 +485,7 @@ class _MiniFeature extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: accent, size: 22),
+          leading ?? Icon(icon, color: accent, size: 22),
           const SizedBox(height: 8),
           Text(
             label,

@@ -3284,4 +3284,17 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get subscriptionBillingPeriodYearly => 'Годовой';
+
+  @override
+  String get globalOfflineBannerTitle => 'Нет подключения к интернету';
+
+  @override
+  String get globalOfflineBannerMessage =>
+      'Часть функций недоступна, пока соединение не восстановится.';
+
+  @override
+  String get globalOnlineRestoredBannerTitle => 'Соединение восстановлено';
+
+  @override
+  String get globalOnlineRestoredBannerMessage => 'Вы снова в сети.';
 }

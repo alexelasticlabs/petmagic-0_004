@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
@@ -16,6 +17,9 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
@@ -188,7 +192,8 @@ class _WalletPageState extends ConsumerState<WalletPage>
       }
 
       final previousState =
-          previous?.checkoutVerificationState ?? WalletCheckoutVerificationState.idle;
+          previous?.checkoutVerificationState ??
+          WalletCheckoutVerificationState.idle;
       final nextState = next.checkoutVerificationState;
       if (previousState == nextState) {
         return;
@@ -234,7 +239,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
       final previousError = previous?.errorMessage?.trim();
       final nextError = next.errorMessage?.trim();
-      if (nextError == null || nextError.isEmpty || nextError == previousError) {
+      if (nextError == null ||
+          nextError.isEmpty ||
+          nextError == previousError) {
         return;
       }
 
@@ -284,6 +291,13 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         wallet: state.wallet,
                         onRefresh: () => controller.load(refresh: true),
                       ),
+                      if (!(state.wallet?.isPremium ?? false)) ...[
+                        const SizedBox(height: 14),
+                        _PremiumUpsellCard(
+                          onOpenPremium: () =>
+                              context.push(PremiumPage.routePath),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       _PacksSection(
                         packs: state.packs,

@@ -172,11 +172,16 @@ class WalletState {
   }
 }
 
-class WalletController extends Notifier<WalletState> {
+class WalletController extends Notifier<WalletState>
+    with WidgetsBindingObserver {
+  static const _walletSyncInterval = Duration(seconds: 10);
+
   late final WalletRepository _repository;
   bool _repositoryInitialized = false;
   Future<void>? _loadInFlight;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
+  Timer? _walletSyncTimer;
+  bool _isWalletSyncInFlight = false;
 
   @override
   WalletState build() {
@@ -184,14 +189,28 @@ class WalletController extends Notifier<WalletState> {
       _repository = ref.read(walletRepositoryProvider);
       _repositoryInitialized = true;
     }
+    WidgetsBinding.instance.addObserver(this);
     _purchaseSubscription?.cancel();
     _purchaseSubscription = _repository.purchaseUpdates.listen(
       _handlePurchaseUpdates,
     );
+    _walletSyncTimer?.cancel();
+    _walletSyncTimer = Timer.periodic(_walletSyncInterval, (_) {
+      unawaited(_syncWalletSnapshot());
+    });
     ref.onDispose(() {
+      WidgetsBinding.instance.removeObserver(this);
+      _walletSyncTimer?.cancel();
       unawaited(_purchaseSubscription?.cancel());
     });
     return const WalletState(isLoading: true);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_syncWalletSnapshot(forceRefresh: true));
+    }
   }
 
   Future<void> load({bool refresh = false}) async {
@@ -285,6 +304,57 @@ class WalletController extends Notifier<WalletState> {
         isRefreshing: false,
         errorMessage: error.toString(),
       );
+    }
+  }
+
+  Future<void> _syncWalletSnapshot({bool forceRefresh = false}) async {
+    if (_isWalletSyncInFlight || _loadInFlight != null) {
+      return;
+    }
+    if (!forceRefresh &&
+        (state.isBuying ||
+            state.isClaimingAd ||
+            state.isRedeeming ||
+            state.isApplyingReferral)) {
+      return;
+    }
+
+    _isWalletSyncInFlight = true;
+    try {
+      final nextWallet = await _repository.fetchWallet();
+      final prevWallet = state.wallet;
+      if (prevWallet == null) {
+        state = state.copyWith(wallet: nextWallet);
+        return;
+      }
+
+      final balanceChanged =
+          prevWallet.balance != nextWallet.balance ||
+          prevWallet.isPremium != nextWallet.isPremium;
+      final weeklyStateChanged =
+          prevWallet.nextWeeklyGrantAtUtc != nextWallet.nextWeeklyGrantAtUtc ||
+          prevWallet.adRewardsRemainingToday != nextWallet.adRewardsRemainingToday;
+
+      if (!balanceChanged && !weeklyStateChanged) {
+        return;
+      }
+
+      List<WalletLedgerItem>? latestLedger;
+      try {
+        latestLedger = (await _repository.fetchLedger(take: 24)).items;
+      } catch (error, stackTrace) {
+        _logWalletLoadFailure('sync_fetch_ledger', error, stackTrace);
+      }
+
+      state = state.copyWith(
+        wallet: nextWallet,
+        ledger: latestLedger ?? state.ledger,
+        clearError: true,
+      );
+    } catch (error, stackTrace) {
+      _logWalletLoadFailure('sync_fetch_wallet', error, stackTrace);
+    } finally {
+      _isWalletSyncInFlight = false;
     }
   }
 

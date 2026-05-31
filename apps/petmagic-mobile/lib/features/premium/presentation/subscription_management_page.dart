@@ -7,9 +7,9 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SubscriptionManagementPage extends ConsumerStatefulWidget {
@@ -204,33 +204,210 @@ class _SubscriptionContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
-        _PremiumHeroCard(summary: summary),
-        const SizedBox(height: 12),
-        _TokensCard(summary: summary),
-        const SizedBox(height: 12),
-        _BenefitsCard(),
-        if (isStripe) ...[
-          const SizedBox(height: 12),
-          _PaymentCard(
-            summary: summary,
-            isProcessing: isProcessing,
-            onChangePayment: onChangePayment,
-          ),
-        ],
-        const SizedBox(height: 20),
-        _ActionsSection(
-          summary: summary,
-          isProcessing: isProcessing,
-          canCancel: canCancel,
-          onManage: onManage,
-          onRestore: onRestore,
-          onCancel: onCancel,
+        Stack(
+          children: [
+            const Positioned.fill(child: _SubscriptionSparkleBackground()),
+            Column(
+              children: [
+                _PremiumHeroCard(summary: summary),
+                const SizedBox(height: 12),
+                _TokensCard(summary: summary),
+                const SizedBox(height: 12),
+                _BenefitsCard(),
+                if (isStripe) ...[
+                  const SizedBox(height: 12),
+                  _PaymentCard(
+                    summary: summary,
+                    isProcessing: isProcessing,
+                    onChangePayment: onChangePayment,
+                  ),
+                ],
+                const SizedBox(height: 20),
+                _ActionsSection(
+                  summary: summary,
+                  isProcessing: isProcessing,
+                  canCancel: canCancel,
+                  onManage: onManage,
+                  onRestore: onRestore,
+                  onCancel: onCancel,
+                ),
+                if (summary.isPremium && summary.cancelAtPeriodEnd == true) ...[
+                  const SizedBox(height: 16),
+                  _CancelledHintBanner(
+                    summary: summary,
+                    colors: colors,
+                    text: text,
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
-        if (summary.isPremium && summary.cancelAtPeriodEnd == true) ...[
-          const SizedBox(height: 16),
-          _CancelledHintBanner(summary: summary, colors: colors, text: text),
-        ],
       ],
+    );
+  }
+}
+
+class _SubscriptionSparkleBackground extends StatefulWidget {
+  const _SubscriptionSparkleBackground();
+
+  @override
+  State<_SubscriptionSparkleBackground> createState() =>
+      _SubscriptionSparkleBackgroundState();
+}
+
+class _SubscriptionSparkleBackgroundState
+    extends State<_SubscriptionSparkleBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final baseGold = isLight
+        ? const Color(0xFFB68830)
+        : const Color(0xFFF2C86B);
+    final softViolet = isLight
+        ? const Color(0xFFC9B6EB)
+        : const Color(0xFF6A52A6);
+
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final t = _controller.value;
+          final phaseA = 0.55 + (0.45 * (0.5 - (t - 0.5).abs()) * 2);
+          final phaseB =
+              0.45 + (0.55 * (0.5 - ((t + 0.25) % 1 - 0.5).abs()) * 2);
+
+          return Stack(
+            children: [
+              Positioned(
+                top: 70,
+                left: 18,
+                child: _SparkleParticle(
+                  size: 4.2,
+                  color: baseGold.withValues(alpha: 0.18 * phaseA),
+                ),
+              ),
+              Positioned(
+                top: 140,
+                right: 34,
+                child: _SparkleParticle(
+                  size: 3.4,
+                  color: baseGold.withValues(alpha: 0.15 * phaseB),
+                ),
+              ),
+              Positioned(
+                top: 260,
+                left: 42,
+                child: _SparkleParticle(
+                  size: 3.2,
+                  color: softViolet.withValues(alpha: 0.13 * phaseB),
+                ),
+              ),
+              Positioned(
+                top: 370,
+                right: 22,
+                child: _SparkleParticle(
+                  size: 2.8,
+                  color: baseGold.withValues(alpha: 0.14 * phaseA),
+                ),
+              ),
+              Positioned(
+                top: 520,
+                left: 26,
+                child: _SparkleParticle(
+                  size: 3.6,
+                  color: baseGold.withValues(alpha: 0.12 * phaseB),
+                ),
+              ),
+              Positioned(
+                top: 650,
+                right: 30,
+                child: _SparkleParticle(
+                  size: 2.6,
+                  color: softViolet.withValues(alpha: 0.1 * phaseA),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SparkleParticle extends StatelessWidget {
+  const _SparkleParticle({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(color: color, blurRadius: size * 2, spreadRadius: 0.2),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionPanel extends StatelessWidget {
+  const _SubscriptionPanel({required this.child, this.padding});
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final radius = BorderRadius.circular(28);
+
+    return ClipRRect(
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          color: isLight
+              ? const Color(0xFFF8FBFF)
+              : colors.surfaceGlass.withValues(alpha: 0.98),
+          border: Border.all(
+            color: isLight
+                ? const Color(0xFFAFC2DB)
+                : colors.border.withValues(alpha: 0.9),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow.withValues(alpha: isLight ? 0.16 : 0.28),
+              blurRadius: isLight ? 14 : 22,
+              offset: Offset(0, isLight ? 7 : 12),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: padding ?? const EdgeInsets.all(18),
+          child: child,
+        ),
+      ),
     );
   }
 }
@@ -270,7 +447,7 @@ class _PremiumHeroCard extends StatelessWidget {
       _ => summary.billingPeriod,
     };
 
-    return ProfileGlassCard(
+    return _SubscriptionPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,11 +455,7 @@ class _PremiumHeroCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(
-                Icons.workspace_premium_rounded,
-                color: colors.gold,
-                size: 22,
-              ),
+              const PremiumCrownIcon(size: 22),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -366,7 +539,7 @@ class _TokensCard extends StatelessWidget {
     final tokensAvailable = summary.tokensAvailable ?? 0;
     final weeklyGrant = summary.weeklyGrantAmount ?? 40;
 
-    return ProfileGlassCard(
+    return _SubscriptionPanel(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,7 +857,7 @@ class _BenefitsCard extends StatelessWidget {
       ),
     ];
 
-    return ProfileGlassCard(
+    return _SubscriptionPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -788,7 +961,7 @@ class _PaymentCard extends StatelessWidget {
         ? '${text.subscriptionPaymentProviderStripe}  ·  $maskedCard'
         : text.subscriptionPaymentProviderStripe;
 
-    return ProfileGlassCard(
+    return _SubscriptionPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -872,6 +1045,15 @@ class _PaymentCard extends StatelessWidget {
               onPressed: isProcessing || !summary.canManageSubscription
                   ? null
                   : onChangePayment,
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isLight ? const Color(0xFFFDFEFF) : null,
+                side: BorderSide(
+                  color: isLight
+                      ? const Color(0xFFAFC2DB)
+                      : colors.border.withValues(alpha: 0.9),
+                ),
+                foregroundColor: isLight ? const Color(0xFF2F3E56) : null,
+              ),
               child: Text(text.subscriptionChangePaymentAction),
             ),
           ),
@@ -904,6 +1086,7 @@ class _ActionsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -920,6 +1103,15 @@ class _ActionsSection extends StatelessWidget {
         const SizedBox(height: 10),
         OutlinedButton(
           onPressed: isProcessing ? null : onRestore,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: isLight ? const Color(0xFFFDFEFF) : null,
+            side: BorderSide(
+              color: isLight
+                  ? const Color(0xFFAFC2DB)
+                  : colors.border.withValues(alpha: 0.9),
+            ),
+            foregroundColor: isLight ? const Color(0xFF2F3E56) : null,
+          ),
           child: Text(text.premiumRestoreAction),
         ),
         if (canCancel) ...[
@@ -949,8 +1141,13 @@ class _ActionsSection extends StatelessWidget {
           OutlinedButton(
             onPressed: isProcessing ? null : onCancel,
             style: OutlinedButton.styleFrom(
-              foregroundColor: colors.danger,
-              side: BorderSide(color: colors.danger.withValues(alpha: 0.5)),
+              foregroundColor: colors.danger.withValues(
+                alpha: isLight ? 0.95 : 1,
+              ),
+              backgroundColor: isLight ? const Color(0xFFFFF8F8) : null,
+              side: BorderSide(
+                color: colors.danger.withValues(alpha: isLight ? 0.62 : 0.5),
+              ),
             ),
             child: Text(text.subscriptionCancelAction),
           ),

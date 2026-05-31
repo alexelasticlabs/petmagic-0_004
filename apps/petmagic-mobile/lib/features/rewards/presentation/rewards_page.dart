@@ -4,8 +4,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/mappers/rewards_error_mapper.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
@@ -13,8 +15,11 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:share_plus/share_plus.dart';
 
 part 'rewards_page_referral_cards.dart';
@@ -327,6 +332,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
         : MediaQuery.viewPaddingOf(context).bottom +
               kPetMagicBottomContentInsetCompact;
     final rewards = state.rewards;
+    final isPremiumUser = state.wallet?.isPremium == true;
     final rewardsSummary = rewards == null
         ? null
         : _RewardsSummaryView(
@@ -382,6 +388,12 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                       onSubmit: controller.applyRedeemCode,
                     ),
                     const SizedBox(height: 16),
+                    if (!isPremiumUser) ...[
+                      _RewardsPremiumUpsellCard(
+                        onOpenPremium: () => context.push(PremiumPage.routePath),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _ReferralCard(rewards: rewardsSummary),
                     const SizedBox(height: 14),
                     _ReferralInfoNote(

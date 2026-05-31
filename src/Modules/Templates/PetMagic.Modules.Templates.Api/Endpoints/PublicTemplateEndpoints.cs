@@ -60,15 +60,19 @@ public static class PublicTemplateEndpoints
     }
 
     private static async Task<Ok<PublicTemplatesCatalogVersionResponse>> GetCatalogVersionAsync(
+        HttpContext httpContext,
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        httpContext.Response.Headers.CacheControl = "public, max-age=10";
+
         var result = await service.GetPublicCatalogVersionAsync(cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<PublicTemplatesCatalogChangesResponse>, ProblemHttpResult>> GetCatalogChangesAsync(
         [FromQuery] long? sinceVersion,
+        HttpContext httpContext,
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
@@ -79,6 +83,8 @@ public static class PublicTemplateEndpoints
                 detail: "Query parameter sinceVersion must be a non-negative integer.",
                 statusCode: StatusCodes.Status400BadRequest);
         }
+
+        httpContext.Response.Headers.CacheControl = "public, max-age=10";
 
         var result = await service.GetPublicCatalogChangesAsync(sinceVersion.Value, cancellationToken);
         return TypedResults.Ok(result.Value);

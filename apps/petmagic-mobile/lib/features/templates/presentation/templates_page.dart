@@ -39,7 +39,7 @@ class TemplatesPage extends ConsumerStatefulWidget {
 }
 
 class _TemplatesPageState extends ConsumerState<TemplatesPage> {
-  static const _refreshCooldown = Duration(seconds: 15);
+  static const _refreshCooldown = Duration(seconds: 45);
   static const _gridCacheExtent = 400.0;
 
   final _scrollController = ScrollController();
@@ -64,8 +64,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       if (!mounted) {
         return;
       }
-      _templatesController.setScreenVisible(true);
-      unawaited(_refreshFeed());
+      _handleScreenBecameVisible(fromAppResume: true);
       if (shouldLoadWallet) {
         unawaited(_walletController.load());
       }
@@ -92,8 +91,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         if (!mounted) {
           return;
         }
-        _templatesController.setScreenVisible(true);
-        unawaited(_refreshFeed());
+        _handleScreenBecameVisible(fromAppResume: true);
       });
       return;
     }
@@ -124,9 +122,31 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       if (!mounted) {
         return;
       }
-      _templatesController.setScreenVisible(true);
-      unawaited(_refreshFeed());
+      _handleScreenBecameVisible(fromAppResume: false);
     });
+  }
+
+  void _handleScreenBecameVisible({required bool fromAppResume}) {
+    _templatesController.setScreenVisible(true);
+
+    final state = ref.read(templatesControllerProvider);
+    final shouldRefresh =
+        state.items.isEmpty ||
+        state.errorMessage != null ||
+        (fromAppResume && _isRefreshStale(DateTime.now()));
+
+    if (shouldRefresh) {
+      unawaited(_refreshFeed());
+    }
+  }
+
+  bool _isRefreshStale(DateTime now) {
+    final lastRefreshAt = _lastRefreshAt;
+    if (lastRefreshAt == null) {
+      return true;
+    }
+
+    return now.difference(lastRefreshAt) >= _refreshCooldown;
   }
 
   void _runAfterBuild(VoidCallback action) {
@@ -401,10 +421,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
 
       if (!gate.isAllowed) {
+        final hasPremiumAccess =
+            ref.read(walletControllerProvider).wallet?.isPremium ?? false;
         final blockerAction = await showTemplateBlockedSheet(
           context: context,
           template: template,
           gate: gate,
+          hasPremiumAccess: hasPremiumAccess,
         );
         if (!mounted || blockerAction == null) {
           return;

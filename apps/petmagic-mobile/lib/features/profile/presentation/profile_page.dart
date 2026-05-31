@@ -20,7 +20,14 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
+
+const _profilePremiumDogAsset = 'assets/rewards/profile-premium-dog.png';
+bool _isRuProfileLocale(BuildContext context) =>
+    Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -345,8 +352,11 @@ class _ProfileHeroCard extends StatelessWidget {
                         ProfileStatusPill(
                           label: membershipLabel,
                           leading: profile.isPremium
-                              ? Icons.workspace_premium_rounded
+                              ? null
                               : Icons.pets_rounded,
+                          leadingWidget: profile.isPremium
+                              ? const PremiumCrownIcon(size: 14)
+                              : null,
                           backgroundColor:
                               (profile.isPremium ? colors.gold : colors.accent)
                                   .withValues(alpha: isLight ? 0.26 : 0.2),
@@ -435,13 +445,13 @@ class _WalletHighlightCard extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: [
                 if (isLight) ...[
-                  const Color(0xFFE7F5EE),
-                  const Color(0xFFE5F1FB),
-                  const Color(0xFFF7FAFF),
+                  const Color(0xFFF1F6FF),
+                  const Color(0xFFE7F0FF),
+                  const Color(0xFFF5F9FF),
                 ] else ...[
-                  colors.accent.withValues(alpha: 0.26),
-                  colors.blue.withValues(alpha: 0.2),
-                  colors.surfaceGlass,
+                  const Color(0xFF0A162B),
+                  const Color(0xFF0D213F),
+                  const Color(0xFF0B1A33),
                 ],
               ],
             ),
@@ -562,137 +572,266 @@ class _PremiumBannerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
+    final isRu = _isRuProfileLocale(context);
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: colors.gold.withValues(alpha: isLight ? 0.42 : 0.28),
+              color: const Color(0xFFE0A91E).withValues(
+                alpha: isLight ? 0.78 : 0.88,
+              ),
+              width: 1.15,
             ),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                if (isLight) ...[
-                  const Color(0xFFFFF3CD),
-                  const Color(0xFFFFF7E5),
-                  const Color(0xFFFEFCF5),
-                ] else ...[
-                  colors.gold.withValues(alpha: 0.18),
-                  const Color(0xFF8A5A12).withValues(alpha: 0.22),
-                  colors.surfaceGlass,
-                ],
-              ],
+              colors: PremiumBannerStyle.gradient(isLight),
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.shadow.withValues(alpha: isLight ? 0.2 : 1),
-                blurRadius: isLight ? 18 : 24,
-                offset: Offset(0, isLight ? 10 : 16),
+                color: isLight
+                    ? const Color(0xFFD7B35D).withValues(alpha: 0.25)
+                    : const Color(0xFF02070F).withValues(alpha: 0.55),
+                blurRadius: isLight ? 12 : 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
+          child: SizedBox(
+            height: 168,
+            child: Stack(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: isLight
-                        ? colors.gold.withValues(alpha: 0.24)
-                        : colors.gold.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(
-                      color: colors.gold.withValues(
-                        alpha: isLight ? 0.4 : 0.22,
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.3, 0.35),
+                        radius: 1.2,
+                        colors: [
+                          const Color(0xFFF4C64D).withValues(
+                            alpha: isLight ? 0.2 : 0.18,
+                          ),
+                          Colors.transparent,
+                        ],
                       ),
                     ),
                   ),
-                  child: Icon(
-                    Icons.workspace_premium_rounded,
-                    color: colors.gold,
-                    size: 21,
+                ),
+                Positioned(
+                  right: 4,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: Image.asset(
+                      _profilePremiumDogAsset,
+                      height: 136,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 140, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        text.profilePremiumBannerTitle,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: const Color(0xFFE0A91E).withValues(
+                              alpha: isLight ? 0.7 : 0.8,
+                            ),
+                          ),
+                          color: const Color(0xFF201300).withValues(
+                            alpha: isLight ? 0.08 : 0.24,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                              const PremiumCrownIcon(size: 12),
+                            const SizedBox(width: 5),
+                              Text(
+                                text.premiumLabel,
+                              style: TextStyle(
+                                color: const Color(0xFFEABA47),
+                                fontSize: 10.4,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                        Text(
+                          isRu ? 'Premium выгоднее' : 'Premium is better',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 15.5,
+                          color: isLight
+                              ? const Color(0xFF1E1608)
+                              : const Color(0xFFEABF55),
+                          fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        text.profilePremiumSubtitle,
-                        maxLines: 2,
+                      const SizedBox(height: 5),
+                        Text(
+                          isRu
+                              ? '40 PowSpark каждую неделю\nБез водяного знака, экспорт\nвысокого качества'
+                              : '40 PowSpark every week\nNo watermark, high-quality\nexport',
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: colors.textSoft,
-                          fontSize: 12.2,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
+                          color: isLight
+                              ? const Color(0xFF3B3324)
+                              : const Color(0xFFE3DFD2),
+                          fontSize: 11.2,
+                          height: 1.25,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colors.gold,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.gold.withValues(alpha: 0.22),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          text.profilePremiumOpenAction,
-                          style: TextStyle(
-                            color: colors.backgroundBottom,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w900,
-                          ),
+                      const Spacer(),
+                        PremiumShimmerButton(
+                          label: text.profilePremiumOpenAction,
+                          onTap: onTap,
+                          height: 42,
                         ),
-                        const SizedBox(width: 5),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: colors.backgroundBottom,
-                          size: 14,
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+class _ProfileGoldShimmerButton extends StatefulWidget {
+  const _ProfileGoldShimmerButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_ProfileGoldShimmerButton> createState() =>
+      _ProfileGoldShimmerButtonState();
+}
+
+class _ProfileGoldShimmerButtonState extends State<_ProfileGoldShimmerButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: widget.onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE0A91E).withValues(alpha: 0.34),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            clipBehavior: Clip.antiAlias,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                final t = _controller.value;
+                final shimmerStart = -1.6 + (t * 2.8);
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFF4C64D), Color(0xFFEAB13A)],
+                        ),
+                      ),
+                      child: child,
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment(shimmerStart, -1),
+                              end: Alignment(shimmerStart + 0.9, 1),
+                              colors: [
+                                Colors.transparent,
+                                Colors.white.withValues(alpha: 0.68),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.23, 0.5, 0.77],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.label,
+                      style: const TextStyle(
+                        color: Color(0xFF261903),
+                        fontSize: 11.2,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Color(0xFF261903),
+                      size: 15,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -771,11 +910,7 @@ class _SubscriptionSummaryCard extends StatelessWidget {
                       color: colors.gold.withValues(alpha: 0.22),
                     ),
                   ),
-                  child: Icon(
-                    Icons.workspace_premium_rounded,
-                    color: colors.gold,
-                    size: 21,
-                  ),
+                  child: const PremiumCrownIcon(size: 21),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

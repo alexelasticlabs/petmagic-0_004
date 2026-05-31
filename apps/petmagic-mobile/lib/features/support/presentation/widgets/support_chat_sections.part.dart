@@ -67,7 +67,8 @@ class _SupportConversationViewport extends StatelessWidget {
         prompt: text.supportHomeTopicTokensNotArrived,
       ),
       _SupportQuickActionData(
-        icon: Icons.workspace_premium_rounded,
+        icon: Icons.star_rounded,
+        isPremium: true,
         label: text.supportHomeTopicPremiumIssue,
         prompt: text.supportHomeTopicPremiumIssue,
       ),

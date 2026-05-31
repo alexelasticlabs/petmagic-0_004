@@ -1212,5 +1212,9 @@
   "subscriptionPaymentTrustText": "Kartendaten werden sicher von Stripe verarbeitet. PetMagic speichert keine Kartendaten.",
   "subscriptionBillingPeriodLabel": "Abrechnungszeitraum",
   "subscriptionBillingPeriodMonthly": "Monatlich",
-  "subscriptionBillingPeriodYearly": "Jährlich"
+  "subscriptionBillingPeriodYearly": "Jährlich",
+  "globalOfflineBannerTitle": "Keine Internetverbindung",
+  "globalOfflineBannerMessage": "Einige Funktionen sind nicht verfügbar, bis die Verbindung wiederhergestellt ist.",
+  "globalOnlineRestoredBannerTitle": "Verbindung wiederhergestellt",
+  "globalOnlineRestoredBannerMessage": "Sie sind wieder online."
 }

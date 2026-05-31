@@ -150,11 +150,13 @@ enum _SupportAttachmentQuickAction { camera, video, files }
 class _SupportQuickActionData {
   const _SupportQuickActionData({
     required this.icon,
+    this.isPremium = false,
     required this.label,
     required this.prompt,
   });
 
   final IconData icon;
+  final bool isPremium;
   final String label;
   final String prompt;
 }

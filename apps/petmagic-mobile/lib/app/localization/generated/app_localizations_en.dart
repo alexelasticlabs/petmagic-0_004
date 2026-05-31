@@ -3271,4 +3271,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get subscriptionBillingPeriodYearly => 'Yearly';
+
+  @override
+  String get globalOfflineBannerTitle => 'No internet connection';
+
+  @override
+  String get globalOfflineBannerMessage =>
+      'Some features are unavailable until your connection is restored.';
+
+  @override
+  String get globalOnlineRestoredBannerTitle => 'Connection restored';
+
+  @override
+  String get globalOnlineRestoredBannerMessage => 'You\'re back online.';
 }

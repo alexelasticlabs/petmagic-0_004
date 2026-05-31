@@ -5,12 +5,14 @@ class SupportAssistantScenario {
   const SupportAssistantScenario({
     required this.key,
     required this.icon,
+    this.isPremium = false,
     required this.topicLabel,
     required this.recommendation,
   });
 
   final String key;
   final IconData icon;
+  final bool isPremium;
   final String topicLabel;
   final String recommendation;
 
@@ -44,7 +46,8 @@ SupportAssistantScenario buildSupportAssistantScenario(
     ),
     'PremiumIssue' => SupportAssistantScenario(
       key: key,
-      icon: Icons.workspace_premium_rounded,
+      icon: Icons.star_rounded,
+      isPremium: true,
       topicLabel: text.supportHomeTopicPremiumIssue,
       recommendation: text.supportAssistantRecommendationPremiumIssue,
     ),

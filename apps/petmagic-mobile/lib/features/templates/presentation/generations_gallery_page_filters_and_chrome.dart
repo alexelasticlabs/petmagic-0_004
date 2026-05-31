@@ -229,3 +229,181 @@ class _ActiveInfoCard extends StatelessWidget {
     );
   }
 }
+
+class _GalleryPremiumUpsellCard extends StatelessWidget {
+  const _GalleryPremiumUpsellCard({required this.onOpenPremium});
+
+  final VoidCallback onOpenPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final isRu = Localizations.localeOf(context).languageCode.toLowerCase() ==
+        'ru';
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFF2C14E).withValues(alpha: 0.92),
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: PremiumBannerStyle.gradient(isLight),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFC342).withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const PremiumCrownIcon(size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    isRu ? 'Экспорт без водяного знака' : 'Watermark-free export',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: isLight
+                          ? const Color(0xFF735018)
+                          : const Color(0xFFFFD776),
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              isRu
+                  ? 'Premium уберет логотип PetMagic'
+                  : 'Premium removes the PetMagic logo',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: isLight
+                    ? const Color(0xFF2D3B54)
+                    : Colors.white.withValues(alpha: 0.82),
+                height: 1.2,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            PremiumShimmerButton(
+              label: text.profilePremiumOpenAction,
+              onTap: onOpenPremium,
+              height: 40,
+              borderRadius: 11,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GalleryGoldShimmerButton extends StatefulWidget {
+  const _GalleryGoldShimmerButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  State<_GalleryGoldShimmerButton> createState() =>
+      _GalleryGoldShimmerButtonState();
+}
+
+class _GalleryGoldShimmerButtonState extends State<_GalleryGoldShimmerButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        final shimmerStart = -1.6 + (t * 2.8);
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: Stack(
+            children: [
+              FilledButton(
+                onPressed: widget.onPressed,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: const Color(0xFFF5BD3E),
+                  foregroundColor: const Color(0xFF241403),
+                  textStyle: const TextStyle(
+                    fontSize: 12.8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(widget.label),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_forward_rounded, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment(shimmerStart, -1),
+                        end: Alignment(shimmerStart + 0.9, 1),
+                        colors: [
+                          Colors.transparent,
+                          const Color(0xFFFFF3C9).withValues(alpha: 0.0),
+                          const Color(0xFFFFF3C9).withValues(alpha: 0.4),
+                          const Color(0xFFFFF3C9).withValues(alpha: 0.0),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.30, 0.5, 0.70, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
