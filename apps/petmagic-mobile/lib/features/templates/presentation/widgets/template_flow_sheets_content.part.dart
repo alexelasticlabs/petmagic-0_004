@@ -27,6 +27,7 @@ class TemplateDetailContent extends StatelessWidget {
       isVideo: template.isVideo,
     );
     final category = _templateDisplayCategory(locale, template.category);
+    final isPremiumTheme = template.isPremium;
     final requirements = template.effectivePetPhotoRequirements
         .map((item) => _templateDisplayRequirement(locale, item))
         .take(4)
@@ -64,7 +65,29 @@ class TemplateDetailContent extends StatelessWidget {
               // ── Adaptive media preview ───────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: _AdaptiveTemplateMediaFrame(template: template),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: isPremiumTheme
+                          ? colors.gold.withValues(alpha: 0.55)
+                          : colors.border.withValues(alpha: 0.46),
+                      width: isPremiumTheme ? 1.2 : 1,
+                    ),
+                    boxShadow: [
+                      if (isPremiumTheme)
+                        BoxShadow(
+                          color: colors.gold.withValues(alpha: 0.2),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: _AdaptiveTemplateMediaFrame(template: template),
+                  ),
+                ),
               ),
 
               // ── Title & description ──────────────────────────────────────
@@ -122,7 +145,7 @@ class TemplateDetailContent extends StatelessWidget {
                         _Pill(
                           leading: const PawSparkIcon(size: 15),
                           label: '${template.tokenCost} PawSpark',
-                          color: colors.gold,
+                          color: isPremiumTheme ? colors.gold : colors.gold,
                         ),
                         _Pill(
                           icon: template.isVideo
@@ -223,10 +246,14 @@ class TemplateDetailContent extends StatelessWidget {
                     const SizedBox(height: 12),
                     DecoratedBox(
                       decoration: BoxDecoration(
-                        color: colors.surfaceStrong.withValues(alpha: 0.72),
+                        color: colors.surfaceStrong.withValues(
+                          alpha: isPremiumTheme ? 0.8 : 0.72,
+                        ),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: colors.border.withValues(alpha: 0.5),
+                          color: isPremiumTheme
+                              ? colors.gold.withValues(alpha: 0.28)
+                              : colors.border.withValues(alpha: 0.5),
                         ),
                       ),
                       child: Padding(
@@ -250,10 +277,14 @@ class TemplateDetailContent extends StatelessWidget {
                     // Quality warning
                     DecoratedBox(
                       decoration: BoxDecoration(
-                        color: colors.gold.withValues(alpha: 0.08),
+                        color: isPremiumTheme
+                            ? colors.gold.withValues(alpha: 0.12)
+                            : colors.gold.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: colors.gold.withValues(alpha: 0.28),
+                          color: isPremiumTheme
+                              ? colors.gold.withValues(alpha: 0.4)
+                              : colors.gold.withValues(alpha: 0.28),
                         ),
                       ),
                       child: Padding(
@@ -301,14 +332,25 @@ class TemplateDetailContent extends StatelessWidget {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              colors.gold.withValues(alpha: 0.16),
-                              colors.surfaceStrong.withValues(alpha: 0.9),
+                              const Color(0x40F3C65A),
+                              colors.surfaceStrong.withValues(alpha: 0.96),
+                              const Color(0x2AA46B12),
                             ],
+                            stops: const [0, 0.64, 1],
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: colors.gold.withValues(alpha: 0.34),
+                            color: const Color(0xBFE6BB64),
+                            width: 1.2,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0x66D9A741),
+                              blurRadius: 20,
+                              spreadRadius: 0.5,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -347,22 +389,9 @@ class TemplateDetailContent extends StatelessWidget {
                                     ),
                               ),
                               const SizedBox(height: 12),
-                              FilledButton.icon(
+                              _PremiumUnlockCtaButton(
+                                label: text.templateUnlockPremiumAction,
                                 onPressed: onUnlockPremium,
-                                icon: const Icon(
-                                  Icons.workspace_premium_rounded,
-                                ),
-                                label: Text(text.templateUnlockPremiumAction),
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(48),
-                                  textStyle: Theme.of(context)
-                                      .textTheme
-                                      .titleSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.1,
-                                      ),
-                                ),
                               ),
                             ],
                           ),
@@ -405,6 +434,134 @@ class TemplateDetailContent extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PremiumUnlockCtaButton extends StatefulWidget {
+  const _PremiumUnlockCtaButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_PremiumUnlockCtaButton> createState() =>
+      _PremiumUnlockCtaButtonState();
+}
+
+class _PremiumUnlockCtaButtonState extends State<_PremiumUnlockCtaButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1650),
+    )..repeat(reverse: true);
+    _pulse = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = Theme.of(context).textTheme.titleSmall;
+    const ctaTextColor = Color(0xFF251102);
+
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) {
+        final glowAlpha = 0.34 + (_pulse.value * 0.42);
+        return Material(
+          color: Colors.transparent,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(15),
+              onTap: widget.onPressed,
+              child: Ink(
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Color(0xFFF0A41C),
+                      Color(0xFFF3C65A),
+                      Color(0xFFF9E18C),
+                    ],
+                    stops: [0, 0.54, 1],
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: const Color(0xFFF9E8B6).withValues(alpha: 0.88),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE4901F).withValues(alpha: 0.22),
+                      blurRadius: 14,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: const Color(
+                        0xFFF7D67A,
+                      ).withValues(alpha: glowAlpha),
+                      blurRadius: 22,
+                      spreadRadius: 0.6,
+                      offset: const Offset(0, 0),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: const Color(0x3DFFF3D2),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xAAFFF0C0)),
+                        ),
+                        child: const Icon(
+                          Icons.workspace_premium_rounded,
+                          color: ctaTextColor,
+                          size: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textStyle?.copyWith(
+                            color: ctaTextColor,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.08,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

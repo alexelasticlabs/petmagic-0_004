@@ -707,7 +707,7 @@ class _TemplateDetails extends StatelessWidget {
   }
 }
 
-class _TemplateActionButton extends StatefulWidget {
+class _TemplateActionButton extends StatelessWidget {
   const _TemplateActionButton({
     required this.label,
     required this.onPressed,
@@ -719,137 +719,94 @@ class _TemplateActionButton extends StatefulWidget {
   final bool isPremiumLockCta;
 
   @override
-  State<_TemplateActionButton> createState() => _TemplateActionButtonState();
-}
-
-class _TemplateActionButtonState extends State<_TemplateActionButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseController;
-  late final Animation<double> _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1700),
-    );
-    _pulse = CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut);
-    _pulseController.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.labelLarge;
     const premiumTextColor = Color(0xFF251102);
-    return AnimatedBuilder(
-      animation: _pulse,
-      builder: (context, child) {
-        final glowPulse = widget.isPremiumLockCta
-            ? 0.36 + (_pulse.value * 0.38)
-            : 0.22;
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onPressed,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+            gradient: isPremiumLockCta
+                ? const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Color(0xFFF0A41C),
+                      Color(0xFFF3C65A),
+                      Color(0xFFF9E18C),
+                    ],
+                    stops: [0, 0.54, 1],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color(0xD910C878), Color(0xCCF2C96A)],
+                  ),
             borderRadius: BorderRadius.circular(16),
-            onTap: widget.onPressed,
-            child: Ink(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              decoration: BoxDecoration(
-                gradient: widget.isPremiumLockCta
-                    ? const LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          Color(0xFFF0A41C),
-                          Color(0xFFF3C65A),
-                          Color(0xFFF9E18C),
-                        ],
-                        stops: [0, 0.54, 1],
-                      )
-                    : const LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [Color(0xD910C878), Color(0xCCF2C96A)],
-                      ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: widget.isPremiumLockCta
-                      ? const Color(0xFFF9E8B6).withValues(alpha: 0.88)
-                      : Colors.white.withValues(alpha: 0.14),
-                  width: widget.isPremiumLockCta ? 1.3 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color:
-                        (widget.isPremiumLockCta
-                                ? const Color(0xFFE4901F)
-                                : const Color(0xFF10C878))
-                            .withValues(alpha: 0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                  if (widget.isPremiumLockCta)
-                    BoxShadow(
-                      color: const Color(
-                        0xFFF7D67A,
-                      ).withValues(alpha: glowPulse),
-                      blurRadius: 24,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 0),
-                    ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textStyle?.copyWith(
-                        color: widget.isPremiumLockCta
-                            ? premiumTextColor
-                            : const Color(0xFF082313),
-                        fontSize: 11.2,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    width: widget.isPremiumLockCta ? 22 : null,
-                    height: widget.isPremiumLockCta ? 22 : null,
-                    decoration: widget.isPremiumLockCta
-                        ? BoxDecoration(
-                            color: const Color(0x3DFFF3D2),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xAAFFF0C0)),
-                          )
-                        : null,
-                    child: Icon(
-                      widget.isPremiumLockCta
-                          ? Icons.workspace_premium_rounded
-                          : Icons.arrow_forward_rounded,
-                      color: widget.isPremiumLockCta
-                          ? premiumTextColor
-                          : const Color(0xFF082313),
-                      size: widget.isPremiumLockCta ? 14 : 16,
-                    ),
-                  ),
-                ],
-              ),
+            border: Border.all(
+              color: isPremiumLockCta
+                  ? const Color(0xFFF9E8B6).withValues(alpha: 0.88)
+                  : Colors.white.withValues(alpha: 0.14),
+              width: isPremiumLockCta ? 1.3 : 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color:
+                    (isPremiumLockCta
+                            ? const Color(0xFFE4901F)
+                            : const Color(0xFF10C878))
+                        .withValues(alpha: 0.24),
+                blurRadius: 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        );
-      },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textStyle?.copyWith(
+                    color: isPremiumLockCta
+                        ? premiumTextColor
+                        : const Color(0xFF082313),
+                    fontSize: 11.2,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                width: isPremiumLockCta ? 22 : null,
+                height: isPremiumLockCta ? 22 : null,
+                decoration: isPremiumLockCta
+                    ? BoxDecoration(
+                        color: const Color(0x3DFFF3D2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xAAFFF0C0)),
+                      )
+                    : null,
+                child: Icon(
+                  isPremiumLockCta
+                      ? Icons.workspace_premium_rounded
+                      : Icons.arrow_forward_rounded,
+                  color: isPremiumLockCta
+                      ? premiumTextColor
+                      : const Color(0xFF082313),
+                  size: isPremiumLockCta ? 14 : 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
