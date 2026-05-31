@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -65,6 +66,26 @@ public sealed class IdentityServiceEmailFlowTests
             CancellationToken.None);
 
         Assert.True(loginResult.IsFailure);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ShouldQueueRussianEmail_WhenAcceptLanguageIsRussian()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(
+            dbContext,
+            acceptLanguage: "ru-RU,ru;q=0.9",
+            emailTemplateRenderer: CreateRealEmailTemplateRenderer());
+
+        var registerResult = await service.RegisterAsync(
+            new RegisterUserCommand("locale.ru@petmagic.app", "StrongPassword123", "Анна", true, true, CurrentLegalVersion, CurrentLegalVersion, true),
+            CancellationToken.None);
+
+        Assert.True(registerResult.IsSuccess);
+
+        var queuedEmail = await dbContext.EmailDispatchJobs.SingleAsync();
+        Assert.Equal("Подтвердите email в PetMagic", queuedEmail.Subject);
+        Assert.Contains("Здравствуйте Анна", queuedEmail.HtmlBody);
     }
 
     [Fact]
@@ -314,7 +335,10 @@ public sealed class IdentityServiceEmailFlowTests
         return new IdentityModuleDbContext(options);
     }
 
-    private static async Task<IdentityService> CreateServiceAsync(IdentityModuleDbContext dbContext)
+    private static async Task<IdentityService> CreateServiceAsync(
+        IdentityModuleDbContext dbContext,
+        string? acceptLanguage = null,
+        IIdentityEmailTemplateRenderer? emailTemplateRenderer = null)
     {
         await dbContext.Database.EnsureCreatedAsync();
         var economyDbContext = CreateEconomyDbContext();
@@ -357,6 +381,16 @@ public sealed class IdentityServiceEmailFlowTests
             }
         }
 
+        var httpContext = string.IsNullOrWhiteSpace(acceptLanguage)
+            ? null
+            : new DefaultHttpContext();
+        if (!string.IsNullOrWhiteSpace(acceptLanguage))
+        {
+            httpContext!.Request.Headers["Accept-Language"] = acceptLanguage;
+        }
+
+        IHttpContextAccessor httpContextAccessor = new StaticHttpContextAccessor(httpContext);
+
         return new IdentityService(
             userManager,
             roleManager,
@@ -364,8 +398,9 @@ public sealed class IdentityServiceEmailFlowTests
             new ServiceCollection()
                 .AddSingleton(CreateEconomyService(economyDbContext))
                 .BuildServiceProvider(),
+            httpContextAccessor,
             new FakeLegalDocumentsCatalog(),
-            new StubEmailTemplateRenderer(),
+            emailTemplateRenderer ?? new StubEmailTemplateRenderer(),
             new InMemoryAvatarStorage(),
             new EmailOptions
             {
@@ -378,6 +413,24 @@ public sealed class IdentityServiceEmailFlowTests
             },
             new AvatarStorageOptions(),
             Options.Create(new JwtOptions()));
+    }
+
+    private static IIdentityEmailTemplateRenderer CreateRealEmailTemplateRenderer()
+    {
+        var rendererType = typeof(IIdentityEmailTemplateRenderer)
+            .Assembly
+            .GetType("PetMagic.Modules.Identity.Infrastructure.IdentityEmailTemplateRenderer");
+
+        Assert.NotNull(rendererType);
+
+        var instance = Activator.CreateInstance(rendererType!, nonPublic: true);
+
+        return Assert.IsAssignableFrom<IIdentityEmailTemplateRenderer>(instance);
+    }
+
+    private sealed class StaticHttpContextAccessor(HttpContext? context) : IHttpContextAccessor
+    {
+        public HttpContext? HttpContext { get; set; } = context;
     }
 
     private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog
@@ -448,12 +501,12 @@ public sealed class IdentityServiceEmailFlowTests
 
     private sealed class StubEmailTemplateRenderer : IIdentityEmailTemplateRenderer
     {
-        public RenderedEmailMessage RenderEmailConfirmation(string? displayName, string code, DateTime expiresAtUtc)
+        public RenderedEmailMessage RenderEmailConfirmation(string? displayName, string code, DateTime expiresAtUtc, string? locale = null)
         {
             return new RenderedEmailMessage("Confirm", $"<p>{code}</p>", code);
         }
 
-        public RenderedEmailMessage RenderPasswordReset(string? displayName, string code, DateTime expiresAtUtc)
+        public RenderedEmailMessage RenderPasswordReset(string? displayName, string code, DateTime expiresAtUtc, string? locale = null)
         {
             return new RenderedEmailMessage("Reset", $"<p>{code}</p>", code);
         }

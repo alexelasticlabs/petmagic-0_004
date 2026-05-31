@@ -306,6 +306,24 @@ abstract class AppLocalizations {
   /// **'Remove avatar'**
   String get profileAvatarRemove;
 
+  /// No description provided for @profileAvatarSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile photo'**
+  String get profileAvatarSheetTitle;
+
+  /// No description provided for @profileAvatarPickFromGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick from gallery'**
+  String get profileAvatarPickFromGallery;
+
+  /// No description provided for @profileAvatarTapToChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to change photo'**
+  String get profileAvatarTapToChange;
+
   /// No description provided for @profileEmailConfirmed.
   ///
   /// In en, this message translates to:
@@ -411,7 +429,7 @@ abstract class AppLocalizations {
   /// No description provided for @profilePremiumSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Unlock all templates and premium editing flows.'**
+  /// **'Unlock all templates and premium editing features.'**
   String get profilePremiumSubtitle;
 
   /// No description provided for @profilePremiumPlanLabel.
@@ -2097,7 +2115,7 @@ abstract class AppLocalizations {
   /// No description provided for @externalCheckoutPendingVerificationMessage.
   ///
   /// In en, this message translates to:
-  /// **'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.'**
+  /// **'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe confirms the payment.'**
   String get externalCheckoutPendingVerificationMessage;
 
   /// No description provided for @premiumContinueWithPlan.
@@ -2187,7 +2205,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumCheckoutFailed.
   ///
   /// In en, this message translates to:
-  /// **'Premium checkout is temporarily unavailable.'**
+  /// **'Premium purchase is temporarily unavailable.'**
   String get premiumCheckoutFailed;
 
   /// No description provided for @premiumManageFailed.
@@ -2799,13 +2817,13 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsHelpStatus.
   ///
   /// In en, this message translates to:
-  /// **'The in-app knowledge base is still being assembled, so this screen shows the current rollout status.'**
+  /// **'The help center is still being prepared, so this screen shows the current status.'**
   String get profileDetailsHelpStatus;
 
   /// No description provided for @profileDetailsHelpNext.
   ///
   /// In en, this message translates to:
-  /// **'The first help articles and troubleshooting guides will appear here as the mobile support content is published.'**
+  /// **'The first help articles and troubleshooting guides will appear here as soon as they are available.'**
   String get profileDetailsHelpNext;
 
   /// No description provided for @profileDetailsSupportBody.
@@ -2817,13 +2835,13 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsSupportStatus.
   ///
   /// In en, this message translates to:
-  /// **'Direct in-app contact is not wired yet. For now, keep this screen as the support entry point for the next slice.'**
+  /// **'Direct support contact in the app is not available yet. For now, this screen is your support entry point.'**
   String get profileDetailsSupportStatus;
 
   /// No description provided for @profileDetailsSupportNext.
   ///
   /// In en, this message translates to:
-  /// **'The next step is a real support form or email handoff connected to the backend support flow.'**
+  /// **'Next, this screen will include a full support form or an email handoff.'**
   String get profileDetailsSupportNext;
 
   /// No description provided for @profileDetailsTermsBody.
@@ -2859,7 +2877,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsPrivacyStatus.
   ///
   /// In en, this message translates to:
-  /// **'Privacy details are currently represented as an in-app summary screen while the full legal document flow is prepared.'**
+  /// **'Privacy details are currently shown as a short summary while the full legal document is being prepared.'**
   String get profileDetailsPrivacyStatus;
 
   /// No description provided for @profileDetailsPrivacyNext.
@@ -2907,7 +2925,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileLegalLoading.
   ///
   /// In en, this message translates to:
-  /// **'Loading the current legal document from the backend...'**
+  /// **'Loading the current legal document...'**
   String get profileLegalLoading;
 
   /// No description provided for @profileLegalUnavailable.
@@ -3021,13 +3039,13 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsDeleteStatus.
   ///
   /// In en, this message translates to:
-  /// **'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.'**
+  /// **'Account deletion is not available as a one-tap action right now. This prevents accidental destructive actions until secure confirmation is ready.'**
   String get profileDetailsDeleteStatus;
 
   /// No description provided for @profileDetailsDeleteNext.
   ///
   /// In en, this message translates to:
-  /// **'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.'**
+  /// **'When full account deletion is available, this screen will become the confirmation and verification step.'**
   String get profileDetailsDeleteNext;
 
   /// No description provided for @supportChatTitle.
@@ -3479,6 +3497,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gallery access is denied. Allow access in device settings.'**
   String get supportChatAttachmentNoGalleryAccessError;
+
+  /// No description provided for @supportChatCameraPermissionPhotoError.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera permission is required to take a photo.'**
+  String get supportChatCameraPermissionPhotoError;
+
+  /// No description provided for @supportChatCameraPermissionVideoError.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera permission is required to record video.'**
+  String get supportChatCameraPermissionVideoError;
+
+  /// No description provided for @supportChatFilesPermissionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Files permission is required to attach files.'**
+  String get supportChatFilesPermissionError;
 
   /// No description provided for @supportChatAttachmentExpiredPlaceholder.
   ///
@@ -5618,6 +5654,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.'**
   String get premiumStorePaymentDisclaimerBody;
+
+  /// No description provided for @debugStripeSmokeTestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stripe PaymentSheet Smoke Test'**
+  String get debugStripeSmokeTestTitle;
+
+  /// No description provided for @debugStripeSmokeTestSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimal screen for PaymentSheet tap/focus diagnostics.'**
+  String get debugStripeSmokeTestSubtitle;
+
+  /// No description provided for @debugStripeSmokeTestOpenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Stripe PaymentSheet'**
+  String get debugStripeSmokeTestOpenAction;
+
+  /// No description provided for @debugStripeSmokeTestOpeningAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening...'**
+  String get debugStripeSmokeTestOpeningAction;
+
+  /// No description provided for @debugStripeSmokeTestMethodUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stripe payment method is not available.'**
+  String get debugStripeSmokeTestMethodUnavailable;
+
+  /// No description provided for @debugStripeSmokeTestNoPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'No Stripe-enabled premium plans found.'**
+  String get debugStripeSmokeTestNoPlans;
+
+  /// No description provided for @debugStripeSmokeTestPrepareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to prepare PaymentSheet checkout.'**
+  String get debugStripeSmokeTestPrepareFailed;
+
+  /// No description provided for @debugStripeSmokeTestOpenedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'PaymentSheet opened successfully.'**
+  String get debugStripeSmokeTestOpenedSuccess;
+
+  /// No description provided for @debugStripeSmokeTestDismissedOrFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'PaymentSheet was dismissed or failed.'**
+  String get debugStripeSmokeTestDismissedOrFailed;
+
+  /// No description provided for @debugStripeSmokeTestVerifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkout verification failed.'**
+  String get debugStripeSmokeTestVerifyFailed;
 
   /// No description provided for @premiumBenefitAiGenerationsTitle.
   ///

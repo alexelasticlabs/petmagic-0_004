@@ -111,6 +111,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileAvatarRemove => 'Remove avatar';
 
   @override
+  String get profileAvatarSheetTitle => 'Profile photo';
+
+  @override
+  String get profileAvatarPickFromGallery => 'Pick from gallery';
+
+  @override
+  String get profileAvatarTapToChange => 'Tap to change photo';
+
+  @override
   String get profileEmailConfirmed => 'Email confirmed';
 
   @override
@@ -165,7 +174,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profilePremiumSubtitle =>
-      'Unlock all templates and premium editing flows.';
+      'Unlock all templates and premium editing features.';
 
   @override
   String get profilePremiumPlanLabel => 'Premium Plan';
@@ -1129,7 +1138,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get externalCheckoutPendingVerificationMessage =>
-      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe webhook arrives.';
+      'Payment is not confirmed yet. We will update Premium or your wallet as soon as Stripe confirms the payment.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -1184,7 +1193,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumCheckoutFailed =>
-      'Premium checkout is temporarily unavailable.';
+      'Premium purchase is temporarily unavailable.';
 
   @override
   String get premiumManageFailed =>
@@ -1532,11 +1541,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsHelpStatus =>
-      'The in-app knowledge base is still being assembled, so this screen shows the current rollout status.';
+      'The help center is still being prepared, so this screen shows the current status.';
 
   @override
   String get profileDetailsHelpNext =>
-      'The first help articles and troubleshooting guides will appear here as the mobile support content is published.';
+      'The first help articles and troubleshooting guides will appear here as soon as they are available.';
 
   @override
   String get profileDetailsSupportBody =>
@@ -1544,11 +1553,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsSupportStatus =>
-      'Direct in-app contact is not wired yet. For now, keep this screen as the support entry point for the next slice.';
+      'Direct support contact in the app is not available yet. For now, this screen is your support entry point.';
 
   @override
   String get profileDetailsSupportNext =>
-      'The next step is a real support form or email handoff connected to the backend support flow.';
+      'Next, this screen will include a full support form or an email handoff.';
 
   @override
   String get profileDetailsTermsBody =>
@@ -1572,7 +1581,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsPrivacyStatus =>
-      'Privacy details are currently represented as an in-app summary screen while the full legal document flow is prepared.';
+      'Privacy details are currently shown as a short summary while the full legal document is being prepared.';
 
   @override
   String get profileDetailsPrivacyNext =>
@@ -1599,8 +1608,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileLegalAcceptedAtLabel => 'Accepted at';
 
   @override
-  String get profileLegalLoading =>
-      'Loading the current legal document from the backend...';
+  String get profileLegalLoading => 'Loading the current legal document...';
 
   @override
   String get profileLegalUnavailable =>
@@ -1667,11 +1675,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.';
+      'Account deletion is not available as a one-tap action right now. This prevents accidental destructive actions until secure confirmation is ready.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.';
+      'When full account deletion is available, this screen will become the confirmation and verification step.';
 
   @override
   String get supportChatTitle => 'Support chat';
@@ -1919,6 +1927,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get supportChatAttachmentNoGalleryAccessError =>
       'Gallery access is denied. Allow access in device settings.';
+
+  @override
+  String get supportChatCameraPermissionPhotoError =>
+      'Camera permission is required to take a photo.';
+
+  @override
+  String get supportChatCameraPermissionVideoError =>
+      'Camera permission is required to record video.';
+
+  @override
+  String get supportChatFilesPermissionError =>
+      'Files permission is required to attach files.';
 
   @override
   String get supportChatAttachmentExpiredPlaceholder =>
@@ -3113,6 +3133,43 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get premiumStorePaymentDisclaimerBody =>
       'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.';
+
+  @override
+  String get debugStripeSmokeTestTitle => 'Stripe PaymentSheet Smoke Test';
+
+  @override
+  String get debugStripeSmokeTestSubtitle =>
+      'Minimal screen for PaymentSheet tap/focus diagnostics.';
+
+  @override
+  String get debugStripeSmokeTestOpenAction => 'Open Stripe PaymentSheet';
+
+  @override
+  String get debugStripeSmokeTestOpeningAction => 'Opening...';
+
+  @override
+  String get debugStripeSmokeTestMethodUnavailable =>
+      'Stripe payment method is not available.';
+
+  @override
+  String get debugStripeSmokeTestNoPlans =>
+      'No Stripe-enabled premium plans found.';
+
+  @override
+  String get debugStripeSmokeTestPrepareFailed =>
+      'Unable to prepare PaymentSheet checkout.';
+
+  @override
+  String get debugStripeSmokeTestOpenedSuccess =>
+      'PaymentSheet opened successfully.';
+
+  @override
+  String get debugStripeSmokeTestDismissedOrFailed =>
+      'PaymentSheet was dismissed or failed.';
+
+  @override
+  String get debugStripeSmokeTestVerifyFailed =>
+      'Checkout verification failed.';
 
   @override
   String get premiumBenefitAiGenerationsTitle => '30 AI generations';

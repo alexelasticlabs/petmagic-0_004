@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,14 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 
 part 'widgets/wallet_page_activity_widgets.dart';
 part 'widgets/wallet_page_overview_widgets.dart';
+
+void _debugWalletCheckoutLog(String message) {
+  if (!kDebugMode) {
+    return;
+  }
+
+  developer.log(message, name: 'PetMagic.Wallet.Checkout');
+}
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
@@ -292,9 +301,8 @@ class _WalletPageState extends ConsumerState<WalletPage>
     PurchaseCheckoutModel checkout,
   ) async {
     final text = AppLocalizations.of(context);
-    developer.log(
+    _debugWalletCheckoutLog(
       'Checkout dispatch (order=${checkout.orderId}, usesPaymentSheet=${checkout.usesPaymentSheet}, provider=${checkout.paymentProvider}, urlLength=${checkout.checkoutUrl.length}, hasClientSecret=${(checkout.paymentIntentClientSecret?.isNotEmpty ?? false)}, hasPublishableKey=${(checkout.publishableKey?.isNotEmpty ?? false)})',
-      name: 'PetMagic.Wallet.Checkout',
     );
 
     if (!checkout.usesPaymentSheet) {
@@ -323,9 +331,8 @@ class _WalletPageState extends ConsumerState<WalletPage>
       );
     }
 
-    developer.log(
+    _debugWalletCheckoutLog(
       'PaymentSheet init start (order=${checkout.orderId})',
-      name: 'PetMagic.Wallet.Checkout',
     );
     _shouldReloadOnResume = true;
     final sheetResult = await StripePaymentSheetCoordinator.present(
@@ -504,9 +511,11 @@ Future<void> _showPackDetailSheet(
         paymentMethodLabel: _walletProviderLabel(text, selectedMethod),
         onChooseAnotherMethod: () {},
         onSubmit: () async {
-          debugPrint(
-            'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${selectedPack.code}',
-          );
+          if (kDebugMode) {
+            debugPrint(
+              'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${selectedPack.code}',
+            );
+          }
           final checkout = await onBuy(selectedPack, selectedMethod);
           if (checkout == null) {
             return WalletStripeCheckoutSubmitResult(

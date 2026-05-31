@@ -6,10 +6,13 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 
 class ProfileLanguageSheetOption {
-  const ProfileLanguageSheetOption({required this.locale, required this.label});
+  const ProfileLanguageSheetOption({
+    required this.locale,
+    required this.nativeLabel,
+  });
 
   final Locale locale;
-  final String label;
+  final String nativeLabel;
 }
 
 Future<void> showProfileLanguageSheet({
@@ -50,24 +53,24 @@ Future<void> showProfileLanguageSheet({
                 border: Border.all(color: colors.border.withValues(alpha: 0.8)),
                 color: colors.surfaceStrong.withValues(alpha: 0.48),
               ),
-              child: Column(
-                children: [
-                  for (var index = 0; index < options.length; index++)
-                    _LanguageTile(
-                      label: options[index].label,
-                      isSelected: _isSameLocale(
-                        options[index].locale,
-                        selectedLocale,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  children: [
+                    for (final option in options)
+                      _LanguageTile(
+                        locale: option.locale,
+                        nativeLabel: option.nativeLabel,
+                        isSelected: _isSameLocale(option.locale, selectedLocale),
+                        onTap: () async {
+                          await onSelect(option.locale);
+                          if (sheetContext.mounted) {
+                            Navigator.of(sheetContext).pop();
+                          }
+                        },
                       ),
-                      showDivider: index != options.length - 1,
-                      onTap: () async {
-                        await onSelect(options[index].locale);
-                        if (sheetContext.mounted) {
-                          Navigator.of(sheetContext).pop();
-                        }
-                      },
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -351,62 +354,89 @@ class _SheetHandle extends StatelessWidget {
 
 class _LanguageTile extends StatelessWidget {
   const _LanguageTile({
-    required this.label,
+    required this.locale,
+    required this.nativeLabel,
     required this.isSelected,
-    required this.showDivider,
     required this.onTap,
   });
 
-  final String label;
+  final Locale locale;
+  final String nativeLabel;
   final bool isSelected;
-  final bool showDivider;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return DecoratedBox(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: DecoratedBox(
       decoration: BoxDecoration(
-        border: showDivider
-            ? Border(
-                bottom: BorderSide(
-                  color: colors.border.withValues(alpha: 0.76),
-                ),
-              )
-            : null,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isSelected
+              ? colors.accent.withValues(alpha: 0.6)
+              : colors.border.withValues(alpha: 0.76),
+        ),
+        color: isSelected
+            ? colors.accentSoft.withValues(alpha: 0.26)
+            : colors.surfaceGlass.withValues(alpha: 0.34),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    color: isSelected
+                        ? colors.accent.withValues(alpha: 0.2)
+                        : colors.surfaceStrong.withValues(alpha: 0.52),
+                  ),
+                  child: Text(
+                    locale.languageCode.toUpperCase(),
+                    style: TextStyle(
+                      color: isSelected ? colors.accent : colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.45,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    label,
+                    nativeLabel,
                     style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 18,
+                      color: isSelected ? colors.textStrong : colors.textSoft,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
                 Icon(
                   isSelected
-                      ? Icons.check_circle_rounded
+                      ? Icons.check_circle
                       : Icons.radio_button_unchecked_rounded,
                   color: isSelected ? colors.accent : colors.textMuted,
-                  size: 22,
+                  size: 21,
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
+    ));
   }
 }
 

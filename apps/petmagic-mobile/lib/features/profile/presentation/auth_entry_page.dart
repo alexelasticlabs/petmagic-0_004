@@ -556,6 +556,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      useRootNavigator: false,
       builder: (context) => _LegalDocumentSheet(document: document),
     );
   }

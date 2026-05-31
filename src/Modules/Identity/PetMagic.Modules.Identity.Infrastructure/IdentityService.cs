@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,7 @@ public sealed class IdentityService(
     RoleManager<IdentityRole<Guid>> roleManager,
     IdentityDbContext dbContext,
     IServiceProvider serviceProvider,
+    IHttpContextAccessor httpContextAccessor,
     ILegalDocumentsCatalog legalDocumentsCatalog,
     IIdentityEmailTemplateRenderer emailTemplateRenderer,
     IAvatarStorage avatarStorage,
@@ -1266,9 +1268,10 @@ public sealed class IdentityService(
             SendCount = 1
         });
 
+        var locale = ResolvePreferredLocale();
         var message = purpose == EmailCodePurpose.EmailConfirmation
-            ? emailTemplateRenderer.RenderEmailConfirmation(user.DisplayName, code, expiresAtUtc)
-            : emailTemplateRenderer.RenderPasswordReset(user.DisplayName, code, expiresAtUtc);
+            ? emailTemplateRenderer.RenderEmailConfirmation(user.DisplayName, code, expiresAtUtc, locale)
+            : emailTemplateRenderer.RenderPasswordReset(user.DisplayName, code, expiresAtUtc, locale);
 
         dbContext.EmailDispatchJobs.Add(new EmailDispatchJob
         {
@@ -1289,6 +1292,31 @@ public sealed class IdentityService(
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private string? ResolvePreferredLocale()
+    {
+        var acceptLanguage = httpContextAccessor.HttpContext?.Request.Headers.AcceptLanguage.ToString();
+        if (string.IsNullOrWhiteSpace(acceptLanguage))
+        {
+            return null;
+        }
+
+        var candidate = acceptLanguage
+            .Split(',', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return null;
+        }
+
+        var semicolonIndex = candidate.IndexOf(';');
+        if (semicolonIndex >= 0)
+        {
+            candidate = candidate[..semicolonIndex];
+        }
+
+        return string.IsNullOrWhiteSpace(candidate) ? null : candidate.Trim();
     }
 
     private async Task InvalidateActiveCodesAsync(Guid userId, EmailCodePurpose purpose, DateTime now, CancellationToken cancellationToken)

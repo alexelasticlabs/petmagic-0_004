@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
@@ -26,18 +27,19 @@ class _StripePaymentSheetSmokeTestPageState
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final state = ref.watch(premiumControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Stripe PaymentSheet Smoke Test')),
+      appBar: AppBar(title: Text(text.debugStripeSmokeTestTitle)),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                'Minimal screen for PaymentSheet tap/focus diagnostics.',
+              Text(
+                text.debugStripeSmokeTestSubtitle,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
@@ -46,7 +48,9 @@ class _StripePaymentSheetSmokeTestPageState
                     ? null
                     : _openPaymentSheet,
                 child: Text(
-                  _isLaunching ? 'Opening...' : 'Open Stripe PaymentSheet',
+                  _isLaunching
+                      ? text.debugStripeSmokeTestOpeningAction
+                      : text.debugStripeSmokeTestOpenAction,
                 ),
               ),
             ],
@@ -57,6 +61,7 @@ class _StripePaymentSheetSmokeTestPageState
   }
 
   Future<void> _openPaymentSheet() async {
+    final text = AppLocalizations.of(context);
     final controller = ref.read(premiumControllerProvider.notifier);
     var state = ref.read(premiumControllerProvider);
 
@@ -78,13 +83,13 @@ class _StripePaymentSheetSmokeTestPageState
     );
 
     if (!stripeMethod.isEnabled) {
-      _showMessage('Stripe payment method is not available.');
+      _showMessage(text.debugStripeSmokeTestMethodUnavailable);
       return;
     }
 
     final stripePlan = state.plans.where((plan) => plan.stripeCheckoutEnabled);
     if (stripePlan.isEmpty) {
-      _showMessage('No Stripe-enabled premium plans found.');
+      _showMessage(text.debugStripeSmokeTestNoPlans);
       return;
     }
 
@@ -101,7 +106,7 @@ class _StripePaymentSheetSmokeTestPageState
       final checkout = await controller.startCheckout();
       if (!mounted || checkout == null || !checkout.usesPaymentSheet) {
         if (mounted) {
-          _showMessage('Unable to prepare PaymentSheet checkout.');
+          _showMessage(text.debugStripeSmokeTestPrepareFailed);
         }
         return;
       }
@@ -121,9 +126,11 @@ class _StripePaymentSheetSmokeTestPageState
       }
 
       if (result.completed) {
-        _showMessage('PaymentSheet opened successfully.');
+        _showMessage(text.debugStripeSmokeTestOpenedSuccess);
       } else {
-        _showMessage(result.errorMessage ?? 'PaymentSheet was dismissed/failed.');
+        _showMessage(
+          result.errorMessage ?? text.debugStripeSmokeTestDismissedOrFailed,
+        );
       }
     } finally {
       if (mounted) {
@@ -136,7 +143,9 @@ class _StripePaymentSheetSmokeTestPageState
     state = ref.read(premiumControllerProvider);
     if (state.checkoutVerificationState == PremiumCheckoutVerificationState.error &&
         mounted) {
-      _showMessage(state.checkoutErrorMessage ?? 'Checkout verification failed.');
+      _showMessage(
+        state.checkoutErrorMessage ?? text.debugStripeSmokeTestVerifyFailed,
+      );
     }
   }
 

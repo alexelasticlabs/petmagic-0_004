@@ -89,14 +89,6 @@ class ProfileSettingsPage extends ConsumerWidget {
               child: Column(
                 children: [
                   ProfileSettingsRow(
-                    icon: Icons.person_outline_rounded,
-                    title: text.profileSettingsAccountInfoTitle,
-                    subtitle: state.profile == null
-                        ? text.profileSettingsUnavailableSubtitle
-                        : state.profile!.email,
-                    onTap: () => context.push(ProfileAccountInfoPage.routePath),
-                  ),
-                  ProfileSettingsRow(
                     icon: Icons.link_rounded,
                     title: text.profileSettingsLinkedAccountsTitle,
                     subtitle: text.profileSettingsLinkedAccountsSubtitle,
@@ -174,7 +166,7 @@ class ProfileSettingsPage extends ConsumerWidget {
                       await showProfileLanguageSheet(
                         context: context,
                         selectedLocale: resolvedLocale,
-                        options: _languageOptions(text),
+                        options: _languageOptions(),
                         onSelect: preferencesController.updateLocale,
                       );
                     },
@@ -338,51 +330,28 @@ class ProfileSettingsPage extends ConsumerWidget {
     );
   }
 
-  static List<ProfileLanguageSheetOption> _languageOptions(
-    AppLocalizations text,
-  ) {
-    return [
-      ProfileLanguageSheetOption(
-        locale: const Locale('ru'),
-        label: text.profileSettingsLanguageRussian,
-      ),
-      ProfileLanguageSheetOption(
-        locale: const Locale('en'),
-        label: text.profileSettingsLanguageEnglish,
-      ),
-      ProfileLanguageSheetOption(
-        locale: const Locale('de'),
-        label: text.profileSettingsLanguageGerman,
-      ),
-      ProfileLanguageSheetOption(
-        locale: const Locale('es'),
-        label: text.profileSettingsLanguageSpanish,
-      ),
-      ProfileLanguageSheetOption(
-        locale: const Locale('fr'),
-        label: text.profileSettingsLanguageFrench,
-      ),
-      ProfileLanguageSheetOption(
-        locale: const Locale('it'),
-        label: text.profileSettingsLanguageItalian,
-      ),
-      ProfileLanguageSheetOption(
-        locale: const Locale('pl'),
-        label: text.profileSettingsLanguagePolish,
-      ),
+  static List<ProfileLanguageSheetOption> _languageOptions() {
+    return const [
+      ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
+      ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
+      ProfileLanguageSheetOption(locale: Locale('de'), nativeLabel: 'Deutsch'),
+      ProfileLanguageSheetOption(locale: Locale('es'), nativeLabel: 'Español'),
+      ProfileLanguageSheetOption(locale: Locale('fr'), nativeLabel: 'Français'),
+      ProfileLanguageSheetOption(locale: Locale('it'), nativeLabel: 'Italiano'),
+      ProfileLanguageSheetOption(locale: Locale('pl'), nativeLabel: 'Polski'),
     ];
   }
 
   static String _languageLabel(AppLocalizations text, Locale locale) {
     return switch (locale.languageCode) {
-      'ru' => text.profileSettingsLanguageRussian,
-      'en' => text.profileSettingsLanguageEnglish,
-      'de' => text.profileSettingsLanguageGerman,
-      'es' => text.profileSettingsLanguageSpanish,
-      'fr' => text.profileSettingsLanguageFrench,
-      'it' => text.profileSettingsLanguageItalian,
-      'pl' => text.profileSettingsLanguagePolish,
-      _ => text.profileSettingsLanguageEnglish,
+      'ru' => 'Русский',
+      'en' => 'English',
+      'de' => 'Deutsch',
+      'es' => 'Español',
+      'fr' => 'Français',
+      'it' => 'Italiano',
+      'pl' => 'Polski',
+      _ => 'English',
     };
   }
 

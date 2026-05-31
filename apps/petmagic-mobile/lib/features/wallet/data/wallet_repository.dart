@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -21,6 +22,14 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
     authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
   );
 });
+
+void _debugWalletApiLog(String message) {
+  if (!kDebugMode) {
+    return;
+  }
+
+  developer.log(message, name: 'PetMagic.Wallet.Api');
+}
 
 class WalletRepository {
   WalletRepository({
@@ -161,9 +170,8 @@ class WalletRepository {
       'locale': locale.toLanguageTag(),
     };
 
-    developer.log(
+    _debugWalletApiLog(
       'POST /api/economy/purchases/create (packId=${pack.packId}, provider=${paymentMethod.provider}, currency=${pack.currencyCode}, country=${locale.countryCode ?? '*'})',
-      name: 'PetMagic.Wallet.Api',
     );
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -177,9 +185,8 @@ class WalletRepository {
       ),
     );
 
-    developer.log(
+    _debugWalletApiLog(
       'POST /api/economy/purchases/create -> ${response.statusCode}',
-      name: 'PetMagic.Wallet.Api',
     );
 
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});
@@ -239,7 +246,9 @@ class WalletRepository {
     }
 
     final launched = await _inAppPurchase.buyConsumable(
-      purchaseParam: PurchaseParam(productDetails: response.productDetails.first),
+      purchaseParam: PurchaseParam(
+        productDetails: response.productDetails.first,
+      ),
     );
     if (!launched) {
       throw const AppException('wallet.payment_unavailable');
@@ -259,7 +268,8 @@ class WalletRepository {
           'productId': purchase.productID,
           'serverVerificationData':
               purchase.verificationData.serverVerificationData,
-          'localVerificationData': purchase.verificationData.localVerificationData,
+          'localVerificationData':
+              purchase.verificationData.localVerificationData,
           'purchaseId': purchase.purchaseID,
           'transactionDate': purchase.transactionDate,
         },
@@ -350,9 +360,7 @@ class WalletRepository {
       if (extraHeaders != null) ...extraHeaders,
     };
 
-    return Options(
-      headers: headers,
-    );
+    return Options(headers: headers);
   }
 
   String _platformValue() {

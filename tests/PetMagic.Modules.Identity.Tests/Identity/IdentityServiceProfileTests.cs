@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -117,6 +118,7 @@ public sealed partial class IdentityServiceProfileTests
             roleManager,
             identityDbContext,
             serviceProvider,
+            new HttpContextAccessor(),
             new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),
             avatarStorage,
@@ -358,12 +360,12 @@ public sealed partial class IdentityServiceProfileTests
 
     private sealed class StubEmailTemplateRenderer : IIdentityEmailTemplateRenderer
     {
-        public RenderedEmailMessage RenderEmailConfirmation(string? displayName, string code, DateTime expiresAtUtc)
+        public RenderedEmailMessage RenderEmailConfirmation(string? displayName, string code, DateTime expiresAtUtc, string? locale = null)
         {
             return new RenderedEmailMessage("Confirm", $"<p>{code}</p>", code);
         }
 
-        public RenderedEmailMessage RenderPasswordReset(string? displayName, string code, DateTime expiresAtUtc)
+        public RenderedEmailMessage RenderPasswordReset(string? displayName, string code, DateTime expiresAtUtc, string? locale = null)
         {
             return new RenderedEmailMessage("Reset", $"<p>{code}</p>", code);
         }

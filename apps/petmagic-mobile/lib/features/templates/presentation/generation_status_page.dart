@@ -36,31 +36,98 @@ class GenerationStatusPage extends ConsumerStatefulWidget {
       _GenerationStatusPageState();
 }
 
-class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
+class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
+    with WidgetsBindingObserver {
   Timer? _pollTimer;
   TemplateGenerationResult? _generation;
   bool _isLoading = true;
   bool _isSubmittingFeedback = false;
   bool _isDeleting = false;
   String? _errorMessage;
+  bool _isPollInFlight = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (_generation?.isTerminal == true) {
-        _pollTimer?.cancel();
-        return;
-      }
+    _startPolling();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
       unawaited(_load(silent: true));
-    });
+      return;
+    }
+
+    _stopPolling();
   }
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
     super.dispose();
+  }
+
+  void _startPolling() {
+    if (_pollTimer != null) {
+      return;
+    }
+
+    _scheduleNextPoll();
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  void _scheduleNextPoll() {
+    if (!mounted || _generation?.isTerminal == true) {
+      _stopPolling();
+      return;
+    }
+
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+      _stopPolling();
+      return;
+    }
+
+    _stopPolling();
+    _pollTimer = Timer(const Duration(seconds: 3), () {
+      unawaited(_handlePollTick());
+    });
+  }
+
+  Future<void> _handlePollTick() async {
+    _pollTimer = null;
+
+    if (!mounted || _generation?.isTerminal == true) {
+      return;
+    }
+
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      _scheduleNextPoll();
+      return;
+    }
+
+    if (_isPollInFlight) {
+      _scheduleNextPoll();
+      return;
+    }
+
+    _isPollInFlight = true;
+    try {
+      await _load(silent: true);
+    } finally {
+      _isPollInFlight = false;
+      _scheduleNextPoll();
+    }
   }
 
   @override
@@ -516,7 +583,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage> {
       }
 
       if (generation.isTerminal) {
-        _pollTimer?.cancel();
+        _stopPolling();
 
         final reachedTerminalNow = previousGeneration != null
             ? !previousGeneration.isTerminal

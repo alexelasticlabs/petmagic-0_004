@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -17,6 +18,22 @@ enum WalletCheckoutVerificationState {
   succeeded,
   pending,
   error,
+}
+
+void _debugCheckoutLog(String message, {Object? error}) {
+  if (!kDebugMode) {
+    return;
+  }
+
+  developer.log(message, name: 'PetMagic.Wallet.Checkout', error: error);
+}
+
+void _debugCheckoutInstant(String eventName, {Map<String, Object>? arguments}) {
+  if (!kDebugMode) {
+    return;
+  }
+
+  developer.Timeline.instantSync(eventName, arguments: arguments);
 }
 
 class WalletState {
@@ -285,9 +302,8 @@ class WalletController extends Notifier<WalletState> {
       return null;
     }
 
-    developer.log(
+    _debugCheckoutLog(
       'Checkout start (pack=${pack.code}, provider=${paymentMethod.provider}, currency=${pack.currencyCode}, amount=${pack.priceAmount})',
-      name: 'PetMagic.Wallet.Checkout',
     );
 
     state = state.copyWith(
@@ -335,9 +351,8 @@ class WalletController extends Notifier<WalletState> {
         WidgetsBinding.instance.platformDispatcher.locale,
       );
 
-      developer.log(
+      _debugCheckoutLog(
         'Checkout response (order=${checkout.orderId}, status=${checkout.status}, urlLength=${checkout.checkoutUrl.length})',
-        name: 'PetMagic.Wallet.Checkout',
       );
 
       if (paymentMethod.isStoreNative) {
@@ -361,14 +376,13 @@ class WalletController extends Notifier<WalletState> {
           'order_id': checkout.orderId,
           'status': checkout.status,
         };
-        developer.Timeline.instantSync(
+        _debugCheckoutInstant(
           'petmagic.wallet.checkout_empty_url',
           arguments: payload,
         );
-        developer.log(
+        _debugCheckoutLog(
           'Empty checkout URL from purchase create API '
           '(pack=${pack.code}, provider=${paymentMethod.provider}, order=${checkout.orderId}, status=${checkout.status})',
-          name: 'PetMagic.Wallet.Checkout',
           error: 'wallet.checkout_empty_url',
         );
 
@@ -390,9 +404,8 @@ class WalletController extends Notifier<WalletState> {
       );
       return checkout;
     } catch (error) {
-      developer.log(
+      _debugCheckoutLog(
         'Checkout failed (pack=${pack.code}, provider=${paymentMethod.provider})',
-        name: 'PetMagic.Wallet.Checkout',
         error: error,
       );
       state = state.copyWith(
@@ -595,9 +608,8 @@ class WalletController extends Notifier<WalletState> {
           return;
         }
       } catch (error) {
-        developer.log(
+        _debugCheckoutLog(
           'Stripe verify attempt failed (order=$pendingOrderId, attempt=${attempt + 1}, reference=${normalizedReference ?? ''})',
-          name: 'PetMagic.Wallet.Checkout',
           error: error,
         );
       }

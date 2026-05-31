@@ -111,6 +111,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get profileAvatarRemove => 'Rimuovi l\'avatar';
 
   @override
+  String get profileAvatarSheetTitle => 'Foto profilo';
+
+  @override
+  String get profileAvatarPickFromGallery => 'Scegli dalla galleria';
+
+  @override
+  String get profileAvatarTapToChange => 'Tocca per cambiare foto';
+
+  @override
   String get profileEmailConfirmed => 'E-mail confermata';
 
   @override
@@ -1012,19 +1021,20 @@ class AppLocalizationsIt extends AppLocalizations {
   String get premiumPaymentTitle => 'Metodo di pagamento';
 
   @override
-  String get premiumPaymentChooseSubtitle => 'Choose how you want to subscribe';
+  String get premiumPaymentChooseSubtitle => 'Scegli come vuoi abbonarti';
 
   @override
   String get premiumPaymentStripe => 'Carta tramite Stripe';
 
   @override
-  String get premiumPaymentStripeSubtitle => 'Card, Apple Pay or Google Pay';
+  String get premiumPaymentStripeSubtitle => 'Carta, Apple Pay o Google Pay';
 
   @override
   String get premiumPaymentGooglePlay => 'Google Play';
 
   @override
-  String get premiumPaymentGooglePlaySubtitle => 'Payment via Google Play';
+  String get premiumPaymentGooglePlaySubtitle =>
+      'Pagamento tramite Google Play';
 
   @override
   String get premiumPaymentApple => 'Apple Pay/App Store';
@@ -1037,15 +1047,15 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get premiumPaymentTrustStripeProcesses =>
-      'Card data is securely processed by Stripe.';
+      'I dati della carta vengono elaborati in modo sicuro da Stripe.';
 
   @override
   String get premiumPaymentTrustNoStorage =>
-      'PetMagic does not store your card details.';
+      'PetMagic non memorizza i dati della tua carta.';
 
   @override
   String get premiumPaymentTrustManageInApp =>
-      'Subscription renewal and cancellation are managed inside PetMagic.';
+      'Rinnovo e annullamento dell\'abbonamento sono gestiti dentro PetMagic.';
 
   @override
   String paymentBonusPercentBadge(Object percent) {
@@ -1141,7 +1151,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get externalCheckoutPendingVerificationMessage =>
-      'Il pagamento non è ancora confermato. Aggiorneremo Premium o il tuo portafoglio non appena arriverà il webhook Stripe.';
+      'Il pagamento non è ancora confermato. Aggiorneremo Premium o il tuo portafoglio non appena Stripe confermerà il pagamento.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -1196,7 +1206,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get premiumCheckoutFailed =>
-      'Premium checkout è temporaneamente non disponibile.';
+      'L\'acquisto Premium è temporaneamente non disponibile.';
 
   @override
   String get premiumManageFailed =>
@@ -1423,7 +1433,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get profileDetailsLinkedAccountsNext =>
-      'Google, Apple e altri fornitori verranno visualizzati qui dopo l\'apertura del flusso di collegamento del backend nell\'app.';
+      'Google, Apple e altri fornitori appariranno qui quando il collegamento account sarà disponibile.';
 
   @override
   String get profileLinkedAccountsLoading =>
@@ -1562,7 +1572,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get profileDetailsSupportNext =>
-      'Il passaggio successivo è un vero e proprio modulo di supporto o un trasferimento di posta elettronica collegato al flusso di supporto back-end.';
+      'Il passaggio successivo sarà un modulo di supporto completo o un trasferimento via e-mail.';
 
   @override
   String get profileDetailsTermsBody =>
@@ -1614,7 +1624,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get profileLegalLoading =>
-      'Caricamento del documento legale corrente dal backend...';
+      'Caricamento del documento legale corrente...';
 
   @override
   String get profileLegalUnavailable =>
@@ -1681,11 +1691,11 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Al momento l\'eliminazione non è disponibile come azione con un tocco nell\'app mobile. Ciò evita comportamenti distruttivi prima che il flusso di conferma del backend sia pronto.';
+      'La cancellazione dell\'account non è disponibile con un solo tocco per ora. Questo evita azioni irreversibili finché la conferma sicura non è pronta.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'Quando viene implementato il flusso di lavoro di eliminazione del backend, questa schermata può diventare la fase di conferma e verifica anziché un segnaposto.';
+      'Quando sarà disponibile il processo completo di cancellazione, questa schermata diventerà il passaggio di conferma e verifica.';
 
   @override
   String get supportChatTitle => 'Chatta di supporto';
@@ -1945,6 +1955,18 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get supportChatAttachmentNoGalleryAccessError =>
       'L\'accesso alla Galleria è negato. Consenti l\'accesso nelle impostazioni del dispositivo.';
+
+  @override
+  String get supportChatCameraPermissionPhotoError =>
+      'Per scattare una foto è necessaria l\'autorizzazione della fotocamera.';
+
+  @override
+  String get supportChatCameraPermissionVideoError =>
+      'Per registrare un video è necessaria l\'autorizzazione della fotocamera.';
+
+  @override
+  String get supportChatFilesPermissionError =>
+      'Per allegare file è necessaria l\'autorizzazione ai file.';
 
   @override
   String get supportChatAttachmentExpiredPlaceholder =>
@@ -3167,6 +3189,43 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get premiumStorePaymentDisclaimerBody =>
       'Il pagamento verrà addebitato sul tuo account App Store/Google Play. L\'abbonamento si rinnova automaticamente a meno che non venga annullato prima della data di rinnovo.';
+
+  @override
+  String get debugStripeSmokeTestTitle => 'Test Stripe PaymentSheet';
+
+  @override
+  String get debugStripeSmokeTestSubtitle =>
+      'Schermata minima per la diagnostica di tocco/focus di PaymentSheet.';
+
+  @override
+  String get debugStripeSmokeTestOpenAction => 'Apri Stripe PaymentSheet';
+
+  @override
+  String get debugStripeSmokeTestOpeningAction => 'Apertura...';
+
+  @override
+  String get debugStripeSmokeTestMethodUnavailable =>
+      'Il metodo di pagamento Stripe non è disponibile.';
+
+  @override
+  String get debugStripeSmokeTestNoPlans =>
+      'Nessun piano Premium con Stripe abilitato trovato.';
+
+  @override
+  String get debugStripeSmokeTestPrepareFailed =>
+      'Impossibile preparare il pagamento con PaymentSheet.';
+
+  @override
+  String get debugStripeSmokeTestOpenedSuccess =>
+      'PaymentSheet aperto correttamente.';
+
+  @override
+  String get debugStripeSmokeTestDismissedOrFailed =>
+      'PaymentSheet è stato chiuso o non è riuscito.';
+
+  @override
+  String get debugStripeSmokeTestVerifyFailed =>
+      'La verifica del pagamento non è riuscita.';
 
   @override
   String get premiumBenefitAiGenerationsTitle => '30 generazioni di IA';

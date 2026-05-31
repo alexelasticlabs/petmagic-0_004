@@ -112,6 +112,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get profileAvatarRemove => 'Avatar entfernen';
 
   @override
+  String get profileAvatarSheetTitle => 'Profilfoto';
+
+  @override
+  String get profileAvatarPickFromGallery => 'Aus Galerie auswählen';
+
+  @override
+  String get profileAvatarTapToChange => 'Tippen, um das Foto zu ändern';
+
+  @override
   String get profileEmailConfirmed => 'E-Mail bestätigt';
 
   @override
@@ -356,10 +365,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get walletDataUnavailableFallback =>
-      'Wallet-Daten sind gerade nicht verfügbar.';
+      'Guthaben-Daten sind gerade nicht verfügbar.';
 
   @override
-  String get walletRefreshTooltip => 'Wallet aktualisieren';
+  String get walletRefreshTooltip => 'Guthaben aktualisieren';
 
   @override
   String get walletBalanceTitle =>
@@ -376,10 +385,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'PawSpark — interne Währung von PetMagic. Verwenden Sie es zum Erstellen von Fotos, Videos und für den Zugang zu Premium-Vorlagen.';
 
   @override
-  String get walletPremiumStatus => 'Premium-Wallet';
+  String get walletPremiumStatus => 'Premium-Guthaben';
 
   @override
-  String get walletFreeStatus => 'Gratis-Wallet';
+  String get walletFreeStatus => 'Basis-Guthaben';
 
   @override
   String walletAdRewardsCount(Object count) {
@@ -737,7 +746,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String walletCheckoutSucceeded(int spark) {
-    return 'Zahlung bestätigt. +$spark PawSpark ist bereits in Ihrer Wallet.';
+    return 'Zahlung bestätigt. +$spark PawSpark ist bereits Ihrem Guthaben gutgeschrieben.';
   }
 
   @override
@@ -752,7 +761,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get walletViewAllTransactions => 'Alle Transaktionen';
 
   @override
-  String get walletNoActivity => 'Noch keine Wallet-Aktivität.';
+  String get walletNoActivity => 'Noch keine Guthaben-Aktivität.';
 
   @override
   String walletBalanceAfter(Object count) {
@@ -772,7 +781,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get walletUnavailableTitle =>
-      'Wallet ist vorübergehend nicht verfügbar';
+      'Guthaben ist vorübergehend nicht verfügbar';
 
   @override
   String get walletTryAgainAction => 'Erneut versuchen';
@@ -821,7 +830,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get walletPartialActivityUnavailable =>
-      'Ihr Guthaben ist bereits verfügbar. Verlauf und einige Wallet-Aktionen werden etwas später aktualisiert.';
+      'Ihr Guthaben ist bereits verfügbar. Verlauf und einige Guthaben-Aktionen werden etwas später aktualisiert.';
 
   @override
   String get walletPaymentGatewayUnavailableError =>
@@ -872,7 +881,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get walletUnavailableError =>
-      'Wallet-Daten sind vorübergehend nicht verfügbar. Bitte versuchen Sie es in einem Moment erneut.';
+      'Guthaben-Daten sind vorübergehend nicht verfügbar. Bitte versuchen Sie es in einem Moment erneut.';
 
   @override
   String get walletRedeemSheetTitle => 'Code einlösen';
@@ -1009,19 +1018,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get premiumPaymentTitle => 'Zahlungsmethode';
 
   @override
-  String get premiumPaymentChooseSubtitle => 'Choose how you want to subscribe';
+  String get premiumPaymentChooseSubtitle =>
+      'Wähle, wie du abonnieren möchtest';
 
   @override
   String get premiumPaymentStripe => 'Karte über Stripe';
 
   @override
-  String get premiumPaymentStripeSubtitle => 'Card, Apple Pay or Google Pay';
+  String get premiumPaymentStripeSubtitle => 'Karte, Apple Pay oder Google Pay';
 
   @override
   String get premiumPaymentGooglePlay => 'Google Play';
 
   @override
-  String get premiumPaymentGooglePlaySubtitle => 'Payment via Google Play';
+  String get premiumPaymentGooglePlaySubtitle => 'Zahlung über Google Play';
 
   @override
   String get premiumPaymentApple => 'Apple Pay / App Store';
@@ -1034,15 +1044,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get premiumPaymentTrustStripeProcesses =>
-      'Card data is securely processed by Stripe.';
+      'Kartendaten werden sicher von Stripe verarbeitet.';
 
   @override
   String get premiumPaymentTrustNoStorage =>
-      'PetMagic does not store your card details.';
+      'PetMagic speichert keine Kartendaten.';
 
   @override
   String get premiumPaymentTrustManageInApp =>
-      'Subscription renewal and cancellation are managed inside PetMagic.';
+      'Verlängerung und Kündigung des Abos werden in PetMagic verwaltet.';
 
   @override
   String paymentBonusPercentBadge(Object percent) {
@@ -1137,7 +1147,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get externalCheckoutPendingVerificationMessage =>
-      'Zahlung noch nicht bestätigt. Wir aktualisieren Premium oder Ihre Wallet, sobald der Stripe-Webhook eintrifft.';
+      'Zahlung noch nicht bestätigt. Wir aktualisieren Premium oder Ihr Guthaben, sobald Stripe die Zahlung bestätigt.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -1191,7 +1201,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get premiumCheckoutFailed =>
-      'Premium Checkout ist vorübergehend nicht verfügbar.';
+      'Premium-Kauf ist vorübergehend nicht verfügbar.';
 
   @override
   String get premiumManageFailed =>
@@ -1541,11 +1551,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDetailsHelpStatus =>
-      'Die In-App-Wissensdatenbank wird noch zusammengestellt, daher zeigt dieser Bildschirm den aktuellen Rollout-Status.';
+      'Die Wissensdatenbank wird derzeit vorbereitet. Dieser Bildschirm zeigt den aktuellen Stand.';
 
   @override
   String get profileDetailsHelpNext =>
-      'Die ersten Hilfeartikel und Anleitungen zur Fehlerbehebung werden hier angezeigt, sobald die Inhalte zum mobilen Support veröffentlicht werden.';
+      'Die ersten Hilfeartikel und Anleitungen zur Fehlerbehebung erscheinen hier, sobald sie veröffentlicht sind.';
 
   @override
   String get profileDetailsSupportBody =>
@@ -1553,11 +1563,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDetailsSupportStatus =>
-      'Der direkte In-App-Kontakt ist noch nicht verkabelt. Behalten Sie diesen Bildschirm vorerst als Support-Einstiegspunkt für das nächste Segment bei.';
+      'Der direkte Kontakt zum Support in der App ist noch nicht verfügbar. Dieser Bildschirm dient vorerst als Einstiegspunkt.';
 
   @override
   String get profileDetailsSupportNext =>
-      'Der nächste Schritt ist ein echtes Support-Formular oder eine E-Mail-Übergabe, die mit dem Backend-Support-Ablauf verbunden ist.';
+      'Als Nächstes wird hier ein vollständiges Support-Formular oder eine E-Mail-Übergabe verfügbar sein.';
 
   @override
   String get profileDetailsTermsBody =>
@@ -1581,7 +1591,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDetailsPrivacyStatus =>
-      'Datenschutzdetails werden derzeit als In-App-Zusammenfassungsbildschirm dargestellt, während der gesamte Rechtsdokumentenfluss vorbereitet wird.';
+      'Derzeit sehen Sie hier eine kurze Datenschutzübersicht. Die vollständige rechtliche Version wird vorbereitet.';
 
   @override
   String get profileDetailsPrivacyNext =>
@@ -1676,7 +1686,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Das Löschen ist derzeit in der mobilen App nicht als One-Tap-Aktion verfügbar. Dadurch wird destruktives Verhalten vermieden, bevor der Back-End-Bestätigungsfluss bereit ist.';
+      'Das Löschen des Kontos ist in der mobilen App derzeit nicht per Ein-Klick möglich. Das schützt vor versehentlichem Löschen, bis der sichere Bestätigungsablauf bereit ist.';
 
   @override
   String get profileDetailsDeleteNext =>
@@ -1719,7 +1729,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get supportChatEmptyMessage =>
-      'Ihr Support-Chat ist fertig. Senden Sie die erste Nachricht und das Team wird hier antworten.';
+      'Ihr Support-Chat ist bereit. Senden Sie Ihre erste Nachricht, und unser Team antwortet hier.';
 
   @override
   String get supportChatWelcomeTitle =>
@@ -1938,6 +1948,18 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get supportChatAttachmentNoGalleryAccessError =>
       'Galeriezugang verweigert. Erlauben Sie den Zugang in den Geräteeinstellungen.';
+
+  @override
+  String get supportChatCameraPermissionPhotoError =>
+      'Kamerazugriff ist erforderlich, um ein Foto aufzunehmen.';
+
+  @override
+  String get supportChatCameraPermissionVideoError =>
+      'Kamerazugriff ist erforderlich, um ein Video aufzunehmen.';
+
+  @override
+  String get supportChatFilesPermissionError =>
+      'Dateizugriff ist erforderlich, um Dateien anzuhängen.';
 
   @override
   String get supportChatAttachmentExpiredPlaceholder =>
@@ -2556,10 +2578,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get templateGuestPreview => 'Gastvorschau';
 
   @override
-  String get templateActionComingSoon => 'Template Studio kommt bald.';
+  String get templateActionComingSoon => 'Vorlagenstudio kommt bald.';
 
   @override
-  String get tokensActionComingSoon => 'PawSpark-Wallet kommt bald.';
+  String get tokensActionComingSoon => 'PawSpark-Guthaben kommt bald.';
 
   @override
   String get rewardsActionComingSoon => 'Das Prämiencenter ist bald verfügbar.';
@@ -3165,6 +3187,43 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get premiumStorePaymentDisclaimerBody =>
       'Die Zahlung wird Ihrem App Store-/Google Play-Konto belastet. Das Abonnement verlängert sich automatisch, sofern es nicht vor dem Verlängerungsdatum gekündigt wird.';
+
+  @override
+  String get debugStripeSmokeTestTitle => 'Stripe PaymentSheet Test';
+
+  @override
+  String get debugStripeSmokeTestSubtitle =>
+      'Minimaler Bildschirm für Tap-/Fokus-Diagnose von PaymentSheet.';
+
+  @override
+  String get debugStripeSmokeTestOpenAction => 'Stripe PaymentSheet öffnen';
+
+  @override
+  String get debugStripeSmokeTestOpeningAction => 'Wird geöffnet...';
+
+  @override
+  String get debugStripeSmokeTestMethodUnavailable =>
+      'Stripe-Zahlungsmethode ist nicht verfügbar.';
+
+  @override
+  String get debugStripeSmokeTestNoPlans =>
+      'Keine Premium-Pläne mit Stripe-Unterstützung gefunden.';
+
+  @override
+  String get debugStripeSmokeTestPrepareFailed =>
+      'PaymentSheet-Zahlung konnte nicht vorbereitet werden.';
+
+  @override
+  String get debugStripeSmokeTestOpenedSuccess =>
+      'PaymentSheet wurde erfolgreich geöffnet.';
+
+  @override
+  String get debugStripeSmokeTestDismissedOrFailed =>
+      'PaymentSheet wurde geschlossen oder ist fehlgeschlagen.';
+
+  @override
+  String get debugStripeSmokeTestVerifyFailed =>
+      'Checkout-Verifizierung fehlgeschlagen.';
 
   @override
   String get premiumBenefitAiGenerationsTitle => '30 KI-Generationen';

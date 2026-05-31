@@ -10,10 +10,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
     );
     if (!permission.granted) {
       if (mounted) {
+        final text = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Camera permission is required to take a photo.'),
-          ),
+          SnackBar(content: Text(text.supportChatCameraPermissionPhotoError)),
         );
       }
       return;
@@ -47,10 +46,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
     );
     if (!permission.granted) {
       if (mounted) {
+        final text = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Camera permission is required to record video.'),
-          ),
+          SnackBar(content: Text(text.supportChatCameraPermissionVideoError)),
         );
       }
       return;
@@ -126,10 +124,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
     );
     if (!permission.granted) {
       if (mounted) {
+        final text = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Files permission is required to attach files.'),
-          ),
+          SnackBar(content: Text(text.supportChatFilesPermissionError)),
         );
       }
       return;

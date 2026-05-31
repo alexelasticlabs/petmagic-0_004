@@ -147,6 +147,9 @@ class _FakeTemplateGenerationRepository
   }
 
   @override
+  Future<void> clearLocalCache() async {}
+
+  @override
   Future<List<TemplateGenerationResult>> fetchGenerations({
     String? status,
     int? skip,

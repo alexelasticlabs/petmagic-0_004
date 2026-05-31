@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
@@ -49,6 +51,9 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
+    final preferences = ref.watch(appPreferencesControllerProvider);
+    final resolvedLocale =
+        preferences.locale ?? Localizations.localeOf(context);
     final titleStyle = Theme.of(context).textTheme.displaySmall;
     final subtitleStyle = Theme.of(context).textTheme.bodyLarge;
 
@@ -80,7 +85,13 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
                             start: 0,
                             end: 0.28,
                             offsetY: 0.015,
-                            child: const BrandHeader(),
+                            child: BrandHeader(
+                              actionLabel: resolvedLocale.languageCode
+                                  .toUpperCase(),
+                              onAction: () => _openLanguageSheet(
+                                selectedLocale: resolvedLocale,
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _animatedEntry(
@@ -257,7 +268,28 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
       }
     }
   }
+
+  Future<void> _openLanguageSheet({required Locale selectedLocale}) async {
+    await showProfileLanguageSheet(
+      context: context,
+      selectedLocale: selectedLocale,
+      options: _languageOptions,
+      onSelect: (locale) => ref
+          .read(appPreferencesControllerProvider.notifier)
+          .updateLocale(locale),
+    );
+  }
 }
+
+const _languageOptions = <ProfileLanguageSheetOption>[
+  ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
+  ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
+  ProfileLanguageSheetOption(locale: Locale('de'), nativeLabel: 'Deutsch'),
+  ProfileLanguageSheetOption(locale: Locale('es'), nativeLabel: 'Español'),
+  ProfileLanguageSheetOption(locale: Locale('fr'), nativeLabel: 'Français'),
+  ProfileLanguageSheetOption(locale: Locale('it'), nativeLabel: 'Italiano'),
+  ProfileLanguageSheetOption(locale: Locale('pl'), nativeLabel: 'Polski'),
+];
 
 class _MagicSignInButton extends StatelessWidget {
   const _MagicSignInButton({

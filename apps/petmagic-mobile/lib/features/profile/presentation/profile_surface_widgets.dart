@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
@@ -244,6 +245,8 @@ class ProfileAvatarBadge extends StatelessWidget {
     required this.fallbackLabel,
     this.size = 92,
     this.bottomBadge,
+    this.onTap,
+    this.showEditOverlay = false,
     super.key,
   });
 
@@ -251,6 +254,8 @@ class ProfileAvatarBadge extends StatelessWidget {
   final String fallbackLabel;
   final double size;
   final Widget? bottomBadge;
+  final VoidCallback? onTap;
+  final bool showEditOverlay;
 
   @override
   Widget build(BuildContext context) {
@@ -267,36 +272,66 @@ class ProfileAvatarBadge extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: colors.surfaceStrong,
-              border: Border.all(color: colors.border),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: imageUrl != null && imageUrl!.isNotEmpty
-                ? Image.network(
-                    imageUrl!,
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                    cacheWidth: avatarCacheSize,
-                    cacheHeight: avatarCacheSize,
-                  )
-                : Center(
-                    child: Text(
-                      initials,
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontSize: size * 0.34,
-                        fontWeight: FontWeight.w900,
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.surfaceStrong,
+                border: Border.all(color: colors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: imageUrl != null && imageUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl!,
+                      width: size,
+                      height: size,
+                      fit: BoxFit.cover,
+                      memCacheWidth: avatarCacheSize,
+                      memCacheHeight: avatarCacheSize,
+                      placeholder: (ctx, url) => const SizedBox.shrink(),
+                      errorWidget: (ctx, url, err) => Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: colors.textMuted,
+                          size: size * 0.38,
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        initials,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontSize: size * 0.34,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
-                  ),
+            ),
           ),
-          if (bottomBadge != null)
+          if (showEditOverlay)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  width: size,
+                  height: size,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0x55000000),
+                  ),
+                  child: Icon(
+                    Icons.photo_camera_rounded,
+                    color: Colors.white,
+                    size: size * 0.28,
+                  ),
+                ),
+              ),
+            ),
+          if (!showEditOverlay && bottomBadge != null)
             Positioned(right: 0, bottom: 0, child: bottomBadge!),
         ],
       ),

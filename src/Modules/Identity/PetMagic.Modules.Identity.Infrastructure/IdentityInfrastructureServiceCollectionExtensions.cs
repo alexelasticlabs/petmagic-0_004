@@ -120,6 +120,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddSingleton(externalAuth);
         services.AddSingleton(emailOptions);
         services.AddSingleton(avatarStorageOptions);
+        services.AddHttpContextAccessor();
         services.AddSingleton<ILegalDocumentsCatalog, LegalDocumentsCatalog>();
         services.AddSingleton<IIdentityEmailTemplateRenderer, IdentityEmailTemplateRenderer>();
         services.AddSingleton<IAvatarStorage, LocalAvatarStorage>();

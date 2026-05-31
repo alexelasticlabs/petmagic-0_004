@@ -96,8 +96,14 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(templatesControllerProvider);
-    final wallet = ref.watch(walletControllerProvider).wallet;
-    final launchState = ref.watch(appLaunchControllerProvider);
+    final wallet = ref.watch(
+      walletControllerProvider.select((walletState) => walletState.wallet),
+    );
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select(
+        (launchState) => launchState.isAuthenticated,
+      ),
+    );
     final controller = ref.read(templatesControllerProvider.notifier);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
@@ -135,7 +141,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _TopBar(
-                        isAuthenticated: launchState.isAuthenticated,
+                        isAuthenticated: isAuthenticated,
                         tokenBalance: wallet?.balance ?? 0,
                         onAuthPressed: () =>
                             context.go(AuthEntryPage.routePath),
@@ -297,98 +303,100 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   Future<void> _startTemplateUploadFlow(TemplateItem template) async {
-    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
-      await showAuthRequiredSheet(context);
-      return;
-    }
-
-    final photo = await _pickPetPhoto();
-    if (!mounted || photo == null) {
-      return;
-    }
-
-    final generationController = ref.read(
-      templateGenerationControllerProvider.notifier,
-    );
-    generationController.selectPhoto(photo);
-
-    final gate = await generationController.checkGate(template);
-    if (!mounted) {
-      return;
-    }
-
-    if (!gate.isAllowed) {
-      final blockerAction = await showTemplateBlockedSheet(
-        context: context,
-        template: template,
-        gate: gate,
-      );
-      if (!mounted || blockerAction == null) {
-        return;
-      }
-
-      switch (blockerAction) {
-        case TemplateBlockedAction.wallet:
-          context.push(WalletPage.routePath);
-        case TemplateBlockedAction.premium:
-          context.push(PremiumPage.routePath);
-        case TemplateBlockedAction.chooseAnother:
-          break;
-      }
-      return;
-    }
-
-    final confirmed = await showTemplateGenerationConfirmSheet(
-      context: context,
-      template: template,
-      photo: photo,
-      gate: gate,
-    );
-    if (!mounted) {
-      return;
-    }
-
-    if (confirmed == false) {
-      await _startTemplateUploadFlow(template);
-      return;
-    }
-
-    if (confirmed != true) {
-      return;
-    }
-
-    final router = GoRouter.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final text = AppLocalizations.of(context);
-    final generation = await generationController.startGeneration(template);
-    if (!mounted) {
-      return;
-    }
-
-    if (generation == null) {
-      final errorMessage = ref
-          .read(templateGenerationControllerProvider)
-          .errorMessage;
-      if (_isAuthRequiredError(errorMessage)) {
+    while (mounted) {
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         await showAuthRequiredSheet(context);
         return;
       }
 
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            errorMessage == null || errorMessage.isEmpty
-                ? text.templateFlowStartFailedError
-                : _generationStartErrorText(text, errorMessage),
+      final photo = await _pickPetPhoto();
+      if (!mounted || photo == null) {
+        return;
+      }
+
+      final generationController = ref.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      generationController.selectPhoto(photo);
+
+      final gate = await generationController.checkGate(template);
+      if (!mounted) {
+        return;
+      }
+
+      if (!gate.isAllowed) {
+        final blockerAction = await showTemplateBlockedSheet(
+          context: context,
+          template: template,
+          gate: gate,
+        );
+        if (!mounted || blockerAction == null) {
+          return;
+        }
+
+        switch (blockerAction) {
+          case TemplateBlockedAction.wallet:
+            context.push(WalletPage.routePath);
+          case TemplateBlockedAction.premium:
+            context.push(PremiumPage.routePath);
+          case TemplateBlockedAction.chooseAnother:
+            break;
+        }
+        return;
+      }
+
+      final confirmed = await showTemplateGenerationConfirmSheet(
+        context: context,
+        template: template,
+        photo: photo,
+        gate: gate,
+      );
+      if (!mounted) {
+        return;
+      }
+
+      if (confirmed == false) {
+        continue;
+      }
+
+      if (confirmed != true) {
+        return;
+      }
+
+      final router = GoRouter.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      final text = AppLocalizations.of(context);
+      final generation = await generationController.startGeneration(template);
+      if (!mounted) {
+        return;
+      }
+
+      if (generation == null) {
+        final errorMessage = ref
+            .read(templateGenerationControllerProvider)
+            .errorMessage;
+        if (_isAuthRequiredError(errorMessage)) {
+          await showAuthRequiredSheet(context);
+          return;
+        }
+
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              errorMessage == null || errorMessage.isEmpty
+                  ? text.templateFlowStartFailedError
+                  : _generationStartErrorText(text, errorMessage),
+            ),
           ),
-        ),
+        );
+        return;
+      }
+
+      router.push(
+        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
       );
       return;
     }
-
-    router.push(
-      '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-    );
   }
 
   Future<XFile?> _pickPetPhoto() async {

@@ -328,12 +328,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     );
     if (!permission.granted) {
       if (mounted) {
+        final text = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Camera permission is required to take a photo.',
-            ),
-          ),
+          SnackBar(content: Text(text.supportChatCameraPermissionPhotoError)),
         );
       }
       return;
@@ -364,11 +361,10 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     );
     if (!permission.granted) {
       if (mounted) {
+        final text = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Gallery permission is required to choose photos.',
-            ),
+          SnackBar(
+            content: Text(text.supportChatAttachmentNoGalleryAccessError),
           ),
         );
       }

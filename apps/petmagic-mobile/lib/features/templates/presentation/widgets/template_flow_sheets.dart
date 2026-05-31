@@ -1719,26 +1719,6 @@ String _templateQualityWarning(Locale locale) {
       : 'Result quality depends on your photo quality.';
 }
 
-String _templateCostContext(Locale locale, int tokenCost) {
-  if (_isRussian(locale)) {
-    return 'Стоимость: $tokenCost PawSpark. Перед запуском проверим баланс и предложим пополнение, если токенов не хватит.';
-  }
-
-  return 'Cost: $tokenCost PawSpark. We will check your balance before start and suggest a top-up if needed.';
-}
-
-String _templateEtaText(Locale locale, {required bool isVideo}) {
-  if (_isRussian(locale)) {
-    return isVideo
-        ? 'Обычно готово за: 2–5 минут'
-        : 'Обычно готово за: 30–60 секунд';
-  }
-
-  return isVideo
-      ? 'Usually ready in: 2-5 minutes'
-      : 'Usually ready in: 30-60 seconds';
-}
-
 String _templateUploadActionLabel(Locale locale, {required bool isVideo}) {
   if (_isRussian(locale)) {
     return isVideo

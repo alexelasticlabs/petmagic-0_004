@@ -81,21 +81,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isPasswordResetRoute = location == PasswordResetPage.routePath;
       final isVerifyEmailRoute = location == EmailVerificationPage.routePath;
       final isLegalGateRoute = location == LegalAcceptanceGatePage.routePath;
-      final isPublicLegalRoute =
-          location ==
-              ProfileSettingsDetailPage.location(
-                ProfileSettingsDetailKind.terms,
-              ) ||
-          location ==
-              ProfileSettingsDetailPage.location(
-                ProfileSettingsDetailKind.privacy,
-              );
       final isPublicAuthRoute =
           isAuthRoute ||
           isRegisterRoute ||
           isPasswordResetRoute ||
-          isVerifyEmailRoute ||
-          isPublicLegalRoute;
+          isVerifyEmailRoute;
 
       if (launchState.isLoading) {
         return isStartupRoute ? null : StartupLoadingPage.routePath;

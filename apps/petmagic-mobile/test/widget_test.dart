@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
+import 'package:petmagic_mobile/app/router/app_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
@@ -499,6 +500,91 @@ void main() {
     expect(find.text('Welcome back!'), findsOneWidget);
     expect(find.text('Sign in to continue'), findsNothing);
   });
+
+  testWidgets(
+    'authenticated user can open legal detail pages from profile settings',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        _onboardingSeenKey: true,
+        _sessionKey: _buildSessionJson(),
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          profileRepositoryProvider.overrideWith(
+            (ref) => _FakeProfileRepository(),
+          ),
+          authSessionStorageProvider.overrideWith(
+            (ref) =>
+                _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
+          ),
+          templatesRepositoryProvider.overrideWith(
+            (ref) => _FakeTemplatesRepository(items: const [_sampleTemplate]),
+          ),
+          templateGenerationControllerProvider.overrideWith(
+            _IdleTemplateGenerationController.new,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
+          walletControllerProvider.overrideWith(_IdleWalletController.new),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(profileControllerProvider.notifier).initialize();
+      container.read(appLaunchControllerProvider.notifier).markSignedIn();
+
+      final router = container.read(appRouterProvider);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      router.go(
+        ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.terms),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
+      expect(
+        tester
+            .widget<ProfileSettingsDetailPage>(
+              find.byType(ProfileSettingsDetailPage),
+            )
+            .kind,
+        ProfileSettingsDetailKind.terms,
+      );
+
+      router.go(
+        ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.privacy),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
+      expect(
+        tester
+            .widget<ProfileSettingsDetailPage>(
+              find.byType(ProfileSettingsDetailPage),
+            )
+            .kind,
+        ProfileSettingsDetailKind.privacy,
+      );
+    },
+  );
 
   testWidgets('settings screen renders account and preferences sections', (
     tester,

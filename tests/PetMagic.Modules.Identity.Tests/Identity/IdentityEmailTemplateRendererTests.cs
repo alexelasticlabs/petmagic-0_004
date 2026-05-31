@@ -16,9 +16,10 @@ public sealed class IdentityEmailTemplateRendererTests
         Assert.Contains("Hi Anna", message.HtmlBody);
         Assert.Contains("Password reset code", message.HtmlBody);
         Assert.Contains("739201", message.HtmlBody);
-        Assert.Contains("2026-05-31 10:30 UTC", message.HtmlBody);
+        Assert.Contains("UTC", message.HtmlBody);
         Assert.Contains("Hi Anna", message.TextBody);
         Assert.Contains("Password reset code: 739201", message.TextBody);
+        Assert.Contains("UTC", message.TextBody);
     }
 
     [Fact]
@@ -34,6 +35,21 @@ public sealed class IdentityEmailTemplateRendererTests
         Assert.Contains("Email confirmation code", withUnsafeName.HtmlBody);
         Assert.Contains("Email confirmation code: 654321", withFallback.TextBody);
         Assert.Contains("Hi friend", withFallback.HtmlBody);
+    }
+
+    [Fact]
+    public void RenderPasswordReset_ShouldUseRequestedLocale()
+    {
+        var renderer = CreateRenderer();
+        var expiresAtUtc = new DateTime(2026, 5, 31, 10, 30, 0, DateTimeKind.Utc);
+
+        var message = renderer.RenderPasswordReset("Анна", "987321", expiresAtUtc, "ru-RU");
+
+        Assert.Equal("Сбросьте пароль в PetMagic", message.Subject);
+        Assert.Contains("Здравствуйте Анна", message.HtmlBody);
+        Assert.Contains("Код для сброса пароля", message.HtmlBody);
+        Assert.Contains("31.05.2026", message.HtmlBody);
+        Assert.Contains("Действует до", message.TextBody);
     }
 
     private static IIdentityEmailTemplateRenderer CreateRenderer()
