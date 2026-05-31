@@ -8,7 +8,20 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 public sealed record AvatarUploadCommand(
     string FileName,
     string ContentType,
-    byte[] Content);
+    byte[]? Content,
+    Stream? ContentStream,
+    long? ContentLengthBytes)
+{
+    public AvatarUploadCommand(string fileName, string contentType, byte[] content)
+        : this(fileName, contentType, content, null, content.LongLength)
+    {
+    }
+
+    public AvatarUploadCommand(string fileName, string contentType, Stream contentStream, long? contentLengthBytes = null)
+        : this(fileName, contentType, null, contentStream, contentLengthBytes)
+    {
+    }
+}
 
 public sealed record StoredAvatarResponse(
     string Url,
@@ -40,7 +53,8 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
 
     public async Task<Result<StoredAvatarResponse>> StoreAsync(AvatarUploadCommand avatar, CancellationToken cancellationToken)
     {
-        if (avatar.Content.Length == 0)
+        var contentLength = avatar.Content?.LongLength ?? avatar.ContentLengthBytes ?? 0;
+        if (contentLength <= 0)
         {
             return Result.Failure<StoredAvatarResponse>(IdentityErrors.InvalidAvatarUpload);
         }
@@ -60,7 +74,31 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
         var physicalPath = Path.Combine(root, year, month, safeName);
 
         Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
-        await File.WriteAllBytesAsync(physicalPath, avatar.Content, cancellationToken);
+        try
+        {
+            if (avatar.Content is not null)
+            {
+                await File.WriteAllBytesAsync(physicalPath, avatar.Content, cancellationToken);
+            }
+            else if (avatar.ContentStream is not null)
+            {
+                if (avatar.ContentStream.CanSeek)
+                {
+                    avatar.ContentStream.Position = 0;
+                }
+
+                await using var output = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await avatar.ContentStream.CopyToAsync(output, cancellationToken);
+            }
+            else
+            {
+                return Result.Failure<StoredAvatarResponse>(IdentityErrors.InvalidAvatarUpload);
+            }
+        }
+        catch
+        {
+            return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarStorageFailed);
+        }
 
         var normalizedRelativePath = relativePath.Replace("\\", "/");
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
@@ -71,7 +109,7 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
             normalizedRelativePath,
             avatar.FileName,
             normalizedContentType,
-            avatar.Content.LongLength,
+            contentLength,
             physicalPath));
     }
 

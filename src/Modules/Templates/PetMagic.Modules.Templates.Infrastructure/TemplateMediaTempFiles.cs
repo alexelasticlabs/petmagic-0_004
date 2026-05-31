@@ -16,6 +16,20 @@ internal static class TemplateMediaTempFiles
         return path;
     }
 
+    public static async Task<string> WriteAsync(Stream contentStream, string extension, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(Root);
+
+        var safeExtension = string.IsNullOrWhiteSpace(extension) || extension.Length > 16
+            ? ".bin"
+            : extension;
+        var path = Path.Combine(Root, $"{Guid.NewGuid():N}{safeExtension}");
+
+        await using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        await contentStream.CopyToAsync(output, cancellationToken);
+        return path;
+    }
+
     public static void TryDeleteIfOwned(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))

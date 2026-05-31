@@ -86,12 +86,12 @@ public sealed class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("I need billing help", SupportConversationPriority.Normal));
 
-        using var regularUserInbox = await application.CreateClient(UserId, "User").GetAsync("/api/admin/support/conversations");
+        using var regularUserInbox = await application.CreateClient(UserId, "User").GetAsync("/api/admin/support/tickets");
         Assert.Equal(HttpStatusCode.Forbidden, regularUserInbox.StatusCode);
 
         var moderatorInbox = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
             application.CreateClient(ModeratorId, "Moderator"),
-            "/api/admin/support/conversations");
+            "/api/admin/support/tickets");
 
         var conversation = Assert.Single(moderatorInbox);
         Assert.Equal(created.ConversationId, conversation.ConversationId);
@@ -114,7 +114,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var adminReply = await PostAsJsonAsync<SupportMessageResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{mine.ConversationId}/messages",
+            $"/api/admin/support/tickets/{mine.ConversationId}/messages",
             new SendSupportMessageRequest("Assigned via first admin reply"));
         Assert.True(adminReply.IsFromAdmin);
 
@@ -125,11 +125,11 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var mineInbox = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
             adminClient,
-            "/api/admin/support/conversations?assignment=mine");
+            "/api/admin/support/tickets?assignment=mine");
 
         var unassignedInbox = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
             adminClient,
-            "/api/admin/support/conversations?assignment=unassigned");
+            "/api/admin/support/tickets?assignment=unassigned");
 
         Assert.Single(mineInbox);
         Assert.Single(unassignedInbox);
@@ -220,7 +220,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var replied = await PostAsJsonAsync<SupportMessageResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}/messages",
+            $"/api/admin/support/tickets/{created.ConversationId}/messages",
             new SendSupportMessageRequest("We have started investigating"));
 
         Assert.True(replied.IsFromAdmin);
@@ -228,20 +228,20 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var assigned = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}/assignment",
+            $"/api/admin/support/tickets/{created.ConversationId}/assignment",
             new AssignSupportConversationRequest(AdminId));
 
         Assert.Equal(AdminId, assigned.AssignedAdminId);
 
         var updated = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            $"/api/admin/support/tickets/{created.ConversationId}/status",
             new UpdateSupportConversationStatusRequest("Closed"));
 
         Assert.Equal("Closed", updated.Status);
         Assert.Equal(AdminId, updated.AssignedAdminId);
 
-        using var markAdminReadResponse = await adminClient.PostAsync($"/api/admin/support/conversations/{created.ConversationId}/read", content: null);
+        using var markAdminReadResponse = await adminClient.PostAsync($"/api/admin/support/tickets/{created.ConversationId}/read", content: null);
         Assert.Equal(HttpStatusCode.NoContent, markAdminReadResponse.StatusCode);
 
         var beforeUserRead = await GetFromJsonAsync<SupportConversationDetailResponse>(
@@ -263,7 +263,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var afterReopen = await GetFromJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}");
+            $"/api/admin/support/tickets/{created.ConversationId}");
 
         Assert.Equal("New", afterReopen.Status);
         Assert.Equal(1, afterReopen.AdminUnreadCount);
@@ -288,13 +288,13 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var closed = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            $"/api/admin/support/tickets/{created.ConversationId}/status",
             new UpdateSupportConversationStatusRequest("Closed"));
 
         Assert.Equal("Closed", closed.Status);
 
         using var invalidTransitionResponse = await adminClient.PutAsJsonAsync(
-            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            $"/api/admin/support/tickets/{created.ConversationId}/status",
             new UpdateSupportConversationStatusRequest("WaitingForUser"));
 
         Assert.Equal(HttpStatusCode.BadRequest, invalidTransitionResponse.StatusCode);
@@ -318,7 +318,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var closed = await PutAsJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            $"/api/admin/support/tickets/{created.ConversationId}/status",
             new UpdateSupportConversationStatusRequest("Closed"));
 
         Assert.Equal("Closed", closed.Status);
@@ -333,7 +333,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}");
+            $"/api/admin/support/tickets/{created.ConversationId}");
 
         Assert.Equal("New", conversation.Status);
         var reopenedEvent = Assert.Single(
@@ -419,7 +419,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var firstPage = await GetFromJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}?take=2");
+            $"/api/admin/support/tickets/{created.ConversationId}?take=2");
 
         Assert.Equal(2, firstPage.Messages.Count);
         Assert.True(firstPage.HasOlderMessages);
@@ -428,7 +428,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         var beforeFirstPage = Uri.EscapeDataString(firstPage.OldestLoadedMessageCreatedAtUtc!.Value.ToString("O"));
         var secondPage = await GetFromJsonAsync<SupportConversationDetailResponse>(
             adminClient,
-            $"/api/admin/support/conversations/{created.ConversationId}?take=2&beforeMessageCreatedAtUtc={beforeFirstPage}");
+            $"/api/admin/support/tickets/{created.ConversationId}?take=2&beforeMessageCreatedAtUtc={beforeFirstPage}");
 
         Assert.Equal(2, secondPage.Messages.Count);
         Assert.NotNull(secondPage.OldestLoadedMessageCreatedAtUtc);
@@ -474,7 +474,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
-            $"/api/admin/support/conversations/{created.ConversationId}");
+            $"/api/admin/support/tickets/{created.ConversationId}");
 
         var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
         Assert.Equal("issue.png", attachmentMessage.AttachmentFileName);
@@ -515,7 +515,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
-            $"/api/admin/support/conversations/{created.ConversationId}");
+            $"/api/admin/support/tickets/{created.ConversationId}");
 
         var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
         Assert.Equal("issue.mp4", attachmentMessage.AttachmentFileName);
@@ -572,7 +572,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         form.Add(new StringContent("Screenshot attached"), "body");
 
         using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
-            $"/api/admin/support/conversations/{created.ConversationId}/attachments",
+            $"/api/admin/support/tickets/{created.ConversationId}/attachments",
             form);
 
         await AssertSuccessAsync(response);
@@ -650,7 +650,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             new OpenConversationRequest("Wrong charge", SupportConversationPriority.Normal));
 
         using var invalidStatusResponse = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
-            $"/api/admin/support/conversations/{created.ConversationId}/status",
+            $"/api/admin/support/tickets/{created.ConversationId}/status",
             new UpdateSupportConversationStatusRequest("NotARealStatus"));
 
         Assert.Equal(HttpStatusCode.BadRequest, invalidStatusResponse.StatusCode);
@@ -1087,7 +1087,8 @@ public sealed class SupportChatEndpointsIntegrationTests
                     new Error("support.attachment_content_type_not_allowed", "Content type is not allowed.")));
             }
 
-            if (!MatchesFileSignature(normalizedContentType, attachment.Content))
+            var payload = ResolvePayload(attachment);
+            if (!MatchesFileSignature(normalizedContentType, payload))
             {
                 return Task.FromResult(Result.Failure<StoredSupportAttachmentResponse>(
                     new Error("support.attachment_mime_mismatch", "MIME type does not match file signature.")));
@@ -1104,8 +1105,36 @@ public sealed class SupportChatEndpointsIntegrationTests
                 url,
                 attachment.FileName,
                 normalizedContentType,
-                attachment.Content.LongLength,
+                attachment.Content?.LongLength ?? attachment.ContentLengthBytes ?? payload.LongLength,
                 null)));
+        }
+
+        private static byte[] ResolvePayload(SupportAttachmentUploadCommand attachment)
+        {
+            if (attachment.Content is { Length: > 0 })
+            {
+                return attachment.Content;
+            }
+
+            if (attachment.ContentStream is null)
+            {
+                return [];
+            }
+
+            if (attachment.ContentStream.CanSeek)
+            {
+                attachment.ContentStream.Position = 0;
+            }
+
+            using var memoryStream = new MemoryStream();
+            attachment.ContentStream.CopyTo(memoryStream);
+
+            if (attachment.ContentStream.CanSeek)
+            {
+                attachment.ContentStream.Position = 0;
+            }
+
+            return memoryStream.ToArray();
         }
 
         private static string NormalizeContentType(string contentType)

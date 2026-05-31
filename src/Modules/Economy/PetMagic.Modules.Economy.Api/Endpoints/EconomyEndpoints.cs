@@ -161,13 +161,6 @@ public static class EconomyEndpoints
         stripePaymentsGroup.MapGet("/diagnostics", GetStripeDiagnosticsAsync)
             .RequireAuthorization();
 
-        var webhooksGroup = endpoints.MapGroup("/api/webhooks")
-            .WithTags("Webhooks")
-            .RequireRateLimiting("economy");
-
-        webhooksGroup.MapPost("/stripe", StripeWebhookAsync)
-            .AllowAnonymous();
-
         return endpoints;
     }
 

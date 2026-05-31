@@ -8,8 +8,12 @@ public sealed class TemplatesDesignTimeDbContextFactory : IDesignTimeDbContextFa
     public TemplatesDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<TemplatesDbContext>();
-        var connectionString = Environment.GetEnvironmentVariable("PETMAGIC_TEMPLATES_MIGRATIONS_CONNECTION_STRING")
-            ?? "Host=localhost;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=PetMagic_DevPassword123";
+        var connectionString = Environment.GetEnvironmentVariable("PETMAGIC_TEMPLATES_MIGRATIONS_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "PETMAGIC_TEMPLATES_MIGRATIONS_CONNECTION_STRING is required for design-time migrations.");
+        }
 
         optionsBuilder.UseNpgsql(connectionString);
         return new TemplatesDbContext(optionsBuilder.Options);

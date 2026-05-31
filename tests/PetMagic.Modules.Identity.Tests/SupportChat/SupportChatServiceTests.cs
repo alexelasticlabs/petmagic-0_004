@@ -753,7 +753,7 @@ public sealed class SupportChatServiceTests
                     StorageKey: storageKey,
                     FileName: fileName,
                     ContentType: contentType,
-                    FileSizeBytes: attachment.Content.LongLength,
+                    FileSizeBytes: attachment.Content?.LongLength ?? attachment.ContentLengthBytes ?? 0,
                     LocalPath: null)));
         }
 

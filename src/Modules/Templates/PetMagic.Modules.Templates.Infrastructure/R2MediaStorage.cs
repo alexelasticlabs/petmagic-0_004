@@ -12,7 +12,8 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
 {
     public async Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
     {
-        if (asset.Content.Length == 0)
+        var contentLength = asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0;
+        if (contentLength <= 0)
         {
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
         }
@@ -28,9 +29,25 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
 
         try
         {
-            tempPath = await TemplateMediaTempFiles.WriteAsync(asset.Content, extension, cancellationToken);
+            if (asset.Content is not null)
+            {
+                tempPath = await TemplateMediaTempFiles.WriteAsync(asset.Content, extension, cancellationToken);
+            }
+            else if (asset.ContentStream is not null)
+            {
+                if (asset.ContentStream.CanSeek)
+                {
+                    asset.ContentStream.Position = 0;
+                }
 
-            await using var stream = new MemoryStream(asset.Content, writable: false);
+                tempPath = await TemplateMediaTempFiles.WriteAsync(asset.ContentStream, extension, cancellationToken);
+            }
+            else
+            {
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+            }
+
+            await using var stream = File.OpenRead(tempPath);
             var request = new PutObjectRequest
             {
                 BucketName = options.R2.BucketName,
@@ -48,7 +65,7 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
                 storageKey,
                 asset.FileName,
                 asset.ContentType,
-                asset.Content.LongLength,
+                contentLength,
                 tempPath));
         }
         catch

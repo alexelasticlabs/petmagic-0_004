@@ -950,11 +950,13 @@ public static class AuthEndpoints
         }
 
         await using var stream = file.OpenReadStream();
-        using var memoryStream = new MemoryStream();
-        await stream.CopyToAsync(memoryStream, cancellationToken);
-
         var result = await service.UpdateUserAvatarAsync(
-            new UpdateUserAvatarCommand(userId, Path.GetFileName(file.FileName), file.ContentType ?? "application/octet-stream", memoryStream.ToArray()),
+            new UpdateUserAvatarCommand(
+                userId,
+                Path.GetFileName(file.FileName),
+                file.ContentType ?? "application/octet-stream",
+                stream,
+                file.Length),
             cancellationToken);
         if (result.IsFailure)
         {

@@ -1,3 +1,5 @@
+using System.IO;
+
 using PetMagic.Modules.Templates.Domain.Enums;
 
 namespace PetMagic.Modules.Templates.Application.Contracts;
@@ -5,7 +7,20 @@ namespace PetMagic.Modules.Templates.Application.Contracts;
 public sealed record MediaUploadCommand(
     string FileName,
     string ContentType,
-    byte[] Content);
+    byte[]? Content,
+    Stream? ContentStream,
+    long? ContentLengthBytes)
+{
+    public MediaUploadCommand(string fileName, string contentType, byte[] content)
+        : this(fileName, contentType, content, null, content.LongLength)
+    {
+    }
+
+    public MediaUploadCommand(string fileName, string contentType, Stream contentStream, long? contentLengthBytes = null)
+        : this(fileName, contentType, null, contentStream, contentLengthBytes)
+    {
+    }
+}
 
 public sealed record TemplateAssetCommand(
     string Url,

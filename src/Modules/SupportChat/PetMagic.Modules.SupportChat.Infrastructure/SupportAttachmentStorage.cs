@@ -56,12 +56,40 @@ internal sealed class LocalSupportAttachmentStorage(
         SupportAttachmentUploadCommand attachment,
         CancellationToken cancellationToken)
     {
-        if (attachment.Content.Length == 0)
+        var contentLength = attachment.Content?.LongLength ?? attachment.ContentLengthBytes ?? 0;
+        if (contentLength <= 0)
         {
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
         }
 
-        if (!TryResolveStoredFileFormat(attachment.ContentType, attachment.FileName, attachment.Content, out var extension, out var normalizedContentType, out var signatureMismatch))
+        var headerBytes = new byte[32];
+        int headerLength;
+
+        if (attachment.Content is not null)
+        {
+            headerLength = Math.Min(headerBytes.Length, attachment.Content.Length);
+            Array.Copy(attachment.Content, headerBytes, headerLength);
+        }
+        else if (attachment.ContentStream is not null)
+        {
+            if (attachment.ContentStream.CanSeek)
+            {
+                attachment.ContentStream.Position = 0;
+            }
+
+            headerLength = await attachment.ContentStream.ReadAsync(headerBytes.AsMemory(0, headerBytes.Length), cancellationToken);
+            if (attachment.ContentStream.CanSeek)
+            {
+                attachment.ContentStream.Position = 0;
+            }
+        }
+        else
+        {
+            return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
+        }
+
+        var signatureBytes = headerBytes.AsSpan(0, headerLength).ToArray();
+        if (!TryResolveStoredFileFormat(attachment.ContentType, attachment.FileName, signatureBytes, out var extension, out var normalizedContentType, out var signatureMismatch))
         {
             if (signatureMismatch)
             {
@@ -72,7 +100,7 @@ internal sealed class LocalSupportAttachmentStorage(
         }
 
         var maxFileSizeBytes = ResolveMaxFileSizeBytes(normalizedContentType);
-        if (attachment.Content.LongLength > maxFileSizeBytes)
+        if (contentLength > maxFileSizeBytes)
         {
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentFileTooLarge);
         }
@@ -91,7 +119,24 @@ internal sealed class LocalSupportAttachmentStorage(
 
         try
         {
-            await File.WriteAllBytesAsync(physicalPath, attachment.Content, cancellationToken);
+            if (attachment.Content is not null)
+            {
+                await File.WriteAllBytesAsync(physicalPath, attachment.Content, cancellationToken);
+            }
+            else if (attachment.ContentStream is not null)
+            {
+                if (attachment.ContentStream.CanSeek)
+                {
+                    attachment.ContentStream.Position = 0;
+                }
+
+                await using var output = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await attachment.ContentStream.CopyToAsync(output, cancellationToken);
+            }
+            else
+            {
+                return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
+            }
         }
         catch
         {
@@ -107,7 +152,7 @@ internal sealed class LocalSupportAttachmentStorage(
             normalizedRelativePath,
             attachment.FileName,
             normalizedContentType,
-            attachment.Content.LongLength,
+            contentLength,
             physicalPath));
     }
 

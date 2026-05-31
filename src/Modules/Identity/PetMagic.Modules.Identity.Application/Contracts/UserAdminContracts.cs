@@ -1,10 +1,25 @@
+using System.IO;
+
 namespace PetMagic.Modules.Identity.Application.Contracts;
 
 public sealed record UpdateUserAvatarCommand(
     Guid UserId,
     string FileName,
     string ContentType,
-    byte[] Content);
+    byte[]? Content,
+    Stream? ContentStream,
+    long? ContentLengthBytes)
+{
+    public UpdateUserAvatarCommand(Guid userId, string fileName, string contentType, byte[] content)
+        : this(userId, fileName, contentType, content, null, content.LongLength)
+    {
+    }
+
+    public UpdateUserAvatarCommand(Guid userId, string fileName, string contentType, Stream contentStream, long? contentLengthBytes = null)
+        : this(userId, fileName, contentType, null, contentStream, contentLengthBytes)
+    {
+    }
+}
 
 public sealed record RemoveUserAvatarCommand(Guid UserId);
 

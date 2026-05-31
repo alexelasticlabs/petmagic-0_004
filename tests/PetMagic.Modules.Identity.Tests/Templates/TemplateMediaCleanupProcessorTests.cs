@@ -218,7 +218,7 @@ public sealed class TemplateMediaCleanupProcessorTests
                 $"templates-media/{asset.FileName}",
                 asset.FileName,
                 asset.ContentType,
-                asset.Content.LongLength,
+                asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0,
                 null)));
         }
 

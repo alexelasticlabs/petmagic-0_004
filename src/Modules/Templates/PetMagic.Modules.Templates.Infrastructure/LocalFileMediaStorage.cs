@@ -44,7 +44,8 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
 
     public async Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
     {
-        if (asset.Content.Length == 0)
+        var contentLength = asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0;
+        if (contentLength <= 0)
         {
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
         }
@@ -65,13 +66,30 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         var physicalPath = Path.Combine(root, DateTime.UtcNow.ToString("yyyy"), DateTime.UtcNow.ToString("MM"), safeName);
 
         Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
-        await File.WriteAllBytesAsync(physicalPath, asset.Content, cancellationToken);
+        if (asset.Content is not null)
+        {
+            await File.WriteAllBytesAsync(physicalPath, asset.Content, cancellationToken);
+        }
+        else if (asset.ContentStream is not null)
+        {
+            if (asset.ContentStream.CanSeek)
+            {
+                asset.ContentStream.Position = 0;
+            }
+
+            await using var output = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await asset.ContentStream.CopyToAsync(output, cancellationToken);
+        }
+        else
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+        }
 
         var normalizedRelativePath = relativePath.Replace("\\", "/");
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
         var url = $"{baseUrl}/{normalizedRelativePath}";
 
-        return Result.Success(new StoredMediaResponse(url, normalizedRelativePath, asset.FileName, normalizedContentType, asset.Content.LongLength, physicalPath));
+        return Result.Success(new StoredMediaResponse(url, normalizedRelativePath, asset.FileName, normalizedContentType, contentLength, physicalPath));
     }
 
     public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)

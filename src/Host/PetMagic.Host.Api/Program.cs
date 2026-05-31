@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Diagnostics;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.DataProtection;
@@ -19,6 +20,7 @@ using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Infrastructure;
 
 using Serilog;
+using Serilog.Events;
 
 LoadDotEnvFileIfPresent();
 
@@ -28,8 +30,7 @@ builder.Host.UseSerilog((context, loggerConfiguration) =>
 {
     loggerConfiguration
         .ReadFrom.Configuration(context.Configuration)
-        .Enrich.FromLogContext()
-        .WriteTo.Console();
+        .Enrich.FromLogContext();
 });
 
 builder.Services.AddOpenApi();
@@ -192,7 +193,44 @@ Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(options =>
+{
+    options.GetLevel = (httpContext, elapsed, exception) =>
+    {
+        if (exception is not null || httpContext.Response.StatusCode >= 500)
+        {
+            return LogEventLevel.Error;
+        }
+
+        var path = httpContext.Request.Path.Value ?? string.Empty;
+        var isNoisePath = path.StartsWith("/health", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/negotiate", StringComparison.OrdinalIgnoreCase);
+        var isOptions = HttpMethods.IsOptions(httpContext.Request.Method);
+        var isWebSocketUpgrade = httpContext.Response.StatusCode == StatusCodes.Status101SwitchingProtocols;
+        if (isNoisePath || isOptions || isWebSocketUpgrade)
+        {
+            return LogEventLevel.Debug;
+        }
+
+        return LogEventLevel.Information;
+    };
+
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        var path = httpContext.Request.Path.Value ?? string.Empty;
+        var routeTemplate = httpContext.GetEndpoint()?.DisplayName ?? path;
+        var userId = httpContext.User.FindFirst("sub")?.Value
+            ?? httpContext.User.FindFirst("userId")?.Value;
+        var traceId = Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier;
+        diagnosticContext.Set("RequestId", httpContext.TraceIdentifier);
+        diagnosticContext.Set("TraceId", traceId);
+        diagnosticContext.Set("UserId", userId ?? "anonymous");
+        diagnosticContext.Set("Route", routeTemplate);
+        diagnosticContext.Set("StatusCode", httpContext.Response.StatusCode);
+    };
+    options.MessageTemplate =
+        "HTTP {RequestMethod} {RequestPath} -> {StatusCode} in {Elapsed:0.0000} ms [rid:{RequestId} tid:{TraceId} uid:{UserId}]";
+});
 app.UseExceptionHandler();
 
 if (!app.Environment.IsDevelopment())
@@ -232,7 +270,15 @@ app.UseStaticFiles(new StaticFileOptions
             return;
         }
 
-        staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+        if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
+        {
+            staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+        }
+        else
+        {
+            staticFileContext.Context.Response.Headers.CacheControl = "no-store";
+            staticFileContext.Context.Response.Headers.Pragma = "no-cache";
+        }
 
         var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
         var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
@@ -318,6 +364,12 @@ static X509Certificate2 LoadOrCreateDataProtectionCertificate(
 
 static void LoadDotEnvFileIfPresent()
 {
+    var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+    if (!string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
     var currentDirectory = new DirectoryInfo(Directory.GetCurrentDirectory());
     while (currentDirectory is not null)
     {

@@ -10,7 +10,8 @@ public sealed class IdentityDesignTimeDbContextFactory : IDesignTimeDbContextFac
         var connectionString = Environment.GetEnvironmentVariable("PETMAGIC_IDENTITY_MIGRATIONS_CONNECTION_STRING");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            connectionString = "Host=localhost;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=PetMagic_DevPassword123";
+            throw new InvalidOperationException(
+                "PETMAGIC_IDENTITY_MIGRATIONS_CONNECTION_STRING is required for design-time migrations.");
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<IdentityDbContext>();

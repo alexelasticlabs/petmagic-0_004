@@ -112,11 +112,12 @@ public static class TemplateGenerationEndpoints
         }
 
         await using var stream = sourceImage!.OpenReadStream();
-        using var memoryStream = new MemoryStream();
-        await stream.CopyToAsync(memoryStream, cancellationToken);
-
         var storeResult = await mediaStorage.StoreAsync(
-            new MediaUploadCommand(Path.GetFileName(sourceImage.FileName), sourceImage.ContentType, memoryStream.ToArray()),
+            new MediaUploadCommand(
+                Path.GetFileName(sourceImage.FileName),
+                sourceImage.ContentType,
+                stream,
+                sourceImage.Length),
             cancellationToken);
 
         if (storeResult.IsFailure)

@@ -295,7 +295,13 @@ public sealed partial class TemplatesApiIntegrationTests
         public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
             var url = $"http://localhost:5000/templates-media/{Guid.NewGuid():N}/{asset.FileName}";
-            var stored = new StoredMediaResponse(url, $"templates-media/{asset.FileName}", asset.FileName, asset.ContentType, asset.Content.LongLength, null);
+            var stored = new StoredMediaResponse(
+                url,
+                $"templates-media/{asset.FileName}",
+                asset.FileName,
+                asset.ContentType,
+                asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0,
+                null);
             assets[url] = stored;
             return Task.FromResult(Result.Success(stored));
         }

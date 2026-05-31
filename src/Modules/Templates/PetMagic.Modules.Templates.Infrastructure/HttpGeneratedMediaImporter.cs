@@ -106,9 +106,10 @@ internal sealed class HttpGeneratedMediaImporter(
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var memoryStream = new MemoryStream();
             await CopyWithLimitAsync(stream, memoryStream, maxFileSizeBytes, cancellationToken);
+            memoryStream.Position = 0;
 
             var extension = resolveExtension(contentType, uri);
-            var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", contentType, memoryStream.ToArray());
+            var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", contentType, memoryStream, memoryStream.Length);
             return await mediaStorage.StoreAsync(upload, cancellationToken);
         }
         catch (OperationCanceledException)

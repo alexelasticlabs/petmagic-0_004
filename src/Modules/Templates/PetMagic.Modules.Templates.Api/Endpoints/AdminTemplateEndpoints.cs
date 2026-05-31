@@ -217,11 +217,12 @@ public static class AdminTemplateEndpoints
         }
 
         await using var stream = sourceImage!.OpenReadStream();
-        using var memoryStream = new MemoryStream();
-        await stream.CopyToAsync(memoryStream, cancellationToken);
-
         var storeResult = await mediaStorage.StoreAsync(
-            new MediaUploadCommand(Path.GetFileName(sourceImage.FileName), sourceImage.ContentType, memoryStream.ToArray()),
+            new MediaUploadCommand(
+                Path.GetFileName(sourceImage.FileName),
+                sourceImage.ContentType,
+                stream,
+                sourceImage.Length),
             cancellationToken);
 
         if (storeResult.IsFailure)
@@ -503,11 +504,12 @@ public static class AdminTemplateEndpoints
         }
 
         await using var stream = file.OpenReadStream();
-        using var memoryStream = new MemoryStream();
-        await stream.CopyToAsync(memoryStream, cancellationToken);
-
         var storeResult = await mediaStorage.StoreAsync(
-            new MediaUploadCommand(Path.GetFileName(file.FileName), contentType, memoryStream.ToArray()),
+            new MediaUploadCommand(
+                Path.GetFileName(file.FileName),
+                contentType,
+                stream,
+                file.Length),
             cancellationToken);
 
         if (storeResult.IsFailure)

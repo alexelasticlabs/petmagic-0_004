@@ -326,7 +326,7 @@ public sealed class AdminTemplateUploadEndpointTests
                 "templates/file.bin",
                 asset.FileName,
                 asset.ContentType,
-                asset.Content.LongLength,
+                asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0,
                 null);
 
             return Task.FromResult(Result.Success(stored));

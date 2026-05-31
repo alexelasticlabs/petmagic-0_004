@@ -1,3 +1,5 @@
+using System.IO;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 
@@ -16,7 +18,20 @@ public sealed record SupportConversationRealtimeEvent(
 public sealed record SupportAttachmentUploadCommand(
     string FileName,
     string ContentType,
-    byte[] Content);
+    byte[]? Content,
+    Stream? ContentStream,
+    long? ContentLengthBytes)
+{
+    public SupportAttachmentUploadCommand(string fileName, string contentType, byte[] content)
+        : this(fileName, contentType, content, null, content.LongLength)
+    {
+    }
+
+    public SupportAttachmentUploadCommand(string fileName, string contentType, Stream contentStream, long? contentLengthBytes = null)
+        : this(fileName, contentType, null, contentStream, contentLengthBytes)
+    {
+    }
+}
 
 public sealed record SupportChatPushNotification(
     Guid ConversationId,

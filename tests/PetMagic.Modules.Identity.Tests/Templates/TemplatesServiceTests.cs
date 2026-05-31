@@ -142,7 +142,13 @@ public sealed partial class TemplatesServiceTests
         public Task<PetMagic.BuildingBlocks.Results.Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(
-                new StoredMediaResponse($"http://localhost:5000/stub/{asset.FileName}", $"stub/{asset.FileName}", asset.FileName, asset.ContentType, asset.Content.LongLength, null)));
+                new StoredMediaResponse(
+                    $"http://localhost:5000/stub/{asset.FileName}",
+                    $"stub/{asset.FileName}",
+                    asset.FileName,
+                    asset.ContentType,
+                    asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0,
+                    null)));
         }
 
         public Task<PetMagic.BuildingBlocks.Results.Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
@@ -170,7 +176,13 @@ public sealed partial class TemplatesServiceTests
         public Task<PetMagic.BuildingBlocks.Results.Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(
-                new StoredMediaResponse($"http://localhost:5000/stub/{asset.FileName}", $"stub/{asset.FileName}", asset.FileName, asset.ContentType, asset.Content.LongLength, null)));
+                new StoredMediaResponse(
+                    $"http://localhost:5000/stub/{asset.FileName}",
+                    $"stub/{asset.FileName}",
+                    asset.FileName,
+                    asset.ContentType,
+                    asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0,
+                    null)));
         }
 
         public Task<PetMagic.BuildingBlocks.Results.Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
