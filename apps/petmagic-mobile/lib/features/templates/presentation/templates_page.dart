@@ -50,6 +50,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   late final WalletController _walletController;
   Timer? _searchDebounce;
   DateTime? _lastRefreshAt;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -59,13 +60,12 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final shouldLoadWallet = ref.read(walletControllerProvider).wallet == null;
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
-    Future.microtask(() {
+    _runAfterBuild(() {
       if (!mounted) {
         return;
       }
-
       _templatesController.setScreenVisible(true);
-      _refreshFeed();
+      unawaited(_refreshFeed());
       if (shouldLoadWallet) {
         unawaited(_walletController.load());
       }
@@ -74,6 +74,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   @override
   void dispose() {
+    _disposed = true;
     _templatesController.setScreenVisible(false);
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _searchDebounce?.cancel();
@@ -87,25 +88,54 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   void _handleLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _templatesController.setScreenVisible(true);
-      unawaited(_refreshFeed());
+      _runAfterBuild(() {
+        if (!mounted) {
+          return;
+        }
+        _templatesController.setScreenVisible(true);
+        unawaited(_refreshFeed());
+      });
       return;
     }
 
-    _templatesController.setScreenVisible(false);
+    _runAfterBuild(() {
+      if (!mounted) {
+        return;
+      }
+      _templatesController.setScreenVisible(false);
+    });
   }
 
   @override
   void deactivate() {
-    _templatesController.setScreenVisible(false);
+    _runAfterBuild(() {
+      if (!mounted) {
+        return;
+      }
+      _templatesController.setScreenVisible(false);
+    });
     super.deactivate();
   }
 
   @override
   void activate() {
     super.activate();
-    _templatesController.setScreenVisible(true);
-    unawaited(_refreshFeed());
+    _runAfterBuild(() {
+      if (!mounted) {
+        return;
+      }
+      _templatesController.setScreenVisible(true);
+      unawaited(_refreshFeed());
+    });
+  }
+
+  void _runAfterBuild(VoidCallback action) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed) {
+        return;
+      }
+      action();
+    });
   }
 
   @override
@@ -241,10 +271,31 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                   ),
                   itemBuilder: (context, index) {
                     final template = state.items[index];
-                    return TemplateCard(
+                    final card = TemplateCard(
                       template: template,
                       hasPremiumAccess: wallet?.isPremium ?? false,
                       onPressed: () => _handleTemplateSelected(template),
+                    );
+                    if (index >= 6) {
+                      return card;
+                    }
+
+                    return TweenAnimationBuilder<double>(
+                      key: ValueKey('template-item-${template.templateId}'),
+                      tween: Tween(begin: 0, end: 1),
+                      duration: Duration(milliseconds: 130 + (index % 6) * 20),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        final clamped = value.clamp(0.0, 1.0);
+                        return Opacity(
+                          opacity: clamped,
+                          child: Transform.translate(
+                            offset: Offset(0, (1 - clamped) * 8),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: card,
                     );
                   },
                 ),

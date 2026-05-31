@@ -45,6 +45,8 @@ class _TemplateCardState extends State<TemplateCard> {
   bool _isPreviewActive = false;
   bool _hasPreviewSlot = false;
   bool _isPressed = false;
+  bool _videoLoadFailed = false;
+  int _previewRetryToken = 0;
 
   @override
   void didUpdateWidget(covariant TemplateCard oldWidget) {
@@ -170,6 +172,9 @@ class _TemplateCardState extends State<TemplateCard> {
                           _TemplateMedia(
                             template: widget.template,
                             controller: _videoController,
+                            videoLoadFailed: _videoLoadFailed,
+                            previewRetryToken: _previewRetryToken,
+                            onRetry: _retryPreviewLoad,
                           ),
                           const _TemplateShadeOverlay(),
                           Positioned(
@@ -341,6 +346,7 @@ class _TemplateCardState extends State<TemplateCard> {
         return;
       }
       setState(() {});
+      _videoLoadFailed = false;
       await _syncPlaybackState();
     } catch (_) {
       await controller.dispose();
@@ -350,9 +356,22 @@ class _TemplateCardState extends State<TemplateCard> {
         _hasPreviewSlot = false;
       }
       if (mounted) {
-        setState(() => _videoController = null);
+        setState(() {
+          _videoController = null;
+          _videoLoadFailed = true;
+        });
       }
     }
+  }
+
+  void _retryPreviewLoad() {
+    _disposeTimer?.cancel();
+    _isPreviewActive = false;
+    _videoLoadFailed = false;
+    _previewRetryToken += 1;
+    setState(() {});
+    unawaited(_disposeVideoController());
+    unawaited(_ensureVideoController());
   }
 
   Future<VideoPlayerController> _createVideoController(
@@ -375,10 +394,19 @@ class _TemplateCardState extends State<TemplateCard> {
 }
 
 class _TemplateMedia extends StatelessWidget {
-  const _TemplateMedia({required this.template, required this.controller});
+  const _TemplateMedia({
+    required this.template,
+    required this.controller,
+    required this.videoLoadFailed,
+    required this.previewRetryToken,
+    required this.onRetry,
+  });
 
   final TemplateItem template;
   final VideoPlayerController? controller;
+  final bool videoLoadFailed;
+  final int previewRetryToken;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -393,6 +421,7 @@ class _TemplateMedia extends StatelessWidget {
         ? assetUrl
         : null;
     final imageUrl = renderableThumbnailUrl ?? fallbackImageUrl;
+    final canRetry = imageUrl != null || assetIsVideo;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -403,21 +432,36 @@ class _TemplateMedia extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (showVideo)
-              FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: controller!.value.size.width,
-                  height: controller!.value.size.height,
-                  child: VideoPlayer(controller!),
+              AnimatedOpacity(
+                opacity: 1,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOut,
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: controller!.value.size.width,
+                    height: controller!.value.size.height,
+                    child: VideoPlayer(controller!),
+                  ),
                 ),
               )
             else if (imageUrl != null)
               _TemplateImageWithFallback(
+                key: ValueKey(
+                  'template-image-${template.templateId}-$previewRetryToken',
+                ),
                 imageUrl: imageUrl,
                 cacheWidth: cacheWidth,
+                onRetry: onRetry,
+                isVideoTemplate: assetIsVideo,
+              )
+            else if (videoLoadFailed)
+              _MediaErrorPlaceholder(
+                isVideo: template.isVideo,
+                onRetry: canRetry ? onRetry : null,
               )
             else
-              const _MediaPlaceholder(),
+              const _MediaSkeletonPlaceholder(),
           ],
         );
       },
@@ -435,12 +479,17 @@ class _TemplateMedia extends StatelessWidget {
 
 class _TemplateImageWithFallback extends StatelessWidget {
   const _TemplateImageWithFallback({
+    super.key,
     required this.imageUrl,
     required this.cacheWidth,
+    required this.onRetry,
+    required this.isVideoTemplate,
   });
 
   final String imageUrl;
   final int? cacheWidth;
+  final VoidCallback onRetry;
+  final bool isVideoTemplate;
 
   @override
   Widget build(BuildContext context) {
@@ -450,12 +499,19 @@ class _TemplateImageWithFallback extends StatelessWidget {
         cacheManager: TemplateMediaCache.thumbnailCache,
         memCacheWidth: cacheWidth,
         maxWidthDiskCache: cacheWidth,
-        placeholder: (context, url) => const _MediaPlaceholder(),
+        placeholder: (context, url) => const _MediaSkeletonPlaceholder(),
+        fadeInDuration: const Duration(milliseconds: 260),
+        fadeOutDuration: const Duration(milliseconds: 100),
         imageBuilder: (context, imageProvider) =>
             _CoverImageFill(imageProvider: imageProvider),
         errorWidget: (context, url, error) {
           unawaited(TemplateMediaCache.thumbnailCache.removeFile(url));
-          return _CoverNetworkImageFill(imageUrl: url, cacheWidth: cacheWidth);
+          return _CoverNetworkImageFill(
+            imageUrl: url,
+            cacheWidth: cacheWidth,
+            isVideoTemplate: isVideoTemplate,
+            onRetry: onRetry,
+          );
         },
       ),
     );
@@ -488,10 +544,14 @@ class _CoverNetworkImageFill extends StatelessWidget {
   const _CoverNetworkImageFill({
     required this.imageUrl,
     required this.cacheWidth,
+    required this.isVideoTemplate,
+    required this.onRetry,
   });
 
   final String imageUrl;
   final int? cacheWidth;
+  final bool isVideoTemplate;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -504,16 +564,25 @@ class _CoverNetworkImageFill extends StatelessWidget {
       cacheWidth: cacheWidth,
       filterQuality: FilterQuality.medium,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        return SizedBox.expand(child: child);
+        if (wasSynchronouslyLoaded || frame != null) {
+          return AnimatedOpacity(
+            opacity: 1,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            child: SizedBox.expand(child: child),
+          );
+        }
+        return const _MediaSkeletonPlaceholder();
       },
       loadingBuilder: (context, child, progress) {
         if (progress == null) {
           return child;
         }
 
-        return const _MediaPlaceholder();
+        return const _MediaSkeletonPlaceholder();
       },
-      errorBuilder: (context, error, stackTrace) => const _MediaPlaceholder(),
+      errorBuilder: (context, error, stackTrace) =>
+          _MediaErrorPlaceholder(isVideo: isVideoTemplate, onRetry: onRetry),
     );
   }
 }
@@ -700,6 +769,7 @@ class _TemplateDetails extends StatelessWidget {
         _TemplateActionButton(
           label: actionLabel,
           isPremiumLockCta: isPremiumLocked,
+          isPremiumTemplateCta: template.isPremium,
           onPressed: onPressed,
         ),
       ],
@@ -712,16 +782,20 @@ class _TemplateActionButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.isPremiumLockCta = false,
+    this.isPremiumTemplateCta = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isPremiumLockCta;
+  final bool isPremiumTemplateCta;
 
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.labelLarge;
     const premiumTextColor = Color(0xFF251102);
+    final usePremiumStyle = isPremiumLockCta || isPremiumTemplateCta;
+    final useSoftPremiumStyle = isPremiumTemplateCta && !isPremiumLockCta;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -741,6 +815,17 @@ class _TemplateActionButton extends StatelessWidget {
                     ],
                     stops: [0, 0.54, 1],
                   )
+                : useSoftPremiumStyle
+                ? const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Color(0xFFE8AA38),
+                      Color(0xFFEFCB72),
+                      Color(0xFFF5DE97),
+                    ],
+                    stops: [0, 0.58, 1],
+                  )
                 : const LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
@@ -748,20 +833,22 @@ class _TemplateActionButton extends StatelessWidget {
                   ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isPremiumLockCta
+              color: usePremiumStyle
                   ? const Color(0xFFF9E8B6).withValues(alpha: 0.88)
                   : Colors.white.withValues(alpha: 0.14),
-              width: isPremiumLockCta ? 1.3 : 1,
+              width: usePremiumStyle ? 1.3 : 1,
             ),
             boxShadow: [
               BoxShadow(
                 color:
                     (isPremiumLockCta
                             ? const Color(0xFFE4901F)
+                            : useSoftPremiumStyle
+                            ? const Color(0xFFD8A64B)
                             : const Color(0xFF10C878))
                         .withValues(alpha: 0.24),
-                blurRadius: 14,
-                offset: const Offset(0, 8),
+                blurRadius: useSoftPremiumStyle ? 10 : 14,
+                offset: Offset(0, useSoftPremiumStyle ? 6 : 8),
               ),
             ],
           ),
@@ -774,7 +861,7 @@ class _TemplateActionButton extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textStyle?.copyWith(
-                    color: isPremiumLockCta
+                    color: usePremiumStyle
                         ? premiumTextColor
                         : const Color(0xFF082313),
                     fontSize: 11.2,
@@ -784,9 +871,9 @@ class _TemplateActionButton extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Container(
-                width: isPremiumLockCta ? 22 : null,
-                height: isPremiumLockCta ? 22 : null,
-                decoration: isPremiumLockCta
+                width: usePremiumStyle ? 22 : null,
+                height: usePremiumStyle ? 22 : null,
+                decoration: usePremiumStyle
                     ? BoxDecoration(
                         color: const Color(0x3DFFF3D2),
                         shape: BoxShape.circle,
@@ -796,11 +883,13 @@ class _TemplateActionButton extends StatelessWidget {
                 child: Icon(
                   isPremiumLockCta
                       ? Icons.workspace_premium_rounded
+                      : useSoftPremiumStyle
+                      ? Icons.arrow_forward_rounded
                       : Icons.arrow_forward_rounded,
-                  color: isPremiumLockCta
+                  color: usePremiumStyle
                       ? premiumTextColor
                       : const Color(0xFF082313),
-                  size: isPremiumLockCta ? 14 : 16,
+                  size: usePremiumStyle ? 13.5 : 16,
                 ),
               ),
             ],
@@ -846,12 +935,79 @@ class _TemplateStatusChip extends StatelessWidget {
   }
 }
 
-class _MediaPlaceholder extends StatelessWidget {
-  const _MediaPlaceholder();
+class _MediaSkeletonPlaceholder extends StatefulWidget {
+  const _MediaSkeletonPlaceholder();
+
+  @override
+  State<_MediaSkeletonPlaceholder> createState() =>
+      _MediaSkeletonPlaceholderState();
+}
+
+class _MediaSkeletonPlaceholderState extends State<_MediaSkeletonPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.linear);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final shimmerPosition = (_animation.value * 2) - 1;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(-1.2 + shimmerPosition, -0.2),
+              end: Alignment(0.4 + shimmerPosition, 0.2),
+              colors: [
+                colors.surfaceStrong.withValues(alpha: 0.9),
+                colors.accentSoft.withValues(alpha: 0.42),
+                colors.surface.withValues(alpha: 0.85),
+              ],
+              stops: const [0.2, 0.5, 0.85],
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: colors.textMuted.withValues(alpha: 0.55),
+              size: 22,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MediaErrorPlaceholder extends StatelessWidget {
+  const _MediaErrorPlaceholder({required this.isVideo, this.onRetry});
+
+  final bool isVideo;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -859,17 +1015,65 @@ class _MediaPlaceholder extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            colors.surfaceStrong,
-            colors.accentSoft.withValues(alpha: 0.9),
-            colors.surface,
+            colors.surfaceStrong.withValues(alpha: 0.92),
+            colors.surface.withValues(alpha: 0.92),
           ],
         ),
       ),
       child: Center(
-        child: Icon(Icons.pets_rounded, color: colors.accent, size: 42),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isVideo
+                    ? Icons.videocam_off_rounded
+                    : Icons.broken_image_outlined,
+                color: colors.textMuted,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _isRu(context)
+                    ? 'Не удалось загрузить превью'
+                    : 'Failed to load preview',
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colors.textSoft,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(110, 34),
+                    side: BorderSide(
+                      color: colors.accent.withValues(alpha: 0.38),
+                    ),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: Text(
+                    _isRu(context) ? 'Повторить' : text.retryAction,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  static bool _isRu(BuildContext context) =>
+      Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
 }
 
 class _PromoBadge extends StatelessWidget {

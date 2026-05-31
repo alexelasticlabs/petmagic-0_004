@@ -1,7 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
@@ -87,6 +90,7 @@ class TemplatesState {
 
 class TemplatesController extends Notifier<TemplatesState> {
   static const _realtimeRefreshDebounce = Duration(milliseconds: 350);
+  static const _warmupPreviewLimit = 10;
 
   TemplatesRepository get _repository => ref.read(templatesRepositoryProvider);
   RealtimeClient get _realtimeClient => ref.read(realtimeClientProvider);
@@ -198,10 +202,7 @@ class TemplatesController extends Notifier<TemplatesState> {
         return;
       }
 
-      await loadInitial(
-        forceRefresh: true,
-        knownCatalogVersion: latestVersion,
-      );
+      await loadInitial(forceRefresh: true, knownCatalogVersion: latestVersion);
     } on Object {
       await loadInitial(forceRefresh: true);
     }
@@ -310,15 +311,6 @@ class TemplatesController extends Notifier<TemplatesState> {
         knownRemoteVersion: knownCatalogVersion,
       );
 
-      if (state.categories.isEmpty || forceRefresh) {
-        final categories = _normalizeCategories(
-          await _repository.fetchCategories(),
-        );
-        if (requestVersion == _requestVersion) {
-          state = state.copyWith(categories: categories);
-        }
-      }
-
       final page = await _repository.fetchFeed(query);
       if (requestVersion != _requestVersion) return;
 
@@ -337,6 +329,10 @@ class TemplatesController extends Notifier<TemplatesState> {
         isRefreshing: false,
         clearError: true,
       );
+      unawaited(_warmupTemplatePreviews(page.items));
+      if (state.categories.isEmpty || forceRefresh) {
+        unawaited(_refreshCategories(requestVersion));
+      }
     } on RequestCancelledException {
       if (requestVersion != _requestVersion) return;
       state = state.copyWith(isLoading: false, isRefreshing: false);
@@ -356,6 +352,25 @@ class TemplatesController extends Notifier<TemplatesState> {
       );
     } finally {
       _resumePendingRealtimeRefreshIfNeeded();
+    }
+  }
+
+  Future<void> _refreshCategories(int requestVersion) async {
+    try {
+      final categories = _normalizeCategories(
+        await _repository.fetchCategories(),
+      );
+      if (requestVersion != _requestVersion) {
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (requestVersion != _requestVersion) {
+          return;
+        }
+        state = state.copyWith(categories: categories);
+      });
+    } catch (_) {
+      // Categories are secondary for first paint.
     }
   }
 
@@ -482,5 +497,54 @@ class TemplatesController extends Notifier<TemplatesState> {
       currentPage: 1,
     );
     loadInitial();
+  }
+
+  Future<void> _warmupTemplatePreviews(List<TemplateItem> items) async {
+    final uniqueUrls = <String>{};
+    for (final item in items.take(_warmupPreviewLimit)) {
+      final thumbnailUrl = _normalizeMediaUrl(item.thumbnailUrl);
+      final previewUrl = _normalizeMediaUrl(item.previewAsset?.url);
+      final isPreviewVideo = isVideoUrl(previewUrl);
+      final preferred = thumbnailUrl != null && !isVideoUrl(thumbnailUrl)
+          ? thumbnailUrl
+          : (!isPreviewVideo ? previewUrl : null);
+      if (preferred != null) {
+        uniqueUrls.add(preferred);
+      }
+    }
+
+    for (final url in uniqueUrls) {
+      try {
+        await TemplateMediaCache.thumbnailCache.getSingleFile(url);
+      } catch (_) {
+        // Warmup is best-effort only.
+      }
+    }
+  }
+
+  String? _normalizeMediaUrl(String? rawUrl) {
+    final trimmed = rawUrl?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+
+    final sanitized = Uri.encodeFull(trimmed.replaceAll('\\', '/'));
+    final parsed = Uri.tryParse(sanitized);
+    if (parsed?.hasScheme == true) {
+      return parsed.toString();
+    }
+
+    final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+    if (baseUri == null) {
+      return sanitized;
+    }
+
+    if (sanitized.startsWith('//')) {
+      final scheme = baseUri.scheme.isNotEmpty ? baseUri.scheme : 'http';
+      return '$scheme:$sanitized';
+    }
+
+    final relativePath = sanitized.startsWith('/') ? sanitized : '/$sanitized';
+    return baseUri.resolve(relativePath).toString();
   }
 }

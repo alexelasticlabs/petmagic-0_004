@@ -243,7 +243,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: PremiumPage.routePath,
         pageBuilder: (context, state) =>
-            const NoTransitionPage(child: PremiumPage()),
+            _buildFadeSlidePage(state: state, child: const PremiumPage()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -267,7 +267,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ),
           };
 
-          return NoTransitionPage(
+          return _buildFadeSlidePage(
+            state: state,
             child: TemplatePreviewPage(
               template: args.template,
               hasPremiumAccess: args.hasPremiumAccess,
@@ -279,7 +280,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '${GenerationStatusPage.routePrefix}/:generationId',
-        pageBuilder: (context, state) => NoTransitionPage(
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
           child: GenerationStatusPage(
             generationId: state.pathParameters['generationId'] ?? '',
           ),
@@ -288,8 +290,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: SubscriptionManagementPage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: SubscriptionManagementPage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: const SubscriptionManagementPage(),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -300,7 +304,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: WalletPage.routePath,
         pageBuilder: (context, state) =>
-            const NoTransitionPage(child: WalletPage()),
+            _buildFadeSlidePage(state: state, child: const WalletPage()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -311,19 +315,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         name: AllTransactionsPage.routeName,
         path: AllTransactionsPage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: AllTransactionsPage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: const AllTransactionsPage(),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: ProfileSettingsPage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: ProfileSettingsPage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: const ProfileSettingsPage(),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: PasswordChangePage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
           child: PasswordChangePage(
             email: state.uri.queryParameters['email'] ?? '',
           ),
@@ -332,13 +341,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: ProfileAccountInfoPage.routePath,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: ProfileAccountInfoPage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: const ProfileAccountInfoPage(),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: ProfileSettingsDetailPage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
           child: ProfileSettingsDetailPage(
             kind: ProfileSettingsDetailKind.fromSlug(
               state.pathParameters['kind'] ?? 'help-center',
@@ -350,18 +362,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: SupportHomePage.routePath,
         pageBuilder: (context, state) =>
-            const NoTransitionPage(child: SupportHomePage()),
+            _buildFadeSlidePage(state: state, child: const SupportHomePage()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: SupportChatPage.routePath,
         pageBuilder: (context, state) =>
-            const NoTransitionPage(child: SupportChatPage()),
+            _buildFadeSlidePage(state: state, child: const SupportChatPage()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: SupportAssistantPage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
           child: SupportAssistantPage(
             scenario: state.uri.queryParameters['scenario'] ?? 'Other',
           ),
@@ -370,7 +383,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: SupportTicketFormPage.routePath,
-        pageBuilder: (context, state) => NoTransitionPage(
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
           child: SupportTicketFormPage(
             scenario: state.uri.queryParameters['scenario'] ?? 'Other',
           ),
@@ -382,3 +396,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(router.dispose);
   return router;
 });
+
+CustomTransitionPage<T> _buildFadeSlidePage<T>({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final fade = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final offset = Tween<Offset>(
+        begin: const Offset(0, 0.025),
+        end: Offset.zero,
+      ).animate(fade);
+      return FadeTransition(
+        opacity: fade,
+        child: SlideTransition(position: offset, child: child),
+      );
+    },
+  );
+}

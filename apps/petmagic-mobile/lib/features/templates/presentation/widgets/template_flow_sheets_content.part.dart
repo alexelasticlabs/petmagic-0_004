@@ -399,34 +399,45 @@ class TemplateDetailContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    FilledButton.icon(
-                      onPressed: isPremiumLocked
-                          ? null
-                          : () => Navigator.of(
-                              context,
-                            ).pop(TemplateDetailAction.upload),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: Theme.of(context).textTheme.titleSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.1,
-                            ),
-                      ),
-                      icon: Icon(
-                        isPremiumLocked
-                            ? Icons.lock_outline_rounded
-                            : Icons.add_photo_alternate_outlined,
-                      ),
-                      label: Text(
-                        isPremiumLocked
-                            ? text.templateFlowUploadPetPhotoLockedAction
-                            : _templateUploadActionLabel(
-                                locale,
-                                isVideo: template.isVideo,
+                    if (template.isPremium && !isPremiumLocked)
+                      _PremiumTemplateUploadButton(
+                        label: _templateUploadActionLabel(
+                          locale,
+                          isVideo: template.isVideo,
+                        ),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).pop(TemplateDetailAction.upload),
+                      )
+                    else
+                      FilledButton.icon(
+                        onPressed: isPremiumLocked
+                            ? null
+                            : () => Navigator.of(
+                                context,
+                              ).pop(TemplateDetailAction.upload),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.1,
                               ),
+                        ),
+                        icon: Icon(
+                          isPremiumLocked
+                              ? Icons.lock_outline_rounded
+                              : Icons.add_photo_alternate_outlined,
+                        ),
+                        label: Text(
+                          isPremiumLocked
+                              ? text.templateFlowUploadPetPhotoLockedAction
+                              : _templateUploadActionLabel(
+                                  locale,
+                                  isVideo: template.isVideo,
+                                ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -562,6 +573,97 @@ class _PremiumUnlockCtaButtonState extends State<_PremiumUnlockCtaButton>
           ),
         );
       },
+    );
+  }
+}
+
+class _PremiumTemplateUploadButton extends StatelessWidget {
+  const _PremiumTemplateUploadButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = Theme.of(context).textTheme.titleSmall;
+    const ctaTextColor = Color(0xFF251102);
+
+    return Material(
+      color: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(15),
+          onTap: onPressed,
+          child: Ink(
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Color(0xFFE8AA38),
+                  Color(0xFFEFCB72),
+                  Color(0xFFF5DE97),
+                ],
+                stops: [0, 0.58, 1],
+              ),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: const Color(0xFFF9E8B6).withValues(alpha: 0.82),
+                width: 1.15,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFD8A64B).withValues(alpha: 0.22),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: const Color(0x3DFFF3D2),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xAAFFF0C0)),
+                    ),
+                    child: const Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: ctaTextColor,
+                      size: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textStyle?.copyWith(
+                        color: ctaTextColor,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.08,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -854,126 +956,61 @@ class _GenerationResultView extends StatelessWidget {
   }
 }
 
-// Adaptive media frame — detects the real aspect ratio of the preview
-// asset (image or video) and renders it at the correct proportions.
-class _AdaptiveTemplateMediaFrame extends StatefulWidget {
+// Stable media frame for template preview.
+// Keeps a fixed aspect ratio from first paint to avoid visible layout jumps.
+class _AdaptiveTemplateMediaFrame extends StatelessWidget {
   const _AdaptiveTemplateMediaFrame({required this.template});
 
   final TemplateItem template;
 
   @override
-  State<_AdaptiveTemplateMediaFrame> createState() =>
-      _AdaptiveTemplateMediaFrameState();
-}
-
-class _AdaptiveTemplateMediaFrameState
-    extends State<_AdaptiveTemplateMediaFrame> {
-  // null = not yet known (show 9:16 skeleton), non-null = detected ratio
-  double? _detectedRatio;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolveImageRatio();
-  }
-
-  @override
-  void didUpdateWidget(covariant _AdaptiveTemplateMediaFrame oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.template.previewAsset?.url !=
-        widget.template.previewAsset?.url) {
-      _detectedRatio = null;
-      _resolveImageRatio();
-    }
-  }
-
-  void _resolveImageRatio() {
-    final asset = widget.template.previewAsset;
-    if (asset == null ||
-        asset.url.isEmpty ||
-        (widget.template.isVideo && isVideoPreview(asset))) {
-      // For videos the ratio is reported back via [_onVideoRatioDetected].
-      return;
-    }
-    // Use ImageStream to get the real pixel dimensions of the image.
-    final provider = NetworkImage(asset.url);
-    final stream = provider.resolve(ImageConfiguration.empty);
-    late ImageStreamListener listener;
-    listener = ImageStreamListener((info, _) {
-      stream.removeListener(listener);
-      if (!mounted) return;
-      final w = info.image.width.toDouble();
-      final h = info.image.height.toDouble();
-      if (h > 0) {
-        setState(() => _detectedRatio = w / h);
-      }
-    }, onError: (error, stackTrace) => stream.removeListener(listener));
-    stream.addListener(listener);
-  }
-
-  void _onVideoRatioDetected(double ratio) {
-    if (!mounted) return;
-    if (_detectedRatio != ratio) {
-      setState(() => _detectedRatio = ratio);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context);
-    final asset = widget.template.previewAsset;
-    final ratio = _detectedRatio ?? 9 / 16;
+    final asset = template.previewAsset;
+    final ratio = template.isVideo ? 9 / 16 : 3 / 4;
 
     Widget media;
     if (asset == null || asset.url.isEmpty) {
       media = _TemplatePreviewPlaceholder(
-        isVideo: widget.template.isVideo,
+        isVideo: template.isVideo,
         title: _templatePreviewMissingTitle(locale),
         subtitle: _templatePreviewMissingSubtitle(
           locale,
-          isVideo: widget.template.isVideo,
+          isVideo: template.isVideo,
         ),
       );
-    } else if (widget.template.isVideo && isVideoPreview(asset)) {
-      media = _NetworkVideoPreview(
-        url: asset.url,
-        onRatioDetected: _onVideoRatioDetected,
-      );
+    } else if (template.isVideo && isVideoPreview(asset)) {
+      media = _NetworkVideoPreview(url: asset.url);
     } else {
       media = CachedNetworkImage(
         imageUrl: asset.url,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         alignment: Alignment.center,
         placeholder: (context, url) =>
             _EmptyMediaBox(label: text.templateFlowLoadingPreview),
         errorWidget: (context, url, error) => _TemplatePreviewPlaceholder(
-          isVideo: widget.template.isVideo,
+          isVideo: template.isVideo,
           title: _templatePreviewMissingTitle(locale),
           subtitle: _templatePreviewMissingSubtitle(
             locale,
-            isVideo: widget.template.isVideo,
+            isVideo: template.isVideo,
           ),
         ),
       );
     }
 
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
-      child: AspectRatio(
-        key: ValueKey(ratio),
-        aspectRatio: ratio,
-        child: ClipRRect(borderRadius: BorderRadius.circular(22), child: media),
-      ),
+    return AspectRatio(
+      aspectRatio: ratio,
+      child: ClipRRect(borderRadius: BorderRadius.circular(22), child: media),
     );
   }
 }
 
 class _NetworkVideoPreview extends StatefulWidget {
-  const _NetworkVideoPreview({required this.url, this.onRatioDetected});
+  const _NetworkVideoPreview({required this.url});
 
   final String url;
-  final void Function(double ratio)? onRatioDetected;
 
   @override
   State<_NetworkVideoPreview> createState() => _NetworkVideoPreviewState();
@@ -1019,10 +1056,6 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
       }
       await controller.play();
       setState(() {});
-      final size = controller.value.size;
-      if (size.height > 0) {
-        widget.onRatioDetected?.call(size.width / size.height);
-      }
     } catch (_) {
       await controller.dispose();
       if (mounted) {
