@@ -21,7 +21,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navProfile => 'Профиль';
 
   @override
-  String get comingSoonMessage => 'Раздел подготовлен для следующей продуктовой волны.';
+  String get comingSoonMessage =>
+      'Раздел подготовлен для следующей продуктовой волны.';
 
   @override
   String get createMagicTitle => 'Создай магию';
@@ -75,16 +76,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileTitle => 'Ваш профиль';
 
   @override
-  String get profileSubtitle => 'Управляйте входом и публичным аватаром пользователя.';
+  String get profileSubtitle =>
+      'Управляйте входом и публичным аватаром пользователя.';
 
   @override
-  String get profileDashboardSubtitle => 'Управляйте аккаунтом и персонализируйте свой опыт в PetMagic.';
+  String get profileDashboardSubtitle =>
+      'Управляйте аккаунтом и персонализируйте свой опыт в PetMagic.';
 
   @override
   String get profileSignInTitle => 'Войдите в аккаунт';
 
   @override
-  String get profileSignInHint => 'Используйте аккаунт PetMagic, чтобы загрузить профиль и управлять аватаром, который виден в админке.';
+  String get profileSignInHint =>
+      'Используйте аккаунт PetMagic, чтобы загрузить профиль и управлять аватаром, который виден в админке.';
 
   @override
   String get profileEmailLabel => 'Email';
@@ -132,7 +136,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileAvatarCropLoading => 'Подготавливаем фото...';
 
   @override
-  String get profileAvatarCropError => 'Не удалось обработать фото. Попробуйте другое изображение.';
+  String get profileAvatarCropError =>
+      'Не удалось обработать фото. Попробуйте другое изображение.';
 
   @override
   String get profileEmailConfirmed => 'Email подтвержден';
@@ -153,7 +158,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileAccountCenterTitle => 'Центр аккаунта';
 
   @override
-  String get profileAccountCenterSubtitle => 'Проверьте предпочтения, приватность и настройки приложения.';
+  String get profileAccountCenterSubtitle =>
+      'Проверьте предпочтения, приватность и настройки приложения.';
 
   @override
   String get profileTermsStat => 'Условия приняты';
@@ -186,7 +192,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profilePremiumTitle => 'Перейти на Premium';
 
   @override
-  String get profilePremiumSubtitle => 'Откройте все шаблоны и premium-сценарии редактирования.';
+  String get profilePremiumSubtitle =>
+      'Откройте все шаблоны и premium-сценарии редактирования.';
 
   @override
   String get profilePremiumPlanLabel => 'Premium тариф';
@@ -204,7 +211,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profilePremiumBenefitUnlimitedTemplates => 'Безлимитные шаблоны';
 
   @override
-  String get profilePremiumBenefitPriorityGeneration => 'Приоритетная генерация';
+  String get profilePremiumBenefitPriorityGeneration =>
+      'Приоритетная генерация';
 
   @override
   String get profilePremiumBenefitNoWatermark => 'Без водяного знака';
@@ -273,12 +281,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionTokensNextGrantLabel => 'Следующее начисление';
 
   @override
-  String subscriptionTokensCountdown(Object days, Object hours, Object minutes) {
+  String subscriptionTokensCountdown(
+    Object days,
+    Object hours,
+    Object minutes,
+  ) {
     return 'Через $daysд $hoursч $minutesм';
   }
 
   @override
-  String get subscriptionTokensExplanation => 'PawSpark начисляются каждые 7 дней с момента покупки подписки. Первый бонус начисляется сразу после покупки.';
+  String get subscriptionTokensExplanation =>
+      'PawSpark начисляются каждые 7 дней с момента покупки подписки. Первый бонус начисляется сразу после покупки.';
 
   @override
   String get subscriptionBenefitsSectionTitle => 'Преимущества Premium';
@@ -287,7 +300,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionBenefitTokens => '40 PawSpark каждые 7 дней';
 
   @override
-  String get subscriptionBenefitFirstBonus => 'Первый бонус сразу после покупки';
+  String get subscriptionBenefitFirstBonus =>
+      'Первый бонус сразу после покупки';
 
   @override
   String get subscriptionBenefitTemplates => 'Доступ к Premium-шаблонам';
@@ -337,13 +351,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletPageTitle => 'PawSpark кошелек';
 
   @override
-  String get walletPageSubtitle => 'Баланс, промокоды, бонус за рекламу и пополнение PawSpark.';
+  String get walletPageSubtitle =>
+      'Баланс, промокоды, бонус за рекламу и пополнение PawSpark.';
 
   @override
   String get profileWalletPreviewEyebrow => 'PawSpark';
 
   @override
-  String get profileWalletPreviewSubtitle => 'Внутренняя валюта для генераций и бонусов.';
+  String get profileWalletPreviewSubtitle =>
+      'Внутренняя валюта для генераций и бонусов.';
 
   @override
   String get profileWalletPreviewAction => 'Открыть';
@@ -366,13 +382,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileWalletEmptyHint => 'Откройте баланс и историю';
 
   @override
-  String get walletDataUnavailableFallback => 'Данные кошелька сейчас недоступны.';
+  String get walletDataUnavailableFallback =>
+      'Данные кошелька сейчас недоступны.';
 
   @override
   String get walletRefreshTooltip => 'Обновить кошелек';
 
   @override
-  String get walletBalanceTitle => 'Доступно для создания фото, видео и premium-шаблонов.';
+  String get walletBalanceTitle =>
+      'Доступно для создания фото, видео и premium-шаблонов.';
 
   @override
   String get walletBalanceEyebrow => 'Ваш баланс';
@@ -381,7 +399,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletBalanceUnit => 'PawSpark';
 
   @override
-  String get walletBalanceExplanation => 'PawSpark — внутренняя валюта PetMagic. Используйте её для создания фото, видео и доступа к премиум-шаблонам.';
+  String get walletBalanceExplanation =>
+      'PawSpark — внутренняя валюта PetMagic. Используйте её для создания фото, видео и доступа к премиум-шаблонам.';
 
   @override
   String get walletPremiumStatus => 'Premium-кошелек';
@@ -410,7 +429,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletAdRewardCompactTitle => 'Получить PawSpark бесплатно';
 
   @override
-  String get walletAdRewardCompactDescription => 'Посмотрите короткую рекламу и получите +15 PawSpark.';
+  String get walletAdRewardCompactDescription =>
+      'Посмотрите короткую рекламу и получите +15 PawSpark.';
 
   @override
   String walletAdRewardRemaining(Object count) {
@@ -421,13 +441,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletWatchAdAction => 'Смотреть рекламу +15';
 
   @override
-  String get walletAdDailyLimitReached => 'Реклама сейчас недоступна. Попробуйте у нас позже.';
+  String get walletAdDailyLimitReached =>
+      'Реклама сейчас недоступна. Попробуйте у нас позже.';
 
   @override
   String get walletPromoTitle => 'Есть промокод?';
 
   @override
-  String get walletPromoSubtitle => 'Введите код от команды PetMagic и сразу получите PawSpark на баланс.';
+  String get walletPromoSubtitle =>
+      'Введите код от команды PetMagic и сразу получите PawSpark на баланс.';
 
   @override
   String get walletPromoInputPlaceholder => 'Введите промокод';
@@ -442,7 +464,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletPremiumUpsellTitle => 'Создаете часто?';
 
   @override
-  String get walletPremiumUpsellMessage => 'Premium дает ежемесячные PawSpark, premium-шаблоны и приоритетную очередь.';
+  String get walletPremiumUpsellMessage =>
+      'Premium дает ежемесячные PawSpark, premium-шаблоны и приоритетную очередь.';
 
   @override
   String get walletViewPremiumAction => 'Посмотреть Premium';
@@ -479,7 +502,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsPageTitle => 'Бонусы';
 
   @override
-  String get rewardsPageSubtitle => 'Получайте PawSpark за промокоды и приглашения';
+  String get rewardsPageSubtitle =>
+      'Получайте PawSpark за промокоды и приглашения';
 
   @override
   String rewardsLastUpdatedLabel(Object value) {
@@ -515,10 +539,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsReferralTitle => 'Пригласи друга';
 
   @override
-  String get rewardsReferralSubtitle => 'Поделитесь кодом с другом. Бонус начисляется не за регистрацию, а после его первой успешной платной покупки.';
+  String get rewardsReferralSubtitle =>
+      'Поделитесь кодом с другом. Бонус начисляется не за регистрацию, а после его первой успешной платной покупки.';
 
   @override
-  String get rewardsReferralInvitePrefix => 'Друг получит бонус перед первой покупкой, а вы получите';
+  String get rewardsReferralInvitePrefix =>
+      'Друг получит бонус перед первой покупкой, а вы получите';
 
   @override
   String get rewardsReferralInviteSuffix => 'после его первой успешной оплаты.';
@@ -542,7 +568,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsReferralFriendCodePrompt => 'Есть код друга?';
 
   @override
-  String get rewardsReferralFriendCodeHint => 'Введите код друга до первой покупки и получите бонус.';
+  String get rewardsReferralFriendCodeHint =>
+      'Введите код друга до первой покупки и получите бонус.';
 
   @override
   String get rewardsReferralInputLabel => 'Код друга';
@@ -560,19 +587,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsReferralCheckingStatus => 'Проверяем реферальный код...';
 
   @override
-  String get rewardsReferralActivatedMessage => 'Реферальный код активирован. Начисление произойдет после вашей первой успешной платной покупки.';
+  String get rewardsReferralActivatedMessage =>
+      'Реферальный код активирован. Начисление произойдет после вашей первой успешной платной покупки.';
 
   @override
   String get rewardsReferralStatusLoading => 'Загружаем статус рефералки...';
 
   @override
-  String get rewardsReferralStatusNone => 'Введите код друга перед первой покупкой. Бонус начисляется только после успешной оплаты.';
+  String get rewardsReferralStatusNone =>
+      'Введите код друга перед первой покупкой. Бонус начисляется только после успешной оплаты.';
 
   @override
-  String get rewardsReferralStatusPending => 'Рефералка подключена. Бонус начислится после вашей первой успешной платной покупки.';
+  String get rewardsReferralStatusPending =>
+      'Рефералка подключена. Бонус начислится после вашей первой успешной платной покупки.';
 
   @override
-  String get rewardsReferralStatusRewarded => 'Реферальный бонус начислен. Спасибо, что развиваете PetMagic.';
+  String get rewardsReferralStatusRewarded =>
+      'Реферальный бонус начислен. Спасибо, что развиваете PetMagic.';
 
   @override
   String get rewardsReferralEarnedLabel => 'Заработано';
@@ -589,7 +620,8 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get rewardsReferralRulesNote => 'Бонус начисляется после первой успешной покупки друга.';
+  String get rewardsReferralRulesNote =>
+      'Бонус начисляется после первой успешной покупки друга.';
 
   @override
   String get rewardsReferralHowItWorksAction => 'Как это работает?';
@@ -603,10 +635,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsHistoryTitle => 'История';
 
   @override
-  String get rewardsHistorySubtitle => 'Последние промокоды, рефералки, реклама и еженедельные награды.';
+  String get rewardsHistorySubtitle =>
+      'Последние промокоды, рефералки, реклама и еженедельные награды.';
 
   @override
-  String get rewardsHistoryEmpty => 'Бонусов пока нет. Промокоды и реферальные награды появятся здесь.';
+  String get rewardsHistoryEmpty =>
+      'Бонусов пока нет. Промокоды и реферальные награды появятся здесь.';
 
   @override
   String get rewardsSourcePromo => 'Промокод';
@@ -630,13 +664,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsReferralCodeNotFoundError => 'Реферальный код не найден.';
 
   @override
-  String get rewardsReferralSelfError => 'Нельзя активировать собственный реферальный код.';
+  String get rewardsReferralSelfError =>
+      'Нельзя активировать собственный реферальный код.';
 
   @override
-  String get rewardsReferralAlreadyLinkedError => 'Для этого аккаунта уже активирован реферальный код.';
+  String get rewardsReferralAlreadyLinkedError =>
+      'Для этого аккаунта уже активирован реферальный код.';
 
   @override
-  String get rewardsReferralPaidUserError => 'Реферальный код нужно активировать до первой успешной платной покупки.';
+  String get rewardsReferralPaidUserError =>
+      'Реферальный код нужно активировать до первой успешной платной покупки.';
 
   @override
   String get walletBuySparkTitle => 'Пополнить PawSpark';
@@ -676,13 +713,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletPackDetailsAction => 'Подробнее';
 
   @override
-  String get walletPackDetailSubtitle => 'Проверьте состав пакета перед переходом к оплате.';
+  String get walletPackDetailSubtitle =>
+      'Проверьте состав пакета перед переходом к оплате.';
 
   @override
-  String get walletCheckoutHint => 'Оплата откроется в защищенном Stripe Checkout. После оплаты PawSpark сразу зачисляются на ваш баланс.';
+  String get walletCheckoutHint =>
+      'Оплата откроется в защищенном Stripe Checkout. После оплаты PawSpark сразу зачисляются на ваш баланс.';
 
   @override
-  String get walletCheckoutProductSubtitle => 'Разовое пополнение вашего баланса PawSpark для создания фото и видео в PetMagic';
+  String get walletCheckoutProductSubtitle =>
+      'Разовое пополнение вашего баланса PawSpark для создания фото и видео в PetMagic';
 
   @override
   String walletCheckoutTokensImmediately(Object count) {
@@ -707,10 +747,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletCheckoutFeatureMoreVideos => 'Больше возможностей для видео';
 
   @override
-  String get walletCheckoutStripeMethodSubtitle => 'Карта, Apple Pay или Google Pay';
+  String get walletCheckoutStripeMethodSubtitle =>
+      'Карта, Apple Pay или Google Pay';
 
   @override
-  String get walletCheckoutTrustText => 'PetMagic не хранит данные вашей карты. Платежи безопасно обрабатываются Stripe.';
+  String get walletCheckoutTrustText =>
+      'PetMagic не хранит данные вашей карты. Платежи безопасно обрабатываются Stripe.';
 
   @override
   String get walletCheckoutOrderSectionTitle => 'Ваше пополнение';
@@ -799,52 +841,65 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletQueryFilterDebits => 'Списания';
 
   @override
-  String get walletPartialActivityUnavailable => 'Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.';
+  String get walletPartialActivityUnavailable =>
+      'Баланс уже доступен. История и часть действий кошелька временно обновятся чуть позже.';
 
   @override
-  String get walletPaymentGatewayUnavailableError => 'Платежи временно недоступны. Попробуйте позже или обновите приложение.';
+  String get walletPaymentGatewayUnavailableError =>
+      'Платежи временно недоступны. Попробуйте позже или обновите приложение.';
 
   @override
-  String get walletPaymentUnavailableError => 'Пополнение временно недоступно. Попробуйте позже.';
+  String get walletPaymentUnavailableError =>
+      'Пополнение временно недоступно. Попробуйте позже.';
 
   @override
-  String get walletPackUnavailableError => 'Этот набор PawSpark больше недоступен.';
+  String get walletPackUnavailableError =>
+      'Этот набор PawSpark больше недоступен.';
 
   @override
   String get walletRedeemCodeNotFoundError => 'Промокод не найден.';
 
   @override
-  String get walletRedeemCodeAlreadyUsedError => 'Этот промокод уже использован.';
+  String get walletRedeemCodeAlreadyUsedError =>
+      'Этот промокод уже использован.';
 
   @override
   String get walletRedeemCodeExpiredError => 'Срок действия промокода истек.';
 
   @override
-  String get walletRedeemCodeInactiveError => 'Этот промокод сейчас недоступен.';
+  String get walletRedeemCodeInactiveError =>
+      'Этот промокод сейчас недоступен.';
 
   @override
-  String get walletRedeemCodeExhaustedError => 'Лимит активаций этого промокода уже исчерпан.';
+  String get walletRedeemCodeExhaustedError =>
+      'Лимит активаций этого промокода уже исчерпан.';
 
   @override
-  String get walletRedeemCodeUserLimitError => 'Для этого пользователя лимит активаций промокода уже исчерпан.';
+  String get walletRedeemCodeUserLimitError =>
+      'Для этого пользователя лимит активаций промокода уже исчерпан.';
 
   @override
-  String get walletRedeemOfflineError => 'Нет соединения с интернетом. Проверьте сеть и попробуйте снова.';
+  String get walletRedeemOfflineError =>
+      'Нет соединения с интернетом. Проверьте сеть и попробуйте снова.';
 
   @override
-  String get walletRedeemServerError => 'Не удалось применить промокод из-за ошибки сервера. Попробуйте позже.';
+  String get walletRedeemServerError =>
+      'Не удалось применить промокод из-за ошибки сервера. Попробуйте позже.';
 
   @override
-  String get walletInsufficientBalanceError => 'Для этой операции недостаточно PawSpark.';
+  String get walletInsufficientBalanceError =>
+      'Для этой операции недостаточно PawSpark.';
 
   @override
-  String get walletUnavailableError => 'Данные кошелька временно недоступны. Попробуйте еще раз чуть позже.';
+  String get walletUnavailableError =>
+      'Данные кошелька временно недоступны. Попробуйте еще раз чуть позже.';
 
   @override
   String get walletRedeemSheetTitle => 'Промокод';
 
   @override
-  String get walletRedeemSheetSubtitle => 'Код можно использовать один раз, если он активен и не истек.';
+  String get walletRedeemSheetSubtitle =>
+      'Код можно использовать один раз, если он активен и не истек.';
 
   @override
   String get walletRedeemInputLabel => 'Промокод';
@@ -859,7 +914,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletApplyCode => 'Применить код';
 
   @override
-  String get walletRedeemSuccessMessage => 'Промокод успешно применён. Баланс уже обновлён.';
+  String get walletRedeemSuccessMessage =>
+      'Промокод успешно применён. Баланс уже обновлён.';
 
   @override
   String get walletRedeemSuccessAction => 'Готово';
@@ -880,13 +936,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileMagicMomentTitle => 'Ваш следующий звездный момент';
 
   @override
-  String get profileMagicMomentSubtitle => 'Создайте что-то яркое для своих питомцев всего за пару касаний.';
+  String get profileMagicMomentSubtitle =>
+      'Создайте что-то яркое для своих питомцев всего за пару касаний.';
 
   @override
   String get premiumPageTitle => 'PetMagic Premium';
 
   @override
-  String get premiumPageSubtitle => 'Безлимитная магия для питомцев, быстрая генерация и premium-шаблоны в одном тарифе.';
+  String get premiumPageSubtitle =>
+      'Безлимитная магия для питомцев, быстрая генерация и premium-шаблоны в одном тарифе.';
 
   @override
   String get premiumHeroEyebrow => 'Premium магия';
@@ -895,7 +953,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumHeroTitle => 'Откройте вирусные видео с питомцами';
 
   @override
-  String get premiumHeroSubtitle => 'Больше генераций, premium-шаблоны, более быстрая обработка и без водяного знака.';
+  String get premiumHeroSubtitle =>
+      'Больше генераций, premium-шаблоны, более быстрая обработка и без водяного знака.';
 
   @override
   String get premiumAlreadyActive => 'Premium активен';
@@ -963,19 +1022,22 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get premiumSocialProof => 'Самый популярный тариф для тех, кто регулярно создаёт контент в PetMagic.';
+  String get premiumSocialProof =>
+      'Самый популярный тариф для тех, кто регулярно создаёт контент в PetMagic.';
 
   @override
   String get premiumPaymentTitle => 'Способ оплаты';
 
   @override
-  String get premiumPaymentChooseSubtitle => 'Выберите, как хотите оформить подписку';
+  String get premiumPaymentChooseSubtitle =>
+      'Выберите, как хотите оформить подписку';
 
   @override
   String get premiumPaymentStripe => 'Stripe';
 
   @override
-  String get premiumPaymentStripeSubtitle => 'Оплата картой, Apple Pay или Google Pay';
+  String get premiumPaymentStripeSubtitle =>
+      'Оплата картой, Apple Pay или Google Pay';
 
   @override
   String get premiumPaymentGooglePlay => 'Google Play';
@@ -993,13 +1055,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumPaymentDefaultBadge => 'По умолчанию';
 
   @override
-  String get premiumPaymentTrustStripeProcesses => 'Данные карты безопасно обрабатываются Stripe.';
+  String get premiumPaymentTrustStripeProcesses =>
+      'Данные карты безопасно обрабатываются Stripe.';
 
   @override
-  String get premiumPaymentTrustNoStorage => 'PetMagic не хранит данные вашей карты.';
+  String get premiumPaymentTrustNoStorage =>
+      'PetMagic не хранит данные вашей карты.';
 
   @override
-  String get premiumPaymentTrustManageInApp => 'Продление и отмена подписки управляются внутри PetMagic.';
+  String get premiumPaymentTrustManageInApp =>
+      'Продление и отмена подписки управляются внутри PetMagic.';
 
   @override
   String paymentBonusPercentBadge(Object percent) {
@@ -1060,7 +1125,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumSecurePaymentTitle => 'Безопасная оплата';
 
   @override
-  String get premiumSecurePaymentSubtitle => 'Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.';
+  String get premiumSecurePaymentSubtitle =>
+      'Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.';
 
   @override
   String get premiumContinueAction => 'Продолжить';
@@ -1077,7 +1143,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get externalCheckoutStripeTitle => 'Оплата через Stripe';
 
   @override
-  String get externalCheckoutStripeMessage => 'Stripe Checkout откроется в защищенном встроенном браузере. После возврата в PetMagic мы автоматически проверим статус оплаты и только потом обновим подписку или баланс.';
+  String get externalCheckoutStripeMessage =>
+      'Stripe Checkout откроется в защищенном встроенном браузере. После возврата в PetMagic мы автоматически проверим статус оплаты и только потом обновим подписку или баланс.';
 
   @override
   String get externalCheckoutContinueAction => 'Продолжить';
@@ -1086,10 +1153,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get externalCheckoutCheckingTitle => 'Проверяем оплату';
 
   @override
-  String get externalCheckoutCheckingMessage => 'Ждем подтверждение от Stripe. Обычно это занимает несколько секунд.';
+  String get externalCheckoutCheckingMessage =>
+      'Ждем подтверждение от Stripe. Обычно это занимает несколько секунд.';
 
   @override
-  String get externalCheckoutPendingVerificationMessage => 'Оплата еще не подтверждена. Мы обновим Premium или баланс сразу после подтверждения от Stripe.';
+  String get externalCheckoutPendingVerificationMessage =>
+      'Оплата еще не подтверждена. Мы обновим Premium или баланс сразу после подтверждения от Stripe.';
 
   @override
   String premiumContinueWithPlan(Object plan, Object price, Object period) {
@@ -1103,16 +1172,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumRestoreAction => 'Восстановить покупки';
 
   @override
-  String get premiumTermsNotice => 'Продолжая, вы соглашаетесь с Условиями использования и Политикой конфиденциальности.';
+  String get premiumTermsNotice =>
+      'Продолжая, вы соглашаетесь с Условиями использования и Политикой конфиденциальности.';
 
   @override
-  String get premiumStoreUnavailable => 'Подписки через App Store / Google Play ждут настройки продуктов. Пока используйте оплату через Stripe.';
+  String get premiumStoreUnavailable =>
+      'Подписки через App Store / Google Play ждут настройки продуктов. Пока используйте оплату через Stripe.';
 
   @override
-  String get premiumStoreProductUnavailable => 'Этот тариф недоступен в магазине на текущем устройстве.';
+  String get premiumStoreProductUnavailable =>
+      'Этот тариф недоступен в магазине на текущем устройстве.';
 
   @override
-  String get premiumStoreVerificationUnavailable => 'Серверная проверка подписки магазина еще не настроена.';
+  String get premiumStoreVerificationUnavailable =>
+      'Серверная проверка подписки магазина еще не настроена.';
 
   @override
   String get premiumStorePurchaseInvalid => 'Покупку не удалось подтвердить.';
@@ -1130,7 +1203,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumRecentlyActivatedTitle => 'Premium подтвержден';
 
   @override
-  String get premiumRecentlyActivatedMessage => 'Доступ Premium уже активен на этом устройстве и готов к использованию.';
+  String get premiumRecentlyActivatedMessage =>
+      'Доступ Premium уже активен на этом устройстве и готов к использованию.';
 
   @override
   String get premiumPurchaseCancelled => 'Покупка была отменена.';
@@ -1139,25 +1213,30 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumCheckoutFailed => 'Оформление Premium временно недоступно.';
 
   @override
-  String get premiumManageFailed => 'Управление оплатой пока недоступно для этого аккаунта.';
+  String get premiumManageFailed =>
+      'Управление оплатой пока недоступно для этого аккаунта.';
 
   @override
-  String get premiumRestoreStarted => 'Premium-статус обновлен на этом устройстве.';
+  String get premiumRestoreStarted =>
+      'Premium-статус обновлен на этом устройстве.';
 
   @override
   String get profileCommunicationsTitle => 'Обновления PetMagic';
 
   @override
-  String get profileCommunicationsEnabled => 'Вы подписаны на продуктовые обновления и предложения.';
+  String get profileCommunicationsEnabled =>
+      'Вы подписаны на продуктовые обновления и предложения.';
 
   @override
-  String get profileCommunicationsDisabled => 'Маркетинговые обновления сейчас отключены.';
+  String get profileCommunicationsDisabled =>
+      'Маркетинговые обновления сейчас отключены.';
 
   @override
   String get profilePrivacyTitle => 'Приватность и согласия';
 
   @override
-  String get profileTermsAccepted => 'Ваш аккаунт принял Условия использования и Политику конфиденциальности.';
+  String get profileTermsAccepted =>
+      'Ваш аккаунт принял Условия использования и Политику конфиденциальности.';
 
   @override
   String get profileTermsPending => 'Проверьте согласия в настройках аккаунта.';
@@ -1166,7 +1245,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileLegalShortcutTitle => 'Приватность и правила';
 
   @override
-  String get profileLegalShortcutAccepted => 'Условия приняты • Настройки приватности';
+  String get profileLegalShortcutAccepted =>
+      'Условия приняты • Настройки приватности';
 
   @override
   String get profileLegalShortcutPending => 'Проверьте согласия';
@@ -1175,19 +1255,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileSupportTitle => 'Связаться с поддержкой';
 
   @override
-  String get profileSupportSubtitle => 'Мы рядом, если нужна помощь с аккаунтом.';
+  String get profileSupportSubtitle =>
+      'Мы рядом, если нужна помощь с аккаунтом.';
 
   @override
-  String get profileSupportCompactSubtitle => 'Помощь с оплатой и доступом к аккаунту.';
+  String get profileSupportCompactSubtitle =>
+      'Помощь с оплатой и доступом к аккаунту.';
 
   @override
   String get profileSettingsShortcutTitle => 'Настройки';
 
   @override
-  String get profileSettingsShortcutSubtitle => 'Управляйте языком, темой и разделами аккаунта.';
+  String get profileSettingsShortcutSubtitle =>
+      'Управляйте языком, темой и разделами аккаунта.';
 
   @override
-  String get profileSettingsCompactSubtitle => 'Язык, тема и настройки аккаунта.';
+  String get profileSettingsCompactSubtitle =>
+      'Язык, тема и настройки аккаунта.';
 
   @override
   String get profilePreferenceEnabled => 'Включено';
@@ -1199,7 +1283,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileSettingsTitle => 'Настройки';
 
   @override
-  String get profileSettingsSubtitle => 'Управляйте приложением и своим аккаунтом.';
+  String get profileSettingsSubtitle =>
+      'Управляйте приложением и своим аккаунтом.';
 
   @override
   String get profileSettingsAccountSection => 'Аккаунт';
@@ -1223,70 +1308,82 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileSettingsAccountInfoTitle => 'Информация об аккаунте';
 
   @override
-  String get profileSettingsUnavailableSubtitle => 'Эта информация станет доступна после входа.';
+  String get profileSettingsUnavailableSubtitle =>
+      'Эта информация станет доступна после входа.';
 
   @override
   String get profileSettingsLinkedAccountsTitle => 'Связанные аккаунты';
 
   @override
-  String get profileSettingsLinkedAccountsSubtitle => 'Добавьте способы входа, чтобы не потерять доступ к аккаунту.';
+  String get profileSettingsLinkedAccountsSubtitle =>
+      'Добавьте способы входа, чтобы не потерять доступ к аккаунту.';
 
   @override
   String get profileSettingsPasswordTitle => 'Сменить пароль';
 
   @override
-  String get profileSettingsPasswordSubtitle => 'Обновите пароль для защиты аккаунта.';
+  String get profileSettingsPasswordSubtitle =>
+      'Обновите пароль для защиты аккаунта.';
 
   @override
   String get profileSettingsNotificationsTitle => 'Настройки уведомлений';
 
   @override
-  String get profileSettingsNotificationsSubtitle => 'Управляйте push и email-предпочтениями в приложении.';
+  String get profileSettingsNotificationsSubtitle =>
+      'Управляйте push и email-предпочтениями в приложении.';
 
   @override
   String get profileSettingsLanguageTitle => 'Язык приложения';
 
   @override
-  String get profileSettingsLanguageSubtitle => 'Выберите язык интерфейса во всем приложении.';
+  String get profileSettingsLanguageSubtitle =>
+      'Выберите язык интерфейса во всем приложении.';
 
   @override
   String get profileSettingsThemeTitle => 'Тема приложения';
 
   @override
-  String get profileSettingsThemeSubtitle => 'Переключайтесь между системной, светлой и темной темой.';
+  String get profileSettingsThemeSubtitle =>
+      'Переключайтесь между системной, светлой и темной темой.';
 
   @override
   String get profileSettingsHelpCenterTitle => 'Центр помощи';
 
   @override
-  String get profileSettingsHelpCenterSubtitle => 'Быстрые ответы и инструкции по частым вопросам.';
+  String get profileSettingsHelpCenterSubtitle =>
+      'Быстрые ответы и инструкции по частым вопросам.';
 
   @override
   String get profileSettingsSupportTitle => 'Связаться с поддержкой';
 
   @override
-  String get profileSettingsSupportSubtitle => 'Напишите нам, если нужна помощь с оплатой или доступом.';
+  String get profileSettingsSupportSubtitle =>
+      'Напишите нам, если нужна помощь с оплатой или доступом.';
 
   @override
   String get profileSettingsTermsTitle => 'Пользовательское соглашение';
 
   @override
-  String get profileSettingsTermsSubtitle => 'Изучите правила использования PetMagic.';
+  String get profileSettingsTermsSubtitle =>
+      'Изучите правила использования PetMagic.';
 
   @override
   String get profileSettingsPrivacyTitle => 'Политика конфиденциальности';
 
   @override
-  String get profileSettingsPrivacySubtitle => 'Узнайте, как обрабатываются и защищаются ваши данные.';
+  String get profileSettingsPrivacySubtitle =>
+      'Узнайте, как обрабатываются и защищаются ваши данные.';
 
   @override
   String get profileSettingsDeleteAccountTitle => 'Удалить аккаунт';
 
   @override
-  String get profileSettingsDeleteAccountSubtitle => 'Это действие нельзя отменить.';
+  String get profileSettingsDeleteAccountSubtitle =>
+      'Это действие нельзя отменить.';
 
   @override
-  String get profileAccountDetailsSubtitle => 'Проверьте данные аккаунта, которые сейчас доступны на этом устройстве.';
+  String get profileAccountDetailsSubtitle =>
+      'Проверьте данные аккаунта, которые сейчас доступны на этом устройстве.';
 
   @override
   String get profileAccountDetailsSection => 'Детали аккаунта';
@@ -1331,19 +1428,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileDetailsNextStepSection => 'Что дальше';
 
   @override
-  String get profileDetailsLinkedAccountsBody => 'Подключите Google или Apple, чтобы сохранить доступ к генерациям, покупкам и PawSpark на любом устройстве.';
+  String get profileDetailsLinkedAccountsBody =>
+      'Подключите Google или Apple, чтобы сохранить доступ к генерациям, покупкам и PawSpark на любом устройстве.';
 
   @override
-  String get profileDetailsLinkedAccountsStatus => 'Выберите и подключите удобные способы входа для вашего аккаунта.';
+  String get profileDetailsLinkedAccountsStatus =>
+      'Выберите и подключите удобные способы входа для вашего аккаунта.';
 
   @override
-  String get profileDetailsLinkedAccountsNext => 'Подключенные аккаунты помогают:\n✓ восстановить доступ\n✓ войти на новом устройстве\n✓ сохранить покупки и PawSpark\n✓ защитить аккаунт';
+  String get profileDetailsLinkedAccountsNext =>
+      'Подключенные аккаунты помогают:\n✓ восстановить доступ\n✓ войти на новом устройстве\n✓ сохранить покупки и PawSpark\n✓ защитить аккаунт';
 
   @override
-  String get profileLinkedAccountsLoading => 'Загружаем связанные способы входа...';
+  String get profileLinkedAccountsLoading =>
+      'Загружаем связанные способы входа...';
 
   @override
-  String get profileLinkedAccountsConnectedStatus => 'Подключен и готов для входа.';
+  String get profileLinkedAccountsConnectedStatus =>
+      'Подключен и готов для входа.';
 
   @override
   String get profileLinkedAccountsNotConnectedStatus => 'Не подключен.';
@@ -1355,28 +1457,36 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileLinkedAccountsDisconnectAction => 'Отключить';
 
   @override
-  String get profileLinkedAccountsProtectedHint => 'Этот способ входа нельзя отключить, пока не подключен другой способ входа.';
+  String get profileLinkedAccountsProtectedHint =>
+      'Этот способ входа нельзя отключить, пока не подключен другой способ входа.';
 
   @override
-  String get profileLinkedAccountsSignInRequired => 'Войдите снова, чтобы управлять связанными аккаунтами.';
+  String get profileLinkedAccountsSignInRequired =>
+      'Войдите снова, чтобы управлять связанными аккаунтами.';
 
   @override
-  String get profileLinkedAccountsUnavailable => 'Связанные аккаунты временно недоступны.';
+  String get profileLinkedAccountsUnavailable =>
+      'Связанные аккаунты временно недоступны.';
 
   @override
-  String get profileDetailsNotificationsBody => 'Выберите, какие уведомления хотите получать в PetMagic.';
+  String get profileDetailsNotificationsBody =>
+      'Выберите, какие уведомления хотите получать в PetMagic.';
 
   @override
-  String get profileDetailsNotificationsStatusEnabled => 'Уведомления включены для этого профиля.';
+  String get profileDetailsNotificationsStatusEnabled =>
+      'Уведомления включены для этого профиля.';
 
   @override
-  String get profileDetailsNotificationsStatusDisabled => 'Уведомления отключены для этого профиля.';
+  String get profileDetailsNotificationsStatusDisabled =>
+      'Уведомления отключены для этого профиля.';
 
   @override
-  String get profileDetailsNotificationsNext => 'Вы можете менять push и email-настройки в любой момент.';
+  String get profileDetailsNotificationsNext =>
+      'Вы можете менять push и email-настройки в любой момент.';
 
   @override
-  String get profileNotificationsLoading => 'Загружаем настройки уведомлений...';
+  String get profileNotificationsLoading =>
+      'Загружаем настройки уведомлений...';
 
   @override
   String get profileNotificationsPushSection => 'Push-уведомления';
@@ -1397,7 +1507,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileNotificationsPushNewTemplates => 'Новые шаблоны';
 
   @override
-  String get profileNotificationsPushPurchasesAndSubscriptions => 'Покупки и подписки';
+  String get profileNotificationsPushPurchasesAndSubscriptions =>
+      'Покупки и подписки';
 
   @override
   String get profileNotificationsEmailSection => 'Email';
@@ -1409,7 +1520,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileNotificationsEmailNews => 'Новости PetMagic';
 
   @override
-  String get profileNotificationsEmailAccountAlerts => 'Важные уведомления аккаунта';
+  String get profileNotificationsEmailAccountAlerts =>
+      'Важные уведомления аккаунта';
 
   @override
   String get profileNotificationsDeviceSection => 'Состояние устройства';
@@ -1421,67 +1533,87 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileNotificationsPushPermissionAllowed => 'Разрешены';
 
   @override
-  String get profileNotificationsPushPermissionDenied => 'Отключены в настройках устройства';
+  String get profileNotificationsPushPermissionDenied =>
+      'Отключены в настройках устройства';
 
   @override
-  String get profileNotificationsPushPermissionNotDetermined => 'Разрешение еще не запрашивалось';
+  String get profileNotificationsPushPermissionNotDetermined =>
+      'Разрешение еще не запрашивалось';
 
   @override
-  String get profileNotificationsPushPermissionProvisional => 'Разрешены в тихом режиме';
+  String get profileNotificationsPushPermissionProvisional =>
+      'Разрешены в тихом режиме';
 
   @override
-  String get profileNotificationsPushPermissionUnknown => 'Не удалось определить';
+  String get profileNotificationsPushPermissionUnknown =>
+      'Не удалось определить';
 
   @override
   String get profileNotificationsRefreshStatus => 'Обновить статус';
 
   @override
-  String get profileNotificationsRequestPermission => 'Разрешить push-уведомления';
+  String get profileNotificationsRequestPermission =>
+      'Разрешить push-уведомления';
 
   @override
-  String get profileDetailsHelpBody => 'Центр помощи соберет быстрые ответы, инструкции по настройке и подсказки по аккаунту в одном месте.';
+  String get profileDetailsHelpBody =>
+      'Центр помощи соберет быстрые ответы, инструкции по настройке и подсказки по аккаунту в одном месте.';
 
   @override
-  String get profileDetailsHelpStatus => 'Встроенная база знаний еще собирается, поэтому этот экран пока показывает текущий статус запуска.';
+  String get profileDetailsHelpStatus =>
+      'Встроенная база знаний еще собирается, поэтому этот экран пока показывает текущий статус запуска.';
 
   @override
-  String get profileDetailsHelpNext => 'Первые статьи помощи и инструкции по устранению проблем появятся здесь после публикации материалов для мобильной поддержки.';
+  String get profileDetailsHelpNext =>
+      'Первые статьи помощи и инструкции по устранению проблем появятся здесь после публикации материалов для мобильной поддержки.';
 
   @override
-  String get profileDetailsSupportBody => 'Здесь будут обрабатываться обращения в поддержку без выхода из раздела профиля.';
+  String get profileDetailsSupportBody =>
+      'Здесь будут обрабатываться обращения в поддержку без выхода из раздела профиля.';
 
   @override
-  String get profileDetailsSupportStatus => 'Прямое обращение в поддержку внутри приложения пока недоступно. Сейчас этот экран служит стартовой точкой для связи с поддержкой.';
+  String get profileDetailsSupportStatus =>
+      'Прямое обращение в поддержку внутри приложения пока недоступно. Сейчас этот экран служит стартовой точкой для связи с поддержкой.';
 
   @override
-  String get profileDetailsSupportNext => 'Далее здесь появится полноценная форма обращения или передача обращения по email с обработкой в системе поддержки.';
+  String get profileDetailsSupportNext =>
+      'Далее здесь появится полноценная форма обращения или передача обращения по email с обработкой в системе поддержки.';
 
   @override
-  String get profileDetailsTermsBody => 'Проверьте, на каких правилах строится использование приложения и аккаунта PetMagic.';
+  String get profileDetailsTermsBody =>
+      'Проверьте, на каких правилах строится использование приложения и аккаунта PetMagic.';
 
   @override
-  String get profileDetailsTermsStatusAccepted => 'Этот аккаунт уже принял Пользовательское соглашение во время регистрации.';
+  String get profileDetailsTermsStatusAccepted =>
+      'Этот аккаунт уже принял Пользовательское соглашение во время регистрации.';
 
   @override
-  String get profileDetailsTermsStatusPending => 'Для этого аккаунта еще не зафиксировано завершенное принятие условий.';
+  String get profileDetailsTermsStatusPending =>
+      'Для этого аккаунта еще не зафиксировано завершенное принятие условий.';
 
   @override
-  String get profileDetailsTermsNext => 'Позже к этому экрану можно подключить полный юридический документ. Сейчас он подтверждает текущее состояние согласия.';
+  String get profileDetailsTermsNext =>
+      'Позже к этому экрану можно подключить полный юридический документ. Сейчас он подтверждает текущее состояние согласия.';
 
   @override
-  String get profileDetailsPrivacyBody => 'Проверьте, как PetMagic хранит, защищает и использует данные аккаунта.';
+  String get profileDetailsPrivacyBody =>
+      'Проверьте, как PetMagic хранит, защищает и использует данные аккаунта.';
 
   @override
-  String get profileDetailsPrivacyStatus => 'Сейчас здесь показана краткая информация о приватности. Полная юридическая версия документа готовится.';
+  String get profileDetailsPrivacyStatus =>
+      'Сейчас здесь показана краткая информация о приватности. Полная юридическая версия документа готовится.';
 
   @override
-  String get profileDetailsPrivacyNext => 'В следующем обновлении здесь будет доступен полный текст политики конфиденциальности.';
+  String get profileDetailsPrivacyNext =>
+      'В следующем обновлении здесь будет доступен полный текст политики конфиденциальности.';
 
   @override
-  String get profileLegalAcceptanceCurrent => 'Для этого аккаунта зафиксировано принятие актуальных юридических документов.';
+  String get profileLegalAcceptanceCurrent =>
+      'Для этого аккаунта зафиксировано принятие актуальных юридических документов.';
 
   @override
-  String get profileLegalAcceptanceRequired => 'Этому аккаунту нужно принять актуальные версии юридических документов.';
+  String get profileLegalAcceptanceRequired =>
+      'Этому аккаунту нужно принять актуальные версии юридических документов.';
 
   @override
   String get profileLegalVersionLabel => 'Текущая версия';
@@ -1496,16 +1628,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileLegalAcceptedAtLabel => 'Дата принятия';
 
   @override
-  String get profileLegalLoading => 'Загружаем актуальный юридический документ...';
+  String get profileLegalLoading =>
+      'Загружаем актуальный юридический документ...';
 
   @override
-  String get profileLegalUnavailable => 'Сейчас не удалось загрузить актуальный юридический документ.';
+  String get profileLegalUnavailable =>
+      'Сейчас не удалось загрузить актуальный юридический документ.';
 
   @override
-  String get profileLegalAcceptAction => 'Принять актуальные юридические документы';
+  String get profileLegalAcceptAction =>
+      'Принять актуальные юридические документы';
 
   @override
-  String get profileLegalAcceptanceGuestHint => 'Во время регистрации вы примете актуальные версии Пользовательского соглашения и Политики конфиденциальности.';
+  String get profileLegalAcceptanceGuestHint =>
+      'Во время регистрации вы примете актуальные версии Пользовательского соглашения и Политики конфиденциальности.';
 
   @override
   String get profileLegalDocumentSection => 'Документ';
@@ -1517,10 +1653,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileLegalOpenFullAction => 'Открыть полную политику';
 
   @override
-  String get profileLegalCompactHint => 'Сверху остается краткое резюме, а детали раскрываются только по нажатию.';
+  String get profileLegalCompactHint =>
+      'Сверху остается краткое резюме, а детали раскрываются только по нажатию.';
 
   @override
-  String get profileLegalCurrentAcceptedHint => 'Для этого аккаунта сейчас не требуется дополнительное подтверждение.';
+  String get profileLegalCurrentAcceptedHint =>
+      'Для этого аккаунта сейчас не требуется дополнительное подтверждение.';
 
   @override
   String get profileLegalCompactSectionLabel => 'Нажмите, чтобы раскрыть';
@@ -1529,46 +1667,56 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profilePrivacyQuickDataTitle => 'Что мы собираем';
 
   @override
-  String get profilePrivacyQuickDataBody => '• Email\n• Имя профиля\n• Историю генераций\n• Загруженные фото питомцев\n• Историю покупок\n• Обращения в поддержку';
+  String get profilePrivacyQuickDataBody =>
+      '• Email\n• Имя профиля\n• Историю генераций\n• Загруженные фото питомцев\n• Историю покупок\n• Обращения в поддержку';
 
   @override
   String get profilePrivacyQuickUsageTitle => 'Для чего используем';
 
   @override
-  String get profilePrivacyQuickUsageBody => '• Работа приложения\n• Генерация контента\n• Поддержка\n• Безопасность аккаунта и платежей';
+  String get profilePrivacyQuickUsageBody =>
+      '• Работа приложения\n• Генерация контента\n• Поддержка\n• Безопасность аккаунта и платежей';
 
   @override
   String get profilePrivacyQuickSharingTitle => 'Передаём ли данные?';
 
   @override
-  String get profilePrivacyQuickSharingBody => 'Мы не продаём персональные данные. Передача возможна только сервисам-обработчикам, которые нужны для работы приложения (например, платежи, облачная инфраструктура, аналитика).';
+  String get profilePrivacyQuickSharingBody =>
+      'Мы не продаём персональные данные. Передача возможна только сервисам-обработчикам, которые нужны для работы приложения (например, платежи, облачная инфраструктура, аналитика).';
 
   @override
   String get profilePrivacyQuickRightsTitle => 'Ваши права';
 
   @override
-  String get profilePrivacyQuickRightsBody => '• Запросить копию данных\n• Запросить удаление аккаунта и данных\n• Отозвать согласие, где это применимо';
+  String get profilePrivacyQuickRightsBody =>
+      '• Запросить копию данных\n• Запросить удаление аккаунта и данных\n• Отозвать согласие, где это применимо';
 
   @override
-  String get profileDetailsDeleteBody => 'Удаление аккаунта намеренно защищено и пока не выполняется с этого экрана.';
+  String get profileDetailsDeleteBody =>
+      'Удаление аккаунта намеренно защищено и пока не выполняется с этого экрана.';
 
   @override
-  String get profileDetailsDeleteStatus => 'Удаление аккаунта сейчас недоступно в один тап в мобильном приложении. Это сделано для безопасности, пока не завершен подтвержденный сценарий удаления.';
+  String get profileDetailsDeleteStatus =>
+      'Удаление аккаунта сейчас недоступно в один тап в мобильном приложении. Это сделано для безопасности, пока не завершен подтвержденный сценарий удаления.';
 
   @override
-  String get profileDetailsDeleteNext => 'После внедрения полного сценария удаления этот экран станет шагом подтверждения и проверки личности.';
+  String get profileDetailsDeleteNext =>
+      'После внедрения полного сценария удаления этот экран станет шагом подтверждения и проверки личности.';
 
   @override
   String get supportChatTitle => 'Чат поддержки';
 
   @override
-  String get supportChatSubtitle => 'Пишите команде PetMagic напрямую из своего профиля.';
+  String get supportChatSubtitle =>
+      'Пишите команде PetMagic напрямую из своего профиля.';
 
   @override
-  String get supportChatSecureTitle => 'Ваш диалог защищен. Мы используем его только для поддержки.';
+  String get supportChatSecureTitle =>
+      'Ваш диалог защищен. Мы используем его только для поддержки.';
 
   @override
-  String get supportChatSecureSubtitle => 'Мы бережно храним ваши данные и защищаем личную информацию.';
+  String get supportChatSecureSubtitle =>
+      'Мы бережно храним ваши данные и защищаем личную информацию.';
 
   @override
   String get supportChatTeamTitle => 'PetMagic Support';
@@ -1589,16 +1737,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatEmptyTitle => 'Начните диалог';
 
   @override
-  String get supportChatEmptyMessage => 'Чат поддержки уже готов. Отправьте первое сообщение, и команда ответит здесь.';
+  String get supportChatEmptyMessage =>
+      'Чат поддержки уже готов. Отправьте первое сообщение, и команда ответит здесь.';
 
   @override
-  String get supportChatWelcomeTitle => 'Здравствуйте! Опишите проблему, и мы поможем.';
+  String get supportChatWelcomeTitle =>
+      'Здравствуйте! Опишите проблему, и мы поможем.';
 
   @override
-  String get supportChatWelcomeBody => 'Вы также можете выбрать одну из частых тем ниже.';
+  String get supportChatWelcomeBody =>
+      'Вы также можете выбрать одну из частых тем ниже.';
 
   @override
-  String get supportChatQuickActionGeneration => 'Проблема с генерацией изображения';
+  String get supportChatQuickActionGeneration =>
+      'Проблема с генерацией изображения';
 
   @override
   String get supportChatQuickActionPayment => 'Проблема с оплатой';
@@ -1625,19 +1777,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatFaqGenerationTitle => 'Почему генерация не сработала?';
 
   @override
-  String get supportChatFaqGenerationBody => 'Отправьте название шаблона, тип питомца и по возможности скриншот. Обычно этого хватает, чтобы поддержка сразу начала разбор.';
+  String get supportChatFaqGenerationBody =>
+      'Отправьте название шаблона, тип питомца и по возможности скриншот. Обычно этого хватает, чтобы поддержка сразу начала разбор.';
 
   @override
   String get supportChatFaqResponseTitle => 'Когда ответит поддержка?';
 
   @override
-  String get supportChatFaqResponseBody => 'Команда поддержки ответит в этом же чате. Обычно мы возвращаемся с ответом в течение 24 часов.';
+  String get supportChatFaqResponseBody =>
+      'Команда поддержки ответит в этом же чате. Обычно мы возвращаемся с ответом в течение 24 часов.';
 
   @override
   String get supportChatFaqRefundTitle => 'Как работает возврат?';
 
   @override
-  String get supportChatFaqRefundBody => 'Напишите дату заказа и причину обращения. Платежные вопросы разбираются прямо в этом диалоге без перехода в другой канал.';
+  String get supportChatFaqRefundBody =>
+      'Напишите дату заказа и причину обращения. Платежные вопросы разбираются прямо в этом диалоге без перехода в другой канал.';
 
   @override
   String get supportChatStatusOpen => 'Открыт';
@@ -1655,7 +1810,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatWaitingForSupportStatus => 'Ожидает поддержку';
 
   @override
-  String get supportChatWaitingForSupportStatusHint => 'Запрос открыт. Команда поддержки увидит новое сообщение.';
+  String get supportChatWaitingForSupportStatusHint =>
+      'Запрос открыт. Команда поддержки увидит новое сообщение.';
 
   @override
   String get supportChatInProgressStatusHint => 'Поддержка изучает ваш вопрос.';
@@ -1664,13 +1820,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatAwaitingYourReplyStatus => 'Ожидает ваш ответ';
 
   @override
-  String get supportChatSupportRepliedStatusHint => 'Поддержка ответила. Помогло ли это?';
+  String get supportChatSupportRepliedStatusHint =>
+      'Поддержка ответила. Помогло ли это?';
 
   @override
-  String get supportChatResolvedStatusHint => 'Обращение отмечено решенным. Его можно переоткрыть в течение 7 дней.';
+  String get supportChatResolvedStatusHint =>
+      'Обращение отмечено решенным. Его можно переоткрыть в течение 7 дней.';
 
   @override
-  String get supportChatClosedStatusHint => 'Обращение закрыто. Если вопрос остался, напишите сообщение — мы откроем его снова.';
+  String get supportChatClosedStatusHint =>
+      'Обращение закрыто. Если вопрос остался, напишите сообщение — мы откроем его снова.';
 
   @override
   String get supportChatMessageDelivered => 'Доставлено';
@@ -1679,10 +1838,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatMessageRead => 'Прочитано';
 
   @override
-  String get supportChatUnavailableError => 'Сейчас не удается связаться с поддержкой. Попробуйте снова через минуту.';
+  String get supportChatUnavailableError =>
+      'Сейчас не удается связаться с поддержкой. Попробуйте снова через минуту.';
 
   @override
-  String get supportChatAttachmentUnavailableError => 'Сейчас не удается отправить вложение. Попробуйте снова через минуту.';
+  String get supportChatAttachmentUnavailableError =>
+      'Сейчас не удается отправить вложение. Попробуйте снова через минуту.';
 
   @override
   String get supportChatAttachmentTooLargeError => 'Файл слишком большой';
@@ -1706,10 +1867,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatImageSavedMessage => 'Изображение сохранено';
 
   @override
-  String get supportChatSaveImageFailedError => 'Не удалось сохранить изображение';
+  String get supportChatSaveImageFailedError =>
+      'Не удалось сохранить изображение';
 
   @override
-  String get supportChatShareImageFailedError => 'Не удалось поделиться изображением';
+  String get supportChatShareImageFailedError =>
+      'Не удалось поделиться изображением';
 
   @override
   String get supportChatAttachmentStatusUploading => 'Загрузка';
@@ -1729,7 +1892,8 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get supportChatImageUploadFailedLabel => 'Не удалось загрузить изображение';
+  String get supportChatImageUploadFailedLabel =>
+      'Не удалось загрузить изображение';
 
   @override
   String get supportChatFileFallbackLabel => 'Файл';
@@ -1738,13 +1902,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatSystemNoticeTitle => 'Запрос отправлен';
 
   @override
-  String get supportChatSystemNoticeBody => 'Спасибо, мы получили ваше сообщение. Поддержка ответит в этом чате.';
+  String get supportChatSystemNoticeBody =>
+      'Спасибо, мы получили ваше сообщение. Поддержка ответит в этом чате.';
 
   @override
-  String get supportChatComposerAttachmentChip => 'До 5 фото: JPG/PNG/WebP, до 10 МБ каждое';
+  String get supportChatComposerAttachmentChip =>
+      'До 5 фото: JPG/PNG/WebP, до 10 МБ каждое';
 
   @override
-  String get supportChatComposerResponseChip => 'Обычно отвечаем в течение нескольких часов';
+  String get supportChatComposerResponseChip =>
+      'Обычно отвечаем в течение нескольких часов';
 
   @override
   String get supportChatAddPhotoTitle => 'Добавить фото';
@@ -1774,28 +1941,35 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatRecentMediaTitle => 'Недавние медиа';
 
   @override
-  String get supportChatAttachmentNoRecentMedia => 'Нет недавних фото или видео';
+  String get supportChatAttachmentNoRecentMedia =>
+      'Нет недавних фото или видео';
 
   @override
-  String get supportChatAttachmentLimitedAccessHint => 'Доступны не все фото. Разрешите полный доступ к галерее в настройках устройства.';
+  String get supportChatAttachmentLimitedAccessHint =>
+      'Доступны не все фото. Разрешите полный доступ к галерее в настройках устройства.';
 
   @override
   String get supportChatOpenSettingsAction => 'Открыть настройки';
 
   @override
-  String get supportChatAttachmentNoGalleryAccessError => 'Нет доступа к галерее. Разрешите доступ в настройках устройства.';
+  String get supportChatAttachmentNoGalleryAccessError =>
+      'Нет доступа к галерее. Разрешите доступ в настройках устройства.';
 
   @override
-  String get supportChatCameraPermissionPhotoError => 'Для съемки фото нужен доступ к камере.';
+  String get supportChatCameraPermissionPhotoError =>
+      'Для съемки фото нужен доступ к камере.';
 
   @override
-  String get supportChatCameraPermissionVideoError => 'Для записи видео нужен доступ к камере.';
+  String get supportChatCameraPermissionVideoError =>
+      'Для записи видео нужен доступ к камере.';
 
   @override
-  String get supportChatFilesPermissionError => 'Для добавления файлов нужен доступ к файлам.';
+  String get supportChatFilesPermissionError =>
+      'Для добавления файлов нужен доступ к файлам.';
 
   @override
-  String get supportChatAttachmentExpiredPlaceholder => 'Файл был удалён через 30 дней';
+  String get supportChatAttachmentExpiredPlaceholder =>
+      'Файл был удалён через 30 дней';
 
   @override
   String get supportChatReplyLabel => 'Ответ';
@@ -1804,7 +1978,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatReplyToPrefix => 'Ответ на сообщение';
 
   @override
-  String get supportChatReplyOriginalUnavailable => 'Исходное сообщение недоступно';
+  String get supportChatReplyOriginalUnavailable =>
+      'Исходное сообщение недоступно';
 
   @override
   String get supportChatPhotoAttachedLabel => 'Фото прикреплено';
@@ -1819,13 +1994,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatAssistantBadge => 'Ассистент';
 
   @override
-  String get supportChatTooManyAttachmentsError => 'Можно добавить не более 5 файлов';
+  String get supportChatTooManyAttachmentsError =>
+      'Можно добавить не более 5 файлов';
 
   @override
-  String get supportChatAttachmentUnsupportedFormatError => 'Этот формат не поддерживается';
+  String get supportChatAttachmentUnsupportedFormatError =>
+      'Этот формат не поддерживается';
 
   @override
-  String get supportChatAttachmentVideoTooLongError => 'Длительность видео должна быть не более 60 секунд.';
+  String get supportChatAttachmentVideoTooLongError =>
+      'Длительность видео должна быть не более 60 секунд.';
 
   @override
   String get supportChatMarkResolvedAction => 'Да, закрыть обращение';
@@ -1837,7 +2015,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportChatCloseRequestDialogTitle => 'Закрыть обращение?';
 
   @override
-  String get supportChatCloseRequestDialogBody => 'Если проблема решена, мы закроем этот диалог. Вы сможете создать новое обращение позже.';
+  String get supportChatCloseRequestDialogBody =>
+      'Если проблема решена, мы закроем этот диалог. Вы сможете создать новое обращение позже.';
 
   @override
   String get supportChatCloseConfirmAction => 'Закрыть';
@@ -1875,10 +2054,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportHomeOpenChatAction => 'Открыть чат';
 
   @override
-  String get supportHomeTopicGenerationIssue => 'Проблема с генерацией изображения';
+  String get supportHomeTopicGenerationIssue =>
+      'Проблема с генерацией изображения';
 
   @override
-  String get supportHomeTopicGenerationTooLong => 'Генерация занимает слишком долго';
+  String get supportHomeTopicGenerationTooLong =>
+      'Генерация занимает слишком долго';
 
   @override
   String get supportHomeTopicTokensNotArrived => 'PawSpark не пришли';
@@ -1905,22 +2086,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportAssistantCheckLaterAction => 'Проверить позже';
 
   @override
-  String get supportAssistantRecommendationGeneration => 'Для лучшего результата используйте фото, где питомец хорошо виден, не обрезан, не размыт и при хорошем освещении.';
+  String get supportAssistantRecommendationGeneration =>
+      'Для лучшего результата используйте фото, где питомец хорошо виден, не обрезан, не размыт и при хорошем освещении.';
 
   @override
-  String get supportAssistantRecommendationGenerationTooLong => 'Генерация видео может занять несколько минут — обычно от 2 до 10 минут. Если прошло слишком много времени, мы можем передать этот вопрос в поддержку.';
+  String get supportAssistantRecommendationGenerationTooLong =>
+      'Генерация видео может занять несколько минут — обычно от 2 до 10 минут. Если прошло слишком много времени, мы можем передать этот вопрос в поддержку.';
 
   @override
-  String get supportAssistantRecommendationTokensNotArrived => 'Иногда PawSpark после оплаты поступают с задержкой в несколько минут. Если PawSpark так и не появились, создайте обращение, и мы проверим платёж.';
+  String get supportAssistantRecommendationTokensNotArrived =>
+      'Иногда PawSpark после оплаты поступают с задержкой в несколько минут. Если PawSpark так и не появились, создайте обращение, и мы проверим платёж.';
 
   @override
-  String get supportAssistantRecommendationPremiumIssue => 'Если Premium уже оплачен, но не отображается в приложении, попробуйте перезапустить приложение. Если проблема сохраняется, мы проверим статус подписки.';
+  String get supportAssistantRecommendationPremiumIssue =>
+      'Если Premium уже оплачен, но не отображается в приложении, попробуйте перезапустить приложение. Если проблема сохраняется, мы проверим статус подписки.';
 
   @override
-  String get supportAssistantRecommendationPaymentRefund => 'Мы можем проверить ваш платёж или передать запрос на возврат в поддержку. Создайте обращение, и мы прикрепим информацию о покупке, если она доступна.';
+  String get supportAssistantRecommendationPaymentRefund =>
+      'Мы можем проверить ваш платёж или передать запрос на возврат в поддержку. Создайте обращение, и мы прикрепим информацию о покупке, если она доступна.';
 
   @override
-  String get supportAssistantRecommendationOther => 'Опишите, что произошло. Вы также можете приложить скриншот, чтобы поддержка быстрее разобралась в ситуации.';
+  String get supportAssistantRecommendationOther =>
+      'Опишите, что произошло. Вы также можете приложить скриншот, чтобы поддержка быстрее разобралась в ситуации.';
 
   @override
   String get supportTicketFormTitle => 'Создать обращение';
@@ -1956,10 +2143,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get supportTicketFormSubmittingLabel => 'Создание обращения...';
 
   @override
-  String get supportTicketFormSuccessMessage => 'Ваше обращение создано. Мы ответим в этом чате.';
+  String get supportTicketFormSuccessMessage =>
+      'Ваше обращение создано. Мы ответим в этом чате.';
 
   @override
-  String get supportTicketFormErrorMessage => 'Не удалось создать обращение. Попробуйте ещё раз.';
+  String get supportTicketFormErrorMessage =>
+      'Не удалось создать обращение. Попробуйте ещё раз.';
 
   @override
   String get profileSettingsThemeSystem => 'Системная';
@@ -2027,19 +2216,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get emptyTemplatesTitle => 'Шаблонов пока нет';
 
   @override
-  String get emptyTemplatesMessage => 'Попробуйте другой фильтр или обновите каталог.';
+  String get emptyTemplatesMessage =>
+      'Попробуйте другой фильтр или обновите каталог.';
 
   @override
   String get templatesFeedEmptyError => 'Шаблоны временно недоступны.';
 
   @override
-  String get templatesConnectionTimeoutError => 'Нет подключения. Проверьте сеть и попробуйте снова.';
+  String get templatesConnectionTimeoutError =>
+      'Нет подключения. Проверьте сеть и попробуйте снова.';
 
   @override
-  String get templatesServerTimeoutError => 'Сервер отвечает слишком долго. Попробуйте снова.';
+  String get templatesServerTimeoutError =>
+      'Сервер отвечает слишком долго. Попробуйте снова.';
 
   @override
-  String get templatesRequestFailedError => 'Сейчас не удалось загрузить шаблоны. Попробуйте снова.';
+  String get templatesRequestFailedError =>
+      'Сейчас не удалось загрузить шаблоны. Попробуйте снова.';
 
   @override
   String get startupOnboardingActionContinueGuest => 'Продолжить как гость';
@@ -2051,10 +2244,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupOnboardingActionStart => 'Начать';
 
   @override
-  String get startupOnboardingPageOneTitle => 'Создавайте магические моменты с питомцем';
+  String get startupOnboardingPageOneTitle =>
+      'Создавайте магические моменты с питомцем';
 
   @override
-  String get startupOnboardingPageOneSubtitle => 'Превращайте обычные кадры в яркие вирусные истории с шаблонами, созданными для питомцев.';
+  String get startupOnboardingPageOneSubtitle =>
+      'Превращайте обычные кадры в яркие вирусные истории с шаблонами, созданными для питомцев.';
 
   @override
   String get startupOnboardingPageOneHighlightOne => 'Трендовые шаблоны';
@@ -2066,10 +2261,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupOnboardingPageOneHighlightThree => 'Тёплый pet-style';
 
   @override
-  String get startupOnboardingPageTwoTitle => 'Сначала смотрите, потом открывайте больше';
+  String get startupOnboardingPageTwoTitle =>
+      'Сначала смотрите, потом открывайте больше';
 
   @override
-  String get startupOnboardingPageTwoSubtitle => 'Листайте каталог как гость, а вход выполните тогда, когда захотите рендерить, сохранять и открывать premium.';
+  String get startupOnboardingPageTwoSubtitle =>
+      'Листайте каталог как гость, а вход выполните тогда, когда захотите рендерить, сохранять и открывать premium.';
 
   @override
   String get startupOnboardingPageTwoHighlightOne => 'Гостевой просмотр';
@@ -2084,7 +2281,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupOnboardingPageThreeTitle => 'PawSpark и premium ждут позже';
 
   @override
-  String get startupOnboardingPageThreeSubtitle => 'Первое знакомство должно быть лёгким. PawSpark, награды и premium-действия откроются после аккуратной авторизации.';
+  String get startupOnboardingPageThreeSubtitle =>
+      'Первое знакомство должно быть лёгким. PawSpark, награды и premium-действия откроются после аккуратной авторизации.';
 
   @override
   String get startupOnboardingPageThreeHighlightOne => 'Premium-фишки';
@@ -2108,10 +2306,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupWelcomeViewOnboarding => 'Показать onboarding';
 
   @override
-  String get startupWelcomeTitle => 'Создавайте магические видео с вашим питомцем';
+  String get startupWelcomeTitle =>
+      'Создавайте магические видео с вашим питомцем';
 
   @override
-  String get startupWelcomeSubtitle => 'Выберите шаблон, добавьте фото питомца и получите готовое AI-видео за пару минут.';
+  String get startupWelcomeSubtitle =>
+      'Выберите шаблон, добавьте фото питомца и получите готовое AI-видео за пару минут.';
 
   @override
   String get startupWelcomeContinueGuest => 'Продолжить как гость';
@@ -2120,34 +2320,40 @@ class AppLocalizationsRu extends AppLocalizations {
   String get startupWelcomeTemplatesTitle => 'Выберите шаблон';
 
   @override
-  String get startupWelcomeTemplatesSubtitle => 'Тренды, мемы и сезонные сцены для любого настроения.';
+  String get startupWelcomeTemplatesSubtitle =>
+      'Тренды, мемы и сезонные сцены для любого настроения.';
 
   @override
   String get startupWelcomeAiTitle => 'Добавьте фото питомца';
 
   @override
-  String get startupWelcomeAiSubtitle => 'Одного фото достаточно, чтобы AI собрал стиль и движение.';
+  String get startupWelcomeAiSubtitle =>
+      'Одного фото достаточно, чтобы AI собрал стиль и движение.';
 
   @override
   String get startupWelcomeShareTitle => 'Получите готовое видео';
 
   @override
-  String get startupWelcomeShareSubtitle => 'Ролик будет готов для публикации и сохранения в один тап.';
+  String get startupWelcomeShareSubtitle =>
+      'Ролик будет готов для публикации и сохранения в один тап.';
 
   @override
-  String get startupWelcomeGuestHint => 'Можно начать без аккаунта. Регистрация понадобится для сохранения истории и доступа к покупкам.';
+  String get startupWelcomeGuestHint =>
+      'Можно начать без аккаунта. Регистрация понадобится для сохранения истории и доступа к покупкам.';
 
   @override
   String get authEntryTitle => 'С возвращением!';
 
   @override
-  String get authEntrySubtitle => 'Войдите, чтобы продолжить магию для вашего питомца.';
+  String get authEntrySubtitle =>
+      'Войдите, чтобы продолжить магию для вашего питомца.';
 
   @override
   String get authRegisterTitle => 'Создайте аккаунт';
 
   @override
-  String get authRegisterSubtitle => 'Присоединяйтесь к PetMagic и откройте шаблоны, PawSpark и premium-возможности.';
+  String get authRegisterSubtitle =>
+      'Присоединяйтесь к PetMagic и откройте шаблоны, PawSpark и premium-возможности.';
 
   @override
   String get authRegisterAction => 'Зарегистрироваться';
@@ -2162,25 +2368,29 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authPasswordRulesHint => 'Используйте минимум 6 символов.';
 
   @override
-  String get authPasswordTooShort => 'Пароль должен содержать минимум 6 символов.';
+  String get authPasswordTooShort =>
+      'Пароль должен содержать минимум 6 символов.';
 
   @override
   String get authForgotPasswordAction => 'Забыли пароль?';
 
   @override
-  String get authForgotPasswordComingSoon => 'Восстановление пароля скоро появится.';
+  String get authForgotPasswordComingSoon =>
+      'Восстановление пароля скоро появится.';
 
   @override
   String get authPasswordResetTitle => 'Восстановление пароля';
 
   @override
-  String get authPasswordResetSubtitle => 'Введите email, и мы отправим код для сброса пароля.';
+  String get authPasswordResetSubtitle =>
+      'Введите email, и мы отправим код для сброса пароля.';
 
   @override
   String get authPasswordResetCodeTitle => 'Введите код из письма';
 
   @override
-  String get authPasswordResetCodeSubtitle => 'Укажите код и задайте новый пароль для входа.';
+  String get authPasswordResetCodeSubtitle =>
+      'Укажите код и задайте новый пароль для входа.';
 
   @override
   String get authPasswordResetCodeLabel => 'Код из письма';
@@ -2195,25 +2405,31 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authPasswordResetResendAction => 'Отправить код повторно';
 
   @override
-  String get authPasswordResetCodeSent => 'Код для восстановления отправлен на вашу почту.';
+  String get authPasswordResetCodeSent =>
+      'Код для восстановления отправлен на вашу почту.';
 
   @override
-  String get authPasswordResetSuccess => 'Пароль обновлен. Теперь можно войти с новым паролем.';
+  String get authPasswordResetSuccess =>
+      'Пароль обновлен. Теперь можно войти с новым паролем.';
 
   @override
-  String get authPasswordResetCodeInvalid => 'Код восстановления недействителен или уже истек.';
+  String get authPasswordResetCodeInvalid =>
+      'Код восстановления недействителен или уже истек.';
 
   @override
   String get authOrContinueWith => 'или продолжить через';
 
   @override
-  String get authAcceptTermsLabel => 'Я принимаю Условия использования и Политику конфиденциальности';
+  String get authAcceptTermsLabel =>
+      'Я принимаю Условия использования и Политику конфиденциальности';
 
   @override
-  String get authReceiveUpdatesLabel => 'Я хочу получать новости и предложения от PetMagic';
+  String get authReceiveUpdatesLabel =>
+      'Я хочу получать новости и предложения от PetMagic';
 
   @override
-  String get authAcceptTermsRequired => 'Чтобы создать аккаунт, нужно принять Условия использования и Политику конфиденциальности.';
+  String get authAcceptTermsRequired =>
+      'Чтобы создать аккаунт, нужно принять Условия использования и Политику конфиденциальности.';
 
   @override
   String get authReviewTermsAction => 'Открыть соглашение';
@@ -2222,13 +2438,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authReviewPrivacyAction => 'Открыть политику';
 
   @override
-  String get authLegalLoading => 'Загружаем актуальные документы соглашения и приватности...';
+  String get authLegalLoading =>
+      'Загружаем актуальные документы соглашения и приватности...';
 
   @override
-  String get authLegalReady => 'Актуальные юридические документы готовы к просмотру и принятию.';
+  String get authLegalReady =>
+      'Актуальные юридические документы готовы к просмотру и принятию.';
 
   @override
-  String get authLegalUnavailable => 'Актуальные юридические документы временно недоступны. Попробуйте еще раз чуть позже.';
+  String get authLegalUnavailable =>
+      'Актуальные юридические документы временно недоступны. Попробуйте еще раз чуть позже.';
 
   @override
   String get authGoogleShortLabel => 'Google';
@@ -2261,19 +2480,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authExternalCancelled => 'Вход был отменен.';
 
   @override
-  String get authExternalFailed => 'Не удалось выполнить вход через внешний сервис. Попробуйте еще раз.';
+  String get authExternalFailed =>
+      'Не удалось выполнить вход через внешний сервис. Попробуйте еще раз.';
 
   @override
-  String get authExternalTimedOut => 'Вход занял слишком много времени. Попробуйте еще раз.';
+  String get authExternalTimedOut =>
+      'Вход занял слишком много времени. Попробуйте еще раз.';
 
   @override
   String get authExternalLaunchFailed => 'Не удалось открыть страницу входа.';
 
   @override
-  String get authExternalCallbackFailed => 'Не удалось завершить вход обратно в приложении.';
+  String get authExternalCallbackFailed =>
+      'Не удалось завершить вход обратно в приложении.';
 
   @override
-  String get authExternalSessionExpired => 'Сессия внешнего входа истекла. Попробуйте еще раз.';
+  String get authExternalSessionExpired =>
+      'Сессия внешнего входа истекла. Попробуйте еще раз.';
 
   @override
   String get authSignInRequired => 'Требуется вход в аккаунт.';
@@ -2285,19 +2508,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authLoginFailed => 'Не удалось войти. Попробуйте снова.';
 
   @override
-  String get authRegistrationFailed => 'Не удалось зарегистрироваться. Попробуйте снова.';
+  String get authRegistrationFailed =>
+      'Не удалось зарегистрироваться. Попробуйте снова.';
 
   @override
-  String get authPasswordResetRequestFailed => 'Не удалось отправить запрос на сброс пароля. Попробуйте снова.';
+  String get authPasswordResetRequestFailed =>
+      'Не удалось отправить запрос на сброс пароля. Попробуйте снова.';
 
   @override
-  String get authPasswordResetFailed => 'Не удалось сбросить пароль. Попробуйте снова.';
+  String get authPasswordResetFailed =>
+      'Не удалось сбросить пароль. Попробуйте снова.';
 
   @override
   String get authRequestFailed => 'Запрос не выполнен. Попробуйте снова.';
 
   @override
-  String get profileActionFailed => 'Не удалось завершить действие. Попробуйте еще раз.';
+  String get profileActionFailed =>
+      'Не удалось завершить действие. Попробуйте еще раз.';
 
   @override
   String get authSecurePrivateTitle => 'Безопасно';
@@ -2321,13 +2548,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authPrivacyTitle => 'Ваша приватность важна';
 
   @override
-  String get authPrivacySubtitle => 'Мы не продаем и не передаем ваши данные третьим лицам.';
+  String get authPrivacySubtitle =>
+      'Мы не продаем и не передаем ваши данные третьим лицам.';
 
   @override
   String get authRequiredTitle => 'Войдите, чтобы открыть это действие';
 
   @override
-  String get authRequiredMessage => 'Гость может изучать приложение, но действия с шаблонами, наградами и PawSpark требуют аккаунт PetMagic.';
+  String get authRequiredMessage =>
+      'Гость может изучать приложение, но действия с шаблонами, наградами и PawSpark требуют аккаунт PetMagic.';
 
   @override
   String get authRequiredContinueBrowsing => 'Продолжить просмотр';
@@ -2357,7 +2586,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowReadyTitle => 'Готово к созданию!';
 
   @override
-  String get templateFlowCheckDetailsSubtitle => 'Проверьте детали перед созданием';
+  String get templateFlowCheckDetailsSubtitle =>
+      'Проверьте детали перед созданием';
 
   @override
   String get templateFlowTemplateLabel => 'Шаблон';
@@ -2369,7 +2599,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowBalanceLabel => 'Ваш баланс';
 
   @override
-  String get templateFlowDurationHint => 'Создание может занять от 10 секунд до 1 минуты.';
+  String get templateFlowDurationHint =>
+      'Создание может занять от 10 секунд до 1 минуты.';
 
   @override
   String get templateFlowCreateMagicAction => 'Создать магию';
@@ -2381,13 +2612,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowPremiumTemplateTitle => 'Premium-шаблон';
 
   @override
-  String get templateFlowPremiumTemplateMessage => 'Этот шаблон доступен с Premium.';
+  String get templateFlowPremiumTemplateMessage =>
+      'Этот шаблон доступен с Premium.';
 
   @override
   String get templateFlowInsufficientBalanceTitle => 'Недостаточно PawSpark';
 
   @override
-  String templateFlowInsufficientBalanceMessage(Object tokenCost, Object balance) {
+  String templateFlowInsufficientBalanceMessage(
+    Object tokenCost,
+    Object balance,
+  ) {
     return 'Шаблон стоит $tokenCost PawSpark. Ваш баланс: $balance PawSpark.';
   }
 
@@ -2398,10 +2633,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowCreateFailedTitle => 'Не получилось создать магию';
 
   @override
-  String get templateFlowCreateFailedBalanceHint => 'Пополните баланс и запустите создание еще раз.';
+  String get templateFlowCreateFailedBalanceHint =>
+      'Пополните баланс и запустите создание еще раз.';
 
   @override
-  String get templateFlowCreateFailedRetryHint => 'Попробуйте другое фото или повторите позже.';
+  String get templateFlowCreateFailedRetryHint =>
+      'Попробуйте другое фото или повторите позже.';
 
   @override
   String get templateFlowCreateHint => 'Это может занять немного времени';
@@ -2458,19 +2695,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowUploadPetPhotoAction => 'Загрузить фото питомца';
 
   @override
-  String get templateFlowPremiumRequiredError => 'Этот шаблон доступен только с Premium.';
+  String get templateFlowPremiumRequiredError =>
+      'Этот шаблон доступен только с Premium.';
 
   @override
-  String get templateFlowInsufficientBalanceError => 'Недостаточно PawSpark для запуска генерации.';
+  String get templateFlowInsufficientBalanceError =>
+      'Недостаточно PawSpark для запуска генерации.';
 
   @override
-  String get templateFlowNetworkError => 'Нет соединения. Проверьте интернет и попробуйте снова.';
+  String get templateFlowNetworkError =>
+      'Нет соединения. Проверьте интернет и попробуйте снова.';
 
   @override
-  String get templateFlowServerError => 'Сервис временно недоступен. Попробуйте чуть позже.';
+  String get templateFlowServerError =>
+      'Сервис временно недоступен. Попробуйте чуть позже.';
 
   @override
-  String get templateFlowStartFailedError => 'Не удалось запустить генерацию. Попробуйте еще раз.';
+  String get templateFlowStartFailedError =>
+      'Не удалось запустить генерацию. Попробуйте еще раз.';
 
   @override
   String get generationStatusTitle => 'Статус генерации';
@@ -2533,10 +2775,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusCancelGenerationAction => 'Отменить генерацию';
 
   @override
-  String get generationStatusResultUnavailableForSave => 'Результат пока недоступен для сохранения.';
+  String get generationStatusResultUnavailableForSave =>
+      'Результат пока недоступен для сохранения.';
 
   @override
-  String get generationStatusResultUnavailableForShare => 'Результат пока недоступен для шаринга.';
+  String get generationStatusResultUnavailableForShare =>
+      'Результат пока недоступен для шаринга.';
 
   @override
   String get generationStatusSaveFileDialogTitle => 'Сохранить файл';
@@ -2545,7 +2789,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusFileSavedMessage => 'Файл сохранен на устройство.';
 
   @override
-  String get generationStatusFileSaveFailedMessage => 'Не удалось сохранить файл. Попробуйте снова.';
+  String get generationStatusFileSaveFailedMessage =>
+      'Не удалось сохранить файл. Попробуйте снова.';
 
   @override
   String get generationStatusSavedToGalleryMessage => 'Сохранено в галерею';
@@ -2557,25 +2802,30 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusDeletedMessage => 'Удалено';
 
   @override
-  String get generationStatusFullscreenControlsHint => 'Нажмите, чтобы скрыть/показать элементы управления';
+  String get generationStatusFullscreenControlsHint =>
+      'Нажмите, чтобы скрыть/показать элементы управления';
 
   @override
   String get generationStatusDeleteSoonMessage => 'Удаление скоро добавим.';
 
   @override
-  String get generationStatusCancelSoonMessage => 'Отмена генерации появится в ближайшем обновлении.';
+  String get generationStatusCancelSoonMessage =>
+      'Отмена генерации появится в ближайшем обновлении.';
 
   @override
-  String get generationStatusRetrySoonMessage => 'Попробуйте выбрать фото и запустить генерацию снова.';
+  String get generationStatusRetrySoonMessage =>
+      'Попробуйте выбрать фото и запустить генерацию снова.';
 
   @override
-  String get generationStatusFeedbackThanksMessage => 'Спасибо! Ваш отзыв поможет улучшить PetMagic.';
+  String get generationStatusFeedbackThanksMessage =>
+      'Спасибо! Ваш отзыв поможет улучшить PetMagic.';
 
   @override
   String get generationStatusResultTitle => 'Результат PetMagic';
 
   @override
-  String get generationStatusNonTerminalHint => 'Обычно это занимает несколько минут. Вы можете продолжить пользоваться приложением.';
+  String get generationStatusNonTerminalHint =>
+      'Обычно это занимает несколько минут. Вы можете продолжить пользоваться приложением.';
 
   @override
   String get generationStatusStageQueued => 'В очереди';
@@ -2593,16 +2843,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusFailedTitle => 'Не удалось создать результат';
 
   @override
-  String get generationStatusTokensRefundedHint => 'PawSpark возвращены на ваш баланс.';
+  String get generationStatusTokensRefundedHint =>
+      'PawSpark возвращены на ваш баланс.';
 
   @override
   String get generationStatusTokensRefundedShort => 'PawSpark возвращены';
 
   @override
-  String get generationStatusSupportHint => 'Если ошибка повторится, напишите в поддержку.';
+  String get generationStatusSupportHint =>
+      'Если ошибка повторится, напишите в поддержку.';
 
   @override
-  String get generationStatusBackgroundHint => 'Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.';
+  String get generationStatusBackgroundHint =>
+      'Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.';
 
   @override
   String get generationStatusDownloadAction => 'Скачать';
@@ -2617,28 +2870,35 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusFeedbackCommentLabel => 'Комментарий';
 
   @override
-  String get generationStatusFeedbackCommentHint => 'Расскажите коротко, что не так';
+  String get generationStatusFeedbackCommentHint =>
+      'Расскажите коротко, что не так';
 
   @override
   String get generationStatusFeedbackSubmitAction => 'Отправить отзыв';
 
   @override
-  String get generationStatusFeedbackReasonPetNotSimilar => 'Питомец плохо похож на себя';
+  String get generationStatusFeedbackReasonPetNotSimilar =>
+      'Питомец плохо похож на себя';
 
   @override
-  String get generationStatusFeedbackReasonFaceDistorted => 'Морда или лицо искажены';
+  String get generationStatusFeedbackReasonFaceDistorted =>
+      'Морда или лицо искажены';
 
   @override
-  String get generationStatusFeedbackReasonStrangeMotion => 'Движение выглядит странно';
+  String get generationStatusFeedbackReasonStrangeMotion =>
+      'Движение выглядит странно';
 
   @override
-  String get generationStatusFeedbackReasonPreviewMismatch => 'Результат отличается от превью';
+  String get generationStatusFeedbackReasonPreviewMismatch =>
+      'Результат отличается от превью';
 
   @override
-  String get generationStatusFeedbackReasonLowQuality => 'Качество получилось низким';
+  String get generationStatusFeedbackReasonLowQuality =>
+      'Качество получилось низким';
 
   @override
-  String get generationStatusFeedbackReasonStyleDisliked => 'Не понравился стиль';
+  String get generationStatusFeedbackReasonStyleDisliked =>
+      'Не понравился стиль';
 
   @override
   String get generationStatusFeedbackReasonOther => 'Другое';
@@ -2661,13 +2921,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusEtaStartsSoon => 'Начнем через несколько минут';
 
   @override
-  String get generationStatusEtaNotifyHint => 'Мы сообщим, когда результат будет готов.';
+  String get generationStatusEtaNotifyHint =>
+      'Мы сообщим, когда результат будет готов.';
 
   @override
-  String get generationStatusFailurePhotoHint => 'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
+  String get generationStatusFailurePhotoHint =>
+      'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
 
   @override
-  String get generationStatusFailureTechnicalHint => 'Не удалось создать результат из-за технической ошибки. Мы вернули PawSpark на ваш баланс.';
+  String get generationStatusFailureTechnicalHint =>
+      'Не удалось создать результат из-за технической ошибки. Мы вернули PawSpark на ваш баланс.';
 
   @override
   String get generationStatusStatusCompleted => 'Ваш результат готов';
@@ -2679,13 +2942,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusStatusCreatingMagic => 'Создаем магию...';
 
   @override
-  String get generationStatusTerminalRefundedHint => 'PawSpark возвращены автоматически.';
+  String get generationStatusTerminalRefundedHint =>
+      'PawSpark возвращены автоматически.';
 
   @override
-  String get generationStatusTerminalFailureHint => 'Техническая ошибка уже зафиксирована.';
+  String get generationStatusTerminalFailureHint =>
+      'Техническая ошибка уже зафиксирована.';
 
   @override
-  String get generationStatusTerminalSuccessHint => 'Откройте результат, поделитесь им или оставьте отзыв.';
+  String get generationStatusTerminalSuccessHint =>
+      'Откройте результат, поделитесь им или оставьте отзыв.';
 
   @override
   String get generationStatusSectionActive => 'В процессе';
@@ -2714,7 +2980,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusCollapseAction => 'Свернуть ▲';
 
   @override
-  String get generationStatusActiveInfoHint => 'Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.';
+  String get generationStatusActiveInfoHint =>
+      'Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.';
 
   @override
   String generationStatusUnreadCount(int count) {
@@ -2725,7 +2992,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusEmptyTitle => 'Здесь появятся ваши результаты';
 
   @override
-  String get generationStatusEmptyMessage => 'Выберите шаблон, загрузите фото питомца и создайте первый магический арт.';
+  String get generationStatusEmptyMessage =>
+      'Выберите шаблон, загрузите фото питомца и создайте первый магический арт.';
 
   @override
   String get generationStatusSubtitleAll => 'Ваши магические создания';
@@ -2743,7 +3011,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusOfflineBannerTitle => 'Вы офлайн';
 
   @override
-  String get generationStatusOfflineBannerMessage => 'Показываем ранее сохраненные результаты на этом устройстве.';
+  String get generationStatusOfflineBannerMessage =>
+      'Показываем ранее сохраненные результаты на этом устройстве.';
 
   @override
   String generationStatusOfflineBannerSyncedAt(Object value) {
@@ -2754,7 +3023,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusOnlineBannerTitle => 'Сеть восстановлена';
 
   @override
-  String get generationStatusOnlineBannerMessage => 'Загружены актуальные данные.';
+  String get generationStatusOnlineBannerMessage =>
+      'Загружены актуальные данные.';
 
   @override
   String generationStatusOnlineBannerSyncedAt(Object value) {
@@ -2826,10 +3096,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get emailVerificationChangeEmailAction => 'Изменить email';
 
   @override
-  String get emailVerificationConfirmedMessage => 'Email подтвержден. Пожалуйста, войдите в аккаунт.';
+  String get emailVerificationConfirmedMessage =>
+      'Email подтвержден. Пожалуйста, войдите в аккаунт.';
 
   @override
-  String get emailVerificationResentFallbackMessage => 'Если аккаунт существует, новый код был отправлен.';
+  String get emailVerificationResentFallbackMessage =>
+      'Если аккаунт существует, новый код был отправлен.';
 
   @override
   String get profileNotificationsDeviceAllowed => 'Разрешено';
@@ -2841,7 +3113,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileNotificationsDeviceDenied => 'Запрещено';
 
   @override
-  String get profileNotificationsDevicePermanentlyDenied => 'Запрещено навсегда';
+  String get profileNotificationsDevicePermanentlyDenied =>
+      'Запрещено навсегда';
 
   @override
   String get profileNotificationsDeviceRestricted => 'Ограничено';
@@ -2862,19 +3135,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileNotificationsDeviceFiles => 'Файлы';
 
   @override
-  String get profileNotificationsRequestDevicePermissions => 'Запросить разрешения устройства';
+  String get profileNotificationsRequestDevicePermissions =>
+      'Запросить разрешения устройства';
 
   @override
-  String get supportChatLoadPreviousMessagesAction => 'Загрузить предыдущие сообщения';
+  String get supportChatLoadPreviousMessagesAction =>
+      'Загрузить предыдущие сообщения';
 
   @override
   String get generationStatusCopyLinkAction => 'Скопировать ссылку';
 
   @override
-  String get generationStatusShareFailedMessage => 'Не удалось поделиться результатом. Попробуйте еще раз.';
+  String get generationStatusShareFailedMessage =>
+      'Не удалось поделиться результатом. Попробуйте еще раз.';
 
   @override
-  String get generationStatusDeleteFailedMessage => 'Не удалось удалить результат. Попробуйте еще раз.';
+  String get generationStatusDeleteFailedMessage =>
+      'Не удалось удалить результат. Попробуйте еще раз.';
 
   @override
   String get premiumSelectedBadge => 'ВЫБРАНО';
@@ -2883,16 +3160,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumBestValueBadge => 'ЛУЧШАЯ ВЫГОДА';
 
   @override
-  String get premiumStorePaymentDisclaimerTitle => 'Безопасная оплата через App Store / Google Play';
+  String get premiumStorePaymentDisclaimerTitle =>
+      'Безопасная оплата через App Store / Google Play';
 
   @override
-  String get premiumStorePaymentDisclaimerBody => 'Оплата будет списана с вашего аккаунта App Store / Google Play. Подписка продлевается автоматически, если ее не отменить до даты продления.';
+  String get premiumStorePaymentDisclaimerBody =>
+      'Оплата будет списана с вашего аккаунта App Store / Google Play. Подписка продлевается автоматически, если ее не отменить до даты продления.';
 
   @override
   String get debugStripeSmokeTestTitle => 'Тест Stripe PaymentSheet';
 
   @override
-  String get debugStripeSmokeTestSubtitle => 'Минимальный экран для диагностики касаний и фокуса в PaymentSheet.';
+  String get debugStripeSmokeTestSubtitle =>
+      'Минимальный экран для диагностики касаний и фокуса в PaymentSheet.';
 
   @override
   String get debugStripeSmokeTestOpenAction => 'Открыть Stripe PaymentSheet';
@@ -2901,19 +3181,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get debugStripeSmokeTestOpeningAction => 'Открываем...';
 
   @override
-  String get debugStripeSmokeTestMethodUnavailable => 'Метод оплаты Stripe недоступен.';
+  String get debugStripeSmokeTestMethodUnavailable =>
+      'Метод оплаты Stripe недоступен.';
 
   @override
-  String get debugStripeSmokeTestNoPlans => 'Планы Premium с включенным Stripe не найдены.';
+  String get debugStripeSmokeTestNoPlans =>
+      'Планы Premium с включенным Stripe не найдены.';
 
   @override
-  String get debugStripeSmokeTestPrepareFailed => 'Не удалось подготовить оплату через PaymentSheet.';
+  String get debugStripeSmokeTestPrepareFailed =>
+      'Не удалось подготовить оплату через PaymentSheet.';
 
   @override
-  String get debugStripeSmokeTestOpenedSuccess => 'PaymentSheet успешно открыт.';
+  String get debugStripeSmokeTestOpenedSuccess =>
+      'PaymentSheet успешно открыт.';
 
   @override
-  String get debugStripeSmokeTestDismissedOrFailed => 'PaymentSheet был закрыт или завершился ошибкой.';
+  String get debugStripeSmokeTestDismissedOrFailed =>
+      'PaymentSheet был закрыт или завершился ошибкой.';
 
   @override
   String get debugStripeSmokeTestVerifyFailed => 'Не удалось проверить оплату.';
@@ -2931,7 +3216,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumBenefitPremiumTemplatesSubtitle => 'эксклюзивные';
 
   @override
-  String get premiumBenefitPriorityVideoQueueTitle => 'Приоритетная очередь видео';
+  String get premiumBenefitPriorityVideoQueueTitle =>
+      'Приоритетная очередь видео';
 
   @override
   String get premiumBenefitPriorityVideoQueueSubtitle => 'быстрее результаты';
@@ -2969,10 +3255,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionRestoreSuccessMessage => 'Покупки восстановлены';
 
   @override
-  String get subscriptionRestoreNoneFoundMessage => 'Активная подписка не найдена';
+  String get subscriptionRestoreNoneFoundMessage =>
+      'Активная подписка не найдена';
 
   @override
-  String get subscriptionPaymentTrustText => 'Данные карты безопасно обрабатываются Stripe. PetMagic не хранит данные вашей карты.';
+  String get subscriptionPaymentTrustText =>
+      'Данные карты безопасно обрабатываются Stripe. PetMagic не хранит данные вашей карты.';
 
   @override
   String get subscriptionBillingPeriodLabel => 'Период подписки';

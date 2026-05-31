@@ -58,7 +58,9 @@ class _TemplateCardState extends State<TemplateCard> {
   @override
   void dispose() {
     _disposeTimer?.cancel();
-    _videoController?.dispose();
+    final controller = _videoController;
+    _videoController = null;
+    unawaited(controller?.dispose());
     if (_hasPreviewSlot) {
       MediaLifecyclePolicy.releaseVideoPreviewSlot();
       _hasPreviewSlot = false;
@@ -167,6 +169,10 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 
   void _handleVisibility(VisibilityInfo info) {
+    if (!mounted) {
+      return;
+    }
+
     final isVideoTemplate =
         widget.template.isVideo && isVideoPreview(widget.template.previewAsset);
     if (!isVideoTemplate) {
@@ -180,7 +186,7 @@ class _TemplateCardState extends State<TemplateCard> {
     if (visibleFraction <= 0) {
       _isPreviewActive = false;
       _disposeTimer?.cancel();
-      unawaited(_videoController?.pause());
+      unawaited(_syncPlaybackState());
       unawaited(_disposeVideoController());
       return;
     }
@@ -192,7 +198,7 @@ class _TemplateCardState extends State<TemplateCard> {
       _disposeTimer?.cancel();
       unawaited(_ensureVideoController());
     } else {
-      unawaited(_videoController?.pause());
+      unawaited(_syncPlaybackState());
       _scheduleVideoDispose();
     }
 
@@ -204,7 +210,24 @@ class _TemplateCardState extends State<TemplateCard> {
     if (shouldPlay) {
       unawaited(_ensureVideoController());
     } else {
-      unawaited(_videoController?.pause());
+      unawaited(_syncPlaybackState());
+    }
+  }
+
+  Future<void> _syncPlaybackState() async {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+
+    try {
+      if (_isPreviewActive) {
+        await controller.play();
+      } else {
+        await controller.pause();
+      }
+    } catch (_) {
+      // Controller might be disposed during async lifecycle transitions.
     }
   }
 
@@ -239,13 +262,7 @@ class _TemplateCardState extends State<TemplateCard> {
 
   Future<void> _ensureVideoController() async {
     if (_videoController != null || widget.template.previewAsset == null) {
-      if (_videoController?.value.isInitialized ?? false) {
-        if (_isPreviewActive) {
-          await _videoController?.play();
-        } else {
-          await _videoController?.pause();
-        }
-      }
+      await _syncPlaybackState();
       return;
     }
 
@@ -276,11 +293,7 @@ class _TemplateCardState extends State<TemplateCard> {
         return;
       }
       setState(() {});
-      if (_isPreviewActive) {
-        await controller.play();
-      } else {
-        await controller.pause();
-      }
+      await _syncPlaybackState();
     } catch (_) {
       await controller.dispose();
       _isPreviewActive = false;

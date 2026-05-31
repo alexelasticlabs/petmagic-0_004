@@ -18,8 +18,8 @@ class ProfileAvatarCropperPage extends StatefulWidget {
 }
 
 class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
-  static const double _minScale = 1;
-  static const double _maxScale = 4;
+  static const double _minZoom = 1;
+  static const double _maxZoom = 3.2;
 
   final TransformationController _transformationController =
       TransformationController();
@@ -27,9 +27,10 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
   img.Image? _decodedImage;
   bool _isPreparing = true;
   bool _isSaving = false;
-  double _zoom = _minScale;
+  double _zoom = _minZoom;
   double _cropSize = 0;
-  Size _baseDisplaySize = Size.zero;
+  Size _imageSize = Size.zero;
+  double _baseScale = 1;
 
   @override
   void initState() {
@@ -72,7 +73,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       return;
     }
 
-    if ((_cropSize - cropSize).abs() < 0.5 && _baseDisplaySize != Size.zero) {
+    if ((_cropSize - cropSize).abs() < 0.5 && _imageSize != Size.zero) {
       return;
     }
 
@@ -80,18 +81,18 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
 
     final imageWidth = _decodedImage!.width.toDouble();
     final imageHeight = _decodedImage!.height.toDouble();
-    final baseScale = math.max(cropSize / imageWidth, cropSize / imageHeight);
+    _imageSize = Size(imageWidth, imageHeight);
+    _baseScale = math.max(cropSize / imageWidth, cropSize / imageHeight);
 
-    final displayWidth = imageWidth * baseScale;
-    final displayHeight = imageHeight * baseScale;
-    _baseDisplaySize = Size(displayWidth, displayHeight);
+    final displayWidth = imageWidth * _baseScale;
+    final displayHeight = imageHeight * _baseScale;
 
     final initialTranslateX = (cropSize - displayWidth) / 2;
     final initialTranslateY = (cropSize - displayHeight) / 2;
 
     final matrix = Matrix4.identity()
       ..translateByDouble(initialTranslateX, initialTranslateY, 0, 1)
-      ..scaleByDouble(_minScale, _minScale, 1, 1);
+      ..scaleByDouble(_baseScale, _baseScale, 1, 1);
 
     _applyClampedMatrix(matrix, updateZoom: false);
     _zoom = _currentScale;
@@ -103,7 +104,10 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       return;
     }
 
-    final factor = nextScale / currentScale;
+    final currentAbsoluteScale = _transformationController.value
+        .getMaxScaleOnAxis();
+    final targetAbsoluteScale = _baseScale * nextScale;
+    final factor = targetAbsoluteScale / currentAbsoluteScale;
     final focalPoint = Offset(_cropSize / 2, _cropSize / 2);
 
     final matrix = Matrix4.copy(_transformationController.value)
@@ -129,16 +133,17 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
   }
 
   double get _currentScale {
-    final scale = _transformationController.value.getMaxScaleOnAxis();
-    if (scale.isNaN || scale.isInfinite) {
-      return _minScale;
+    final absoluteScale = _transformationController.value.getMaxScaleOnAxis();
+    if (absoluteScale.isNaN || absoluteScale.isInfinite || _baseScale <= 0) {
+      return _minZoom;
     }
 
-    return scale.clamp(_minScale, _maxScale);
+    final zoom = absoluteScale / _baseScale;
+    return zoom.clamp(_minZoom, _maxZoom);
   }
 
   void _applyClampedMatrix(Matrix4 input, {required bool updateZoom}) {
-    if (_cropSize <= 0 || _baseDisplaySize == Size.zero) {
+    if (_cropSize <= 0 || _imageSize == Size.zero || _baseScale <= 0) {
       _transformationController.value = input;
       if (updateZoom) {
         setState(() => _zoom = _currentScale);
@@ -146,15 +151,20 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       return;
     }
 
-    final scale = input.getMaxScaleOnAxis().clamp(_minScale, _maxScale);
-    input.setEntry(0, 0, scale);
-    input.setEntry(1, 1, scale);
+    final absoluteScale = input.getMaxScaleOnAxis().clamp(
+      _baseScale * _minZoom,
+      _baseScale * _maxZoom,
+    );
+    final zoom = (absoluteScale / _baseScale).clamp(_minZoom, _maxZoom);
+    final clampedScale = _baseScale * zoom;
+    input.setEntry(0, 0, clampedScale);
+    input.setEntry(1, 1, clampedScale);
 
     var tx = input.storage[12];
     var ty = input.storage[13];
 
-    final scaledWidth = _baseDisplaySize.width * scale;
-    final scaledHeight = _baseDisplaySize.height * scale;
+    final scaledWidth = _imageSize.width * clampedScale;
+    final scaledHeight = _imageSize.height * clampedScale;
 
     final minTx = scaledWidth <= _cropSize
         ? (_cropSize - scaledWidth) / 2
@@ -174,14 +184,14 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
     _transformationController.value = input;
 
     if (updateZoom && mounted) {
-      setState(() => _zoom = scale);
+      setState(() => _zoom = zoom);
     }
   }
 
   Future<void> _saveCrop() async {
     final text = AppLocalizations.of(context);
     final decoded = _decodedImage;
-    if (decoded == null || _cropSize <= 0 || _baseDisplaySize == Size.zero) {
+    if (decoded == null || _cropSize <= 0 || _imageSize == Size.zero) {
       _showError(text.profileAvatarCropError);
       return;
     }
@@ -190,20 +200,16 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
 
     try {
       final matrix = _transformationController.value;
-      final scale = matrix.getMaxScaleOnAxis().clamp(_minScale, _maxScale);
+      final scale = matrix.getMaxScaleOnAxis().clamp(
+        _baseScale * _minZoom,
+        _baseScale * _maxZoom,
+      );
       final tx = matrix.storage[12];
       final ty = matrix.storage[13];
 
-      final leftOnBase = (-tx) / scale;
-      final topOnBase = (-ty) / scale;
-      final sizeOnBase = _cropSize / scale;
-
-      final ratioX = decoded.width / _baseDisplaySize.width;
-      final ratioY = decoded.height / _baseDisplaySize.height;
-
-      final leftPx = (leftOnBase * ratioX).round();
-      final topPx = (topOnBase * ratioY).round();
-      final sizePx = (sizeOnBase * ratioX).round();
+      final leftPx = ((-tx) / scale).round();
+      final topPx = ((-ty) / scale).round();
+      final sizePx = (_cropSize / scale).round();
 
       final clampedLeft = leftPx.clamp(0, decoded.width - 1);
       final clampedTop = topPx.clamp(0, decoded.height - 1);
@@ -345,18 +351,18 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                                 child: InteractiveViewer(
                                   transformationController:
                                       _transformationController,
-                                  minScale: _minScale,
-                                  maxScale: _maxScale,
+                                  minScale: 0.01,
+                                  maxScale: 100,
                                   boundaryMargin: EdgeInsets.zero,
                                   clipBehavior: Clip.none,
                                   onInteractionUpdate: _onInteractionUpdate,
                                   onInteractionEnd: _onInteractionEnd,
                                   child: SizedBox(
-                                    width: _baseDisplaySize.width,
-                                    height: _baseDisplaySize.height,
+                                    width: _imageSize.width,
+                                    height: _imageSize.height,
                                     child: Image.file(
                                       File(widget.sourceImagePath),
-                                      fit: BoxFit.fill,
+                                      fit: BoxFit.cover,
                                     ),
                                   ),
                                 ),
@@ -408,8 +414,8 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                                   Expanded(
                                     child: Slider(
                                       value: _zoom,
-                                      min: _minScale,
-                                      max: _maxScale,
+                                      min: _minZoom,
+                                      max: _maxZoom,
                                       onChanged: _isSaving
                                           ? null
                                           : _handleScaleChanged,
