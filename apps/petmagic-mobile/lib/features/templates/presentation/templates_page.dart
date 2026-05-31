@@ -27,6 +27,7 @@ import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
   const TemplatesPage({super.key});
@@ -378,7 +379,6 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
 
       final router = GoRouter.of(context);
-      final messenger = ScaffoldMessenger.of(context);
       final text = AppLocalizations.of(context);
       final generation = await generationController.startGeneration(template);
       if (!mounted) {
@@ -394,14 +394,12 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
           return;
         }
 
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              errorMessage == null || errorMessage.isEmpty
-                  ? text.templateFlowStartFailedError
-                  : _generationStartErrorText(text, errorMessage),
-            ),
-          ),
+        PetMagicToast.show(
+          context,
+          message: errorMessage == null || errorMessage.isEmpty
+              ? text.templateFlowStartFailedError
+              : _generationStartErrorText(text, errorMessage),
+          tone: PetMagicToastTone.warning,
         );
         return;
       }
@@ -430,14 +428,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final permission = await _permissionCoordinator.requestOnDemand(
       requiredPermission,
     );
-    if (!permission.granted) {
+      if (!permission.granted) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+        PetMagicToast.show(
+          context,
+          message:
               'Permission is required to continue. You can enable it in system settings.',
-            ),
-          ),
+          tone: PetMagicToastTone.warning,
         );
       }
       return null;

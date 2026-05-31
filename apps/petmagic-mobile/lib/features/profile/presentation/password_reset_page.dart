@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.da
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class PasswordResetPage extends ConsumerStatefulWidget {
   const PasswordResetPage({super.key, this.initialEmail});
@@ -258,9 +259,11 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
 
     final nextState = ref.read(passwordResetControllerProvider);
     if (nextState.successMessage == 'auth.password_reset_success') {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(text.authPasswordResetSuccess)));
+      PetMagicToast.show(
+        context,
+        message: text.authPasswordResetSuccess,
+        tone: PetMagicToastTone.success,
+      );
       _goToAuth();
     }
   }

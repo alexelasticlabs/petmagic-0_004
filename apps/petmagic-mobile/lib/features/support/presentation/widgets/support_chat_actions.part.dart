@@ -11,8 +11,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
     if (!permission.granted) {
       if (mounted) {
         final text = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(text.supportChatCameraPermissionPhotoError)),
+        _showSupportToast(
+          text.supportChatCameraPermissionPhotoError,
+          tone: PetMagicToastTone.warning,
         );
       }
       return;
@@ -47,8 +48,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
     if (!permission.granted) {
       if (mounted) {
         final text = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(text.supportChatCameraPermissionVideoError)),
+        _showSupportToast(
+          text.supportChatCameraPermissionVideoError,
+          tone: PetMagicToastTone.warning,
         );
       }
       return;
@@ -125,8 +127,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
     if (!permission.granted) {
       if (mounted) {
         final text = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(text.supportChatFilesPermissionError)),
+        _showSupportToast(
+          text.supportChatFilesPermissionError,
+          tone: PetMagicToastTone.warning,
         );
       }
       return;
@@ -153,12 +156,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
     if (files.length > remainingSlots) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context).supportChatTooManyAttachmentsError,
-          ),
-        ),
+      _showSupportToast(
+        AppLocalizations.of(context).supportChatTooManyAttachmentsError,
+        tone: PetMagicToastTone.warning,
       );
     }
 
@@ -196,12 +196,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return true;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          AppLocalizations.of(context).supportChatTooManyAttachmentsError,
-        ),
-      ),
+    _showSupportToast(
+      AppLocalizations.of(context).supportChatTooManyAttachmentsError,
+      tone: PetMagicToastTone.warning,
     );
     return false;
   }
@@ -293,9 +290,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
       SupportAttachmentValidationError.videoTooLong =>
         text.supportChatAttachmentVideoTooLongError,
     };
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    _showSupportToast(message, tone: PetMagicToastTone.warning);
   }
 
   Future<void> _showAttachmentOptionsImpl() async {
@@ -795,12 +790,12 @@ class _SupportAttachmentPickerSheetState
         }
       } else {
         if (_selectedAssetOrderById.length >= _supportAttachmentMaxCount) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                AppLocalizations.of(context).supportChatTooManyAttachmentsError,
-              ),
-            ),
+          PetMagicToast.show(
+            context,
+            message: AppLocalizations.of(
+              context,
+            ).supportChatTooManyAttachmentsError,
+            tone: PetMagicToastTone.warning,
           );
           return;
         }

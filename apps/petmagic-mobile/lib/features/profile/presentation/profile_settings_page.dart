@@ -13,6 +13,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class ProfileSettingsPage extends ConsumerWidget {
   const ProfileSettingsPage({super.key});
@@ -113,15 +114,11 @@ class ProfileSettingsPage extends ConsumerWidget {
                       final email = (state.profile?.email ?? state.email)
                           .trim();
                       if (email.isEmpty) {
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                text.profileSettingsUnavailableSubtitle,
-                              ),
-                            ),
-                          );
+                        PetMagicToast.show(
+                          context,
+                          message: text.profileSettingsUnavailableSubtitle,
+                          tone: PetMagicToastTone.info,
+                        );
                         return;
                       }
 
@@ -311,19 +308,14 @@ class ProfileSettingsPage extends ConsumerWidget {
                           return;
                         }
 
-                        final messenger = ScaffoldMessenger.of(context);
-                        messenger
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                mapProfileFeedbackMessage(
-                                  nextState.errorMessage!,
-                                  text,
-                                ),
-                              ),
-                            ),
-                          );
+                        PetMagicToast.show(
+                          context,
+                          message: mapProfileFeedbackMessage(
+                            nextState.errorMessage!,
+                            text,
+                          ),
+                          tone: PetMagicToastTone.warning,
+                        );
                       },
                     );
                   },

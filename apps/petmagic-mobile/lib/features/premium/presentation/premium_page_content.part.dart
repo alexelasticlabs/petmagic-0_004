@@ -1321,9 +1321,11 @@ class _Link extends StatelessWidget {
     );
     if (safeUri == null) {
       final text = _premiumText(context);
-      ScaffoldMessenger.of(
+      PetMagicToast.show(
         context,
-      ).showSnackBar(SnackBar(content: Text(text.premiumManageFailed)));
+        message: text.premiumManageFailed,
+        tone: PetMagicToastTone.warning,
+      );
       return;
     }
 
@@ -1337,9 +1339,11 @@ class _Link extends StatelessWidget {
 
     if (!launched) {
       final text = _premiumText(context);
-      ScaffoldMessenger.of(
+      PetMagicToast.show(
         context,
-      ).showSnackBar(SnackBar(content: Text(text.premiumManageFailed)));
+        message: text.premiumManageFailed,
+        tone: PetMagicToastTone.warning,
+      );
     }
   }
 

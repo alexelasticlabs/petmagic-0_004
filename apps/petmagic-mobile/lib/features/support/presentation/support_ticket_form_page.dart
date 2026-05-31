@@ -16,6 +16,7 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_page.
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class SupportTicketFormPage extends ConsumerStatefulWidget {
   const SupportTicketFormPage({required this.scenario, super.key});
@@ -37,6 +38,13 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   final ImagePicker _imagePicker = ImagePicker();
   final AppPermissionCoordinator _permissionCoordinator =
       AppPermissionCoordinator();
+
+  void _showToast(
+    String message, {
+    PetMagicToastTone tone = PetMagicToastTone.info,
+  }) {
+    PetMagicToast.show(context, message: message, tone: tone);
+  }
 
   List<XFile> _attachments = const [];
   bool _isSubmitting = false;
@@ -246,8 +254,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   Future<void> _showAttachmentOptions() async {
     if (_attachments.length >= _maxAttachmentCount) {
       final text = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportChatTooManyAttachmentsError)),
+      _showToast(
+        text.supportChatTooManyAttachmentsError,
+        tone: PetMagicToastTone.warning,
       );
       return;
     }
@@ -356,8 +365,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     if (!permission.granted) {
       if (mounted) {
         final text = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(text.supportChatCameraPermissionPhotoError)),
+        _showToast(
+          text.supportChatCameraPermissionPhotoError,
+          tone: PetMagicToastTone.warning,
         );
       }
       return;
@@ -389,10 +399,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     if (!permission.granted) {
       if (mounted) {
         final text = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(text.supportChatAttachmentNoGalleryAccessError),
-          ),
+        _showToast(
+          text.supportChatAttachmentNoGalleryAccessError,
+          tone: PetMagicToastTone.warning,
         );
       }
       return;
@@ -428,15 +437,12 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   Future<XFile?> _validatePickedImage(XFile picked) async {
     final type = _resolveContentTypeForUpload(picked.path).toLowerCase();
     if (type != 'image/jpeg' && type != 'image/png' && type != 'image/webp') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _mapSupportError(
-              AppLocalizations.of(context),
-              'support.attachment_content_type_not_allowed',
-            ),
-          ),
+      _showToast(
+        _mapSupportError(
+          AppLocalizations.of(context),
+          'support.attachment_content_type_not_allowed',
         ),
+        tone: PetMagicToastTone.warning,
       );
       return null;
     }
@@ -448,15 +454,12 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       }
 
       if (fileSizeBytes > _maxAttachmentFileSizeBytes) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _mapSupportError(
-                AppLocalizations.of(context),
-                'support.attachment_file_too_large',
-              ),
-            ),
+        _showToast(
+          _mapSupportError(
+            AppLocalizations.of(context),
+            'support.attachment_file_too_large',
           ),
+          tone: PetMagicToastTone.warning,
         );
         return null;
       }
@@ -475,8 +478,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     final text = AppLocalizations.of(context);
     final description = _descriptionController.text.trim();
     if (description.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportTicketFormDescriptionHint)),
+      _showToast(
+        text.supportTicketFormDescriptionHint,
+        tone: PetMagicToastTone.warning,
       );
       return;
     }
@@ -510,8 +514,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportTicketFormSuccessMessage)),
+      _showToast(
+        text.supportTicketFormSuccessMessage,
+        tone: PetMagicToastTone.success,
       );
       context.go(SupportChatPage.routePath);
     } catch (error, stackTrace) {
@@ -527,8 +532,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportTicketFormErrorMessage)),
+      _showToast(
+        text.supportTicketFormErrorMessage,
+        tone: PetMagicToastTone.warning,
       );
     } finally {
       if (mounted) {

@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 part 'premium_page_content.part.dart';
 
@@ -82,9 +83,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     if (uri == null) {
       if (mounted) {
         final text = _premiumText(context);
-        ScaffoldMessenger.of(
+        PetMagicToast.show(
           context,
-        ).showSnackBar(SnackBar(content: Text(text.premiumManageFailed)));
+          message: text.premiumManageFailed,
+          tone: PetMagicToastTone.warning,
+        );
       }
       return;
     }
@@ -92,9 +95,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       final text = _premiumText(context);
-      ScaffoldMessenger.of(
+      PetMagicToast.show(
         context,
-      ).showSnackBar(SnackBar(content: Text(text.premiumManageFailed)));
+        message: text.premiumManageFailed,
+        tone: PetMagicToastTone.warning,
+      );
     }
   }
 
@@ -167,9 +172,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
         publishableKey == null ||
         publishableKey.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(
+        PetMagicToast.show(
           context,
-        ).showSnackBar(SnackBar(content: Text(text.premiumCheckoutFailed)));
+          message: text.premiumCheckoutFailed,
+          tone: PetMagicToastTone.warning,
+        );
       }
       return;
     }
@@ -191,9 +198,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
             : (failureMessage == null || failureMessage.isEmpty)
             ? text.premiumCheckoutFailed
             : failureMessage;
-        ScaffoldMessenger.of(
+        PetMagicToast.show(
           context,
-        ).showSnackBar(SnackBar(content: Text(resolved)));
+          message: resolved,
+          tone: result.cancelled
+              ? PetMagicToastTone.info
+              : PetMagicToastTone.warning,
+        );
       }
       return;
     }
@@ -343,18 +354,17 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       }
 
       final fallbackText = _premiumText(context);
-      final messenger = ScaffoldMessenger.of(context);
       final navigator = Navigator.of(context);
 
       if (navigator.canPop()) {
         navigator.pop();
       }
 
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(fallbackText.premiumPurchaseActivated)),
-        );
+      PetMagicToast.show(
+        context,
+        message: fallbackText.premiumPurchaseActivated,
+        tone: PetMagicToastTone.success,
+      );
     });
 
     return AnnotatedRegion<SystemUiOverlayStyle>(

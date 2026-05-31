@@ -4,6 +4,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class StripePaymentSheetSmokeTestPage extends ConsumerStatefulWidget {
   const StripePaymentSheetSmokeTestPage({super.key});
@@ -150,8 +151,10 @@ class _StripePaymentSheetSmokeTestPageState
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
+    PetMagicToast.show(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      message: message,
+      tone: PetMagicToastTone.info,
+    );
   }
 }

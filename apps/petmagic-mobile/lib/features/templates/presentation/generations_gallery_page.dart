@@ -18,6 +18,7 @@ import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 part 'generations_gallery_page_cards.dart';
 part 'generations_gallery_page_filters_and_chrome.dart';

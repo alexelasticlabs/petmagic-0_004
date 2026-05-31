@@ -24,6 +24,20 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final iconBackground = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        colors.surfaceStrong.withValues(alpha: isLight ? 0.62 : 0.58),
+        colors.surface.withValues(alpha: isLight ? 0.94 : 0.86),
+      ],
+    );
+    final iconBorder = colors.border.withValues(alpha: isLight ? 0.92 : 0.8);
+    final iconColor = Color.alphaBlend(
+      colors.textStrong.withValues(alpha: isLight ? 0.28 : 0.18),
+      colors.accent,
+    );
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,17 +46,11 @@ class _SectionHeader extends StatelessWidget {
           width: iconBoxSize,
           height: iconBoxSize,
           decoration: BoxDecoration(
-            gradient: iconGradient,
+            gradient: iconBackground,
             borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: colors.accent.withValues(alpha: 0.18),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            border: Border.all(color: iconBorder),
           ),
-          child: Icon(icon, color: colors.textStrong, size: iconSize),
+          child: Icon(icon, color: iconColor, size: iconSize),
         ),
         const SizedBox(width: 14),
         Expanded(

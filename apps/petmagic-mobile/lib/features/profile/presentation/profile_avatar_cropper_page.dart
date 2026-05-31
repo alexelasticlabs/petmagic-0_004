@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:image/image.dart' as img;
 
 class ProfileAvatarCropperPage extends StatefulWidget {
@@ -257,9 +258,11 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    PetMagicToast.show(
+      context,
+      message: message,
+      tone: PetMagicToastTone.warning,
+    );
   }
 
   @override

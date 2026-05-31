@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SubscriptionManagementPage extends ConsumerStatefulWidget {
@@ -77,10 +78,10 @@ class _SubscriptionManagementPageState
       );
       if (uri == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context).premiumManageFailed),
-            ),
+          PetMagicToast.show(
+            context,
+            message: AppLocalizations.of(context).premiumManageFailed,
+            tone: PetMagicToastTone.warning,
           );
         }
         return;
@@ -96,10 +97,10 @@ class _SubscriptionManagementPageState
         launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
       if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).premiumManageFailed),
-          ),
+        PetMagicToast.show(
+          context,
+          message: AppLocalizations.of(context).premiumManageFailed,
+          tone: PetMagicToastTone.warning,
         );
       }
     } finally {
@@ -135,12 +136,10 @@ class _SubscriptionManagementPageState
       ref.invalidate(profileControllerProvider);
       ref.invalidate(premiumControllerProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context).subscriptionAutoRenewOff,
-            ),
-          ),
+        PetMagicToast.show(
+          context,
+          message: AppLocalizations.of(context).subscriptionAutoRenewOff,
+          tone: PetMagicToastTone.success,
         );
       }
     } finally {
@@ -161,9 +160,13 @@ class _SubscriptionManagementPageState
         final message = updated.isPremium
             ? text.subscriptionRestoreSuccessMessage
             : text.subscriptionRestoreNoneFoundMessage;
-        ScaffoldMessenger.of(
+        PetMagicToast.show(
           context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+          message: message,
+          tone: updated.isPremium
+              ? PetMagicToastTone.success
+              : PetMagicToastTone.info,
+        );
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);

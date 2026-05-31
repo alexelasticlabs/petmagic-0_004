@@ -19,6 +19,7 @@ import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:video_player/video_player.dart';
 
 part 'generation_status_page_common_sections.dart';
@@ -540,9 +541,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   }
 
   void _showInfo(String message) {
-    ScaffoldMessenger.of(
+    PetMagicToast.show(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      message: message,
+      tone: PetMagicToastTone.info,
+    );
   }
 
   String _buildOutputFileName(
@@ -679,12 +682,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context).generationStatusFeedbackThanksMessage,
-          ),
-        ),
+      PetMagicToast.show(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).generationStatusFeedbackThanksMessage,
+        tone: PetMagicToastTone.success,
       );
     } finally {
       if (mounted) {

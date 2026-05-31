@@ -17,6 +17,7 @@ import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 part 'widgets/wallet_page_activity_widgets.dart';
 part 'widgets/wallet_page_overview_widgets.dart';
@@ -194,11 +195,11 @@ class _WalletPageState extends ConsumerState<WalletPage>
       }
 
       final grantedSpark = next.checkoutGrantedSpark ?? 0;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(text.walletCheckoutSucceeded(grantedSpark))),
-        );
+      PetMagicToast.show(
+        context,
+        message: text.walletCheckoutSucceeded(grantedSpark),
+        tone: PetMagicToastTone.success,
+      );
     });
 
     return ProfileScreenBackground(
@@ -522,9 +523,11 @@ Future<void> _showPackDetailSheet(
 
     final message = result.errorMessage?.trim();
     if (message != null && message.isNotEmpty) {
-      ScaffoldMessenger.of(
+      PetMagicToast.show(
         context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+        message: message,
+        tone: PetMagicToastTone.warning,
+      );
     }
     return;
   }

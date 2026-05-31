@@ -11,6 +11,14 @@ String? rewardsWarningMessage(AppLocalizations text, String? raw) {
       value.contains('wallet.purchases_failed')) {
     return null;
   }
+  // Referral/promo actions are already shown as in-app push toasts.
+  if (value.contains('referral_') ||
+      value.contains('redeem_code') ||
+      value.contains('users cannot activate their own referral code') ||
+      value.contains('already linked') ||
+      value.contains('already activated referral code')) {
+    return null;
+  }
 
   return friendlyRewardsError(text, raw);
 }
@@ -33,8 +41,15 @@ String friendlyRewardsError(AppLocalizations text, String raw) {
   if (value.contains('referral_self_referral')) {
     return text.rewardsReferralSelfError;
   }
+  if (value.contains('users cannot activate their own referral code')) {
+    return text.rewardsReferralSelfError;
+  }
 
   if (value.contains('referral_already_linked')) {
+    return text.rewardsReferralAlreadyLinkedError;
+  }
+  if (value.contains('already linked') ||
+      value.contains('already activated referral code')) {
     return text.rewardsReferralAlreadyLinkedError;
   }
 
@@ -75,5 +90,6 @@ String friendlyRewardsError(AppLocalizations text, String raw) {
     return text.walletRedeemServerError;
   }
 
-  return raw;
+  // Never expose raw backend text to end users.
+  return text.walletRedeemServerError;
 }

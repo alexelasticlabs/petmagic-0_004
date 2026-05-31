@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:share_plus/share_plus.dart';
 
 part 'rewards_page_referral_cards.dart';
@@ -257,9 +258,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                item.reason.isEmpty
-                                                    ? item.source
-                                                    : item.reason,
+                                                _ledgerEntryTitle(text, item),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
@@ -322,6 +321,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
     final colors = context.petMagicColors;
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final bottomNavInset = hasShell
         ? petMagicScrollableBottomInset(context)
         : MediaQuery.viewPaddingOf(context).bottom +
@@ -357,7 +357,12 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                 color: colors.accent,
                 backgroundColor: colors.surfaceStrong,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, bottomNavInset),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    bottomNavInset + keyboardInset + 8,
+                  ),
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     _RewardsHero(
@@ -425,3 +430,78 @@ class _RewardsSummaryView {
 }
 
 enum _FeedbackTone { success, warning, info }
+
+String _ledgerEntryTitle(AppLocalizations text, WalletLedgerItem item) {
+  final reason = item.reason.trim();
+  final source = item.source.trim().toLowerCase();
+
+  if (reason.isNotEmpty) {
+    final normalizedReason = reason.toLowerCase();
+
+    if (normalizedReason.startsWith('purchase:')) {
+      return text.walletSourcePackPurchase;
+    }
+
+    if (normalizedReason.startsWith('template_generation:')) {
+      return text.walletSourceGenerationSpend;
+    }
+
+    if (normalizedReason.startsWith('redeem:')) {
+      final code = reason.split(':').skip(1).join(':').trim();
+      if (code.isNotEmpty) {
+        return '${text.walletSourcePromoCode} · $code';
+      }
+      return text.walletSourcePromoCode;
+    }
+
+    if (normalizedReason == 'rewarded ad') {
+      return text.walletSourceAdReward;
+    }
+
+    if (_looksTechnical(reason)) {
+      return _sourceLabel(text, source, fallbackDelta: item.delta);
+    }
+
+    return reason;
+  }
+
+  return _sourceLabel(text, source, fallbackDelta: item.delta);
+}
+
+String _sourceLabel(
+  AppLocalizations text,
+  String source, {
+  required int fallbackDelta,
+}) {
+  return switch (source) {
+    'pack_purchase' || 'purchase' => text.walletSourcePackPurchase,
+    'generation_spend' ||
+    'template_generation' => text.walletSourceGenerationSpend,
+    'generation_refund' => text.walletSourceGenerationRefund,
+    'weekly_grant' ||
+    'premium_subscription_weekly_grant' => text.walletSourceWeeklyGrant,
+    'ad_reward' => text.walletSourceAdReward,
+    'promo_redeem' || 'redeem_code' || 'redeem' => text.walletSourcePromoCode,
+    'admin_grant' => text.walletSourceAdminGrant,
+    'admin_debit' => text.walletSourceAdminDebit,
+    _ => fallbackDelta >= 0
+        ? text.walletSourceWeeklyGrant
+        : text.walletSourceGenerationSpend,
+  };
+}
+
+bool _looksTechnical(String value) {
+  final normalized = value.trim().toLowerCase();
+  if (normalized.isEmpty) {
+    return true;
+  }
+
+  if (normalized.contains(':') || normalized.contains('_')) {
+    return true;
+  }
+
+  // Detect long ids/hashes in event names.
+  final compact = normalized.replaceAll('-', '');
+  return compact.length >= 24 &&
+      RegExp(r'^[a-z0-9]+$').hasMatch(compact);
+}

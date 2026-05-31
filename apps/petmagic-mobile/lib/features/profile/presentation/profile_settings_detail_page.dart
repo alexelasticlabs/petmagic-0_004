@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_li
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_notifications_settings_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 enum ProfileSettingsDetailKind {
   linkedAccounts,
@@ -264,11 +265,11 @@ class _ProfileAccountInfoPageState
 
   void _showActionFeedback(String message) {
     final text = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(mapProfileFeedbackMessage(message, text))),
-      );
+    PetMagicToast.show(
+      context,
+      message: mapProfileFeedbackMessage(message, text),
+      tone: PetMagicToastTone.warning,
+    );
   }
 }
 
@@ -843,19 +844,14 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                           return;
                         }
 
-                        final messenger = ScaffoldMessenger.of(context);
-                        messenger
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                mapProfileFeedbackMessage(
-                                  nextState.errorMessage!,
-                                  text,
-                                ),
-                              ),
-                            ),
-                          );
+                        PetMagicToast.show(
+                          context,
+                          message: mapProfileFeedbackMessage(
+                            nextState.errorMessage!,
+                            text,
+                          ),
+                          tone: PetMagicToastTone.warning,
+                        );
                       },
                     );
                   },

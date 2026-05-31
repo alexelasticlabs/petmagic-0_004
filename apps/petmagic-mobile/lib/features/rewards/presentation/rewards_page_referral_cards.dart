@@ -12,8 +12,6 @@ class _PromoCodeCard extends StatefulWidget {
 
 class _PromoCodeCardState extends State<_PromoCodeCard> {
   late final TextEditingController _controller;
-  String? _message;
-  _FeedbackTone _messageTone = _FeedbackTone.info;
 
   @override
   void initState() {
@@ -27,14 +25,23 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
     super.dispose();
   }
 
+  void _showInAppPush(String message, _FeedbackTone tone) {
+    PetMagicToast.show(
+      context,
+      message: message,
+      tone: switch (tone) {
+        _FeedbackTone.success => PetMagicToastTone.success,
+        _FeedbackTone.warning => PetMagicToastTone.warning,
+        _FeedbackTone.info => PetMagicToastTone.info,
+      },
+    );
+  }
+
   Future<void> _submit() async {
     final code = _controller.text.trim();
     final text = AppLocalizations.of(context);
     if (code.isEmpty) {
-      setState(() {
-        _messageTone = _FeedbackTone.warning;
-        _message = text.rewardsPromoEmptyError;
-      });
+      _showInAppPush(text.rewardsPromoEmptyError, _FeedbackTone.warning);
       return;
     }
 
@@ -42,24 +49,19 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
       return;
     }
 
-    setState(() {
-      _messageTone = _FeedbackTone.info;
-      _message = text.rewardsPromoCheckingStatus;
-    });
+    _showInAppPush(text.rewardsPromoCheckingStatus, _FeedbackTone.info);
 
     final error = await widget.onSubmit(code);
     if (!mounted) {
       return;
     }
 
-    setState(() {
-      _messageTone = error == null
-          ? _FeedbackTone.success
-          : _FeedbackTone.warning;
-      _message = error == null
+    _showInAppPush(
+      error == null
           ? text.walletRedeemSuccessMessage
-          : friendlyRewardsError(text, error);
-    });
+          : friendlyRewardsError(text, error),
+      error == null ? _FeedbackTone.success : _FeedbackTone.warning,
+    );
 
     if (error == null) {
       _controller.clear();
@@ -84,6 +86,7 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
         color: Colors.transparent,
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final compact = constraints.maxWidth < 390;
             final actionWidth = (constraints.maxWidth * 0.34).clamp(
               118.0,
               140.0,
@@ -103,79 +106,133 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                   subtitleSize: 12.5,
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 50,
-                        child: TextField(
-                          key: const Key('rewards_promo_input'),
-                          controller: _controller,
-                          textCapitalization: TextCapitalization.characters,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => unawaited(_submit()),
-                          style: TextStyle(
-                            color: colors.textStrong,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.3,
-                          ),
-                          decoration: _fieldDecoration(
-                            context,
-                            hintText: text.walletRedeemHint,
-                          ),
-                        ),
+                if (compact) ...[
+                  SizedBox(
+                    height: 50,
+                    child: TextField(
+                      key: const Key('rewards_promo_input'),
+                      controller: _controller,
+                      textCapitalization: TextCapitalization.characters,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => unawaited(_submit()),
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                      decoration: _fieldDecoration(
+                        context,
+                        hintText: text.walletRedeemHint,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: actionWidth,
-                      height: 50,
-                      child: FilledButton(
-                        key: const Key('rewards_promo_submit'),
-                        onPressed: widget.isSubmitting ? null : _submit,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colors.accent,
-                          foregroundColor: promoForeground,
-                          disabledBackgroundColor: colors.border,
-                          disabledForegroundColor: colors.textMuted,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(13),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        child: widget.isSubmitting
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator.adaptive(
-                                  strokeWidth: 2.2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    promoForeground,
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                text.walletRedeemAction,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_message != null) ...[
-                  const SizedBox(height: 12),
-                  _InlineStatus(
-                    message: _message!,
-                    tone: _feedbackToneColor(_messageTone, colors),
                   ),
-                ],
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      key: const Key('rewards_promo_submit'),
+                      onPressed: widget.isSubmitting ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colors.accent,
+                        foregroundColor: promoForeground,
+                        disabledBackgroundColor: colors.border,
+                        disabledForegroundColor: colors.textMuted,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      child: widget.isSubmitting
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator.adaptive(
+                                strokeWidth: 2.2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  promoForeground,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              text.walletRedeemAction,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                    ),
+                  ),
+                ] else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: TextField(
+                            key: const Key('rewards_promo_input'),
+                            controller: _controller,
+                            textCapitalization: TextCapitalization.characters,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => unawaited(_submit()),
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
+                            ),
+                            decoration: _fieldDecoration(
+                              context,
+                              hintText: text.walletRedeemHint,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: actionWidth,
+                        height: 50,
+                        child: FilledButton(
+                          key: const Key('rewards_promo_submit'),
+                          onPressed: widget.isSubmitting ? null : _submit,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colors.accent,
+                            foregroundColor: promoForeground,
+                            disabledBackgroundColor: colors.border,
+                            disabledForegroundColor: colors.textMuted,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          child: widget.isSubmitting
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator.adaptive(
+                                    strokeWidth: 2.2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      promoForeground,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  text.walletRedeemAction,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             );
           },
@@ -556,8 +613,6 @@ class _FriendCodeCard extends StatefulWidget {
 class _FriendCodeCardState extends State<_FriendCodeCard> {
   late final TextEditingController _controller;
   late final FocusNode _friendCodeFocusNode;
-  String? _message;
-  _FeedbackTone _messageTone = _FeedbackTone.info;
   bool _showFriendCodeInput = false;
 
   @override
@@ -583,6 +638,18 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
     super.dispose();
   }
 
+  void _showInAppPush(String message, _FeedbackTone tone) {
+    PetMagicToast.show(
+      context,
+      message: message,
+      tone: switch (tone) {
+        _FeedbackTone.success => PetMagicToastTone.success,
+        _FeedbackTone.warning => PetMagicToastTone.warning,
+        _FeedbackTone.info => PetMagicToastTone.info,
+      },
+    );
+  }
+
   void _openFriendCodeInput() {
     if (_showFriendCodeInput) {
       return;
@@ -602,10 +669,7 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
     final code = _controller.text.trim();
     final text = AppLocalizations.of(context);
     if (code.isEmpty) {
-      setState(() {
-        _messageTone = _FeedbackTone.warning;
-        _message = text.rewardsReferralEmptyError;
-      });
+      _showInAppPush(text.rewardsReferralEmptyError, _FeedbackTone.warning);
       return;
     }
 
@@ -613,24 +677,19 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
       return;
     }
 
-    setState(() {
-      _messageTone = _FeedbackTone.info;
-      _message = text.rewardsReferralCheckingStatus;
-    });
+    _showInAppPush(text.rewardsReferralCheckingStatus, _FeedbackTone.info);
 
     final error = await widget.onSubmit(code);
     if (!mounted) {
       return;
     }
 
-    setState(() {
-      _messageTone = error == null
-          ? _FeedbackTone.success
-          : _FeedbackTone.warning;
-      _message = error == null
+    _showInAppPush(
+      error == null
           ? text.rewardsReferralActivatedMessage
-          : friendlyRewardsError(text, error);
-    });
+          : friendlyRewardsError(text, error),
+      error == null ? _FeedbackTone.success : _FeedbackTone.warning,
+    );
 
     if (error == null) {
       _controller.clear();
@@ -834,13 +893,6 @@ class _FriendCodeCardState extends State<_FriendCodeCard> {
                     gradient: LinearGradient(colors: actionGradient),
                     icon: Icons.check_circle_outline_rounded,
                     onPressed: widget.isSubmitting ? null : _submit,
-                  ),
-                ],
-                if (_message != null && !isReferralAlreadyActive) ...[
-                  const SizedBox(height: 12),
-                  _InlineStatus(
-                    message: _message!,
-                    tone: _feedbackToneColor(_messageTone, colors),
                   ),
                 ],
               ],

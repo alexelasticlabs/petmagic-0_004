@@ -536,9 +536,22 @@ class ProfileSettingsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final tone = isDestructive ? colors.danger : colors.textStrong;
     final iconTone =
         iconColor ?? (isDestructive ? colors.danger : colors.accent);
+    final iconBackground = isDestructive
+        ? colors.danger.withValues(alpha: isLight ? 0.12 : 0.14)
+        : colors.surfaceStrong.withValues(alpha: isLight ? 0.52 : 0.58);
+    final iconBorder = isDestructive
+        ? colors.danger.withValues(alpha: isLight ? 0.22 : 0.3)
+        : colors.border.withValues(alpha: isLight ? 0.85 : 0.78);
+    final resolvedIconColor = isDestructive
+        ? colors.danger
+        : Color.alphaBlend(
+            colors.textStrong.withValues(alpha: isLight ? 0.35 : 0.18),
+            iconTone,
+          );
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -548,10 +561,11 @@ class ProfileSettingsRow extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: iconTone.withValues(alpha: 0.2),
+              color: iconBackground,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: iconBorder),
             ),
-            child: Icon(icon, color: iconTone, size: 19),
+            child: Icon(icon, color: resolvedIconColor, size: 19),
           ),
           const SizedBox(width: 12),
           Expanded(

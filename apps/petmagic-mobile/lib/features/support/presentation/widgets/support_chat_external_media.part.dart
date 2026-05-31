@@ -11,9 +11,10 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
       }
 
       final text = AppLocalizations.of(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(text.supportChatUnavailableError)));
+      _showSupportToast(
+        text.supportChatUnavailableError,
+        tone: PetMagicToastTone.warning,
+      );
       return;
     }
 
@@ -43,16 +44,18 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportChatImageSavedMessage)),
+      _showSupportToast(
+        text.supportChatImageSavedMessage,
+        tone: PetMagicToastTone.success,
       );
     } on Object {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportChatSaveImageFailedError)),
+      _showSupportToast(
+        text.supportChatSaveImageFailedError,
+        tone: PetMagicToastTone.warning,
       );
     }
   }
@@ -79,8 +82,9 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportChatShareImageFailedError)),
+      _showSupportToast(
+        text.supportChatShareImageFailedError,
+        tone: PetMagicToastTone.warning,
       );
     }
   }

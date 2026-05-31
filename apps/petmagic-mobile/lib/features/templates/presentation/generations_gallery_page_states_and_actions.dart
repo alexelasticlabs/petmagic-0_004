@@ -548,5 +548,9 @@ String _buildGenerationFileName(
 }
 
 void _notifySoon(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  PetMagicToast.show(
+    context,
+    message: message,
+    tone: PetMagicToastTone.info,
+  );
 }

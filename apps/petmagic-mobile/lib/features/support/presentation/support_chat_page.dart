@@ -22,6 +22,7 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_contr
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
@@ -68,6 +69,13 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   String? _highlightedMessageId;
   final Map<String, GlobalKey> _messageKeys = <String, GlobalKey>{};
   double _keyboardInset = 0;
+
+  void _showSupportToast(
+    String message, {
+    PetMagicToastTone tone = PetMagicToastTone.info,
+  }) {
+    PetMagicToast.show(context, message: message, tone: tone);
+  }
 
   bool get _hasPendingAttachment => _pendingAttachments.isNotEmpty;
 
@@ -288,9 +296,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     final targetContext = targetKey?.currentContext;
     if (targetContext == null) {
       final text = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(text.supportChatReplyOriginalUnavailable)),
-      );
+      _showSupportToast(text.supportChatReplyOriginalUnavailable);
       return;
     }
 
