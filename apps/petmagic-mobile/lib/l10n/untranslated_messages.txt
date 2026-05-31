@@ -1,1 +1,46 @@
-{}
+{
+  "de": [
+    "profileAvatarCropTitle",
+    "profileAvatarCropHint",
+    "profileAvatarCropCancelAction",
+    "profileAvatarCropSaveAction",
+    "profileAvatarCropLoading",
+    "profileAvatarCropError"
+  ],
+
+  "es": [
+    "profileAvatarCropTitle",
+    "profileAvatarCropHint",
+    "profileAvatarCropCancelAction",
+    "profileAvatarCropSaveAction",
+    "profileAvatarCropLoading",
+    "profileAvatarCropError"
+  ],
+
+  "fr": [
+    "profileAvatarCropTitle",
+    "profileAvatarCropHint",
+    "profileAvatarCropCancelAction",
+    "profileAvatarCropSaveAction",
+    "profileAvatarCropLoading",
+    "profileAvatarCropError"
+  ],
+
+  "it": [
+    "profileAvatarCropTitle",
+    "profileAvatarCropHint",
+    "profileAvatarCropCancelAction",
+    "profileAvatarCropSaveAction",
+    "profileAvatarCropLoading",
+    "profileAvatarCropError"
+  ],
+
+  "pl": [
+    "profileAvatarCropTitle",
+    "profileAvatarCropHint",
+    "profileAvatarCropCancelAction",
+    "profileAvatarCropSaveAction",
+    "profileAvatarCropLoading",
+    "profileAvatarCropError"
+  ]
+}

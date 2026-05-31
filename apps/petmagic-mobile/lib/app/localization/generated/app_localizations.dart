@@ -324,6 +324,42 @@ abstract class AppLocalizations {
   /// **'Tap to change photo'**
   String get profileAvatarTapToChange;
 
+  /// No description provided for @profileAvatarCropTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile photo'**
+  String get profileAvatarCropTitle;
+
+  /// No description provided for @profileAvatarCropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move and zoom photo'**
+  String get profileAvatarCropHint;
+
+  /// No description provided for @profileAvatarCropCancelAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get profileAvatarCropCancelAction;
+
+  /// No description provided for @profileAvatarCropSaveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get profileAvatarCropSaveAction;
+
+  /// No description provided for @profileAvatarCropLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing photo...'**
+  String get profileAvatarCropLoading;
+
+  /// No description provided for @profileAvatarCropError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not process photo. Try another image.'**
+  String get profileAvatarCropError;
+
   /// No description provided for @profileEmailConfirmed.
   ///
   /// In en, this message translates to:

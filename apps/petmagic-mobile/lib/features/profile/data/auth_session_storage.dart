@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -28,7 +29,17 @@ class AuthSessionStorage {
 
     try {
       return AuthSession.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.Timeline.instantSync(
+        'petmagic.profile.auth_session.error',
+        arguments: {'stage': 'deserialize', 'raw_length': raw.length},
+      );
+      developer.log(
+        'AuthSessionStorage::deserialize failed',
+        name: 'PetMagic.Profile.AuthSession',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return null;
     }
   }

@@ -1,3 +1,7 @@
+import 'dart:developer' as developer;
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -83,6 +87,32 @@ class ProfileState {
 class ProfileController extends Notifier<ProfileState> {
   static const _genericActionError = 'profile.action_failed';
 
+  void _logProfileFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace, {
+    Map<String, Object?> context = const {},
+  }) {
+    final payload = <String, Object>{'stage': stage};
+    for (final entry in context.entries) {
+      final value = entry.value;
+      if (value != null) {
+        payload[entry.key] = value.toString();
+      }
+    }
+
+    developer.Timeline.instantSync(
+      'petmagic.profile.controller.error',
+      arguments: payload,
+    );
+    developer.log(
+      'ProfileController::$stage failed',
+      name: 'PetMagic.Profile.Controller',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   final ImagePicker _imagePicker = ImagePicker();
   final ImageCropper _imageCropper = ImageCropper();
 
@@ -157,7 +187,8 @@ class ProfileController extends Notifier<ProfileState> {
         clearSession: true,
         clearProfile: true,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('initialize_unknown', error, stackTrace);
       final storedSession = await _repository.readSession();
       if (storedSession != null) {
         state = state.copyWith(
@@ -242,7 +273,8 @@ class ProfileController extends Notifier<ProfileState> {
           );
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('login_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
@@ -296,7 +328,8 @@ class ProfileController extends Notifier<ProfileState> {
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('register_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
@@ -327,7 +360,8 @@ class ProfileController extends Notifier<ProfileState> {
           );
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('authenticate_provider_unknown', error, stackTrace);
       _setFailure(message: 'auth.external_invalid');
     }
   }
@@ -345,7 +379,8 @@ class ProfileController extends Notifier<ProfileState> {
       state = state.copyWith(isSaving: false);
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('link_external_unknown', error, stackTrace);
       _setFailure(message: 'auth.external_invalid');
     }
   }
@@ -363,7 +398,8 @@ class ProfileController extends Notifier<ProfileState> {
       state = state.copyWith(isSaving: false);
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('unlink_external_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
@@ -381,7 +417,8 @@ class ProfileController extends Notifier<ProfileState> {
         await ref
             .read(externalAuthRepositoryProvider)
             .clearSession(ExternalAuthProvider.google);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logProfileFailure('logout_google_cleanup', error, stackTrace);
         // Logout must still complete even if provider cleanup fails.
       }
       state = state.copyWith(
@@ -395,7 +432,8 @@ class ProfileController extends Notifier<ProfileState> {
       ref.read(appLaunchControllerProvider.notifier).markSignedOut();
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('logout_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
@@ -413,7 +451,8 @@ class ProfileController extends Notifier<ProfileState> {
         await ref
             .read(externalAuthRepositoryProvider)
             .clearSession(ExternalAuthProvider.google);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logProfileFailure('delete_account_google_cleanup', error, stackTrace);
         // Account deletion must still complete even if provider cleanup fails.
       }
 
@@ -428,17 +467,56 @@ class ProfileController extends Notifier<ProfileState> {
       ref.read(appLaunchControllerProvider.notifier).markSignedOut();
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('delete_account_unknown', error, stackTrace);
+      _setFailure(message: _genericActionError);
+    }
+  }
+
+  Future<XFile?> pickAvatarImage() {
+    return _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 90,
+    );
+  }
+
+  Future<void> uploadAvatarFromPath(String filePath) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+
+    try {
+      final previousAvatarUrl = state.profile?.avatar?.url;
+      final profile = await _repository.uploadAvatar(filePath);
+      final nextAvatarUrl = profile.avatar?.url;
+
+      state = state.copyWith(
+        isSaving: false,
+        profile: profile,
+        session: _replaceSessionUser(profile),
+      );
+
+      await _evictAvatarCache(previousAvatarUrl);
+      await _evictAvatarCache(nextAvatarUrl);
+
+      ref
+          .read(appLaunchControllerProvider.notifier)
+          .markSignedInWithLegalStatus(
+            requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
+          );
+    } on AppException catch (error) {
+      _setFailure(message: error.message);
+    } catch (error, stackTrace) {
+      _logProfileFailure('upload_avatar_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
 
   Future<void> uploadAvatar() async {
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      imageQuality: 90,
-    );
+    final file = await pickAvatarImage();
     if (file == null) {
       return;
     }
@@ -472,28 +550,7 @@ class ProfileController extends Notifier<ProfileState> {
       return;
     }
 
-    state = state.copyWith(
-      isSaving: true,
-      clearError: true,
-      clearSuccess: true,
-    );
-    try {
-      final profile = await _repository.uploadAvatar(croppedFile.path);
-      state = state.copyWith(
-        isSaving: false,
-        profile: profile,
-        session: _replaceSessionUser(profile),
-      );
-      ref
-          .read(appLaunchControllerProvider.notifier)
-          .markSignedInWithLegalStatus(
-            requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
-          );
-    } on AppException catch (error) {
-      _setFailure(message: error.message);
-    } catch (_) {
-      _setFailure(message: _genericActionError);
-    }
+    await uploadAvatarFromPath(croppedFile.path);
   }
 
   Future<void> removeAvatar() async {
@@ -511,7 +568,8 @@ class ProfileController extends Notifier<ProfileState> {
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('remove_avatar_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
@@ -532,7 +590,8 @@ class ProfileController extends Notifier<ProfileState> {
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('update_profile_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
@@ -557,7 +616,8 @@ class ProfileController extends Notifier<ProfileState> {
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logProfileFailure('accept_legal_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
     }
   }
@@ -591,5 +651,23 @@ class ProfileController extends Notifier<ProfileState> {
       expiresAtUtc: session.expiresAtUtc,
       user: profile,
     );
+  }
+
+  Future<void> _evictAvatarCache(String? imageUrl) async {
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      await CachedNetworkImage.evictFromCache(imageUrl);
+      imageCache.evict(NetworkImage(imageUrl));
+    } catch (error, stackTrace) {
+      _logProfileFailure(
+        'avatar_cache_evict_failed',
+        error,
+        stackTrace,
+        context: {'avatar_url': imageUrl},
+      );
+    }
   }
 }

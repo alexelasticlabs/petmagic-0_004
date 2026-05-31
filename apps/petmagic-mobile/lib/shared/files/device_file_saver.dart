@@ -2,18 +2,44 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
-Future<List<int>> downloadFileBytes(String fileUrl, {Dio? client}) async {
-  final httpClient = client ?? Dio();
-  final response = await httpClient.get<List<int>>(
-    fileUrl,
-    options: Options(responseType: ResponseType.bytes),
-  );
-  final bytes = response.data;
-  if (bytes == null || bytes.isEmpty) {
-    throw StateError('Empty download payload.');
-  }
+Future<List<int>> downloadFileBytes(
+  String fileUrl, {
+  Dio? client,
+  Duration timeout = const Duration(seconds: 20),
+  CancelToken? cancelToken,
+}) async {
+  final ownsClient = client == null;
+  final httpClient =
+      client ??
+      Dio(
+        BaseOptions(
+          connectTimeout: timeout,
+          receiveTimeout: timeout,
+          sendTimeout: timeout,
+        ),
+      );
 
-  return bytes;
+  try {
+    final response = await httpClient.get<List<int>>(
+      fileUrl,
+      cancelToken: cancelToken,
+      options: Options(
+        responseType: ResponseType.bytes,
+        receiveTimeout: timeout,
+        sendTimeout: timeout,
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Empty download payload.');
+    }
+
+    return bytes;
+  } finally {
+    if (ownsClient) {
+      httpClient.close(force: true);
+    }
+  }
 }
 
 Future<bool> saveBytesToDevice({

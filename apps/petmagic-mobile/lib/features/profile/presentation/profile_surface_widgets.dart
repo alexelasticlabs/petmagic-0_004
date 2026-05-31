@@ -267,66 +267,85 @@ class ProfileAvatarBadge extends StatelessWidget {
         .round();
 
     return SizedBox(
-      width: size + 18,
-      height: size + 18,
+      width: size,
+      height: size,
       child: Stack(
-        clipBehavior: Clip.none,
+        clipBehavior: Clip.hardEdge,
         children: [
-          GestureDetector(
-            onTap: onTap,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: colors.surfaceStrong,
-                border: Border.all(color: colors.border),
+          Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: onTap,
+              customBorder: const CircleBorder(),
+              child: Ink(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colors.surfaceStrong,
+                  border: Border.all(color: colors.border),
+                ),
+                child: ClipOval(
+                  child: imageUrl != null && imageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl!,
+                          width: size,
+                          height: size,
+                          fit: BoxFit.cover,
+                          memCacheWidth: avatarCacheSize,
+                          memCacheHeight: avatarCacheSize,
+                          placeholder: (ctx, url) => const SizedBox.shrink(),
+                          errorWidget: (ctx, url, err) => Center(
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              color: colors.textMuted,
+                              size: size * 0.38,
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            initials,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: size * 0.34,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: imageUrl != null && imageUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: imageUrl!,
-                      width: size,
-                      height: size,
-                      fit: BoxFit.cover,
-                      memCacheWidth: avatarCacheSize,
-                      memCacheHeight: avatarCacheSize,
-                      placeholder: (ctx, url) => const SizedBox.shrink(),
-                      errorWidget: (ctx, url, err) => Center(
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          color: colors.textMuted,
-                          size: size * 0.38,
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Text(
-                        initials,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: size * 0.34,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
             ),
           ),
           if (showEditOverlay)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: onTap,
-                child: Container(
-                  width: size,
-                  height: size,
-                  decoration: const BoxDecoration(
+            Positioned(
+              right: size * 0.08,
+              bottom: size * 0.08,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0x55000000),
+                    color: colors.surfaceStrong.withValues(alpha: 0.92),
+                    border: Border.all(
+                      color: colors.backgroundTop.withValues(alpha: 0.9),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colors.shadow.withValues(alpha: 0.22),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    Icons.photo_camera_rounded,
-                    color: Colors.white,
-                    size: size * 0.28,
+                  child: Padding(
+                    padding: EdgeInsets.all(size * 0.08),
+                    child: Icon(
+                      Icons.photo_camera_rounded,
+                      color: colors.textStrong,
+                      size: size * 0.18,
+                    ),
                   ),
                 ),
               ),

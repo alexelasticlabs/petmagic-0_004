@@ -120,6 +120,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileAvatarTapToChange => 'Tap to change photo';
 
   @override
+  String get profileAvatarCropTitle => 'Edit profile photo';
+
+  @override
+  String get profileAvatarCropHint => 'Move and zoom photo';
+
+  @override
+  String get profileAvatarCropCancelAction => 'Cancel';
+
+  @override
+  String get profileAvatarCropSaveAction => 'Save';
+
+  @override
+  String get profileAvatarCropLoading => 'Preparing photo...';
+
+  @override
+  String get profileAvatarCropError =>
+      'Could not process photo. Try another image.';
+
+  @override
   String get profileEmailConfirmed => 'Email confirmed';
 
   @override

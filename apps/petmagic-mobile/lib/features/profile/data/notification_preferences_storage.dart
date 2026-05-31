@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -126,7 +127,17 @@ class NotificationPreferencesStorage {
         decoded,
         fallbackMarketingEmails: fallbackMarketingEmails,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.Timeline.instantSync(
+        'petmagic.profile.notifications.error',
+        arguments: {'stage': 'read_preferences', 'scope': scope},
+      );
+      developer.log(
+        'NotificationPreferencesStorage::read failed',
+        name: 'PetMagic.Profile.Notifications',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return NotificationPreferences.defaults().copyWith(
         emailOffersAndDiscounts: fallbackMarketingEmails,
       );

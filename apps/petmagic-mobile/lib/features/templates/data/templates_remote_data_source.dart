@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -113,7 +115,9 @@ class TemplatesRemoteDataSource {
     }
   }
 
-  Future<TemplatesCatalogChangesDto> fetchCatalogChanges(int sinceVersion) async {
+  Future<TemplatesCatalogChangesDto> fetchCatalogChanges(
+    int sinceVersion,
+  ) async {
     try {
       final response = await _dio.get<Map<String, Object?>>(
         '/api/templates/changes',
@@ -164,7 +168,17 @@ class TemplatesRemoteDataSource {
       if (detail != null && detail.isNotEmpty) {
         return detail;
       }
-    } catch (_) {
+    } catch (mappingError, stackTrace) {
+      developer.Timeline.instantSync(
+        'petmagic.templates.error_mapping_failed',
+        arguments: {'stage': 'detail_extract'},
+      );
+      developer.log(
+        'TemplatesRemoteDataSource::extract_error_detail failed',
+        name: 'PetMagic.Templates.Api',
+        error: mappingError,
+        stackTrace: stackTrace,
+      );
       // Keep a safe fallback below.
     }
 

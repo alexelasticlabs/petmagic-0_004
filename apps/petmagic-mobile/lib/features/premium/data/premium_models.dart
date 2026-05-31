@@ -286,8 +286,7 @@ class PremiumStatusModel {
       canManageSubscription: json['canManageSubscription'] as bool? ?? false,
       manageSubscriptionAction:
           json['manageSubscriptionAction'] as String? ?? 'None',
-      weeklyGrantAmount:
-          (json['weeklyGrantAmount'] as num?)?.toInt(),
+      weeklyGrantAmount: (json['weeklyGrantAmount'] as num?)?.toInt(),
     );
   }
 }

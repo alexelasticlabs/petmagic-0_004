@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 
@@ -39,7 +40,10 @@ class NotificationCoordinator {
   bool _authenticatedReady = false;
 
   Future<void> initializeForAuthenticatedUser() async {
-    if (_isDisposed || _authenticatedReady || _initializing || !_firebaseReady) {
+    if (_isDisposed ||
+        _authenticatedReady ||
+        _initializing ||
+        !_firebaseReady) {
       return;
     }
 
@@ -48,7 +52,8 @@ class NotificationCoordinator {
       await _ensureInitialized();
       await registerCurrentToken();
 
-      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
       if (!_initialMessageHandled && initialMessage != null) {
         _initialMessageHandled = true;
         _handleRemoteMessageRoute(initialMessage);
@@ -75,7 +80,9 @@ class NotificationCoordinator {
 
       await _registerTokenWithRetry(token);
       _lastRegisteredToken = token;
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      _logNotificationFailure('register_current_token', error, stackTrace);
+    }
   }
 
   Future<void> unregisterCurrentTokenOnSignOut() async {
@@ -87,10 +94,14 @@ class NotificationCoordinator {
 
     try {
       await _templateRepository.unregisterPushToken(token);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      _logNotificationFailure('unregister_template_token', error, stackTrace);
+    }
     try {
       await _supportRepository.unregisterPushToken(token);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      _logNotificationFailure('unregister_support_token', error, stackTrace);
+    }
     _lastRegisteredToken = null;
   }
 
@@ -175,8 +186,9 @@ class NotificationCoordinator {
   }
 
   Future<void> _initializeLocalNotifications() async {
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings();
     const settings = InitializationSettings(
       android: androidSettings,
@@ -224,7 +236,13 @@ class NotificationCoordinator {
           locale: Platform.localeName,
         );
         return;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logNotificationFailure(
+          'register_token_attempt_failed',
+          error,
+          stackTrace,
+          context: {'attempt': attempt + 1, 'max_attempts': maxAttempts},
+        );
         if (attempt == maxAttempts - 1) {
           rethrow;
         }
@@ -316,6 +334,37 @@ class NotificationCoordinator {
       if (route is String && route.isNotEmpty) {
         _onRouteRequested(route);
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      _logNotificationFailure(
+        'decode_notification_payload',
+        error,
+        stackTrace,
+        context: {'payload_length': payload.length},
+      );
+    }
+  }
+
+  void _logNotificationFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace, {
+    Map<String, Object?> context = const {},
+  }) {
+    final payload = <String, Object>{'stage': stage};
+    for (final entry in context.entries) {
+      final value = entry.value;
+      if (value != null) {
+        payload[entry.key] = value.toString();
+      }
+    }
+
+    AppLogger.error(
+      feature: 'Notifications',
+      operation: stage,
+      message: 'Notification coordinator operation failed',
+      error: error,
+      stackTrace: stackTrace,
+      context: payload,
+    );
   }
 }

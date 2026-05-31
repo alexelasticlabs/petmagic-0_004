@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:app_links/app_links.dart';
@@ -33,6 +34,23 @@ enum ExternalAuthProvider {
   const ExternalAuthProvider(this.apiValue);
 
   final String apiValue;
+}
+
+void _logExternalAuthFailure(
+  String stage,
+  Object error,
+  StackTrace stackTrace,
+) {
+  developer.Timeline.instantSync(
+    'petmagic.profile.external_auth.error',
+    arguments: {'stage': stage},
+  );
+  developer.log(
+    'ExternalAuth::$stage failed',
+    name: 'PetMagic.Profile.ExternalAuth',
+    error: error,
+    stackTrace: stackTrace,
+  );
 }
 
 abstract class ExternalAuthRepository {
@@ -145,7 +163,12 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     } on DioException catch (error) {
       await _resetGoogleSession(googleSignIn);
       throw _mapDioException(error, fallbackMessage: _genericFailedCode);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logExternalAuthFailure(
+        'authenticate_native_google_unknown',
+        error,
+        stackTrace,
+      );
       await _resetGoogleSession(googleSignIn);
       throw const AppException(_genericFailedCode);
     }
@@ -158,10 +181,16 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
     try {
       await googleSignIn.disconnect();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logExternalAuthFailure('google_disconnect_cleanup', error, stackTrace);
       try {
         await googleSignIn.signOut();
-      } catch (_) {
+      } catch (innerError, innerStackTrace) {
+        _logExternalAuthFailure(
+          'google_sign_out_cleanup',
+          innerError,
+          innerStackTrace,
+        );
         // Best-effort cleanup only.
       }
     }

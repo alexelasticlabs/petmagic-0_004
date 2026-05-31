@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -57,6 +59,23 @@ class PasswordResetState {
 
 class PasswordResetController extends Notifier<PasswordResetState> {
   static const _genericActionError = 'profile.action_failed';
+
+  void _logPasswordResetFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    developer.Timeline.instantSync(
+      'petmagic.profile.password_reset.error',
+      arguments: {'stage': stage},
+    );
+    developer.log(
+      'PasswordResetController::$stage failed',
+      name: 'PetMagic.Profile.PasswordReset',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
 
   ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
@@ -120,7 +139,8 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logPasswordResetFailure('request_reset_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
     }
@@ -166,7 +186,8 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logPasswordResetFailure('confirm_reset_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
     }

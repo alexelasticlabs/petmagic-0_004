@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -109,6 +110,49 @@ final premiumSubscriptionManagementServiceProvider =
         repository: ref.watch(premiumRepositoryProvider),
       );
     });
+
+void _logPremiumCheckoutFailure(
+  String stage,
+  Object error,
+  StackTrace stackTrace,
+) {
+  developer.Timeline.instantSync(
+    'petmagic.premium.checkout.error',
+    arguments: {'stage': stage},
+  );
+  developer.log(
+    'PremiumController::$stage failed',
+    name: 'PetMagic.Premium.Checkout',
+    error: error,
+    stackTrace: stackTrace,
+  );
+}
+
+void _logPremiumLoadFailure(
+  String stage,
+  Object error,
+  StackTrace stackTrace, {
+  Map<String, Object?> context = const {},
+}) {
+  final payload = <String, Object>{'stage': stage};
+  for (final entry in context.entries) {
+    final value = entry.value;
+    if (value != null) {
+      payload[entry.key] = value.toString();
+    }
+  }
+
+  developer.Timeline.instantSync(
+    'petmagic.premium.load.error',
+    arguments: payload,
+  );
+  developer.log(
+    'PremiumController::$stage failed',
+    name: 'PetMagic.Premium.Load',
+    error: error,
+    stackTrace: stackTrace,
+  );
+}
 
 class PremiumSubscriptionManagementService {
   const PremiumSubscriptionManagementService({
@@ -588,7 +632,12 @@ class PremiumController extends Notifier<PremiumState> {
           planCode: normalizedPlanCode!,
           externalSubscriptionId: normalizedSubscriptionId!,
         );
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logPremiumCheckoutFailure(
+          'verify_stripe_subscription_checkout',
+          error,
+          stackTrace,
+        );
         // Keep polling fallback even when explicit Stripe verification fails.
       }
     }
@@ -821,7 +870,13 @@ class PremiumController extends Notifier<PremiumState> {
         );
         isAvailable = isAvailable || availability.isAvailable;
         productIds.addAll(availability.productIds);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logPremiumLoadFailure(
+          'fetch_store_availability',
+          error,
+          stackTrace,
+          context: {'provider': provider.name},
+        );
         // Store products can be temporarily unavailable; keep paywall usable.
       }
     }

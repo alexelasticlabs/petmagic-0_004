@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 
 class TemplateMediaCache {
   TemplateMediaCache._();
@@ -47,13 +48,15 @@ class TemplateMediaCache {
   static Future<void> clearAll() async {
     try {
       await thumbnailCache.emptyCache();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logCacheFailure('clear_thumbnail_cache', error, stackTrace);
       // Keep best-effort semantics for logout cleanup.
     }
 
     try {
       await previewVideoCache.emptyCache();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logCacheFailure('clear_preview_cache', error, stackTrace);
       // Keep best-effort semantics for logout cleanup.
     }
   }
@@ -91,7 +94,8 @@ class TemplateMediaCache {
             final fileSize = stat.size;
             totalBytes += fileSize;
             stats.add(_PreviewCacheFileStat(file, fileSize, stat.modified));
-          } catch (_) {
+          } catch (error, stackTrace) {
+            _logCacheFailure('preview_budget_stat_file', error, stackTrace);
             // Skip files that cannot be stat'ed.
           }
         }
@@ -109,14 +113,32 @@ class TemplateMediaCache {
           try {
             await item.file.delete();
             totalBytes -= item.sizeBytes;
-          } catch (_) {
+          } catch (error, stackTrace) {
+            _logCacheFailure('preview_budget_delete_file', error, stackTrace);
             // Keep best-effort semantics.
           }
         }
+      } catch (error, stackTrace) {
+        _logCacheFailure('preview_budget_cleanup', error, stackTrace);
       } finally {
         _isPreviewBudgetCleanupRunning = false;
       }
     });
+  }
+
+  static void _logCacheFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    AppLogger.error(
+      feature: 'Performance.MediaCache',
+      operation: stage,
+      message: 'Template media cache operation failed',
+      error: error,
+      stackTrace: stackTrace,
+      context: {'stage': stage},
+    );
   }
 }
 

@@ -66,8 +66,8 @@ void main() {
       ),
     );
 
-    expect(colors.backgroundTop, const Color(0xFFFFFFFF));
-    expect(colors.textStrong, const Color(0xFF101B31));
+    expect(colors.backgroundTop, const Color(0xFFF9FAFC));
+    expect(colors.textStrong, const Color(0xFF0F1D35));
   });
 
   testWidgets('petMagicColors falls back safely for dark ThemeData', (

@@ -37,6 +37,32 @@ flutter run --dart-define=API_BASE_URL=http://localhost:5000
 flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
 ```
 
+## Release Hardening Checklist
+
+- Always pass HTTPS API endpoint in release builds:
+
+```bash
+flutter build appbundle --release --dart-define=API_BASE_URL=https://api.petmagic.app
+```
+
+- Configure release signing in `android/key.properties` (do not commit secrets):
+
+```properties
+storeFile=../keystore/release.keystore
+storePassword=***
+keyAlias=***
+keyPassword=***
+```
+
+- Release tasks fail fast if signing is missing.
+  For local temporary experiments only, you may bypass with:
+
+```bash
+flutter build apk --release -PallowInsecureReleaseSigning=true
+```
+
+Do not use the insecure override for production artifacts.
+
 ## External auth and password reset
 
 Google sign-in now uses native mobile sign-in first and only falls back to browser OAuth when needed.
@@ -57,7 +83,7 @@ See the full setup guide in [md/AUTH_EMAIL_SETUP.md](md/AUTH_EMAIL_SETUP.md).
 
 ```bash
 dart format lib test
-flutter analyze
+flutter analyze --fatal-infos
 flutter test
 ```
 

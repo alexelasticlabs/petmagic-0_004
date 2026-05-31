@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -394,9 +393,6 @@ class _TemplateImageWithFallback extends StatelessWidget {
         imageBuilder: (context, imageProvider) =>
             _CoverImageFill(imageProvider: imageProvider),
         errorWidget: (context, url, error) {
-          if (kDebugMode) {
-            debugPrint('Template image preview failed for $url: $error');
-          }
           unawaited(TemplateMediaCache.thumbnailCache.removeFile(url));
           return _CoverNetworkImageFill(imageUrl: url, cacheWidth: cacheWidth);
         },
@@ -456,14 +452,7 @@ class _CoverNetworkImageFill extends StatelessWidget {
 
         return const _MediaPlaceholder();
       },
-      errorBuilder: (context, error, stackTrace) {
-        if (kDebugMode) {
-          debugPrint(
-            'Template direct image fallback failed for $imageUrl: $error',
-          );
-        }
-        return const _MediaPlaceholder();
-      },
+      errorBuilder: (context, error, stackTrace) => const _MediaPlaceholder(),
     );
   }
 }

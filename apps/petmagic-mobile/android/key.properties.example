@@ -1,0 +1,7 @@
+# Copy this file to android/key.properties and replace placeholders.
+# Do not commit android/key.properties.
+
+storeFile=../keystore/release.keystore
+storePassword=CHANGE_ME
+keyAlias=CHANGE_ME
+keyPassword=CHANGE_ME

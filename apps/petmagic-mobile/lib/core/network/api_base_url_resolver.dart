@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -127,7 +128,7 @@ class ApiBaseUrlResolver {
       addCandidate(baseUrl);
     }
 
-    if (AppConfig.configuredApiBaseUrl.isEmpty && !kIsWeb) {
+    if (kDebugMode && AppConfig.configuredApiBaseUrl.isEmpty && !kIsWeb) {
       final subnetCandidates = await _readLocalSubnetCandidates();
       for (final baseUrl in subnetCandidates) {
         addCandidate(baseUrl);
@@ -234,7 +235,16 @@ class ApiBaseUrlResolver {
       await response.drain<void>();
 
       return response.statusCode >= 200 && response.statusCode < 300;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      final normalized = _normalizeBaseUrl(baseUrl);
+      if (normalized != null && normalized == _activeBaseUrl) {
+        _logResolverFailure(
+          'probe_active_base_url',
+          error,
+          stackTrace,
+          context: {'base_url': normalized},
+        );
+      }
       return false;
     } finally {
       httpClient.close(force: true);
@@ -242,6 +252,10 @@ class ApiBaseUrlResolver {
   }
 
   Future<List<String>> _readLocalSubnetCandidates() async {
+    if (!kDebugMode) {
+      return const [];
+    }
+
     final overrideProvider = _localSubnetCandidatesProvider;
     if (overrideProvider != null) {
       return overrideProvider();
@@ -294,9 +308,40 @@ class ApiBaseUrlResolver {
       }
 
       return candidates;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logResolverFailure(
+        'read_local_subnet_candidates',
+        error,
+        stackTrace,
+      );
       return const [];
     }
+  }
+
+  void _logResolverFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace, {
+    Map<String, Object?> context = const {},
+  }) {
+    final payload = <String, Object>{'stage': stage};
+    for (final entry in context.entries) {
+      final value = entry.value;
+      if (value != null) {
+        payload[entry.key] = value.toString();
+      }
+    }
+
+    developer.Timeline.instantSync(
+      'petmagic.api_base_url_resolver.error',
+      arguments: payload,
+    );
+    developer.log(
+      'ApiBaseUrlResolver::$stage failed',
+      name: 'PetMagic.Network.BaseUrlResolver',
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
   List<int> _buildHostProbeOrder(Set<int> ownHostOctets) {
@@ -399,6 +444,10 @@ class ApiBaseUrlResolver {
 
     final scheme = uri.scheme.toLowerCase();
     if (scheme != 'http' && scheme != 'https') {
+      return null;
+    }
+
+    if (!kDebugMode && scheme != 'https') {
       return null;
     }
 

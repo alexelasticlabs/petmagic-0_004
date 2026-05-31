@@ -21,12 +21,12 @@ void main() {
     await tester.tap(find.text(text.profileSettingsLanguageTitle));
     await tester.pumpAndSettle();
 
-    expect(find.text(text.profileSettingsLanguageEnglish), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
 
-    await tester.tap(find.text(text.profileSettingsLanguageEnglish));
+    await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
 
-    expect(find.text(text.profileSettingsLanguageEnglish), findsWidgets);
+    expect(find.text('English'), findsWidgets);
   });
 
   testWidgets('theme sheet applies selected theme mode', (tester) async {

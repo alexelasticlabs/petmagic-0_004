@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 
@@ -20,20 +19,26 @@ enum WalletCheckoutVerificationState {
   error,
 }
 
-void _debugCheckoutLog(String message, {Object? error}) {
-  if (!kDebugMode) {
-    return;
-  }
-
-  developer.log(message, name: 'PetMagic.Wallet.Checkout', error: error);
+void _checkoutInfo(
+  String operation, {
+  Map<String, Object?> context = const {},
+}) {
+  AppLogger.info(
+    feature: 'Wallet.Checkout',
+    operation: operation,
+    context: context,
+  );
 }
 
-void _debugCheckoutInstant(String eventName, {Map<String, Object>? arguments}) {
-  if (!kDebugMode) {
-    return;
-  }
-
-  developer.Timeline.instantSync(eventName, arguments: arguments);
+void _logWalletLoadFailure(String stage, Object error, StackTrace stackTrace) {
+  AppLogger.error(
+    feature: 'Wallet.Load',
+    operation: stage,
+    message: 'Wallet load stage failed',
+    error: error,
+    stackTrace: stackTrace,
+    context: {'stage': stage},
+  );
 }
 
 class WalletState {
@@ -242,15 +247,17 @@ class WalletController extends Notifier<WalletState> {
         () async {
           try {
             ledger = (await _repository.fetchLedger(take: 24)).items;
-          } catch (_) {
+          } catch (error, stackTrace) {
             softError ??= 'wallet.ledger_failed';
+            _logWalletLoadFailure('fetch_ledger', error, stackTrace);
           }
         }(),
         () async {
           try {
             rewards = await _repository.fetchRewards();
-          } catch (_) {
+          } catch (error, stackTrace) {
             softError ??= 'rewards.summary_failed';
+            _logWalletLoadFailure('fetch_rewards', error, stackTrace);
           }
         }(),
         () async {
@@ -260,15 +267,17 @@ class WalletController extends Notifier<WalletState> {
             );
             packs = config.packs;
             paymentMethods = config.paymentMethods;
-          } catch (_) {
+          } catch (error, stackTrace) {
             softError ??= 'wallet.packs_failed';
+            _logWalletLoadFailure('fetch_checkout_config', error, stackTrace);
           }
         }(),
         () async {
           try {
             purchases = (await _repository.fetchPurchases(take: 12)).items;
-          } catch (_) {
+          } catch (error, stackTrace) {
             softError ??= 'wallet.purchases_failed';
+            _logWalletLoadFailure('fetch_purchases', error, stackTrace);
           }
         }(),
       ]);
@@ -302,8 +311,14 @@ class WalletController extends Notifier<WalletState> {
       return null;
     }
 
-    _debugCheckoutLog(
-      'Checkout start (pack=${pack.code}, provider=${paymentMethod.provider}, currency=${pack.currencyCode}, amount=${pack.priceAmount})',
+    _checkoutInfo(
+      'checkout_started',
+      context: {
+        'pack_code': pack.code,
+        'provider': paymentMethod.provider,
+        'currency': pack.currencyCode,
+        'amount': pack.priceAmount,
+      },
     );
 
     state = state.copyWith(
@@ -351,8 +366,13 @@ class WalletController extends Notifier<WalletState> {
         WidgetsBinding.instance.platformDispatcher.locale,
       );
 
-      _debugCheckoutLog(
-        'Checkout response (order=${checkout.orderId}, status=${checkout.status}, urlLength=${checkout.checkoutUrl.length})',
+      _checkoutInfo(
+        'checkout_created',
+        context: {
+          'order_id': checkout.orderId,
+          'status': checkout.status,
+          'checkout_url_length': checkout.checkoutUrl.length,
+        },
       );
 
       if (paymentMethod.isStoreNative) {
@@ -376,13 +396,11 @@ class WalletController extends Notifier<WalletState> {
           'order_id': checkout.orderId,
           'status': checkout.status,
         };
-        _debugCheckoutInstant(
-          'petmagic.wallet.checkout_empty_url',
-          arguments: payload,
-        );
-        _debugCheckoutLog(
-          'Empty checkout URL from purchase create API '
-          '(pack=${pack.code}, provider=${paymentMethod.provider}, order=${checkout.orderId}, status=${checkout.status})',
+        AppLogger.warn(
+          feature: 'Wallet.Checkout',
+          operation: 'empty_checkout_url',
+          message: 'Empty checkout URL received from purchase create API',
+          context: payload,
           error: 'wallet.checkout_empty_url',
         );
 
@@ -404,8 +422,11 @@ class WalletController extends Notifier<WalletState> {
       );
       return checkout;
     } catch (error) {
-      _debugCheckoutLog(
-        'Checkout failed (pack=${pack.code}, provider=${paymentMethod.provider})',
+      AppLogger.error(
+        feature: 'Wallet.Checkout',
+        operation: 'checkout_failed',
+        message: 'Checkout failed',
+        context: {'pack_code': pack.code, 'provider': paymentMethod.provider},
         error: error,
       );
       state = state.copyWith(
@@ -608,8 +629,15 @@ class WalletController extends Notifier<WalletState> {
           return;
         }
       } catch (error) {
-        _debugCheckoutLog(
-          'Stripe verify attempt failed (order=$pendingOrderId, attempt=${attempt + 1}, reference=${normalizedReference ?? ''})',
+        AppLogger.warn(
+          feature: 'Wallet.Checkout',
+          operation: 'stripe_verify_attempt_failed',
+          message: 'Stripe verify attempt failed',
+          context: {
+            'order_id': pendingOrderId,
+            'attempt': attempt + 1,
+            'reference': normalizedReference ?? '',
+          },
           error: error,
         );
       }
@@ -631,7 +659,12 @@ class WalletController extends Notifier<WalletState> {
           );
           return;
         }
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logWalletLoadFailure(
+          'fetch_purchase_for_verification',
+          error,
+          stackTrace,
+        );
         // Keep retrying verify endpoint; failures here should not interrupt confirmation loop.
       }
 

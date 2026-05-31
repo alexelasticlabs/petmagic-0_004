@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -58,6 +60,23 @@ class PasswordChangeState {
 class PasswordChangeController extends Notifier<PasswordChangeState> {
   static const _genericActionError = 'profile.action_failed';
 
+  void _logPasswordChangeFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    developer.Timeline.instantSync(
+      'petmagic.profile.password_change.error',
+      arguments: {'stage': stage},
+    );
+    developer.log(
+      'PasswordChangeController::$stage failed',
+      name: 'PetMagic.Profile.PasswordChange',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
   @override
@@ -107,7 +126,8 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logPasswordChangeFailure('request_code_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
     }
@@ -152,7 +172,8 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
     } on AppException catch (error) {
       _setFailure(error.message);
       return false;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logPasswordChangeFailure('confirm_change_unknown', error, stackTrace);
       _setFailure(_genericActionError);
       return false;
     }

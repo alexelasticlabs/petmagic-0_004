@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -39,6 +40,32 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
 
   List<XFile> _attachments = const [];
   bool _isSubmitting = false;
+
+  void _logSupportTicketFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace, {
+    Map<String, Object?> context = const {},
+  }) {
+    final payload = <String, Object>{'stage': stage};
+    for (final entry in context.entries) {
+      final value = entry.value;
+      if (value != null) {
+        payload[entry.key] = value.toString();
+      }
+    }
+
+    developer.Timeline.instantSync(
+      'petmagic.support.ticket.error',
+      arguments: payload,
+    );
+    developer.log(
+      'SupportTicketForm::$stage failed',
+      name: 'PetMagic.Support.TicketForm',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
 
   @override
   void initState() {
@@ -487,7 +514,16 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
         SnackBar(content: Text(text.supportTicketFormSuccessMessage)),
       );
       context.go(SupportChatPage.routePath);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logSupportTicketFailure(
+        'submit_ticket',
+        error,
+        stackTrace,
+        context: {
+          'scenario': scenario,
+          'attachments_count': _attachments.length,
+        },
+      );
       if (!mounted) {
         return;
       }

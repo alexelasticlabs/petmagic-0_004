@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 
 class AppPerformanceMonitor extends StatefulWidget {
   const AppPerformanceMonitor({required this.child, super.key});
@@ -69,13 +69,11 @@ class _AppPerformanceMonitorState extends State<AppPerformanceMonitor> {
         'budget_ms': AppConfig.targetFrameBudgetMs,
       };
 
-      developer.Timeline.instantSync('petmagic.slow_frame', arguments: payload);
-      developer.log(
-        'Slow frame build=${buildMs.toStringAsFixed(2)}ms '
-        'raster=${rasterMs.toStringAsFixed(2)}ms '
-        'total=${totalMs.toStringAsFixed(2)}ms '
-        'budget=${AppConfig.targetFrameBudgetMs}ms',
-        name: 'PetMagic.Performance.Frame',
+      AppLogger.warn(
+        feature: 'Performance.Frame',
+        operation: 'slow_frame_detected',
+        message: 'Slow frame detected',
+        context: payload,
       );
     }
   }
@@ -95,13 +93,11 @@ class _AppPerformanceMonitorState extends State<AppPerformanceMonitor> {
       'max_mb': maxSizeMb,
     };
 
-    developer.Timeline.instantSync('petmagic.image_cache', arguments: payload);
-    developer.log(
-      'ImageCache entries=${cache.currentSize} '
-      'live=${cache.liveImageCount} '
-      'pending=${cache.pendingImageCount} '
-      'size=${currentSizeMb}MB/${maxSizeMb}MB',
-      name: 'PetMagic.Performance.ImageCache',
+    AppLogger.debug(
+      feature: 'Performance.ImageCache',
+      operation: 'snapshot',
+      message: 'Image cache stats',
+      context: payload,
     );
   }
 }

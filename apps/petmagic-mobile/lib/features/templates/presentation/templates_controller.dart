@@ -88,8 +88,8 @@ class TemplatesState {
 class TemplatesController extends Notifier<TemplatesState> {
   static const _realtimeRefreshDebounce = Duration(milliseconds: 350);
 
-  late final TemplatesRepository _repository;
-  late final RealtimeClient _realtimeClient;
+  TemplatesRepository get _repository => ref.read(templatesRepositoryProvider);
+  RealtimeClient get _realtimeClient => ref.read(realtimeClientProvider);
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Timer? _realtimeRefreshTimer;
   bool _hasPendingRealtimeRefresh = false;
@@ -127,8 +127,6 @@ class TemplatesController extends Notifier<TemplatesState> {
 
   @override
   TemplatesState build() {
-    _repository = ref.watch(templatesRepositoryProvider);
-    _realtimeClient = ref.watch(realtimeClientProvider);
     unawaited(_resumeRealtimeIfNeeded());
     ref.onDispose(() {
       _pauseRealtime();

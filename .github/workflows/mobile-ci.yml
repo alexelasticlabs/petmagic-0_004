@@ -38,7 +38,27 @@ jobs:
         run: dart run tool/check_generation_status_l10n.dart
 
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Verify release signing guard
+        shell: bash
+        run: |
+          set +e
+          output=$(cd android && ./gradlew :app:assembleRelease 2>&1)
+          status=$?
+          set -e
+
+          echo "$output"
+
+          if [ "$status" -eq 0 ]; then
+            echo "Expected release signing guard to fail without key.properties"
+            exit 1
+          fi
+
+          if ! echo "$output" | grep -q "Release signing is not configured"; then
+            echo "Release task failed for an unexpected reason"
+            exit 1
+          fi
 
       - name: Test
         run: flutter test

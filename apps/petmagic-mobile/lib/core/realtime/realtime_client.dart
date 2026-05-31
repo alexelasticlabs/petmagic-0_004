@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -182,7 +183,13 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       await _apiBaseUrlResolver.markSuccessful(baseUrl);
       await _consumeResponse(response);
       return true;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logRealtimeFailure(
+        'connect',
+        error,
+        stackTrace,
+        context: {'base_url': baseUrl},
+      );
       await _apiBaseUrlResolver.invalidate(baseUrl);
       return false;
     }
@@ -250,9 +257,42 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
           (key, value) => MapEntry(key.toString(), value as Object?),
         );
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      _logRealtimeFailure(
+        'parse_payload',
+        error,
+        stackTrace,
+        context: {'payload_length': rawPayload.length},
+      );
+    }
 
     return const {};
+  }
+
+  void _logRealtimeFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace, {
+    Map<String, Object?> context = const {},
+  }) {
+    final payload = <String, Object>{'stage': stage};
+    for (final entry in context.entries) {
+      final value = entry.value;
+      if (value != null) {
+        payload[entry.key] = value.toString();
+      }
+    }
+
+    developer.Timeline.instantSync(
+      'petmagic.realtime.error',
+      arguments: payload,
+    );
+    developer.log(
+      'ServerSentEventsRealtimeClient::$stage failed',
+      name: 'PetMagic.Realtime',
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
   Future<void> _waitBeforeReconnect() async {

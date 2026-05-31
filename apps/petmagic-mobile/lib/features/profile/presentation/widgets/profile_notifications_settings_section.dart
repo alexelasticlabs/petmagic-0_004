@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,6 +48,23 @@ class _ProfileNotificationsSettingsSectionState
   bool _isSaving = false;
   bool _isRequestingPermission = false;
 
+  void _logNotificationsFailure(
+    String stage,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    developer.Timeline.instantSync(
+      'petmagic.profile.notifications.settings.error',
+      arguments: {'stage': stage},
+    );
+    developer.log(
+      'ProfileNotificationsSettings::$stage failed',
+      name: 'PetMagic.Profile.Notifications.Settings',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,7 +95,8 @@ class _ProfileNotificationsSettingsSectionState
         _isLoading = false;
       });
       await _refreshDevicePermissions();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logNotificationsFailure('load', error, stackTrace);
       if (!mounted) {
         return;
       }
@@ -112,7 +132,8 @@ class _ProfileNotificationsSettingsSectionState
 
     try {
       await _storage.save(scope: widget.scope, preferences: next);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logNotificationsFailure('save_preferences', error, stackTrace);
       if (!mounted) {
         return;
       }
@@ -141,7 +162,8 @@ class _ProfileNotificationsSettingsSectionState
       setState(() {
         _pushAuthorizationStatus = settings.authorizationStatus;
       });
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logNotificationsFailure('refresh_push_permission', error, stackTrace);
       if (!mounted) {
         return;
       }
@@ -172,7 +194,8 @@ class _ProfileNotificationsSettingsSectionState
         _isRequestingPermission = false;
         _pushAuthorizationStatus = settings.authorizationStatus;
       });
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _logNotificationsFailure('request_push_permission', error, stackTrace);
       if (!mounted) {
         return;
       }

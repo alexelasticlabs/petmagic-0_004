@@ -39,6 +39,7 @@ class TemplatesPage extends ConsumerStatefulWidget {
 
 class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   static const _refreshCooldown = Duration(seconds: 15);
+  static const _gridCacheExtent = 400.0;
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
@@ -140,7 +141,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         color: colors.accent,
         child: CustomScrollView(
           controller: _scrollController,
-          cacheExtent: 560,
+          cacheExtent: _gridCacheExtent,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
@@ -569,6 +570,7 @@ class _TopBar extends StatelessWidget {
             icon: const Icon(Icons.login_rounded, size: 17),
             label: Text(text.profileSignInAction),
             style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 40),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               foregroundColor: colors.accent,
               side: BorderSide(color: colors.accent.withValues(alpha: 0.5)),

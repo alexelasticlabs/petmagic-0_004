@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/startup/guest_launch_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -52,6 +54,19 @@ class AppLaunchState {
 class AppLaunchController extends Notifier<AppLaunchState> {
   late final GuestLaunchStorage _guestLaunchStorage;
 
+  void _logAppLaunchFailure(String stage, Object error, StackTrace stackTrace) {
+    developer.Timeline.instantSync(
+      'petmagic.app_launch.error',
+      arguments: {'stage': stage},
+    );
+    developer.log(
+      'AppLaunchController::$stage failed',
+      name: 'PetMagic.Startup.AppLaunch',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   @override
   AppLaunchState build() {
     _guestLaunchStorage = ref.watch(guestLaunchStorageProvider);
@@ -82,7 +97,8 @@ class AppLaunchController extends Notifier<AppLaunchState> {
     if (!state.hasSeenOnboarding) {
       try {
         await _guestLaunchStorage.saveOnboardingSeen(true);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logAppLaunchFailure('save_onboarding_seen', error, stackTrace);
         // Do not block guest entry when local persistence fails.
       }
     }
@@ -114,9 +130,7 @@ class AppLaunchController extends Notifier<AppLaunchState> {
     );
   }
 
-  void markSignedInWithLegalStatus({
-    required bool requiresLegalAcceptance,
-  }) {
+  void markSignedInWithLegalStatus({required bool requiresLegalAcceptance}) {
     state = state.copyWith(
       isLoading: false,
       isAuthenticated: true,

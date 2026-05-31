@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -10,6 +8,7 @@ import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -22,14 +21,6 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
     authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
   );
 });
-
-void _debugWalletApiLog(String message) {
-  if (!kDebugMode) {
-    return;
-  }
-
-  developer.log(message, name: 'PetMagic.Wallet.Api');
-}
 
 class WalletRepository {
   WalletRepository({
@@ -170,8 +161,15 @@ class WalletRepository {
       'locale': locale.toLanguageTag(),
     };
 
-    _debugWalletApiLog(
-      'POST /api/economy/purchases/create (packId=${pack.packId}, provider=${paymentMethod.provider}, currency=${pack.currencyCode}, country=${locale.countryCode ?? '*'})',
+    AppLogger.info(
+      feature: 'Wallet.Api',
+      operation: 'create_purchase_started',
+      context: {
+        'pack_id': pack.packId,
+        'provider': paymentMethod.provider,
+        'currency': pack.currencyCode,
+        'country': locale.countryCode ?? '*',
+      },
     );
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
@@ -185,8 +183,10 @@ class WalletRepository {
       ),
     );
 
-    _debugWalletApiLog(
-      'POST /api/economy/purchases/create -> ${response.statusCode}',
+    AppLogger.info(
+      feature: 'Wallet.Api',
+      operation: 'create_purchase_completed',
+      context: {'status': response.statusCode ?? 0},
     );
 
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});

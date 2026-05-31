@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -233,7 +234,17 @@ class ProfileRepository {
           },
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.Timeline.instantSync(
+        'petmagic.profile.logout.error',
+        arguments: {'stage': 'remote_logout'},
+      );
+      developer.log(
+        'ProfileRepository::remote logout failed',
+        name: 'PetMagic.Profile.Auth',
+        error: error,
+        stackTrace: stackTrace,
+      );
       // Keep logout local-first.
     }
   }

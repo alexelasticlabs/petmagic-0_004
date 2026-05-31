@@ -104,13 +104,14 @@ class _StatusHero extends StatelessWidget {
               color: generation.isCompleted
                   ? colors.accent
                   : generation.isFailed
-                      ? colors.danger
-                      : colors.textSoft,
+                  ? colors.danger
+                  : colors.textSoft,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 12),
-          if (!generation.isTerminal) ...[            Row(
+          if (!generation.isTerminal) ...[
+            Row(
               children: [
                 SizedBox(
                   width: 84,
@@ -157,11 +158,9 @@ class _StatusHero extends StatelessWidget {
                 height: 1.35,
               ),
             ),
-          ] else if (generation.isCompleted) ...[            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
+          ] else if (generation.isCompleted) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -194,7 +193,8 @@ class _StatusHero extends StatelessWidget {
                 ],
               ),
             ),
-          ] else ...[            Text(
+          ] else ...[
+            Text(
               terminalHint(text, generation),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colors.textMuted,
@@ -303,17 +303,16 @@ class _ResultCardState extends State<_ResultCard> {
   void _resolveImageAspectRatio() {
     final url = widget.generation.outputUrl ?? '';
     if (url.isEmpty) return;
-    NetworkImage(url).resolve(const ImageConfiguration()).addListener(
-      ImageStreamListener(
-        (info, _) {
-          if (!mounted) return;
-          final w = info.image.width.toDouble();
-          final h = info.image.height.toDouble();
-          if (h > 0) setState(() => _aspectRatio = w / h);
-        },
-        onError: (_, __) {},
-      ),
-    );
+    NetworkImage(url)
+        .resolve(const ImageConfiguration())
+        .addListener(
+          ImageStreamListener((info, _) {
+            if (!mounted) return;
+            final w = info.image.width.toDouble();
+            final h = info.image.height.toDouble();
+            if (h > 0) setState(() => _aspectRatio = w / h);
+          }, onError: (error, stackTrace) {}),
+        );
   }
 
   @override

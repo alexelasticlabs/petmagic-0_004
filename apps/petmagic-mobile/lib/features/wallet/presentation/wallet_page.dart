@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +11,7 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
@@ -21,14 +20,6 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 
 part 'widgets/wallet_page_activity_widgets.dart';
 part 'widgets/wallet_page_overview_widgets.dart';
-
-void _debugWalletCheckoutLog(String message) {
-  if (!kDebugMode) {
-    return;
-  }
-
-  developer.log(message, name: 'PetMagic.Wallet.Checkout');
-}
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
@@ -323,8 +314,18 @@ class _WalletPageState extends ConsumerState<WalletPage>
     PurchaseCheckoutModel checkout,
   ) async {
     final text = AppLocalizations.of(context);
-    _debugWalletCheckoutLog(
-      'Checkout dispatch (order=${checkout.orderId}, usesPaymentSheet=${checkout.usesPaymentSheet}, provider=${checkout.paymentProvider}, urlLength=${checkout.checkoutUrl.length}, hasClientSecret=${(checkout.paymentIntentClientSecret?.isNotEmpty ?? false)}, hasPublishableKey=${(checkout.publishableKey?.isNotEmpty ?? false)})',
+    AppLogger.info(
+      feature: 'Wallet.Checkout',
+      operation: 'checkout_dispatch',
+      context: {
+        'order_id': checkout.orderId,
+        'uses_payment_sheet': checkout.usesPaymentSheet,
+        'provider': checkout.paymentProvider,
+        'url_length': checkout.checkoutUrl.length,
+        'has_client_secret':
+            checkout.paymentIntentClientSecret?.isNotEmpty ?? false,
+        'has_publishable_key': checkout.publishableKey?.isNotEmpty ?? false,
+      },
     );
 
     if (!checkout.usesPaymentSheet) {
@@ -353,8 +354,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
       );
     }
 
-    _debugWalletCheckoutLog(
-      'PaymentSheet init start (order=${checkout.orderId})',
+    AppLogger.info(
+      feature: 'Wallet.Checkout',
+      operation: 'paymentsheet_init',
+      context: {'order_id': checkout.orderId},
     );
     _shouldReloadOnResume = true;
     final sheetResult = await StripePaymentSheetCoordinator.present(
@@ -533,11 +536,11 @@ Future<void> _showPackDetailSheet(
         paymentMethodLabel: _walletProviderLabel(text, selectedMethod),
         onChooseAnotherMethod: () {},
         onSubmit: () async {
-          if (kDebugMode) {
-            debugPrint(
-              'PETMAGIC_WALLET_CHECKOUT buy_tapped pack=${selectedPack.code}',
-            );
-          }
+          AppLogger.info(
+            feature: 'Wallet.Checkout',
+            operation: 'buy_tapped',
+            context: {'pack_code': selectedPack.code},
+          );
           final checkout = await onBuy(selectedPack, selectedMethod);
           if (checkout == null) {
             return WalletStripeCheckoutSubmitResult(

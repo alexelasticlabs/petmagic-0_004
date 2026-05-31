@@ -72,7 +72,7 @@ class AppConfig {
       return [configuredApiBaseUrl];
     }
 
-    if (!kIsWeb && Platform.isAndroid) {
+    if (kDebugMode && !kIsWeb && Platform.isAndroid) {
       return const [
         'http://10.0.2.2:5000',
         'http://host.docker.internal:5000',
@@ -82,7 +82,11 @@ class AppConfig {
       ];
     }
 
-    return const ['http://localhost:5000', 'http://127.0.0.1:5000'];
+    if (kDebugMode) {
+      return const ['http://localhost:5000', 'http://127.0.0.1:5000'];
+    }
+
+    return const ['https://api.petmagic.app'];
   }
 
   static String get apiBaseUrl {

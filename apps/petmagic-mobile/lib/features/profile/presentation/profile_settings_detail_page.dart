@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_avatar_cropper_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
@@ -172,7 +173,24 @@ class _ProfileAccountInfoPageState
   }
 
   Future<void> _uploadAvatar() async {
-    await ref.read(profileControllerProvider.notifier).uploadAvatar();
+    final controller = ref.read(profileControllerProvider.notifier);
+    final selectedFile = await controller.pickAvatarImage();
+    if (selectedFile == null || !mounted) {
+      return;
+    }
+
+    final croppedPath = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) =>
+            ProfileAvatarCropperPage(sourceImagePath: selectedFile.path),
+        fullscreenDialog: true,
+      ),
+    );
+    if (!mounted || croppedPath == null || croppedPath.trim().isEmpty) {
+      return;
+    }
+
+    await controller.uploadAvatarFromPath(croppedPath);
     if (!mounted) {
       return;
     }
@@ -317,10 +335,12 @@ class _AccountProfileHeroCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             text.profileAvatarTapToChange,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color: colors.textMuted,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
+              color: colors.textSoft,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
             ),
           ),
           const SizedBox(height: 16),

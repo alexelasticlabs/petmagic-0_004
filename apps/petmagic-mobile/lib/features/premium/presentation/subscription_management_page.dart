@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SubscriptionManagementPage extends ConsumerStatefulWidget {
@@ -70,7 +71,21 @@ class _SubscriptionManagementPageState
     try {
       final service = ref.read(premiumSubscriptionManagementServiceProvider);
       final url = await service.createManagementUrl(manageSubscriptionAction);
-      final uri = Uri.parse(url);
+      final uri = parseSafeExternalUri(
+        url,
+        allowedHttpsHosts: premiumExternalAllowedHosts(),
+      );
+      if (uri == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context).premiumManageFailed),
+            ),
+          );
+        }
+        return;
+      }
+
       var launched = false;
       try {
         launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
@@ -78,7 +93,14 @@ class _SubscriptionManagementPageState
         launched = false;
       }
       if (!launched) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).premiumManageFailed),
+          ),
+        );
       }
     } finally {
       if (mounted) {

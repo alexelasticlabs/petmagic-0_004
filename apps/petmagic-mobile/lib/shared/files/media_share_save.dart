@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:gallery_saver_plus/gallery_saver.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -9,8 +10,14 @@ import 'temp_media_cleanup.dart';
 Future<File> cacheRemoteMediaFile({
   required String mediaUrl,
   required String fileName,
+  Duration downloadTimeout = const Duration(seconds: 20),
+  CancelToken? cancelToken,
 }) async {
-  final bytes = await downloadFileBytes(mediaUrl);
+  final bytes = await downloadFileBytes(
+    mediaUrl,
+    timeout: downloadTimeout,
+    cancelToken: cancelToken,
+  );
   final safeFileName = sanitizeFileName(
     fileName,
     fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
@@ -27,10 +34,14 @@ Future<void> shareRemoteMediaFile({
   required String mediaUrl,
   required String fileName,
   String? title,
+  Duration downloadTimeout = const Duration(seconds: 20),
+  CancelToken? cancelToken,
 }) async {
   final tempFile = await cacheRemoteMediaFile(
     mediaUrl: mediaUrl,
     fileName: fileName,
+    downloadTimeout: downloadTimeout,
+    cancelToken: cancelToken,
   );
 
   final shareResult = await SharePlus.instance.share(
@@ -49,10 +60,14 @@ Future<bool> saveRemoteMediaToGallery({
   required String fileName,
   required bool isVideo,
   String? albumName,
+  Duration downloadTimeout = const Duration(seconds: 20),
+  CancelToken? cancelToken,
 }) async {
   final tempFile = await cacheRemoteMediaFile(
     mediaUrl: mediaUrl,
     fileName: fileName,
+    downloadTimeout: downloadTimeout,
+    cancelToken: cancelToken,
   );
 
   final saved = isVideo
