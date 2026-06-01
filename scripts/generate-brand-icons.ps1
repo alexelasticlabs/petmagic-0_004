@@ -157,8 +157,14 @@ function Save-Ico {
 }
 
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
+$sourceIconPath = Join-Path $root '1 (2).png'
 
-$master = New-IconBitmap -Size 1024
+if (-not (Test-Path $sourceIconPath)) {
+    throw "Source icon not found: $sourceIconPath"
+}
+
+$sourceImage = [System.Drawing.Image]::FromFile($sourceIconPath)
+$master = [System.Drawing.Bitmap]::new($sourceImage)
 
 try {
     $brandingPng = Join-Path $root 'apps/petmagic-mobile/assets/branding/petmagic-app-icon-1024.png'
@@ -213,4 +219,5 @@ try {
 }
 finally {
     $master.Dispose()
+    $sourceImage.Dispose()
 }
