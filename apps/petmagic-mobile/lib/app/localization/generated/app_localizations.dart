@@ -1440,6 +1440,48 @@ abstract class AppLocalizations {
   /// **'PetMagic does not store your card details. Payments are securely processed by Stripe.'**
   String get walletCheckoutTrustText;
 
+  /// No description provided for @walletPaymentMethodChooseSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how you want to top up PawSpark.'**
+  String get walletPaymentMethodChooseSubtitle;
+
+  /// No description provided for @walletPaymentTrustTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure payment'**
+  String get walletPaymentTrustTitle;
+
+  /// No description provided for @walletPaymentTrustStripeProcesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Card data is securely processed by Stripe.'**
+  String get walletPaymentTrustStripeProcesses;
+
+  /// No description provided for @walletPaymentTrustNoStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic does not store your card details.'**
+  String get walletPaymentTrustNoStorage;
+
+  /// No description provided for @walletPaymentTrustTopUpAnytime.
+  ///
+  /// In en, this message translates to:
+  /// **'You can top up PawSpark anytime.'**
+  String get walletPaymentTrustTopUpAnytime;
+
+  /// No description provided for @walletPaymentStoreUnavailableGooglePlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play is temporarily unavailable on this device. Use Stripe for now.'**
+  String get walletPaymentStoreUnavailableGooglePlay;
+
+  /// No description provided for @walletPaymentStoreUnavailableAppStore.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store is temporarily unavailable on this device. Use Stripe for now.'**
+  String get walletPaymentStoreUnavailableAppStore;
+
   /// No description provided for @walletCheckoutOrderSectionTitle.
   ///
   /// In en, this message translates to:
@@ -5714,6 +5756,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.'**
   String get premiumStorePaymentDisclaimerBody;
+
+  /// No description provided for @premiumCheckoutPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to Premium'**
+  String get premiumCheckoutPageTitle;
+
+  /// No description provided for @premiumCheckoutHeroBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium subscription'**
+  String get premiumCheckoutHeroBadge;
+
+  /// No description provided for @premiumCheckoutHeroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recurring Premium access for unlimited templates and faster generation in PetMagic.'**
+  String get premiumCheckoutHeroSubtitle;
+
+  /// No description provided for @premiumCheckoutTokensPerPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} PawSpark every billing period'**
+  String premiumCheckoutTokensPerPeriod(Object count);
+
+  /// No description provided for @premiumCheckoutIncludesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What you get'**
+  String get premiumCheckoutIncludesTitle;
+
+  /// No description provided for @premiumCheckoutIncludedTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Access to Premium templates'**
+  String get premiumCheckoutIncludedTemplates;
+
+  /// No description provided for @premiumCheckoutIncludedPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority generation queue'**
+  String get premiumCheckoutIncludedPriority;
+
+  /// No description provided for @premiumCheckoutIncludedNoWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'No watermark on exports'**
+  String get premiumCheckoutIncludedNoWatermark;
+
+  /// No description provided for @premiumCheckoutPaymentMethodSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Card, Apple Pay or Google Pay'**
+  String get premiumCheckoutPaymentMethodSubtitle;
+
+  /// No description provided for @premiumCheckoutTrustText.
+  ///
+  /// In en, this message translates to:
+  /// **'Card data is securely processed by Stripe. PetMagic does not store your card details.'**
+  String get premiumCheckoutTrustText;
+
+  /// No description provided for @premiumCheckoutSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your subscription'**
+  String get premiumCheckoutSummaryTitle;
+
+  /// No description provided for @premiumCheckoutSummaryPlanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get premiumCheckoutSummaryPlanLabel;
+
+  /// No description provided for @premiumCheckoutSummaryPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Billing period'**
+  String get premiumCheckoutSummaryPeriodLabel;
+
+  /// No description provided for @premiumCheckoutPeriodMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get premiumCheckoutPeriodMonthly;
+
+  /// No description provided for @premiumCheckoutPeriodYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get premiumCheckoutPeriodYearly;
+
+  /// No description provided for @premiumCheckoutContinueAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue via {provider}'**
+  String premiumCheckoutContinueAction(Object provider);
+
+  /// No description provided for @premiumCheckoutPayAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {price}'**
+  String premiumCheckoutPayAction(Object price);
+
+  /// No description provided for @premiumCheckoutTotalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get premiumCheckoutTotalLabel;
 
   /// No description provided for @debugStripeSmokeTestTitle.
   ///

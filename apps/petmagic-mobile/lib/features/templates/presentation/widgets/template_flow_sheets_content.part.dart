@@ -89,6 +89,10 @@ class TemplateDetailContent extends StatelessWidget {
                   ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: const _TemplateScrollHint(),
+              ),
 
               // ── Title & description ──────────────────────────────────────
               Padding(
@@ -341,16 +345,16 @@ class TemplateDetailContent extends StatelessWidget {
                           ),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: const Color(0xFFE0A91E).withValues(
-                              alpha: 0.76,
-                            ),
+                            color: const Color(
+                              0xFFE0A91E,
+                            ).withValues(alpha: 0.76),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF081538).withValues(
-                                alpha: 0.26,
-                              ),
+                              color: const Color(
+                                0xFF081538,
+                              ).withValues(alpha: 0.26),
                               blurRadius: 14,
                               spreadRadius: 0.5,
                               offset: const Offset(0, 8),
@@ -446,6 +450,53 @@ class TemplateDetailContent extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _TemplateScrollHint extends StatelessWidget {
+  const _TemplateScrollHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    final colors = context.petMagicColors;
+    final hintLabel = _isRussian(locale)
+        ? 'Листайте вниз, чтобы продолжить'
+        : 'Scroll down to continue';
+
+    return IgnorePointer(
+      ignoring: true,
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceStrong.withValues(alpha: 0.82),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 17,
+                  color: colors.textSoft,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  hintLabel,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: colors.textSoft,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -727,12 +778,10 @@ class _TemplateGenerationProgressContentState
                             key: ValueKey<String>(
                               'generation-premium-gate-${generation!.generationId}',
                             ),
-                            onClose: () => setState(
-                              () => _isPremiumGateDismissed = true,
-                            ),
-                            onLater: () => setState(
-                              () => _isPremiumGateDismissed = true,
-                            ),
+                            onClose: () =>
+                                setState(() => _isPremiumGateDismissed = true),
+                            onLater: () =>
+                                setState(() => _isPremiumGateDismissed = true),
                           )
                         : _GenerationResultView(
                             template: widget.template,
@@ -767,8 +816,8 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final isRu = Localizations.localeOf(context).languageCode.toLowerCase() ==
-        'ru';
+    final isRu =
+        Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -780,9 +829,9 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: const Color(0xFFE0A91E).withValues(
-                alpha: isLight ? 0.78 : 0.9,
-              ),
+              color: const Color(
+                0xFFE0A91E,
+              ).withValues(alpha: isLight ? 0.78 : 0.9),
               width: 1.15,
             ),
             gradient: LinearGradient(
@@ -793,19 +842,19 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
           ),
           child: Stack(
             children: [
-          Positioned(
-            right: 12,
-            top: 8,
-            child: IconButton(
-              onPressed: onClose,
-              icon: Icon(
-                Icons.close_rounded,
-                color: isLight
-                    ? const Color(0xFF514325)
-                    : const Color(0xFFE1DED4),
+              Positioned(
+                right: 12,
+                top: 8,
+                child: IconButton(
+                  onPressed: onClose,
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: isLight
+                        ? const Color(0xFF514325)
+                        : const Color(0xFFE1DED4),
+                  ),
+                ),
               ),
-            ),
-          ),
               Positioned(
                 right: 8,
                 bottom: 0,
@@ -823,75 +872,77 @@ class _GenerationCompletedPremiumGate extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Text(
-                  isRu ? 'Видео готово! 🎉' : 'Video is ready! 🎉',
-                  style: TextStyle(
-                    color: isLight
-                        ? const Color(0xFF1E1608)
-                        : const Color(0xFFEDE7D8),
-                    fontSize: compact ? 27 : 32,
-                    fontWeight: FontWeight.w900,
-                    height: 1.02,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  isRu ? 'Хотите создавать больше?' : 'Want to create more?',
-                  style: TextStyle(
-                    color: isLight
-                        ? const Color(0xFF3C3222)
-                        : const Color(0xFFD2D8E5),
-                    fontSize: compact ? 15.5 : 17.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  isRu
-                      ? 'Premium даёт 40 PowSpark каждую неделю,\nPremium-шаблоны и экспорт без водяного знака.'
-                      : 'Premium gives 40 PowSpark every week,\nPremium templates and watermark-free export.',
-                  style: TextStyle(
-                    color: isLight
-                        ? const Color(0xFF3B3324)
-                        : const Color(0xFFE3DFD2),
-                    fontSize: compact ? 13.4 : 15.2,
-                    height: 1.3,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                PremiumShimmerButton(
-                  label: text.premiumContinueAction,
-                  onTap: () => context.push(PremiumPage.routePath),
-                  height: 46,
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: OutlinedButton(
-                    onPressed: onLater,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(
-                        color: isLight
-                            ? const Color(0xFFBCB29B)
-                            : const Color(0xFF2A3651),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: Text(
-                      text.templateFlowChooseAnotherTemplateAction,
+                    Text(
+                      isRu ? 'Видео готово! 🎉' : 'Video is ready! 🎉',
                       style: TextStyle(
                         color: isLight
-                            ? const Color(0xFF3C3324)
-                            : const Color(0xFFC6CEDD),
+                            ? const Color(0xFF1E1608)
+                            : const Color(0xFFEDE7D8),
+                        fontSize: compact ? 27 : 32,
+                        fontWeight: FontWeight.w900,
+                        height: 1.02,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      isRu
+                          ? 'Хотите создавать больше?'
+                          : 'Want to create more?',
+                      style: TextStyle(
+                        color: isLight
+                            ? const Color(0xFF3C3222)
+                            : const Color(0xFFD2D8E5),
+                        fontSize: compact ? 15.5 : 17.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                ),
+                    const SizedBox(height: 10),
+                    Text(
+                      isRu
+                          ? 'Premium даёт 40 PowSpark каждую неделю,\nPremium-шаблоны и экспорт без водяного знака.'
+                          : 'Premium gives 40 PowSpark every week,\nPremium templates and watermark-free export.',
+                      style: TextStyle(
+                        color: isLight
+                            ? const Color(0xFF3B3324)
+                            : const Color(0xFFE3DFD2),
+                        fontSize: compact ? 13.4 : 15.2,
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    PremiumShimmerButton(
+                      label: text.premiumContinueAction,
+                      onTap: () => context.push(PremiumPage.routePath),
+                      height: 46,
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: OutlinedButton(
+                        onPressed: onLater,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: isLight
+                                ? const Color(0xFFBCB29B)
+                                : const Color(0xFF2A3651),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          text.templateFlowChooseAnotherTemplateAction,
+                          style: TextStyle(
+                            color: isLight
+                                ? const Color(0xFF3C3324)
+                                : const Color(0xFFC6CEDD),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1386,7 +1437,7 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
       fit: StackFit.expand,
       children: [
         FittedBox(
-          fit: BoxFit.contain,
+          fit: BoxFit.cover,
           child: SizedBox(
             width: controller.value.size.width,
             height: controller.value.size.height,

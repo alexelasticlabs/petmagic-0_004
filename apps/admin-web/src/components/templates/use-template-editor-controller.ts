@@ -108,8 +108,15 @@ export function useTemplateEditorController({
   });
 
   const uploadTemplateMediaMutation = useMutation({
-    mutationFn: ({ assetKind, file }: { assetKind: TemplateAssetKind; file: File }) =>
-      uploadTemplateMedia(file, assetKind),
+    mutationFn: ({
+      assetKind,
+      file,
+      durationSeconds,
+    }: {
+      assetKind: TemplateAssetKind;
+      file: File;
+      durationSeconds?: number;
+    }) => uploadTemplateMedia(file, assetKind, { durationSeconds }),
     onSuccess: (asset, { assetKind }) => {
       setForm((current) =>
         assetKind === "Preview"
@@ -119,6 +126,7 @@ export function useTemplateEditorController({
               previewFileName: asset.fileName,
               previewContentType: asset.contentType,
               previewFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
+              previewDurationSeconds: asset.durationSeconds?.toString() ?? "",
             }
           : {
               ...current,
@@ -251,7 +259,20 @@ export function useTemplateEditorController({
 
     setUploadingKind(assetKind);
     try {
-      await uploadTemplateMediaMutation.mutateAsync({ assetKind, file });
+      const durationSeconds =
+        assetKind === "Preview" && file.type.startsWith("video/")
+          ? await readVideoDurationSeconds(file)
+          : undefined;
+      await uploadTemplateMediaMutation.mutateAsync({ assetKind, file, durationSeconds });
+    } catch (error) {
+      const message = resolveUploadErrorMessage(error, text.errorSavingTemplate);
+      setToast({ type: "error", message });
+      clientLogger.warn("templates.media_upload_failed", {
+        assetKind,
+        fileName: file.name,
+        contentType: file.type,
+        error,
+      });
     } finally {
       setUploadingKind(null);
     }
@@ -309,6 +330,65 @@ export function useTemplateEditorController({
     text,
     uploadingKind,
   };
+}
+
+function resolveUploadErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === "object" && "validationErrors" in error) {
+    const validationErrors = (error as { validationErrors?: string[] }).validationErrors ?? [];
+    if (validationErrors.length > 0) {
+      return validationErrors.join(" ");
+    }
+  }
+
+  if (
+    error instanceof Error &&
+    error.message &&
+    !/^API request failed with status \d+$/i.test(error.message)
+  ) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+async function readVideoDurationSeconds(file: File): Promise<number | undefined> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const duration = await new Promise<number | undefined>((resolve) => {
+      const video = document.createElement("video");
+      let settled = false;
+      const timeoutId = window.setTimeout(() => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        resolve(undefined);
+      }, 5000);
+
+      const finalize = (value: number | undefined) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      };
+
+      video.preload = "metadata";
+      video.src = objectUrl;
+      video.onloadedmetadata = () => {
+        const value = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
+        finalize(value);
+      };
+      video.onerror = () => finalize(undefined);
+    });
+
+    return duration;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function getTemplateCatalogPath(locale: Locale, templateType: TemplateType) {

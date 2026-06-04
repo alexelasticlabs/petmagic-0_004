@@ -229,6 +229,7 @@ public sealed partial class TemplatesApiIntegrationTests
                     "fal-ai/kling-video/v3/pro/motion-control",
                     "fal-ai/kling-video/v3/standard/motion-control"
                 ],
+                SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
                 PreviewMaxFileSizeBytes = 5 * 1024 * 1024,
                 ReferenceMotionMaxFileSizeBytes = 5 * 1024 * 1024,
                 SeedSampleTemplates = false,

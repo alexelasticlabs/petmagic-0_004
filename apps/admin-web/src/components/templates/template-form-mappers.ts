@@ -60,6 +60,7 @@ export function createInitialTemplateForm(templateType: TemplateType): TemplateF
     previewFileName: "",
     previewContentType: templateType === "Video" ? "video/mp4" : "image/jpeg",
     previewFileSizeBytes: "",
+    previewDurationSeconds: "",
     musicDescription: "",
     referenceUrl: "",
     referenceFileName: "",
@@ -92,6 +93,7 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
       template.previewAsset?.contentType ??
       (template.templateType === "Video" ? "video/mp4" : "image/jpeg"),
     previewFileSizeBytes: template.previewAsset?.fileSizeBytes?.toString() ?? "",
+    previewDurationSeconds: template.previewAsset?.durationSeconds?.toString() ?? "",
     musicDescription: template.musicDescription ?? "",
     referenceUrl: template.referenceMotionAsset?.url ?? "",
     referenceFileName: template.referenceMotionAsset?.fileName ?? "",
@@ -127,7 +129,8 @@ export async function saveImageTemplateFromForm(
       form.previewUrl,
       form.previewFileName,
       form.previewContentType,
-      form.previewFileSizeBytes
+      form.previewFileSizeBytes,
+      form.previewDurationSeconds
     ),
     imageModel: form.imageModel,
     imagePrompt: form.imagePrompt,
@@ -156,7 +159,8 @@ export async function saveVideoTemplateFromForm(
       form.previewUrl,
       form.previewFileName,
       form.previewContentType,
-      form.previewFileSizeBytes
+      form.previewFileSizeBytes,
+      form.previewDurationSeconds
     ),
     referenceMotionAsset: buildAsset(
       form.referenceUrl,

@@ -8,5 +8,9 @@
 
     <application
         android:usesCleartextTraffic="true"
-        tools:replace="android:usesCleartextTraffic" />
+        tools:replace="android:usesCleartextTraffic">
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+    </application>
 </manifest>

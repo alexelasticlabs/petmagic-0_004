@@ -49,6 +49,17 @@ internal sealed partial class TemplatesService
             UpdatedAtUtc = now
         };
 
+        template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
+            template.Title,
+            template.ShortDescription,
+            DeserializeRequirements(template.PetPhotoRequirements),
+            template.ImagePrompt,
+            template.PreprocessingPrompt,
+            template.KlingPrompt,
+            options.SupportedLocalizationLocales,
+            options.SourceLocalizationLocale,
+            cancellationToken);
+
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
 
         if (template.Status == TemplateStatus.Active)
@@ -148,6 +159,16 @@ internal sealed partial class TemplatesService
             template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
             template.ImageModel = command.ImageModel.Trim();
             template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
+            template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
+                template.Title,
+                template.ShortDescription,
+                DeserializeRequirements(template.PetPhotoRequirements),
+                template.ImagePrompt,
+                template.PreprocessingPrompt,
+                template.KlingPrompt,
+                options.SupportedLocalizationLocales,
+                options.SourceLocalizationLocale,
+                cancellationToken);
 
             var staleChanges = dbContext.ChangeTracker
                 .Entries<TemplateCatalogChange>()
@@ -215,6 +236,17 @@ internal sealed partial class TemplatesService
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
+
+        template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
+            template.Title,
+            template.ShortDescription,
+            DeserializeRequirements(template.PetPhotoRequirements),
+            template.ImagePrompt,
+            template.PreprocessingPrompt,
+            template.KlingPrompt,
+            options.SupportedLocalizationLocales,
+            options.SourceLocalizationLocale,
+            cancellationToken);
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
         SetAsset(template, TemplateAssetKind.ReferenceMotion, command.ReferenceMotionAsset);
@@ -288,6 +320,16 @@ internal sealed partial class TemplatesService
         template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
         template.KeepOriginalSound = command.KeepOriginalSound;
         template.Status = statusResult.Value;
+        template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
+            template.Title,
+            template.ShortDescription,
+            DeserializeRequirements(template.PetPhotoRequirements),
+            template.ImagePrompt,
+            template.PreprocessingPrompt,
+            template.KlingPrompt,
+            options.SupportedLocalizationLocales,
+            options.SourceLocalizationLocale,
+            cancellationToken);
         var now = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
@@ -333,6 +375,16 @@ internal sealed partial class TemplatesService
             template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
             template.KeepOriginalSound = command.KeepOriginalSound;
             template.Status = statusResult.Value;
+            template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
+                template.Title,
+                template.ShortDescription,
+                DeserializeRequirements(template.PetPhotoRequirements),
+                template.ImagePrompt,
+                template.PreprocessingPrompt,
+                template.KlingPrompt,
+                options.SupportedLocalizationLocales,
+                options.SourceLocalizationLocale,
+                cancellationToken);
 
             var staleChanges = dbContext.ChangeTracker
                 .Entries<TemplateCatalogChange>()

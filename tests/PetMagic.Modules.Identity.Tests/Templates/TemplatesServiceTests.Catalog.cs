@@ -272,7 +272,7 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(activated.IsSuccess);
 
-        var publicList = await service.ListPublicAsync(null, null, null, null, CancellationToken.None);
+        var publicList = await service.ListPublicAsync(null, null, null, null, null, CancellationToken.None);
 
         Assert.True(publicList.IsSuccess);
         Assert.Single(publicList.Value);
@@ -306,9 +306,9 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(expectedRequirements, created.Value.PetPhotoRequirements);
 
         var adminDetail = await service.GetAdminAsync(created.Value.TemplateId, CancellationToken.None);
-        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, CancellationToken.None);
+        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, null, CancellationToken.None);
         var publicFeed = await service.ListPublicFeedAsync(
-            new PublicTemplatesFeedQuery(null, null, [], null, "good lighting", 10, null),
+            new PublicTemplatesFeedQuery(null, null, [], null, "good lighting", 10, null, null),
             CancellationToken.None);
 
         Assert.True(adminDetail.IsSuccess);
@@ -337,7 +337,7 @@ public sealed partial class TemplatesServiceTests
         await SetUpdatedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
 
         var firstPage = await service.ListPublicFeedAsync(
-            new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, null),
+            new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, null, null),
             CancellationToken.None);
 
         Assert.True(firstPage.IsSuccess);
@@ -346,7 +346,7 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal([newestId, middleId], [.. firstPage.Value.Items.Select(item => item.TemplateId)]);
 
         var secondPage = await service.ListPublicFeedAsync(
-            new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, firstPage.Value.NextCursor),
+            new PublicTemplatesFeedQuery(null, "Portrait", ["cozy"], null, "portrait", 2, firstPage.Value.NextCursor, null),
             CancellationToken.None);
 
         Assert.True(secondPage.IsSuccess);
@@ -373,7 +373,7 @@ public sealed partial class TemplatesServiceTests
         await SetUpdatedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
 
         var firstPage = await service.ListPublicFeedAsync(
-            new PublicTemplatesFeedQuery(null, "portrait", [], null, "portrait", 2, null),
+            new PublicTemplatesFeedQuery(null, "portrait", [], null, "portrait", 2, null, null),
             CancellationToken.None);
 
         Assert.True(firstPage.IsSuccess);
@@ -382,7 +382,7 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal([newestId, middleId], [.. firstPage.Value.Items.Select(item => item.TemplateId)]);
 
         var secondPage = await service.ListPublicFeedAsync(
-            new PublicTemplatesFeedQuery(null, "PORTRAIT", [], null, "PoRtRaIt", 2, firstPage.Value.NextCursor),
+            new PublicTemplatesFeedQuery(null, "PORTRAIT", [], null, "PoRtRaIt", 2, firstPage.Value.NextCursor, null),
             CancellationToken.None);
 
         Assert.True(secondPage.IsSuccess);
@@ -648,7 +648,7 @@ public sealed partial class TemplatesServiceTests
         Assert.NotNull(deletedTemplate!.DeletedAtUtc);
 
         var publicCatalog = await service.ListPublicCatalogAsync(
-            new PublicTemplatesCatalogQuery(1, 20, null, null),
+            new PublicTemplatesCatalogQuery(1, 20, null, null, null),
             CancellationToken.None);
         Assert.True(publicCatalog.IsSuccess);
         Assert.DoesNotContain(publicCatalog.Value.Items, item => item.Id == created.Value.TemplateId);
@@ -711,7 +711,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(initialVersion.IsSuccess);
         Assert.True(initialVersion.Value.Version > 0);
 
-        var firstChanges = await service.GetPublicCatalogChangesAsync(0, CancellationToken.None);
+        var firstChanges = await service.GetPublicCatalogChangesAsync(0, null, CancellationToken.None);
         Assert.True(firstChanges.IsSuccess);
         Assert.Single(firstChanges.Value.Upserts);
         Assert.Empty(firstChanges.Value.DeletedIds);
@@ -724,7 +724,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(afterDeleteVersion.IsSuccess);
         Assert.True(afterDeleteVersion.Value.Version > initialVersion.Value.Version);
 
-        var delta = await service.GetPublicCatalogChangesAsync(initialVersion.Value.Version, CancellationToken.None);
+        var delta = await service.GetPublicCatalogChangesAsync(initialVersion.Value.Version, null, CancellationToken.None);
         Assert.True(delta.IsSuccess);
         Assert.Empty(delta.Value.Upserts);
         Assert.Contains(created.Value.TemplateId, delta.Value.DeletedIds);
@@ -759,7 +759,7 @@ public sealed partial class TemplatesServiceTests
         dbContext.TemplateCatalogChanges.RemoveRange(dbContext.TemplateCatalogChanges);
         await dbContext.SaveChangesAsync(CancellationToken.None);
 
-        var changes = await service.GetPublicCatalogChangesAsync(0, CancellationToken.None);
+        var changes = await service.GetPublicCatalogChangesAsync(0, null, CancellationToken.None);
 
         Assert.True(changes.IsSuccess);
         Assert.True(changes.Value.NeedsFullResync);

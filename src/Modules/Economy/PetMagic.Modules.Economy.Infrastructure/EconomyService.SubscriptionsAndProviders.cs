@@ -188,6 +188,22 @@ public sealed partial class EconomyService
         string providerContext,
         CancellationToken cancellationToken)
     {
+        var periodStartUtc = subscription.CurrentPeriodStartUtc ?? subscription.CreatedAtUtc;
+        if (subscription.LastTokenGrantAtUtc.HasValue
+            && subscription.LastTokenGrantAtUtc.Value >= periodStartUtc)
+        {
+            logger?.LogInformation(
+                "Premium activation grant skipped (already_granted_for_period). Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} LastTokenGrantAtUtc={LastTokenGrantAtUtc}.",
+                providerContext,
+                subscription.UserId,
+                subscription.Id,
+                subscription.PlanId,
+                subscription.CurrentPeriodStartUtc,
+                subscription.CurrentPeriodEndUtc,
+                subscription.LastTokenGrantAtUtc);
+            return;
+        }
+
         if (subscription.MonthlyTokenLimit <= 0
             || subscription.MonthlyTokensGranted >= subscription.MonthlyTokenLimit)
         {
@@ -207,7 +223,14 @@ public sealed partial class EconomyService
 
         var wallet = await GetOrCreateWalletAsync(subscription.UserId, cancellationToken);
         var now = DateTime.UtcNow;
-        var allowanceToGrant = subscription.MonthlyTokenLimit - subscription.MonthlyTokensGranted;
+        var allowanceToGrant = Math.Min(
+            options.Value.WeeklyPremiumSpark,
+            subscription.MonthlyTokenLimit - subscription.MonthlyTokensGranted);
+
+        if (allowanceToGrant <= 0)
+        {
+            return;
+        }
 
         ApplyWalletDelta(
             wallet,

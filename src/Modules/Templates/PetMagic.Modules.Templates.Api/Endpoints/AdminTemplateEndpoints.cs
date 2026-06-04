@@ -1,4 +1,5 @@
 using FluentValidation;
+using System.Globalization;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -464,7 +465,8 @@ public static class AdminTemplateEndpoints
         [FromServices] ITemplateMediaLifecycleService mediaLifecycleService,
         [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
         [FromServices] IMediaMetadataReader metadataReader,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromForm] string? durationSeconds = null)
     {
         var errors = new Dictionary<string, string[]>();
 
@@ -520,6 +522,7 @@ public static class AdminTemplateEndpoints
         var storedContentType = string.IsNullOrWhiteSpace(storeResult.Value.ContentType)
             ? contentType
             : storeResult.Value.ContentType;
+        var providedDuration = ParseOptionalDuration(durationSeconds);
 
         double? duration = null;
         if (storedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
@@ -528,11 +531,25 @@ public static class AdminTemplateEndpoints
             var durationResult = await metadataReader.GetVideoDurationSecondsAsync(storeResult.Value, cancellationToken);
             if (durationResult.IsFailure)
             {
-                await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
-                return TypedResults.Problem(title: durationResult.Error.Code, detail: durationResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+                if (providedDuration.HasValue && providedDuration.Value > 0)
+                {
+                    duration = providedDuration.Value;
+                }
+                else
+                {
+                    await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+                    return TypedResults.Problem(title: durationResult.Error.Code, detail: durationResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+                }
+            }
+            else
+            {
+                duration = durationResult.Value;
             }
 
-            duration = durationResult.Value;
+            if ((!duration.HasValue || duration.Value <= 0) && providedDuration.HasValue && providedDuration.Value > 0)
+            {
+                duration = providedDuration.Value;
+            }
 
             if (kind == TemplateAssetKind.Preview)
             {
@@ -573,6 +590,21 @@ public static class AdminTemplateEndpoints
             storeResult.Value.ContentType,
             storeResult.Value.FileSizeBytes,
             duration));
+    }
+
+    private static double? ParseOptionalDuration(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return null;
+        }
+
+        if (!double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return null;
+        }
+
+        return parsed;
     }
 
     private static TemplateMediaRole MapMediaRole(TemplateAssetKind assetKind)

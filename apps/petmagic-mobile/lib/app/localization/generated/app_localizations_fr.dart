@@ -762,6 +762,33 @@ class AppLocalizationsFr extends AppLocalizations {
       'PetMagic ne stocke pas vos données de carte. Les paiements sont traités en toute sécurité par Stripe.';
 
   @override
+  String get walletPaymentMethodChooseSubtitle =>
+      'Choose how you want to top up PawSpark.';
+
+  @override
+  String get walletPaymentTrustTitle => 'Secure payment';
+
+  @override
+  String get walletPaymentTrustStripeProcesses =>
+      'Card data is securely processed by Stripe.';
+
+  @override
+  String get walletPaymentTrustNoStorage =>
+      'PetMagic does not store your card details.';
+
+  @override
+  String get walletPaymentTrustTopUpAnytime =>
+      'You can top up PawSpark anytime.';
+
+  @override
+  String get walletPaymentStoreUnavailableGooglePlay =>
+      'Google Play is temporarily unavailable on this device. Use Stripe for now.';
+
+  @override
+  String get walletPaymentStoreUnavailableAppStore =>
+      'App Store is temporarily unavailable on this device. Use Stripe for now.';
+
+  @override
   String get walletCheckoutOrderSectionTitle => 'Récapitulatif de la commande';
 
   @override
@@ -3232,6 +3259,69 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get premiumStorePaymentDisclaimerBody =>
       'Le paiement sera débité de votre compte App Store / Google Play. L\'abonnement se renouvelle automatiquement sauf annulation avant la date de renouvellement.';
+
+  @override
+  String get premiumCheckoutPageTitle => 'Upgrade to Premium';
+
+  @override
+  String get premiumCheckoutHeroBadge => 'Premium subscription';
+
+  @override
+  String get premiumCheckoutHeroSubtitle =>
+      'Recurring Premium access for unlimited templates and faster generation in PetMagic.';
+
+  @override
+  String premiumCheckoutTokensPerPeriod(Object count) {
+    return '$count PawSpark every billing period';
+  }
+
+  @override
+  String get premiumCheckoutIncludesTitle => 'What you get';
+
+  @override
+  String get premiumCheckoutIncludedTemplates => 'Access to Premium templates';
+
+  @override
+  String get premiumCheckoutIncludedPriority => 'Priority generation queue';
+
+  @override
+  String get premiumCheckoutIncludedNoWatermark => 'No watermark on exports';
+
+  @override
+  String get premiumCheckoutPaymentMethodSubtitle =>
+      'Card, Apple Pay or Google Pay';
+
+  @override
+  String get premiumCheckoutTrustText =>
+      'Card data is securely processed by Stripe. PetMagic does not store your card details.';
+
+  @override
+  String get premiumCheckoutSummaryTitle => 'Your subscription';
+
+  @override
+  String get premiumCheckoutSummaryPlanLabel => 'Plan';
+
+  @override
+  String get premiumCheckoutSummaryPeriodLabel => 'Billing period';
+
+  @override
+  String get premiumCheckoutPeriodMonthly => 'Monthly';
+
+  @override
+  String get premiumCheckoutPeriodYearly => 'Yearly';
+
+  @override
+  String premiumCheckoutContinueAction(Object provider) {
+    return 'Continue via $provider';
+  }
+
+  @override
+  String premiumCheckoutPayAction(Object price) {
+    return 'Pay $price';
+  }
+
+  @override
+  String get premiumCheckoutTotalLabel => 'Total';
 
   @override
   String get debugStripeSmokeTestTitle => 'Test Stripe PaymentSheet';

@@ -9,7 +9,9 @@ import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/mappers/rewards_error_mapper.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
@@ -315,13 +317,20 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(walletControllerProvider.notifier).load());
+    if (ref.read(appLaunchControllerProvider).isAuthenticated) {
+      Future.microtask(
+        () => ref.read(walletControllerProvider.notifier).load(),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(walletControllerProvider);
     final controller = ref.read(walletControllerProvider.notifier);
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final hasShell =
@@ -346,6 +355,39 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
             rewardedReferredUsersCount: rewards.rewardedReferredUsersCount,
           );
     final warningMessage = rewardsWarningMessage(text, state.errorMessage);
+
+    if (!isAuthenticated) {
+      return _RewardsBackdrop(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              bottomNavInset + keyboardInset + 8,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _WarningBanner(
+                  message: text.authSignInRequired,
+                  tone: colors.gold,
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: () => showAuthRequiredSheet(
+                    context,
+                    redirectPath: RewardsPage.routePath,
+                  ),
+                  icon: const Icon(Icons.login_rounded, size: 18),
+                  label: Text(text.profileSignInAction),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return _RewardsBackdrop(
       child: SafeArea(
@@ -388,9 +430,10 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                       onSubmit: controller.applyRedeemCode,
                     ),
                     const SizedBox(height: 16),
-                    if (!isPremiumUser) ...[
+                    if (isAuthenticated && !isPremiumUser) ...[
                       _RewardsPremiumUpsellCard(
-                        onOpenPremium: () => context.push(PremiumPage.routePath),
+                        onOpenPremium: () =>
+                            context.push(PremiumPage.routePath),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -496,9 +539,10 @@ String _sourceLabel(
     'promo_redeem' || 'redeem_code' || 'redeem' => text.walletSourcePromoCode,
     'admin_grant' => text.walletSourceAdminGrant,
     'admin_debit' => text.walletSourceAdminDebit,
-    _ => fallbackDelta >= 0
-        ? text.walletSourceWeeklyGrant
-        : text.walletSourceGenerationSpend,
+    _ =>
+      fallbackDelta >= 0
+          ? text.walletSourceWeeklyGrant
+          : text.walletSourceGenerationSpend,
   };
 }
 
@@ -514,6 +558,5 @@ bool _looksTechnical(String value) {
 
   // Detect long ids/hashes in event names.
   final compact = normalized.replaceAll('-', '');
-  return compact.length >= 24 &&
-      RegExp(r'^[a-z0-9]+$').hasMatch(compact);
+  return compact.length >= 24 && RegExp(r'^[a-z0-9]+$').hasMatch(compact);
 }

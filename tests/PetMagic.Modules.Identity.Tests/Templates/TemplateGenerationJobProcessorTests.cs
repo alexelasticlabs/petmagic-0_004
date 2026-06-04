@@ -397,6 +397,7 @@ public sealed class TemplateGenerationJobProcessorTests
             AllowedImageModels = ["openai/gpt-image-2/edit"],
             AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
             AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
+            SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
             StaleProcessingRecoveryDelayMilliseconds = staleProcessingRecoveryDelayMilliseconds,
             MaxGenerationAttempts = 3,
             MaxRefundAttempts = 3,

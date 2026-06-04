@@ -128,7 +128,7 @@ class ApiBaseUrlResolver {
       addCandidate(baseUrl);
     }
 
-    if (kDebugMode && AppConfig.configuredApiBaseUrl.isEmpty && !kIsWeb) {
+    if (kDebugMode && !kIsWeb) {
       final subnetCandidates = await _readLocalSubnetCandidates();
       for (final baseUrl in subnetCandidates) {
         addCandidate(baseUrl);
@@ -309,11 +309,7 @@ class ApiBaseUrlResolver {
 
       return candidates;
     } catch (error, stackTrace) {
-      _logResolverFailure(
-        'read_local_subnet_candidates',
-        error,
-        stackTrace,
-      );
+      _logResolverFailure('read_local_subnet_candidates', error, stackTrace);
       return const [];
     }
   }

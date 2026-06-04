@@ -482,7 +482,8 @@ public sealed record PublicTemplatesCatalogQuery(
     int? Page,
     int? PageSize,
     TemplateType? Type,
-    string? Category);
+    string? Category,
+    string? Locale);
 
 public sealed record PublicTemplateCatalogMetadataResponse(
     Guid Id,
@@ -523,7 +524,8 @@ public sealed record PublicTemplatesFeedQuery(
     bool? PremiumOnly,
     string? Search,
     int? Take,
-    string? Cursor);
+    string? Cursor,
+    string? Locale);
 
 public sealed record PublicTemplatesFeedResponse(
     IReadOnlyList<PublicTemplateListItemResponse> Items,

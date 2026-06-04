@@ -1,6 +1,8 @@
 using System.Data;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -8,8 +10,10 @@ using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 using PetMagic.Modules.Identity.Application.Contracts;
+
 using Stripe;
 namespace PetMagic.Modules.Economy.Infrastructure;
+
 public sealed partial class EconomyService
 {
     public async Task<Result<PremiumCheckoutResponse>> CreatePremiumCheckoutAsync(
@@ -501,6 +505,20 @@ public sealed partial class EconomyService
             stripeSubscription.Id,
             null,
             cancellationToken);
+
+        if (isPremium)
+        {
+            await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                subscription,
+                "stripe",
+                cancellationToken);
+
+            await SettlePendingReferralBonusAsync(
+                command.UserId,
+                $"premium:stripe:{subscription.PlanId}",
+                DateTime.UtcNow,
+                cancellationToken);
+        }
 
         return await GetSubscriptionSummaryAsync(command.UserId, cancellationToken);
     }

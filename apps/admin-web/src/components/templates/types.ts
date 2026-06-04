@@ -13,6 +13,7 @@ export type TemplateFormState = {
   previewFileName: string;
   previewContentType: string;
   previewFileSizeBytes: string;
+  previewDurationSeconds: string;
   musicDescription: string;
   referenceUrl: string;
   referenceFileName: string;

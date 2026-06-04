@@ -332,6 +332,13 @@
   "walletCheckoutFeatureMoreVideos": "More video creation options",
   "walletCheckoutStripeMethodSubtitle": "Card, Apple Pay or Google Pay",
   "walletCheckoutTrustText": "PetMagic does not store your card details. Payments are securely processed by Stripe.",
+  "walletPaymentMethodChooseSubtitle": "Choose how you want to top up PawSpark.",
+  "walletPaymentTrustTitle": "Secure payment",
+  "walletPaymentTrustStripeProcesses": "Card data is securely processed by Stripe.",
+  "walletPaymentTrustNoStorage": "PetMagic does not store your card details.",
+  "walletPaymentTrustTopUpAnytime": "You can top up PawSpark anytime.",
+  "walletPaymentStoreUnavailableGooglePlay": "Google Play is temporarily unavailable on this device. Use Stripe for now.",
+  "walletPaymentStoreUnavailableAppStore": "App Store is temporarily unavailable on this device. Use Stripe for now.",
   "walletCheckoutOrderSectionTitle": "Your top-up",
   "walletCheckoutSucceeded": "Payment confirmed. +{spark} PawSpark is already in your wallet.",
   "@walletCheckoutSucceeded": {
@@ -1188,6 +1195,39 @@
   "premiumBestValueBadge": "BEST VALUE",
   "premiumStorePaymentDisclaimerTitle": "Secure payment via App Store / Google Play",
   "premiumStorePaymentDisclaimerBody": "Payment will be charged to your App Store / Google Play account. Subscription renews automatically unless cancelled before the renewal date.",
+  "premiumCheckoutPageTitle": "Upgrade to Premium",
+  "premiumCheckoutHeroBadge": "Premium subscription",
+  "premiumCheckoutHeroSubtitle": "Recurring Premium access for unlimited templates and faster generation in PetMagic.",
+  "premiumCheckoutTokensPerPeriod": "{count} PawSpark every billing period",
+  "@premiumCheckoutTokensPerPeriod": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "premiumCheckoutIncludesTitle": "What you get",
+  "premiumCheckoutIncludedTemplates": "Access to Premium templates",
+  "premiumCheckoutIncludedPriority": "Priority generation queue",
+  "premiumCheckoutIncludedNoWatermark": "No watermark on exports",
+  "premiumCheckoutPaymentMethodSubtitle": "Card, Apple Pay or Google Pay",
+  "premiumCheckoutTrustText": "Card data is securely processed by Stripe. PetMagic does not store your card details.",
+  "premiumCheckoutSummaryTitle": "Your subscription",
+  "premiumCheckoutSummaryPlanLabel": "Plan",
+  "premiumCheckoutSummaryPeriodLabel": "Billing period",
+  "premiumCheckoutPeriodMonthly": "Monthly",
+  "premiumCheckoutPeriodYearly": "Yearly",
+  "premiumCheckoutContinueAction": "Continue via {provider}",
+  "@premiumCheckoutContinueAction": {
+    "placeholders": {
+      "provider": {}
+    }
+  },
+  "premiumCheckoutPayAction": "Pay {price}",
+  "@premiumCheckoutPayAction": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "premiumCheckoutTotalLabel": "Total",
   "debugStripeSmokeTestTitle": "Stripe PaymentSheet Test",
   "debugStripeSmokeTestSubtitle": "Minimal screen to diagnose tap and focus behavior in PaymentSheet.",
   "debugStripeSmokeTestOpenAction": "Open Stripe PaymentSheet",

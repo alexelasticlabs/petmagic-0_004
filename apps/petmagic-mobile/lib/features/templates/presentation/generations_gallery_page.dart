@@ -52,6 +52,9 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     super.initState();
     _historyController = ref.read(generationHistoryControllerProvider.notifier);
     _walletController = ref.read(walletControllerProvider.notifier);
+    _historyController.setScreenVisible(
+      ref.read(appLaunchControllerProvider).isAuthenticated,
+    );
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       if (!mounted) {
@@ -64,6 +67,11 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
         unawaited(_walletController.load());
       }
 
+      if (!launch.isAuthenticated) {
+        _historyController.setScreenVisible(false);
+        return;
+      }
+
       _historyController.setScreenVisible(true);
       await _historyController.load();
     });
@@ -71,6 +79,14 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isAuthenticated = ref
+        .read(appLaunchControllerProvider)
+        .isAuthenticated;
+    if (!isAuthenticated) {
+      _historyController.setScreenVisible(false);
+      return;
+    }
+
     if (state == AppLifecycleState.resumed) {
       _historyController.setScreenVisible(true);
       unawaited(_historyController.load(refresh: true));
@@ -89,6 +105,11 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   @override
   void activate() {
     super.activate();
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      _historyController.setScreenVisible(false);
+      return;
+    }
+
     _historyController.setScreenVisible(true);
     unawaited(_historyController.load(refresh: true));
   }
@@ -113,9 +134,8 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
         (walletState) => walletState.wallet?.isPremium,
       ),
     );
-    final shouldShowPremiumUpsell = isAuthenticated
-        ? hasPremiumAccess == false
-        : true;
+    final shouldShowPremiumUpsell =
+        isAuthenticated && hasPremiumAccess == false;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -133,9 +153,15 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
               const Positioned.fill(child: _GalleryAtmosphere()),
               RefreshIndicator.adaptive(
                 color: colors.accent,
-                onRefresh: () => ref
-                    .read(generationHistoryControllerProvider.notifier)
-                    .load(refresh: true),
+                onRefresh: () {
+                  if (!isAuthenticated) {
+                    return Future.value();
+                  }
+
+                  return ref
+                      .read(generationHistoryControllerProvider.notifier)
+                      .load(refresh: true);
+                },
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics(),
@@ -240,7 +266,12 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
                               ),
                       ),
                     ),
-                    ..._buildContentSlivers(context, text, state),
+                    ..._buildContentSlivers(
+                      context,
+                      text,
+                      state,
+                      isAuthenticated: isAuthenticated,
+                    ),
                   ],
                 ),
               ),
@@ -254,8 +285,27 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   List<Widget> _buildContentSlivers(
     BuildContext context,
     AppLocalizations text,
-    GenerationHistoryState state,
-  ) {
+    GenerationHistoryState state, {
+    required bool isAuthenticated,
+  }) {
+    if (!isAuthenticated) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _GuestAccessState(
+            onOpenSignIn: () {
+              unawaited(
+                showAuthRequiredSheet(
+                  context,
+                  redirectPath: GenerationsGalleryPage.routePath,
+                ),
+              );
+            },
+          ),
+        ),
+      ];
+    }
+
     final filteredItems = _itemsForSelectedFilter(state.items, state.filter);
 
     if (state.isLoading && filteredItems.isEmpty) {

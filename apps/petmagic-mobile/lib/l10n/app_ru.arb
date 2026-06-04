@@ -332,6 +332,13 @@
   "walletCheckoutFeatureMoreVideos": "Больше возможностей для видео",
   "walletCheckoutStripeMethodSubtitle": "Карта, Apple Pay или Google Pay",
   "walletCheckoutTrustText": "PetMagic не хранит данные вашей карты. Платежи безопасно обрабатываются Stripe.",
+  "walletPaymentMethodChooseSubtitle": "Выберите, как хотите пополнить PawSpark.",
+  "walletPaymentTrustTitle": "Безопасная оплата",
+  "walletPaymentTrustStripeProcesses": "Данные карты безопасно обрабатываются Stripe.",
+  "walletPaymentTrustNoStorage": "PetMagic не хранит данные вашей карты.",
+  "walletPaymentTrustTopUpAnytime": "Пополнить PawSpark можно в любой момент.",
+  "walletPaymentStoreUnavailableGooglePlay": "Google Play временно недоступен на этом устройстве. Пока используйте Stripe.",
+  "walletPaymentStoreUnavailableAppStore": "App Store временно недоступен на этом устройстве. Пока используйте Stripe.",
   "walletCheckoutOrderSectionTitle": "Ваше пополнение",
   "walletCheckoutSucceeded": "Оплата подтверждена. +{spark} PawSpark уже в вашем кошельке.",
   "@walletCheckoutSucceeded": {
@@ -1188,6 +1195,39 @@
   "premiumBestValueBadge": "ЛУЧШАЯ ВЫГОДА",
   "premiumStorePaymentDisclaimerTitle": "Безопасная оплата через App Store / Google Play",
   "premiumStorePaymentDisclaimerBody": "Оплата будет списана с вашего аккаунта App Store / Google Play. Подписка продлевается автоматически, если ее не отменить до даты продления.",
+  "premiumCheckoutPageTitle": "Оформить Premium",
+  "premiumCheckoutHeroBadge": "Подписка Premium",
+  "premiumCheckoutHeroSubtitle": "Регулярный доступ к Premium с безлимитными шаблонами и более быстрой генерацией в PetMagic.",
+  "premiumCheckoutTokensPerPeriod": "{count} PawSpark каждый платежный период",
+  "@premiumCheckoutTokensPerPeriod": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "premiumCheckoutIncludesTitle": "Что вы получите",
+  "premiumCheckoutIncludedTemplates": "Доступ к Premium-шаблонам",
+  "premiumCheckoutIncludedPriority": "Приоритетная очередь генерации",
+  "premiumCheckoutIncludedNoWatermark": "Без водяного знака на экспорте",
+  "premiumCheckoutPaymentMethodSubtitle": "Карта, Apple Pay или Google Pay",
+  "premiumCheckoutTrustText": "Данные карты безопасно обрабатываются Stripe. PetMagic не хранит данные вашей карты.",
+  "premiumCheckoutSummaryTitle": "Ваша подписка",
+  "premiumCheckoutSummaryPlanLabel": "Тариф",
+  "premiumCheckoutSummaryPeriodLabel": "Период оплаты",
+  "premiumCheckoutPeriodMonthly": "Ежемесячно",
+  "premiumCheckoutPeriodYearly": "Ежегодно",
+  "premiumCheckoutContinueAction": "Продолжить через {provider}",
+  "@premiumCheckoutContinueAction": {
+    "placeholders": {
+      "provider": {}
+    }
+  },
+  "premiumCheckoutPayAction": "Оплатить {price}",
+  "@premiumCheckoutPayAction": {
+    "placeholders": {
+      "price": {}
+    }
+  },
+  "premiumCheckoutTotalLabel": "Итого",
   "debugStripeSmokeTestTitle": "Тест Stripe PaymentSheet",
   "debugStripeSmokeTestSubtitle": "Минимальный экран для диагностики касаний и фокуса в PaymentSheet.",
   "debugStripeSmokeTestOpenAction": "Открыть Stripe PaymentSheet",

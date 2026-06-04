@@ -34,12 +34,14 @@ public static class PublicTemplateEndpoints
     }
 
     private static async Task<IResult> ListAsync(
+        HttpContext httpContext,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
         [FromQuery] string? type,
         [FromQuery] string? category,
         [FromQuery] string[]? tags,
         [FromQuery] bool? premiumOnly,
+        [FromQuery] string? locale,
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
@@ -50,12 +52,12 @@ public static class PublicTemplateEndpoints
         if (page.HasValue || pageSize.HasValue)
         {
             var pagedResult = await service.ListPublicCatalogAsync(
-                new PublicTemplatesCatalogQuery(page, pageSize, templateType, category),
+                new PublicTemplatesCatalogQuery(page, pageSize, templateType, category, ResolveLocalePreference(httpContext, locale)),
                 cancellationToken);
             return TypedResults.Ok(pagedResult.Value);
         }
 
-        var result = await service.ListPublicAsync(templateType, category, tags, premiumOnly, cancellationToken);
+        var result = await service.ListPublicAsync(templateType, category, tags, premiumOnly, ResolveLocalePreference(httpContext, locale), cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 
@@ -72,6 +74,7 @@ public static class PublicTemplateEndpoints
 
     private static async Task<Results<Ok<PublicTemplatesCatalogChangesResponse>, ProblemHttpResult>> GetCatalogChangesAsync(
         [FromQuery] long? sinceVersion,
+        [FromQuery] string? locale,
         HttpContext httpContext,
         ITemplatesService service,
         CancellationToken cancellationToken)
@@ -86,7 +89,7 @@ public static class PublicTemplateEndpoints
 
         httpContext.Response.Headers.CacheControl = "public, max-age=10";
 
-        var result = await service.GetPublicCatalogChangesAsync(sinceVersion.Value, cancellationToken);
+        var result = await service.GetPublicCatalogChangesAsync(sinceVersion.Value, ResolveLocalePreference(httpContext, locale), cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 
@@ -141,6 +144,7 @@ public static class PublicTemplateEndpoints
     }
 
     private static async Task<Ok<PublicTemplatesFeedResponse>> ListFeedAsync(
+        HttpContext httpContext,
         [FromQuery] string? type,
         [FromQuery] string? category,
         [FromQuery] string[]? tags,
@@ -148,6 +152,7 @@ public static class PublicTemplateEndpoints
         [FromQuery] string? search,
         [FromQuery] int? take,
         [FromQuery] string? cursor,
+        [FromQuery] string? locale,
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
@@ -163,7 +168,8 @@ public static class PublicTemplateEndpoints
                 premiumOnly,
                 search,
                 take,
-                cursor),
+                cursor,
+                ResolveLocalePreference(httpContext, locale)),
             cancellationToken);
 
         return TypedResults.Ok(result.Value);
@@ -172,11 +178,12 @@ public static class PublicTemplateEndpoints
     private static async Task<Results<Ok<PublicTemplateResponse>, ProblemHttpResult>> GetAsync(
         Guid templateId,
         [FromQuery] string? source,
+        [FromQuery] string? locale,
         HttpContext httpContext,
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetPublicAsync(templateId, cancellationToken);
+        var result = await service.GetPublicAsync(templateId, ResolveLocalePreference(httpContext, locale), cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
@@ -281,6 +288,40 @@ public static class PublicTemplateEndpoints
             ?? httpContext.User.FindFirstValue("sub");
 
         return Guid.TryParse(raw, out var userId) ? userId : null;
+    }
+
+    private static string? ResolveLocalePreference(HttpContext httpContext, string? explicitLocale)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitLocale))
+        {
+            return NormalizeLocale(explicitLocale);
+        }
+
+        var acceptLanguage = httpContext.Request.Headers.AcceptLanguage.ToString();
+        if (string.IsNullOrWhiteSpace(acceptLanguage))
+        {
+            return null;
+        }
+
+        var first = acceptLanguage.Split(',', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+        return NormalizeLocale(first);
+    }
+
+    private static string? NormalizeLocale(string? locale)
+    {
+        if (string.IsNullOrWhiteSpace(locale))
+        {
+            return null;
+        }
+
+        var normalized = locale.Trim().ToLowerInvariant();
+        var separatorIndex = normalized.IndexOf('-');
+        if (separatorIndex > 0)
+        {
+            normalized = normalized[..separatorIndex];
+        }
+
+        return normalized.Length == 2 ? normalized : null;
     }
 
     private static async Task WriteEventAsync(

@@ -21,6 +21,9 @@ final authSessionCoordinatorProvider = Provider<AuthSessionCoordinator>((ref) {
 });
 
 class AuthSessionCoordinator {
+  static const int _requestTransientRetryAttempts = 2;
+  static const int _refreshTransientRetryAttempts = 3;
+
   AuthSessionCoordinator({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
@@ -39,27 +42,33 @@ class AuthSessionCoordinator {
     String unauthorizedMessage = 'auth.sign_in_required',
     String sessionExpiredMessage = 'auth.session_expired',
   }) async {
-    var session = await _sessionStorage.read();
-    if (session == null) {
+    final initialSession = await _sessionStorage.read();
+    if (initialSession == null) {
       throw AppException(unauthorizedMessage, statusCode: 401);
     }
 
     try {
-      return await request(session);
+      return await _executeWithTransientRetry(
+        operation: () => request(initialSession),
+        maxAttempts: _requestTransientRetryAttempts,
+      );
     } on DioException catch (error) {
       if (error.response?.statusCode != 401) {
         throw mapError(error, fallbackMessage: requestFailedMessage);
       }
     }
 
-    session = await _refreshSessionWithLock(
-      refreshToken: session.refreshToken,
+    final refreshedSession = await _refreshSessionWithLock(
+      refreshToken: initialSession.refreshToken,
       mapError: mapError,
       sessionExpiredMessage: sessionExpiredMessage,
     );
 
     try {
-      return await request(session);
+      return await _executeWithTransientRetry(
+        operation: () => request(refreshedSession),
+        maxAttempts: _requestTransientRetryAttempts,
+      );
     } on DioException catch (error) {
       throw mapError(error, fallbackMessage: requestFailedMessage);
     }
@@ -100,9 +109,12 @@ class AuthSessionCoordinator {
     _refreshInFlight = completer;
 
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/refresh',
-        data: {'refreshToken': refreshToken},
+      final response = await _executeWithTransientRetry(
+        operation: () => _dio.post<Map<String, dynamic>>(
+          '/api/auth/refresh',
+          data: {'refreshToken': refreshToken},
+        ),
+        maxAttempts: _refreshTransientRetryAttempts,
       );
 
       final refreshed = AuthSession.fromJson(response.data ?? const {});
@@ -110,12 +122,13 @@ class AuthSessionCoordinator {
       completer.complete(refreshed);
       return refreshed;
     } on DioException catch (error, stackTrace) {
-      await _sessionStorage.clear();
+      if (_shouldInvalidateSessionForRefreshError(error)) {
+        await _sessionStorage.clear();
+      }
       final mapped = mapError(error, fallbackMessage: sessionExpiredMessage);
       completer.completeError(mapped, stackTrace);
       throw mapped;
     } catch (error, stackTrace) {
-      await _sessionStorage.clear();
       final mapped = AppException(sessionExpiredMessage, cause: error);
       completer.completeError(mapped, stackTrace);
       throw mapped;
@@ -124,5 +137,60 @@ class AuthSessionCoordinator {
         _refreshInFlight = null;
       }
     }
+  }
+
+  bool _shouldInvalidateSessionForRefreshError(DioException error) {
+    final statusCode = error.response?.statusCode;
+    if (statusCode == null) {
+      return false;
+    }
+
+    return statusCode == 400 || statusCode == 401 || statusCode == 403;
+  }
+
+  Future<T> _executeWithTransientRetry<T>({
+    required Future<T> Function() operation,
+    required int maxAttempts,
+  }) async {
+    var attempt = 0;
+    DioException? lastError;
+
+    while (attempt < maxAttempts) {
+      try {
+        return await operation();
+      } on DioException catch (error) {
+        lastError = error;
+        attempt += 1;
+
+        if (!_isTransientDioFailure(error) || attempt >= maxAttempts) {
+          rethrow;
+        }
+
+        await Future<void>.delayed(_retryDelayForAttempt(attempt));
+      }
+    }
+
+    throw lastError ?? DioException(requestOptions: RequestOptions(path: ''));
+  }
+
+  bool _isTransientDioFailure(DioException error) {
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout) {
+      return true;
+    }
+
+    final statusCode = error.response?.statusCode;
+    return statusCode == 429 ||
+        statusCode == 500 ||
+        statusCode == 502 ||
+        statusCode == 503 ||
+        statusCode == 504;
+  }
+
+  Duration _retryDelayForAttempt(int attempt) {
+    final clampedAttempt = attempt.clamp(1, 4);
+    return Duration(milliseconds: 250 * (1 << (clampedAttempt - 1)));
   }
 }

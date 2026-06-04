@@ -287,6 +287,13 @@ class WalletController extends Notifier<WalletState>
         }(),
       ]);
 
+      if (packs.isNotEmpty && paymentMethods.isNotEmpty) {
+        paymentMethods = await _resolvePaymentMethodsAvailability(
+          packs: packs,
+          paymentMethods: paymentMethods,
+        );
+      }
+
       state = state.copyWith(
         wallet: wallet,
         rewards: rewards,
@@ -305,6 +312,69 @@ class WalletController extends Notifier<WalletState>
         errorMessage: error.toString(),
       );
     }
+  }
+
+  Future<List<WalletPaymentMethodModel>> _resolvePaymentMethodsAvailability({
+    required List<CurrencyPackModel> packs,
+    required List<WalletPaymentMethodModel> paymentMethods,
+  }) async {
+    final resolved = <WalletPaymentMethodModel>[];
+
+    for (final method in paymentMethods) {
+      if (!method.isEnabled || !method.isStoreNative) {
+        resolved.add(method);
+        continue;
+      }
+
+      try {
+        final availability = await _repository.fetchStoreAvailability(
+          packs,
+          method,
+        );
+
+        final hasSupportedPack = packs.any((pack) {
+          final productId = pack.productIdForProvider(method.provider);
+          return productId != null &&
+              productId.isNotEmpty &&
+              availability.productIds.contains(productId);
+        });
+
+        if (availability.isAvailable && hasSupportedPack) {
+          resolved.add(method);
+          continue;
+        }
+
+        resolved.add(_copyPaymentMethodWithEnabled(method, false));
+      } catch (error, stackTrace) {
+        _logWalletLoadFailure('fetch_store_availability', error, stackTrace);
+        resolved.add(_copyPaymentMethodWithEnabled(method, false));
+      }
+    }
+
+    return resolved;
+  }
+
+  WalletPaymentMethodModel _copyPaymentMethodWithEnabled(
+    WalletPaymentMethodModel method,
+    bool isEnabled,
+  ) {
+    return WalletPaymentMethodModel(
+      provider: method.provider,
+      purchaseChannel: method.purchaseChannel,
+      platform: method.platform,
+      region: method.region,
+      isEnabled: isEnabled,
+      isSelectedByDefault: method.isSelectedByDefault,
+      requiresExternalWarning: method.requiresExternalWarning,
+      requiresStoreDisclosure: method.requiresStoreDisclosure,
+      isRecommended: method.isRecommended,
+      bonusTokensPercent: method.bonusTokensPercent,
+      displayLabel: method.displayLabel,
+      displaySubtitle: method.displaySubtitle,
+      warningTitle: method.warningTitle,
+      warningMessage: method.warningMessage,
+      notes: method.notes,
+    );
   }
 
   Future<void> _syncWalletSnapshot({bool forceRefresh = false}) async {
@@ -333,7 +403,8 @@ class WalletController extends Notifier<WalletState>
           prevWallet.isPremium != nextWallet.isPremium;
       final weeklyStateChanged =
           prevWallet.nextWeeklyGrantAtUtc != nextWallet.nextWeeklyGrantAtUtc ||
-          prevWallet.adRewardsRemainingToday != nextWallet.adRewardsRemainingToday;
+          prevWallet.adRewardsRemainingToday !=
+              nextWallet.adRewardsRemainingToday;
 
       if (!balanceChanged && !weeklyStateChanged) {
         return;
@@ -795,15 +866,15 @@ class WalletController extends Notifier<WalletState>
         await load(refresh: true);
         state = state.copyWith(
           isBuying: false,
-        checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
-        checkoutGrantedSpark: verified.sparkToGrant,
-        highlightedPurchaseOrderId: verified.orderId,
-        clearPendingCheckout: true,
-        clearPendingStoreProvider: true,
-        clearCheckoutError: true,
-      );
-      return;
-    }
+          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
+          checkoutGrantedSpark: verified.sparkToGrant,
+          highlightedPurchaseOrderId: verified.orderId,
+          clearPendingCheckout: true,
+          clearPendingStoreProvider: true,
+          clearCheckoutError: true,
+        );
+        return;
+      }
 
       state = state.copyWith(
         isBuying: false,

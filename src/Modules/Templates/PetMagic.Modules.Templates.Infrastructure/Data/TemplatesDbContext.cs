@@ -43,6 +43,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.Version).HasDefaultValue(0L);
             entity.Property(x => x.Title).HasMaxLength(120).IsRequired();
             entity.Property(x => x.ShortDescription).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.LocalizedTextsJson).HasColumnType("text");
             entity.Property(x => x.PetPhotoRequirements).HasMaxLength(1000);
             entity.Property(x => x.Category).HasMaxLength(64).IsRequired();
             entity.Property(x => x.Tags).HasMaxLength(1000).IsRequired();

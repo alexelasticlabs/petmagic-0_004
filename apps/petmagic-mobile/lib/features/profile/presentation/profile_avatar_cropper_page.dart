@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -26,6 +27,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       TransformationController();
 
   img.Image? _decodedImage;
+  Uint8List? _displayImageBytes;
   bool _isPreparing = true;
   bool _isSaving = false;
   double _zoom = _minZoom;
@@ -48,13 +50,28 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
   Future<void> _loadSourceImage() async {
     try {
       final bytes = await File(widget.sourceImagePath).readAsBytes();
-      final decoded = img.decodeImage(bytes);
+      final decodedSource = img.decodeImage(bytes);
       if (!mounted) {
         return;
       }
 
+      if (decodedSource == null) {
+        setState(() {
+          _decodedImage = null;
+          _displayImageBytes = null;
+          _isPreparing = false;
+        });
+        return;
+      }
+
+      final decoded = img.bakeOrientation(decodedSource);
+      final previewBytes = Uint8List.fromList(
+        img.encodeJpg(decoded, quality: 95),
+      );
+
       setState(() {
         _decodedImage = decoded;
+        _displayImageBytes = previewBytes;
         _isPreparing = false;
       });
     } catch (_) {
@@ -64,6 +81,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
 
       setState(() {
         _decodedImage = null;
+        _displayImageBytes = null;
         _isPreparing = false;
       });
     }
@@ -92,8 +110,10 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
     final initialTranslateY = (cropSize - displayHeight) / 2;
 
     final matrix = Matrix4.identity()
-      ..translateByDouble(initialTranslateX, initialTranslateY, 0, 1)
-      ..scaleByDouble(_baseScale, _baseScale, 1, 1);
+      ..setEntry(0, 0, _baseScale)
+      ..setEntry(1, 1, _baseScale)
+      ..setEntry(2, 2, 1)
+      ..setTranslationRaw(initialTranslateX, initialTranslateY, 0);
 
     _applyClampedMatrix(matrix, updateZoom: false);
     _zoom = _currentScale;
@@ -105,25 +125,43 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       return;
     }
 
-    final currentAbsoluteScale = _transformationController.value
-        .getMaxScaleOnAxis();
+    final matrix = _transformationController.value;
+    final currentAbsoluteScale = matrix.getMaxScaleOnAxis();
+    final currentTx = matrix.storage[12];
+    final currentTy = matrix.storage[13];
     final targetAbsoluteScale = _baseScale * nextScale;
-    final factor = targetAbsoluteScale / currentAbsoluteScale;
+
+    if (currentAbsoluteScale <= 0 || currentAbsoluteScale.isNaN) {
+      return;
+    }
+
     final focalPoint = Offset(_cropSize / 2, _cropSize / 2);
+    final imagePointX = (focalPoint.dx - currentTx) / currentAbsoluteScale;
+    final imagePointY = (focalPoint.dy - currentTy) / currentAbsoluteScale;
 
-    final matrix = Matrix4.copy(_transformationController.value)
-      ..translateByDouble(focalPoint.dx, focalPoint.dy, 0, 1)
-      ..scaleByDouble(factor, factor, 1, 1)
-      ..translateByDouble(-focalPoint.dx, -focalPoint.dy, 0, 1);
+    final nextTx = focalPoint.dx - imagePointX * targetAbsoluteScale;
+    final nextTy = focalPoint.dy - imagePointY * targetAbsoluteScale;
 
-    _applyClampedMatrix(matrix, updateZoom: true);
+    final nextMatrix = _matrixWithScaleAndTranslation(
+      targetAbsoluteScale,
+      nextTx,
+      nextTy,
+    );
+
+    _applyClampedMatrix(nextMatrix, updateZoom: true);
   }
 
   void _onInteractionUpdate(ScaleUpdateDetails details) {
-    _applyClampedMatrix(
-      Matrix4.copy(_transformationController.value),
-      updateZoom: true,
-    );
+    if (!mounted) {
+      return;
+    }
+
+    final liveZoom = _currentScale;
+    if ((_zoom - liveZoom).abs() < 0.001) {
+      return;
+    }
+
+    setState(() => _zoom = liveZoom);
   }
 
   void _onInteractionEnd(ScaleEndDetails details) {
@@ -158,8 +196,6 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
     );
     final zoom = (absoluteScale / _baseScale).clamp(_minZoom, _maxZoom);
     final clampedScale = _baseScale * zoom;
-    input.setEntry(0, 0, clampedScale);
-    input.setEntry(1, 1, clampedScale);
 
     var tx = input.storage[12];
     var ty = input.storage[13];
@@ -179,14 +215,23 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
     tx = tx.clamp(minTx, maxTx);
     ty = ty.clamp(minTy, maxTy);
 
-    input.storage[12] = tx;
-    input.storage[13] = ty;
-
-    _transformationController.value = input;
+    _transformationController.value = _matrixWithScaleAndTranslation(
+      clampedScale,
+      tx,
+      ty,
+    );
 
     if (updateZoom && mounted) {
       setState(() => _zoom = zoom);
     }
+  }
+
+  Matrix4 _matrixWithScaleAndTranslation(double scale, double tx, double ty) {
+    return Matrix4.identity()
+      ..setEntry(0, 0, scale)
+      ..setEntry(1, 1, scale)
+      ..setEntry(2, 2, 1)
+      ..setTranslationRaw(tx, ty, 0);
   }
 
   Future<void> _saveCrop() async {
@@ -354,6 +399,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                                 child: InteractiveViewer(
                                   transformationController:
                                       _transformationController,
+                                  constrained: false,
                                   minScale: 0.01,
                                   maxScale: 100,
                                   boundaryMargin: EdgeInsets.zero,
@@ -363,10 +409,12 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                                   child: SizedBox(
                                     width: _imageSize.width,
                                     height: _imageSize.height,
-                                    child: Image.file(
-                                      File(widget.sourceImagePath),
-                                      fit: BoxFit.cover,
-                                    ),
+                                    child: _displayImageBytes == null
+                                        ? const SizedBox.shrink()
+                                        : Image.memory(
+                                            _displayImageBytes!,
+                                            fit: BoxFit.fill,
+                                          ),
                                   ),
                                 ),
                               ),

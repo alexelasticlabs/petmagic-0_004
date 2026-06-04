@@ -21,12 +21,13 @@ internal sealed partial class TemplatesService
             || normalized.EndsWith(".m4v", StringComparison.Ordinal);
     }
 
-    private static PublicTemplateCatalogMetadataResponse MapPublicCatalogMetadataItem(TemplateItem template)
+    private static PublicTemplateCatalogMetadataResponse MapPublicCatalogMetadataItem(TemplateItem template, string? locale)
     {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
         var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
         return MapPublicCatalogMetadataItem(
             template.Id,
-            template.Title,
+            localizedTexts.Title,
             template.Category,
             template.TemplateType,
             previewAsset?.Url,
@@ -155,13 +156,15 @@ internal sealed partial class TemplatesService
             DeserializeRequirements(template.PetPhotoRequirements));
     }
 
-    private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template)
+    private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template, string? locale)
     {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+
         return new PublicTemplateListItemResponse(
             template.Id,
             template.TemplateType.ToString(),
-            template.Title,
-            template.ShortDescription,
+            localizedTexts.Title,
+            localizedTexts.ShortDescription,
             template.Category,
             ResolveEffectivePromoBadge(template, DateTime.UtcNow),
             DeserializeTags(template.Tags),
@@ -170,16 +173,18 @@ internal sealed partial class TemplatesService
             GetAsset(template, TemplateAssetKind.Preview),
             template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
-            DeserializeRequirements(template.PetPhotoRequirements));
+                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements));
     }
 
-    private static PublicTemplateResponse MapPublicResponse(TemplateItem template)
+    private static PublicTemplateResponse MapPublicResponse(TemplateItem template, string? locale)
     {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+
         return new PublicTemplateResponse(
             template.Id,
             template.TemplateType.ToString(),
-            template.Title,
-            template.ShortDescription,
+            localizedTexts.Title,
+            localizedTexts.ShortDescription,
             template.Category,
             ResolveEffectivePromoBadge(template, DateTime.UtcNow),
             DeserializeTags(template.Tags),
@@ -188,7 +193,7 @@ internal sealed partial class TemplatesService
             GetAsset(template, TemplateAssetKind.Preview),
             template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
-            DeserializeRequirements(template.PetPhotoRequirements));
+                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements));
     }
 
     private static TemplatePromoBadgeMode ParsePromoBadgeMode(string raw)

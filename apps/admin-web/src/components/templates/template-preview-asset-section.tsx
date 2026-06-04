@@ -202,6 +202,7 @@ export function TemplatePreviewAssetSection({
                   previewFileName: "",
                   previewContentType: "",
                   previewFileSizeBytes: "",
+                  previewDurationSeconds: "",
                 }));
               }}
             >

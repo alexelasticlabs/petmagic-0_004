@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -9,7 +14,9 @@ import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart'
 import 'package:petmagic_mobile/app/router/app_router.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/notifications/push_notifications_bootstrap.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/startup/session_scope_reset.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/shared/widgets/network_status_banner.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_notification_host.dart';
 
@@ -23,12 +30,104 @@ const _supportedAppLocales = <Locale>[
   Locale('pl'),
 ];
 
+final _networkRecoveryCoordinatorProvider =
+    Provider<_NetworkRecoveryCoordinator>(
+      (ref) => _NetworkRecoveryCoordinator(ref),
+    );
+
+class _NetworkRecoveryCoordinator {
+  _NetworkRecoveryCoordinator(this._ref);
+
+  final Ref _ref;
+
+  static const Duration _minRecoveryInterval = Duration(seconds: 8);
+
+  bool _isRecovering = false;
+  DateTime? _lastRecoveryAttemptAtUtc;
+
+  Future<void> onInternetRestored() async {
+    final now = DateTime.now().toUtc();
+    if (_isRecovering) {
+      return;
+    }
+
+    final lastAttemptAtUtc = _lastRecoveryAttemptAtUtc;
+    if (lastAttemptAtUtc != null &&
+        now.difference(lastAttemptAtUtc) < _minRecoveryInterval) {
+      return;
+    }
+
+    _isRecovering = true;
+    _lastRecoveryAttemptAtUtc = now;
+
+    try {
+      final session = await _ref.read(authSessionStorageProvider).read();
+      if (session == null) {
+        return;
+      }
+
+      await _ref
+          .read(authSessionCoordinatorProvider)
+          .requireValidSession(
+            mapError: (error, {required fallbackMessage}) => AppException(
+              fallbackMessage,
+              statusCode: error.response?.statusCode,
+              cause: error,
+            ),
+          );
+    } on AppException catch (error, stackTrace) {
+      if (error.statusCode == 400 ||
+          error.statusCode == 401 ||
+          error.statusCode == 403) {
+        _ref.read(appLaunchControllerProvider.notifier).markSignedOut();
+      }
+
+      AppLogger.warn(
+        feature: 'Network',
+        operation: 'session_recovery_on_network_restored',
+        message: 'Session recovery failed after network restore',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'status_code': error.statusCode},
+      );
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Network',
+        operation: 'session_recovery_on_network_restored_unknown',
+        message:
+            'Unexpected error during session recovery after network restore',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _isRecovering = false;
+    }
+  }
+}
+
 class PetMagicApp extends ConsumerWidget {
   const PetMagicApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(sessionScopeResetProvider);
+    final networkRecoveryCoordinator = ref.watch(
+      _networkRecoveryCoordinatorProvider,
+    );
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      final wasOffline = previous?.hasInternet == false;
+      final isRestored = wasOffline && next.hasInternet;
+      if (!isRestored) {
+        return;
+      }
+
+      unawaited(networkRecoveryCoordinator.onInternetRestored());
+    });
+
     ref.watch(networkStatusControllerProvider);
     final router = ref.watch(appRouterProvider);
     final preferences = ref.watch(appPreferencesControllerProvider);

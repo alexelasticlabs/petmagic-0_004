@@ -69,6 +69,20 @@ class AppConfig {
 
   static List<String> get apiBaseUrls {
     if (configuredApiBaseUrl.isNotEmpty) {
+      if (kDebugMode &&
+          !kIsWeb &&
+          Platform.isAndroid &&
+          _isConfiguredLoopbackBaseUrl) {
+        return _orderedUniqueUrls([
+          configuredApiBaseUrl,
+          'http://10.0.2.2:5000',
+          'http://host.docker.internal:5000',
+          'http://10.0.3.2:5000',
+          'http://127.0.0.1:5000',
+          'http://localhost:5000',
+        ]);
+      }
+
       return [configuredApiBaseUrl];
     }
 
@@ -91,5 +105,30 @@ class AppConfig {
 
   static String get apiBaseUrl {
     return apiBaseUrls.first;
+  }
+
+  static bool get _isConfiguredLoopbackBaseUrl {
+    final uri = Uri.tryParse(configuredApiBaseUrl.trim());
+    if (uri == null) {
+      return false;
+    }
+
+    final host = uri.host;
+    return host == 'localhost' || host == '127.0.0.1';
+  }
+
+  static List<String> _orderedUniqueUrls(Iterable<String> rawUrls) {
+    final unique = <String>{};
+    final ordered = <String>[];
+    for (final rawUrl in rawUrls) {
+      final value = rawUrl.trim();
+      if (value.isEmpty) {
+        continue;
+      }
+      if (unique.add(value)) {
+        ordered.add(value);
+      }
+    }
+    return ordered;
   }
 }

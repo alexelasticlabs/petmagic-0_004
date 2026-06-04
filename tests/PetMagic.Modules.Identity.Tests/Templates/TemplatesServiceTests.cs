@@ -38,6 +38,7 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "fal-ai/kling-video/v3/standard/motion-control"
             ],
+            SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
             SeedSampleTemplates = false
         };
 

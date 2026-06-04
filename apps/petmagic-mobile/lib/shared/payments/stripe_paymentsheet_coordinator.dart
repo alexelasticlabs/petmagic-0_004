@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
@@ -119,7 +120,18 @@ class StripePaymentSheetCoordinator {
     BuildContext context, {
     required Duration settleDelay,
   }) async {
+    if (kDebugMode) {
+      final binding = WidgetsBinding.instance;
+      if (binding.debugShowWidgetInspectorOverride) {
+        binding.debugShowWidgetInspectorOverride = false;
+      }
+    }
+
     FocusManager.instance.primaryFocus?.unfocus();
+    await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    if (!context.mounted) {
+      return;
+    }
 
     final navigator = Navigator.of(context, rootNavigator: true);
     navigator.popUntil((route) => route is PageRoute<dynamic>);

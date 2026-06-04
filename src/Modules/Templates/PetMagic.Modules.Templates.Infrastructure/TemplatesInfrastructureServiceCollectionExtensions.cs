@@ -59,6 +59,15 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "fal-ai/kling-video/v3/standard/motion-control"
             ]),
+            SourceLocalizationLocale = section["SourceLocalizationLocale"] ?? "en",
+            SupportedLocalizationLocales = ReadValues(section, "SupportedLocalizationLocales", [
+                "ru",
+                "de",
+                "es",
+                "fr",
+                "it",
+                "pl"
+            ]),
             PreviewMaxFileSizeBytes = ParseLong(section["PreviewMaxFileSizeBytes"], 25 * 1024 * 1024),
             ReferenceMotionMaxFileSizeBytes = ParseLong(section["ReferenceMotionMaxFileSizeBytes"], 100 * 1024 * 1024),
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], true),
@@ -152,6 +161,20 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             ALTER TABLE templates_items
             ADD COLUMN IF NOT EXISTS "PetPhotoRequirements" character varying(1000);
             """);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE templates_items
+            ADD COLUMN IF NOT EXISTS "LocalizedTextsJson" text;
+            """);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE templates_items
+            ALTER COLUMN "LocalizedTextsJson" TYPE text USING "LocalizedTextsJson"::text;
+            """);
+
+        await BackfillTemplateLocalizationsAsync(dbContext, options, cancellationToken: default);
 
         if (!options.SeedSampleTemplates)
         {
@@ -267,6 +290,36 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         );
 
         await dbContext.SaveChangesAsync();
+        await BackfillTemplateLocalizationsAsync(dbContext, options, cancellationToken: default);
+    }
+
+    private static async Task BackfillTemplateLocalizationsAsync(TemplatesDbContext dbContext, TemplatesOptions options, CancellationToken cancellationToken)
+    {
+        var templates = await dbContext.TemplateItems
+            .Where(template => template.DeletedAtUtc == null && string.IsNullOrWhiteSpace(template.LocalizedTextsJson))
+            .ToArrayAsync(cancellationToken);
+
+        if (templates.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var template in templates)
+        {
+            var petPhotoRequirements = DeserializeRequirements(template.PetPhotoRequirements);
+            template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
+                template.Title,
+                template.ShortDescription,
+                petPhotoRequirements,
+                template.ImagePrompt,
+                template.PreprocessingPrompt,
+                template.KlingPrompt,
+                options.SupportedLocalizationLocales,
+                options.SourceLocalizationLocale,
+                cancellationToken);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string[] ReadValues(IConfigurationSection section, string key, string[] fallback)
@@ -279,6 +332,22 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             .ToArray();
 
         return values.Length == 0 ? fallback : values;
+    }
+
+    private static string[]? DeserializeRequirements(string? requirements)
+    {
+        if (string.IsNullOrWhiteSpace(requirements))
+        {
+            return null;
+        }
+
+        return requirements
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .ToArray();
     }
 
     private static void AddMediaStorage(IServiceCollection services, TemplatesOptions options)

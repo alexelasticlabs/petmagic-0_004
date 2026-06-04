@@ -121,6 +121,52 @@ class _ErrorState extends ConsumerWidget {
   }
 }
 
+class _GuestAccessState extends StatelessWidget {
+  const _GuestAccessState({required this.onOpenSignIn});
+
+  final VoidCallback onOpenSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.lock_outline_rounded, size: 42, color: colors.textMuted),
+          const SizedBox(height: 12),
+          Text(
+            text.authSignInRequired,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: colors.textStrong,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            text.generationStatusEmptyMessage,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.textSoft,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onOpenSignIn,
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: Text(text.profileSignInAction),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OfflineCacheBanner extends ConsumerWidget {
   const _OfflineCacheBanner({
     required this.lastSyncedAtUtc,
@@ -337,7 +383,9 @@ Future<void> _showReadyCardActions(
                   title: Text(text.generationStatusSaveAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    unawaited(_saveGenerationToGallery(context, text, generation));
+                    unawaited(
+                      _saveGenerationToGallery(context, text, generation),
+                    );
                   },
                 ),
                 ListTile(
@@ -361,7 +409,9 @@ Future<void> _showReadyCardActions(
                   title: Text(text.generationStatusDeleteAction),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    unawaited(_deleteGeneration(context, text, ref, generation));
+                    unawaited(
+                      _deleteGeneration(context, text, ref, generation),
+                    );
                   },
                 ),
                 ListTile(
@@ -572,9 +622,5 @@ String _buildGenerationFileName(
 }
 
 void _notifySoon(BuildContext context, String message) {
-  PetMagicToast.show(
-    context,
-    message: message,
-    tone: PetMagicToastTone.info,
-  );
+  PetMagicToast.show(context, message: message, tone: PetMagicToastTone.info);
 }

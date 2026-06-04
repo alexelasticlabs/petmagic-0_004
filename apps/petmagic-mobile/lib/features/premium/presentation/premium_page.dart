@@ -4,10 +4,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_stripe_checkout_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
@@ -50,12 +53,30 @@ class PremiumPage extends ConsumerStatefulWidget {
 class _PremiumPageState extends ConsumerState<PremiumPage>
     with WidgetsBindingObserver {
   bool _shouldReloadOnResume = false;
+  bool _didAutoCloseAfterActivation = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() => ref.read(premiumControllerProvider.notifier).load());
+  }
+
+  void _closeAfterSuccessfulActivation() {
+    if (!mounted || _didAutoCloseAfterActivation) {
+      return;
+    }
+
+    _didAutoCloseAfterActivation = true;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    if (context.mounted) {
+      context.go(TemplatesPage.routePath);
+    }
   }
 
   @override
@@ -138,9 +159,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       context: context,
       title: text.premiumPaymentTitle,
       subtitle: text.premiumPaymentChooseSubtitle,
-      continueLabel: text.premiumContinueAction,
+      continueLabel: text.premiumCheckoutContinueAction(
+        text.premiumPaymentStripe,
+      ),
       continueLabelBuilder: (option) =>
-          text.paymentContinueViaProviderAction(option.title),
+          text.premiumCheckoutContinueAction(option.title),
       options: options,
       trustTitle: text.premiumSecurePaymentTitle,
       trustLines: [
@@ -159,10 +182,65 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     }
 
     controller.selectProvider(provider);
+    if (provider == PremiumPaymentProvider.stripe) {
+      final selectedPlan = ref.read(premiumControllerProvider).selectedPlan;
+      if (selectedPlan == null) {
+        return;
+      }
+
+      final checkoutCompleted = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (pageContext) => PremiumStripeCheckoutPage(
+            plan: selectedPlan,
+            paymentMethodLabel: selected.title,
+            onChooseAnotherMethod: () {},
+            onSubmit: () => _submitStripeCheckout(
+              wasPremiumBeforeCheckout: currentState.isPremium,
+            ),
+          ),
+        ),
+      );
+
+      if (checkoutCompleted == false && mounted) {
+        await _openPaymentMethodSheetAndCheckout();
+      }
+      return;
+    }
+
     await _startCheckout();
   }
 
-  Future<void> _presentStripePaymentSheet({
+  Future<PremiumStripeCheckoutSubmitResult> _submitStripeCheckout({
+    required bool wasPremiumBeforeCheckout,
+  }) async {
+    final text = _premiumText(context);
+    final controller = ref.read(premiumControllerProvider.notifier);
+    final checkout = await controller.startCheckout();
+    if (!mounted || checkout == null) {
+      final state = ref.read(premiumControllerProvider);
+      return PremiumStripeCheckoutSubmitResult(
+        status: PremiumStripeCheckoutActionStatus.failed,
+        message: _resolveCheckoutErrorMessage(
+          text,
+          state.errorMessage ?? text.premiumCheckoutFailed,
+        ),
+      );
+    }
+
+    if (!checkout.usesPaymentSheet) {
+      return PremiumStripeCheckoutSubmitResult(
+        status: PremiumStripeCheckoutActionStatus.failed,
+        message: text.premiumCheckoutFailed,
+      );
+    }
+
+    return _presentStripePaymentSheet(
+      checkout: checkout,
+      wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
+    );
+  }
+
+  Future<PremiumStripeCheckoutSubmitResult> _presentStripePaymentSheet({
     required PremiumCheckoutModel checkout,
     required bool wasPremiumBeforeCheckout,
   }) async {
@@ -173,14 +251,10 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
         clientSecret.isEmpty ||
         publishableKey == null ||
         publishableKey.isEmpty) {
-      if (mounted) {
-        PetMagicToast.show(
-          context,
-          message: text.premiumCheckoutFailed,
-          tone: PetMagicToastTone.warning,
-        );
-      }
-      return;
+      return PremiumStripeCheckoutSubmitResult(
+        status: PremiumStripeCheckoutActionStatus.failed,
+        message: text.premiumCheckoutFailed,
+      );
     }
 
     final result = await StripePaymentSheetCoordinator.present(
@@ -193,22 +267,18 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       ),
     );
     if (!result.completed || !mounted) {
-      if (mounted) {
-        final failureMessage = result.errorMessage?.trim();
-        final resolved = result.cancelled
-            ? text.premiumPurchaseCancelled
-            : (failureMessage == null || failureMessage.isEmpty)
-            ? text.premiumCheckoutFailed
-            : failureMessage;
-        PetMagicToast.show(
-          context,
-          message: resolved,
-          tone: result.cancelled
-              ? PetMagicToastTone.info
-              : PetMagicToastTone.warning,
-        );
-      }
-      return;
+      final failureMessage = result.errorMessage?.trim();
+      final resolved = result.cancelled
+          ? text.premiumPurchaseCancelled
+          : (failureMessage == null || failureMessage.isEmpty)
+          ? text.premiumCheckoutFailed
+          : failureMessage;
+      return PremiumStripeCheckoutSubmitResult(
+        status: result.cancelled
+            ? PremiumStripeCheckoutActionStatus.cancelled
+            : PremiumStripeCheckoutActionStatus.failed,
+        message: resolved,
+      );
     }
 
     final controller = ref.read(premiumControllerProvider.notifier);
@@ -223,6 +293,55 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       stripePlanCode: selectedPlanCode,
       stripeExternalSubscriptionId: checkout.externalSubscriptionId,
     );
+
+    final state = ref.read(premiumControllerProvider);
+    if (state.checkoutVerificationState ==
+        PremiumCheckoutVerificationState.error) {
+      return PremiumStripeCheckoutSubmitResult(
+        status: PremiumStripeCheckoutActionStatus.failed,
+        message: _resolveCheckoutErrorMessage(
+          text,
+          state.checkoutErrorMessage ??
+              state.errorMessage ??
+              text.premiumCheckoutFailed,
+        ),
+      );
+    }
+
+    if (state.checkoutVerificationState ==
+            PremiumCheckoutVerificationState.pending ||
+        state.checkoutVerificationState ==
+            PremiumCheckoutVerificationState.activated ||
+        state.isPremium) {
+      return const PremiumStripeCheckoutSubmitResult(
+        status: PremiumStripeCheckoutActionStatus.success,
+      );
+    }
+
+    return PremiumStripeCheckoutSubmitResult(
+      status: PremiumStripeCheckoutActionStatus.failed,
+      message: text.premiumCheckoutFailed,
+    );
+  }
+
+  String _resolveCheckoutErrorMessage(AppLocalizations text, String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.contains('premium.purchase_cancelled')) {
+      return text.premiumPurchaseCancelled;
+    }
+    if (normalized.contains('premium.store_unavailable')) {
+      return text.premiumStoreUnavailable;
+    }
+    if (normalized.contains('premium.store_product_unavailable')) {
+      return text.premiumStoreProductUnavailable;
+    }
+    if (normalized.contains('premium.checkout_failed')) {
+      return text.premiumCheckoutFailed;
+    }
+    if (normalized.isEmpty) {
+      return text.premiumCheckoutFailed;
+    }
+    return value;
   }
 
   List<PaymentMethodSheetOption> _buildPaymentMethodOptions(
@@ -346,21 +465,30 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     });
 
     ref.listen(premiumControllerProvider, (previous, next) {
-      final justActivated =
+      final justActivatedViaCheckoutState =
           previous?.checkoutVerificationState !=
               PremiumCheckoutVerificationState.activated &&
           next.checkoutVerificationState ==
               PremiumCheckoutVerificationState.activated;
+      final justActivatedViaFlag =
+          previous?.recentlyActivatedPremium != true &&
+          next.recentlyActivatedPremium;
+      final justActivatedViaSuccessMessage =
+          previous?.successMessage != 'premium.purchase_activated' &&
+          next.successMessage == 'premium.purchase_activated' &&
+          next.isPremium;
+
+      final justActivated =
+          justActivatedViaCheckoutState ||
+          justActivatedViaFlag ||
+          justActivatedViaSuccessMessage;
+
       if (!justActivated || !mounted) {
         return;
       }
 
       final fallbackText = _premiumText(context);
-      final navigator = Navigator.of(context);
-
-      if (navigator.canPop()) {
-        navigator.pop();
-      }
+      _closeAfterSuccessfulActivation();
 
       PetMagicToast.show(
         context,

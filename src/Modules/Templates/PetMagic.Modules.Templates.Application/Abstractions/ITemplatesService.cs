@@ -50,7 +50,7 @@ public interface ITemplatesService
 
     Task<Result> DeleteAsync(Guid templateId, CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, CancellationToken cancellationToken);
+    Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, string? locale, CancellationToken cancellationToken);
 
     Task<Result<IReadOnlyList<PublicTemplateCategoryResponse>>> ListPublicCategoriesAsync(CancellationToken cancellationToken);
 
@@ -58,9 +58,9 @@ public interface ITemplatesService
 
     Task<Result<PublicTemplatesCatalogVersionResponse>> GetPublicCatalogVersionAsync(CancellationToken cancellationToken);
 
-    Task<Result<PublicTemplatesCatalogChangesResponse>> GetPublicCatalogChangesAsync(long sinceVersion, CancellationToken cancellationToken);
+    Task<Result<PublicTemplatesCatalogChangesResponse>> GetPublicCatalogChangesAsync(long sinceVersion, string? locale, CancellationToken cancellationToken);
 
     Task<Result<PublicTemplatesFeedResponse>> ListPublicFeedAsync(PublicTemplatesFeedQuery query, CancellationToken cancellationToken);
 
-    Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, CancellationToken cancellationToken);
+    Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken);
 }

@@ -24,6 +24,10 @@ public sealed class TemplatesOptions
 
     public required string[] AllowedKlingModels { get; init; }
 
+    public string SourceLocalizationLocale { get; init; } = "en";
+
+    public required string[] SupportedLocalizationLocales { get; init; }
+
     public long PreviewMaxFileSizeBytes { get; init; } = 25 * 1024 * 1024;
 
     public long ReferenceMotionMaxFileSizeBytes { get; init; } = 100 * 1024 * 1024;

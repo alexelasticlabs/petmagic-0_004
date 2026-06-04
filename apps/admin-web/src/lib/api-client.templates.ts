@@ -308,11 +308,21 @@ export async function deleteTemplate(templateId: string): Promise<void> {
 
 export async function uploadTemplateMedia(
   file: File,
-  assetKind: TemplateAssetKind
+  assetKind: TemplateAssetKind,
+  options?: {
+    durationSeconds?: number;
+  }
 ): Promise<TemplateAsset> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("assetKind", assetKind);
+  if (
+    typeof options?.durationSeconds === "number" &&
+    Number.isFinite(options.durationSeconds) &&
+    options.durationSeconds > 0
+  ) {
+    formData.append("durationSeconds", options.durationSeconds.toString());
+  }
 
   return apiRequest<TemplateAsset>("/api/admin/templates/media/upload", {
     method: "POST",

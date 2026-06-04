@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
@@ -51,8 +53,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
     super.initState();
     _walletController = ref.read(walletControllerProvider.notifier);
     WidgetsBinding.instance.addObserver(this);
-    _startAutoRefresh();
-    Future.microtask(() => _walletController.load());
+    if (ref.read(appLaunchControllerProvider).isAuthenticated) {
+      _startAutoRefresh();
+      Future.microtask(() => _walletController.load());
+    }
   }
 
   @override
@@ -73,12 +77,24 @@ class _WalletPageState extends ConsumerState<WalletPage>
   @override
   void activate() {
     super.activate();
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      _autoRefreshTimer?.cancel();
+      _autoRefreshTimer = null;
+      return;
+    }
+
     _scheduleNextAutoRefresh();
     unawaited(_walletController.load(refresh: true));
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      _autoRefreshTimer?.cancel();
+      _autoRefreshTimer = null;
+      return;
+    }
+
     if (state != AppLifecycleState.resumed) {
       _autoRefreshTimer?.cancel();
       _autoRefreshTimer = null;
@@ -174,6 +190,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
   Widget build(BuildContext context) {
     final state = ref.watch(walletControllerProvider);
     final controller = ref.read(walletControllerProvider.notifier);
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final hasShell =
@@ -185,6 +204,23 @@ class _WalletPageState extends ConsumerState<WalletPage>
           )
         : MediaQuery.viewPaddingOf(context).bottom +
               kPetMagicBottomContentInsetCompact;
+
+    if (!isAuthenticated) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 24, 16, bottomNavInset),
+            child: _WalletUnavailableCard(
+              message: text.authSignInRequired,
+              onRetry: () => showAuthRequiredSheet(
+                context,
+                redirectPath: WalletPage.routePath,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     ref.listen(walletControllerProvider, (previous, next) {
       if (!mounted) {
@@ -291,7 +327,8 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         wallet: state.wallet,
                         onRefresh: () => controller.load(refresh: true),
                       ),
-                      if (!(state.wallet?.isPremium ?? false)) ...[
+                      if (isAuthenticated &&
+                          !(state.wallet?.isPremium ?? false)) ...[
                         const SizedBox(height: 14),
                         _PremiumUpsellCard(
                           onOpenPremium: () =>
@@ -503,13 +540,25 @@ Future<void> _showPackDetailSheet(
       enabledMethods.first;
 
   List<PaymentMethodSheetOption> buildMethodOptions() {
-    return enabledMethods
-        .map(
-          (method) => PaymentMethodSheetOption(
+    return paymentMethods
+        .map((method) {
+          final provider = method.provider.trim().toLowerCase();
+          final legalNotice = switch (provider) {
+            'stripe' => text.walletCheckoutTrustText,
+            'google_play' ||
+            'app_store' => text.premiumStorePaymentDisclaimerBody,
+            _ => null,
+          };
+          final storeUnavailableSubtitle =
+              !method.isEnabled && method.isStoreNative
+              ? _walletStoreUnavailableSubtitle(text, method)
+              : null;
+
+          return PaymentMethodSheetOption(
             id: method.provider,
             title: _walletProviderLabel(text, method),
             icon: _walletProviderIcon(method),
-            subtitle: method.displaySubtitle,
+            subtitle: storeUnavailableSubtitle ?? method.displaySubtitle,
             badge: method.isRecommended
                 ? text.premiumPaymentRecommendedBadge
                 : (method.isSelectedByDefault
@@ -518,20 +567,27 @@ Future<void> _showPackDetailSheet(
             warningTitle: method.warningTitle,
             warningMessage: method.warningMessage,
             notes: method.notes,
+            legalNotice: legalNotice,
             isEnabled: method.isEnabled,
-          ),
-        )
+          );
+        })
         .toList(growable: false);
   }
 
   final selectedOption = await showPaymentMethodSheet(
     context: context,
     title: text.premiumPaymentTitle,
-    subtitle: text.premiumSecurePaymentSubtitle,
+    subtitle: text.walletPaymentMethodChooseSubtitle,
     continueLabel: text.premiumContinueAction,
     continueLabelBuilder: (option) =>
         text.paymentContinueViaProviderAction(option.title),
     options: buildMethodOptions(),
+    trustTitle: text.walletPaymentTrustTitle,
+    trustLines: [
+      text.walletPaymentTrustStripeProcesses,
+      text.walletPaymentTrustNoStorage,
+      text.walletPaymentTrustTopUpAnytime,
+    ],
   );
   if (selectedOption == null || !context.mounted) {
     return;
@@ -650,6 +706,18 @@ IconData _walletProviderIcon(WalletPaymentMethodModel method) {
     'google_play' => Icons.android_rounded,
     'app_store' => Icons.apple_rounded,
     _ => Icons.payments_rounded,
+  };
+}
+
+String? _walletStoreUnavailableSubtitle(
+  AppLocalizations text,
+  WalletPaymentMethodModel method,
+) {
+  final provider = method.provider.trim().toLowerCase();
+  return switch (provider) {
+    'google_play' => text.walletPaymentStoreUnavailableGooglePlay,
+    'app_store' => text.walletPaymentStoreUnavailableAppStore,
+    _ => method.displaySubtitle,
   };
 }
 

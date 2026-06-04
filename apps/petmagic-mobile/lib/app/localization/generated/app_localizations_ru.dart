@@ -755,6 +755,33 @@ class AppLocalizationsRu extends AppLocalizations {
       'PetMagic не хранит данные вашей карты. Платежи безопасно обрабатываются Stripe.';
 
   @override
+  String get walletPaymentMethodChooseSubtitle =>
+      'Выберите, как хотите пополнить PawSpark.';
+
+  @override
+  String get walletPaymentTrustTitle => 'Безопасная оплата';
+
+  @override
+  String get walletPaymentTrustStripeProcesses =>
+      'Данные карты безопасно обрабатываются Stripe.';
+
+  @override
+  String get walletPaymentTrustNoStorage =>
+      'PetMagic не хранит данные вашей карты.';
+
+  @override
+  String get walletPaymentTrustTopUpAnytime =>
+      'Пополнить PawSpark можно в любой момент.';
+
+  @override
+  String get walletPaymentStoreUnavailableGooglePlay =>
+      'Google Play временно недоступен на этом устройстве. Пока используйте Stripe.';
+
+  @override
+  String get walletPaymentStoreUnavailableAppStore =>
+      'App Store временно недоступен на этом устройстве. Пока используйте Stripe.';
+
+  @override
   String get walletCheckoutOrderSectionTitle => 'Ваше пополнение';
 
   @override
@@ -3180,6 +3207,71 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get premiumStorePaymentDisclaimerBody =>
       'Оплата будет списана с вашего аккаунта App Store / Google Play. Подписка продлевается автоматически, если ее не отменить до даты продления.';
+
+  @override
+  String get premiumCheckoutPageTitle => 'Оформить Premium';
+
+  @override
+  String get premiumCheckoutHeroBadge => 'Подписка Premium';
+
+  @override
+  String get premiumCheckoutHeroSubtitle =>
+      'Регулярный доступ к Premium с безлимитными шаблонами и более быстрой генерацией в PetMagic.';
+
+  @override
+  String premiumCheckoutTokensPerPeriod(Object count) {
+    return '$count PawSpark каждый платежный период';
+  }
+
+  @override
+  String get premiumCheckoutIncludesTitle => 'Что вы получите';
+
+  @override
+  String get premiumCheckoutIncludedTemplates => 'Доступ к Premium-шаблонам';
+
+  @override
+  String get premiumCheckoutIncludedPriority =>
+      'Приоритетная очередь генерации';
+
+  @override
+  String get premiumCheckoutIncludedNoWatermark =>
+      'Без водяного знака на экспорте';
+
+  @override
+  String get premiumCheckoutPaymentMethodSubtitle =>
+      'Карта, Apple Pay или Google Pay';
+
+  @override
+  String get premiumCheckoutTrustText =>
+      'Данные карты безопасно обрабатываются Stripe. PetMagic не хранит данные вашей карты.';
+
+  @override
+  String get premiumCheckoutSummaryTitle => 'Ваша подписка';
+
+  @override
+  String get premiumCheckoutSummaryPlanLabel => 'Тариф';
+
+  @override
+  String get premiumCheckoutSummaryPeriodLabel => 'Период оплаты';
+
+  @override
+  String get premiumCheckoutPeriodMonthly => 'Ежемесячно';
+
+  @override
+  String get premiumCheckoutPeriodYearly => 'Ежегодно';
+
+  @override
+  String premiumCheckoutContinueAction(Object provider) {
+    return 'Продолжить через $provider';
+  }
+
+  @override
+  String premiumCheckoutPayAction(Object price) {
+    return 'Оплатить $price';
+  }
+
+  @override
+  String get premiumCheckoutTotalLabel => 'Итого';
 
   @override
   String get debugStripeSmokeTestTitle => 'Тест Stripe PaymentSheet';

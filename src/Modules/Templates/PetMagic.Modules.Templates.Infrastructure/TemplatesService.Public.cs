@@ -39,6 +39,8 @@ internal sealed partial class TemplatesService
             {
                 template.Id,
                 template.Title,
+                template.LocalizedTextsJson,
+                LocalizedTitle = TemplateLocalizationTranslator.Resolve(template.Title, string.Empty, template.LocalizedTextsJson, query.Locale).Title,
                 template.Category,
                 template.TemplateType,
                 template.TokenCost,
@@ -60,9 +62,9 @@ internal sealed partial class TemplatesService
         var hasMore = totalCount > offset + pageItems.Length;
 
         return Result.Success(new PublicTemplatesCatalogPageResponse(
-            [.. pageItems.Select(item => MapPublicCatalogMetadataItem(
+                [.. pageItems.Select(item => MapPublicCatalogMetadataItem(
                 item.Id,
-                item.Title,
+                item.LocalizedTitle,
                 item.Category,
                 item.TemplateType,
                 item.Preview?.Url,
@@ -96,7 +98,7 @@ internal sealed partial class TemplatesService
         return Result.Success(new PublicTemplatesCatalogVersionResponse(version, updatedAtUtc));
     }
 
-    public async Task<Result<PublicTemplatesCatalogChangesResponse>> GetPublicCatalogChangesAsync(long sinceVersion, CancellationToken cancellationToken)
+    public async Task<Result<PublicTemplatesCatalogChangesResponse>> GetPublicCatalogChangesAsync(long sinceVersion, string? locale, CancellationToken cancellationToken)
     {
         var normalizedSinceVersion = Math.Max(0L, sinceVersion);
         var toVersion = await GetCurrentCatalogVersionAsync(cancellationToken);
@@ -159,6 +161,8 @@ internal sealed partial class TemplatesService
             {
                 template.Id,
                 template.Title,
+                template.LocalizedTextsJson,
+                LocalizedTitle = TemplateLocalizationTranslator.Resolve(template.Title, string.Empty, template.LocalizedTextsJson, locale).Title,
                 template.Category,
                 template.TemplateType,
                 template.TokenCost,
@@ -199,7 +203,7 @@ internal sealed partial class TemplatesService
             deletedIds.Remove(change.TemplateId);
             upserts[change.TemplateId] = MapPublicCatalogMetadataItem(
                 template.Id,
-                template.Title,
+                template.LocalizedTitle,
                 template.Category,
                 template.TemplateType,
                 template.Preview?.Url,
@@ -219,7 +223,7 @@ internal sealed partial class TemplatesService
             false));
     }
 
-    public async Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, CancellationToken cancellationToken)
+    public async Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, string? locale, CancellationToken cancellationToken)
     {
         var normalizedTags = NormalizeTags(tags ?? []);
         var items = await dbContext.TemplateItems
@@ -236,7 +240,7 @@ internal sealed partial class TemplatesService
 
         var filtered = items
             .Where(x => normalizedTags.Length == 0 || normalizedTags.All(tag => DeserializeTags(x.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)))
-            .Select(MapPublicListItem)
+            .Select(template => MapPublicListItem(template, locale))
             .ToArray();
 
         return Result.Success<IReadOnlyList<PublicTemplateListItemResponse>>(filtered);
@@ -320,13 +324,13 @@ internal sealed partial class TemplatesService
             : null;
 
         return Result.Success(new PublicTemplatesFeedResponse(
-            [.. pageItems.Select(MapPublicListItem)],
+            [.. pageItems.Select(template => MapPublicListItem(template, query.Locale))],
             nextCursor,
             hasMore,
             DateTime.UtcNow));
     }
 
-    public async Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, CancellationToken cancellationToken)
+    public async Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken)
     {
         var template = await FindTemplateAsync(templateId, cancellationToken);
         if (template is null || template.DeletedAtUtc is not null || template.Status != TemplateStatus.Active)
@@ -334,6 +338,6 @@ internal sealed partial class TemplatesService
             return Result.Failure<PublicTemplateResponse>(TemplatesErrors.NotFound);
         }
 
-        return Result.Success(MapPublicResponse(template));
+        return Result.Success(MapPublicResponse(template, locale));
     }
 }

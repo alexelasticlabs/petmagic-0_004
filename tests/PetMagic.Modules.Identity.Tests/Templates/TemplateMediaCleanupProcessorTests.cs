@@ -129,6 +129,7 @@ public sealed class TemplateMediaCleanupProcessorTests
             AllowedImageModels = ["openai/gpt-image-2/edit"],
             AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
             AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
+            SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
             GenerationRetentionDaysAfterCompletion = retentionDays,
             MediaCleanupRetryDelayMilliseconds = 0,
             MetadataTempRetentionHours = metadataTempRetentionHours,
