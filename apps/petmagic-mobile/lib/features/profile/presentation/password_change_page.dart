@@ -363,8 +363,8 @@ class _PasswordChangeStepIndicator extends StatelessWidget {
               state: i < currentStep
                   ? _StepState.done
                   : i == currentStep
-                      ? _StepState.active
-                      : _StepState.upcoming,
+                  ? _StepState.active
+                  : _StepState.upcoming,
             ),
           ),
           if (i < steps.length - 1)
@@ -429,18 +429,16 @@ class _StepPill extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            isDone ? Icons.check_rounded : icon,
-            size: 15,
-            color: iconColor,
-          ),
+          Icon(isDone ? Icons.check_rounded : icon, size: 15, color: iconColor),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: isDone || isActive ? colors.textStrong : colors.textMuted,
+                color: isDone || isActive
+                    ? colors.textStrong
+                    : colors.textMuted,
                 fontSize: 12.5,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
               ),

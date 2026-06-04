@@ -10,7 +10,5 @@ class AppException implements Exception {
 }
 
 class RequestCancelledException extends AppException {
-  const RequestCancelledException([
-    super.message = 'Request cancelled.',
-  ]);
+  const RequestCancelledException([super.message = 'Request cancelled.']);
 }

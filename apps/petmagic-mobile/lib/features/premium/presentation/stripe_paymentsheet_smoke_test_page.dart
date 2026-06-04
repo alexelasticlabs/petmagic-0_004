@@ -142,7 +142,8 @@ class _StripePaymentSheetSmokeTestPageState
     }
 
     state = ref.read(premiumControllerProvider);
-    if (state.checkoutVerificationState == PremiumCheckoutVerificationState.error &&
+    if (state.checkoutVerificationState ==
+            PremiumCheckoutVerificationState.error &&
         mounted) {
       _showMessage(
         state.checkoutErrorMessage ?? text.debugStripeSmokeTestVerifyFailed,
@@ -151,10 +152,6 @@ class _StripePaymentSheetSmokeTestPageState
   }
 
   void _showMessage(String message) {
-    PetMagicToast.show(
-      context,
-      message: message,
-      tone: PetMagicToastTone.info,
-    );
+    PetMagicToast.show(context, message: message, tone: PetMagicToastTone.info);
   }
 }

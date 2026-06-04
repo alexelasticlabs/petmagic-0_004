@@ -29,9 +29,7 @@ class AuthSessionStorage {
     final stopwatch = Stopwatch()..start();
     String? raw;
     try {
-      raw = await _secureStorage
-          .read(key: sessionKey)
-          .timeout(_readTimeout);
+      raw = await _secureStorage.read(key: sessionKey).timeout(_readTimeout);
     } on TimeoutException catch (error, stackTrace) {
       AppLogger.warn(
         feature: 'Startup',
@@ -85,7 +83,10 @@ class AuthSessionStorage {
   }
 
   Future<void> save(AuthSession session) async {
-    await _secureStorage.write(key: sessionKey, value: jsonEncode(session.toJson()));
+    await _secureStorage.write(
+      key: sessionKey,
+      value: jsonEncode(session.toJson()),
+    );
   }
 
   Future<void> clear() async {

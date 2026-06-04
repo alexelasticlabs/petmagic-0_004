@@ -364,7 +364,8 @@ class _ProfileNotificationsSettingsSectionState
                     ),
                     _NotificationToggleRow(
                       icon: Icons.receipt_long_outlined,
-                      label: text.profileNotificationsPushPurchasesAndSubscriptions,
+                      label: text
+                          .profileNotificationsPushPurchasesAndSubscriptions,
                       subtitle: 'Подтверждения оплат и статус подписки',
                       value: _preferences!.pushPurchasesAndSubscriptions,
                       enabled: !_isSaving,
@@ -682,19 +683,20 @@ class _PushPermissionStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final isAllowed = status == AuthorizationStatus.authorized ||
+    final isAllowed =
+        status == AuthorizationStatus.authorized ||
         status == AuthorizationStatus.provisional;
     final isDenied = status == AuthorizationStatus.denied;
     final chipColor = isAllowed
         ? colors.accent
         : isDenied
-            ? colors.danger
-            : colors.textMuted;
+        ? colors.danger
+        : colors.textMuted;
     final chipIcon = isAllowed
         ? Icons.notifications_active_rounded
         : isDenied
-            ? Icons.notifications_off_outlined
-            : Icons.notifications_none_rounded;
+        ? Icons.notifications_off_outlined
+        : Icons.notifications_none_rounded;
 
     return Row(
       children: [
@@ -741,7 +743,11 @@ class _PushPermissionStatusCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             child: Text(
-              isAllowed ? '✓' : isDenied ? '✗' : '?',
+              isAllowed
+                  ? '✓'
+                  : isDenied
+                  ? '✗'
+                  : '?',
               style: TextStyle(
                 color: chipColor,
                 fontSize: 13,
@@ -769,14 +775,17 @@ class _DevicePermissionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final isOk = state == AppPermissionState.granted ||
+    final isOk =
+        state == AppPermissionState.granted ||
         state == AppPermissionState.limited;
     final chipColor = isOk ? colors.accent : colors.textMuted;
 
     return Row(
       children: [
         Icon(
-          isOk ? Icons.check_circle_outline_rounded : Icons.radio_button_unchecked_rounded,
+          isOk
+              ? Icons.check_circle_outline_rounded
+              : Icons.radio_button_unchecked_rounded,
           size: 16,
           color: chipColor,
         ),

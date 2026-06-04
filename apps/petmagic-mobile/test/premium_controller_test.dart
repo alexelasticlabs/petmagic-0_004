@@ -62,56 +62,61 @@ void main() {
     },
   );
 
-  test('stripe checkout returns payment sheet payload for in-app flow', () async {
-    final repository = _FakePremiumRepository(
-      config: _paywallConfig(
-        methods: const [
-          PremiumPaymentMethodModel(
-            provider: PremiumPaymentProvider.stripe,
-            purchaseChannel: 'external_checkout',
-            platform: 'android',
-            region: '*',
-            isEnabled: true,
-            isSelectedByDefault: true,
-            requiresExternalWarning: false,
-            requiresStoreDisclosure: false,
-            isRecommended: true,
-            bonusTokensPercent: 0,
-          ),
+  test(
+    'stripe checkout returns payment sheet payload for in-app flow',
+    () async {
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+        stripeCheckout: const PremiumCheckoutModel(
+          paymentProvider: 'stripe',
+          checkoutUrl: '',
+          status: 'pending',
+          externalSubscriptionId: 'cs_test_123',
+          paymentIntentClientSecret: 'pi_client_secret',
+          customerId: 'cus_123',
+          customerEphemeralKeySecret: 'ephkey_123',
+          publishableKey:
+              'pk_'
+              'test_123',
+        ),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
         ],
-      ),
-      status: _status(provider: 'stripe', canManageSubscription: false),
-      stripeCheckout: const PremiumCheckoutModel(
-        paymentProvider: 'stripe',
-        checkoutUrl: '',
-        status: 'pending',
-        externalSubscriptionId: 'cs_test_123',
-        paymentIntentClientSecret: 'pi_client_secret',
-        customerId: 'cus_123',
-        customerEphemeralKeySecret: 'ephkey_123',
-        publishableKey: 'pk_test_123',
-      ),
-    );
+      );
+      addTearDown(container.dispose);
 
-    final container = ProviderContainer(
-      overrides: [
-        premiumRepositoryProvider.overrideWithValue(repository),
-        premiumRefreshProfileProvider.overrideWithValue(() async {}),
-      ],
-    );
-    addTearDown(container.dispose);
+      await container.read(premiumControllerProvider.notifier).load();
+      final checkout = await container
+          .read(premiumControllerProvider.notifier)
+          .startCheckout();
 
-    await container.read(premiumControllerProvider.notifier).load();
-    final checkout = await container
-        .read(premiumControllerProvider.notifier)
-        .startCheckout();
-
-    final state = container.read(premiumControllerProvider);
-    expect(checkout, isNotNull);
-    expect(checkout?.usesPaymentSheet, isTrue);
-    expect(state.externalUrl, isNull);
-    expect(state.isBuying, isFalse);
-  });
+      final state = container.read(premiumControllerProvider);
+      expect(checkout, isNotNull);
+      expect(checkout?.usesPaymentSheet, isTrue);
+      expect(state.externalUrl, isNull);
+      expect(state.isBuying, isFalse);
+    },
+  );
 }
 
 PremiumPaywallConfigModel _paywallConfig({

@@ -91,7 +91,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.85),
+                ),
               ),
               child: Wrap(
                 children: [

@@ -25,10 +25,7 @@ class SupportAttachmentValidation {
     'image/webp',
   };
 
-  static const videoMimeTypes = <String>{
-    'video/mp4',
-    'video/quicktime',
-  };
+  static const videoMimeTypes = <String>{'video/mp4', 'video/quicktime'};
 
   static SupportAttachmentValidationResult validate({
     required String contentType,
@@ -65,9 +62,7 @@ class SupportAttachmentValidation {
       );
     }
 
-    if (isVideo &&
-        videoDuration != null &&
-        videoDuration > videoMaxDuration) {
+    if (isVideo && videoDuration != null && videoDuration > videoMaxDuration) {
       return const SupportAttachmentValidationResult(
         isAllowed: false,
         isVideo: true,
@@ -75,9 +70,6 @@ class SupportAttachmentValidation {
       );
     }
 
-    return SupportAttachmentValidationResult(
-      isAllowed: true,
-      isVideo: isVideo,
-    );
+    return SupportAttachmentValidationResult(isAllowed: true, isVideo: isVideo);
   }
 }

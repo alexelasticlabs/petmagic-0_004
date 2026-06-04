@@ -71,7 +71,10 @@ class _MotionEntranceState extends State<MotionEntrance>
     }
 
     _started = true;
-    _controller.duration = PetMotion.effectiveDuration(context, widget.duration);
+    _controller.duration = PetMotion.effectiveDuration(
+      context,
+      widget.duration,
+    );
 
     if (widget.delay > Duration.zero) {
       await Future<void>.delayed(widget.delay);

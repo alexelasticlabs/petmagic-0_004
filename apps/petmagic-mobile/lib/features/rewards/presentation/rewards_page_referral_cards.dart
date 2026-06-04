@@ -269,9 +269,9 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFFE0A91E).withValues(
-                  alpha: isLight ? 0.78 : 0.88,
-                ),
+                color: const Color(
+                  0xFFE0A91E,
+                ).withValues(alpha: isLight ? 0.78 : 0.88),
                 width: 1.15,
               ),
               gradient: LinearGradient(
@@ -300,9 +300,9 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                           center: const Alignment(-0.3, 0.35),
                           radius: 1.2,
                           colors: [
-                            const Color(0xFFF4C64D).withValues(
-                              alpha: isLight ? 0.2 : 0.18,
-                            ),
+                            const Color(
+                              0xFFF4C64D,
+                            ).withValues(alpha: isLight ? 0.2 : 0.18),
                             Colors.transparent,
                           ],
                         ),
@@ -334,13 +334,13 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: const Color(0xFFE0A91E).withValues(
-                                alpha: isLight ? 0.7 : 0.8,
-                              ),
+                              color: const Color(
+                                0xFFE0A91E,
+                              ).withValues(alpha: isLight ? 0.7 : 0.8),
                             ),
-                            color: const Color(0xFF201300).withValues(
-                              alpha: isLight ? 0.08 : 0.24,
-                            ),
+                            color: const Color(
+                              0xFF201300,
+                            ).withValues(alpha: isLight ? 0.08 : 0.24),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,

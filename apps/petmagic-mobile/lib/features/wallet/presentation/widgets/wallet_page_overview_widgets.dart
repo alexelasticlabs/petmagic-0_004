@@ -428,7 +428,9 @@ class _PremiumUpsellCard extends StatelessWidget {
     final borderColor = const Color(
       0xFFE1AF54,
     ).withValues(alpha: isDark ? 0.82 : 0.90);
-    final textPrimary = isDark ? const Color(0xFFF7C96A) : const Color(0xFF735018);
+    final textPrimary = isDark
+        ? const Color(0xFFF7C96A)
+        : const Color(0xFF735018);
     final textSecondary = isDark
         ? Colors.white.withValues(alpha: 0.90)
         : const Color(0xFF2D3B54);

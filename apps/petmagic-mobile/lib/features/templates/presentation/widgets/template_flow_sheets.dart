@@ -27,7 +27,8 @@ enum PetPhotoSourceAction { gallery, camera }
 
 enum TemplateBlockedAction { wallet, premium, chooseAnother }
 
-const _kInsufficientBalanceMascotAsset = 'assets/rewards/powspark-empty-cat.png';
+const _kInsufficientBalanceMascotAsset =
+    'assets/rewards/powspark-empty-cat.png';
 
 Future<TemplateDetailAction?> showTemplateDetailSheet(
   BuildContext context,
@@ -346,9 +347,8 @@ Future<TemplateBlockedAction?> showTemplateBlockedSheet({
             onClose: () => Navigator.of(
               sheetContext,
             ).pop(TemplateBlockedAction.chooseAnother),
-            onOpenPremium: () => Navigator.of(
-              sheetContext,
-            ).pop(TemplateBlockedAction.premium),
+            onOpenPremium: () =>
+                Navigator.of(sheetContext).pop(TemplateBlockedAction.premium),
             onBuyPowSpark: () =>
                 Navigator.of(sheetContext).pop(TemplateBlockedAction.wallet),
             onLater: () => Navigator.of(
@@ -467,8 +467,8 @@ class _InsufficientBalanceBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final isRu = Localizations.localeOf(context).languageCode.toLowerCase() ==
-        'ru';
+    final isRu =
+        Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -479,9 +479,9 @@ class _InsufficientBalanceBanner extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: const Color(0xFFE0A91E).withValues(
-                alpha: isLight ? 0.78 : 0.9,
-              ),
+              color: const Color(
+                0xFFE0A91E,
+              ).withValues(alpha: isLight ? 0.78 : 0.9),
               width: 1.15,
             ),
             gradient: LinearGradient(
@@ -492,19 +492,19 @@ class _InsufficientBalanceBanner extends StatelessWidget {
           ),
           child: Stack(
             children: [
-          Positioned(
-            right: 8,
-            top: 6,
-            child: IconButton(
-              onPressed: onClose,
-              icon: Icon(
-                Icons.close_rounded,
-                color: isLight
-                    ? const Color(0xFF514325)
-                    : const Color(0xFFE1DED4),
+              Positioned(
+                right: 8,
+                top: 6,
+                child: IconButton(
+                  onPressed: onClose,
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: isLight
+                        ? const Color(0xFF514325)
+                        : const Color(0xFFE1DED4),
+                  ),
+                ),
               ),
-            ),
-          ),
               Positioned(
                 right: -8,
                 bottom: -2,
@@ -523,135 +523,140 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF140D01).withValues(
-                          alpha: isLight ? 0.16 : 0.36,
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(
+                              0xFF140D01,
+                            ).withValues(alpha: isLight ? 0.16 : 0.36),
+                            border: Border.all(
+                              color: const Color(
+                                0xFFE0A91E,
+                              ).withValues(alpha: 0.76),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.bolt_rounded,
+                            color: Color(0xFFEAB13A),
+                            size: 28,
+                          ),
                         ),
-                        border: Border.all(
-                          color: const Color(0xFFE0A91E).withValues(alpha: 0.76),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            isRu ? 'PowSpark закончились' : 'No PowSpark left',
+                            style: TextStyle(
+                              color: isLight
+                                  ? const Color(0xFF1E1608)
+                                  : const Color(0xFFEDE7D8),
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: const Icon(
-                        Icons.bolt_rounded,
-                        color: Color(0xFFEAB13A),
-                        size: 28,
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isRu ? 'PowSpark закончились' : 'No PowSpark left',
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF1E1608)
-                              : const Color(0xFFEDE7D8),
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Text(
-                  isRu
-                      ? 'Вы можете купить PowSpark разово\nили оформить Premium и получать\n40 PowSpark каждую неделю.'
-                      : 'You can buy PowSpark once\nor get Premium and receive\n40 PowSpark every week.',
-                  style: TextStyle(
-                    color: isLight
-                        ? const Color(0xFF3B3324)
-                        : const Color(0xFFE3DFD2),
-                    fontSize: 12.4,
-                    height: 1.3,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                    Text(
-                  text.templateFlowInsufficientBalanceMessage(
-                    templateCost,
-                    balance,
-                  ),
-                  style: TextStyle(
-                    color: isLight
-                        ? const Color(0xFF2F2719)
-                        : const Color(0xFFD7DFEF),
-                    fontSize: 11.8,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (showPremiumCta) ...[
-                  PremiumShimmerButton(
-                    label: text.profilePremiumOpenAction,
-                    onTap: onOpenPremium,
-                    height: 40,
-                  ),
-                  const SizedBox(height: 9),
-                ],
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: OutlinedButton(
-                    onPressed: onBuyPowSpark,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF0EA76A), width: 1.2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        text.templateFlowTopUpBalanceAction,
-                        style: const TextStyle(
-                          color: Color(0xFF0EA76A),
-                          fontSize: 12.8,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                    child: OutlinedButton(
-                      onPressed: onLater,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(
+                      isRu
+                          ? 'Вы можете купить PowSpark разово\nили оформить Premium и получать\n40 PowSpark каждую неделю.'
+                          : 'You can buy PowSpark once\nor get Premium and receive\n40 PowSpark every week.',
+                      style: TextStyle(
                         color: isLight
-                            ? const Color(0xFFBCB29B)
-                            : const Color(0xFF2A3651),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                            ? const Color(0xFF3B3324)
+                            : const Color(0xFFE3DFD2),
+                        fontSize: 12.4,
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    child: Center(
-                      child: Text(
-                        text.templateFlowChooseAnotherTemplateAction,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isLight
-                              ? const Color(0xFF3C3324)
-                              : const Color(0xFFC6CEDD),
-                          fontSize: 12.6,
-                          fontWeight: FontWeight.w700,
+                    const SizedBox(height: 10),
+                    Text(
+                      text.templateFlowInsufficientBalanceMessage(
+                        templateCost,
+                        balance,
+                      ),
+                      style: TextStyle(
+                        color: isLight
+                            ? const Color(0xFF2F2719)
+                            : const Color(0xFFD7DFEF),
+                        fontSize: 11.8,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (showPremiumCta) ...[
+                      PremiumShimmerButton(
+                        label: text.profilePremiumOpenAction,
+                        onTap: onOpenPremium,
+                        height: 40,
+                      ),
+                      const SizedBox(height: 9),
+                    ],
+                    SizedBox(
+                      width: double.infinity,
+                      height: 40,
+                      child: OutlinedButton(
+                        onPressed: onBuyPowSpark,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: Color(0xFF0EA76A),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            text.templateFlowTopUpBalanceAction,
+                            style: const TextStyle(
+                              color: Color(0xFF0EA76A),
+                              fontSize: 12.8,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 40,
+                      child: OutlinedButton(
+                        onPressed: onLater,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: isLight
+                                ? const Color(0xFFBCB29B)
+                                : const Color(0xFF2A3651),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            text.templateFlowChooseAnotherTemplateAction,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isLight
+                                  ? const Color(0xFF3C3324)
+                                  : const Color(0xFFC6CEDD),
+                              fontSize: 12.6,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -664,10 +669,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
 }
 
 class _TemplateGoldShimmerButton extends StatefulWidget {
-  const _TemplateGoldShimmerButton({
-    required this.label,
-    required this.onTap,
-  });
+  const _TemplateGoldShimmerButton({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;

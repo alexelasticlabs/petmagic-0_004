@@ -86,9 +86,9 @@ class _PushNotificationsBootstrapState
     }
 
     try {
-      final initialLink = await _appLinks
-          .getInitialLink()
-          .timeout(_initialLinkTimeout);
+      final initialLink = await _appLinks.getInitialLink().timeout(
+        _initialLinkTimeout,
+      );
       if (initialLink != null) {
         _openDeepLink(initialLink);
       }
@@ -96,7 +96,8 @@ class _PushNotificationsBootstrapState
       AppLogger.warn(
         feature: 'Startup',
         operation: 'deep_link_initial_timeout',
-        message: 'Initial deep link read timed out, continue without blocking startup',
+        message:
+            'Initial deep link read timed out, continue without blocking startup',
         context: {'timeout_ms': _initialLinkTimeout.inMilliseconds},
         error: error,
         stackTrace: stackTrace,
@@ -105,7 +106,8 @@ class _PushNotificationsBootstrapState
       AppLogger.error(
         feature: 'Startup',
         operation: 'deep_link_initial_failed',
-        message: 'Initial deep link read failed, continue without blocking startup',
+        message:
+            'Initial deep link read failed, continue without blocking startup',
         error: error,
         stackTrace: stackTrace,
       );

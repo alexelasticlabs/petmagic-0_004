@@ -20,7 +20,8 @@ class EmailVerificationPage extends ConsumerStatefulWidget {
   final String? initialPassword;
 
   @override
-  ConsumerState<EmailVerificationPage> createState() => _EmailVerificationPageState();
+  ConsumerState<EmailVerificationPage> createState() =>
+      _EmailVerificationPageState();
 }
 
 class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
@@ -51,9 +52,12 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
               controller: _codeController,
               keyboardType: TextInputType.number,
               maxLength: 6,
-              decoration: InputDecoration(labelText: text.emailVerificationCodeLabel),
+              decoration: InputDecoration(
+                labelText: text.emailVerificationCodeLabel,
+              ),
             ),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red)),
             if (_info != null) Text(_info!),
             const SizedBox(height: 12),
             FilledButton(
@@ -73,7 +77,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
             TextButton(
               onPressed: _isBusy
                   ? null
-                  : () => context.go('${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}'),
+                  : () => context.go(
+                      '${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}',
+                    ),
               child: Text(text.emailVerificationChangeEmailAction),
             ),
           ],
@@ -92,7 +98,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
 
     try {
       final repository = ref.read(profileRepositoryProvider);
-      await repository.verifyEmailCode(email: widget.email, code: _codeController.text);
+      await repository.verifyEmailCode(
+        email: widget.email,
+        code: _codeController.text,
+      );
       if (!mounted) return;
 
       final password = widget.initialPassword;
@@ -115,7 +124,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       setState(() {
         _info = text.emailVerificationConfirmedMessage;
       });
-      context.go('${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}');
+      context.go(
+        '${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}',
+      );
     } catch (error) {
       setState(() {
         _error = error.toString();

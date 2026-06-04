@@ -332,7 +332,9 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.85),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: colors.shadow.withValues(alpha: 0.3),
@@ -565,11 +567,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   }
 
   void _showInfo(String message) {
-    PetMagicToast.show(
-      context,
-      message: message,
-      tone: PetMagicToastTone.info,
-    );
+    PetMagicToast.show(context, message: message, tone: PetMagicToastTone.info);
   }
 
   String _buildOutputFileName(

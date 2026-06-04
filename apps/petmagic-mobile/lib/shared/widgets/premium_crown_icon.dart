@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 const String _kPremiumCrownAsset = 'assets/rewards/premium-crown.png';
 
 class PremiumCrownIcon extends StatelessWidget {
-  const PremiumCrownIcon({
-    super.key,
-    this.size = 16,
-    this.opacity = 1,
-  });
+  const PremiumCrownIcon({super.key, this.size = 16, this.opacity = 1});
 
   final double size;
   final double opacity;

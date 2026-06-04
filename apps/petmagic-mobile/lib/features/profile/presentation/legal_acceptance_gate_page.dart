@@ -30,7 +30,9 @@ class _LegalAcceptanceGatePageState
     final text = AppLocalizations.of(context);
     final state = ref.watch(profileControllerProvider);
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final legalDocumentsAsync = ref.watch(currentLegalDocumentsProvider(locale));
+    final legalDocumentsAsync = ref.watch(
+      currentLegalDocumentsProvider(locale),
+    );
     final profile = state.profile ?? state.session?.user;
 
     return Scaffold(
@@ -70,8 +72,9 @@ class _LegalAcceptanceGatePageState
                       Text(text.profileLegalUnavailable),
                       const SizedBox(height: 10),
                       OutlinedButton(
-                        onPressed: () =>
-                            ref.invalidate(currentLegalDocumentsProvider(locale)),
+                        onPressed: () => ref.invalidate(
+                          currentLegalDocumentsProvider(locale),
+                        ),
                         child: Text(text.retryAction),
                       ),
                     ],

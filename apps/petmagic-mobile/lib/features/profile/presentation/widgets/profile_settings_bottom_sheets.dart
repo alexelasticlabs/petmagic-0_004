@@ -61,7 +61,10 @@ Future<void> showProfileLanguageSheet({
                       _LanguageTile(
                         locale: option.locale,
                         nativeLabel: option.nativeLabel,
-                        isSelected: _isSameLocale(option.locale, selectedLocale),
+                        isSelected: _isSameLocale(
+                          option.locale,
+                          selectedLocale,
+                        ),
                         onTap: () async {
                           await onSelect(option.locale);
                           if (sheetContext.mounted) {
@@ -96,9 +99,21 @@ Future<void> showProfileThemeSheet({
   final text = AppLocalizations.of(context);
 
   final options = [
-    (mode: ThemeMode.system, label: text.profileSettingsThemeSystem, icon: Icons.brightness_auto_rounded),
-    (mode: ThemeMode.light, label: text.profileSettingsThemeLight, icon: Icons.light_mode_rounded),
-    (mode: ThemeMode.dark, label: text.profileSettingsThemeDark, icon: Icons.dark_mode_rounded),
+    (
+      mode: ThemeMode.system,
+      label: text.profileSettingsThemeSystem,
+      icon: Icons.brightness_auto_rounded,
+    ),
+    (
+      mode: ThemeMode.light,
+      label: text.profileSettingsThemeLight,
+      icon: Icons.light_mode_rounded,
+    ),
+    (
+      mode: ThemeMode.dark,
+      label: text.profileSettingsThemeDark,
+      icon: Icons.dark_mode_rounded,
+    ),
   ];
 
   return showPetMagicModalBottomSheet<void>(
@@ -372,71 +387,72 @@ class _LanguageTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected
-              ? colors.accent.withValues(alpha: 0.6)
-              : colors.border.withValues(alpha: 0.76),
-        ),
-        color: isSelected
-            ? colors.accentSoft.withValues(alpha: 0.26)
-            : colors.surfaceGlass.withValues(alpha: 0.34),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color: isSelected
-                        ? colors.accent.withValues(alpha: 0.2)
-                        : colors.surfaceStrong.withValues(alpha: 0.52),
-                  ),
-                  child: Text(
-                    locale.languageCode.toUpperCase(),
-                    style: TextStyle(
-                      color: isSelected ? colors.accent : colors.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.45,
+          border: Border.all(
+            color: isSelected
+                ? colors.accent.withValues(alpha: 0.6)
+                : colors.border.withValues(alpha: 0.76),
+          ),
+          color: isSelected
+              ? colors.accentSoft.withValues(alpha: 0.26)
+              : colors.surfaceGlass.withValues(alpha: 0.34),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: isSelected
+                          ? colors.accent.withValues(alpha: 0.2)
+                          : colors.surfaceStrong.withValues(alpha: 0.52),
+                    ),
+                    child: Text(
+                      locale.languageCode.toUpperCase(),
+                      style: TextStyle(
+                        color: isSelected ? colors.accent : colors.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.45,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    nativeLabel,
-                    style: TextStyle(
-                      color: isSelected ? colors.textStrong : colors.textSoft,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      nativeLabel,
+                      style: TextStyle(
+                        color: isSelected ? colors.textStrong : colors.textSoft,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                Icon(
-                  isSelected
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked_rounded,
-                  color: isSelected ? colors.accent : colors.textMuted,
-                  size: 21,
-                ),
-              ],
+                  Icon(
+                    isSelected
+                        ? Icons.check_circle
+                        : Icons.radio_button_unchecked_rounded,
+                    color: isSelected ? colors.accent : colors.textMuted,
+                    size: 21,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
   }
 }
 

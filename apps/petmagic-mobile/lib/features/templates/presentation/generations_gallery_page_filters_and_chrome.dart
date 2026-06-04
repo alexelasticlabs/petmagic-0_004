@@ -238,8 +238,8 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final isRu = Localizations.localeOf(context).languageCode.toLowerCase() ==
-        'ru';
+    final isRu =
+        Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
     final isLight = Theme.of(context).brightness == Brightness.light;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -271,7 +271,9 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    isRu ? 'Экспорт без водяного знака' : 'Watermark-free export',
+                    isRu
+                        ? 'Экспорт без водяного знака'
+                        : 'Watermark-free export',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(

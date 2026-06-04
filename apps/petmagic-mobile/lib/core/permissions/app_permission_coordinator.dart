@@ -4,19 +4,24 @@ import 'package:permission_handler/permission_handler.dart';
 
 enum AppPermissionType { notifications, camera, photos, files }
 
-enum AppPermissionState { granted, denied, permanentlyDenied, restricted, limited, unknown }
+enum AppPermissionState {
+  granted,
+  denied,
+  permanentlyDenied,
+  restricted,
+  limited,
+  unknown,
+}
 
 class AppPermissionStatus {
-  const AppPermissionStatus({
-    required this.type,
-    required this.state,
-  });
+  const AppPermissionStatus({required this.type, required this.state});
 
   final AppPermissionType type;
   final AppPermissionState state;
 
   bool get granted =>
-      state == AppPermissionState.granted || state == AppPermissionState.limited;
+      state == AppPermissionState.granted ||
+      state == AppPermissionState.limited;
 }
 
 class AppPermissionCoordinator {
@@ -47,7 +52,8 @@ class AppPermissionCoordinator {
     return switch (type) {
       AppPermissionType.notifications => Permission.notification,
       AppPermissionType.camera => Permission.camera,
-      AppPermissionType.photos => Platform.isIOS ? Permission.photos : Permission.photos,
+      AppPermissionType.photos =>
+        Platform.isIOS ? Permission.photos : Permission.photos,
       AppPermissionType.files => _filesPermission(),
     };
   }

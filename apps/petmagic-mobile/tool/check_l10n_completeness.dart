@@ -138,7 +138,9 @@ void main(List<String> args) {
     return;
   }
 
-  stdout.writeln('Localization completeness check passed (${baseKeys.length} keys).');
+  stdout.writeln(
+    'Localization completeness check passed (${baseKeys.length} keys).',
+  );
 }
 
 Map<String, dynamic> _readArb(File file) {

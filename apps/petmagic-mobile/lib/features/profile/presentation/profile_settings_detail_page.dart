@@ -243,7 +243,9 @@ class _ProfileAccountInfoPageState
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.85),
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -261,8 +263,9 @@ class _ProfileAccountInfoPageState
                   ListTile(
                     leading: const Icon(Icons.add_a_photo_outlined),
                     title: Text(text.profileAvatarPickFromGallery),
-                    onTap: () =>
-                        Navigator.of(ctx).pop(_AvatarSheetAction.pickFromGallery),
+                    onTap: () => Navigator.of(
+                      ctx,
+                    ).pop(_AvatarSheetAction.pickFromGallery),
                   ),
                   if (hasAvatar)
                     ListTile(

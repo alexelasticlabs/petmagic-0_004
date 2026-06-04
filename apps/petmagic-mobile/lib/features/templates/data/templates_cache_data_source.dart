@@ -59,7 +59,9 @@ class TemplatesCacheDataSource {
 
     return decoded
         .whereType<Map>()
-        .map((item) => TemplateItemDto.fromJson(Map<String, Object?>.from(item)))
+        .map(
+          (item) => TemplateItemDto.fromJson(Map<String, Object?>.from(item)),
+        )
         .toList(growable: false);
   }
 
@@ -100,7 +102,9 @@ class TemplatesCacheDataSource {
       byId[upsert.templateId] = upsert;
     }
 
-    await writeCatalogItems(_sortByUpdatedAt(byId.values.toList(growable: false)));
+    await writeCatalogItems(
+      _sortByUpdatedAt(byId.values.toList(growable: false)),
+    );
     await writeCatalogVersion(changes.toVersion);
 
     return removedPreviewUrls;
@@ -131,7 +135,9 @@ class TemplatesCacheDataSource {
   }
 
   Future<TemplatesFeedDto?> readFirstPage(TemplatesQuery query) async {
-    return readPage(query.copyWith(page: 1, resetPage: true, clearCursor: true));
+    return readPage(
+      query.copyWith(page: 1, resetPage: true, clearCursor: true),
+    );
   }
 
   Future<void> writeFirstPage(
@@ -152,20 +158,23 @@ class TemplatesCacheDataSource {
 
   Future<List<String>> readCategories() async {
     final items = await readCatalogItems();
-    final categories = items
-        .map((item) => item.category.trim())
-        .where((category) => category.isNotEmpty)
-        .toSet()
-        .toList(growable: false)
-      ..sort();
+    final categories =
+        items
+            .map((item) => item.category.trim())
+            .where((category) => category.isNotEmpty)
+            .toSet()
+            .toList(growable: false)
+          ..sort();
     return categories;
   }
 
   List<TemplateItemDto> _sortByUpdatedAt(List<TemplateItemDto> items) {
     final sorted = [...items];
     sorted.sort((a, b) {
-      final aUpdatedAt = a.updatedAtUtc ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-      final bUpdatedAt = b.updatedAtUtc ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      final aUpdatedAt =
+          a.updatedAtUtc ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      final bUpdatedAt =
+          b.updatedAtUtc ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
       final byDate = bUpdatedAt.compareTo(aUpdatedAt);
       if (byDate != 0) {
         return byDate;
@@ -177,33 +186,39 @@ class TemplatesCacheDataSource {
     return sorted;
   }
 
-  List<TemplateItemDto> _filterItems(List<TemplateItemDto> items, TemplatesQuery query) {
+  List<TemplateItemDto> _filterItems(
+    List<TemplateItemDto> items,
+    TemplatesQuery query,
+  ) {
     final normalizedSearch = query.search?.trim().toLowerCase();
     final normalizedCategory = query.category?.trim().toLowerCase();
 
-    return items.where((item) {
-      if (query.type != null && templateTypeFromApi(item.templateType) != query.type) {
-        return false;
-      }
+    return items
+        .where((item) {
+          if (query.type != null &&
+              templateTypeFromApi(item.templateType) != query.type) {
+            return false;
+          }
 
-      if (normalizedCategory != null && normalizedCategory.isNotEmpty) {
-        if (item.category.trim().toLowerCase() != normalizedCategory) {
-          return false;
-        }
-      }
+          if (normalizedCategory != null && normalizedCategory.isNotEmpty) {
+            if (item.category.trim().toLowerCase() != normalizedCategory) {
+              return false;
+            }
+          }
 
-      if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
-        final title = item.title.toLowerCase();
-        final category = item.category.toLowerCase();
-        final tags = item.tags.join(' ').toLowerCase();
-        if (!title.contains(normalizedSearch)
-            && !category.contains(normalizedSearch)
-            && !tags.contains(normalizedSearch)) {
-          return false;
-        }
-      }
+          if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
+            final title = item.title.toLowerCase();
+            final category = item.category.toLowerCase();
+            final tags = item.tags.join(' ').toLowerCase();
+            if (!title.contains(normalizedSearch) &&
+                !category.contains(normalizedSearch) &&
+                !tags.contains(normalizedSearch)) {
+              return false;
+            }
+          }
 
-      return true;
-    }).toList(growable: false);
+          return true;
+        })
+        .toList(growable: false);
   }
 }
