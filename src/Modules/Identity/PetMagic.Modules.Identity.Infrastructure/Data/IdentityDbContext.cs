@@ -36,6 +36,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.AccountStatus).HasConversion<int>().HasDefaultValue(AccountStatus.PendingEmailVerification);
             entity.Property(x => x.AccountStatusUpdatedAtUtc);
             entity.HasIndex(x => x.AccountStatus);
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => new { x.AccountStatus, x.AccountStatusUpdatedAtUtc, x.CreatedAtUtc });
             entity.HasIndex(x => x.Email).IsUnique();
         });
 
@@ -62,6 +64,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.Action).HasMaxLength(120).IsRequired();
             entity.Property(x => x.Details).HasMaxLength(2000);
             entity.HasIndex(x => x.OccurredAtUtc);
+            entity.HasIndex(x => new { x.SubjectUserId, x.OccurredAtUtc });
         });
 
         builder.Entity<UserEmailCode>(entity =>
@@ -89,6 +92,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.FailureCode).HasMaxLength(120);
             entity.Property(x => x.FailureMessage).HasMaxLength(2000);
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
             entity.HasIndex(x => x.NextAttemptAtUtc);
             entity.HasIndex(x => x.UserId);
         });

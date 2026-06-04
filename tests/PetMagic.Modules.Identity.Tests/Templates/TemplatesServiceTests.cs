@@ -50,7 +50,8 @@ public sealed partial class TemplatesServiceTests
             metadataReader,
             mediaStorage ?? new RecordingMediaStorage(),
             lifecycleService,
-            realtimeService ?? new RecordingTemplateFeedRealtimeService());
+            realtimeService ?? new RecordingTemplateFeedRealtimeService(),
+            new TestHttpClientFactory(new HttpClient(new UnavailableTranslationHandler())));
     }
 
     private static async Task<Guid> CreateActiveImageTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
@@ -75,6 +76,23 @@ public sealed partial class TemplatesServiceTests
         return created.Value.TemplateId;
     }
 
+    private sealed class TestHttpClientFactory(HttpClient httpClient) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+        {
+            Assert.Equal(TemplateLocalizationTranslator.HttpClientName, name);
+            return httpClient;
+        }
+    }
+
+    private sealed class UnavailableTranslationHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        }
+    }
+
     private static async Task SetUpdatedAtUtcAsync(TemplatesDbContext dbContext, Guid templateId, DateTime updatedAtUtc)
     {
         var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
@@ -82,9 +100,41 @@ public sealed partial class TemplatesServiceTests
         await dbContext.SaveChangesAsync();
     }
 
-    private static TemplateGenerationService CreateGenerationService(TemplatesDbContext dbContext)
+    private static TemplateGenerationService CreateGenerationService(TemplatesDbContext dbContext, TemplatesOptions? options = null)
     {
-        return new TemplateGenerationService(dbContext, new PassiveGenerationBilling());
+        return new TemplateGenerationService(dbContext, new PassiveGenerationBilling(), options ?? CreateTemplatesOptions());
+    }
+
+    private static TemplatesOptions CreateTemplatesOptions(
+        int queueMaxSize = 1_000,
+        int globalMaxConcurrentGenerations = 3,
+        int estimatedImageGenerationSeconds = 60)
+    {
+        return new TemplatesOptions
+        {
+            PublicBaseUrl = "http://localhost:5000",
+            LocalMediaRootPath = "wwwroot/templates-media",
+            DefaultImagePrompt = "Create a themed pet portrait.",
+            DefaultPreprocessingPrompt = "Keep the same pet.",
+            DefaultKlingPrompt = "Funny dance.",
+            AllowedImageModels = [
+                "openai/gpt-image-2/edit",
+                "fal-ai/nano-banana-pro/edit"
+            ],
+            AllowedPreprocessingModels = [
+                "openai/gpt-image-2/edit",
+                "fal-ai/nano-banana-pro/edit"
+            ],
+            AllowedKlingModels = [
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "fal-ai/kling-video/v3/standard/motion-control"
+            ],
+            SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
+            QueueMaxSize = queueMaxSize,
+            GlobalMaxConcurrentGenerations = globalMaxConcurrentGenerations,
+            EstimatedImageGenerationSeconds = estimatedImageGenerationSeconds,
+            SeedSampleTemplates = false
+        };
     }
 
     private static TemplatesDbContext CreateDbContext()

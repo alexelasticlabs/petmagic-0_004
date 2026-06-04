@@ -45,6 +45,8 @@
     <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Application\PetMagic.Modules.SupportChat.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Domain\PetMagic.Modules.SupportChat.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\SupportChat\PetMagic.Modules.SupportChat.Infrastructure\PetMagic.Modules.SupportChat.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Host\PetMagic.Host.Api\PetMagic.Host.Api.csproj" />
+    <ProjectReference Include="..\..\src\Host\PetMagic.Host.GenerationWorker\PetMagic.Host.GenerationWorker.csproj" />
   </ItemGroup>
 
 </Project>

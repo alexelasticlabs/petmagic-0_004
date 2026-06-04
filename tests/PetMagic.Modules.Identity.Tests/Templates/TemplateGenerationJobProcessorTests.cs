@@ -54,7 +54,7 @@ public sealed class TemplateGenerationJobProcessorTests
         job.SourceImageUrl = "http://localhost:5000/templates-media/source.jpg";
         job.NormalizedImageUrl = "http://localhost:5000/templates-media/normalized.jpg";
         job.ReferenceMotionUrl = "http://localhost:5000/templates-media/reference.mp4";
-        job.OutputUrl = "http://localhost:5000/templates-media/output.mp4";
+        job.ResultUrl = "http://localhost:5000/templates-media/output.mp4";
         job.UserMediaDeletedAtUtc = DateTime.UtcNow.AddDays(-2);
 
         dbContext.TemplateItems.Add(template);
@@ -165,6 +165,55 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
+    public async Task ProcessNextAsync_ShouldKeepPersistedStatusProcessingAcrossVideoStageTransitions()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var now = DateTime.UtcNow;
+        var referenceMotion = template.Assets.Single(x => x.AssetKind == TemplateAssetKind.ReferenceMotion);
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = template.Id,
+            Status = TemplateGenerationStatus.Queued,
+            TokenCost = template.TokenCost,
+            SourceImageUrl = "http://localhost:5000/templates-media/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 1024,
+            ReferenceMotionUrl = referenceMotion.Url,
+            CreatedAtUtc = now.AddMinutes(-1),
+            QueuedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now.AddMinutes(-1)
+        };
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var recorder = new ProcessingStatusRecorder(dbContext, job.Id);
+        var processor = CreateProcessor(
+            dbContext,
+            imagePreprocessor: new SnapshotImagePreprocessor(recorder),
+            videoMotionGenerator: new SnapshotVideoMotionGenerator(recorder),
+            generatedMediaImporter: new SnapshotGeneratedMediaImporter(recorder));
+
+        var processed = await processor.ProcessNextAsync(CancellationToken.None);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        var snapshots = recorder.Snapshots.ToArray();
+        Assert.True(processed);
+        Assert.Equal(TemplateGenerationStatus.Completed, persisted.Status);
+        Assert.Equal(3, snapshots.Length);
+        Assert.All(snapshots, snapshot => Assert.Equal(TemplateGenerationStatus.Processing, snapshot.Status));
+        Assert.Contains(snapshots, snapshot => snapshot.Label == "preprocessing" && snapshot.Stage == "preprocessing" && snapshot.PreprocessingCompletedAtUtc is null);
+        Assert.Contains(snapshots, snapshot => snapshot.Label == "generating" && snapshot.Stage == "generating" && snapshot.PreprocessingCompletedAtUtc is not null && snapshot.MotionGenerationCompletedAtUtc is null);
+        Assert.Contains(snapshots, snapshot => snapshot.Label == "finalizing" && snapshot.Stage == "finalizing" && snapshot.MotionGenerationCompletedAtUtc is not null && snapshot.MediaImportCompletedAtUtc is null);
+    }
+
+    [Fact]
     public async Task ProcessNextAsync_ShouldProcessImageJobAndPersistImportedImage()
     {
         await using var dbContext = CreateDbContext();
@@ -218,7 +267,7 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Equal(0.219m, persisted.MotionProviderCostUsd);
         Assert.Equal(template.ImageModel, imageGenerator.Model);
         Assert.Equal("https://fal.example.test/generated-image.png", generatedMediaImporter.GeneratedImageUrl);
-        Assert.Equal("http://localhost:5000/templates-media/output.png", persisted.OutputUrl);
+        Assert.Equal("http://localhost:5000/templates-media/output.png", persisted.ResultUrl);
     }
 
     [Fact]
@@ -245,6 +294,8 @@ public sealed class TemplateGenerationJobProcessorTests
             QueuedAtUtc = now.AddMinutes(-25),
             LastAttemptAtUtc = now.AddMinutes(-20),
             StartedAtUtc = now.AddMinutes(-20),
+            LockedAtUtc = now.AddMinutes(-20),
+            LockedBy = "stale-worker",
             UpdatedAtUtc = now.AddMinutes(-20),
             NormalizedImageUrl = "http://localhost:5000/templates-media/stale-normalized.jpg",
             PreprocessingCompletedAtUtc = now.AddMinutes(-19),
@@ -272,7 +323,7 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Equal(TemplateGenerationStatus.Completed, persisted.Status);
         Assert.Equal(2, persisted.AttemptCount);
         Assert.NotNull(persisted.StartedAtUtc);
-        Assert.True(persisted.StartedAtUtc > now.AddMinutes(-5));
+        Assert.Equal(now.AddMinutes(-20), persisted.StartedAtUtc);
         Assert.Equal(template.PreprocessingModel, persisted.UsedPreprocessingModel);
         Assert.NotNull(persisted.PreprocessingCompletedAtUtc);
         Assert.NotNull(persisted.CompletedAtUtc);
@@ -300,6 +351,8 @@ public sealed class TemplateGenerationJobProcessorTests
             QueuedAtUtc = now.AddMinutes(-30),
             LastAttemptAtUtc = now.AddMinutes(-20),
             StartedAtUtc = now.AddMinutes(-20),
+            LockedAtUtc = now.AddMinutes(-20),
+            LockedBy = "stale-worker",
             UpdatedAtUtc = now.AddMinutes(-20),
             ChargedAtUtc = now.AddMinutes(-30)
         };
@@ -319,7 +372,7 @@ public sealed class TemplateGenerationJobProcessorTests
         var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
         Assert.True(processed);
         Assert.Equal(TemplateGenerationStatus.Failed, persisted.Status);
-        Assert.Equal(TemplatesErrors.GenerationAttemptsExceeded.Code, persisted.FailureCode);
+        Assert.Equal(TemplatesErrors.GenerationAttemptsExceeded.Code, persisted.LastErrorCode);
         Assert.NotNull(persisted.CompletedAtUtc);
         Assert.NotNull(persisted.RefundedAtUtc);
         Assert.Contains(job.Id, billing.RefundedGenerationIds);
@@ -398,6 +451,7 @@ public sealed class TemplateGenerationJobProcessorTests
             AllowedPreprocessingModels = ["openai/gpt-image-2/edit"],
             AllowedKlingModels = ["fal-ai/kling-video/v3/pro/motion-control"],
             SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
+            JobLockTimeoutMilliseconds = staleProcessingRecoveryDelayMilliseconds,
             StaleProcessingRecoveryDelayMilliseconds = staleProcessingRecoveryDelayMilliseconds,
             MaxGenerationAttempts = 3,
             MaxRefundAttempts = 3,
@@ -591,6 +645,66 @@ public sealed class TemplateGenerationJobProcessorTests
         }
     }
 
+    private sealed record ProcessingStatusSnapshot(
+        string Label,
+        TemplateGenerationStatus Status,
+        string Stage,
+        DateTime? PreprocessingCompletedAtUtc,
+        DateTime? MotionGenerationCompletedAtUtc,
+        DateTime? MediaImportCompletedAtUtc);
+
+    private sealed class ProcessingStatusRecorder(TemplatesDbContext dbContext, Guid generationId)
+    {
+        public ConcurrentQueue<ProcessingStatusSnapshot> Snapshots { get; } = [];
+
+        public async Task CaptureAsync(string label, CancellationToken cancellationToken)
+        {
+            var job = await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .Include(x => x.Template)
+                .SingleAsync(x => x.Id == generationId, cancellationToken);
+
+            Snapshots.Enqueue(new ProcessingStatusSnapshot(
+                label,
+                job.Status,
+                TemplateGenerationService.ResolveStage(job),
+                job.PreprocessingCompletedAtUtc,
+                job.MotionGenerationCompletedAtUtc,
+                job.MediaImportCompletedAtUtc));
+        }
+    }
+
+    private sealed class SnapshotImagePreprocessor(ProcessingStatusRecorder recorder) : IImagePreprocessor
+    {
+        public async Task<Result<ImagePreprocessResult>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
+        {
+            await recorder.CaptureAsync("preprocessing", cancellationToken);
+            return Result.Success(new ImagePreprocessResult(
+                "http://localhost:5000/templates-media/normalized.jpg",
+                "preprocess-request-1",
+                1.25));
+        }
+    }
+
+    private sealed class SnapshotVideoMotionGenerator(ProcessingStatusRecorder recorder) : IVideoMotionGenerator
+    {
+        public async Task<Result<VideoMotionGenerationResult>> CreateAsync(
+            string normalizedImageUrl,
+            string referenceVideoUrl,
+            string characterOrientation,
+            bool keepOriginalSound,
+            string prompt,
+            string model,
+            CancellationToken cancellationToken)
+        {
+            await recorder.CaptureAsync("generating", cancellationToken);
+            return Result.Success(new VideoMotionGenerationResult(
+                "https://fal.example.test/generated.mp4",
+                "motion-request-1",
+                8.4));
+        }
+    }
+
     private sealed class FixedDurationMetadataReader : IMediaMetadataReader
     {
         public Task<Result<double?>> GetVideoDurationSecondsAsync(TemplateAssetCommand asset, CancellationToken cancellationToken)
@@ -656,6 +770,32 @@ public sealed class TemplateGenerationJobProcessorTests
             "image/png",
             1024,
             null)));
+        }
+    }
+
+    private sealed class SnapshotGeneratedMediaImporter(ProcessingStatusRecorder recorder) : IGeneratedMediaImporter
+    {
+        public async Task<Result<StoredMediaResponse>> ImportVideoAsync(string generatedVideoUrl, Guid generationId, CancellationToken cancellationToken)
+        {
+            await recorder.CaptureAsync("finalizing", cancellationToken);
+            return Result.Success(new StoredMediaResponse(
+                "http://localhost:5000/templates-media/output.mp4",
+                "templates-media/output.mp4",
+                "output.mp4",
+                "video/mp4",
+                1024,
+                null));
+        }
+
+        public Task<Result<StoredMediaResponse>> ImportImageAsync(string generatedImageUrl, Guid generationId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new StoredMediaResponse(
+                "http://localhost:5000/templates-media/output.png",
+                "templates-media/output.png",
+                "output.png",
+                "image/png",
+                1024,
+                null)));
         }
     }
 

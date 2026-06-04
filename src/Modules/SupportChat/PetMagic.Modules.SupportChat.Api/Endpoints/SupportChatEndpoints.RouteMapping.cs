@@ -10,6 +10,7 @@ public static partial class SupportChatEndpoints
     {
         var userGroup = endpoints.MapGroup("/api/support")
             .WithTags("Support")
+            .RequireRateLimiting("support-chat")
             .RequireAuthorization(policy => policy
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context =>
@@ -53,6 +54,7 @@ public static partial class SupportChatEndpoints
     {
         var adminGroup = endpoints.MapGroup("/api/admin/support")
             .WithTags("Admin.Support")
+            .RequireRateLimiting("admin")
             .RequireAuthorization("ModeratorOrAdmin");
 
         adminGroup.MapGet("/tickets", ListAdminInboxAsync);

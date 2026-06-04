@@ -59,6 +59,8 @@ class TemplateGenerationResult {
     this.chargedAtUtc,
     this.refundedAtUtc,
     this.isUnread = false,
+    this.queuePosition,
+    this.estimatedWaitSeconds,
   });
 
   final String generationId;
@@ -92,6 +94,8 @@ class TemplateGenerationResult {
   final DateTime? refundedAtUtc;
   final bool userMediaExpired;
   final bool isUnread;
+  final int? queuePosition;
+  final int? estimatedWaitSeconds;
 
   bool get isTerminal =>
       status == TemplateGenerationStatus.succeeded ||

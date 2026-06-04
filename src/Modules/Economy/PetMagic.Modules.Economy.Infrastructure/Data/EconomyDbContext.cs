@@ -57,6 +57,8 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.Source).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Reason).HasMaxLength(120).IsRequired();
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => new { x.Source, x.CreatedAtUtc });
         });
 
         builder.Entity<CurrencyPack>(entity =>
@@ -82,6 +84,8 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.CheckoutUrl).HasMaxLength(500);
             entity.Property(x => x.PriceAmount).HasPrecision(12, 2);
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => new { x.Status, x.CreatedAtUtc });
             entity.HasIndex(x => x.SavedPaymentMethodId);
             entity.HasIndex(x => new { x.PaymentProvider, x.ExternalPaymentId });
         });
@@ -119,6 +123,7 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
             entity.HasIndex(x => x.CodeHash).IsUnique();
             entity.HasIndex(x => new { x.IsActive, x.ExpiresAtUtc });
+            entity.HasIndex(x => x.CreatedAtUtc);
         });
 
         builder.Entity<RedeemCodeRedemption>(entity =>
@@ -129,6 +134,7 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.RewardValue).IsRequired();
             entity.Property(x => x.RedeemedAtUtc).IsRequired();
             entity.HasIndex(x => new { x.RedeemCodeId, x.UserId });
+            entity.HasIndex(x => new { x.RedeemCodeId, x.RedeemedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.RedeemedAtUtc });
         });
 
@@ -214,6 +220,9 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
             entity.HasIndex(x => new { x.UserId, x.UpdatedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.Status, x.CurrentPeriodEndUtc });
+            entity.HasIndex(x => x.UpdatedAtUtc);
+            entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
+            entity.HasIndex(x => new { x.Provider, x.UpdatedAtUtc });
             entity.HasIndex(x => new { x.Provider, x.ExternalSubscriptionId }).IsUnique();
         });
 
@@ -249,6 +258,8 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.PayloadJson).HasMaxLength(32000);
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => new { x.Provider, x.Status, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.Provider, x.ExternalEventId });
             entity.HasIndex(x => new { x.Provider, x.ExternalSubscriptionId });
         });

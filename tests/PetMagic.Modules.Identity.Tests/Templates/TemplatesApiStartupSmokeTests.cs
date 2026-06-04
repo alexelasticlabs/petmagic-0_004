@@ -4,6 +4,9 @@ using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,6 +26,21 @@ public sealed class TemplatesApiStartupSmokeTests
         await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
 
         Assert.NotNull(app);
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/templates/{templateId:guid}/generations", "generation-create")]
+    [InlineData("GET", "/api/templates/generations", "generation-status")]
+    [InlineData("GET", "/api/templates/generations/{generationId:guid}", "generation-status")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/feedback", "templates")]
+    public async Task TemplateGenerationEndpoints_ShouldUseExpectedRateLimitPolicies(
+        string method,
+        string routePattern,
+        string expectedPolicy)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(expectedPolicy, app.GetRateLimitPolicy(method, routePattern));
     }
 
     private sealed class TemplatesApiStartupTestApplication : IAsyncDisposable
@@ -47,6 +65,9 @@ public sealed class TemplatesApiStartupSmokeTests
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddPolicy("templates", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("generation-create", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("generation-status", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("admin", _ => RateLimitPartition.GetNoLimiter("tests"));
             });
 
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
@@ -89,6 +110,22 @@ public sealed class TemplatesApiStartupSmokeTests
             await app.StartAsync();
 
             return new TemplatesApiStartupTestApplication(app);
+        }
+
+        public string? GetRateLimitPolicy(string method, string routePattern)
+        {
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
         }
 
         public async ValueTask DisposeAsync()

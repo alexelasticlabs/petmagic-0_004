@@ -73,6 +73,44 @@ public sealed class IdentityInfrastructureConfigurationTests
         Assert.Contains("Apple external auth configuration is incomplete", exception.Message);
     }
 
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldRejectBootstrapAdminPassword_InProduction()
+    {
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+        var services = CreateServices(environment);
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["BootstrapAdmin:Email"] = "admin@petmagic.app",
+            ["BootstrapAdmin:Password"] = "DemoPassword123!"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddIdentityInfrastructure(configuration, environment));
+
+        Assert.Contains("BootstrapAdmin:Password must not be configured outside development", exception.Message);
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldAllowEmptyBootstrapAdmin_InProduction()
+    {
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+        var services = CreateServices(environment);
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["BootstrapAdmin:Email"] = "",
+            ["BootstrapAdmin:Password"] = "",
+            ["Email:DispatchWorkerEnabled"] = "false"
+        });
+
+        services.AddIdentityInfrastructure(configuration, environment);
+    }
+
     private static IConfiguration CreateConfiguration(IEnumerable<KeyValuePair<string, string?>> values)
     {
         var defaults = new Dictionary<string, string?>
@@ -93,11 +131,11 @@ public sealed class IdentityInfrastructureConfigurationTests
             .Build();
     }
 
-    private static ServiceCollection CreateServices()
+    private static ServiceCollection CreateServices(IHostEnvironment? environment = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IHostEnvironment>(new TestHostEnvironment(Directory.GetCurrentDirectory()));
+        services.AddSingleton(environment ?? new TestHostEnvironment(Directory.GetCurrentDirectory()));
         return services;
     }
 

@@ -18,6 +18,18 @@ internal sealed class TemplateGenerationWorker(
             return;
         }
 
+        var loopCount = Math.Max(1, options.MaxConcurrentJobsPerWorker);
+        if (loopCount > 1)
+        {
+            await Task.WhenAll(Enumerable.Range(0, loopCount).Select(loopIndex => RunProcessingLoopAsync(loopIndex, stoppingToken)));
+            return;
+        }
+
+        await RunProcessingLoopAsync(0, stoppingToken);
+    }
+
+    private async Task RunProcessingLoopAsync(int loopIndex, CancellationToken stoppingToken)
+    {
         var consecutiveFailures = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -50,7 +62,7 @@ internal sealed class TemplateGenerationWorker(
             catch (Exception exception)
             {
                 consecutiveFailures++;
-                logger.LogError(exception, "Template generation worker loop failed.");
+                logger.LogError(exception, "Template generation worker loop {LoopIndex} failed.", loopIndex);
                 await Task.Delay(GetBackoffDelay(options.GenerationWorkerPollIntervalMilliseconds, consecutiveFailures), stoppingToken);
             }
         }

@@ -32,9 +32,13 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
         }
 
         using var document = result.Value.Response;
-        return TryReadVideoUrl(document.RootElement, out var videoUrl)
-            ? Result.Success(new VideoMotionGenerationResult(videoUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds))
-            : Result.Failure<VideoMotionGenerationResult>(TemplatesErrors.AiProviderFailed);
+        if (TryReadVideoUrl(document.RootElement, out var videoUrl))
+        {
+            return Result.Success(new VideoMotionGenerationResult(videoUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds));
+        }
+
+        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, model);
+        return Result.Failure<VideoMotionGenerationResult>(TemplatesErrors.AiProviderFailed);
     }
 
     private static bool TryReadVideoUrl(JsonElement root, out string videoUrl)

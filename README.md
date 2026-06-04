@@ -1,279 +1,159 @@
-# PetMagic - Authentication & User Management Platform
+# PetMagic
 
-A production-ready modular monolith with ASP.NET Core backend and Next.js admin panel for user and role management.
+PetMagic is a modular ASP.NET Core backend with a Next.js admin panel and a Flutter mobile client. PostgreSQL is the source of truth for application data and template generation jobs.
 
-## 🚀 Quick Start
+## Services
 
-### Prerequisites
-- Docker & Docker Compose (v2.0+)
-- Git
+| Service | Port | Role |
+| --- | --- | --- |
+| `postgres` | `5432` | PostgreSQL 16 data store |
+| `backend` | `5000` by default | REST API, auth, economy, template queue API |
+| `generation-worker` | none | Claims and processes queued template generation jobs |
+| `admin-web` | `3000` | Admin UI |
 
-### One-Command Local Startup
+The backend API does not run template generation work in Docker Compose. It enqueues rows in `templates_generation_jobs` with `Templates__GenerationWorkerEnabled=false`. The `generation-worker` service runs the processing loops with `Templates__GenerationWorkerEnabled=true`.
 
-`ash
-# Clone repository and navigate to root
-git clone <repo>
-cd petmagic-0_004
+## Local Startup
 
-# Copy environment template
+```bash
 cp .env.example .env
+# Fill JWT_SIGNING_KEY before starting Compose.
+docker compose up --build
+```
 
-# Start all services (PostgreSQL + API + Admin Web)
-docker-compose up --build
-`
+Scale generation workers locally:
 
-#### Expected Output:
-- PostgreSQL: Ready at localhost:5432
-- Backend API: Ready at http://localhost:5000 (health check: /health)
-- Admin Web: Ready at http://localhost:3000
+```bash
+docker compose up --build --scale generation-worker=3
+```
 
-### Backups
+Expected local endpoints:
 
-Use `scripts/backup-postgres.ps1` to export the current PostgreSQL database to `backups/`. Avoid `docker-compose down -v` unless you intentionally want to delete the data volume.
+- Backend health: `http://localhost:5000/health`
+- Admin web: `http://localhost:3000`
+- PostgreSQL: `localhost:5432`
 
-#### Default Credentials:
-- Email: dmin@petmagic.app
-- Password: DemoPassword123!
+If you change `BACKEND_HOST_PORT`, update frontend and mobile API base URLs accordingly.
 
----
+## Configuration
 
-## 📋 Architecture
+Use `.env.example` as a template only. Real credentials must stay in local `.env`, CI/CD secrets, platform environment variables, or a managed secret store. `.env` is ignored by Git.
 
-### Services
+Important variables:
 
-| Service | Port | Role | Tech Stack |
-|---------|------|------|------------|
-| **PostgreSQL 16** | 5432 | Persistent data store | Alpine image, volume backup |
-| **Backend API** | 5000 | REST API, JWT auth, business logic | .NET 10, EF Core 10, Serilog, OpenTelemetry |
-| **Admin Web** | 3000 | Admin dashboard for user management | Next.js 16, TypeScript, RU/EN localization |
-| **Mobile App** | Simulator / device | iOS and Android client | Flutter 3, Riverpod, RU/EN/EU localization |
+```env
+POSTGRES_PASSWORD=replace_with_local_or_secret_value
+JWT_SIGNING_KEY=replace_with_64_byte_random_value
+BACKEND_HOST_PORT=5000
+ADMIN_WEB_HOST_PORT=3000
 
-### Project Structure
+GENERATION_WORKER_MAX_CONCURRENT_JOBS=1
+GENERATION_GLOBAL_MAX_CONCURRENT=3
+GENERATION_PROVIDER_MAX_RPM=60
+GENERATION_QUEUE_MAX_SIZE=1000
 
-`
-petmagic-0_004/
-├── docker-compose.yml          # Orchestration definition
-├── Dockerfile.api              # Backend multi-stage build
-├── apps/admin-web/
-│   └── Dockerfile              # Frontend build
-├── apps/petmagic-mobile/       # Flutter iOS/Android app
-├── src/
-│   ├── Host/                   # Application entry point
-│   ├── Modules/Identity/       # Authentication module (DDD vertical slice)
-│   │   ├── Domain/             # Business entities
-│   │   ├── Application/        # Use cases, contracts, validation
-│   │   ├── Infrastructure/     # Data access, external services
-│   │   └── Api/                # HTTP endpoints
-│   └── BuildingBlocks/         # Cross-cutting concerns (Result, Error)
-└── tests/                      # Unit tests (XUnit)
-`
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+FAL_AI_API_KEY=
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY=
+R2_SECRET_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=
+```
 
----
+Generate a local JWT signing key:
 
-## 🔧 Configuration
+```bash
+openssl rand -base64 64
+```
 
-### Environment Variables (.env)
+`docker compose` requires `JWT_SIGNING_KEY` to be set explicitly; there is no shared fallback signing key in the Compose file.
 
-`nv
-# Database
-POSTGRES_PASSWORD=YourStrongPassword
+Production startup validates unsafe defaults. Non-development environments require a non-placeholder JWT signing key, configured CORS origins, production payment/provider secrets, production-safe template providers, and no `BootstrapAdmin:Password`.
 
-# JWT Signing
-JWT_SIGNING_KEY=Base64EncodedKey  # Generate: openssl rand -base64 64
+## Development
 
-# Bootstrap Admin
-BOOTSTRAP_ADMIN_EMAIL=admin@petmagic.app
-BOOTSTRAP_ADMIN_PASSWORD=YourPassword123!
-
-# Frontend API Endpoint
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
-
-# Optional: OAuth
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-`
-
-### Customization
-
-- **Backend config**: src/Host/PetMagic.Host.Api/appsettings.json
-- **Database**: Connection string in docker-compose.yml or .env
-- **Frontend themes**: pps/admin-web/app/globals.css
-
----
-
-## 🏗️ Development Workflow
-
-### Local Build & Test (No Docker)
-
-`ash
-# Navigate to project root
-cd d:\Flutter\project\petmagic-0_004
-
-# Restore NuGet packages
-dotnet restore
-
-# Build solution
+```bash
+dotnet restore PetMagic.slnx
 dotnet build PetMagic.slnx
-
-# Run unit tests
 dotnet test PetMagic.slnx
+```
 
-# Run backend API (requires PostgreSQL on localhost:5432)
-cd src/Host/PetMagic.Host.Api
-dotnet run
+Run the backend without Docker after PostgreSQL is available:
 
-# In another terminal, run frontend dev server
+```bash
+dotnet run --project src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj
+```
+
+Run the admin web:
+
+```bash
 cd apps/admin-web
 npm install
 npm run dev
+```
 
-# In another terminal, run mobile app
+Run the mobile app:
+
+```bash
 cd apps/petmagic-mobile
 flutter pub get
 flutter gen-l10n
 flutter run --dart-define=API_BASE_URL=http://localhost:5000
-`
+```
 
----
+Format mobile Dart code:
 
-## 📚 API Documentation
+```bash
+dart format --set-exit-if-changed apps/petmagic-mobile/lib apps/petmagic-mobile/test
+```
 
-### Authentication Endpoints
+## Template Generation Queue
 
-| Method | Endpoint | Auth | Purpose |
-|--------|----------|------|---------|
-| POST | /api/auth/register | None | Register new mobile user (Flutter iOS/Android) |
-| POST | /api/auth/login | None | Login with email/password |
-| POST | /api/auth/refresh | None | Refresh expired access token |
-| POST | /api/auth/logout | Bearer | Invalidate own refresh token |
-| GET | /api/auth/me | Bearer | Get current user profile |
-| GET | /api/auth/external/{provider} | None | OAuth login initiation |
+Template generation requests create queued jobs and return `202 Accepted`. Active duplicate protection uses `Idempotency-Key` and deterministic request hashes. The worker claims jobs with PostgreSQL locking (`FOR UPDATE SKIP LOCKED`), writes locks through `LockedBy` and `LockedAtUtc`, retries stale jobs, and records terminal results only for the claimed job.
 
-Admin Web policy: login-only for Admin/Moderator users. Self-registration is intentionally disabled in admin-web UI.
+The queue supports:
 
-### Economy Endpoints (PawSpark)
+- Per-user active generation limits.
+- Global queue size limit.
+- DB-backed provider request-per-minute throttle before FAL submit.
+- PostgreSQL advisory locks for global worker concurrency.
+- Queue position and estimated wait time in queued generation responses.
 
-| Method | Endpoint | Auth | Purpose |
-|--------|----------|------|---------|
-| GET | /api/economy/wallet | Bearer | Get current user PawSpark balance and reward counters |
-| POST | /api/economy/wallet/claim-weekly | Bearer | Claim weekly PawSpark grant (Free/Premium) |
-| POST | /api/economy/wallet/claim-ad | Bearer | Claim rewarded-ad PawSpark (daily capped) |
-| POST | /api/economy/wallet/spend | Bearer | Spend PawSpark for generation actions |
-| GET | /api/economy/packs | None | List available PawSpark packs (USD/EUR) |
-| POST | /api/economy/purchases/create | Bearer | Create pack purchase order and receive checkout link |
-| GET | /api/economy/purchases/{orderId} | Bearer | Get user-owned purchase status |
-| POST | /api/economy/purchases/{orderId}/confirm | Bearer | Confirm purchase and credit PawSpark (manual fallback) |
-| POST | /api/economy/webhooks/stripe | None | Stripe webhook endpoint with signature verification and idempotency |
+## Load Testing
 
-Economy defaults for MVP: Free weekly grant 100 PS, Premium weekly grant 250 PS, rewarded ads limit 5/day.
-Stripe checkout and webhook settings:
-- `Economy:StripeSecretKey`
-- `Economy:StripeWebhookSecret`
-- `Economy:StripeCheckoutSuccessUrl`
-- `Economy:StripeCheckoutCancelUrl`
+The k6 script is in `scripts/k6/template-generation-load-test.js`. Runtime outputs are written under ignored `artifacts/load/`.
 
-Webhook endpoint expects `Stripe-Signature` header and uses Stripe SDK signature verification.
+```bash
+k6 run -e BASE_URL=http://localhost:5000 \
+  -e MODE=admin-test \
+  -e TEMPLATE_ID=<template-id> \
+  -e PROFILE=generation \
+  scripts/k6/template-generation-load-test.js
+```
 
-### Admin Endpoints (requires Admin/Moderator role)
+See `md/LOAD_TESTING.md` for profiles, environment variables, and baseline capture notes.
 
-| Method | Endpoint | Auth | Purpose |
-|--------|----------|------|---------|
-| GET | /api/admin/users | ModeratorOrAdmin | List all users |
-| PUT | /api/admin/users/{id}/role | AdminOnly | Assign role to user |
-| DELETE | /api/admin/users/{id}/role | AdminOnly | Revoke role from user |
-| PUT | /api/admin/users/{id}/premium | ModeratorOrAdmin | Toggle premium status |
-| PATCH | /api/admin/users/{id}/active | ModeratorOrAdmin | Activate/deactivate user |
+## Security
 
----
+- CI runs Gitleaks on repository history through `.github/workflows/backend-security.yml`.
+- Real Stripe, FAL, R2, JWT, SMTP, Google, Apple, Firebase, and database credentials must not be committed.
+- If a credential is committed, rotate or revoke it, remove it from history, and rerun the secret scan.
+- Production problem responses hide exception details and include correlation identifiers.
 
-## 🔐 Security
+See `md/SECURITY.md` for the security policy and dependency audit notes.
 
-### Features
-✅ JWT with refresh token rotation (30 min access, 30 day refresh by default)
-✅ Refresh token session tracking with revocation
-✅ Password hashing with PBKDF2
-✅ Role-based access control (Admin, Moderator, User)
-✅ Context isolation + no remote module in Electron (if applicable)
-✅ CORS configured for admin-web origin
-✅ Serilog audit logging with correlation IDs
+## Useful Commands
 
-### Known Issues & Mitigations
-See [SECURITY.md](./SECURITY.md) for dependency vulnerability audit and suppression rationale.
+```bash
+docker compose --env-file /dev/null config
+docker compose ps
+docker compose logs backend
+docker compose logs generation-worker
+dotnet test PetMagic.slnx --no-restore
+```
 
----
+## Backups
 
-## 🧪 Testing
-
-`ash
-# Run all unit tests
-dotnet test PetMagic.slnx
-
-# Run specific test class
-dotnet test PetMagic.slnx --filter RegisterUserCommandValidatorTests
-
-# Run with coverage (requires coverlet)
-dotnet test PetMagic.slnx /p:CollectCoverage=true
-`
-
----
-
-## 📦 Deployment
-
-### Docker Compose (Development)
-`ash
-docker-compose up --build
-`
-
-### Production Checklist
-- [ ] Update .env with strong, unique credentials
-- [ ] Enable HTTPS (nginx reverse proxy recommended)
-- [ ] Configure external PostgreSQL (e.g., AWS RDS)
-- [ ] Set up OpenTelemetry exporter to Grafana/Jaeger
-- [ ] Enable API rate limiting
-- [ ] Configure secrets vault (Vault, AWS Secrets Manager)
-- [ ] Run security scanning on Docker images (Trivy)
-- [ ] Set up CI/CD pipeline with automated tests
-
----
-
-## 📝 Documentation
-
-- **Architecture**: Modular Monolith with Vertical Slices (DDD)
-- **API Design**: RESTful with JWT Bearer authentication
-- **Frontend**: Next.js App Router with dynamic localization ([locale] segments)
-- **Database**: PostgreSQL 16 with EF Core 10 migrations
-- **Observability**: Serilog (structured logging) + OpenTelemetry (distributed tracing)
-- **Google + Email setup**: [md/AUTH_EMAIL_SETUP.md](md/AUTH_EMAIL_SETUP.md)
-
----
-
-## 🐛 Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Container won't start | Check docker logs <container_name> |
-| DB connection error | Verify POSTGRES_PASSWORD in .env matches docker-compose |
-| API returns 500 | Check backend logs: docker logs petmagic_api |
-| Admin Web blank page | Check browser console + frontend logs:
-pm run dev |
-| CORS errors | Verify NEXT_PUBLIC_API_BASE_URL matches docker-compose backend service name |
-
----
-
-## 📄 License
-
-[Your License Here]
-
-## 👥 Contributors
-
-- PetMagic Development Team
-
----
-
-## 📞 Support
-
-For issues or questions:
-1. Check [SECURITY.md](./SECURITY.md) for known vulnerabilities
-2. Review API documentation above
-3. Check container logs: \docker-compose logs\
-4. Open an issue on GitHub
+Use `scripts/backup-postgres.ps1` to export the current PostgreSQL database to `backups/`. Avoid `docker compose down -v` unless you intentionally want to delete local data volumes.

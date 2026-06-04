@@ -355,7 +355,7 @@ public sealed partial class IdentityServiceProfileTests
                 TemplateId = templateId,
                 Status = TemplateGenerationStatus.Failed,
                 TokenCost = 20,
-                FailureCode = "templates.failed",
+                LastErrorCode = "templates.failed",
                 SourceImageUrl = "source",
                 SourceImageFileName = "source.jpg",
                 SourceImageContentType = "image/jpeg",

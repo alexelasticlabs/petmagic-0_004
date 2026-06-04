@@ -205,6 +205,24 @@ public sealed partial class TemplatesApiIntegrationTests
                     limiterOptions.Window = TimeSpan.FromMinutes(1);
                     limiterOptions.QueueLimit = 0;
                 });
+                options.AddFixedWindowLimiter("generation-create", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 1_000;
+                    limiterOptions.Window = TimeSpan.FromMinutes(1);
+                    limiterOptions.QueueLimit = 0;
+                });
+                options.AddFixedWindowLimiter("generation-status", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 1_000;
+                    limiterOptions.Window = TimeSpan.FromMinutes(1);
+                    limiterOptions.QueueLimit = 0;
+                });
+                options.AddFixedWindowLimiter("admin", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 1_000;
+                    limiterOptions.Window = TimeSpan.FromMinutes(1);
+                    limiterOptions.QueueLimit = 0;
+                });
             });
 
             builder.Services.AddDbContext<TemplatesDbContext>(options =>
@@ -249,6 +267,9 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
             builder.Services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
             builder.Services.AddSingleton<ITemplateGenerationPushNotificationSender, NoopPushNotificationSender>();
+            builder.Services
+                .AddHttpClient(TemplateLocalizationTranslator.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => new UnavailableTranslationHandler());
             builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
@@ -338,6 +359,14 @@ public sealed partial class TemplatesApiIntegrationTests
     private sealed class FixedTemplateMediaUploadPolicy : ITemplateMediaUploadPolicy
     {
         public long GetMaxFileSizeBytes(TemplateAssetKind assetKind) => 5 * 1024 * 1024;
+    }
+
+    private sealed class UnavailableTranslationHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        }
     }
 
     private sealed class TestImagePreprocessor : IImagePreprocessor

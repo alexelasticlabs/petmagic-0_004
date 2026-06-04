@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -59,6 +60,377 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task StartAsync_ShouldReturnExistingActiveJob_WhenRequestHashMatches()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Idempotent Portrait", "Portrait", ["idempotent"]);
+        var userId = Guid.NewGuid();
+        var source = new TemplateAssetCommand("https://cdn.example.com/source-a.jpg", "source-a.jpg", "image/jpeg", 2048, null);
+
+        var first = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(userId, templateId, source, null, "request-hash-1", 3),
+            CancellationToken.None);
+
+        var second = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-b.jpg", "source-b.jpg", "image/jpeg", 2048, null),
+                null,
+                "request-hash-1",
+                3),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value.GenerationId, second.Value.GenerationId);
+        Assert.Equal(1, await dbContext.TemplateGenerationJobs.CountAsync());
+        Assert.Equal(1, second.Value.QueuePosition);
+        Assert.NotNull(second.Value.EstimatedWaitSeconds);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldReturnExistingActiveJob_WhenIdempotencyKeyMatches()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Idempotency Key Portrait", "Portrait", ["idempotency-key"]);
+        var userId = Guid.NewGuid();
+
+        var first = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-a.jpg", "source-a.jpg", "image/jpeg", 2048, null),
+                "same-key",
+                "request-hash-a",
+                3),
+            CancellationToken.None);
+
+        var second = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-b.jpg", "source-b.jpg", "image/jpeg", 2048, null),
+                "same-key",
+                "request-hash-b",
+                3),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value.GenerationId, second.Value.GenerationId);
+        Assert.Equal(1, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldCreateSeparateJobs_WhenDuplicateKeysBelongToDifferentUsers()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Per User Portrait", "Portrait", ["per-user"]);
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+
+        var first = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                firstUserId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-a.jpg", "source-a.jpg", "image/jpeg", 2048, null),
+                "same-key",
+                "same-hash",
+                1),
+            CancellationToken.None);
+
+        var second = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                secondUserId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-b.jpg", "source-b.jpg", "image/jpeg", 2048, null),
+                "same-key",
+                "same-hash",
+                1),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.NotEqual(first.Value.GenerationId, second.Value.GenerationId);
+        Assert.Equal(2, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldFail_WhenActiveGenerationLimitIsReached()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Limited Portrait", "Portrait", ["limit"]);
+        var userId = Guid.NewGuid();
+
+        var first = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-a.jpg", "source-a.jpg", "image/jpeg", 2048, null),
+                null,
+                "limit-hash-1",
+                1),
+            CancellationToken.None);
+
+        var second = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-b.jpg", "source-b.jpg", "image/jpeg", 2048, null),
+                null,
+                "limit-hash-2",
+                1),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal(TemplatesErrors.ActiveGenerationLimitReached.Code, second.Error.Code);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldFail_WhenQueueMaxSizeIsReached()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var options = CreateTemplatesOptions(queueMaxSize: 1);
+        var generationService = CreateGenerationService(dbContext, options);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Overloaded Portrait", "Portrait", ["overload"]);
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+
+        var first = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                firstUserId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-a.jpg", "source-a.jpg", "image/jpeg", 2048, null),
+                null,
+                "overload-hash-1",
+                1),
+            CancellationToken.None);
+
+        var second = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                secondUserId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-b.jpg", "source-b.jpg", "image/jpeg", 2048, null),
+                null,
+                "overload-hash-2",
+                1),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationQueueOverloaded.Code, second.Error.Code);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldIgnoreCompletedAndFailedJobs_ForActiveLimit()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Terminal Portrait", "Portrait", ["terminal"]);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/completed.jpg",
+                SourceImageFileName = "completed.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                UpdatedAtUtc = now.AddMinutes(-4),
+                CompletedAtUtc = now.AddMinutes(-4)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Failed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/failed.jpg",
+                SourceImageFileName = "failed.jpg",
+                SourceImageContentType = "image/jpeg",
+                LastErrorCode = "templates.ai_provider_failed",
+                CreatedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-2),
+                CompletedAtUtc = now.AddMinutes(-2)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                null,
+                "terminal-hash",
+                1),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal("Queued", started.Value.Status);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldCalculateQueueMetricsFromQueuedJobsOnly()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var options = CreateTemplatesOptions(globalMaxConcurrentGenerations: 2, estimatedImageGenerationSeconds: 40);
+        var generationService = CreateGenerationService(dbContext, options);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Queue Metric Portrait", "Portrait", ["queue"]);
+        var now = DateTime.UtcNow;
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/completed.jpg",
+                SourceImageFileName = "completed.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                UpdatedAtUtc = now.AddMinutes(-4),
+                CompletedAtUtc = now.AddMinutes(-4)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Failed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/failed.jpg",
+                SourceImageFileName = "failed.jpg",
+                SourceImageContentType = "image/jpeg",
+                LastErrorCode = "templates.ai_provider_failed",
+                CreatedAtUtc = now.AddMinutes(-4),
+                QueuedAtUtc = now.AddMinutes(-4),
+                UpdatedAtUtc = now.AddMinutes(-3),
+                CompletedAtUtc = now.AddMinutes(-3)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/queued.jpg",
+                SourceImageFileName = "queued.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-3),
+                ChargedAtUtc = now.AddMinutes(-3)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Processing,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/processing.jpg",
+                SourceImageFileName = "processing.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-2),
+                QueuedAtUtc = now.AddMinutes(-2),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                StartedAtUtc = now.AddMinutes(-1),
+                ChargedAtUtc = now.AddMinutes(-2),
+                LockedAtUtc = now.AddMinutes(-1),
+                LockedBy = "worker-1"
+            });
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                null,
+                "queue-metrics-hash",
+                10),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(2, started.Value.QueuePosition);
+        Assert.Equal(40, started.Value.EstimatedWaitSeconds);
+    }
+
+    [Fact]
+    public async Task UserScopedGenerationOperations_ShouldReturnGenerationJobNotFound_ForForeignGenerationId()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var templateId = await CreateActiveImageTemplateAsync(service, "Scoped Portrait", "Portrait", ["scoped"]);
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            ResultUrl = "https://cdn.example.com/output.png",
+            CreatedAtUtc = now.AddMinutes(-3),
+            QueuedAtUtc = now.AddMinutes(-3),
+            StartedAtUtc = now.AddMinutes(-2),
+            CompletedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-3)
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var fetched = await generationService.GetAsync(otherUserId, job.Id, CancellationToken.None);
+        var markedRead = await generationService.MarkReadAsync(otherUserId, job.Id, CancellationToken.None);
+        var deleted = await generationService.DeleteAsync(otherUserId, job.Id, CancellationToken.None);
+        var feedback = await generationService.RecordFeedbackAsync(
+            new RecordTemplateGenerationFeedbackCommand(otherUserId, job.Id, 2, [], null, null),
+            CancellationToken.None);
+
+        Assert.True(fetched.IsFailure);
+        Assert.True(markedRead.IsFailure);
+        Assert.True(deleted.IsFailure);
+        Assert.True(feedback.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, fetched.Error.Code);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, markedRead.Error.Code);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, deleted.Error.Code);
+        Assert.Equal(TemplatesErrors.GenerationJobNotFound.Code, feedback.Error.Code);
+    }
+
+    [Fact]
     public async Task GenerationHistoryFeedbackAsync_ShouldTrackUnreadAndTypedFeedback()
     {
         await using var dbContext = CreateDbContext();
@@ -94,7 +466,7 @@ public sealed partial class TemplatesServiceTests
             SourceImageUrl = "https://cdn.example.com/source.jpg",
             SourceImageFileName = "source.jpg",
             SourceImageContentType = "image/jpeg",
-            OutputUrl = "https://cdn.example.com/output.png",
+            ResultUrl = "https://cdn.example.com/output.png",
             UsedPreprocessingModel = "openai/gpt-image-2/edit",
             PreprocessingProviderRequestId = "image-request-123",
             AttemptCount = 1,

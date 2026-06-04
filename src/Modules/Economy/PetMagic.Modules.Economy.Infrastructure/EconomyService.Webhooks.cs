@@ -22,7 +22,7 @@ public sealed partial class EconomyService
         var stripeWebhookSecrets = ResolveStripeWebhookSecrets();
         if (stripeWebhookSecrets.Count == 0)
         {
-            return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidStripeSignature);
+            return StripeWebhookFailure(EconomyErrors.InvalidStripeSignature, "configuration");
         }
 
         try
@@ -62,13 +62,13 @@ public sealed partial class EconomyService
 
             if (!isSignatureValid)
             {
-                return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidStripeSignature);
+                return StripeWebhookFailure(EconomyErrors.InvalidStripeSignature, "signature");
             }
 
             var envelope = EconomyWebhookParser.ParseStripeEnvelope(command.RawBody);
             if (!envelope.Success)
             {
-                return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
+                return StripeWebhookFailure(EconomyErrors.InvalidWebhookPayload, "fallback.parse");
             }
 
             eventId = envelope.EventId;
@@ -77,13 +77,13 @@ public sealed partial class EconomyService
 
         if (string.IsNullOrWhiteSpace(eventId) || string.IsNullOrWhiteSpace(eventType))
         {
-            return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
+            return StripeWebhookFailure(EconomyErrors.InvalidWebhookPayload, "envelope");
         }
 
         var parsedEvent = EconomyWebhookParser.ParseStripeEvent(command.RawBody);
         if (!parsedEvent.Success)
         {
-            return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
+            return StripeWebhookFailure(EconomyErrors.InvalidWebhookPayload, "event.parse", eventType);
         }
 
         var alreadyProcessed = await dbContext.ProcessedWebhookEvents
@@ -112,7 +112,7 @@ public sealed partial class EconomyService
                 var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
                 if (confirmResult.IsFailure && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
                 {
-                    return Result.Failure<StripeWebhookResultResponse>(confirmResult.Error);
+                    return StripeWebhookFailure(confirmResult.Error, "purchase.confirm", eventType);
                 }
             }
         }
@@ -146,7 +146,7 @@ public sealed partial class EconomyService
                 {
                     if (identityService is null)
                     {
-                        return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
+                        return StripeWebhookFailure(EconomyErrors.PremiumBillingUnavailable, "premium.identity", eventType);
                     }
 
                     var premiumResult = await identityService.SetPremiumStatusAsync(
@@ -155,7 +155,7 @@ public sealed partial class EconomyService
 
                     if (premiumResult.IsFailure)
                     {
-                        return Result.Failure<StripeWebhookResultResponse>(premiumResult.Error);
+                        return StripeWebhookFailure(premiumResult.Error, "premium.identity", eventType);
                     }
 
                     logger?.LogInformation(
@@ -186,7 +186,7 @@ public sealed partial class EconomyService
 
                     if (resolvedPlan is null && existingSubscription is null)
                     {
-                        return Result.Failure<StripeWebhookResultResponse>(EconomyErrors.PremiumPlanNotFound);
+                        return StripeWebhookFailure(EconomyErrors.PremiumPlanNotFound, "premium.plan", eventType);
                     }
 
                     var resolvedPlanId = resolvedPlan?.PlanCode ?? existingSubscription!.PlanId;
@@ -268,7 +268,7 @@ public sealed partial class EconomyService
 
             if (methodResult.IsFailure)
             {
-                return Result.Failure<StripeWebhookResultResponse>(methodResult.Error);
+                return StripeWebhookFailure(methodResult.Error, "payment_method.resolve", eventType);
             }
 
             await SavePaymentMethodAsync(parsedEvent.UserId.Value, "stripe", methodResult.Value, cancellationToken);
@@ -276,6 +276,12 @@ public sealed partial class EconomyService
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success(new StripeWebhookResultResponse(eventId, true, "processed"));
+    }
+
+    private static Result<StripeWebhookResultResponse> StripeWebhookFailure(Error error, string stage, string? eventType = null)
+    {
+        EconomyMetrics.RecordStripeWebhookFailure(error.Code, stage, eventType);
+        return Result.Failure<StripeWebhookResultResponse>(error);
     }
 
     public async Task<Result<StoreWebhookResultResponse>> HandleAppStoreServerNotificationAsync(

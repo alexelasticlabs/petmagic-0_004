@@ -96,6 +96,12 @@ public sealed record UserListItemResponse(
     DateTime CreatedAtUtc,
     UserAvatarResponse? Avatar);
 
+public sealed record UserListPageResponse(
+    IReadOnlyList<UserListItemResponse> Items,
+    int Skip,
+    int Take,
+    bool HasMore);
+
 public sealed record SendBulkEmailCommand(
     string Audience,
     string Subject,

@@ -5,6 +5,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal static class TemplatesErrors
 {
     public static readonly Error NotFound = new("templates.not_found", "Template was not found.");
+    public static readonly Error GenerationJobNotFound = new("GENERATION_JOB_NOT_FOUND", "Generation job was not found.");
     public static readonly Error CategoryNotFound = new("templates.category_not_found", "Template category was not found.");
     public static readonly Error CategoryAlreadyExists = new("templates.category_already_exists", "Template category already exists.");
     public static readonly Error CategoryArchived = new("templates.category_archived", "Template category is archived and cannot be assigned to new templates.");
@@ -26,6 +27,8 @@ internal static class TemplatesErrors
     public static readonly Error AiProviderFailed = new("templates.ai_provider_failed", "AI provider request failed.");
     public static readonly Error AiProviderTimedOut = new("templates.ai_provider_timed_out", "AI provider request timed out.");
     public static readonly Error GenerationAttemptsExceeded = new("templates.generation_attempts_exceeded", "Template generation exceeded the maximum number of attempts.");
+    public static readonly Error ActiveGenerationLimitReached = new("ACTIVE_GENERATION_LIMIT_REACHED", "Active generation limit was reached.");
+    public static readonly Error GenerationQueueOverloaded = new("GENERATION_QUEUE_OVERLOADED", "Generation queue is overloaded.");
     public static readonly Error InvalidFeedback = new("templates.invalid_feedback", "Generation feedback is invalid.");
     public static readonly Error InvalidPushToken = new("templates.push_token_invalid", "Push device token is invalid.");
     public static readonly Error GeneratedMediaImportFailed = new("templates.generated_media_import_failed", "Generated media could not be imported into storage.");

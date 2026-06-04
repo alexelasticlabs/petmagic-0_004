@@ -26,7 +26,15 @@ public sealed class TemplateGenerationJob
 
     public string? ReferenceMotionUrl { get; set; }
 
-    public string? OutputUrl { get; set; }
+    public string? ResultUrl { get; set; }
+
+    public DateTime? LockedAtUtc { get; set; }
+
+    public string? LockedBy { get; set; }
+
+    public string? IdempotencyKey { get; set; }
+
+    public string? RequestHash { get; set; }
 
     public string? UsedPreprocessingModel { get; set; }
 
@@ -52,9 +60,9 @@ public sealed class TemplateGenerationJob
 
     public int AttemptCount { get; set; }
 
-    public string? FailureCode { get; set; }
+    public string? LastErrorCode { get; set; }
 
-    public string? FailureMessage { get; set; }
+    public string? LastErrorMessage { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 

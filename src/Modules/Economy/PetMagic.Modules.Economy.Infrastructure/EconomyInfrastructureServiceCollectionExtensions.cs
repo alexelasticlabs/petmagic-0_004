@@ -13,7 +13,10 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 public static class EconomyInfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddEconomyInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddEconomyInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool isProduction = false)
     {
         var section = configuration.GetSection(EconomyOptions.SectionName);
         var legacyStripeSecretKey = ReadValue(section, "StripeSecretKey", "STRIPE_SECRET_KEY") ?? string.Empty;
@@ -104,6 +107,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty
         };
 
+        ValidateProductionConfiguration(economyOptions, isProduction);
+
         services.AddSingleton<IOptions<EconomyOptions>>(Microsoft.Extensions.Options.Options.Create(economyOptions));
 
         services.AddDbContext<EconomyDbContext>(options =>
@@ -117,10 +122,15 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddScoped<IAdminUserEconomyAnalyticsReader, AdminUserEconomyAnalyticsReader>();
         services.AddSingleton<IGoogleStoreWebhookTokenVerifier, GoogleStoreWebhookTokenVerifier>();
         services.AddSingleton<IStoreWebhookSecurityValidator, StoreWebhookSecurityValidator>();
-        services.AddSingleton<IPaymentGateway>(_ => new StripePaymentGateway(economyOptions));
+        services.AddHttpClient(StripePaymentGateway.HttpClientName);
+        services.AddHttpClient(StoreSubscriptionVerifier.HttpClientName);
+        services.AddHttpClient(FcmEconomyPushNotificationSender.HttpClientName);
+        services.AddSingleton<IPaymentGateway>(serviceProvider =>
+            new StripePaymentGateway(
+                economyOptions,
+                serviceProvider.GetRequiredService<IHttpClientFactory>()));
         services.AddScoped<IEconomyPushTokenService, EconomyPushTokenService>();
         services.AddScoped<NoopEconomyPushNotificationSender>();
-        services.AddSingleton<HttpClient>();
         services.AddScoped<FcmEconomyPushNotificationSender>();
         services.AddScoped<IEconomyPushNotificationSender>(serviceProvider =>
             economyOptions.IsFirebasePushConfigured
@@ -128,7 +138,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 : serviceProvider.GetRequiredService<NoopEconomyPushNotificationSender>());
         services.AddSingleton<IStoreSubscriptionVerifier>(serviceProvider =>
             new StoreSubscriptionVerifier(
-                new HttpClient(),
+                serviceProvider.GetRequiredService<IHttpClientFactory>(),
                 serviceProvider.GetRequiredService<IOptions<EconomyOptions>>()));
 
         return services;
@@ -169,6 +179,103 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         return raw.Replace("\\n", "\n", StringComparison.Ordinal);
     }
 
+    private static void ValidateProductionConfiguration(EconomyOptions options, bool isProduction)
+    {
+        if (!isProduction)
+        {
+            return;
+        }
+
+        var stripeSecretKey = FirstNonEmpty(options.StripeLiveSecretKey, options.StripeSecretKey);
+        var stripePublishableKey = FirstNonEmpty(options.StripeLivePublishableKey, options.StripePublishableKey);
+        var stripeWebhookSecret = FirstNonEmpty(options.StripeLiveWebhookSecret, options.StripeWebhookSecret);
+
+        RequireProductionSecret(stripeSecretKey, "Stripe live secret key", "STRIPE_LIVE_SECRET_KEY or STRIPE_SECRET_KEY");
+        RequireProductionSecret(stripePublishableKey, "Stripe live publishable key", "STRIPE_LIVE_PUBLISHABLE_KEY or STRIPE_PUBLISHABLE_KEY");
+        RequireProductionSecret(stripeWebhookSecret, "Stripe live webhook secret", "STRIPE_LIVE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET");
+
+        if (!HasAnyPrefix(stripeSecretKey!, "sk_live_", "rk_live_"))
+        {
+            throw new InvalidOperationException("Stripe live secret key must use a live Stripe key prefix in Production.");
+        }
+
+        if (!stripePublishableKey!.StartsWith("pk_live_", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Stripe live publishable key must use a live Stripe key prefix in Production.");
+        }
+
+        if (!stripeWebhookSecret!.StartsWith("whsec_", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Stripe webhook secret must use the whsec_ prefix in Production.");
+        }
+
+        RequireProductionSecret(options.AppStoreSharedSecret, "App Store shared secret", "APP_STORE_SHARED_SECRET");
+        RequireProductionSecret(options.AppStoreBundleId, "App Store bundle id", "Economy:AppStoreBundleId");
+
+        RequireProductionSecret(options.GooglePlayPackageName, "Google Play package name", "Economy:GooglePlayPackageName");
+        RequireProductionSecret(options.GooglePlayServiceAccountEmail, "Google Play service account email", "GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL");
+        RequireProductionSecret(options.GooglePlayPrivateKeyPem, "Google Play private key", "GOOGLE_PLAY_PRIVATE_KEY_PEM");
+        RequireProductionSecret(options.GooglePlayPubSubAudience, "Google Play Pub/Sub audience", "GOOGLE_PLAY_PUBSUB_AUDIENCE");
+        RequireProductionSecret(options.GooglePlayPubSubExpectedEmail, "Google Play Pub/Sub expected email", "GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL");
+
+        if (!options.GooglePlayPrivateKeyPem.Contains("BEGIN PRIVATE KEY", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Google Play private key must be a PEM private key in Production.");
+        }
+
+        if (options.FirebasePushEnabled && !options.IsFirebasePushConfigured)
+        {
+            throw new InvalidOperationException("Economy Firebase push is enabled but Firebase project id or service account configuration is missing.");
+        }
+
+        if (options.FirebasePushEnabled)
+        {
+            RequireProductionSecret(options.FirebaseProjectId, "Firebase project id", "ECONOMY_FIREBASE_PROJECT_ID or FIREBASE_PROJECT_ID");
+        }
+    }
+
+    private static void RequireProductionSecret(string? value, string settingName, string configurationHint)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"{settingName} must be configured in Production. Set {configurationHint}.");
+        }
+
+        if (LooksLikePlaceholder(value))
+        {
+            throw new InvalidOperationException($"{settingName} contains a placeholder/test value and must be replaced in Production.");
+        }
+    }
+
+    private static bool LooksLikePlaceholder(string value)
+    {
+        return value.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("DEV_ONLY", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("PetMagicDemo", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("PetMagic_Dev", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("test_stripe", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("test_webhook", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("sk_test_", StringComparison.Ordinal)
+            || value.StartsWith("pk_test_", StringComparison.Ordinal);
+    }
+
+    private static bool HasAnyPrefix(string value, params string[] prefixes)
+    {
+        return prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private static bool IsProductionEnvironment()
+    {
+        var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+        return string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static async Task EnsureEconomySeedDataAsync(this IServiceProvider serviceProvider)
     {
         using var scope = serviceProvider.CreateScope();
@@ -176,7 +283,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         await dbContext.Database.MigrateAsync();
 
         await SeedSubscriptionPlansAsync(dbContext);
-        await SeedPaymentProviderConfigurationsAsync(dbContext);
+        await SeedPaymentProviderConfigurationsAsync(
+            dbContext,
+            IsProductionEnvironment() ? "live" : "test");
 
         if (await dbContext.CurrencyPacks.AnyAsync())
         {
@@ -325,10 +434,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         await dbContext.SaveChangesAsync();
     }
 
-    private static async Task SeedPaymentProviderConfigurationsAsync(EconomyDbContext dbContext)
+    private static async Task SeedPaymentProviderConfigurationsAsync(EconomyDbContext dbContext, string defaultMode)
     {
         var now = DateTime.UtcNow;
-        var defaultMode = "test";
         var configs = new[]
         {
             new PaymentProviderConfiguration

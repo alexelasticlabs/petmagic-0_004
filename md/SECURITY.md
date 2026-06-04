@@ -46,6 +46,20 @@ This document outlines the security audit conducted on PetMagic backend and fron
    - Version 10.1.0+ not available in stable channel
    - Not exploitable in current JWT-based architecture
 
+4. Added CI secret scanning
+   - Workflow: `.github/workflows/backend-security.yml`
+   - Tool: Gitleaks
+   - Scope: full repository history available to the checkout
+   - CI blocks pull requests and protected-branch pushes when credentials are detected
+
+## Secret Handling Policy
+
+- Real Stripe, FAL, R2, JWT signing, SMTP, Google, Apple, Firebase, and database credentials must never be committed.
+- Production and staging secrets must be injected only through CI/CD secrets, platform environment variables, or a managed secret store.
+- `.env.example`, `appsettings*.json`, Docker Compose defaults, and tests may contain placeholders only.
+- If a real credential is committed, treat it as compromised: revoke or rotate it first, then remove it from history and rerun secret scanning.
+- Application logs, exception messages, and problem responses must not include credential values.
+
 ### Build Validation
 
 ✓ Full solution rebuilds without errors: dotnet build PetMagic.slnx

@@ -12,10 +12,12 @@ using PetMagic.Modules.Economy.Infrastructure.Options;
 namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
 public sealed class StoreSubscriptionVerifier(
-    HttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     IOptions<EconomyOptions> options,
     ILogger<StoreSubscriptionVerifier>? logger = null) : IStoreSubscriptionVerifier
 {
+    public const string HttpClientName = "StoreSubscriptionVerifier";
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<Result<StoreSubscriptionVerificationResponse>> VerifyAsync(
@@ -66,7 +68,7 @@ public sealed class StoreSubscriptionVerifier(
                 $"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{Uri.EscapeDataString(options.Value.GooglePlayPackageName)}/purchases/subscriptionsv2/tokens/{Uri.EscapeDataString(request.ServerVerificationData)}");
             requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            using var response = await httpClient.SendAsync(requestMessage, cancellationToken);
+            using var response = await CreateClient().SendAsync(requestMessage, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
@@ -198,7 +200,7 @@ public sealed class StoreSubscriptionVerifier(
                 $"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{Uri.EscapeDataString(options.Value.GooglePlayPackageName)}/purchases/products/{Uri.EscapeDataString(request.ProductId)}/tokens/{Uri.EscapeDataString(request.ServerVerificationData)}");
             requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            using var response = await httpClient.SendAsync(requestMessage, cancellationToken);
+            using var response = await CreateClient().SendAsync(requestMessage, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
@@ -284,7 +286,7 @@ public sealed class StoreSubscriptionVerifier(
     {
         try
         {
-            using var response = await httpClient.PostAsync(
+            using var response = await CreateClient().PostAsync(
                 url,
                 new StringContent(payload, Encoding.UTF8, "application/json"),
                 cancellationToken);
@@ -376,7 +378,7 @@ public sealed class StoreSubscriptionVerifier(
     {
         try
         {
-            using var response = await httpClient.PostAsync(
+            using var response = await CreateClient().PostAsync(
                 url,
                 new StringContent(payload, Encoding.UTF8, "application/json"),
                 cancellationToken);
@@ -508,7 +510,7 @@ public sealed class StoreSubscriptionVerifier(
         var signature = SignGoogleJwt(unsignedToken, options.Value.GooglePlayPrivateKeyPem);
         var assertion = $"{unsignedToken}.{signature}";
 
-        using var response = await httpClient.PostAsync(
+        using var response = await CreateClient().PostAsync(
             "https://oauth2.googleapis.com/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -529,6 +531,8 @@ public sealed class StoreSubscriptionVerifier(
             ? tokenElement.GetString()
             : null;
     }
+
+    private HttpClient CreateClient() => httpClientFactory.CreateClient(HttpClientName);
 
     private static string SignGoogleJwt(string value, string pem)
     {

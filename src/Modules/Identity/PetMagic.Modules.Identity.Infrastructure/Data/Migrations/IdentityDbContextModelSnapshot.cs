@@ -280,6 +280,10 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 
                     b.HasIndex("AccountStatus");
 
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("AccountStatus", "AccountStatusUpdatedAtUtc", "CreatedAtUtc");
+
                     b.HasIndex("Email")
                         .IsUnique();
 
@@ -318,6 +322,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("SubjectUserId", "OccurredAtUtc");
 
                     b.ToTable("audit_events", (string)null);
                 });
@@ -390,6 +396,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.HasIndex("Status", "QueuedAtUtc");
+
+                    b.HasIndex("Status", "UpdatedAtUtc");
 
                     b.ToTable("email_dispatch_jobs", (string)null);
                 });

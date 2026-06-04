@@ -24,6 +24,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateCatalogChange> TemplateCatalogChanges => Set<TemplateCatalogChange>();
 
+    public DbSet<TemplateAiProviderRequestPermit> TemplateAiProviderRequestPermits => Set<TemplateAiProviderRequestPermit>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<TemplateCategory>(entity =>
@@ -95,29 +97,56 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.SourceImageContentType).HasMaxLength(128).IsRequired();
             entity.Property(x => x.NormalizedImageUrl).HasMaxLength(2048);
             entity.Property(x => x.ReferenceMotionUrl).HasMaxLength(2048);
-            entity.Property(x => x.OutputUrl).HasMaxLength(2048);
+            entity.Property(x => x.ResultUrl).HasMaxLength(2048);
+            entity.Property(x => x.LockedBy).HasMaxLength(128).IsConcurrencyToken();
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(256);
+            entity.Property(x => x.RequestHash).HasMaxLength(128);
             entity.Property(x => x.UsedPreprocessingModel).HasMaxLength(256);
             entity.Property(x => x.UsedKlingModel).HasMaxLength(256);
             entity.Property(x => x.PreprocessingProviderRequestId).HasMaxLength(128);
             entity.Property(x => x.MotionProviderRequestId).HasMaxLength(128);
             entity.Property(x => x.MotionProviderCostUsd).HasPrecision(12, 4);
-            entity.Property(x => x.FailureCode).HasMaxLength(128);
-            entity.Property(x => x.FailureMessage).HasMaxLength(1000);
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.Property(x => x.LastErrorMessage).HasMaxLength(1000);
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
             entity.Property(x => x.UserMediaCleanupFailureCode).HasMaxLength(128);
             entity.HasIndex(x => x.HiddenByUserAtUtc);
             entity.HasIndex(x => x.UserMediaDeletedAtUtc);
             entity.HasIndex(x => new { x.UserId, x.Status, x.ResultViewedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.Status })
+                .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");
             entity.HasIndex(x => x.LastUserMediaCleanupAttemptAtUtc);
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.LockedAtUtc })
+                .HasDatabaseName("IX_templates_generation_jobs_Status_LockedAtUtc");
             entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
             entity.HasIndex(x => new { x.Status, x.RefundedAtUtc, x.RefundLastAttemptedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.TemplateId, x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("UX_templates_generation_jobs_UserId_IdempotencyKey_active")
+                .HasFilter(""" "Status" IN (1, 2) AND "IdempotencyKey" IS NOT NULL """);
+            entity.HasIndex(x => new { x.UserId, x.RequestHash })
+                .IsUnique()
+                .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
+                .HasFilter(""" "Status" IN (1, 2) AND "RequestHash" IS NOT NULL """);
             entity.HasOne(x => x.Template)
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateAiProviderRequestPermit>(entity =>
+        {
+            entity.ToTable("templates_ai_provider_request_permits");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Provider).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => new { x.Provider, x.BucketUtc, x.PermitNumber })
+                .IsUnique()
+                .HasDatabaseName("UX_templates_ai_provider_permits_provider_bucket_slot");
+            entity.HasIndex(x => x.CreatedAtUtc)
+                .HasDatabaseName("IX_templates_ai_provider_permits_CreatedAtUtc");
         });
 
         builder.Entity<TemplateGenerationFeedback>(entity =>

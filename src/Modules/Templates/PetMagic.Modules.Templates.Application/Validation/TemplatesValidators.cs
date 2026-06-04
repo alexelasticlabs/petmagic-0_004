@@ -147,6 +147,8 @@ public sealed class StartTemplateGenerationCommandValidator : AbstractValidator<
     {
         RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.TemplateId).NotEmpty();
+        RuleFor(x => x.IdempotencyKey).MaximumLength(256);
+        RuleFor(x => x.RequestHash).MaximumLength(128);
         RuleFor(x => x.SourceImageAsset).NotNull().SetValidator(new TemplateAssetCommandValidator());
         RuleFor(x => x.SourceImageAsset.ContentType)
             .Must(contentType =>

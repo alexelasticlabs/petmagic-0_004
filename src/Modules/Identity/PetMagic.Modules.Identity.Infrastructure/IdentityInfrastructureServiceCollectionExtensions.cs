@@ -27,11 +27,13 @@ public static class IdentityInfrastructureServiceCollectionExtensions
 
         var externalAuth = BuildExternalAuthOptions(configuration.GetSection(ExternalAuthOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+        var bootstrapAdminOptions = configuration.GetSection(BootstrapAdminOptions.SectionName).Get<BootstrapAdminOptions>() ?? new BootstrapAdminOptions();
         var emailOptions = BuildEmailOptions(configuration.GetSection(EmailOptions.SectionName));
         var avatarStorageOptions = BuildAvatarStorageOptions(configuration.GetSection(AvatarStorageOptions.SectionName));
 
         ValidateExternalAuthConfiguration(externalAuth);
         ValidateJwtConfiguration(jwtOptions, environment);
+        ValidateBootstrapAdminConfiguration(bootstrapAdminOptions, environment);
 
         services.AddDbContext<IdentityDbContext>(options =>
         {
@@ -385,6 +387,20 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         }
     }
 
+    private static void ValidateBootstrapAdminConfiguration(BootstrapAdminOptions options, IHostEnvironment? environment)
+    {
+        if (environment is null || environment.IsDevelopment())
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.Password))
+        {
+            throw new InvalidOperationException(
+                "BootstrapAdmin:Password must not be configured outside development. Create production admin users through a controlled provisioning flow.");
+        }
+    }
+
     private static void ValidateProductionEmailConfiguration(EmailOptions options, IHostEnvironment? environment)
     {
         if (environment is null || environment.IsDevelopment() || !options.DispatchWorkerEnabled)
@@ -398,4 +414,3 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         }
     }
 }
-

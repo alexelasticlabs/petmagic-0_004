@@ -829,6 +829,12 @@ public sealed class SupportChatEndpointsIntegrationTests
                     limiterOptions.Window = TimeSpan.FromMinutes(1);
                     limiterOptions.QueueLimit = 0;
                 });
+                options.AddFixedWindowLimiter("admin", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 1_000;
+                    limiterOptions.Window = TimeSpan.FromMinutes(1);
+                    limiterOptions.QueueLimit = 0;
+                });
             });
 
             builder.Services.AddDbContext<SupportChatDbContext>(options =>

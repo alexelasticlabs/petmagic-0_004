@@ -92,7 +92,7 @@ EMAIL_FROM_NAME=PetMagic
 POSTGRES_PASSWORD=PetMagic_DevPassword123
 JWT_SIGNING_KEY=сгенерируй_длинный_секрет
 BOOTSTRAP_ADMIN_EMAIL=admin@petmagic.app
-BOOTSTRAP_ADMIN_PASSWORD=DemoPassword123!
+BOOTSTRAP_ADMIN_PASSWORD=replace_with_local_admin_password
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
 ```
 
@@ -348,7 +348,7 @@ http://localhost:5000
 POSTGRES_PASSWORD=PetMagic_DevPassword123
 JWT_SIGNING_KEY=replace_with_long_random_secret
 BOOTSTRAP_ADMIN_EMAIL=admin@petmagic.app
-BOOTSTRAP_ADMIN_PASSWORD=DemoPassword123!
+BOOTSTRAP_ADMIN_PASSWORD=replace_with_local_admin_password
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
 
 GOOGLE_CLIENT_ID=replace_with_google_client_id

@@ -18,7 +18,7 @@ public static class AdminTemplateCategoryEndpoints
         var group = endpoints.MapGroup("/api/admin/templates/categories")
             .WithTags("Admin.TemplateCategories")
             .RequireAuthorization("ModeratorOrAdmin")
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("admin");
 
         group.MapGet("/", ListAsync);
         group.MapPost("/", CreateAsync);

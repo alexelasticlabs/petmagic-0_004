@@ -6,9 +6,5 @@ public enum TemplateGenerationStatus
     Processing = 2,
     Succeeded = 3,
     Completed = Succeeded,
-    Failed = 4,
-    Uploading = 5,
-    Preprocessing = 6,
-    Generating = 7,
-    Finalizing = 8
+    Failed = 4
 }

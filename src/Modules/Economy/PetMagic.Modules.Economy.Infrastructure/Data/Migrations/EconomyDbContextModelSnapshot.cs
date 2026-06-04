@@ -329,6 +329,10 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasIndex("PaymentProvider", "ExternalPaymentId");
 
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Status", "CreatedAtUtc");
+
                     b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.ToTable("economy_purchase_orders", (string)null);
@@ -412,6 +416,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.HasIndex("CodeHash")
                         .IsUnique();
 
+                    b.HasIndex("CreatedAtUtc");
+
                     b.HasIndex("IsActive", "ExpiresAtUtc");
 
                     b.ToTable("economy_redeem_codes", (string)null);
@@ -449,6 +455,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("RedeemCodeId", "UserId");
+
+                    b.HasIndex("RedeemCodeId", "RedeemedAtUtc");
 
                     b.HasIndex("UserId", "RedeemedAtUtc");
 
@@ -640,6 +648,10 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasIndex("Provider", "ExternalSubscriptionId");
 
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Provider", "Status", "CreatedAtUtc");
+
                     b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.ToTable("economy_subscription_event_logs", (string)null);
@@ -782,6 +794,12 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.HasIndex("Provider", "ExternalSubscriptionId")
                         .IsUnique();
 
+                    b.HasIndex("UpdatedAtUtc");
+
+                    b.HasIndex("Provider", "UpdatedAtUtc");
+
+                    b.HasIndex("Status", "UpdatedAtUtc");
+
                     b.HasIndex("UserId", "UpdatedAtUtc");
 
                     b.HasIndex("UserId", "Status", "CurrentPeriodEndUtc");
@@ -846,6 +864,10 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Source", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 

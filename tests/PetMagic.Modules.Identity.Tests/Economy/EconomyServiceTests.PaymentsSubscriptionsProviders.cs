@@ -210,9 +210,10 @@ public sealed partial class EconomyServiceTests
         var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId);
 
-        Assert.Equal(2222, wallet.Balance);
+        Assert.Equal(40, wallet.Balance);
         Assert.Equal("yearly", subscription.PlanId);
         Assert.Equal(2222, subscription.MonthlyTokenLimit);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
         Assert.Single(identityService.SetPremiumStatusCalls);
     }
 
@@ -281,8 +282,8 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("Canceled", subscription.Status);
         Assert.True(subscription.CancelAtPeriodEnd);
         Assert.Equal("txn-app-2", subscription.ExternalTransactionId);
-        Assert.Equal(500, subscription.MonthlyTokensGranted);
-        Assert.Equal(500, wallet.Balance);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
+        Assert.Equal(40, wallet.Balance);
         Assert.Single(identityService.SetPremiumStatusCalls);
         Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
     }
@@ -358,8 +359,8 @@ public sealed partial class EconomyServiceTests
         Assert.True(subscription.CancelAtPeriodEnd);
         Assert.Equal("gp-token-1", subscription.ExternalTransactionId);
         Assert.Equal("order-1", subscription.ExternalSubscriptionId);
-        Assert.Equal(500, subscription.MonthlyTokensGranted);
-        Assert.Equal(500, wallet.Balance);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
+        Assert.Equal(40, wallet.Balance);
         Assert.Single(identityService.SetPremiumStatusCalls);
         Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
     }

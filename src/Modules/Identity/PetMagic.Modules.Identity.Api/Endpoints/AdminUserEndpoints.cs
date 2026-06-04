@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using FluentValidation;
 
 using Microsoft.AspNetCore.Builder;
@@ -18,6 +20,7 @@ public static class AdminUserEndpoints
     {
         var group = endpoints.MapGroup("/api/admin/users")
             .WithTags("Admin.Users")
+            .RequireRateLimiting("admin")
             .RequireAuthorization("ModeratorOrAdmin");
 
         group.MapGet("/", ListUsersAsync);
@@ -35,16 +38,23 @@ public static class AdminUserEndpoints
     }
 
     private static async Task<Results<Ok<IReadOnlyList<UserListItemResponse>>, ProblemHttpResult>> ListUsersAsync(
+        [FromQuery] int skip,
+        [FromQuery] int take,
+        HttpContext httpContext,
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.ListUsersAsync(cancellationToken);
+        var result = await service.ListUsersAsync(skip, take, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        return TypedResults.Ok(result.Value);
+        httpContext.Response.Headers["X-Pagination-Skip"] = result.Value.Skip.ToString(CultureInfo.InvariantCulture);
+        httpContext.Response.Headers["X-Pagination-Take"] = result.Value.Take.ToString(CultureInfo.InvariantCulture);
+        httpContext.Response.Headers["X-Pagination-Has-More"] = result.Value.HasMore ? "true" : "false";
+
+        return TypedResults.Ok(result.Value.Items);
     }
 
     private static async Task<Results<Ok<AdminUserWalletOperationResponse>, ValidationProblem, ProblemHttpResult>> AdjustWalletAsync(

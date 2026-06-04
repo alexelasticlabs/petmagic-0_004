@@ -196,9 +196,9 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                 x.UsedPreprocessingModel,
                 x.UsedKlingModel,
                 x.MotionProviderCostUsd,
-                x.FailureCode,
-                x.FailureMessage,
-                x.OutputUrl,
+                x.LastErrorCode,
+                x.LastErrorMessage,
+                x.ResultUrl,
                 x.CreatedAtUtc,
                 x.StartedAtUtc,
                 x.CompletedAtUtc))
@@ -225,7 +225,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             .Take(take)
             .ToArrayAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>([.. jobs.Select(TemplateGenerationService.MapResponse)]);
+        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>([.. jobs.Select(job => TemplateGenerationService.MapResponse(job))]);
     }
 
     public async Task<Result<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>> GetAdminFailureBreakdownAsync(Guid templateId, CancellationToken cancellationToken)
@@ -244,7 +244,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             .Where(x => x.TemplateId == templateId && x.Status == TemplateGenerationStatus.Failed)
             .Select(x => new
             {
-                x.FailureCode,
+                FailureCode = x.LastErrorCode,
                 LastOccurredAtUtc = x.CompletedAtUtc ?? x.StartedAtUtc ?? x.CreatedAtUtc
             })
             .ToArrayAsync(cancellationToken);
@@ -431,9 +431,9 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
                     x.UsedPreprocessingModel,
                     x.UsedKlingModel,
                     x.MotionProviderCostUsd,
-                    x.FailureCode,
-                    x.FailureMessage,
-                    x.OutputUrl,
+                    x.LastErrorCode,
+                    x.LastErrorMessage,
+                    x.ResultUrl,
                     x.CreatedAtUtc,
                     x.StartedAtUtc,
                     x.CompletedAtUtc))

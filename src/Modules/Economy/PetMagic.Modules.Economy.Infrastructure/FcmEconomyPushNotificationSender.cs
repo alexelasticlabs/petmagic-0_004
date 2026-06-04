@@ -19,9 +19,11 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 internal sealed class FcmEconomyPushNotificationSender(
     EconomyDbContext dbContext,
     IOptions<EconomyOptions> options,
-    HttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     ILogger<FcmEconomyPushNotificationSender> logger) : IEconomyPushNotificationSender
 {
+    public const string HttpClientName = "EconomyFcm";
+
     private const string FirebaseMessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private GoogleCredential? credential;
@@ -143,7 +145,7 @@ internal sealed class FcmEconomyPushNotificationSender(
         };
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+        using var response = await httpClientFactory.CreateClient(HttpClientName).SendAsync(httpRequest, cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (response.IsSuccessStatusCode)
         {

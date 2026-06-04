@@ -17,6 +17,7 @@ public static class AdminEconomyEndpoints
     {
         var group = endpoints.MapGroup("/api/admin/economy")
             .WithTags("Admin.Economy")
+            .RequireRateLimiting("admin")
             .RequireAuthorization("ModeratorOrAdmin");
 
         group.MapGet("/ledger", GetWalletLedgerAsync);

@@ -53,7 +53,7 @@ public sealed class TemplateMediaCleanupProcessorTests
         job.SourceImageUrl = "http://localhost:5000/templates-media/source.jpg";
         job.NormalizedImageUrl = "http://localhost:5000/templates-media/normalized.jpg";
         job.ReferenceMotionUrl = "http://localhost:5000/templates-media/reference.mp4";
-        job.OutputUrl = "http://localhost:5000/templates-media/output.mp4";
+        job.ResultUrl = "http://localhost:5000/templates-media/output.mp4";
         job.RefundAttemptCount = 2;
         job.RefundLastErrorCode = "economy.unavailable";
         job.RefundLastAttemptedAtUtc = DateTime.UtcNow.AddDays(-9);
@@ -73,7 +73,7 @@ public sealed class TemplateMediaCleanupProcessorTests
         Assert.NotNull(persisted.UserMediaDeletedAtUtc);
         Assert.Equal(string.Empty, persisted.SourceImageUrl);
         Assert.Null(persisted.NormalizedImageUrl);
-        Assert.Null(persisted.OutputUrl);
+        Assert.Null(persisted.ResultUrl);
         Assert.Null(persisted.UserMediaCleanupFailureCode);
         Assert.Contains("http://localhost:5000/templates-media/source.jpg", mediaStorage.DeletedUrls);
         Assert.Contains("http://localhost:5000/templates-media/normalized.jpg", mediaStorage.DeletedUrls);

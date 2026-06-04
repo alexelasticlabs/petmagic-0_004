@@ -73,6 +73,18 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], true),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
             GenerationWorkerPollIntervalMilliseconds = ParseInt(section["GenerationWorkerPollIntervalMilliseconds"], 1_000),
+            MaxConcurrentJobsPerWorker = ParsePositiveInt(section["MaxConcurrentJobsPerWorker"], 1),
+            GlobalMaxConcurrentGenerations = ParsePositiveInt(section["GlobalMaxConcurrentGenerations"], 3),
+            MaxAiProviderRequestsPerMinute = ParseNonNegativeInt(section["MaxAiProviderRequestsPerMinute"], 60),
+            QueueMaxSize = ParseNonNegativeInt(section["QueueMaxSize"], 1_000),
+            EstimatedVideoGenerationSeconds = ParsePositiveInt(section["EstimatedVideoGenerationSeconds"], 120),
+            EstimatedImageGenerationSeconds = ParsePositiveInt(section["EstimatedImageGenerationSeconds"], 60),
+            FreeUserMaxActiveGenerations = ParsePositiveInt(section["FreeUserMaxActiveGenerations"], 1),
+            PremiumUserMaxActiveGenerations = ParsePositiveInt(section["PremiumUserMaxActiveGenerations"], 3),
+            PrivilegedUserMaxActiveGenerations = ParsePositiveInt(section["PrivilegedUserMaxActiveGenerations"], 10),
+            JobLockTimeoutMilliseconds = ParsePositiveInt(
+                section["JobLockTimeoutMilliseconds"] ?? section["StaleProcessingRecoveryDelayMilliseconds"],
+                900_000),
             StaleProcessingRecoveryDelayMilliseconds = ParsePositiveInt(section["StaleProcessingRecoveryDelayMilliseconds"], 900_000),
             MaxGenerationAttempts = ParsePositiveInt(section["MaxGenerationAttempts"], 3),
             MaxRefundAttempts = ParsePositiveInt(section["MaxRefundAttempts"], 5),
@@ -122,11 +134,10 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<ITemplateMediaUploadPolicy, ConfiguredTemplateMediaUploadPolicy>();
         services.AddSingleton<IMediaMetadataReader, FileMediaMetadataReader>();
         AddMediaStorage(services, options);
-        AddAiProviders(services, options);
-        AddGeneratedMediaImporter(services, options);
         AddGenerationBilling(services);
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
+        services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName);
         services.AddScoped<NoopTemplateGenerationPushNotificationSender>();
         services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>();
         services.AddScoped<ITemplateGenerationPushNotificationSender>(serviceProvider =>
@@ -140,12 +151,27 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddScoped<ITemplatesService, TemplatesService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
-        services.AddScoped<TemplateGenerationJobProcessor>();
         services.AddScoped<TemplateMediaCleanupProcessor>();
-        services.AddHostedService<TemplateGenerationWorker>();
-        services.AddHostedService<TemplateMediaCleanupWorker>();
+        if (options.GenerationWorkerEnabled)
+        {
+            AddGenerationWorkerServices(services, options);
+            services.AddHostedService<TemplateGenerationWorker>();
+        }
+
+        if (options.MediaCleanupWorkerEnabled)
+        {
+            services.AddHostedService<TemplateMediaCleanupWorker>();
+        }
 
         return services;
+    }
+
+    private static void AddGenerationWorkerServices(IServiceCollection services, TemplatesOptions options)
+    {
+        AddAiProviders(services, options);
+        AddGeneratedMediaImporter(services, options);
+        services.AddScoped<TemplateAiProviderRateLimiter>();
+        services.AddScoped<TemplateGenerationJobProcessor>();
     }
 
     public static async Task EnsureTemplatesSeedDataAsync(this IServiceProvider serviceProvider)
@@ -153,6 +179,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         using var scope = serviceProvider.CreateScope();
         var options = scope.ServiceProvider.GetRequiredService<TemplatesOptions>();
         var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+        var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
 
         await dbContext.Database.MigrateAsync();
         // Guard against environments where migration history drift left the column missing.
@@ -174,7 +201,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             ALTER COLUMN "LocalizedTextsJson" TYPE text USING "LocalizedTextsJson"::text;
             """);
 
-        await BackfillTemplateLocalizationsAsync(dbContext, options, cancellationToken: default);
+        await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
 
         if (!options.SeedSampleTemplates)
         {
@@ -290,10 +317,14 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         );
 
         await dbContext.SaveChangesAsync();
-        await BackfillTemplateLocalizationsAsync(dbContext, options, cancellationToken: default);
+        await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
     }
 
-    private static async Task BackfillTemplateLocalizationsAsync(TemplatesDbContext dbContext, TemplatesOptions options, CancellationToken cancellationToken)
+    private static async Task BackfillTemplateLocalizationsAsync(
+        TemplatesDbContext dbContext,
+        TemplatesOptions options,
+        IHttpClientFactory httpClientFactory,
+        CancellationToken cancellationToken)
     {
         var templates = await dbContext.TemplateItems
             .Where(template => template.DeletedAtUtc == null && string.IsNullOrWhiteSpace(template.LocalizedTextsJson))
@@ -316,6 +347,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 template.KlingPrompt,
                 options.SupportedLocalizationLocales,
                 options.SourceLocalizationLocale,
+                httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
                 cancellationToken);
         }
 
@@ -383,10 +415,10 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             }
 
             services.AddHttpClient(FalQueueClient.HttpClientName);
-            services.AddSingleton<FalQueueClient>();
-            services.AddSingleton<IImagePreprocessor, FalImagePreprocessor>();
-            services.AddSingleton<IImageGenerator, FalImageGenerator>();
-            services.AddSingleton<IVideoMotionGenerator, FalVideoMotionGenerator>();
+            services.AddScoped<FalQueueClient>();
+            services.AddScoped<IImagePreprocessor, FalImagePreprocessor>();
+            services.AddScoped<IImageGenerator, FalImageGenerator>();
+            services.AddScoped<IVideoMotionGenerator, FalVideoMotionGenerator>();
             return;
         }
 

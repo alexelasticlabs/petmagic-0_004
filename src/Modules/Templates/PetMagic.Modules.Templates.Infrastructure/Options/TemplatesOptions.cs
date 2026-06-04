@@ -38,6 +38,26 @@ public sealed class TemplatesOptions
 
     public int GenerationWorkerPollIntervalMilliseconds { get; init; } = 1_000;
 
+    public int MaxConcurrentJobsPerWorker { get; init; } = 1;
+
+    public int GlobalMaxConcurrentGenerations { get; init; } = 3;
+
+    public int MaxAiProviderRequestsPerMinute { get; init; } = 60;
+
+    public int QueueMaxSize { get; init; } = 1_000;
+
+    public int EstimatedVideoGenerationSeconds { get; init; } = 120;
+
+    public int EstimatedImageGenerationSeconds { get; init; } = 60;
+
+    public int FreeUserMaxActiveGenerations { get; init; } = 1;
+
+    public int PremiumUserMaxActiveGenerations { get; init; } = 3;
+
+    public int PrivilegedUserMaxActiveGenerations { get; init; } = 10;
+
+    public int JobLockTimeoutMilliseconds { get; init; } = 900_000;
+
     public int StaleProcessingRecoveryDelayMilliseconds { get; init; } = 900_000;
 
     public int MaxGenerationAttempts { get; init; } = 3;

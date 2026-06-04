@@ -531,11 +531,7 @@ public sealed partial class EconomyService
         if (string.IsNullOrWhiteSpace(paymentResult.Value.CheckoutUrl)
             && string.IsNullOrWhiteSpace(paymentResult.Value.PaymentIntentClientSecret))
         {
-            EmptyCheckoutUrlCounter.Add(
-                1,
-                new KeyValuePair<string, object?>("provider", provider),
-                new KeyValuePair<string, object?>("platform", command.Platform),
-                new KeyValuePair<string, object?>("currency", order.CurrencyCode));
+            EconomyMetrics.RecordEmptyCheckoutUrl(provider, command.Platform, order.CurrencyCode);
 
             logger?.LogWarning(
                 "Payment gateway returned empty checkout URL for wallet top-up. OrderId={OrderId} UserId={UserId} PackId={PackId} Provider={Provider} ExternalPaymentId={ExternalPaymentId}",

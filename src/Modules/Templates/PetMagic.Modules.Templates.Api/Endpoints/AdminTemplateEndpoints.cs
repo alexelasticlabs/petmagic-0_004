@@ -23,7 +23,7 @@ public static class AdminTemplateEndpoints
         var group = endpoints.MapGroup("/api/admin/templates")
             .WithTags("Admin.Templates")
             .RequireAuthorization("ModeratorOrAdmin")
-            .RequireRateLimiting("templates");
+            .RequireRateLimiting("admin");
 
         group.MapGet("/", ListAsync);
         group.MapGet("/analytics", GetAnalyticsOverviewAsync);

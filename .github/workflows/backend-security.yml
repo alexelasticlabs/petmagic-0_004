@@ -7,19 +7,26 @@ on:
       - main
       - master
       - develop
-    paths:
-      - src/**
-      - tests/**
-      - PetMagic.slnx
-      - .github/workflows/backend-security.yml
   pull_request:
-    paths:
-      - src/**
-      - tests/**
-      - PetMagic.slnx
-      - .github/workflows/backend-security.yml
 
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   dependency-review:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

@@ -48,6 +48,7 @@ public sealed class IdentityApiStartupSmokeTests
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddPolicy("auth", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("admin", _ => RateLimitPartition.GetNoLimiter("tests"));
             });
 
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)

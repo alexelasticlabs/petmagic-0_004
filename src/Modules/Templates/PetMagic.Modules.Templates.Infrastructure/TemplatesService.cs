@@ -10,7 +10,8 @@ internal sealed partial class TemplatesService(
     IMediaMetadataReader metadataReader,
     IMediaStorage mediaStorage,
     ITemplateMediaLifecycleService mediaLifecycleService,
-    ITemplateFeedRealtimeService templateFeedRealtimeService) : ITemplatesService
+    ITemplateFeedRealtimeService templateFeedRealtimeService,
+    IHttpClientFactory httpClientFactory) : ITemplatesService
 {
     private readonly TemplateCategoryAdminService _templateCategoryAdminService =
         new(dbContext, templateFeedRealtimeService);

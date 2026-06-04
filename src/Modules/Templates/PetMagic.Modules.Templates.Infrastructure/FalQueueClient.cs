@@ -8,7 +8,10 @@ using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, TemplatesOptions options)
+internal sealed class FalQueueClient(
+    IHttpClientFactory httpClientFactory,
+    TemplatesOptions options,
+    TemplateAiProviderRateLimiter rateLimiter)
 {
     public const string HttpClientName = "FalQueue";
 
@@ -18,7 +21,7 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
     {
         if (!options.Fal.IsConfigured)
         {
-            return Result.Failure<FalQueueRunResult>(TemplatesErrors.AiProviderUnavailable);
+            return ProviderFailure<FalQueueRunResult>("configuration", model, TemplatesErrors.AiProviderUnavailable);
         }
 
         try
@@ -34,10 +37,11 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
 
             submitRequest.Content = new StringContent(JsonSerializer.Serialize(input, JsonOptions), Encoding.UTF8, "application/json");
 
+            await rateLimiter.WaitForPermitAsync("fal", cancellationToken);
             using var submitResponse = await CreateClient().SendAsync(submitRequest, cancellationToken);
             if (!submitResponse.IsSuccessStatusCode)
             {
-                return Result.Failure<FalQueueRunResult>(TemplatesErrors.AiProviderFailed);
+                return ProviderFailure<FalQueueRunResult>("submit", model, TemplatesErrors.AiProviderFailed);
             }
 
             var submitBody = await submitResponse.Content.ReadAsStringAsync(cancellationToken);
@@ -47,12 +51,12 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
             var responseUrl = ReadRequiredString(submitDocument.RootElement, "response_url");
             if (statusUrl is null || responseUrl is null)
             {
-                return Result.Failure<FalQueueRunResult>(TemplatesErrors.AiProviderFailed);
+                return ProviderFailure<FalQueueRunResult>("submit.parse", model, TemplatesErrors.AiProviderFailed);
             }
 
             for (var attempt = 0; attempt < options.Fal.MaxPollingAttempts; attempt++)
             {
-                var statusResult = await FetchStatusAsync(statusUrl, cancellationToken);
+                var statusResult = await FetchStatusAsync(statusUrl, model, cancellationToken);
                 if (statusResult.IsFailure)
                 {
                     return Result.Failure<FalQueueRunResult>(statusResult.Error);
@@ -64,10 +68,10 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
                 {
                     if (!string.IsNullOrWhiteSpace(ReadRequiredString(statusDocument.RootElement, "error")))
                     {
-                        return Result.Failure<FalQueueRunResult>(TemplatesErrors.AiProviderFailed);
+                        return ProviderFailure<FalQueueRunResult>("status.error", model, TemplatesErrors.AiProviderFailed);
                     }
 
-                    var responseResult = await FetchResponseAsync(responseUrl, cancellationToken);
+                    var responseResult = await FetchResponseAsync(responseUrl, model, cancellationToken);
                     if (responseResult.IsFailure)
                     {
                         return Result.Failure<FalQueueRunResult>(responseResult.Error);
@@ -82,13 +86,13 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
                 if (!string.Equals(status, "IN_QUEUE", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(status, "IN_PROGRESS", StringComparison.OrdinalIgnoreCase))
                 {
-                    return Result.Failure<FalQueueRunResult>(TemplatesErrors.AiProviderFailed);
+                    return ProviderFailure<FalQueueRunResult>("status", model, TemplatesErrors.AiProviderFailed);
                 }
 
                 await Task.Delay(Math.Max(options.Fal.PollIntervalMilliseconds, 250), cancellationToken);
             }
 
-            return Result.Failure<FalQueueRunResult>(TemplatesErrors.AiProviderTimedOut);
+            return ProviderFailure<FalQueueRunResult>("poll.timeout", model, TemplatesErrors.AiProviderTimedOut);
         }
         catch (OperationCanceledException)
         {
@@ -96,11 +100,11 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
         }
         catch
         {
-            return Result.Failure<FalQueueRunResult>(TemplatesErrors.AiProviderFailed);
+            return ProviderFailure<FalQueueRunResult>("request.exception", model, TemplatesErrors.AiProviderFailed);
         }
     }
 
-    private async Task<Result<JsonDocument>> FetchStatusAsync(string statusUrl, CancellationToken cancellationToken)
+    private async Task<Result<JsonDocument>> FetchStatusAsync(string statusUrl, string model, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, statusUrl);
         ApplyAuth(request);
@@ -108,14 +112,14 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
         using var response = await CreateClient().SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            return Result.Failure<JsonDocument>(TemplatesErrors.AiProviderFailed);
+            return ProviderFailure<JsonDocument>("status", model, TemplatesErrors.AiProviderFailed);
         }
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         return Result.Success(JsonDocument.Parse(body));
     }
 
-    private async Task<Result<JsonDocument>> FetchResponseAsync(string responseUrl, CancellationToken cancellationToken)
+    private async Task<Result<JsonDocument>> FetchResponseAsync(string responseUrl, string model, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, responseUrl);
         ApplyAuth(request);
@@ -123,7 +127,7 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
         using var response = await CreateClient().SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            return Result.Failure<JsonDocument>(TemplatesErrors.AiProviderFailed);
+            return ProviderFailure<JsonDocument>("response", model, TemplatesErrors.AiProviderFailed);
         }
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -174,6 +178,12 @@ internal sealed class FalQueueClient(IHttpClientFactory httpClientFactory, Templ
         }
 
         return null;
+    }
+
+    private static Result<T> ProviderFailure<T>(string stage, string model, Error error)
+    {
+        TemplateGenerationMetrics.RecordAiProviderError("fal", stage, error.Code, model);
+        return Result.Failure<T>(error);
     }
 }
 

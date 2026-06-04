@@ -134,13 +134,16 @@ public static class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapPost("/webhooks/stripe", StripeWebhookAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting("webhooks");
 
         group.MapPost("/webhooks/app-store", AppStoreServerNotificationAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting("webhooks");
 
         group.MapPost("/webhooks/google-play", GooglePlayDeveloperNotificationAsync)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting("webhooks");
 
         var stripePaymentsGroup = endpoints.MapGroup("/api/payments/stripe")
             .WithTags("Stripe Payments")

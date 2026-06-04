@@ -8,6 +8,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal static class TemplateLocalizationTranslator
 {
+    public const string HttpClientName = "TemplateLocalizationTranslator";
+
     private static readonly Regex PlaceholderPattern = new(@"\{[^{}]+\}", RegexOptions.Compiled);
     private const string SourceLocale = "en";
     private const string NewlineToken = "___PM_NL___";
@@ -22,6 +24,7 @@ internal static class TemplateLocalizationTranslator
         string? klingPrompt,
         IEnumerable<string> targetLocales,
         string? sourceLocale,
+        HttpClient httpClient,
         CancellationToken cancellationToken)
     {
         var normalizedSourceLocale = NormalizeLocale(sourceLocale) ?? SourceLocale;
@@ -34,12 +37,12 @@ internal static class TemplateLocalizationTranslator
                 continue;
             }
 
-            var translatedTitle = await TranslateAsync(locale, title, normalizedSourceLocale, cancellationToken);
-            var translatedShortDescription = await TranslateAsync(locale, shortDescription, normalizedSourceLocale, cancellationToken);
-            var translatedPetPhotoRequirements = await TranslateListAsync(locale, petPhotoRequirements, normalizedSourceLocale, cancellationToken);
-            var translatedImagePrompt = await TranslateOptionalAsync(locale, imagePrompt, normalizedSourceLocale, cancellationToken);
-            var translatedPreprocessingPrompt = await TranslateOptionalAsync(locale, preprocessingPrompt, normalizedSourceLocale, cancellationToken);
-            var translatedKlingPrompt = await TranslateOptionalAsync(locale, klingPrompt, normalizedSourceLocale, cancellationToken);
+            var translatedTitle = await TranslateAsync(locale, title, normalizedSourceLocale, httpClient, cancellationToken);
+            var translatedShortDescription = await TranslateAsync(locale, shortDescription, normalizedSourceLocale, httpClient, cancellationToken);
+            var translatedPetPhotoRequirements = await TranslateListAsync(locale, petPhotoRequirements, normalizedSourceLocale, httpClient, cancellationToken);
+            var translatedImagePrompt = await TranslateOptionalAsync(locale, imagePrompt, normalizedSourceLocale, httpClient, cancellationToken);
+            var translatedPreprocessingPrompt = await TranslateOptionalAsync(locale, preprocessingPrompt, normalizedSourceLocale, httpClient, cancellationToken);
+            var translatedKlingPrompt = await TranslateOptionalAsync(locale, klingPrompt, normalizedSourceLocale, httpClient, cancellationToken);
 
             if (string.IsNullOrWhiteSpace(translatedTitle) || string.IsNullOrWhiteSpace(translatedShortDescription))
             {
@@ -112,6 +115,7 @@ internal static class TemplateLocalizationTranslator
         string targetLocale,
         IReadOnlyList<string>? values,
         string sourceLocale,
+        HttpClient httpClient,
         CancellationToken cancellationToken)
     {
         if (values is null || values.Count == 0)
@@ -122,7 +126,7 @@ internal static class TemplateLocalizationTranslator
         var translatedValues = new List<string>(values.Count);
         foreach (var value in values)
         {
-            var translated = await TranslateOptionalAsync(targetLocale, value, sourceLocale, cancellationToken);
+            var translated = await TranslateOptionalAsync(targetLocale, value, sourceLocale, httpClient, cancellationToken);
             if (string.IsNullOrWhiteSpace(translated))
             {
                 translatedValues.Add(value);
@@ -140,6 +144,7 @@ internal static class TemplateLocalizationTranslator
         string targetLocale,
         string? value,
         string sourceLocale,
+        HttpClient httpClient,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -147,10 +152,15 @@ internal static class TemplateLocalizationTranslator
             return null;
         }
 
-        return await TranslateAsync(targetLocale, value, sourceLocale, cancellationToken);
+        return await TranslateAsync(targetLocale, value, sourceLocale, httpClient, cancellationToken);
     }
 
-    private static async Task<string?> TranslateAsync(string targetLocale, string text, string sourceLocale, CancellationToken cancellationToken)
+    private static async Task<string?> TranslateAsync(
+        string targetLocale,
+        string text,
+        string sourceLocale,
+        HttpClient httpClient,
+        CancellationToken cancellationToken)
     {
         var protectedText = ProtectText(text);
         var query = string.Create(
@@ -160,7 +170,6 @@ internal static class TemplateLocalizationTranslator
 
         try
         {
-            using var httpClient = new HttpClient();
             using var response = await httpClient.GetAsync(requestUri, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {

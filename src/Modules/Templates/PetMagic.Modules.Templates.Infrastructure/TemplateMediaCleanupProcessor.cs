@@ -89,7 +89,7 @@ internal sealed class TemplateMediaCleanupProcessor(
             {
                 job.SourceImageUrl,
                 job.NormalizedImageUrl,
-                job.OutputUrl
+                job.ResultUrl
             }
             .Where(url => !string.IsNullOrWhiteSpace(url))
             .Cast<string>()
@@ -111,7 +111,7 @@ internal sealed class TemplateMediaCleanupProcessor(
 
         job.SourceImageUrl = string.Empty;
         job.NormalizedImageUrl = null;
-        job.OutputUrl = null;
+        job.ResultUrl = null;
         job.UserMediaDeletedAtUtc = now;
         job.LastUserMediaCleanupAttemptAtUtc = now;
         job.UserMediaCleanupFailureCode = null;

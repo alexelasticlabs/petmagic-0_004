@@ -13,20 +13,31 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 
 public sealed partial class IdentityService
 {
-    public async Task<Result<IReadOnlyList<UserListItemResponse>>> ListUsersAsync(CancellationToken cancellationToken)
+    public async Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, CancellationToken cancellationToken)
     {
+        var normalizedSkip = Math.Max(0, skip);
+        var normalizedTake = NormalizeTake(take, 100, 200);
         var users = await userManager.Users
             .AsNoTracking()
             .OrderByDescending(x => x.CreatedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .Skip(normalizedSkip)
+            .Take(normalizedTake + 1)
             .ToListAsync(cancellationToken);
 
         if (users.Count == 0)
         {
-            return Result.Success<IReadOnlyList<UserListItemResponse>>([]);
+            return Result.Success(new UserListPageResponse([], normalizedSkip, normalizedTake, HasMore: false));
+        }
+
+        var hasMore = users.Count > normalizedTake;
+        if (hasMore)
+        {
+            users.RemoveAt(users.Count - 1);
         }
 
         var userIds = users.Select(x => x.Id).ToArray();
-        var rolesByUserId = await dbContext.UserRoles
+        var roleRows = await dbContext.UserRoles
             .AsNoTracking()
             .Where(x => userIds.Contains(x.UserId))
             .Join(
@@ -38,13 +49,15 @@ public sealed partial class IdentityService
                     userRole.UserId,
                     RoleName = role.Name ?? string.Empty
                 })
+            .ToListAsync(cancellationToken);
+
+        var rolesByUserId = roleRows
             .GroupBy(x => x.UserId)
-            .ToDictionaryAsync(
+            .ToDictionary(
                 group => group.Key,
                 group => (IReadOnlyList<string>)[.. group
                     .Select(x => x.RoleName)
-                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)],
-                cancellationToken);
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)]);
 
         var output = users
             .Select(user => new UserListItemResponse(
@@ -64,7 +77,7 @@ public sealed partial class IdentityService
                 ToAvatarResponse(user)))
             .ToArray();
 
-        return Result.Success<IReadOnlyList<UserListItemResponse>>(output);
+        return Result.Success(new UserListPageResponse(output, normalizedSkip, normalizedTake, hasMore));
     }
 
     public async Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -332,5 +345,15 @@ public sealed partial class IdentityService
         await WriteAuditAsync(userId, auditAction, auditDetails, cancellationToken);
 
         return Result.Success();
+    }
+
+    private static int NormalizeTake(int take, int fallback, int max)
+    {
+        if (take <= 0)
+        {
+            return fallback;
+        }
+
+        return Math.Min(take, max);
     }
 }

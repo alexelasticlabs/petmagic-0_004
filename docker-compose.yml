@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-PetMagic_DevPassword123}"
       POSTGRES_DB: petmagic_db
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,13 +25,13 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 5000
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:-PetMagic_DevPassword123};"
-      Jwt__SigningKey: "${JWT_SIGNING_KEY:-PetMagicDemoSigningKey12345DemoSigningKey}"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env. Generate with openssl rand -base64 64}"
       Jwt__Issuer: petmagic.app
       Jwt__Audience: petmagic-admin
       DataProtection__CertificatePassword: "${DATA_PROTECTION_CERTIFICATE_PASSWORD:-PetMagic.DataProtection.Dev.2026}"
-      BootstrapAdmin__Email: admin@petmagic.app
-      BootstrapAdmin__Password: PetMagic!Admin2026
-      BootstrapAdmin__DisplayName: PetMagic Admin
+      BootstrapAdmin__Email: "${BOOTSTRAP_ADMIN_EMAIL:-admin@petmagic.app}"
+      BootstrapAdmin__Password: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
+      BootstrapAdmin__DisplayName: "${BOOTSTRAP_ADMIN_DISPLAY_NAME:-PetMagic Admin}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
       APPLE_CLIENT_ID: "${APPLE_CLIENT_ID:-}"
@@ -60,9 +60,16 @@ services:
       Identity__AvatarStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
       SupportChat__AttachmentStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
       Templates__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
+      Templates__GenerationWorkerEnabled: "false"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
     ports:
-      - "5000:5000"
+      - "${BACKEND_HOST_PORT:-5000}:5000"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl --fail --silent http://localhost:5000/health >/dev/null || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     volumes:
       - backend_data_protection:/root/.aspnet/DataProtection-Keys
       - backend_support_attachments:/app/wwwroot/support-attachments
@@ -70,6 +77,42 @@ services:
       - backend_template_media:/app/wwwroot/templates-media
     depends_on:
       postgres:
+        condition: service_healthy
+    networks:
+      - petmagic-network
+
+  generation-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.generation-worker
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:-PetMagic_DevPassword123};"
+      FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
+      R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
+      R2_ACCESS_KEY: "${R2_ACCESS_KEY:-}"
+      R2_SECRET_KEY: "${R2_SECRET_KEY:-}"
+      R2_BUCKET_NAME: "${R2_BUCKET_NAME:-}"
+      R2_PUBLIC_URL: "${R2_PUBLIC_URL:-}"
+      Templates__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
+      Templates__GenerationWorkerEnabled: "true"
+      Templates__MediaCleanupWorkerEnabled: "false"
+      Templates__MaxConcurrentJobsPerWorker: "${GENERATION_WORKER_MAX_CONCURRENT_JOBS:-1}"
+      Templates__GlobalMaxConcurrentGenerations: "${GENERATION_GLOBAL_MAX_CONCURRENT:-3}"
+      Templates__MaxAiProviderRequestsPerMinute: "${GENERATION_PROVIDER_MAX_RPM:-60}"
+      Templates__MaxGenerationAttempts: "${GENERATION_MAX_ATTEMPTS:-3}"
+      Templates__JobLockTimeoutMilliseconds: "${GENERATION_JOB_LOCK_TIMEOUT_MS:-900000}"
+      Templates__QueueMaxSize: "${GENERATION_QUEUE_MAX_SIZE:-1000}"
+      Templates__EstimatedVideoGenerationSeconds: "${GENERATION_ESTIMATED_VIDEO_SECONDS:-120}"
+      Templates__EstimatedImageGenerationSeconds: "${GENERATION_ESTIMATED_IMAGE_SECONDS:-60}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+    volumes:
+      - backend_template_media:/app/wwwroot/templates-media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
         condition: service_healthy
     networks:
       - petmagic-network
@@ -82,7 +125,7 @@ services:
       NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}"
       INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:-http://backend:5000}"
     ports:
-      - "3000:3000"
+      - "${ADMIN_WEB_HOST_PORT:-3000}:3000"
     depends_on:
       - backend
     networks:

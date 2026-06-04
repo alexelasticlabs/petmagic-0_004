@@ -32,6 +32,16 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TemplateAiProviders.Fake, options.AiProvider);
         Assert.True(options.GenerationWorkerEnabled);
         Assert.Equal(1_000, options.GenerationWorkerPollIntervalMilliseconds);
+        Assert.Equal(1, options.MaxConcurrentJobsPerWorker);
+        Assert.Equal(3, options.GlobalMaxConcurrentGenerations);
+        Assert.Equal(60, options.MaxAiProviderRequestsPerMinute);
+        Assert.Equal(900_000, options.JobLockTimeoutMilliseconds);
+        Assert.Equal(1_000, options.QueueMaxSize);
+        Assert.Equal(120, options.EstimatedVideoGenerationSeconds);
+        Assert.Equal(60, options.EstimatedImageGenerationSeconds);
+        Assert.Equal(1, options.FreeUserMaxActiveGenerations);
+        Assert.Equal(3, options.PremiumUserMaxActiveGenerations);
+        Assert.Equal(10, options.PrivilegedUserMaxActiveGenerations);
         Assert.Equal(900_000, options.StaleProcessingRecoveryDelayMilliseconds);
         Assert.Equal(3, options.MaxGenerationAttempts);
         Assert.Equal(5, options.MaxRefundAttempts);
@@ -69,6 +79,13 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:Fal:ApiKey"] = "test-fal-key",
             ["Templates:Fal:QueueBaseUrl"] = "https://queue.fal.run",
             ["Templates:GenerationWorkerPollIntervalMilliseconds"] = "250",
+            ["Templates:MaxConcurrentJobsPerWorker"] = "2",
+            ["Templates:GlobalMaxConcurrentGenerations"] = "5",
+            ["Templates:MaxAiProviderRequestsPerMinute"] = "12",
+            ["Templates:JobLockTimeoutMilliseconds"] = "450000",
+            ["Templates:QueueMaxSize"] = "25",
+            ["Templates:EstimatedVideoGenerationSeconds"] = "180",
+            ["Templates:EstimatedImageGenerationSeconds"] = "45",
             ["Templates:StaleProcessingRecoveryDelayMilliseconds"] = "600000",
             ["Templates:MaxGenerationAttempts"] = "4",
             ["Templates:MaxRefundAttempts"] = "6",
@@ -92,12 +109,20 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var imagePreprocessor = provider.GetRequiredService<IImagePreprocessor>();
         var videoMotionGenerator = provider.GetRequiredService<IVideoMotionGenerator>();
         var generatedMediaImporter = provider.GetRequiredService<IGeneratedMediaImporter>();
+        var hostedServices = provider.GetServices<IHostedService>();
 
         Assert.Equal(TemplateStorageProviders.R2, options.StorageProvider);
         Assert.Equal(TemplateAiProviders.Fal, options.AiProvider);
         Assert.Equal("petmagic-test", options.R2.BucketName);
         Assert.Equal("test-fal-key", options.Fal.ApiKey);
         Assert.Equal(250, options.GenerationWorkerPollIntervalMilliseconds);
+        Assert.Equal(2, options.MaxConcurrentJobsPerWorker);
+        Assert.Equal(5, options.GlobalMaxConcurrentGenerations);
+        Assert.Equal(12, options.MaxAiProviderRequestsPerMinute);
+        Assert.Equal(450_000, options.JobLockTimeoutMilliseconds);
+        Assert.Equal(25, options.QueueMaxSize);
+        Assert.Equal(180, options.EstimatedVideoGenerationSeconds);
+        Assert.Equal(45, options.EstimatedImageGenerationSeconds);
         Assert.Equal(600_000, options.StaleProcessingRecoveryDelayMilliseconds);
         Assert.Equal(4, options.MaxGenerationAttempts);
         Assert.Equal(6, options.MaxRefundAttempts);
@@ -114,6 +139,34 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal("FalImagePreprocessor", imagePreprocessor.GetType().Name);
         Assert.Equal("FalVideoMotionGenerator", videoMotionGenerator.GetType().Name);
         Assert.Equal("HttpGeneratedMediaImporter", generatedMediaImporter.GetType().Name);
+        Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateGenerationWorker");
+        Assert.DoesNotContain(hostedServices, service => service.GetType().Name == "TemplateMediaCleanupWorker");
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldNotRegisterGenerationWorker_WhenDisabled()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "false"
+        });
+
+        services.AddTemplatesInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<TemplatesOptions>();
+        var hostedServices = provider.GetServices<IHostedService>();
+
+        Assert.False(options.GenerationWorkerEnabled);
+        Assert.Empty(provider.GetServices<IImagePreprocessor>());
+        Assert.Empty(provider.GetServices<IImageGenerator>());
+        Assert.Empty(provider.GetServices<IVideoMotionGenerator>());
+        Assert.Empty(provider.GetServices<IGeneratedMediaImporter>());
+        Assert.Empty(provider.GetServices<TemplateGenerationJobProcessor>());
+        Assert.DoesNotContain(hostedServices, service => service.GetType().Name == "TemplateGenerationWorker");
+        Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateMediaCleanupWorker");
     }
 
     [Fact]

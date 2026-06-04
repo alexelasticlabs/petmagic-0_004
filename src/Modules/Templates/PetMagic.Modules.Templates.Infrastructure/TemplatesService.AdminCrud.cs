@@ -58,6 +58,7 @@ internal sealed partial class TemplatesService
             template.KlingPrompt,
             options.SupportedLocalizationLocales,
             options.SourceLocalizationLocale,
+            httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
             cancellationToken);
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
@@ -168,6 +169,7 @@ internal sealed partial class TemplatesService
                 template.KlingPrompt,
                 options.SupportedLocalizationLocales,
                 options.SourceLocalizationLocale,
+                httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
                 cancellationToken);
 
             var staleChanges = dbContext.ChangeTracker
@@ -246,6 +248,7 @@ internal sealed partial class TemplatesService
             template.KlingPrompt,
             options.SupportedLocalizationLocales,
             options.SourceLocalizationLocale,
+            httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
             cancellationToken);
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
@@ -329,6 +332,7 @@ internal sealed partial class TemplatesService
             template.KlingPrompt,
             options.SupportedLocalizationLocales,
             options.SourceLocalizationLocale,
+            httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
             cancellationToken);
         var now = DateTime.UtcNow;
 
@@ -384,6 +388,7 @@ internal sealed partial class TemplatesService
                 template.KlingPrompt,
                 options.SupportedLocalizationLocales,
                 options.SourceLocalizationLocale,
+                httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
                 cancellationToken);
 
             var staleChanges = dbContext.ChangeTracker

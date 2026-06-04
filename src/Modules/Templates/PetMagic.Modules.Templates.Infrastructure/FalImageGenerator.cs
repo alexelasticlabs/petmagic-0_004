@@ -28,9 +28,13 @@ internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGene
         }
 
         using var document = result.Value.Response;
-        return TryReadFirstImageUrl(document.RootElement, out var imageUrl)
-            ? Result.Success(new ImageGenerationResult(imageUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds))
-            : Result.Failure<ImageGenerationResult>(TemplatesErrors.AiProviderFailed);
+        if (TryReadFirstImageUrl(document.RootElement, out var imageUrl))
+        {
+            return Result.Success(new ImageGenerationResult(imageUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds));
+        }
+
+        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, model);
+        return Result.Failure<ImageGenerationResult>(TemplatesErrors.AiProviderFailed);
     }
 
     private static bool TryReadFirstImageUrl(JsonElement root, out string imageUrl)

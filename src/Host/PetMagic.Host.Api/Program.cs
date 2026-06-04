@@ -1,14 +1,18 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Claims;
 using System.Diagnostics;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Http;
 
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
+using PetMagic.Host.Api.Observability;
 using PetMagic.Modules.Economy.Api;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Host.Api.Security;
@@ -34,8 +38,11 @@ builder.Host.UseSerilog((context, loggerConfiguration) =>
 });
 
 builder.Services.AddOpenApi();
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(SafeProblemDetailsOptions.Configure);
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<CorrelationIdDelegatingHandler>();
+builder.Services.ConfigureAll<HttpClientFactoryOptions>(CorrelationIdHttpClientFactoryOptions.AddCorrelationIdHandler);
 
 var dataProtectionKeysPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -88,9 +95,12 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddRateLimiter(options =>
 {
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = RateLimitProblemResponse.WriteAsync;
+
     options.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "global",
+            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 30,
@@ -101,9 +111,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("economy", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.User.FindFirst("sub")?.Value
-                ?? httpContext.Connection.RemoteIpAddress?.ToString()
-                ?? "global",
+            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 60,
@@ -114,9 +122,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("templates", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.User.FindFirst("sub")?.Value
-                ?? httpContext.Connection.RemoteIpAddress?.ToString()
-                ?? "global",
+            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 90,
@@ -125,11 +131,31 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
             }));
 
+    options.AddPolicy("generation-create", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 12,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+
+    options.AddPolicy("generation-status", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 180,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+
     options.AddPolicy("support-chat", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.User.FindFirst("sub")?.Value
-                ?? httpContext.Connection.RemoteIpAddress?.ToString()
-                ?? "global",
+            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 60,
@@ -138,9 +164,31 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
             }));
 
+    options.AddPolicy("admin", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+
+    options.AddPolicy("webhooks", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+
     options.AddPolicy("auth-register", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "global",
+            partitionKey: RateLimitPartitionKeys.Ip(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 8,
@@ -151,7 +199,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("auth-password-reset", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "global",
+            partitionKey: RateLimitPartitionKeys.Ip(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 10,
@@ -162,7 +210,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services
-    .AddEconomyInfrastructure(builder.Configuration)
+    .AddEconomyInfrastructure(builder.Configuration, builder.Environment.IsProduction())
     .AddEconomyApiModule()
     .AddIdentityInfrastructure(builder.Configuration, builder.Environment)
     .AddIdentityApiModule()
@@ -182,7 +230,9 @@ builder.Services
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddRuntimeInstrumentation()
+        .AddMeter("PetMagic.Host.Api")
         .AddMeter("PetMagic.Modules.Economy")
+        .AddMeter("PetMagic.Modules.Templates")
         .AddOtlpExporter());
 
 var app = builder.Build();
@@ -193,6 +243,7 @@ Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
 
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging(options =>
 {
     options.GetLevel = (httpContext, elapsed, exception) =>
@@ -220,18 +271,25 @@ app.UseSerilogRequestLogging(options =>
         var path = httpContext.Request.Path.Value ?? string.Empty;
         var routeTemplate = httpContext.GetEndpoint()?.DisplayName ?? path;
         var userId = httpContext.User.FindFirst("sub")?.Value
+            ?? httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? httpContext.User.FindFirst("userId")?.Value;
         var traceId = Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier;
         diagnosticContext.Set("RequestId", httpContext.TraceIdentifier);
         diagnosticContext.Set("TraceId", traceId);
+        diagnosticContext.Set(
+            "CorrelationId",
+            httpContext.Items.TryGetValue(CorrelationId.HttpContextItemKey, out var correlationId)
+                ? correlationId
+                : "unknown");
         diagnosticContext.Set("UserId", userId ?? "anonymous");
         diagnosticContext.Set("Route", routeTemplate);
         diagnosticContext.Set("StatusCode", httpContext.Response.StatusCode);
     };
     options.MessageTemplate =
-        "HTTP {RequestMethod} {RequestPath} -> {StatusCode} in {Elapsed:0.0000} ms [rid:{RequestId} tid:{TraceId} uid:{UserId}]";
+        "HTTP {RequestMethod} {RequestPath} -> {StatusCode} in {Elapsed:0.0000} ms [rid:{RequestId} cid:{CorrelationId} tid:{TraceId} uid:{UserId}]";
 });
 app.UseExceptionHandler();
+app.UseMiddleware<RequestMetricsMiddleware>();
 
 if (!app.Environment.IsDevelopment())
 {

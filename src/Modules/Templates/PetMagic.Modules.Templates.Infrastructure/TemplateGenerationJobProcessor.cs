@@ -24,10 +24,20 @@ internal sealed class TemplateGenerationJobProcessor(
     ILogger<TemplateGenerationJobProcessor> logger)
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
+    private const int GlobalGenerationAdvisoryLockKey = 0x506D4745;
+    private static readonly string WorkerInstanceId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
+    private static readonly object LocalConcurrencyLock = new();
+    private static readonly HashSet<int> LocalConcurrencySlots = [];
 
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
         var recoveredStaleJob = await RecoverNextStaleProcessingJobAsync(cancellationToken);
+        await using var concurrencyLease = await TryAcquireGlobalConcurrencyLeaseAsync(cancellationToken);
+        if (concurrencyLease is null)
+        {
+            return recoveredStaleJob;
+        }
+
         var job = await ClaimNextAsync(cancellationToken);
 
         if (job is null)
@@ -40,6 +50,7 @@ internal sealed class TemplateGenerationJobProcessor(
             return recoveredStaleJob;
         }
 
+        TemplateGenerationMetrics.RecordJobClaimed(job);
         await ProcessAsync(job, cancellationToken);
         return true;
     }
@@ -47,12 +58,14 @@ internal sealed class TemplateGenerationJobProcessor(
     private async Task<bool> RecoverNextStaleProcessingJobAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        var staleThreshold = now.AddMilliseconds(-options.StaleProcessingRecoveryDelayMilliseconds);
+        var staleThreshold = now.AddMilliseconds(-options.JobLockTimeoutMilliseconds);
         var staleJob = await dbContext.TemplateGenerationJobs
-            .Where(x => ActiveStatuses.Contains(x.Status)
+            .Include(x => x.Template)
+            .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
-                && (x.LastAttemptAtUtc ?? x.StartedAtUtc ?? x.UpdatedAtUtc) <= staleThreshold)
-            .OrderBy(x => x.LastAttemptAtUtc ?? x.StartedAtUtc ?? x.UpdatedAtUtc)
+                && x.LockedAtUtc != null
+                && x.LockedAtUtc <= staleThreshold)
+            .OrderBy(x => x.LockedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (staleJob is null)
@@ -62,12 +75,22 @@ internal sealed class TemplateGenerationJobProcessor(
 
         if (staleJob.AttemptCount >= options.MaxGenerationAttempts)
         {
-            await MarkFailedAsync(staleJob, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken);
+            await MarkFailedAsync(staleJob, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken, requireClaim: false);
             return true;
         }
 
         MarkQueuedForRecovery(staleJob, now);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            TemplateGenerationMetrics.RecordJobRequeued(staleJob);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            logger.LogWarning(exception, "Stale template generation job {GenerationId} recovery was skipped because its lock changed.", staleJob.Id);
+            dbContext.ChangeTracker.Clear();
+        }
+
         return true;
     }
 
@@ -88,9 +111,11 @@ internal sealed class TemplateGenerationJobProcessor(
                 "AttemptCount" = "AttemptCount" + 1,
                 "LastAttemptAtUtc" = {2},
                 "StartedAtUtc" = COALESCE("StartedAtUtc", {2}),
+                "LockedAtUtc" = {2},
+                "LockedBy" = {5},
                 "UpdatedAtUtc" = {2},
                 "NormalizedImageUrl" = NULL,
-                "OutputUrl" = NULL,
+                "ResultUrl" = NULL,
                 "UsedPreprocessingModel" = NULL,
                 "UsedKlingModel" = NULL,
                 "PreprocessingProviderRequestId" = NULL,
@@ -102,8 +127,8 @@ internal sealed class TemplateGenerationJobProcessor(
                 "PreprocessingCompletedAtUtc" = NULL,
                 "MotionGenerationCompletedAtUtc" = NULL,
                 "MediaImportCompletedAtUtc" = NULL,
-                "FailureCode" = NULL,
-                "FailureMessage" = NULL
+                "LastErrorCode" = NULL,
+                "LastErrorMessage" = NULL
             WHERE "Id" = (
                 SELECT "Id"
                 FROM templates_generation_jobs
@@ -112,13 +137,14 @@ internal sealed class TemplateGenerationJobProcessor(
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
             )
-            RETURNING "Id" AS "Value";
+            RETURNING "Id" AS "Value"
             """,
             (int)TemplateGenerationStatus.Queued,
             (int)TemplateGenerationStatus.Processing,
             now,
             options.MaxGenerationAttempts,
-            TemplateGenerationService.AdminTestUserId)
+            TemplateGenerationService.AdminTestUserId,
+            WorkerInstanceId)
             .ToListAsync(cancellationToken);
 
         var claimedId = claimedIds.FirstOrDefault();
@@ -160,32 +186,26 @@ internal sealed class TemplateGenerationJobProcessor(
         job.AttemptCount++;
         job.LastAttemptAtUtc = now;
         job.StartedAtUtc ??= now;
+        job.LockedAtUtc = now;
+        job.LockedBy = WorkerInstanceId;
         job.UpdatedAtUtc = now;
         ResetAttemptState(job);
     }
-
-    private static readonly TemplateGenerationStatus[] ActiveStatuses =
-    [
-        TemplateGenerationStatus.Processing,
-        TemplateGenerationStatus.Uploading,
-        TemplateGenerationStatus.Preprocessing,
-        TemplateGenerationStatus.Generating,
-        TemplateGenerationStatus.Finalizing
-    ];
 
     private static void MarkQueuedForRecovery(TemplateGenerationJob job, DateTime now)
     {
         job.Status = TemplateGenerationStatus.Queued;
         job.QueuedAtUtc = now;
         job.UpdatedAtUtc = now;
-        job.StartedAtUtc = null;
+        job.LockedAtUtc = null;
+        job.LockedBy = null;
         ResetAttemptState(job);
     }
 
     private static void ResetAttemptState(TemplateGenerationJob job)
     {
         job.NormalizedImageUrl = null;
-        job.OutputUrl = null;
+        job.ResultUrl = null;
         job.UsedPreprocessingModel = null;
         job.UsedKlingModel = null;
         job.PreprocessingProviderRequestId = null;
@@ -197,8 +217,8 @@ internal sealed class TemplateGenerationJobProcessor(
         job.PreprocessingCompletedAtUtc = null;
         job.MotionGenerationCompletedAtUtc = null;
         job.MediaImportCompletedAtUtc = null;
-        job.FailureCode = null;
-        job.FailureMessage = null;
+        job.LastErrorCode = null;
+        job.LastErrorMessage = null;
         job.CompletedAtUtc = null;
     }
 
@@ -256,6 +276,7 @@ internal sealed class TemplateGenerationJobProcessor(
     private async Task<bool> FailNextExhaustedQueuedJobAsync(CancellationToken cancellationToken)
     {
         var job = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
             .Where(x => x.Status == TemplateGenerationStatus.Queued
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
                 && x.AttemptCount >= options.MaxGenerationAttempts)
@@ -267,7 +288,7 @@ internal sealed class TemplateGenerationJobProcessor(
             return false;
         }
 
-        await MarkFailedAsync(job, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken);
+        await MarkFailedAsync(job, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken, requireClaim: false);
         return true;
     }
 
@@ -308,7 +329,10 @@ internal sealed class TemplateGenerationJobProcessor(
         var imageModel = job.Template.ImageModel!;
         var imagePrompt = TemplateGenerationService.ResolvePrompt(job.Template.ImagePrompt, options.DefaultImagePrompt);
 
-        await MarkStatusAsync(job, TemplateGenerationStatus.Preprocessing, cancellationToken);
+        if (!await PublishProcessingStageAsync(job, cancellationToken))
+        {
+            return;
+        }
 
         job.UsedPreprocessingModel = imageModel;
 
@@ -329,9 +353,15 @@ internal sealed class TemplateGenerationJobProcessor(
         job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
         job.MotionProviderCostUsd = FalModelPricing.TryGetImageGenerationCostUsd(imageModel);
         job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (!await SaveClaimedChangesAsync(job, cancellationToken))
+        {
+            return;
+        }
 
-        await MarkStatusAsync(job, TemplateGenerationStatus.Finalizing, cancellationToken);
+        if (!await PublishProcessingStageAsync(job, cancellationToken))
+        {
+            return;
+        }
 
         var storedOutput = await generatedMediaImporter.ImportImageAsync(generated.Value.ImageUrl, job.Id, cancellationToken);
         if (storedOutput.IsFailure)
@@ -340,12 +370,17 @@ internal sealed class TemplateGenerationJobProcessor(
             return;
         }
 
-        job.OutputUrl = storedOutput.Value.Url;
+        job.ResultUrl = storedOutput.Value.Url;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
         job.Status = TemplateGenerationStatus.Succeeded;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (!await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
+        {
+            return;
+        }
+
+        TemplateGenerationMetrics.RecordJobCompleted(job);
         await PublishStatusChangedAsync(job, cancellationToken);
     }
 
@@ -357,7 +392,10 @@ internal sealed class TemplateGenerationJobProcessor(
         var motionModel = job.Template.KlingModel!;
         var motionPrompt = TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt);
 
-        await MarkStatusAsync(job, TemplateGenerationStatus.Preprocessing, cancellationToken);
+        if (!await PublishProcessingStageAsync(job, cancellationToken))
+        {
+            return;
+        }
 
         job.UsedPreprocessingModel = preprocessingModel;
         job.UsedKlingModel = motionModel;
@@ -379,9 +417,15 @@ internal sealed class TemplateGenerationJobProcessor(
         job.PreprocessingInferenceTimeSeconds = normalized.Value.InferenceTimeSeconds;
         job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
         job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (!await SaveClaimedChangesAsync(job, cancellationToken))
+        {
+            return;
+        }
 
-        await MarkStatusAsync(job, TemplateGenerationStatus.Generating, cancellationToken);
+        if (!await PublishProcessingStageAsync(job, cancellationToken))
+        {
+            return;
+        }
 
         var generated = await videoMotionGenerator.CreateAsync(
             normalized.Value.ImageUrl,
@@ -402,9 +446,15 @@ internal sealed class TemplateGenerationJobProcessor(
         job.MotionInferenceTimeSeconds = generated.Value.InferenceTimeSeconds;
         job.MotionGenerationCompletedAtUtc = DateTime.UtcNow;
         job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (!await SaveClaimedChangesAsync(job, cancellationToken))
+        {
+            return;
+        }
 
-        await MarkStatusAsync(job, TemplateGenerationStatus.Finalizing, cancellationToken);
+        if (!await PublishProcessingStageAsync(job, cancellationToken))
+        {
+            return;
+        }
 
         var storedOutput = await generatedMediaImporter.ImportVideoAsync(generated.Value.VideoUrl, job.Id, cancellationToken);
         if (storedOutput.IsFailure)
@@ -424,37 +474,67 @@ internal sealed class TemplateGenerationJobProcessor(
             job.MotionProviderCostUsd = FalModelPricing.TryCalculateMotionCostUsd(motionModel, durationResult.Value);
         }
 
-        job.OutputUrl = storedOutput.Value.Url;
+        job.ResultUrl = storedOutput.Value.Url;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
         job.Status = TemplateGenerationStatus.Succeeded;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (!await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
+        {
+            return;
+        }
+
+        TemplateGenerationMetrics.RecordJobCompleted(job);
         await PublishStatusChangedAsync(job, cancellationToken);
     }
 
-    private async Task MarkStatusAsync(TemplateGenerationJob job, TemplateGenerationStatus status, CancellationToken cancellationToken)
+    private async Task<bool> PublishProcessingStageAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {
-        job.Status = status;
+        job.Status = TemplateGenerationStatus.Processing;
         job.UpdatedAtUtc = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (!await SaveClaimedChangesAsync(job, cancellationToken))
+        {
+            return false;
+        }
+
         await PublishStatusChangedAsync(job, cancellationToken);
+        return true;
     }
 
-    private async Task MarkFailedAsync(TemplateGenerationJob job, Error error, CancellationToken cancellationToken)
+    private async Task<bool> MarkFailedAsync(
+        TemplateGenerationJob job,
+        Error error,
+        CancellationToken cancellationToken,
+        bool requireClaim = true)
     {
+        var hasClaim = !string.IsNullOrWhiteSpace(job.LockedBy);
+        if (requireClaim && !hasClaim)
+        {
+            logger.LogWarning("Template generation job {GenerationId} failure was ignored because it is no longer claimed.", job.Id);
+            return false;
+        }
+
+        var previousStatus = job.Status;
+        job.Status = TemplateGenerationStatus.Failed;
+        job.LastErrorCode = error.Code;
+        job.LastErrorMessage = error.Message;
+        job.UpdatedAtUtc = DateTime.UtcNow;
+        job.CompletedAtUtc = job.UpdatedAtUtc;
+        if (!await SaveJobChangesAsync(job, cancellationToken, releaseLock: true))
+        {
+            return false;
+        }
+
+        TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, error.Code);
+
         if (job.ChargedAtUtc is not null && job.RefundedAtUtc is null)
         {
             await TryRefundAsync(job, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        job.Status = TemplateGenerationStatus.Failed;
-        job.FailureCode = error.Code;
-        job.FailureMessage = error.Message;
-        job.UpdatedAtUtc = DateTime.UtcNow;
-        job.CompletedAtUtc = job.UpdatedAtUtc;
-        await dbContext.SaveChangesAsync(cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
+        return true;
     }
 
     private async ValueTask PublishStatusChangedAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
@@ -465,6 +545,104 @@ internal sealed class TemplateGenerationJobProcessor(
         {
             await pushNotificationSender.NotifyGenerationTerminalAsync(response, cancellationToken);
         }
+    }
+
+    private Task<bool> SaveClaimedChangesAsync(
+        TemplateGenerationJob job,
+        CancellationToken cancellationToken,
+        bool releaseLock = false)
+    {
+        if (string.IsNullOrWhiteSpace(job.LockedBy))
+        {
+            logger.LogWarning("Template generation job {GenerationId} update was ignored because it is no longer claimed.", job.Id);
+            return Task.FromResult(false);
+        }
+
+        return SaveJobChangesAsync(job, cancellationToken, releaseLock);
+    }
+
+    private async Task<bool> SaveJobChangesAsync(
+        TemplateGenerationJob job,
+        CancellationToken cancellationToken,
+        bool releaseLock = false)
+    {
+        if (releaseLock)
+        {
+            job.LockedAtUtc = null;
+            job.LockedBy = null;
+        }
+        else
+        {
+            job.LockedAtUtc = DateTime.UtcNow;
+        }
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            logger.LogWarning(exception, "Template generation job {GenerationId} update was skipped because its lock changed.", job.Id);
+            dbContext.ChangeTracker.Clear();
+            return false;
+        }
+    }
+
+    private async Task<GlobalConcurrencyLease?> TryAcquireGlobalConcurrencyLeaseAsync(CancellationToken cancellationToken)
+    {
+        var maxConcurrentGenerations = options.GlobalMaxConcurrentGenerations;
+        if (maxConcurrentGenerations <= 0)
+        {
+            return GlobalConcurrencyLease.Noop;
+        }
+
+        return string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
+            ? await TryAcquirePostgresConcurrencyLeaseAsync(maxConcurrentGenerations, cancellationToken)
+            : TryAcquireLocalConcurrencyLease(maxConcurrentGenerations);
+    }
+
+    private async Task<GlobalConcurrencyLease?> TryAcquirePostgresConcurrencyLeaseAsync(
+        int maxConcurrentGenerations,
+        CancellationToken cancellationToken)
+    {
+        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        for (var slot = 1; slot <= maxConcurrentGenerations; slot++)
+        {
+            var acquired = await dbContext.Database.SqlQueryRaw<bool>(
+                """
+                SELECT pg_try_advisory_lock({0}, {1}) AS "Value"
+                """,
+                GlobalGenerationAdvisoryLockKey,
+                slot)
+                .SingleAsync(cancellationToken);
+
+            if (acquired)
+            {
+                return new GlobalConcurrencyLease(dbContext, slot);
+            }
+        }
+
+        await dbContext.Database.CloseConnectionAsync();
+        return null;
+    }
+
+    private GlobalConcurrencyLease? TryAcquireLocalConcurrencyLease(int maxConcurrentGenerations)
+    {
+        lock (LocalConcurrencyLock)
+        {
+            for (var slot = 1; slot <= maxConcurrentGenerations; slot++)
+            {
+                if (!LocalConcurrencySlots.Add(slot))
+                {
+                    continue;
+                }
+
+                return new GlobalConcurrencyLease(slot);
+            }
+        }
+
+        return null;
     }
 
     private async Task<bool> TryRefundAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
@@ -490,5 +668,63 @@ internal sealed class TemplateGenerationJobProcessor(
         }
 
         return false;
+    }
+
+    private sealed class GlobalConcurrencyLease : IAsyncDisposable
+    {
+        public static readonly GlobalConcurrencyLease Noop = new();
+
+        private readonly TemplatesDbContext? dbContext;
+        private readonly int? slot;
+        private readonly bool postgres;
+
+        private GlobalConcurrencyLease()
+        {
+        }
+
+        public GlobalConcurrencyLease(TemplatesDbContext dbContext, int slot)
+        {
+            this.dbContext = dbContext;
+            this.slot = slot;
+            postgres = true;
+        }
+
+        public GlobalConcurrencyLease(int slot)
+        {
+            this.slot = slot;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (slot is null)
+            {
+                return;
+            }
+
+            if (postgres && dbContext is not null)
+            {
+                try
+                {
+                    await dbContext.Database.SqlQueryRaw<bool>(
+                        """
+                        SELECT pg_advisory_unlock({0}, {1}) AS "Value"
+                        """,
+                        GlobalGenerationAdvisoryLockKey,
+                        slot.Value)
+                        .SingleAsync();
+                }
+                finally
+                {
+                    await dbContext.Database.CloseConnectionAsync();
+                }
+
+                return;
+            }
+
+            lock (LocalConcurrencyLock)
+            {
+                LocalConcurrencySlots.Remove(slot.Value);
+            }
+        }
     }
 }

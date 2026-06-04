@@ -246,9 +246,9 @@ public sealed partial class IdentityServiceProfileTests
                         template?.TemplateType.ToString() ?? string.Empty,
                         x.Status.ToString(),
                         x.TokenCost,
-                        x.FailureCode,
-                        x.FailureMessage,
-                        x.OutputUrl,
+                        x.LastErrorCode,
+                        x.LastErrorMessage,
+                        x.ResultUrl,
                         x.CreatedAtUtc,
                         x.CompletedAtUtc);
                 })
@@ -256,7 +256,7 @@ public sealed partial class IdentityServiceProfileTests
 
             var failureBreakdown = generations
                 .Where(x => x.Status == TemplateGenerationStatus.Failed)
-                .GroupBy(x => string.IsNullOrWhiteSpace(x.FailureCode) ? "templates.unknown_failure" : x.FailureCode)
+                .GroupBy(x => string.IsNullOrWhiteSpace(x.LastErrorCode) ? "templates.unknown_failure" : x.LastErrorCode)
                 .Select(group => new TemplatesContracts.AdminUserTemplateFailureBreakdownItemResponse(
                     group.Key,
                     group.Count(),

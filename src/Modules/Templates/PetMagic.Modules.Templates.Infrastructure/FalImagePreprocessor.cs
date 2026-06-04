@@ -24,9 +24,13 @@ internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImageP
         }
 
         using var document = result.Value.Response;
-        return TryReadFirstImageUrl(document.RootElement, out var imageUrl)
-            ? Result.Success(new ImagePreprocessResult(imageUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds))
-            : Result.Failure<ImagePreprocessResult>(TemplatesErrors.AiProviderFailed);
+        if (TryReadFirstImageUrl(document.RootElement, out var imageUrl))
+        {
+            return Result.Success(new ImagePreprocessResult(imageUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds));
+        }
+
+        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, model);
+        return Result.Failure<ImagePreprocessResult>(TemplatesErrors.AiProviderFailed);
     }
 
     private static bool TryReadFirstImageUrl(JsonElement root, out string imageUrl)

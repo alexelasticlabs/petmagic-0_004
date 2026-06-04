@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 using FluentValidation;
 
@@ -23,12 +25,15 @@ public static class TemplateGenerationEndpoints
     private const string InvalidSubjectMessage = "Invalid access token subject.";
     private const string PremiumRequiredCode = "templates.premium_required";
     private const string PremiumRequiredMessage = "Premium subscription is required for this template.";
+    private const int FreeActiveGenerationLimit = 1;
+    private const int PremiumActiveGenerationLimit = 3;
+    private const int PrivilegedActiveGenerationLimit = 10;
+    private const int MaxIdempotencyKeyLength = 256;
 
     public static IEndpointRouteBuilder MapTemplateGenerationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/templates")
             .WithTags("Template Generations")
-            .RequireRateLimiting("templates")
             .RequireAuthorization(policy => policy
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context =>
@@ -42,31 +47,40 @@ public static class TemplateGenerationEndpoints
 
         group.MapPost("/{templateId:guid}/generations", StartGenerationAsync)
             .RequireAuthorization()
+            .RequireRateLimiting("generation-create")
             .DisableAntiforgery();
 
         group.MapGet("/generations", ListGenerationsAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("generation-status");
 
         group.MapGet("/generations/unread-count", GetUnreadCountAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("generation-status");
 
         group.MapGet("/generations/{generationId:guid}", GetGenerationAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("generation-status");
 
         group.MapPost("/generations/{generationId:guid}/mark-read", MarkReadAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
 
         group.MapDelete("/generations/{generationId:guid}", DeleteGenerationAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
 
         group.MapPost("/generations/{generationId:guid}/feedback", RecordFeedbackAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
 
         group.MapPut("/notifications/push-token", RegisterPushTokenAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
 
         group.MapDelete("/notifications/push-token", UnregisterPushTokenAsync)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
 
         return endpoints;
     }
@@ -109,10 +123,20 @@ public static class TemplateGenerationEndpoints
         }
 
         var uploadValidation = ValidateSourceImage(sourceImage, uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview));
+        var idempotencyKey = NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault());
+        if (idempotencyKey?.Length > MaxIdempotencyKeyLength)
+        {
+            uploadValidation["Idempotency-Key"] = [$"Idempotency-Key must be at most {MaxIdempotencyKeyLength} characters."];
+        }
+
         if (uploadValidation.Count > 0)
         {
             return TypedResults.ValidationProblem(uploadValidation);
         }
+
+        var sourceImageHash = await ComputeSha256HexAsync(sourceImage!, cancellationToken);
+        var requestHash = ComputeRequestHash(userId!.Value, templateId, sourceImageHash);
+        var activeGenerationLimit = await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken);
 
         await using var stream = sourceImage!.OpenReadStream();
         var storeResult = await mediaStorage.StoreAsync(
@@ -132,7 +156,10 @@ public static class TemplateGenerationEndpoints
         var command = new StartTemplateGenerationCommand(
             userId!.Value,
             templateId,
-            new TemplateAssetCommand(stored.Url, stored.FileName, stored.ContentType, stored.FileSizeBytes, null));
+            new TemplateAssetCommand(stored.Url, stored.FileName, stored.ContentType, stored.FileSizeBytes, null),
+            idempotencyKey,
+            requestHash,
+            activeGenerationLimit);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -148,6 +175,11 @@ public static class TemplateGenerationEndpoints
                 title: result.Error.Code,
                 detail: result.Error.Message,
                 statusCode: ResolveFailureStatusCode(result.Error));
+        }
+
+        if (!string.Equals(result.Value.SourceImageAsset?.Url, stored.Url, StringComparison.OrdinalIgnoreCase))
+        {
+            await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
         }
 
         return TypedResults.Accepted($"/api/templates/generations/{result.Value.GenerationId}", result.Value);
@@ -260,7 +292,7 @@ public static class TemplateGenerationEndpoints
             return TypedResults.Problem(
                 title: result.Error.Code,
                 detail: result.Error.Message,
-                statusCode: result.Error.Code == "templates.not_found"
+                statusCode: IsNotFoundError(result.Error)
                     ? StatusCodes.Status404NotFound
                     : StatusCodes.Status400BadRequest);
         }
@@ -345,7 +377,7 @@ public static class TemplateGenerationEndpoints
             return TypedResults.Problem(
                 title: result.Error.Code,
                 detail: result.Error.Message,
-                statusCode: result.Error.Code == "templates.not_found"
+                statusCode: IsNotFoundError(result.Error)
                     ? StatusCodes.Status404NotFound
                     : StatusCodes.Status400BadRequest);
         }
@@ -382,6 +414,7 @@ public static class TemplateGenerationEndpoints
         return error.Code switch
         {
             "templates.not_found" => StatusCodes.Status404NotFound,
+            "GENERATION_JOB_NOT_FOUND" => StatusCodes.Status404NotFound,
             "templates.invalid_status" => StatusCodes.Status409Conflict,
             "templates.type_mismatch" => StatusCodes.Status400BadRequest,
             "templates.image_model_required" => StatusCodes.Status409Conflict,
@@ -390,8 +423,16 @@ public static class TemplateGenerationEndpoints
             "templates.character_orientation_required" => StatusCodes.Status409Conflict,
             "templates.premium_required" => StatusCodes.Status403Forbidden,
             "economy.insufficient_balance" => StatusCodes.Status402PaymentRequired,
+            "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,
+            "GENERATION_QUEUE_OVERLOADED" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
         };
+    }
+
+    private static bool IsNotFoundError(Error error)
+    {
+        return string.Equals(error.Code, "templates.not_found", StringComparison.Ordinal)
+            || string.Equals(error.Code, "GENERATION_JOB_NOT_FOUND", StringComparison.Ordinal);
     }
 
     private static bool TryGetPremiumClaim(ClaimsPrincipal principal, out bool isPremium)
@@ -410,6 +451,21 @@ public static class TemplateGenerationEndpoints
     private static bool IsPrivilegedTemplateUser(ClaimsPrincipal principal)
     {
         return principal.IsInRole("Admin") || principal.IsInRole("Moderator");
+    }
+
+    private static async Task<int> ResolveActiveGenerationLimitAsync(
+        HttpContext context,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (IsPrivilegedTemplateUser(context.User))
+        {
+            return PrivilegedActiveGenerationLimit;
+        }
+
+        return await HasPremiumTemplateAccessAsync(context, userId, cancellationToken)
+            ? PremiumActiveGenerationLimit
+            : FreeActiveGenerationLimit;
     }
 
     private static async Task<bool> HasPremiumTemplateAccessAsync(
@@ -436,6 +492,26 @@ public static class TemplateGenerationEndpoints
 
         var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
         return profile.IsSuccess && profile.Value.IsPremium;
+    }
+
+    private static string? NormalizeIdempotencyKey(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static async Task<string> ComputeSha256HexAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        using var sha256 = SHA256.Create();
+        var hashBytes = await sha256.ComputeHashAsync(stream, cancellationToken);
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    private static string ComputeRequestHash(Guid userId, Guid templateId, string sourceImageHash)
+    {
+        var material = $"{userId:N}:{templateId:N}:{sourceImageHash}";
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(material));
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
     private static (Guid? UserId, Error? Error) TryGetSubject(HttpContext context)

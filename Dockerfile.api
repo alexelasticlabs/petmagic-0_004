@@ -1,24 +1,35 @@
 # syntax=docker/dockerfile:1.7
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
+ARG TARGETARCH
 WORKDIR /src
 COPY ["src/", "src/"]
 RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-    dotnet restore "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" \
-    -r linux-x64 \
-    -p:PublishReadyToRun=true \
-    --verbosity normal
+    case "$TARGETARCH" in \
+      amd64) RID=linux-x64 ;; \
+      arm64) RID=linux-arm64 ;; \
+      *) echo "Unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && dotnet restore "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" \
+      -r "$RID" \
+      -p:PublishReadyToRun=true \
+      --verbosity normal
 RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-    dotnet publish "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" \
-    -c Release \
-    --no-restore \
-    -r linux-x64 \
-    --self-contained false \
-    -o /app/publish \
-    -p:PublishReadyToRun=true
+    case "$TARGETARCH" in \
+      amd64) RID=linux-x64 ;; \
+      arm64) RID=linux-arm64 ;; \
+      *) echo "Unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && dotnet publish "src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" \
+      -c Release \
+      --no-restore \
+      -r "$RID" \
+      --self-contained false \
+      -o /app/publish \
+      -p:PublishReadyToRun=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/publish .

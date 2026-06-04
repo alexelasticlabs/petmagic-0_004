@@ -45,9 +45,9 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
                 x.template.TemplateType.ToString(),
                 x.generation.Status.ToString(),
                 x.generation.TokenCost,
-                x.generation.FailureCode,
-                x.generation.FailureMessage,
-                x.generation.OutputUrl,
+                x.generation.LastErrorCode,
+                x.generation.LastErrorMessage,
+                x.generation.ResultUrl,
                 x.generation.CreatedAtUtc,
                 x.generation.CompletedAtUtc))
             .ToListAsync(cancellationToken);
@@ -57,7 +57,7 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
             .Where(x => x.UserId == userId && x.Status == TemplateGenerationStatus.Failed)
             .Select(x => new
             {
-                x.FailureCode,
+                FailureCode = x.LastErrorCode,
                 LastOccurredAtUtc = x.CompletedAtUtc ?? x.UpdatedAtUtc
             })
             .ToListAsync(cancellationToken);

@@ -18,6 +18,29 @@ String formatGenerationDateTime(DateTime value) {
 }
 
 String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
+  if (generation.status == TemplateGenerationStatus.queued) {
+    final position = generation.queuePosition;
+    final waitSeconds = generation.estimatedWaitSeconds;
+    if (position != null &&
+        position > 0 &&
+        waitSeconds != null &&
+        waitSeconds > 0) {
+      return text.generationStatusEtaEstimated(
+        'queue #$position, ${_formatWaitDuration(waitSeconds)}',
+      );
+    }
+
+    if (waitSeconds != null && waitSeconds > 0) {
+      return text.generationStatusEtaEstimated(
+        _formatWaitDuration(waitSeconds),
+      );
+    }
+
+    if (position != null && position > 0) {
+      return '${text.generationStatusEtaQueued} #$position';
+    }
+  }
+
   final estimated = generation.estimatedDurationLabel;
   if (estimated != null && estimated.isNotEmpty) {
     return text.generationStatusEtaEstimated(estimated);
@@ -30,6 +53,15 @@ String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
     return text.generationStatusEtaFinalizing;
   }
   return text.generationStatusEtaDefault;
+}
+
+String _formatWaitDuration(int totalSeconds) {
+  final minutes = (totalSeconds / 60).ceil();
+  if (minutes <= 1) {
+    return '1 min';
+  }
+
+  return '$minutes min';
 }
 
 String failureReasonMessage(

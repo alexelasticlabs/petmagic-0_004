@@ -25,6 +25,38 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateAiProviderRequestPermit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("BucketUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PermitNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("IX_templates_ai_provider_permits_CreatedAtUtc");
+
+                    b.HasIndex("Provider", "BucketUtc", "PermitNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_templates_ai_provider_permits_provider_bucket_slot");
+
+                    b.ToTable("templates_ai_provider_request_permits", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateAnalyticsEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -261,11 +293,15 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("FailureCode")
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("LastErrorCode")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<string>("FailureMessage")
+                    b.Property<string>("LastErrorMessage")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
@@ -277,6 +313,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.Property<DateTime?>("LastUserMediaCleanupAttemptAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LockedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LockedBy")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<DateTime?>("MediaImportCompletedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -296,10 +340,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(128)");
 
                     b.Property<string>("NormalizedImageUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<string>("OutputUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
@@ -323,6 +363,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<string>("RequestHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<int>("RefundAttemptCount")
                         .HasColumnType("integer");
 
@@ -338,6 +382,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.Property<DateTime?>("ResultViewedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResultUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.Property<string>("SourceImageContentType")
                         .IsRequired()
@@ -400,6 +448,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("Status", "CompletedAtUtc");
 
+                    b.HasIndex("Status", "LockedAtUtc")
+                        .HasDatabaseName("IX_templates_generation_jobs_Status_LockedAtUtc");
+
                     b.HasIndex("Status", "QueuedAtUtc");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
@@ -409,6 +460,19 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("TemplateId", "Status", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "Status", "ResultViewedAtUtc");
+
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");
+
+                    b.HasIndex("UserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter(""" "Status" IN (1, 2) AND "IdempotencyKey" IS NOT NULL """)
+                        .HasDatabaseName("UX_templates_generation_jobs_UserId_IdempotencyKey_active");
+
+                    b.HasIndex("UserId", "RequestHash")
+                        .IsUnique()
+                        .HasFilter(""" "Status" IN (1, 2) AND "RequestHash" IS NOT NULL """)
+                        .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active");
 
                     b.ToTable("templates_generation_jobs", (string)null);
                 });

@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/src/Host/">
     <Project Path="src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj" />
+    <Project Path="src/Host/PetMagic.Host.GenerationWorker/PetMagic.Host.GenerationWorker.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
     <Folder Name="/src/Modules/Economy/">

@@ -113,7 +113,10 @@ public sealed record ChangeTemplateCategoryArchiveStateCommand(
 public sealed record StartTemplateGenerationCommand(
     Guid UserId,
     Guid TemplateId,
-    TemplateAssetCommand SourceImageAsset);
+    TemplateAssetCommand SourceImageAsset,
+    string? IdempotencyKey = null,
+    string? RequestHash = null,
+    int? ActiveGenerationLimit = null);
 
 public sealed record StoredMediaResponse(
     string Url,
@@ -584,4 +587,9 @@ public sealed record TemplateGenerationResponse(
     string? EstimatedDurationLabel = null,
     DateTime? ChargedAtUtc = null,
     DateTime? RefundedAtUtc = null,
-    bool IsUnread = false);
+    bool IsUnread = false,
+    int? QueuePosition = null,
+    int? EstimatedWaitSeconds = null)
+{
+    public Guid JobId => GenerationId;
+}

@@ -10,11 +10,14 @@ using Stripe.Checkout;
 
 namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
-public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGateway
+public sealed class StripePaymentGateway(
+    EconomyOptions options,
+    IHttpClientFactory httpClientFactory) : IPaymentGateway
 {
+    public const string HttpClientName = "Stripe";
+
     private const string Provider = "stripe";
     private const string MobileEphemeralKeyStripeVersion = "2020-03-02";
-    private static readonly HttpClient StripeHttpClient = new();
 
     public async Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
     {
@@ -675,12 +678,15 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
         return !string.IsNullOrWhiteSpace(apiKey);
     }
 
-    private static void ConfigureStripe(string? apiKey)
+    private void ConfigureStripe(string? apiKey)
     {
         StripeConfiguration.ApiKey = apiKey;
+        StripeConfiguration.StripeClient = new StripeClient(
+            apiKey,
+            httpClient: new SystemNetHttpClient(httpClientFactory.CreateClient(HttpClientName)));
     }
 
-    private static async Task<Result<string>> CreateCustomerEphemeralKeySecretAsync(
+    private async Task<Result<string>> CreateCustomerEphemeralKeySecretAsync(
         string apiKey,
         string customerId,
         CancellationToken cancellationToken)
@@ -694,7 +700,9 @@ public sealed class StripePaymentGateway(EconomyOptions options) : IPaymentGatew
 
         try
         {
-            using var response = await StripeHttpClient.SendAsync(request, cancellationToken);
+            using var response = await httpClientFactory
+                .CreateClient(HttpClientName)
+                .SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return Result.Failure<string>(EconomyErrors.PaymentGatewayFailed);

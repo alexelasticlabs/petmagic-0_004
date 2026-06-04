@@ -4,6 +4,9 @@ using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,6 +26,22 @@ public sealed class EconomyApiStartupSmokeTests
         await using var app = await EconomyApiStartupTestApplication.CreateAsync();
 
         Assert.NotNull(app);
+    }
+
+    [Theory]
+    [InlineData("POST", "/api/economy/webhooks/stripe", "webhooks")]
+    [InlineData("POST", "/api/economy/webhooks/app-store", "webhooks")]
+    [InlineData("POST", "/api/economy/webhooks/google-play", "webhooks")]
+    [InlineData("POST", "/api/payments/stripe/token-purchase", "economy")]
+    [InlineData("GET", "/api/admin/economy/ledger", "admin")]
+    public async Task EconomyEndpoints_ShouldUseExpectedRateLimitPolicies(
+        string method,
+        string routePattern,
+        string expectedPolicy)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        Assert.Equal(expectedPolicy, app.GetRateLimitPolicy(method, routePattern));
     }
 
     private sealed class EconomyApiStartupTestApplication : IAsyncDisposable
@@ -47,6 +66,8 @@ public sealed class EconomyApiStartupSmokeTests
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddPolicy("economy", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("admin", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("webhooks", _ => RateLimitPartition.GetNoLimiter("tests"));
             });
 
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
@@ -83,6 +104,22 @@ public sealed class EconomyApiStartupSmokeTests
             await app.StartAsync();
 
             return new EconomyApiStartupTestApplication(app);
+        }
+
+        public string? GetRateLimitPolicy(string method, string routePattern)
+        {
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
         }
 
         public async ValueTask DisposeAsync()

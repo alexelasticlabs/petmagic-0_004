@@ -4,6 +4,8 @@ using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,6 +25,18 @@ public sealed class SupportChatApiStartupSmokeTests
         await using var app = await SupportChatApiStartupTestApplication.CreateAsync();
 
         Assert.NotNull(app);
+    }
+
+    [Theory]
+    [InlineData("/api/support/conversation/{conversationId:guid}/read")]
+    [InlineData("/api/support/conversation/{conversationId:guid}/resolve")]
+    [InlineData("/api/support/conversation/{conversationId:guid}/close")]
+    [InlineData("/api/support/conversation/{conversationId:guid}/reopen")]
+    public async Task SupportChatUserStateChangeEndpoints_ShouldRequireSupportRateLimit(string routePattern)
+    {
+        await using var app = await SupportChatApiStartupTestApplication.CreateAsync();
+
+        Assert.True(app.HasRateLimit(routePattern, "support-chat"));
     }
 
     private sealed class SupportChatApiStartupTestApplication : IAsyncDisposable
@@ -47,6 +61,7 @@ public sealed class SupportChatApiStartupSmokeTests
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddPolicy("support-chat", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("admin", _ => RateLimitPartition.GetNoLimiter("tests"));
             });
 
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
@@ -85,6 +100,17 @@ public sealed class SupportChatApiStartupSmokeTests
         {
             await app.StopAsync();
             await app.DisposeAsync();
+        }
+
+        public bool HasRateLimit(string routePattern, string policyName)
+        {
+            return app.Services.GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Where(endpoint => string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal))
+                .Any(endpoint => endpoint.Metadata
+                    .GetOrderedMetadata<EnableRateLimitingAttribute>()
+                    .Any(metadata => string.Equals(metadata.PolicyName, policyName, StringComparison.Ordinal)));
         }
     }
 

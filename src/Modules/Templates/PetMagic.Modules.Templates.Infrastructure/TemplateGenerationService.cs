@@ -8,17 +8,22 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class TemplateGenerationService(
     TemplatesDbContext dbContext,
-    ITemplateGenerationBilling billing) : ITemplateGenerationService
+    ITemplateGenerationBilling billing,
+    TemplatesOptions options) : ITemplateGenerationService
 {
     internal static readonly Guid AdminTestUserId = Guid.Empty;
 
     public async Task<Result<TemplateGenerationResponse>> StartAsync(StartTemplateGenerationCommand command, CancellationToken cancellationToken)
     {
+        var normalizedIdempotencyKey = NormalizeOptionalText(command.IdempotencyKey, 256);
+        var normalizedRequestHash = NormalizeOptionalText(command.RequestHash, 128);
+
         var template = await dbContext.TemplateItems
             .Include(x => x.Assets)
             .FirstOrDefaultAsync(x => x.Id == command.TemplateId, cancellationToken);
@@ -32,6 +37,38 @@ internal sealed class TemplateGenerationService(
         if (readiness is not null)
         {
             return Result.Failure<TemplateGenerationResponse>(readiness);
+        }
+
+        var duplicate = await FindActiveDuplicateAsync(
+            command.UserId,
+            normalizedIdempotencyKey,
+            normalizedRequestHash,
+            cancellationToken);
+        if (duplicate is not null)
+        {
+            return Result.Success(await MapResponseWithQueueMetricsAsync(duplicate, cancellationToken));
+        }
+
+        var activeLimit = Math.Max(1, command.ActiveGenerationLimit ?? options.FreeUserMaxActiveGenerations);
+        var activeCount = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .CountAsync(x => x.UserId == command.UserId
+                && TemplateGenerationJobStatusSets.Active.Contains(x.Status),
+                cancellationToken);
+        if (activeCount >= activeLimit)
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.ActiveGenerationLimitReached);
+        }
+
+        if (options.QueueMaxSize > 0)
+        {
+            var queueSize = await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status), cancellationToken);
+            if (queueSize >= options.QueueMaxSize)
+            {
+                return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationQueueOverloaded);
+            }
         }
 
         var now = DateTime.UtcNow;
@@ -48,23 +85,46 @@ internal sealed class TemplateGenerationService(
             SourceImageContentType = command.SourceImageAsset.ContentType,
             SourceImageFileSizeBytes = command.SourceImageAsset.FileSizeBytes,
             ReferenceMotionUrl = GetAsset(template, TemplateAssetKind.ReferenceMotion)?.Url,
+            IdempotencyKey = normalizedIdempotencyKey,
+            RequestHash = normalizedRequestHash,
             CreatedAtUtc = now,
             QueuedAtUtc = now,
             UpdatedAtUtc = now
         };
 
         dbContext.TemplateGenerationJobs.Add(job);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            TemplateGenerationMetrics.RecordJobQueued(job);
+        }
+        catch (DbUpdateException) when (normalizedIdempotencyKey is not null || normalizedRequestHash is not null)
+        {
+            dbContext.ChangeTracker.Clear();
+            duplicate = await FindActiveDuplicateAsync(
+                command.UserId,
+                normalizedIdempotencyKey,
+                normalizedRequestHash,
+                cancellationToken);
+            if (duplicate is not null)
+            {
+                return Result.Success(await MapResponseWithQueueMetricsAsync(duplicate, cancellationToken));
+            }
+
+            throw;
+        }
 
         var charge = await billing.ChargeAsync(job.UserId, job.Id, job.TokenCost, cancellationToken);
         if (charge.IsFailure)
         {
+            var previousStatus = job.Status;
             job.Status = TemplateGenerationStatus.Failed;
-            job.FailureCode = charge.Error.Code;
-            job.FailureMessage = charge.Error.Message;
+            job.LastErrorCode = charge.Error.Code;
+            job.LastErrorMessage = charge.Error.Message;
             job.UpdatedAtUtc = DateTime.UtcNow;
             job.CompletedAtUtc = job.UpdatedAtUtc;
             await dbContext.SaveChangesAsync(cancellationToken);
+            TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, charge.Error.Code);
             return Result.Failure<TemplateGenerationResponse>(charge.Error);
         }
 
@@ -72,7 +132,7 @@ internal sealed class TemplateGenerationService(
         job.UpdatedAtUtc = job.ChargedAtUtc.Value;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(MapResponse(job));
+        return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
     }
 
     public async Task<Result<TemplateGenerationResponse>> StartAdminTestAsync(Guid templateId, TemplateAssetCommand sourceImageAsset, CancellationToken cancellationToken)
@@ -113,8 +173,9 @@ internal sealed class TemplateGenerationService(
 
         dbContext.TemplateGenerationJobs.Add(job);
         await dbContext.SaveChangesAsync(cancellationToken);
+        TemplateGenerationMetrics.RecordJobQueued(job);
 
-        return Result.Success(MapResponse(job));
+        return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
     }
 
     public async Task<Result<TemplateGenerationResponse>> GetAsync(Guid userId, Guid generationId, CancellationToken cancellationToken)
@@ -129,8 +190,8 @@ internal sealed class TemplateGenerationService(
                 cancellationToken);
 
         return job is null
-            ? Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound)
-            : Result.Success(MapResponse(job));
+            ? Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound)
+            : Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
     }
 
     public async Task<Result<IReadOnlyList<TemplateGenerationResponse>>> ListAsync(Guid userId, TemplateGenerationHistoryQuery query, CancellationToken cancellationToken)
@@ -145,12 +206,17 @@ internal sealed class TemplateGenerationService(
 
         generationsQuery = ApplyStatusFilter(generationsQuery, query.Status);
 
-        var items = await generationsQuery
+        var jobs = await generationsQuery
             .OrderByDescending(x => x.CreatedAtUtc)
             .Skip(skip)
             .Take(take)
-            .Select(x => MapResponse(x))
             .ToArrayAsync(cancellationToken);
+
+        var items = new List<TemplateGenerationResponse>(jobs.Length);
+        foreach (var job in jobs)
+        {
+            items.Add(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
+        }
 
         return Result.Success<IReadOnlyList<TemplateGenerationResponse>>(items);
     }
@@ -179,7 +245,7 @@ internal sealed class TemplateGenerationService(
 
         if (job is null)
         {
-            return Result.Failure(TemplatesErrors.NotFound);
+            return Result.Failure(TemplatesErrors.GenerationJobNotFound);
         }
 
         job.ResultViewedAtUtc ??= DateTime.UtcNow;
@@ -195,7 +261,7 @@ internal sealed class TemplateGenerationService(
 
         if (job is null || job.HiddenByUserAtUtc != null)
         {
-            return Result.Failure(TemplatesErrors.NotFound);
+            return Result.Failure(TemplatesErrors.GenerationJobNotFound);
         }
 
         var now = DateTime.UtcNow;
@@ -220,7 +286,7 @@ internal sealed class TemplateGenerationService(
 
         if (job is null)
         {
-            return Result.Failure(TemplatesErrors.NotFound);
+            return Result.Failure(TemplatesErrors.GenerationJobNotFound);
         }
 
         var reasons = NormalizeFeedbackReasons(command.SelectedReasons);
@@ -257,8 +323,8 @@ internal sealed class TemplateGenerationService(
             .FirstOrDefaultAsync(x => x.Id == generationId && x.UserId == AdminTestUserId, cancellationToken);
 
         return job is null
-            ? Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound)
-            : Result.Success(MapResponse(job));
+            ? Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound)
+            : Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
     }
 
     internal static Error? ValidateTemplate(TemplateItem template, bool requireActiveStatus)
@@ -313,7 +379,10 @@ internal sealed class TemplateGenerationService(
         return string.IsNullOrWhiteSpace(prompt) ? fallback : prompt.Trim();
     }
 
-    internal static TemplateGenerationResponse MapResponse(TemplateGenerationJob job)
+    internal static TemplateGenerationResponse MapResponse(
+        TemplateGenerationJob job,
+        int? queuePosition = null,
+        int? estimatedWaitSeconds = null)
     {
         return new TemplateGenerationResponse(
             job.Id,
@@ -324,7 +393,7 @@ internal sealed class TemplateGenerationService(
             MapSourceImageAsset(job),
             job.NormalizedImageUrl,
             job.ReferenceMotionUrl,
-            job.OutputUrl,
+            job.ResultUrl,
             job.AttemptCount,
             job.UsedPreprocessingModel,
             job.UsedKlingModel,
@@ -334,8 +403,8 @@ internal sealed class TemplateGenerationService(
             job.MotionInferenceTimeSeconds,
             job.OutputVideoDurationSeconds,
             job.MotionProviderCostUsd,
-            job.FailureCode,
-            job.FailureMessage,
+            job.LastErrorCode,
+            job.LastErrorMessage,
             job.CreatedAtUtc,
             job.UpdatedAtUtc,
             job.StartedAtUtc,
@@ -351,7 +420,55 @@ internal sealed class TemplateGenerationService(
             ResolveEstimatedDurationLabel(job.Template?.TemplateType),
             job.ChargedAtUtc,
             job.RefundedAtUtc,
-            job.Status == TemplateGenerationStatus.Completed && job.ResultViewedAtUtc == null);
+            job.Status == TemplateGenerationStatus.Completed && job.ResultViewedAtUtc == null,
+            queuePosition,
+            estimatedWaitSeconds);
+    }
+
+    private async Task<TemplateGenerationResponse> MapResponseWithQueueMetricsAsync(
+        TemplateGenerationJob job,
+        CancellationToken cancellationToken)
+    {
+        if (job.Status != TemplateGenerationStatus.Queued)
+        {
+            return MapResponse(job);
+        }
+
+        var queuePosition = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .CountAsync(x => x.Status == TemplateGenerationStatus.Queued
+                && x.QueuedAtUtc < job.QueuedAtUtc,
+                cancellationToken) + 1;
+
+        var averageGenerationSeconds = job.Template?.TemplateType == TemplateType.Video
+            ? options.EstimatedVideoGenerationSeconds
+            : options.EstimatedImageGenerationSeconds;
+        var globalConcurrency = Math.Max(1, options.GlobalMaxConcurrentGenerations);
+        var estimatedWaitSeconds = (int)Math.Ceiling(queuePosition * averageGenerationSeconds / (double)globalConcurrency);
+
+        return MapResponse(job, queuePosition, estimatedWaitSeconds);
+    }
+
+    private Task<TemplateGenerationJob?> FindActiveDuplicateAsync(
+        Guid userId,
+        string? idempotencyKey,
+        string? requestHash,
+        CancellationToken cancellationToken)
+    {
+        if (idempotencyKey is null && requestHash is null)
+        {
+            return Task.FromResult<TemplateGenerationJob?>(null);
+        }
+
+        return dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Include(x => x.Template)
+            .Where(x => x.UserId == userId
+                && TemplateGenerationJobStatusSets.Active.Contains(x.Status)
+                && ((idempotencyKey != null && x.IdempotencyKey == idempotencyKey)
+                    || (requestHash != null && x.RequestHash == requestHash)))
+            .OrderBy(x => x.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static IQueryable<TemplateGenerationJob> ApplyStatusFilter(
@@ -361,13 +478,20 @@ internal sealed class TemplateGenerationService(
         return rawStatus?.Trim().ToLowerInvariant() switch
         {
             null or "" or "all" => query,
-            "active" or "in_progress" or "processing" => query.Where(x => x.Status != TemplateGenerationStatus.Completed && x.Status != TemplateGenerationStatus.Failed),
+            "active" or "in_progress" or "processing" => query.Where(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status)),
             "ready" or "succeeded" or "completed" => query.Where(x => x.Status == TemplateGenerationStatus.Completed),
             "error" or "failed" => query.Where(x => x.Status == TemplateGenerationStatus.Failed),
             "queued" => query.Where(x => x.Status == TemplateGenerationStatus.Queued),
-            "preprocessing" => query.Where(x => x.Status == TemplateGenerationStatus.Preprocessing),
-            "generating" => query.Where(x => x.Status == TemplateGenerationStatus.Generating),
-            "finalizing" => query.Where(x => x.Status == TemplateGenerationStatus.Finalizing),
+            "preprocessing" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
+                && x.StartedAtUtc != null
+                && x.PreprocessingCompletedAtUtc == null),
+            "generating" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
+                && x.PreprocessingCompletedAtUtc != null
+                && x.MotionGenerationCompletedAtUtc == null
+                && x.Template.TemplateType == TemplateType.Video),
+            "finalizing" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
+                && ((x.Template.TemplateType == TemplateType.Image && x.PreprocessingCompletedAtUtc != null)
+                    || x.MotionGenerationCompletedAtUtc != null)),
             _ => query
         };
     }
@@ -435,27 +559,34 @@ internal sealed class TemplateGenerationService(
             return "succeeded";
         }
 
-        if (job.Status == TemplateGenerationStatus.Finalizing || job.MediaImportCompletedAtUtc is not null)
+        if (job.Status == TemplateGenerationStatus.Queued)
+        {
+            return "queued";
+        }
+
+        if (job.Status != TemplateGenerationStatus.Processing)
+        {
+            return "processing";
+        }
+
+        if (job.MediaImportCompletedAtUtc is not null
+            || job.MotionGenerationCompletedAtUtc is not null
+            || (job.Template?.TemplateType == TemplateType.Image && job.PreprocessingCompletedAtUtc is not null))
         {
             return "finalizing";
         }
 
-        if (job.Status == TemplateGenerationStatus.Generating || job.MotionGenerationCompletedAtUtc is not null)
+        if (job.Template?.TemplateType == TemplateType.Video && job.PreprocessingCompletedAtUtc is not null)
         {
             return "generating";
         }
 
-        if (job.Status == TemplateGenerationStatus.Preprocessing || job.StartedAtUtc is not null)
+        if (job.StartedAtUtc is not null)
         {
             return "preprocessing";
         }
 
-        if (job.Status == TemplateGenerationStatus.Uploading)
-        {
-            return "uploading";
-        }
-
-        return "queued";
+        return "processing";
     }
 
     internal static int ResolveProgressPercent(TemplateGenerationJob job)

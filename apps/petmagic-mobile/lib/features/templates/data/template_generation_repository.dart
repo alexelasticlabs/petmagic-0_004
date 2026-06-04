@@ -531,6 +531,8 @@ class TemplateGenerationDto {
     this.chargedAtUtc,
     this.refundedAtUtc,
     this.isUnread = false,
+    this.queuePosition,
+    this.estimatedWaitSeconds,
   });
 
   final String generationId;
@@ -564,6 +566,8 @@ class TemplateGenerationDto {
   final DateTime? refundedAtUtc;
   final bool userMediaExpired;
   final bool isUnread;
+  final int? queuePosition;
+  final int? estimatedWaitSeconds;
 
   factory TemplateGenerationDto.fromJson(Map<String, dynamic> json) {
     final rawSourceImageAsset = json['sourceImageAsset'];
@@ -609,6 +613,8 @@ class TemplateGenerationDto {
       refundedAtUtc: _dateTime(json['refundedAtUtc']),
       userMediaExpired: json['userMediaExpired'] as bool? ?? false,
       isUnread: json['isUnread'] as bool? ?? false,
+      queuePosition: (json['queuePosition'] as num?)?.toInt(),
+      estimatedWaitSeconds: (json['estimatedWaitSeconds'] as num?)?.toInt(),
     );
   }
 
@@ -645,6 +651,8 @@ class TemplateGenerationDto {
       refundedAtUtc: refundedAtUtc,
       userMediaExpired: userMediaExpired,
       isUnread: isUnread,
+      queuePosition: queuePosition,
+      estimatedWaitSeconds: estimatedWaitSeconds,
     );
   }
 
