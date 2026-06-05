@@ -395,6 +395,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("Status", "NextAttemptAtUtc", "QueuedAtUtc");
+
                     b.HasIndex("Status", "QueuedAtUtc");
 
                     b.HasIndex("Status", "UpdatedAtUtc");

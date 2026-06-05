@@ -1,10 +1,15 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+
+using PetMagic.Modules.Economy.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(EconomyDbContext))]
+    [Migration("20260604191000_AddEconomyPerformanceIndexes")]
     public partial class AddEconomyPerformanceIndexes : Migration
     {
         /// <inheritdoc />

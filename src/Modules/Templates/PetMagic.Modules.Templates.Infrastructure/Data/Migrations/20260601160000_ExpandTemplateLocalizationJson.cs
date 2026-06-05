@@ -1,10 +1,15 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+
+using PetMagic.Modules.Templates.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(TemplatesDbContext))]
+    [Migration("20260601160000_ExpandTemplateLocalizationJson")]
     public partial class ExpandTemplateLocalizationJson : Migration
     {
         /// <inheritdoc />

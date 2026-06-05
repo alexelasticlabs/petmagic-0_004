@@ -117,7 +117,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.HasIndex("Token")
                         .IsUnique();
 
-                    b.HasIndex("UserId", "DisabledAtUtc", "LastSeenAtUtc");
+                    b.HasIndex("UserId", "DisabledAtUtc", "LastSeenAtUtc")
+                        .HasDatabaseName("IX_epdt_UserId_DisabledAtUtc_LastSeenAtUtc");
 
                     b.ToTable("economy_push_device_tokens", (string)null);
                 });
@@ -334,6 +335,9 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.HasIndex("Status", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "PaymentProvider", "CreatedAtUtc")
+                        .HasDatabaseName("IX_economy_purchase_orders_UserId_PaymentProvider_CreatedAtUtc");
 
                     b.ToTable("economy_purchase_orders", (string)null);
                 });
@@ -590,9 +594,13 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Provider", "ExternalPaymentMethodId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("UX_espm_Provider_ExternalPaymentMethodId");
 
                     b.HasIndex("UserId", "IsActive", "IsDefault");
+
+                    b.HasIndex("UserId", "Provider", "IsActive", "IsDefault", "UpdatedAtUtc")
+                        .HasDatabaseName("IX_espm_UserId_Provider_Active_Default_Updated");
 
                     b.ToTable("economy_saved_payment_methods", (string)null);
                 });
@@ -646,13 +654,17 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasIndex("Provider", "ExternalEventId");
 
-                    b.HasIndex("Provider", "ExternalSubscriptionId");
+                    b.HasIndex("Provider", "ExternalSubscriptionId")
+                        .HasDatabaseName("IX_esel_Provider_ExternalSubscriptionId");
 
                     b.HasIndex("CreatedAtUtc");
 
                     b.HasIndex("Provider", "Status", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "Provider", "CreatedAtUtc")
+                        .HasDatabaseName("IX_esel_UserId_Provider_CreatedAtUtc");
 
                     b.ToTable("economy_subscription_event_logs", (string)null);
                 });

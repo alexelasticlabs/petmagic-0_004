@@ -293,6 +293,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -455,7 +459,11 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 
-                    b.HasIndex("Status", "RefundedAtUtc", "RefundLastAttemptedAtUtc");
+                    b.HasIndex("UserId", "HiddenByUserAtUtc", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc");
+
+                    b.HasIndex("Status", "RefundedAtUtc", "RefundLastAttemptedAtUtc")
+                        .HasDatabaseName("IX_tgj_Status_RefundedAtUtc_RefundLastAttemptedAtUtc");
 
                     b.HasIndex("TemplateId", "Status", "CreatedAtUtc");
 
@@ -710,7 +718,8 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("Token")
                         .IsUnique();
 
-                    b.HasIndex("UserId", "DisabledAtUtc", "LastSeenAtUtc");
+                    b.HasIndex("UserId", "DisabledAtUtc", "LastSeenAtUtc")
+                        .HasDatabaseName("IX_tpdt_UserId_DisabledAtUtc_LastSeenAtUtc");
 
                     b.ToTable("templates_push_device_tokens", (string)null);
                 });

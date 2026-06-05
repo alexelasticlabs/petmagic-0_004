@@ -1,10 +1,15 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+
+using PetMagic.Modules.Identity.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(IdentityDbContext))]
+    [Migration("20260604190000_AddIdentityPerformanceIndexes")]
     public partial class AddIdentityPerformanceIndexes : Migration
     {
         /// <inheritdoc />

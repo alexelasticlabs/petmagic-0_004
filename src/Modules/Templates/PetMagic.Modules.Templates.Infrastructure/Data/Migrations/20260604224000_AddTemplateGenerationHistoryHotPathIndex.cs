@@ -1,5 +1,3 @@
-using System;
-
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -11,26 +9,24 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
     [DbContext(typeof(TemplatesDbContext))]
-    [Migration("20260601153000_AddTemplateLocalizationJson")]
-    public partial class AddTemplateLocalizationJson : Migration
+    [Migration("20260604224000_AddTemplateGenerationHistoryHotPathIndex")]
+    public partial class AddTemplateGenerationHistoryHotPathIndex : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "LocalizedTextsJson",
-                table: "templates_items",
-                type: "character varying(12000)",
-                maxLength: 12000,
-                nullable: true);
+            migrationBuilder.CreateIndex(
+                name: "IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc",
+                table: "templates_generation_jobs",
+                columns: new[] { "UserId", "HiddenByUserAtUtc", "CreatedAtUtc" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "LocalizedTextsJson",
-                table: "templates_items");
+            migrationBuilder.DropIndex(
+                name: "IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc",
+                table: "templates_generation_jobs");
         }
     }
 }
