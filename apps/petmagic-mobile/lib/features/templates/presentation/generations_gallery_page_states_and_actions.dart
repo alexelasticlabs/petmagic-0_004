@@ -354,11 +354,12 @@ Future<void> _showReadyCardActions(
         top: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surface,
+          child: Material(
+            color: colors.surface,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+              side: BorderSide(color: colors.border.withValues(alpha: 0.85)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -448,11 +449,12 @@ Future<void> _showFailedCardActions(
         top: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surface,
+          child: Material(
+            color: colors.surface,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: colors.border.withValues(alpha: 0.85)),
+              side: BorderSide(color: colors.border.withValues(alpha: 0.85)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

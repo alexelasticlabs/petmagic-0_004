@@ -387,7 +387,7 @@ class WalletRepository {
   }) {
     final headers = <String, String>{
       HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-      if (extraHeaders != null) ...extraHeaders,
+      ...?extraHeaders,
     };
 
     return Options(headers: headers);

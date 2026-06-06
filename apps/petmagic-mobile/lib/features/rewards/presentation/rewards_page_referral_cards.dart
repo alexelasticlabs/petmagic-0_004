@@ -16,6 +16,8 @@ class _PromoCodeCard extends StatefulWidget {
 
 class _PromoCodeCardState extends State<_PromoCodeCard> {
   late final TextEditingController _controller;
+  String? _feedbackMessage;
+  _FeedbackTone _feedbackTone = _FeedbackTone.info;
 
   @override
   void initState() {
@@ -29,23 +31,18 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
     super.dispose();
   }
 
-  void _showInAppPush(String message, _FeedbackTone tone) {
-    PetMagicToast.show(
-      context,
-      message: message,
-      tone: switch (tone) {
-        _FeedbackTone.success => PetMagicToastTone.success,
-        _FeedbackTone.warning => PetMagicToastTone.warning,
-        _FeedbackTone.info => PetMagicToastTone.info,
-      },
-    );
+  void _showFeedback(String message, _FeedbackTone tone) {
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackTone = tone;
+    });
   }
 
   Future<void> _submit() async {
     final code = _controller.text.trim();
     final text = AppLocalizations.of(context);
     if (code.isEmpty) {
-      _showInAppPush(text.rewardsPromoEmptyError, _FeedbackTone.warning);
+      _showFeedback(text.rewardsPromoEmptyError, _FeedbackTone.warning);
       return;
     }
 
@@ -53,14 +50,14 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
       return;
     }
 
-    _showInAppPush(text.rewardsPromoCheckingStatus, _FeedbackTone.info);
+    _showFeedback(text.rewardsPromoCheckingStatus, _FeedbackTone.info);
 
     final error = await widget.onSubmit(code);
     if (!mounted) {
       return;
     }
 
-    _showInAppPush(
+    _showFeedback(
       error == null
           ? text.walletRedeemSuccessMessage
           : friendlyRewardsError(text, error),
@@ -237,11 +234,60 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                       ),
                     ],
                   ),
+                if (_feedbackMessage != null) ...[
+                  const SizedBox(height: 10),
+                  _PromoFeedbackMessage(
+                    message: _feedbackMessage!,
+                    tone: _feedbackTone,
+                  ),
+                ],
               ],
             );
           },
         ),
       ),
+    );
+  }
+}
+
+class _PromoFeedbackMessage extends StatelessWidget {
+  const _PromoFeedbackMessage({required this.message, required this.tone});
+
+  final String message;
+  final _FeedbackTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final color = switch (tone) {
+      _FeedbackTone.success => colors.accent,
+      _FeedbackTone.warning => colors.gold,
+      _FeedbackTone.info => colors.blue,
+    };
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          tone == _FeedbackTone.success
+              ? Icons.check_circle_rounded
+              : Icons.info_rounded,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(
+              color: color,
+              fontSize: 12.5,
+              height: 1.35,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

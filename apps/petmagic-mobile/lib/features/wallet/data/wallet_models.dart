@@ -283,9 +283,7 @@ class PurchaseCheckoutModel {
   final String? publishableKey;
   final String status;
 
-  bool get usesPaymentSheet =>
-      (paymentIntentClientSecret?.isNotEmpty ?? false) &&
-      (publishableKey?.isNotEmpty ?? false);
+  bool get usesPaymentSheet => false;
 
   factory PurchaseCheckoutModel.fromJson(Map<String, dynamic> json) {
     return PurchaseCheckoutModel(

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -15,6 +16,7 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 
 void main() {
   testWidgets(
@@ -43,14 +45,14 @@ void main() {
       expect(find.text(text.walletPromoTitle), findsNothing);
 
       await tester.drag(find.byType(ListView).first, const Offset(0, -520));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text(text.walletBuySparkTitle), findsWidgets);
 
       expect(find.text(text.walletPackDetailsAction), findsWidgets);
 
       await tester.tap(find.text(text.walletPackDetailsAction).first);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text(text.premiumPaymentStripe), findsAtLeastNWidgets(1));
       expect(tester.takeException(), isNull);
@@ -226,9 +228,9 @@ void main() {
     final text = AppLocalizations.of(rewardsContext);
 
     await tester.drag(find.byType(ListView).first, const Offset(0, -360));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.ensureVisible(find.byKey(const Key('rewards_promo_input')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.enterText(
       find.byKey(const Key('rewards_promo_input')),
@@ -239,7 +241,7 @@ void main() {
     );
     submitButton.onPressed!();
     await tester.pump(const Duration(milliseconds: 200));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(
       find.text(text.walletRedeemOfflineError, skipOffstage: false),
@@ -265,13 +267,13 @@ void main() {
     final text = AppLocalizations.of(rewardsContext);
 
     await tester.drag(find.byType(ListView).first, const Offset(0, -360));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     final submitButton = tester.widget<FilledButton>(
       find.byKey(const Key('rewards_promo_submit')),
     );
     submitButton.onPressed!();
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text(text.rewardsPromoEmptyError), findsOneWidget);
   });
@@ -294,23 +296,24 @@ void main() {
     final text = AppLocalizations.of(rewardsContext);
 
     await tester.drag(find.byType(ListView).first, const Offset(0, -1080));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.ensureVisible(
       find.byKey(const Key('rewards_referral_show_input')),
     );
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('rewards_referral_show_input')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.enterText(
       find.byKey(const Key('rewards_referral_input')),
       'PMFRIEND1',
     );
     await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text(text.rewardsReferralStatusPending), findsOneWidget);
+    await PetMagicNotificationCenter.instance.clearQueue();
   });
 
   testWidgets('rewards page hides purchase soft warnings from wallet preload', (
@@ -340,7 +343,7 @@ void main() {
     expect(find.text('wallet.purchases_failed'), findsNothing);
 
     await tester.drag(find.byType(ListView).first, const Offset(0, -620));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text(text.rewardsReferralTitle), findsWidgets);
     expect(find.byKey(const Key('rewards_referral_show_input')), findsWidgets);
@@ -367,7 +370,7 @@ void main() {
     final text = AppLocalizations.of(rewardsContext);
 
     await tester.drag(find.byType(ListView).first, const Offset(0, -620));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text(text.walletPaymentGatewayUnavailableError), findsNothing);
     expect(find.textContaining('wallet.payment_unavailable'), findsNothing);
@@ -388,13 +391,33 @@ class _IdleGenerationHistoryController extends GenerationHistoryController {
   }
 }
 
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
 Future<void> _pumpWalletPage(
   WidgetTester tester, {
   required WalletRepository repository,
 }) async {
+  addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
+
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
+        walletRepositoryProvider.overrideWithValue(repository),
+      ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         locale: const Locale('ru'),
@@ -422,16 +445,23 @@ Future<void> _pumpWalletPage(
 
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 200));
-  await tester.pumpAndSettle();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 Future<void> _pumpRewardsPage(
   WidgetTester tester, {
   required WalletRepository repository,
 }) async {
+  addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
+
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
+        walletRepositoryProvider.overrideWithValue(repository),
+      ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         locale: const Locale('ru'),
@@ -459,7 +489,7 @@ Future<void> _pumpRewardsPage(
 
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 200));
-  await tester.pumpAndSettle();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 class _FakeWalletRepository extends WalletRepository {

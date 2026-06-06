@@ -1,54 +1,54 @@
 {
-    "project_info": {
-        "project_number": "288623941469",
-        "project_id": "petmagic-f036b",
-        "storage_bucket": "petmagic-f036b.firebasestorage.app"
-    },
-    "client": [
-        {
-            "client_info": {
-                "mobilesdk_app_id": "1:288623941469:android:644096c9f2428f0364bab4",
-                "android_client_info": {
-                    "package_name": "com.petmagic.app"
-                }
-            },
-            "oauth_client": [
-                {
-                    "client_id": "288623941469-3pq3f1kq4ec3d2n8fj091317ke7ufks7.apps.googleusercontent.com",
-                    "client_type": 1,
-                    "android_info": {
-                        "package_name": "com.petmagic.app",
-                        "certificate_hash": "fa1f5d99f24eec1781ec73dfc44c6a8459acba3d"
-                    }
-                },
-                {
-                    "client_id": "288623941469-5q2r9fct5cd27cunu2tvqiifkpggb0nm.apps.googleusercontent.com",
-                    "client_type": 3
-                }
-            ],
-            "api_key": [
-                {
-                    "current_key": "AIzaSyCq2xUslLCKvbcAh6noacGYyb4vVVRcnDQ"
-                }
-            ],
-            "services": {
-                "appinvite_service": {
-                    "other_platform_oauth_client": [
-                        {
-                            "client_id": "288623941469-5q2r9fct5cd27cunu2tvqiifkpggb0nm.apps.googleusercontent.com",
-                            "client_type": 3
-                        },
-                        {
-                            "client_id": "288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b.apps.googleusercontent.com",
-                            "client_type": 2,
-                            "ios_info": {
-                                "bundle_id": "com.petmagic.app"
-                            }
-                        }
-                    ]
-                }
-            }
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "petmagic-placeholder",
+    "storage_bucket": "petmagic-placeholder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "com.petmagic.app"
         }
-    ],
-    "configuration_version": "1"
+      },
+      "oauth_client": [
+        {
+          "client_id": "replace-with-android-oauth-client-id.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.petmagic.app",
+            "certificate_hash": "replace-with-release-certificate-sha1"
+          }
+        },
+        {
+          "client_id": "replace-with-web-oauth-client-id.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "replace-with-firebase-api-key"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "replace-with-web-oauth-client-id.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "replace-with-ios-oauth-client-id.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.petmagic.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
 }

@@ -514,6 +514,12 @@ class PremiumController extends Notifier<PremiumState> {
           WidgetsBinding.instance.platformDispatcher.locale,
         );
         if (!checkout.usesPaymentSheet) {
+          final checkoutUrl = checkout.checkoutUrl.trim();
+          if (checkoutUrl.isNotEmpty) {
+            state = state.copyWith(isBuying: false, externalUrl: checkoutUrl);
+            return null;
+          }
+
           state = state.copyWith(
             isBuying: false,
             errorMessage: 'premium.checkout_failed',

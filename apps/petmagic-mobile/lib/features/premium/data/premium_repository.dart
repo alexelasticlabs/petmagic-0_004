@@ -116,7 +116,7 @@ class PremiumRepository {
     );
 
     final checkout = PremiumCheckoutModel.fromJson(response.data ?? const {});
-    if (platform == 'web') {
+    if (platform == 'web' || checkout.checkoutUrl.trim().isNotEmpty) {
       return checkout;
     }
 
@@ -310,7 +310,7 @@ class PremiumRepository {
   }) {
     final headers = <String, String>{
       HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-      if (extraHeaders != null) ...extraHeaders,
+      ...?extraHeaders,
     };
 
     return Options(headers: headers);

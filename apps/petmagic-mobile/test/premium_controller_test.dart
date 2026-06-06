@@ -63,7 +63,7 @@ void main() {
   );
 
   test(
-    'stripe checkout returns payment sheet payload for in-app flow',
+    'stripe checkout opens external checkout url for mobile flow',
     () async {
       final repository = _FakePremiumRepository(
         config: _paywallConfig(
@@ -85,7 +85,7 @@ void main() {
         status: _status(provider: 'stripe', canManageSubscription: false),
         stripeCheckout: const PremiumCheckoutModel(
           paymentProvider: 'stripe',
-          checkoutUrl: '',
+          checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_123',
           status: 'pending',
           externalSubscriptionId: 'cs_test_123',
           paymentIntentClientSecret: 'pi_client_secret',
@@ -111,9 +111,11 @@ void main() {
           .startCheckout();
 
       final state = container.read(premiumControllerProvider);
-      expect(checkout, isNotNull);
-      expect(checkout?.usesPaymentSheet, isTrue);
-      expect(state.externalUrl, isNull);
+      expect(checkout, isNull);
+      expect(
+        state.externalUrl,
+        'https://checkout.stripe.com/c/pay/cs_test_123',
+      );
       expect(state.isBuying, isFalse);
     },
   );

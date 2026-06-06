@@ -15,6 +15,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_pa
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
@@ -24,6 +25,7 @@ import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 part 'widgets/wallet_page_activity_widgets.dart';
 part 'widgets/wallet_page_overview_widgets.dart';
@@ -286,6 +288,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
         return;
       }
 
+      if (_isWalletPartialError(nextError)) {
+        return;
+      }
+
       PetMagicToast.show(
         context,
         message: _friendlyError(text, nextError),
@@ -327,6 +333,13 @@ class _WalletPageState extends ConsumerState<WalletPage>
                         wallet: state.wallet,
                         onRefresh: () => controller.load(refresh: true),
                       ),
+                      if (state.errorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        ProfileMessageCard(
+                          message: _friendlyError(text, state.errorMessage!),
+                          tone: const Color(0xFFFFC107),
+                        ),
+                      ],
                       if (isAuthenticated &&
                           !(state.wallet?.isPremium ?? false)) ...[
                         const SizedBox(height: 14),
@@ -401,6 +414,22 @@ class _WalletPageState extends ConsumerState<WalletPage>
     );
 
     if (!checkout.usesPaymentSheet) {
+      final checkoutUrl = checkout.checkoutUrl.trim();
+      final uri = parseSafeExternalUri(
+        checkoutUrl,
+        allowedHttpsHosts: premiumExternalAllowedHosts(),
+      );
+      if (uri != null) {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) {
+          _shouldReloadOnResume = true;
+          return StripePaymentSheetResult.success;
+        }
+      }
+
       return StripePaymentSheetResult.failure(
         error: StateError('wallet.payment_gateway_unavailable'),
         errorMessage: text.walletPaymentGatewayUnavailableError,
@@ -879,4 +908,10 @@ String _friendlyError(AppLocalizations text, String value) {
   }
 
   return value;
+}
+
+bool _isWalletPartialError(String value) {
+  return value.contains('wallet.ledger_failed') ||
+      value.contains('wallet.packs_failed') ||
+      value.contains('wallet.purchases_failed');
 }

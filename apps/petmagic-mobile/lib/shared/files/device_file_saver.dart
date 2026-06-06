@@ -1,6 +1,8 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:share_plus/share_plus.dart';
 
 Future<List<int>> downloadFileBytes(
   String fileUrl, {
@@ -49,19 +51,41 @@ Future<bool> saveBytesToDevice({
   List<String>? allowedExtensions,
 }) async {
   final normalizedExtensions = _normalizeAllowedExtensions(allowedExtensions);
-  final targetPath = await FilePicker.platform.saveFile(
-    dialogTitle: dialogTitle,
-    fileName: fileName,
-    type: normalizedExtensions == null ? FileType.any : FileType.custom,
-    allowedExtensions: normalizedExtensions,
-    bytes: Uint8List.fromList(bytes),
+  final safeFileName = sanitizeFileName(
+    fileName,
+    fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
   );
-
-  if (kIsWeb) {
-    return true;
+  final extension = extractFileExtension(safeFileName);
+  if (normalizedExtensions != null &&
+      extension != null &&
+      !normalizedExtensions.contains(extension)) {
+    return false;
   }
 
-  return targetPath != null && targetPath.trim().isNotEmpty;
+  if (kIsWeb) {
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(Uint8List.fromList(bytes), name: safeFileName)],
+        title: dialogTitle,
+      ),
+    );
+    return result.status == ShareResultStatus.success;
+  }
+
+  final tempFile = File(
+    '${Directory.systemTemp.path}${Platform.pathSeparator}petmagic_$safeFileName',
+  );
+  await tempFile.writeAsBytes(bytes, flush: true);
+  try {
+    final result = await SharePlus.instance.share(
+      ShareParams(files: [XFile(tempFile.path, name: safeFileName)]),
+    );
+    return result.status == ShareResultStatus.success;
+  } finally {
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+  }
 }
 
 String sanitizeFileName(String? value, {required String fallback}) {

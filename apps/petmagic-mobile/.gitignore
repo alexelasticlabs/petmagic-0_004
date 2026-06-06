@@ -32,6 +32,10 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/ios/Flutter/ephemeral/
+/ios/SourcePackages/
+/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+/ios/Runner.xcworkspace/xcshareddata/swiftpm/
 
 # Symbolication related
 app.*.symbols

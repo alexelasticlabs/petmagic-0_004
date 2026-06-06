@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:gallery_saver_plus/gallery_saver.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'device_file_saver.dart';
@@ -70,16 +70,29 @@ Future<bool> saveRemoteMediaToGallery({
     cancelToken: cancelToken,
   );
 
-  final saved = isVideo
-      ? await GallerySaver.saveVideo(tempFile.path, albumName: albumName)
-      : await GallerySaver.saveImage(tempFile.path, albumName: albumName);
+  final saveTitle = sanitizeFileName(
+    fileName,
+    fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
+  );
 
-  final isSaved = saved ?? false;
-  if (isSaved) {
+  try {
+    if (isVideo) {
+      await PhotoManager.editor.saveVideo(
+        tempFile,
+        title: saveTitle,
+        relativePath: albumName,
+      );
+    } else {
+      await PhotoManager.editor.saveImageWithPath(
+        tempFile.path,
+        title: saveTitle,
+        relativePath: albumName,
+      );
+    }
     await TempMediaCleanup.deleteIfExists(tempFile);
-  } else {
+    return true;
+  } catch (_) {
     TempMediaCleanup.scheduleTtlSweep();
+    return false;
   }
-
-  return isSaved;
 }

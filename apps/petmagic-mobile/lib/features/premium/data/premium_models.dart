@@ -312,9 +312,7 @@ class PremiumCheckoutModel {
   final String? customerEphemeralKeySecret;
   final String? publishableKey;
 
-  bool get usesPaymentSheet =>
-      (paymentIntentClientSecret?.isNotEmpty ?? false) &&
-      (publishableKey?.isNotEmpty ?? false);
+  bool get usesPaymentSheet => false;
 
   factory PremiumCheckoutModel.fromJson(Map<String, dynamic> json) {
     return PremiumCheckoutModel(

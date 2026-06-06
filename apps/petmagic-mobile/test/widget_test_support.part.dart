@@ -61,11 +61,22 @@ Future<void> _pumpApp(
   await tester.pump(const Duration(milliseconds: 250));
 
   addTearDown(() async {
+    await PetMagicNotificationCenter.instance.clearQueue();
     view.resetPhysicalSize();
     view.resetDevicePixelRatio();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
+}
+
+Future<void> _pumpFrames(
+  WidgetTester tester, {
+  int count = 8,
+  Duration step = const Duration(milliseconds: 100),
+}) async {
+  for (var index = 0; index < count; index++) {
+    await tester.pump(step);
+  }
 }
 
 class _IdleTemplateGenerationController extends TemplateGenerationController {

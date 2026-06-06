@@ -33,6 +33,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -162,6 +163,7 @@ void main() {
 
     expect(profileRepository.passwordResetRequestedFor, 'pet@example.com');
     expect(find.text('Enter the code from your email'), findsOneWidget);
+    await PetMagicNotificationCenter.instance.clearQueue();
   });
 
   testWidgets('password reset returns to sign in with prefilled email', (
@@ -195,6 +197,7 @@ void main() {
     expect(find.text('Welcome back!'), findsOneWidget);
     final emailField = tester.widget<TextField>(find.byType(TextField).first);
     expect(emailField.controller?.text, 'pet@example.com');
+    await PetMagicNotificationCenter.instance.clearQueue();
   });
 
   testWidgets('registers a new user and opens email verification', (
@@ -332,7 +335,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Google'));
     await tester.pump();
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.text('Magic Studio'), findsOneWidget);
   });
@@ -352,9 +355,10 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Google'));
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.text('Sign-in was cancelled.'), findsOneWidget);
+    await PetMagicNotificationCenter.instance.clearQueue();
   });
 
   test(
@@ -462,7 +466,7 @@ void main() {
 
     await tester.tap(find.text('Continue as guest'));
     await tester.pump();
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.text('Magic Studio'), findsOneWidget);
 
@@ -526,10 +530,10 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     router.go('/profile');
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     final text = AppLocalizations.of(
       tester.element(find.byType(Scaffold).first),
@@ -594,12 +598,12 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpFrames(tester);
 
       router.go(
         ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.terms),
       );
-      await tester.pumpAndSettle();
+      await _pumpFrames(tester);
 
       expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
       expect(
@@ -614,7 +618,7 @@ void main() {
       router.go(
         ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.privacy),
       );
-      await tester.pumpAndSettle();
+      await _pumpFrames(tester);
 
       expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
       expect(

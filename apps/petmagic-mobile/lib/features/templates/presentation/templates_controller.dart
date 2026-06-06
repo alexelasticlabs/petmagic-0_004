@@ -93,7 +93,7 @@ class TemplatesController extends Notifier<TemplatesState> {
   static const _warmupPreviewLimit = 10;
 
   TemplatesRepository get _repository => ref.read(templatesRepositoryProvider);
-  RealtimeClient get _realtimeClient => ref.read(realtimeClientProvider);
+  RealtimeClient? _activeRealtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Timer? _realtimeRefreshTimer;
   bool _hasPendingRealtimeRefresh = false;
@@ -131,6 +131,7 @@ class TemplatesController extends Notifier<TemplatesState> {
 
   @override
   TemplatesState build() {
+    _activeRealtimeClient = ref.watch(realtimeClientProvider);
     unawaited(_resumeRealtimeIfNeeded());
     ref.onDispose(() {
       _pauseRealtime();
@@ -219,7 +220,12 @@ class TemplatesController extends Notifier<TemplatesState> {
       return;
     }
 
-    _realtimeSubscription ??= _realtimeClient.events.listen(
+    final realtimeClient = _activeRealtimeClient;
+    if (realtimeClient == null) {
+      return;
+    }
+
+    _realtimeSubscription ??= realtimeClient.events.listen(
       _handleRealtimeEvent,
     );
     if (_isRealtimeConnected) {
@@ -227,7 +233,7 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
 
     try {
-      await _realtimeClient.connect();
+      await realtimeClient.connect();
       _isRealtimeConnected = true;
     } on Object {
       // Realtime is best-effort; templates feed still works via pull refresh.
@@ -240,8 +246,9 @@ class TemplatesController extends Notifier<TemplatesState> {
     unawaited(_realtimeSubscription?.cancel());
     _realtimeSubscription = null;
 
-    if (_isRealtimeConnected) {
-      unawaited(_realtimeClient.disconnect());
+    final realtimeClient = _activeRealtimeClient;
+    if (_isRealtimeConnected && realtimeClient != null) {
+      unawaited(realtimeClient.disconnect());
       _isRealtimeConnected = false;
     }
   }

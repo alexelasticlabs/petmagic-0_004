@@ -651,14 +651,16 @@ class _PremiumFeaturePill extends StatelessWidget {
         children: [
           Icon(icon, size: 11.5, color: foregroundColor),
           const SizedBox(width: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: foregroundColor,
-              fontSize: 10.8,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: foregroundColor,
+                fontSize: 10.8,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

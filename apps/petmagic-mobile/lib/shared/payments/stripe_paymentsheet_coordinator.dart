@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 
 enum StripePaymentSheetOutcome { completed, cancelled, failed }
 
@@ -72,48 +71,10 @@ class StripePaymentSheetCoordinator {
     Duration settleDelay = const Duration(milliseconds: 220),
   }) async {
     await _closeTransientUi(context, settleDelay: settleDelay);
-
-    try {
-      Stripe.publishableKey = request.publishableKey;
-      Stripe.urlScheme = request.urlScheme;
-      await Stripe.instance.applySettings();
-
-      await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
-          paymentIntentClientSecret: request.paymentIntentClientSecret,
-          merchantDisplayName: request.merchantDisplayName,
-          customerId: request.customerId,
-          customerEphemeralKeySecret: request.customerEphemeralKeySecret,
-          returnURL: request.returnUrl,
-        ),
-      );
-
-      await Stripe.instance.presentPaymentSheet();
-      return StripePaymentSheetResult.success;
-    } on StripeException catch (error) {
-      final code = error.error.code.toString().toLowerCase();
-      final isCancelled =
-          code.contains('canceled') ||
-          code.contains('cancelled') ||
-          code.contains('cancellation');
-      return StripePaymentSheetResult.failure(
-        error: error,
-        errorMessage: error.error.localizedMessage,
-        isCancelled: isCancelled,
-      );
-    } on PlatformException catch (error) {
-      final normalizedMessage = error.message?.toLowerCase() ?? '';
-      final isCancelled =
-          normalizedMessage.contains('cancel') ||
-          normalizedMessage.contains('dismiss');
-      return StripePaymentSheetResult.failure(
-        error: error,
-        errorMessage: error.message,
-        isCancelled: isCancelled,
-      );
-    } catch (error) {
-      return StripePaymentSheetResult.failure(error: error);
-    }
+    return StripePaymentSheetResult.failure(
+      error: UnsupportedError('stripe_paymentsheet_unavailable'),
+      errorMessage: 'Stripe PaymentSheet is unavailable in this build.',
+    );
   }
 
   static Future<void> _closeTransientUi(

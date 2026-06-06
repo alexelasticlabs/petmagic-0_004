@@ -137,7 +137,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
     final permission = await _permissionCoordinator.requestOnDemand(
-      AppPermissionType.files,
+      AppPermissionType.photos,
     );
     if (!permission.granted) {
       if (mounted) {
@@ -152,25 +152,16 @@ extension _SupportChatPageActions on _SupportChatPageState {
 
     final remainingSlots =
         _supportAttachmentMaxCount - _pendingAttachments.length;
-    final picked = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: const [
-        'jpg',
-        'jpeg',
-        'png',
-        'webp',
-        'mp4',
-        'm4v',
-        'mov',
-        'qt',
-      ],
-    );
-    final files = picked?.files;
-    if (files == null || files.isEmpty || !mounted) {
+    final pickedFiles = remainingSlots == 1
+        ? [?(await _imagePicker.pickMedia(imageQuality: 92))]
+        : await _imagePicker.pickMultipleMedia(
+            imageQuality: 92,
+            limit: remainingSlots,
+          );
+    if (pickedFiles.isEmpty || !mounted) {
       return;
     }
-    if (files.length > remainingSlots) {
+    if (pickedFiles.length > remainingSlots) {
       _showSupportToast(
         AppLocalizations.of(context).supportChatTooManyAttachmentsError,
         tone: PetMagicToastTone.warning,
@@ -178,14 +169,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
     }
 
     final nextAttachments = <_PendingSupportAttachment>[];
-    for (final file in files.take(remainingSlots)) {
-      final path = file.path;
-      if (path == null) {
-        continue;
-      }
-
+    for (final file in pickedFiles.take(remainingSlots)) {
       final attachment = await _validateAttachmentCandidateImpl(
-        filePath: path,
+        filePath: file.path,
         fileName: file.name,
       );
       if (attachment != null) {
@@ -521,30 +507,12 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowMultiple: false,
-      allowedExtensions: const [
-        'jpg',
-        'jpeg',
-        'png',
-        'webp',
-        'mp4',
-        'm4v',
-        'mov',
-        'qt',
-      ],
-    );
-    final files = picked?.files;
-    if (files == null ||
-        files.isEmpty ||
-        files.first.path == null ||
-        !mounted) {
+    final pickedFile = await _imagePicker.pickMedia(imageQuality: 92);
+    if (pickedFile == null || !mounted) {
       return;
     }
-    final pickedFile = files.first;
     final attachment = await _validateAttachmentCandidateImpl(
-      filePath: pickedFile.path!,
+      filePath: pickedFile.path,
       fileName: pickedFile.name,
     );
     if (attachment == null) {

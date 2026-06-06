@@ -13,11 +13,7 @@ final authSessionStorageProvider = Provider<AuthSessionStorage>((ref) {
 
 class AuthSessionStorage {
   AuthSessionStorage({FlutterSecureStorage? secureStorage})
-    : _secureStorage =
-          secureStorage ??
-          const FlutterSecureStorage(
-            aOptions: AndroidOptions(encryptedSharedPreferences: true),
-          );
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   static const sessionKey = 'petmagic_mobile_auth_session';
   static const _readTimeout = Duration(seconds: 5);

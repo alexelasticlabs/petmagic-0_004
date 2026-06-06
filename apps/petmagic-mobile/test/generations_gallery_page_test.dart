@@ -6,12 +6,14 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -217,7 +219,11 @@ class _GalleryHarness {
   Widget app() {
     return ProviderScope(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
         generationHistoryControllerProvider.overrideWith(() => controller),
+        walletControllerProvider.overrideWith(_IdleWalletController.new),
         realtimeClientProvider.overrideWith(
           (ref) => const NoopRealtimeClient(),
         ),
@@ -236,6 +242,29 @@ class _GalleryHarness {
       ),
     );
   }
+}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _IdleWalletController extends WalletController {
+  @override
+  WalletState build() {
+    return const WalletState();
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {}
 }
 
 class _FakeGenerationHistoryController extends GenerationHistoryController {

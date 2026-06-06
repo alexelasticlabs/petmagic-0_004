@@ -218,6 +218,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     final checkout = await controller.startCheckout();
     if (!mounted || checkout == null) {
       final state = ref.read(premiumControllerProvider);
+      final externalUrl = state.externalUrl;
+      if (externalUrl != null && externalUrl.isNotEmpty) {
+        return const PremiumStripeCheckoutSubmitResult(
+          status: PremiumStripeCheckoutActionStatus.success,
+        );
+      }
+
       return PremiumStripeCheckoutSubmitResult(
         status: PremiumStripeCheckoutActionStatus.failed,
         message: _resolveCheckoutErrorMessage(
