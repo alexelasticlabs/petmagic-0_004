@@ -47,13 +47,20 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
             }
 
+            var detectedContentType = MediaMagicBytes.DetectContentType(tempPath);
+            if (detectedContentType is null || !ContentTypesMatch(detectedContentType, asset.ContentType))
+            {
+                TemplateMediaTempFiles.TryDeleteIfOwned(tempPath);
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+            }
+
             await using var stream = File.OpenRead(tempPath);
             var request = new PutObjectRequest
             {
                 BucketName = options.R2.BucketName,
                 Key = storageKey,
                 InputStream = stream,
-                ContentType = asset.ContentType,
+                ContentType = detectedContentType,
                 DisablePayloadSigning = true,
                 DisableDefaultChecksumValidation = true
             };
@@ -64,7 +71,7 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
                 BuildPublicUrl(storageKey),
                 storageKey,
                 asset.FileName,
-                asset.ContentType,
+                detectedContentType,
                 contentLength,
                 tempPath));
         }
@@ -99,6 +106,37 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
         }
     }
 
+    public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl) || !options.R2.IsConfigured)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
+
+        var storageKey = TryResolveManagedKey(assetUrl);
+        if (storageKey is null)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
+
+        try
+        {
+            var request = new GetPreSignedUrlRequest
+            {
+                BucketName = options.R2.BucketName,
+                Key = storageKey,
+                Verb = HttpVerb.GET,
+                Expires = DateTime.UtcNow.Add(ttl)
+            };
+
+            return Task.FromResult(Result.Success(s3Client.GetPreSignedURL(request)));
+        }
+        catch
+        {
+            return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
+        }
+    }
+
     private string BuildObjectKey(string extension)
     {
         var now = DateTime.UtcNow;
@@ -128,6 +166,21 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
         return storageKey.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase)
             ? storageKey
             : null;
+    }
+
+    private static bool ContentTypesMatch(string detectedContentType, string declaredContentType)
+    {
+        var normalizedDeclared = declaredContentType.Trim().ToLowerInvariant();
+        if (string.Equals(normalizedDeclared, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(detectedContentType, normalizedDeclared, StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(detectedContentType, "video/mp4", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(normalizedDeclared, "application/mp4", StringComparison.OrdinalIgnoreCase))
+            || (string.Equals(detectedContentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(normalizedDeclared, "image/jpg", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string NormalizePrefix(string prefix)

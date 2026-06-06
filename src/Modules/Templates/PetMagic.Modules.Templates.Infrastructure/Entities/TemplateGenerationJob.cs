@@ -36,6 +36,8 @@ public sealed class TemplateGenerationJob
 
     public string? RequestHash { get; set; }
 
+    public string? CorrelationId { get; set; }
+
     public string? UsedPreprocessingModel { get; set; }
 
     public string? UsedKlingModel { get; set; }

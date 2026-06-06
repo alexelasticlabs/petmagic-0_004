@@ -1,0 +1,19 @@
+title = "PetMagic Gitleaks configuration"
+
+[allowlist]
+description = "Ignore local secrets and generated artifacts that are excluded from Git."
+paths = [
+  '''(^|/)\.env$''',
+  '''(^|/)\.env\.local$''',
+  '''(^|/)\.env\.[^/]+\.local$''',
+  '''(^|/)\.next/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)bin/''',
+  '''(^|/)obj/''',
+  '''(^|/)build/''',
+  '''(^|/)\.dart_tool/''',
+  '''(^|/)artifacts/load/''',
+  '''(^|/)artifacts/query-plans/''',
+  '''(^|/)TestResults/''',
+  '''(^|/)Results/'''
+]

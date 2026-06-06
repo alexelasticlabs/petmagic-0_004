@@ -15,6 +15,20 @@ public static class HostApiMetrics
         unit: "{request}",
         description: "Number of HTTP requests that completed with a client/server error or an exception.");
 
+    private static readonly Histogram<double> RequestDurationSeconds = Meter.CreateHistogram<double>(
+        "request_duration_seconds",
+        unit: "s",
+        description: "Duration of HTTP requests handled by the API.");
+
+    public static void RecordRequestDuration(HttpContext httpContext, int statusCode, TimeSpan duration)
+    {
+        RequestDurationSeconds.Record(
+            Math.Max(0, duration.TotalSeconds),
+            new KeyValuePair<string, object?>("method", httpContext.Request.Method),
+            new KeyValuePair<string, object?>("route", ResolveRoute(httpContext)),
+            new KeyValuePair<string, object?>("status_code", statusCode));
+    }
+
     public static void RecordRequestError(HttpContext httpContext, int statusCode, string errorKind)
     {
         RequestErrorsTotal.Add(

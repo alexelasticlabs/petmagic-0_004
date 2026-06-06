@@ -1,9 +1,11 @@
 import http from 'k6/http';
 import { check, fail, sleep } from 'k6';
+import encoding from 'k6/encoding';
 import { Counter, Rate, Trend } from 'k6/metrics';
 
 const profile = (__ENV.PROFILE || 'generation').toLowerCase();
-const sourceImage = 'petmagic-load-test-source';
+const sourcePngBytes = encoding.b64decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=');
 
 const createLatency = new Trend('generation_create_latency', true);
 const pollLatency = new Trend('generation_poll_latency', true);
@@ -102,7 +104,7 @@ function submitGeneration(data, idempotencyKey) {
     const response = http.post(
         url,
         {
-            sourceImage: http.file(sourceImage, `source-${idempotencyKey}.png`, 'image/png')
+            sourceImage: http.file(sourceImageFor(idempotencyKey), `source-${idempotencyKey}.png`, 'image/png')
         },
         {
             headers: {
@@ -118,6 +120,17 @@ function submitGeneration(data, idempotencyKey) {
 
     createLatency.add(response.timings.duration);
     return response;
+}
+
+function sourceImageFor(idempotencyKey) {
+    const suffix = `\npetmagic-load-test-source-${idempotencyKey}`;
+    const source = new Uint8Array(sourcePngBytes.byteLength + suffix.length);
+    source.set(new Uint8Array(sourcePngBytes), 0);
+    for (let i = 0; i < suffix.length; i += 1) {
+        source[sourcePngBytes.byteLength + i] = suffix.charCodeAt(i) & 0xff;
+    }
+
+    return source.buffer;
 }
 
 function pollGeneration(data, generationId) {
@@ -158,7 +171,8 @@ function recordCreateResult(response) {
     const accepted = response.status === 202;
     acceptedRate.add(accepted);
 
-    const title = response.headers['Content-Type']?.includes('json')
+    const contentType = response.headers['Content-Type'] || '';
+    const title = contentType.indexOf('json') >= 0
         ? String(response.json('title') || response.json('code') || '')
         : '';
     const overloaded = response.status === 503 && title === 'GENERATION_QUEUE_OVERLOADED';
@@ -208,11 +222,22 @@ function buildScenarios(selectedProfile) {
     const duration = __ENV.DURATION || '2m';
 
     if (selectedProfile === 'polling') {
+        if (__ENV.POLLING_EXECUTOR === 'constant-vus') {
+            return {
+                status_polling: {
+                    executor: 'constant-vus',
+                    vus,
+                    duration,
+                    exec: 'statusPolling'
+                }
+            };
+        }
+
         return {
             status_polling: {
-                executor: 'constant-vus',
+                executor: 'shared-iterations',
                 vus,
-                duration,
+                iterations,
                 exec: 'statusPolling'
             }
         };
@@ -310,14 +335,21 @@ export function handleSummary(data) {
 
     return {
         stdout: summary,
-        [jsonPath]: JSON.stringify(data, null, 2),
+        [jsonPath]: JSON.stringify(sanitizeSummary(data), null, 2),
         [mdPath]: summary
     };
 }
 
+function sanitizeSummary(data) {
+    const sanitized = Object.assign({}, data);
+    delete sanitized.setup_data;
+    return sanitized;
+}
+
 function renderSummary(data) {
-    const metric = name => data.metrics[name]?.values || {};
+    const metric = name => (data.metrics[name] && data.metrics[name].values) || {};
     const httpReqDuration = metric('http_req_duration');
+    const httpReqs = metric('http_reqs');
     const checks = metric('checks');
     const failures = metric('http_req_failed');
     const createAccepted = metric('generation_create_accepted');
@@ -329,9 +361,15 @@ function renderSummary(data) {
         '',
         `Profile: ${profile}`,
         `Timestamp: ${new Date().toISOString()}`,
+        `Git commit: ${__ENV.GIT_COMMIT || 'unknown'}`,
+        `Workers: ${__ENV.WORKER_COUNT || 'unknown'}`,
+        `VUs: ${__ENV.VUS || 'default'}`,
+        `Iterations: ${__ENV.ITERATIONS || 'default'}`,
+        `Duration: ${__ENV.DURATION || 'default'}`,
         '',
         '| Metric | Value |',
         '| --- | ---: |',
+        `| HTTP RPS | ${formatNumber(httpReqs.rate)} |`,
         `| HTTP p95 | ${formatMs(httpReqDuration['p(95)'])} |`,
         `| HTTP p99 | ${formatMs(httpReqDuration['p(99)'])} |`,
         `| HTTP failure rate | ${formatRate(failures.rate)} |`,
@@ -360,4 +398,8 @@ function formatMs(value) {
 
 function formatRate(value) {
     return value === undefined ? 'n/a' : `${(Number(value) * 100).toFixed(2)}%`;
+}
+
+function formatNumber(value) {
+    return value === undefined ? 'n/a' : Number(value).toFixed(2);
 }

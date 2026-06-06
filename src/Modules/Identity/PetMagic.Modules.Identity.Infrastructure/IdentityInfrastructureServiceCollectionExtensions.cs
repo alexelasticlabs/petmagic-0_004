@@ -72,7 +72,8 @@ public static class IdentityInfrastructureServiceCollectionExtensions
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey))
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+                    ClockSkew = TimeSpan.FromMinutes(1)
                 };
                 options.Events = new JwtBearerEvents
                 {
@@ -375,7 +376,20 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             throw new InvalidOperationException("Jwt:SigningKey must be configured outside development.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.Issuer))
+        {
+            throw new InvalidOperationException("Jwt:Issuer must be configured outside development.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Audience))
+        {
+            throw new InvalidOperationException("Jwt:Audience must be configured outside development.");
+        }
+
         if (options.SigningKey.Contains("CHANGE_ME_IN_PRODUCTION", StringComparison.OrdinalIgnoreCase)
+            || options.SigningKey.Contains("CHANGE_ME_IN_PROD", StringComparison.OrdinalIgnoreCase)
+            || options.SigningKey.Contains("SUPER_CHANGE_ME", StringComparison.OrdinalIgnoreCase)
+            || options.SigningKey.Contains("REPLACE_WITH", StringComparison.OrdinalIgnoreCase)
             || options.SigningKey.Contains("DEV_ONLY", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Jwt:SigningKey contains a placeholder value and must be replaced outside development.");

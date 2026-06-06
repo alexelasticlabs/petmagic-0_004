@@ -101,6 +101,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.LockedBy).HasMaxLength(128).IsConcurrencyToken();
             entity.Property(x => x.IdempotencyKey).HasMaxLength(256);
             entity.Property(x => x.RequestHash).HasMaxLength(128);
+            entity.Property(x => x.CorrelationId).HasMaxLength(128);
             entity.Property(x => x.UsedPreprocessingModel).HasMaxLength(256);
             entity.Property(x => x.UsedKlingModel).HasMaxLength(256);
             entity.Property(x => x.PreprocessingProviderRequestId).HasMaxLength(128);
@@ -120,8 +121,11 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.Status, x.LockedAtUtc })
                 .HasDatabaseName("IX_templates_generation_jobs_Status_LockedAtUtc");
             entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
-            entity.HasIndex(x => new { x.Status, x.RefundedAtUtc, x.RefundLastAttemptedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.RefundedAtUtc, x.RefundLastAttemptedAtUtc })
+                .HasDatabaseName("IX_tgj_Status_RefundedAtUtc_RefundLastAttemptedAtUtc");
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.HiddenByUserAtUtc, x.CreatedAtUtc })
+                .HasDatabaseName("IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc");
             entity.HasIndex(x => new { x.TemplateId, x.Status, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.UserId, x.IdempotencyKey })
                 .IsUnique()
@@ -180,7 +184,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.AppVersion).HasMaxLength(64);
             entity.Property(x => x.Locale).HasMaxLength(16);
             entity.HasIndex(x => x.Token).IsUnique();
-            entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc, x.LastSeenAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc, x.LastSeenAtUtc })
+                .HasDatabaseName("IX_tpdt_UserId_DisabledAtUtc_LastSeenAtUtc");
         });
 
         builder.Entity<TemplateAnalyticsEvent>(entity =>

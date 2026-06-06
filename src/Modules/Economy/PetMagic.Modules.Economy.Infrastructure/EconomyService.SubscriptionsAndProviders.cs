@@ -188,6 +188,25 @@ public sealed partial class EconomyService
         string providerContext,
         CancellationToken cancellationToken)
     {
+        await using var transaction = dbContext.Database.IsRelational() && dbContext.Database.CurrentTransaction is null
+            ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
+            : null;
+
+        if (dbContext.Database.IsRelational())
+        {
+            await dbContext.Database.SqlQueryRaw<Guid>(
+                """
+                SELECT "Id" AS "Value"
+                FROM economy_user_subscriptions
+                WHERE "Id" = {0}
+                FOR UPDATE
+                """,
+                subscription.Id)
+                .SingleAsync(cancellationToken);
+
+            await dbContext.Entry(subscription).ReloadAsync(cancellationToken);
+        }
+
         var periodStartUtc = subscription.CurrentPeriodStartUtc ?? subscription.CreatedAtUtc;
         if (subscription.LastTokenGrantAtUtc.HasValue
             && subscription.LastTokenGrantAtUtc.Value >= periodStartUtc)
@@ -256,6 +275,10 @@ public sealed partial class EconomyService
             subscription.MonthlyTokensGranted);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
     }
 
     private static string GetManageSubscriptionAction(string? provider)

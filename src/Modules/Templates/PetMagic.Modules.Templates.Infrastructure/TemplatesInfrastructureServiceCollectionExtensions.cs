@@ -96,6 +96,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             MediaCleanupRetryDelayMilliseconds = ParseNonNegativeInt(section["MediaCleanupRetryDelayMilliseconds"], 30_000),
             MetadataTempRetentionHours = ParsePositiveInt(section["MetadataTempRetentionHours"], 24),
             CleanupExpiredGenerationMediaWhileRefundPending = ParseBool(section["CleanupExpiredGenerationMediaWhileRefundPending"], true),
+            UserMediaReadUrlTtlSeconds = ParsePositiveInt(section["UserMediaReadUrlTtlSeconds"], 900),
             GeneratedVideoMaxFileSizeBytes = ParseLong(section["GeneratedVideoMaxFileSizeBytes"], 250 * 1024 * 1024),
             GeneratedImageMaxFileSizeBytes = ParseLong(section["GeneratedImageMaxFileSizeBytes"], 30 * 1024 * 1024),
             R2 = new R2StorageOptions

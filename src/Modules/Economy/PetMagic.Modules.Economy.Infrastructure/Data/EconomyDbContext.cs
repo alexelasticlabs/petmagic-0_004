@@ -86,6 +86,8 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => new { x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.PaymentProvider, x.CreatedAtUtc })
+                .HasDatabaseName("IX_economy_purchase_orders_UserId_PaymentProvider_CreatedAtUtc");
             entity.HasIndex(x => x.SavedPaymentMethodId);
             entity.HasIndex(x => new { x.PaymentProvider, x.ExternalPaymentId });
         });
@@ -184,7 +186,11 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
             entity.HasIndex(x => new { x.UserId, x.IsActive, x.IsDefault });
-            entity.HasIndex(x => new { x.Provider, x.ExternalPaymentMethodId }).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.Provider, x.IsActive, x.IsDefault, x.UpdatedAtUtc })
+                .HasDatabaseName("IX_espm_UserId_Provider_Active_Default_Updated");
+            entity.HasIndex(x => new { x.Provider, x.ExternalPaymentMethodId })
+                .IsUnique()
+                .HasDatabaseName("UX_espm_Provider_ExternalPaymentMethodId");
         });
 
         builder.Entity<SubscriptionPlan>(entity =>
@@ -260,8 +266,11 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => new { x.Provider, x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.Provider, x.CreatedAtUtc })
+                .HasDatabaseName("IX_esel_UserId_Provider_CreatedAtUtc");
             entity.HasIndex(x => new { x.Provider, x.ExternalEventId });
-            entity.HasIndex(x => new { x.Provider, x.ExternalSubscriptionId });
+            entity.HasIndex(x => new { x.Provider, x.ExternalSubscriptionId })
+                .HasDatabaseName("IX_esel_Provider_ExternalSubscriptionId");
         });
 
         builder.Entity<EconomyPushDeviceToken>(entity =>
@@ -276,7 +285,8 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
             entity.HasIndex(x => x.Token).IsUnique();
-            entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc, x.LastSeenAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.DisabledAtUtc, x.LastSeenAtUtc })
+                .HasDatabaseName("IX_epdt_UserId_DisabledAtUtc_LastSeenAtUtc");
         });
     }
 }

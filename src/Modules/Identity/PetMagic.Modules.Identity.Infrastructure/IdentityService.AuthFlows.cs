@@ -7,6 +7,10 @@ using PetMagic.Modules.Identity.Infrastructure.Entities;
 namespace PetMagic.Modules.Identity.Infrastructure;
 public sealed partial class IdentityService
 {
+    private const int PasswordLockoutThreshold = 8;
+    private const int PasswordLockoutBaseMinutes = 15;
+    private const int PasswordLockoutMaxHours = 24;
+
     public async Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken)
     {
         var email = command.Email.Trim();
@@ -69,6 +73,7 @@ public sealed partial class IdentityService
             MarketingEmailsUpdatedAtUtc = now,
             IsPremium = false,
             IsActive = true,
+            LockoutEnabled = true,
             CreatedAtUtc = now,
             AccountStatus = AccountStatus.PendingEmailVerification,
             AccountStatusUpdatedAtUtc = now
@@ -112,11 +117,26 @@ public sealed partial class IdentityService
             return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
         }
 
+        if (!user.LockoutEnabled)
+        {
+            user.LockoutEnabled = true;
+            await userManager.UpdateAsync(user);
+        }
+
+        if (await userManager.IsLockedOutAsync(user))
+        {
+            await WriteAuditAsync(user.Id, "auth.login.locked", "Login denied: account is temporarily locked.", cancellationToken);
+            return Result.Failure<TokenPairResponse>(IdentityErrors.AccountLocked);
+        }
+
         var validPassword = await userManager.CheckPasswordAsync(user, command.Password);
         if (!validPassword)
         {
+            await RegisterPasswordFailureAsync(user);
             await WriteAuditAsync(user.Id, "auth.login.failed", "Invalid password.", cancellationToken);
-            return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
+            return await userManager.IsLockedOutAsync(user)
+                ? Result.Failure<TokenPairResponse>(IdentityErrors.AccountLocked)
+                : Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
         }
 
         if (!user.EmailConfirmed)
@@ -133,9 +153,34 @@ public sealed partial class IdentityService
 
         var roles = await userManager.GetRolesAsync(user);
         var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken);
+        if (user.AccessFailedCount > 0)
+        {
+            await userManager.ResetAccessFailedCountAsync(user);
+        }
+
         await WriteAuditAsync(user.Id, "auth.login.succeeded", "User logged in.", cancellationToken);
 
         return Result.Success(tokenPair);
+    }
+
+    private async Task RegisterPasswordFailureAsync(AppUser user)
+    {
+        await userManager.AccessFailedAsync(user);
+        var failedCount = await userManager.GetAccessFailedCountAsync(user);
+        if (failedCount < PasswordLockoutThreshold)
+        {
+            return;
+        }
+
+        var multiplier = Math.Pow(2, Math.Min(8, failedCount - PasswordLockoutThreshold));
+        var lockout = TimeSpan.FromMinutes(PasswordLockoutBaseMinutes * multiplier);
+        var maxLockout = TimeSpan.FromHours(PasswordLockoutMaxHours);
+        if (lockout > maxLockout)
+        {
+            lockout = maxLockout;
+        }
+
+        await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.Add(lockout));
     }
 
     public async Task<Result> RequestEmailConfirmationAsync(RequestEmailConfirmationCommand command, CancellationToken cancellationToken)

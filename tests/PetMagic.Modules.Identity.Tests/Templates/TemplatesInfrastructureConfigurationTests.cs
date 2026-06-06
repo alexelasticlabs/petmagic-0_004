@@ -243,6 +243,71 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Contains("Economy-backed template generation billing", exception.Message);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("true")]
+    public void RequireGenerationWorkerMode_ShouldRejectEnabledGenerationWorker_ForProductionApiHost(string? configuredValue)
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = configuredValue
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
+                configuration,
+                environment,
+                "PetMagic.Host.Api",
+                expectedEnabled: false));
+
+        Assert.Contains("Templates:GenerationWorkerEnabled=false", exception.Message);
+    }
+
+    [Fact]
+    public void RequireGenerationWorkerMode_ShouldRejectDisabledGenerationWorker_ForProductionWorkerHost()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "false"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
+                configuration,
+                environment,
+                "PetMagic.Host.GenerationWorker",
+                expectedEnabled: true));
+
+        Assert.Contains("Templates:GenerationWorkerEnabled=true", exception.Message);
+    }
+
+    [Fact]
+    public void RequireGenerationWorkerMode_ShouldAllowDevelopmentHostOverrides()
+    {
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "true"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Development
+        };
+
+        TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
+            configuration,
+            environment,
+            "PetMagic.Host.Api",
+            expectedEnabled: false);
+    }
+
     private static IConfiguration CreateConfiguration(IEnumerable<KeyValuePair<string, string?>> values)
     {
         var defaults = new Dictionary<string, string?>

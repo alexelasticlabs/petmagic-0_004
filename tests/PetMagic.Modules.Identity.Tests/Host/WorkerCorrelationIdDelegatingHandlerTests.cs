@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Host.GenerationWorker;
 
 namespace PetMagic.Modules.Identity.Tests.Host;
@@ -23,6 +24,26 @@ public sealed class WorkerCorrelationIdDelegatingHandlerTests
         Assert.NotNull(innerHandler.Request);
         Assert.True(innerHandler.Request!.Headers.TryGetValues(WorkerCorrelationIdDelegatingHandler.HeaderName, out var values));
         Assert.Equal(activity.TraceId.ToString(), Assert.Single(values));
+    }
+
+    [Fact]
+    public async Task SendAsync_ShouldPreferCurrentCorrelationContext()
+    {
+        using var correlationScope = CorrelationContext.Push("worker-current-correlation");
+        using var activity = new Activity("worker-http").Start();
+        var innerHandler = new CapturingHandler();
+        var handler = new WorkerCorrelationIdDelegatingHandler
+        {
+            InnerHandler = innerHandler
+        };
+        using var client = new HttpClient(handler);
+
+        using var response = await client.GetAsync("https://example.test/resource");
+
+        Assert.True(response.IsSuccessStatusCode);
+        Assert.NotNull(innerHandler.Request);
+        Assert.True(innerHandler.Request!.Headers.TryGetValues(WorkerCorrelationIdDelegatingHandler.HeaderName, out var values));
+        Assert.Equal("worker-current-correlation", Assert.Single(values));
     }
 
     [Fact]

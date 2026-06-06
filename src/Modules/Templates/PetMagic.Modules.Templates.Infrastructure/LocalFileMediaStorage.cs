@@ -66,23 +66,43 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         var physicalPath = Path.Combine(root, DateTime.UtcNow.ToString("yyyy"), DateTime.UtcNow.ToString("MM"), safeName);
 
         Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
-        if (asset.Content is not null)
+        try
         {
-            await File.WriteAllBytesAsync(physicalPath, asset.Content, cancellationToken);
-        }
-        else if (asset.ContentStream is not null)
-        {
-            if (asset.ContentStream.CanSeek)
+            if (asset.Content is not null)
             {
-                asset.ContentStream.Position = 0;
+                await File.WriteAllBytesAsync(physicalPath, asset.Content, cancellationToken);
+            }
+            else if (asset.ContentStream is not null)
+            {
+                if (asset.ContentStream.CanSeek)
+                {
+                    asset.ContentStream.Position = 0;
+                }
+
+                await using var output = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await asset.ContentStream.CopyToAsync(output, cancellationToken);
+            }
+            else
+            {
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
             }
 
-            await using var output = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await asset.ContentStream.CopyToAsync(output, cancellationToken);
+            var detectedContentType = MediaMagicBytes.DetectContentType(physicalPath);
+            if (detectedContentType is null
+                || !string.Equals(detectedContentType, normalizedContentType, StringComparison.OrdinalIgnoreCase))
+            {
+                File.Delete(physicalPath);
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+            }
         }
-        else
+        catch
         {
-            return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+            if (File.Exists(physicalPath))
+            {
+                File.Delete(physicalPath);
+            }
+
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
         }
 
         var normalizedRelativePath = relativePath.Replace("\\", "/");

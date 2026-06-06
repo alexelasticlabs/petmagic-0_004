@@ -42,7 +42,7 @@ public sealed partial class TemplatesApiIntegrationTests
         byte[] content)
     {
         using var multipart = new MultipartFormDataContent();
-        using var fileContent = new ByteArrayContent(content);
+        using var fileContent = new ByteArrayContent(WithValidMediaHeader(contentType, fileName, content));
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         multipart.Add(fileContent, "file", fileName);
         multipart.Add(new StringContent(assetKind.ToString()), "assetKind");
@@ -51,6 +51,22 @@ public sealed partial class TemplatesApiIntegrationTests
         response.EnsureSuccessStatusCode();
 
         return await ReadJsonAsync<TemplateAssetResponse>(response);
+    }
+
+    private static byte[] WithValidMediaHeader(string contentType, string fileName, byte[] content)
+    {
+        var normalizedContentType = contentType.Trim().ToLowerInvariant();
+        if (normalizedContentType == "video/mp4" || normalizedContentType == "application/mp4")
+        {
+            return [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32, .. content];
+        }
+
+        if (normalizedContentType == "image/png" || fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+        {
+            return [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, .. content];
+        }
+
+        return [0xFF, 0xD8, 0xFF, 0xE0, .. content];
     }
 
     private static async Task<AdminTemplateResponse> CreateActiveImageTemplateAsync(HttpClient client, string title, string category, string[] tags)
@@ -458,9 +474,14 @@ public sealed partial class TemplatesApiIntegrationTests
             var role = Request.Headers.TryGetValue("X-Test-Role", out var roleValues)
                 ? roleValues.ToString()
                 : "Admin";
+            var userId = Request.Headers.TryGetValue("X-Test-UserId", out var userIdValues)
+                && Guid.TryParse(userIdValues.ToString(), out var parsedUserId)
+                    ? parsedUserId
+                    : TestUserId;
+
             var claims = new List<Claim>
             {
-                new(ClaimTypes.NameIdentifier, TestUserId.ToString()),
+                new(ClaimTypes.NameIdentifier, userId.ToString()),
                 new(ClaimTypes.Name, "integration-test-user"),
             };
 

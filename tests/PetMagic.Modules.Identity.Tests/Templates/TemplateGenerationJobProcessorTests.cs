@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -271,6 +272,28 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
+    public async Task ProcessNextAsync_ShouldRestoreJobCorrelationId_ForProviderCalls()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Queued, now.AddMinutes(-1));
+        job.CorrelationId = "worker-job-correlation";
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var imageGenerator = new CorrelationCapturingImageGenerator();
+        var processor = CreateProcessor(dbContext, imageGenerator: imageGenerator);
+
+        var processed = await processor.ProcessNextAsync(CancellationToken.None);
+
+        Assert.True(processed);
+        Assert.Equal("worker-job-correlation", imageGenerator.CorrelationId);
+    }
+
+    [Fact]
     public async Task ProcessNextAsync_ShouldRecoverStaleProcessingJob_AndRetryIt()
     {
         await using var dbContext = CreateDbContext();
@@ -395,6 +418,7 @@ public sealed class TemplateGenerationJobProcessorTests
         IVideoMotionGenerator? videoMotionGenerator = null,
         IGeneratedMediaImporter? generatedMediaImporter = null,
         IMediaMetadataReader? mediaMetadataReader = null,
+        IMediaStorage? mediaStorage = null,
         TemplatesOptions? options = null)
     {
         return new TemplateGenerationJobProcessor(
@@ -404,6 +428,7 @@ public sealed class TemplateGenerationJobProcessorTests
             videoMotionGenerator ?? new NoopVideoMotionGenerator(),
             generatedMediaImporter ?? new NoopGeneratedMediaImporter(),
             mediaMetadataReader ?? new FixedDurationMetadataReader(),
+            mediaStorage ?? new TrackingMediaStorage(),
             billing ?? new TestTemplateGenerationBilling(),
             new RecordingTemplateFeedRealtimeService(),
             new NoopPushNotificationSender(),
@@ -740,6 +765,24 @@ public sealed class TemplateGenerationJobProcessorTests
                 "image/png",
                 1024,
                 null)));
+        }
+    }
+
+    private sealed class CorrelationCapturingImageGenerator : IImageGenerator
+    {
+        public string? CorrelationId { get; private set; }
+
+        public Task<Result<ImageGenerationResult>> CreateAsync(
+            string sourceImageUrl,
+            string prompt,
+            string model,
+            CancellationToken cancellationToken)
+        {
+            CorrelationId = CorrelationContext.CurrentId;
+            return Task.FromResult(Result.Success(new ImageGenerationResult(
+                "https://fal.example.test/generated-image.png",
+                "image-request-1",
+                1.5)));
         }
     }
 

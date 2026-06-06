@@ -211,17 +211,21 @@ public static class AdminTemplateEndpoints
         [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
-        var uploadValidation = ValidateSourceImage(sourceImage, uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview));
+        var uploadValidation = await ValidateSourceImageAsync(
+            sourceImage,
+            uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview),
+            cancellationToken);
         if (uploadValidation.Count > 0)
         {
             return TypedResults.ValidationProblem(uploadValidation);
         }
 
+        var detectedContentType = (await TemplateUploadSniffer.DetectContentTypeAsync(sourceImage!, cancellationToken))!;
         await using var stream = sourceImage!.OpenReadStream();
         var storeResult = await mediaStorage.StoreAsync(
             new MediaUploadCommand(
                 Path.GetFileName(sourceImage.FileName),
-                sourceImage.ContentType,
+                detectedContentType,
                 stream,
                 sourceImage.Length),
             cancellationToken);
@@ -421,7 +425,10 @@ public static class AdminTemplateEndpoints
         return Enum.TryParse<TemplateStatus>(raw, true, out var value) ? value : null;
     }
 
-    private static Dictionary<string, string[]> ValidateSourceImage(IFormFile? sourceImage, long maxSizeBytes)
+    private static async Task<Dictionary<string, string[]>> ValidateSourceImageAsync(
+        IFormFile? sourceImage,
+        long maxSizeBytes,
+        CancellationToken cancellationToken)
     {
         var errors = new Dictionary<string, string[]>();
         if (sourceImage is null || sourceImage.Length == 0)
@@ -430,7 +437,10 @@ public static class AdminTemplateEndpoints
             return errors;
         }
 
-        if (!sourceImage.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        var detectedContentType = await TemplateUploadSniffer.DetectContentTypeAsync(sourceImage, cancellationToken);
+        if (detectedContentType is null
+            || !IsAllowedSourceImageContentType(detectedContentType)
+            || !TemplateUploadSniffer.MatchesDeclaredContentType(detectedContentType, sourceImage.ContentType))
         {
             errors[nameof(sourceImage)] = ["Source image content type is not allowed."];
         }
@@ -441,6 +451,13 @@ public static class AdminTemplateEndpoints
         }
 
         return errors;
+    }
+
+    private static bool IsAllowedSourceImageContentType(string contentType)
+    {
+        return string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/png", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int ResolveGenerationFailureStatusCode(PetMagic.BuildingBlocks.Results.Error error)
@@ -486,8 +503,11 @@ public static class AdminTemplateEndpoints
         }
 
         var kind = parsedAssetKind;
-        var contentType = file!.ContentType ?? "application/octet-stream";
-        if (!IsAllowedUpload(file.FileName, kind, contentType))
+        var declaredContentType = file!.ContentType ?? "application/octet-stream";
+        var detectedContentType = await TemplateUploadSniffer.DetectContentTypeAsync(file, cancellationToken);
+        if (detectedContentType is null
+            || !TemplateUploadSniffer.MatchesDeclaredContentType(detectedContentType, declaredContentType)
+            || !IsAllowedUpload(file.FileName, kind, detectedContentType))
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -509,7 +529,7 @@ public static class AdminTemplateEndpoints
         var storeResult = await mediaStorage.StoreAsync(
             new MediaUploadCommand(
                 Path.GetFileName(file.FileName),
-                contentType,
+                detectedContentType,
                 stream,
                 file.Length),
             cancellationToken);
@@ -520,7 +540,7 @@ public static class AdminTemplateEndpoints
         }
 
         var storedContentType = string.IsNullOrWhiteSpace(storeResult.Value.ContentType)
-            ? contentType
+            ? detectedContentType
             : storeResult.Value.ContentType;
         var providedDuration = ParseOptionalDuration(durationSeconds);
 

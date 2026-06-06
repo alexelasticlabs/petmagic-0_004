@@ -1,0 +1,103 @@
+groups:
+  - name: petmagic-api-sli
+    interval: 30s
+    rules:
+      - record: api_response_time_p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route, method) (
+              rate(request_duration_seconds_bucket[5m])
+            )
+          )
+
+      - alert: PetMagicApiP95High
+        expr: api_response_time_p95 > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-api
+        annotations:
+          summary: "PetMagic API p95 latency is high"
+          description: "Route {{ $labels.route }} {{ $labels.method }} has p95 latency above 1s for 10 minutes."
+
+      - alert: PetMagicApiErrorRateHigh
+        expr: |
+          sum(rate(request_errors_total[5m]))
+            / clamp_min(sum(rate(request_duration_seconds_count[5m])), 1)
+            > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-api
+        annotations:
+          summary: "PetMagic API error rate is high"
+          description: "HTTP 4xx/5xx or exception rate is above 5% for 10 minutes."
+
+  - name: petmagic-generation
+    interval: 30s
+    rules:
+      - alert: PetMagicGenerationQueueBacklog
+        expr: sum(generation_jobs_queued) > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Template generation queue backlog is growing"
+          description: "More than 50 jobs have remained queued for 10 minutes. Check worker count, provider throttling, and PostgreSQL locks."
+
+      - alert: PetMagicGenerationWorkerNotProcessing
+        expr: |
+          sum(generation_jobs_queued) > 0
+            and sum(rate(generation_lifecycle_events_total{event_type=~"stage|end"}[10m])) == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Template generation workers are not processing queued jobs"
+          description: "Jobs are queued, but no processing/completion lifecycle events were observed for 10 minutes."
+
+      - alert: PetMagicGenerationFailuresHigh
+        expr: sum(rate(generation_jobs_failed_total[10m])) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Template generation failure rate is elevated"
+          description: "Generation jobs are failing above the warning threshold."
+
+      - alert: PetMagicGenerationRetriesExhausted
+        expr: increase(generation_jobs_exhausted_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Template generation retries exhausted"
+          description: "At least one generation job exhausted all retry attempts in the last 15 minutes."
+
+      - alert: PetMagicAiProviderErrorsHigh
+        expr: sum(rate(ai_provider_errors_total[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "AI provider errors are elevated"
+          description: "AI provider error rate is above threshold. Check provider status, model config, and rate limits."
+
+  - name: petmagic-economy
+    interval: 30s
+    rules:
+      - alert: PetMagicStripeWebhookFailures
+        expr: increase(stripe_webhook_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-economy
+        annotations:
+          summary: "Stripe webhook processing failures detected"
+          description: "Stripe webhook failures occurred in the last 5 minutes. Check signature config, payload parsing, and downstream database writes."

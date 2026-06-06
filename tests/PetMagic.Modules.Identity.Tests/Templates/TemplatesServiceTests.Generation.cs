@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -57,6 +58,50 @@ public sealed partial class TemplatesServiceTests
         var fetched = await generationService.GetAdminAsync(started.Value.GenerationId, CancellationToken.None);
         Assert.True(fetched.IsSuccess);
         Assert.Equal(started.Value.GenerationId, fetched.Value.GenerationId);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldPersistCurrentCorrelationId()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Correlated Portrait", "Portrait", ["correlation"]);
+        var userId = Guid.NewGuid();
+
+        using var correlationScope = CorrelationContext.Push("generation-create-correlation");
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "correlated-key",
+                "correlated-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == started.Value.GenerationId);
+        Assert.Equal("generation-create-correlation", persisted.CorrelationId);
+    }
+
+    [Fact]
+    public async Task StartAdminTestAsync_ShouldPersistCurrentCorrelationId()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Admin Correlated Portrait", "Portrait", ["admin-correlation"]);
+
+        using var correlationScope = CorrelationContext.Push("admin-generation-correlation");
+        var started = await generationService.StartAdminTestAsync(
+            templateId,
+            new TemplateAssetCommand("https://cdn.example.com/admin-source.jpg", "admin-source.jpg", "image/jpeg", 2048, null),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == started.Value.GenerationId);
+        Assert.Equal("admin-generation-correlation", persisted.CorrelationId);
     }
 
     [Fact]
@@ -380,6 +425,106 @@ public sealed partial class TemplatesServiceTests
         Assert.True(started.IsSuccess);
         Assert.Equal(2, started.Value.QueuePosition);
         Assert.Equal(40, started.Value.EstimatedWaitSeconds);
+    }
+
+    [Fact]
+    public async Task ListAsync_ShouldCalculateQueueMetricsForQueuedHistory()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var options = CreateTemplatesOptions(globalMaxConcurrentGenerations: 2, estimatedImageGenerationSeconds: 40);
+        var generationService = CreateGenerationService(dbContext, options);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Queued History Portrait", "Portrait", ["queue-history"]);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var olderForeignQueuedJobId = Guid.NewGuid();
+        var firstQueuedJobId = Guid.NewGuid();
+        var secondQueuedJobId = Guid.NewGuid();
+        var processingJobId = Guid.NewGuid();
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = olderForeignQueuedJobId,
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/foreign-queued.jpg",
+                SourceImageFileName = "foreign-queued.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                UpdatedAtUtc = now.AddMinutes(-5),
+                ChargedAtUtc = now.AddMinutes(-5)
+            },
+            new TemplateGenerationJob
+            {
+                Id = firstQueuedJobId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/queued-a.jpg",
+                SourceImageFileName = "queued-a.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-4),
+                QueuedAtUtc = now.AddMinutes(-4),
+                UpdatedAtUtc = now.AddMinutes(-4),
+                ChargedAtUtc = now.AddMinutes(-4)
+            },
+            new TemplateGenerationJob
+            {
+                Id = secondQueuedJobId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/queued-b.jpg",
+                SourceImageFileName = "queued-b.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-3),
+                ChargedAtUtc = now.AddMinutes(-3)
+            },
+            new TemplateGenerationJob
+            {
+                Id = processingJobId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Processing,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/processing.jpg",
+                SourceImageFileName = "processing.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-2),
+                QueuedAtUtc = now.AddMinutes(-2),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                StartedAtUtc = now.AddMinutes(-1),
+                ChargedAtUtc = now.AddMinutes(-2),
+                LockedAtUtc = now.AddMinutes(-1),
+                LockedBy = "worker-1"
+            });
+        await dbContext.SaveChangesAsync();
+
+        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("all", null, 10), CancellationToken.None);
+
+        Assert.True(history.IsSuccess);
+        Assert.DoesNotContain(history.Value, x => x.GenerationId == olderForeignQueuedJobId);
+        Assert.Equal(3, history.Value.Count);
+
+        var firstQueued = Assert.Single(history.Value, x => x.GenerationId == firstQueuedJobId);
+        Assert.Equal(2, firstQueued.QueuePosition);
+        Assert.Equal(40, firstQueued.EstimatedWaitSeconds);
+
+        var secondQueued = Assert.Single(history.Value, x => x.GenerationId == secondQueuedJobId);
+        Assert.Equal(3, secondQueued.QueuePosition);
+        Assert.Equal(60, secondQueued.EstimatedWaitSeconds);
+
+        var processing = Assert.Single(history.Value, x => x.GenerationId == processingJobId);
+        Assert.Null(processing.QueuePosition);
+        Assert.Null(processing.EstimatedWaitSeconds);
     }
 
     [Fact]

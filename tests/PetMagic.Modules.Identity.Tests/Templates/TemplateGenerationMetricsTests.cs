@@ -14,6 +14,9 @@ public sealed class TemplateGenerationMetricsTests
             TemplateGenerationMetrics.MeterName,
             "generation_jobs_queued",
             "generation_jobs_processing",
+            "generation_jobs_failed_total",
+            "generation_jobs_exhausted_total",
+            "generation_lifecycle_events_total",
             "generation_duration_seconds",
             "ai_provider_errors_total");
 
@@ -52,6 +55,11 @@ public sealed class TemplateGenerationMetricsTests
         TemplateGenerationMetrics.RecordJobQueued(job);
         TemplateGenerationMetrics.RecordJobClaimed(job);
         TemplateGenerationMetrics.RecordJobCompleted(job);
+        TemplateGenerationMetrics.RecordJobStage(job, "finalizing");
+        job.Status = TemplateGenerationStatus.Processing;
+        job.CompletedAtUtc = now.AddSeconds(30);
+        TemplateGenerationMetrics.RecordJobFailed(job, TemplateGenerationStatus.Processing, TemplatesErrors.AiProviderFailed.Code);
+        TemplateGenerationMetrics.RecordJobExhausted(job, TemplatesErrors.GenerationAttemptsExceeded.Code);
         TemplateGenerationMetrics.RecordAiProviderError(
             "fal",
             "submit",
@@ -67,9 +75,44 @@ public sealed class TemplateGenerationMetricsTests
                 && Equals(x.Tags["terminal_status"], "completed"));
         Assert.Contains(
             recorder.Measurements,
+            x => x.InstrumentName == "generation_jobs_failed_total"
+                && x.Value == 1
+                && Equals(x.Tags["terminal_status"], "failed")
+                && Equals(x.Tags["failure_code"], TemplatesErrors.AiProviderFailed.Code));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_duration_seconds"
+                && x.Value >= 150
+                && Equals(x.Tags["terminal_status"], "failed")
+                && Equals(x.Tags["failure_code"], TemplatesErrors.AiProviderFailed.Code));
+        Assert.Contains(
+            recorder.Measurements,
             x => x.InstrumentName == "ai_provider_errors_total"
                 && x.Value == 1
                 && Equals(x.Tags["provider"], "fal")
                 && Equals(x.Tags["stage"], "submit"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_jobs_exhausted_total"
+                && x.Value == 1
+                && Equals(x.Tags["failure_code"], TemplatesErrors.GenerationAttemptsExceeded.Code));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_lifecycle_events_total"
+                && x.Value == 1
+                && Equals(x.Tags["event_type"], "start")
+                && Equals(x.Tags["stage"], "queued"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_lifecycle_events_total"
+                && x.Value == 1
+                && Equals(x.Tags["event_type"], "stage")
+                && Equals(x.Tags["stage"], "finalizing"));
+        Assert.Contains(
+            recorder.Measurements,
+            x => x.InstrumentName == "generation_lifecycle_events_total"
+                && x.Value == 1
+                && Equals(x.Tags["event_type"], "fail")
+                && Equals(x.Tags["failure_code"], TemplatesErrors.AiProviderFailed.Code));
     }
 }

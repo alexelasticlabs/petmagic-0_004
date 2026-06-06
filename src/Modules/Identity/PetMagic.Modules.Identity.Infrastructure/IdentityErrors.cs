@@ -6,6 +6,8 @@ public static class IdentityErrors
 {
     public static readonly Error InvalidCredentials = new("auth.invalid_credentials", "Invalid credentials.");
 
+    public static readonly Error AccountLocked = new("auth.account_locked", "Account is temporarily locked.");
+
     public static readonly Error InvalidSubject = new("auth.invalid_subject", "Invalid access token subject.");
 
     public static readonly Error UserAlreadyExists = new("auth.user_exists", "A user with this email already exists.");

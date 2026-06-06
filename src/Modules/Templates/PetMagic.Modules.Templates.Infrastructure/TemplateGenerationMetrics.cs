@@ -26,6 +26,16 @@ internal static class TemplateGenerationMetrics
         unit: "{job}",
         description: "Number of template generation jobs that reached Failed status.");
 
+    private static readonly Counter<long> LifecycleEventsTotal = Meter.CreateCounter<long>(
+        "generation_lifecycle_events_total",
+        unit: "{event}",
+        description: "Number of template generation lifecycle events by stage.");
+
+    private static readonly Counter<long> ExhaustedJobsTotal = Meter.CreateCounter<long>(
+        "generation_jobs_exhausted_total",
+        unit: "{job}",
+        description: "Number of template generation jobs that exhausted all retry attempts.");
+
     private static readonly Histogram<double> GenerationDurationSeconds = Meter.CreateHistogram<double>(
         "generation_duration_seconds",
         unit: "s",
@@ -39,6 +49,7 @@ internal static class TemplateGenerationMetrics
     public static void RecordJobQueued(TemplateGenerationJob job)
     {
         QueuedJobs.Add(1, JobTags(job));
+        RecordLifecycleEvent(job, "start", "queued", null);
     }
 
     public static void RecordJobClaimed(TemplateGenerationJob job)
@@ -46,6 +57,7 @@ internal static class TemplateGenerationMetrics
         var tags = JobTags(job);
         QueuedJobs.Add(-1, tags);
         ProcessingJobs.Add(1, tags);
+        RecordLifecycleEvent(job, "stage", "processing", null);
     }
 
     public static void RecordJobRequeued(TemplateGenerationJob job)
@@ -53,11 +65,13 @@ internal static class TemplateGenerationMetrics
         var tags = JobTags(job);
         ProcessingJobs.Add(-1, tags);
         QueuedJobs.Add(1, tags);
+        RecordLifecycleEvent(job, "stage", "requeued", null);
     }
 
     public static void RecordJobCompleted(TemplateGenerationJob job)
     {
         ProcessingJobs.Add(-1, JobTags(job));
+        RecordLifecycleEvent(job, "end", "completed", null);
         RecordGenerationDuration(job, "completed", null);
     }
 
@@ -75,7 +89,18 @@ internal static class TemplateGenerationMetrics
         FailedJobsTotal.Add(
             1,
             TerminalJobTags(job, "failed", failureCode));
+        RecordLifecycleEvent(job, "fail", "failed", failureCode);
         RecordGenerationDuration(job, "failed", failureCode);
+    }
+
+    public static void RecordJobStage(TemplateGenerationJob job, string stage)
+    {
+        RecordLifecycleEvent(job, "stage", stage, null);
+    }
+
+    public static void RecordJobExhausted(TemplateGenerationJob job, string failureCode)
+    {
+        ExhaustedJobsTotal.Add(1, TerminalJobTags(job, "failed", failureCode));
     }
 
     public static void RecordAiProviderError(string provider, string stage, string errorCode, string? model = null)
@@ -94,6 +119,21 @@ internal static class TemplateGenerationMetrics
         var start = job.StartedAtUtc ?? job.QueuedAtUtc;
         var durationSeconds = Math.Max(0, (end - start).TotalSeconds);
         GenerationDurationSeconds.Record(durationSeconds, TerminalJobTags(job, terminalStatus, failureCode));
+    }
+
+    private static void RecordLifecycleEvent(
+        TemplateGenerationJob job,
+        string eventType,
+        string stage,
+        string? failureCode)
+    {
+        LifecycleEventsTotal.Add(
+            1,
+            new KeyValuePair<string, object?>("template_type", ResolveTemplateType(job)),
+            new KeyValuePair<string, object?>("event_type", eventType),
+            new KeyValuePair<string, object?>("stage", stage),
+            new KeyValuePair<string, object?>("failure_code", string.IsNullOrWhiteSpace(failureCode) ? "none" : failureCode),
+            new KeyValuePair<string, object?>("admin_test", job.UserId == TemplateGenerationService.AdminTestUserId));
     }
 
     private static KeyValuePair<string, object?>[] JobTags(TemplateGenerationJob job)

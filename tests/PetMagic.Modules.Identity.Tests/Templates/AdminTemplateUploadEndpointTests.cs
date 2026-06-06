@@ -22,7 +22,7 @@ public sealed class AdminTemplateUploadEndpointTests
     {
         await using var dbContext = CreateDbContext();
         var lifecycleService = CreateLifecycleService(dbContext);
-        var file = CreateFormFile("preview.jpg", "image/jpeg", Encoding.UTF8.GetBytes("image-bytes"));
+        var file = CreateFormFile("preview.jpg", "image/jpeg", JpegBytes());
         var storage = new RecordingMediaStorage(new StoredMediaResponse(
             "https://cdn.example.com/templates/preview.jpg",
             "templates/preview.jpg",
@@ -59,7 +59,7 @@ public sealed class AdminTemplateUploadEndpointTests
     {
         await using var dbContext = CreateDbContext();
         var lifecycleService = CreateLifecycleService(dbContext);
-        var file = CreateFormFile("reference.mp4", "video/mp4", Encoding.UTF8.GetBytes("video-bytes"));
+        var file = CreateFormFile("reference.mp4", "video/mp4", Mp4Bytes());
         var storage = new RecordingMediaStorage(new StoredMediaResponse(
             "https://cdn.example.com/templates/reference.mp4",
             "templates/reference.mp4",
@@ -90,7 +90,7 @@ public sealed class AdminTemplateUploadEndpointTests
     {
         await using var dbContext = CreateDbContext();
         var lifecycleService = CreateLifecycleService(dbContext);
-        var file = CreateFormFile("reference.mp4", "application/octet-stream", Encoding.UTF8.GetBytes("video-bytes"));
+        var file = CreateFormFile("reference.mp4", "application/octet-stream", Mp4Bytes());
         var storage = new RecordingMediaStorage(new StoredMediaResponse(
             "https://cdn.example.com/templates/reference.mp4",
             "templates/reference.mp4",
@@ -120,7 +120,7 @@ public sealed class AdminTemplateUploadEndpointTests
     public async Task UploadMediaAsync_ShouldRejectReferenceWebm()
     {
         await using var dbContext = CreateDbContext();
-        var file = CreateFormFile("reference.webm", "video/webm", Encoding.UTF8.GetBytes("video-bytes"));
+        var file = CreateFormFile("reference.webm", "video/webm", WebmBytes());
 
         var result = await AdminTemplateEndpoints.UploadMediaAsync(
             file,
@@ -183,7 +183,7 @@ public sealed class AdminTemplateUploadEndpointTests
     public async Task UploadMediaAsync_ShouldRejectOversizedFile_UsingConfiguredLimit()
     {
         await using var dbContext = CreateDbContext();
-        var file = CreateFormFile("preview.jpg", "image/jpeg", new byte[11]);
+        var file = CreateFormFile("preview.jpg", "image/jpeg", JpegBytes(11));
 
         var result = await AdminTemplateEndpoints.UploadMediaAsync(
             file,
@@ -205,7 +205,7 @@ public sealed class AdminTemplateUploadEndpointTests
     {
         await using var dbContext = CreateDbContext();
         var lifecycleService = CreateLifecycleService(dbContext);
-        var file = CreateFormFile("preview.mp4", "video/mp4", Encoding.UTF8.GetBytes("video-bytes"));
+        var file = CreateFormFile("preview.mp4", "video/mp4", Mp4Bytes());
         var storage = new RecordingMediaStorage(new StoredMediaResponse(
             "https://cdn.example.com/templates/preview.mp4",
             "templates/preview.mp4",
@@ -235,7 +235,7 @@ public sealed class AdminTemplateUploadEndpointTests
     {
         await using var dbContext = CreateDbContext();
         var lifecycleService = CreateLifecycleService(dbContext);
-        var file = CreateFormFile("preview.mp4", "video/mp4", Encoding.UTF8.GetBytes("video-bytes"));
+        var file = CreateFormFile("preview.mp4", "video/mp4", Mp4Bytes());
         var storage = new RecordingMediaStorage(new StoredMediaResponse(
             "https://cdn.example.com/templates/preview.mp4",
             "templates/preview.mp4",
@@ -268,6 +268,26 @@ public sealed class AdminTemplateUploadEndpointTests
             Headers = new HeaderDictionary(),
             ContentType = contentType
         };
+    }
+
+    private static byte[] JpegBytes(int length = 32)
+    {
+        var bytes = new byte[Math.Max(length, 4)];
+        bytes[0] = 0xFF;
+        bytes[1] = 0xD8;
+        bytes[2] = 0xFF;
+        bytes[3] = 0xE0;
+        return bytes;
+    }
+
+    private static byte[] Mp4Bytes()
+    {
+        return [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32, 0x00, 0x00, 0x00, 0x00];
+    }
+
+    private static byte[] WebmBytes()
+    {
+        return [0x1A, 0x45, 0xDF, 0xA3, 0x00, 0x00, 0x00, 0x00];
     }
 
     private static async Task<(int StatusCode, string Body)> ExecuteAsync(IResult result)

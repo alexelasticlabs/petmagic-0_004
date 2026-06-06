@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.RateLimiting;
@@ -41,6 +42,30 @@ public sealed class TemplatesApiStartupSmokeTests
         await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
 
         Assert.Equal(expectedPolicy, app.GetRateLimitPolicy(method, routePattern));
+    }
+
+    [Fact]
+    public async Task TemplatesApiEndpoints_ShouldAllDeclareRateLimitPolicies()
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Empty(app.GetApiRoutesWithoutRateLimit());
+    }
+
+    [Fact]
+    public async Task TemplatesApiEndpoints_ShouldAllDeclareAccessPolicy()
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Empty(app.GetApiRoutesWithoutAccessPolicy());
+    }
+
+    [Fact]
+    public async Task TemplatesAdminEndpoints_ShouldRequireAdminOrModeratorPolicy()
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
     }
 
     private sealed class TemplatesApiStartupTestApplication : IAsyncDisposable
@@ -126,6 +151,49 @@ public sealed class TemplatesApiStartupSmokeTests
                         .Contains(method, StringComparer.OrdinalIgnoreCase));
 
             return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        }
+
+        public string[] GetApiRoutesWithoutRateLimit()
+        {
+            return app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith("/api/", StringComparison.Ordinal) == true)
+                .Where(endpoint => endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>() is null)
+                .Select(endpoint => endpoint.RoutePattern.RawText!)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        public string[] GetApiRoutesWithoutAccessPolicy()
+        {
+            return app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith("/api/", StringComparison.Ordinal) == true)
+                .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
+                .Where(endpoint => endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0)
+                .Select(endpoint => endpoint.RoutePattern.RawText!)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        public string[] GetAdminRoutesWithoutRolePolicy()
+        {
+            return app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith("/api/admin/", StringComparison.Ordinal) == true)
+                .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
+                .Where(endpoint => !endpoint.Metadata
+                    .GetOrderedMetadata<IAuthorizeData>()
+                    .Any(metadata => metadata.Policy is "AdminOnly" or "ModeratorOrAdmin"))
+                .Select(endpoint => endpoint.RoutePattern.RawText!)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
         }
 
         public async ValueTask DisposeAsync()

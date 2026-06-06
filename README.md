@@ -133,7 +133,13 @@ k6 run -e BASE_URL=http://localhost:5000 \
   scripts/k6/template-generation-load-test.js
 ```
 
-See `md/LOAD_TESTING.md` for profiles, environment variables, and baseline capture notes.
+See `docs/LOAD_TESTING.md` for profiles, environment variables, and baseline capture notes.
+
+## Observability
+
+OpenTelemetry metrics and Prometheus alert rules cover API latency/error SLIs, Stripe webhook failures, template generation queue health, lifecycle stages, retry exhaustion, and AI provider errors.
+
+See `docs/OBSERVABILITY.md` and `deploy/monitoring/prometheus/petmagic-alerts.yml`.
 
 ## Security
 
@@ -142,7 +148,7 @@ See `md/LOAD_TESTING.md` for profiles, environment variables, and baseline captu
 - If a credential is committed, rotate or revoke it, remove it from history, and rerun the secret scan.
 - Production problem responses hide exception details and include correlation identifiers.
 
-See `md/SECURITY.md` for the security policy and dependency audit notes.
+See `docs/SECURITY.md` for the security policy and dependency audit notes.
 
 ## Useful Commands
 

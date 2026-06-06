@@ -32,7 +32,12 @@ public sealed class SupportChatDbContext(DbContextOptions<SupportChatDbContext> 
             entity.Property(x => x.FeedbackComment).HasMaxLength(1000);
             entity.HasIndex(x => x.InitiatorUserId).IsUnique();
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
-            entity.HasIndex(x => new { x.AssignedAdminId, x.Status });
+            entity.HasIndex(x => new { x.Status, x.Priority, x.UpdatedAtUtc })
+                .HasDatabaseName("IX_support_conversations_Status_Priority_UpdatedAtUtc");
+            entity.HasIndex(x => new { x.Source, x.Status, x.UpdatedAtUtc })
+                .HasDatabaseName("IX_support_conversations_Source_Status_UpdatedAtUtc");
+            entity.HasIndex(x => new { x.AssignedAdminId, x.Status, x.UpdatedAtUtc })
+                .HasDatabaseName("IX_support_conversations_AssignedAdminId_Status_UpdatedAtUtc");
             entity.HasIndex(x => x.LastMessageAtUtc);
             entity.HasIndex(x => x.WaitingSinceUtc);
             entity.HasIndex(x => x.ReopenUntilUtc);

@@ -10,6 +10,11 @@ on:
     paths:
       - src/**
       - tests/**
+      - scripts/k6/**
+      - scripts/db/**
+      - scripts/load/**
+      - docs/LOAD_TESTING.md
+      - deploy/monitoring/**
       - PetMagic.slnx
       - Directory.Build.props
       - .editorconfig
@@ -18,12 +23,52 @@ on:
     paths:
       - src/**
       - tests/**
+      - scripts/k6/**
+      - scripts/db/**
+      - scripts/load/**
+      - docs/LOAD_TESTING.md
+      - deploy/monitoring/**
       - PetMagic.slnx
       - Directory.Build.props
       - .editorconfig
       - .github/workflows/backend-ci.yml
 
 jobs:
+  load-test-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate k6 load-test profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          for profile in generation create-and-poll polling duplicates overload; do
+            docker run --rm \
+              -v "$PWD:/work" \
+              -w /work \
+              grafana/k6:0.49.0 inspect \
+              -e PROFILE="$profile" \
+              scripts/k6/template-generation-load-test.js >/dev/null
+          done
+
+      - name: Validate load baseline wrapper syntax
+        run: |
+          bash -n scripts/load/run-template-generation-baseline.sh
+          bash -n scripts/load/run-minimal-template-generation-suite.sh
+          bash -n scripts/db/capture-hot-query-plans.sh
+
+      - name: Validate Prometheus alert rules
+        run: |
+          docker run --rm \
+            --entrypoint promtool \
+            -v "$PWD:/work" \
+            -w /work \
+            prom/prometheus:v2.54.1 \
+            check rules deploy/monitoring/prometheus/petmagic-alerts.yml
+
   build-test:
     runs-on: ubuntu-latest
 

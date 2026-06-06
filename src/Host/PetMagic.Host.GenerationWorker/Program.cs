@@ -10,9 +10,24 @@ using PetMagic.Host.GenerationWorker;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure;
 
+using Serilog;
+
 LoadDotEnvFileIfPresent();
 
 var builder = Host.CreateApplicationBuilder(args);
+
+TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
+    builder.Configuration,
+    builder.Environment,
+    "PetMagic.Host.GenerationWorker",
+    expectedEnabled: true);
+
+builder.Services.AddSerilog((_, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .ReadFrom.Configuration(builder.Configuration)
+        .Enrich.FromLogContext();
+});
 
 builder.Services.AddMemoryCache();
 builder.Services.AddTransient<WorkerCorrelationIdDelegatingHandler>();

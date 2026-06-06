@@ -18,7 +18,7 @@ public sealed class LocalFileMediaStorageTests
         try
         {
             var stored = await storage.StoreAsync(
-                new MediaUploadCommand("preview.jpg", "image/jpeg", [1, 2, 3]),
+                new MediaUploadCommand("preview.jpg", "image/jpeg", JpegBytes()),
                 CancellationToken.None);
 
             Assert.True(stored.IsSuccess);
@@ -62,7 +62,7 @@ public sealed class LocalFileMediaStorageTests
         try
         {
             var stored = await storage.StoreAsync(
-                new MediaUploadCommand("preview.html", "image/png", [1, 2, 3]),
+                new MediaUploadCommand("preview.html", "image/png", PngBytes()),
                 CancellationToken.None);
 
             Assert.True(stored.IsSuccess);
@@ -121,6 +121,16 @@ public sealed class LocalFileMediaStorageTests
         var path = Path.Combine(Path.GetTempPath(), $"petmagic-media-{Guid.NewGuid():N}");
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static byte[] JpegBytes()
+    {
+        return [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x00, 0x00, 0x00];
+    }
+
+    private static byte[] PngBytes()
+    {
+        return [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00];
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IHostEnvironment

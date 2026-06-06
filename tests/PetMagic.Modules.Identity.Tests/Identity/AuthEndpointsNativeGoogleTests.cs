@@ -59,9 +59,10 @@ public sealed class AuthEndpointsNativeGoogleTests
         Assert.Equal("Google", service.LastExternalLoginCommand!.Provider);
         Assert.Equal("google-subject-1", service.LastExternalLoginCommand.ProviderSubject);
         Assert.True(response.Headers.TryGetValues("Set-Cookie", out var setCookieValues));
-        Assert.Contains(
+        var refreshCookie = Assert.Single(
             setCookieValues,
             value => value.Contains("petmagic_refresh_token=refresh-token", StringComparison.Ordinal));
+        AssertRefreshCookieSecurity(refreshCookie, expectSecure: false);
     }
 
     [Fact]
@@ -82,9 +83,40 @@ public sealed class AuthEndpointsNativeGoogleTests
         Assert.NotNull(payload);
         Assert.Equal("rotated-refresh-token", payload!.RefreshToken);
         Assert.True(response.Headers.TryGetValues("Set-Cookie", out var setCookieValues));
-        Assert.Contains(
+        var refreshCookie = Assert.Single(
             setCookieValues,
             value => value.Contains("petmagic_refresh_token=rotated-refresh-token", StringComparison.Ordinal));
+        AssertRefreshCookieSecurity(refreshCookie, expectSecure: false);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldSetSecureRefreshCookie_WhenRequestIsHttps()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(
+            verifier,
+            service,
+            baseAddress: new Uri("https://localhost"));
+        app.Client.DefaultRequestHeaders.Add("Cookie", "petmagic_refresh_token=cookie-refresh-token");
+
+        var response = await app.Client.PostAsJsonAsync("/api/auth/refresh", new { refreshToken = string.Empty });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var setCookieValues));
+        var refreshCookie = Assert.Single(
+            setCookieValues,
+            value => value.Contains("petmagic_refresh_token=rotated-refresh-token", StringComparison.Ordinal));
+        AssertRefreshCookieSecurity(refreshCookie, expectSecure: true);
+    }
+
+    private static void AssertRefreshCookieSecurity(string setCookie, bool expectSecure)
+    {
+        Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("path=/api/auth", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(expectSecure ? "samesite=none" : "samesite=lax", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(expectSecure, setCookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
     }
 
     private sealed class GoogleMobileConfigResponse
@@ -106,7 +138,8 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         public static async Task<TestApplication> CreateAsync(
             IGoogleIdentityTokenVerifier verifier,
-            FakeIdentityService service)
+            FakeIdentityService service,
+            Uri? baseAddress = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -133,7 +166,13 @@ public sealed class AuthEndpointsNativeGoogleTests
             app.MapAuthEndpoints();
 
             await app.StartAsync();
-            return new TestApplication(app, app.GetTestClient());
+            var client = app.GetTestClient();
+            if (baseAddress is not null)
+            {
+                client.BaseAddress = baseAddress;
+            }
+
+            return new TestApplication(app, client);
         }
 
         public async ValueTask DisposeAsync()

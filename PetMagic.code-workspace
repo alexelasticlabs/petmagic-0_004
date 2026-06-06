@@ -12,7 +12,12 @@
       "**/bin": true,
       "**/obj": true,
       "**/.next": true,
-      "**/.dart_tool": true
+      "**/.dart_tool": true,
+      "**/build": true,
+      "**/ios/Pods": true,
+      "**/ios/.symlinks": true,
+      "**/ios/Flutter/ephemeral": true,
+      "**/ios/SourcePackages": true
     },
     "search.exclude": {
       "**/node_modules": true,
@@ -20,7 +25,11 @@
       "**/obj": true,
       "**/.next": true,
       "**/.dart_tool": true,
-      "**/build": true
+      "**/build": true,
+      "**/ios/Pods": true,
+      "**/ios/.symlinks": true,
+      "**/ios/Flutter/ephemeral": true,
+      "**/ios/SourcePackages": true
     },
     "[csharp]": {
       "editor.defaultFormatter": "ms-dotnettools.csharp"

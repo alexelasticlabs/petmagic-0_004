@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -17,6 +18,7 @@ internal sealed class TemplateGenerationJobProcessor(
     IVideoMotionGenerator videoMotionGenerator,
     IGeneratedMediaImporter generatedMediaImporter,
     IMediaMetadataReader mediaMetadataReader,
+    IMediaStorage mediaStorage,
     ITemplateGenerationBilling billing,
     ITemplateFeedRealtimeService realtimeService,
     ITemplateGenerationPushNotificationSender pushNotificationSender,
@@ -75,7 +77,11 @@ internal sealed class TemplateGenerationJobProcessor(
 
         if (staleJob.AttemptCount >= options.MaxGenerationAttempts)
         {
-            await MarkFailedAsync(staleJob, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken, requireClaim: false);
+            if (await MarkFailedAsync(staleJob, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken, requireClaim: false))
+            {
+                TemplateGenerationMetrics.RecordJobExhausted(staleJob, TemplatesErrors.GenerationAttemptsExceeded.Code);
+            }
+
             return true;
         }
 
@@ -84,6 +90,7 @@ internal sealed class TemplateGenerationJobProcessor(
         {
             await dbContext.SaveChangesAsync(cancellationToken);
             TemplateGenerationMetrics.RecordJobRequeued(staleJob);
+            dbContext.ChangeTracker.Clear();
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -288,12 +295,24 @@ internal sealed class TemplateGenerationJobProcessor(
             return false;
         }
 
-        await MarkFailedAsync(job, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken, requireClaim: false);
+        if (await MarkFailedAsync(job, TemplatesErrors.GenerationAttemptsExceeded, cancellationToken, requireClaim: false))
+        {
+            TemplateGenerationMetrics.RecordJobExhausted(job, TemplatesErrors.GenerationAttemptsExceeded.Code);
+        }
+
         return true;
     }
 
     private async Task ProcessAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {
+        var correlationId = ResolveJobCorrelationId(job);
+        using var correlationScope = CorrelationContext.Push(correlationId);
+        using var loggingScope = logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["CorrelationId"] = correlationId,
+            ["GenerationId"] = job.Id
+        });
+
         try
         {
             var readiness = TemplateGenerationService.ValidateTemplate(
@@ -324,6 +343,13 @@ internal sealed class TemplateGenerationJobProcessor(
         }
     }
 
+    private static string ResolveJobCorrelationId(TemplateGenerationJob job)
+    {
+        return !string.IsNullOrWhiteSpace(job.CorrelationId) && CorrelationContext.IsValid(job.CorrelationId)
+            ? job.CorrelationId
+            : CorrelationContext.ResolveOrCreate();
+    }
+
     private async Task ProcessImageAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {
         var imageModel = job.Template.ImageModel!;
@@ -336,8 +362,15 @@ internal sealed class TemplateGenerationJobProcessor(
 
         job.UsedPreprocessingModel = imageModel;
 
+        var sourceImageUrl = await CreateProviderReadUrlAsync(job.SourceImageUrl, cancellationToken);
+        if (sourceImageUrl is null)
+        {
+            await MarkFailedAsync(job, TemplatesErrors.MediaStorageFailed, cancellationToken);
+            return;
+        }
+
         var generated = await imageGenerator.CreateAsync(
-            job.SourceImageUrl,
+            sourceImageUrl,
             imagePrompt,
             imageModel,
             cancellationToken);
@@ -400,8 +433,15 @@ internal sealed class TemplateGenerationJobProcessor(
         job.UsedPreprocessingModel = preprocessingModel;
         job.UsedKlingModel = motionModel;
 
+        var sourceImageUrl = await CreateProviderReadUrlAsync(job.SourceImageUrl, cancellationToken);
+        if (sourceImageUrl is null)
+        {
+            await MarkFailedAsync(job, TemplatesErrors.MediaStorageFailed, cancellationToken);
+            return;
+        }
+
         var normalized = await imagePreprocessor.NormalizeAsync(
-            job.SourceImageUrl,
+            sourceImageUrl,
             preprocessingModel,
             preprocessingPrompt,
             cancellationToken);
@@ -497,6 +537,7 @@ internal sealed class TemplateGenerationJobProcessor(
             return false;
         }
 
+        TemplateGenerationMetrics.RecordJobStage(job, TemplateGenerationService.ResolveStage(job));
         await PublishStatusChangedAsync(job, cancellationToken);
         return true;
     }
@@ -545,6 +586,13 @@ internal sealed class TemplateGenerationJobProcessor(
         {
             await pushNotificationSender.NotifyGenerationTerminalAsync(response, cancellationToken);
         }
+    }
+
+    private async Task<string?> CreateProviderReadUrlAsync(string assetUrl, CancellationToken cancellationToken)
+    {
+        var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
+        var signed = await mediaStorage.CreateReadUrlAsync(assetUrl, ttl, cancellationToken);
+        return signed.IsSuccess ? signed.Value : null;
     }
 
     private Task<bool> SaveClaimedChangesAsync(

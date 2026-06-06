@@ -80,6 +80,8 @@ public sealed class TemplatesOptions
 
     public bool CleanupExpiredGenerationMediaWhileRefundPending { get; init; } = true;
 
+    public int UserMediaReadUrlTtlSeconds { get; init; } = 900;
+
     public long GeneratedVideoMaxFileSizeBytes { get; init; } = 250 * 1024 * 1024;
 
     public long GeneratedImageMaxFileSizeBytes { get; init; } = 30 * 1024 * 1024;

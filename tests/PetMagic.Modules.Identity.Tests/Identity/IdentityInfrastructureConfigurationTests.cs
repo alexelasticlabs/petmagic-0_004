@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Options;
@@ -91,6 +93,67 @@ public sealed class IdentityInfrastructureConfigurationTests
             () => services.AddIdentityInfrastructure(configuration, environment));
 
         Assert.Contains("BootstrapAdmin:Password must not be configured outside development", exception.Message);
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldRejectPlaceholderJwtSigningKey_InProduction()
+    {
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+        var services = CreateServices(environment);
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Jwt:SigningKey"] = "SUPER_CHANGE_ME_IN_PROD_64_BYTES_MINIMUM___________"
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddIdentityInfrastructure(configuration, environment));
+
+        Assert.Contains("Jwt:SigningKey contains a placeholder value", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("Jwt:Issuer", "Jwt:Issuer must be configured outside development.")]
+    [InlineData("Jwt:Audience", "Jwt:Audience must be configured outside development.")]
+    public void AddIdentityInfrastructure_ShouldRejectMissingJwtIssuerOrAudience_InProduction(
+        string setting,
+        string expectedMessage)
+    {
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+        var services = CreateServices(environment);
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            [setting] = ""
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddIdentityInfrastructure(configuration, environment));
+
+        Assert.Contains(expectedMessage, exception.Message);
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldConfigureStrictJwtBearerValidation()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration([]);
+
+        services.AddIdentityInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        Assert.True(options.TokenValidationParameters.ValidateIssuer);
+        Assert.True(options.TokenValidationParameters.ValidateAudience);
+        Assert.True(options.TokenValidationParameters.ValidateLifetime);
+        Assert.True(options.TokenValidationParameters.ValidateIssuerSigningKey);
+        Assert.Equal(TimeSpan.FromMinutes(1), options.TokenValidationParameters.ClockSkew);
     }
 
     [Fact]

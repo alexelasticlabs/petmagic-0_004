@@ -122,7 +122,10 @@ public static class TemplateGenerationEndpoints
                 statusCode: StatusCodes.Status403Forbidden);
         }
 
-        var uploadValidation = ValidateSourceImage(sourceImage, uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview));
+        var uploadValidation = await ValidateSourceImageAsync(
+            sourceImage,
+            uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview),
+            cancellationToken);
         var idempotencyKey = NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault());
         if (idempotencyKey?.Length > MaxIdempotencyKeyLength)
         {
@@ -138,11 +141,12 @@ public static class TemplateGenerationEndpoints
         var requestHash = ComputeRequestHash(userId!.Value, templateId, sourceImageHash);
         var activeGenerationLimit = await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken);
 
+        var detectedContentType = (await TemplateUploadSniffer.DetectContentTypeAsync(sourceImage!, cancellationToken))!;
         await using var stream = sourceImage!.OpenReadStream();
         var storeResult = await mediaStorage.StoreAsync(
             new MediaUploadCommand(
                 Path.GetFileName(sourceImage.FileName),
-                sourceImage.ContentType,
+                detectedContentType,
                 stream,
                 sourceImage.Length),
             cancellationToken);
@@ -153,36 +157,46 @@ public static class TemplateGenerationEndpoints
         }
 
         var stored = storeResult.Value;
-        var command = new StartTemplateGenerationCommand(
-            userId!.Value,
-            templateId,
-            new TemplateAssetCommand(stored.Url, stored.FileName, stored.ContentType, stored.FileSizeBytes, null),
-            idempotencyKey,
-            requestHash,
-            activeGenerationLimit);
-
-        var validation = await validator.ValidateAsync(command, cancellationToken);
-        if (!validation.IsValid)
+        try
         {
-            return TypedResults.ValidationProblem(validation.ToDictionary());
-        }
+            var command = new StartTemplateGenerationCommand(
+                userId!.Value,
+                templateId,
+                new TemplateAssetCommand(stored.Url, stored.FileName, stored.ContentType, stored.FileSizeBytes, null),
+                idempotencyKey,
+                requestHash,
+                activeGenerationLimit);
 
-        var result = await generationService.StartAsync(command, cancellationToken);
-        if (result.IsFailure)
+            var validation = await validator.ValidateAsync(command, cancellationToken);
+            if (!validation.IsValid)
+            {
+                await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+                return TypedResults.ValidationProblem(validation.ToDictionary());
+            }
+
+            var result = await generationService.StartAsync(command, cancellationToken);
+            if (result.IsFailure)
+            {
+                await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+                return TypedResults.Problem(
+                    title: result.Error.Code,
+                    detail: result.Error.Message,
+                    statusCode: ResolveFailureStatusCode(result.Error));
+            }
+
+            if (!string.Equals(result.Value.SourceImageAsset?.FileName, stored.FileName, StringComparison.Ordinal)
+                || !string.Equals(result.Value.SourceImageAsset?.ContentType, stored.ContentType, StringComparison.OrdinalIgnoreCase))
+            {
+                await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+            }
+
+            return TypedResults.Accepted($"/api/templates/generations/{result.Value.GenerationId}", result.Value);
+        }
+        catch
         {
             await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveFailureStatusCode(result.Error));
+            throw;
         }
-
-        if (!string.Equals(result.Value.SourceImageAsset?.Url, stored.Url, StringComparison.OrdinalIgnoreCase))
-        {
-            await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
-        }
-
-        return TypedResults.Accepted($"/api/templates/generations/{result.Value.GenerationId}", result.Value);
     }
 
     private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> GetGenerationAsync(
@@ -385,7 +399,10 @@ public static class TemplateGenerationEndpoints
         return TypedResults.NoContent();
     }
 
-    private static Dictionary<string, string[]> ValidateSourceImage(IFormFile? sourceImage, long maxSizeBytes)
+    private static async Task<Dictionary<string, string[]>> ValidateSourceImageAsync(
+        IFormFile? sourceImage,
+        long maxSizeBytes,
+        CancellationToken cancellationToken)
     {
         var errors = new Dictionary<string, string[]>();
         if (sourceImage is null || sourceImage.Length == 0)
@@ -394,9 +411,10 @@ public static class TemplateGenerationEndpoints
             return errors;
         }
 
-        if (!sourceImage.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(sourceImage.ContentType, "image/heic", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(sourceImage.ContentType, "image/heif", StringComparison.OrdinalIgnoreCase))
+        var detectedContentType = await TemplateUploadSniffer.DetectContentTypeAsync(sourceImage, cancellationToken);
+        if (detectedContentType is null
+            || !IsAllowedSourceImageContentType(detectedContentType)
+            || !TemplateUploadSniffer.MatchesDeclaredContentType(detectedContentType, sourceImage.ContentType))
         {
             errors[nameof(sourceImage)] = ["Source image content type is not allowed. Please upload JPEG, PNG, or WebP."];
         }
@@ -407,6 +425,13 @@ public static class TemplateGenerationEndpoints
         }
 
         return errors;
+    }
+
+    private static bool IsAllowedSourceImageContentType(string contentType)
+    {
+        return string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/png", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int ResolveFailureStatusCode(Error error)

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -86,196 +87,216 @@ public sealed partial class EconomyService
             return StripeWebhookFailure(EconomyErrors.InvalidWebhookPayload, "event.parse", eventType);
         }
 
-        var alreadyProcessed = await dbContext.ProcessedWebhookEvents
-            .AnyAsync(x => x.Provider == "stripe" && x.EventId == eventId, cancellationToken);
-
-        if (alreadyProcessed)
+        if (!dbContext.Database.IsRelational()
+            && await dbContext.ProcessedWebhookEvents.AnyAsync(x => x.Provider == "stripe" && x.EventId == eventId, cancellationToken))
         {
             return Result.Success(new StripeWebhookResultResponse(eventId, false, "ignored_duplicate"));
         }
 
-        dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
-        {
-            Id = Guid.NewGuid(),
-            Provider = "stripe",
-            EventId = eventId,
-            EventType = eventType,
-            ProcessedAtUtc = DateTime.UtcNow
-        });
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken)
+            : null;
 
-        if (string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal)
-            || string.Equals(eventType, "payment_intent.succeeded", StringComparison.Ordinal))
+        try
         {
-            var order = await ResolveOrderAsync(parsedEvent.OrderId, parsedEvent.ObjectId, cancellationToken);
-            if (order is not null)
+            dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
             {
-                var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
-                if (confirmResult.IsFailure && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+                Id = Guid.NewGuid(),
+                Provider = "stripe",
+                EventId = eventId,
+                EventType = eventType,
+                ProcessedAtUtc = DateTime.UtcNow
+            });
+
+            if (string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal)
+                || string.Equals(eventType, "payment_intent.succeeded", StringComparison.Ordinal))
+            {
+                var order = await ResolveOrderAsync(parsedEvent.OrderId, parsedEvent.ObjectId, cancellationToken);
+                if (order is not null)
                 {
-                    return StripeWebhookFailure(confirmResult.Error, "purchase.confirm", eventType);
+                    var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
+                    if (confirmResult.IsFailure && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+                    {
+                        return StripeWebhookFailure(confirmResult.Error, "purchase.confirm", eventType);
+                    }
                 }
             }
-        }
 
-        if (parsedEvent.UserId.HasValue
-            && string.Equals(parsedEvent.Purpose, "premium_subscription", StringComparison.Ordinal))
-        {
-            var isCheckoutCompleted = string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal);
-            var isInvoiceSucceeded = string.Equals(eventType, "invoice.payment_succeeded", StringComparison.Ordinal);
-            var isInvoiceFailed = string.Equals(eventType, "invoice.payment_failed", StringComparison.Ordinal);
-            var isSubscriptionCreated = string.Equals(eventType, "customer.subscription.created", StringComparison.Ordinal);
-            var isSubscriptionUpdated = string.Equals(eventType, "customer.subscription.updated", StringComparison.Ordinal);
-            var isSubscriptionDeleted = string.Equals(eventType, "customer.subscription.deleted", StringComparison.Ordinal);
-            var subscriptionStatusIsActive = string.Equals(parsedEvent.Status, "active", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(parsedEvent.Status, "trialing", StringComparison.OrdinalIgnoreCase);
-
-            if (isCheckoutCompleted
-                || isInvoiceSucceeded
-                || isInvoiceFailed
-                || isSubscriptionCreated
-                || isSubscriptionUpdated
-                || isSubscriptionDeleted)
+            if (parsedEvent.UserId.HasValue
+                && string.Equals(parsedEvent.Purpose, "premium_subscription", StringComparison.Ordinal))
             {
-                var shouldActivatePremium = isCheckoutCompleted
+                var isCheckoutCompleted = string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal);
+                var isInvoiceSucceeded = string.Equals(eventType, "invoice.payment_succeeded", StringComparison.Ordinal);
+                var isInvoiceFailed = string.Equals(eventType, "invoice.payment_failed", StringComparison.Ordinal);
+                var isSubscriptionCreated = string.Equals(eventType, "customer.subscription.created", StringComparison.Ordinal);
+                var isSubscriptionUpdated = string.Equals(eventType, "customer.subscription.updated", StringComparison.Ordinal);
+                var isSubscriptionDeleted = string.Equals(eventType, "customer.subscription.deleted", StringComparison.Ordinal);
+                var subscriptionStatusIsActive = string.Equals(parsedEvent.Status, "active", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(parsedEvent.Status, "trialing", StringComparison.OrdinalIgnoreCase);
+
+                if (isCheckoutCompleted
                     || isInvoiceSucceeded
-                    || ((isSubscriptionCreated || isSubscriptionUpdated) && subscriptionStatusIsActive);
-                var shouldDeactivatePremium = isInvoiceFailed || isSubscriptionDeleted;
-                var shouldUpdateIdentity = shouldActivatePremium || shouldDeactivatePremium || isSubscriptionUpdated;
-
-                if (shouldUpdateIdentity)
+                    || isInvoiceFailed
+                    || isSubscriptionCreated
+                    || isSubscriptionUpdated
+                    || isSubscriptionDeleted)
                 {
-                    if (identityService is null)
+                    var shouldActivatePremium = isCheckoutCompleted
+                        || isInvoiceSucceeded
+                        || ((isSubscriptionCreated || isSubscriptionUpdated) && subscriptionStatusIsActive);
+                    var shouldDeactivatePremium = isInvoiceFailed || isSubscriptionDeleted;
+                    var shouldUpdateIdentity = shouldActivatePremium || shouldDeactivatePremium || isSubscriptionUpdated;
+
+                    if (shouldUpdateIdentity)
                     {
-                        return StripeWebhookFailure(EconomyErrors.PremiumBillingUnavailable, "premium.identity", eventType);
+                        if (identityService is null)
+                        {
+                            return StripeWebhookFailure(EconomyErrors.PremiumBillingUnavailable, "premium.identity", eventType);
+                        }
+
+                        var premiumResult = await identityService.SetPremiumStatusAsync(
+                            new SetPremiumStatusCommand(parsedEvent.UserId.Value, shouldActivatePremium),
+                            cancellationToken);
+
+                        if (premiumResult.IsFailure)
+                        {
+                            return StripeWebhookFailure(premiumResult.Error, "premium.identity", eventType);
+                        }
+
+                        logger?.LogInformation(
+                            "Premium entitlement updated from Stripe webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Activated={Activated} Status={Status}.",
+                            "stripe",
+                            parsedEvent.UserId.Value,
+                            eventId,
+                            eventType,
+                            shouldActivatePremium,
+                            parsedEvent.Status);
+
+                        await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                            parsedEvent.UserId.Value,
+                            new PremiumPushNotification(
+                                Status: shouldActivatePremium ? "active" : "inactive",
+                                Provider: "stripe",
+                                PlanCode: parsedEvent.PlanCode),
+                            cancellationToken);
                     }
 
-                    var premiumResult = await identityService.SetPremiumStatusAsync(
-                        new SetPremiumStatusCommand(parsedEvent.UserId.Value, shouldActivatePremium),
-                        cancellationToken);
-
-                    if (premiumResult.IsFailure)
+                    if (!string.IsNullOrWhiteSpace(parsedEvent.PlanCode) || !string.IsNullOrWhiteSpace(parsedEvent.SubscriptionId))
                     {
-                        return StripeWebhookFailure(premiumResult.Error, "premium.identity", eventType);
-                    }
+                        var (resolvedPlan, existingSubscription) = await ResolveStripePlanContextAsync(
+                            parsedEvent.UserId.Value,
+                            parsedEvent.PlanCode,
+                            parsedEvent.SubscriptionId,
+                            cancellationToken);
 
-                    logger?.LogInformation(
-                        "Premium entitlement updated from Stripe webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Activated={Activated} Status={Status}.",
-                        "stripe",
-                        parsedEvent.UserId.Value,
-                        eventId,
-                        eventType,
-                        shouldActivatePremium,
-                        parsedEvent.Status);
+                        if (resolvedPlan is null && existingSubscription is null)
+                        {
+                            return StripeWebhookFailure(EconomyErrors.PremiumPlanNotFound, "premium.plan", eventType);
+                        }
 
-                    await _pushNotificationSender.NotifyPremiumUpdateAsync(
-                        parsedEvent.UserId.Value,
-                        new PremiumPushNotification(
-                            Status: shouldActivatePremium ? "active" : "inactive",
-                            Provider: "stripe",
-                            PlanCode: parsedEvent.PlanCode),
-                        cancellationToken);
-                }
+                        var resolvedPlanId = resolvedPlan?.PlanCode ?? existingSubscription!.PlanId;
+                        var monthlyTokenLimit = resolvedPlan?.MonthlyTokenLimit ?? existingSubscription!.MonthlyTokenLimit;
+                        var subscriptionStatus = "Pending";
+                        if (shouldActivatePremium)
+                        {
+                            subscriptionStatus = parsedEvent.CancelAtPeriodEnd
+                                ? "Canceled"
+                                : EconomyWebhookParser.MapStripeSubscriptionStatus(parsedEvent.Status);
+                        }
+                        else if (isInvoiceFailed)
+                        {
+                            subscriptionStatus = "PastDue";
+                        }
+                        else if (isSubscriptionDeleted)
+                        {
+                            subscriptionStatus = "Expired";
+                        }
 
-                if (!string.IsNullOrWhiteSpace(parsedEvent.PlanCode) || !string.IsNullOrWhiteSpace(parsedEvent.SubscriptionId))
-                {
-                    var (resolvedPlan, existingSubscription) = await ResolveStripePlanContextAsync(
-                        parsedEvent.UserId.Value,
-                        parsedEvent.PlanCode,
-                        parsedEvent.SubscriptionId,
-                        cancellationToken);
+                        var subscription = await UpsertUserSubscriptionAsync(
+                            parsedEvent.UserId.Value,
+                            "stripe",
+                            isCheckoutCompleted ? "web" : "payment_sheet",
+                            string.Empty,
+                            resolvedPlanId,
+                            subscriptionStatus,
+                            parsedEvent.CustomerId,
+                            parsedEvent.SubscriptionId,
+                            parsedEvent.ObjectId,
+                            parsedEvent.CurrentPeriodStartUtc ?? existingSubscription?.CurrentPeriodStartUtc ?? DateTime.UtcNow,
+                            parsedEvent.CurrentPeriodEndUtc,
+                            parsedEvent.CancelAtPeriodEnd,
+                            monthlyTokenLimit,
+                            cancellationToken);
 
-                    if (resolvedPlan is null && existingSubscription is null)
-                    {
-                        return StripeWebhookFailure(EconomyErrors.PremiumPlanNotFound, "premium.plan", eventType);
-                    }
+                        await AppendSubscriptionEventAsync(
+                            parsedEvent.UserId.Value,
+                            subscription.Id,
+                            "stripe",
+                            shouldActivatePremium
+                                ? "SubscriptionActivated"
+                                : isInvoiceFailed
+                                    ? "SubscriptionPaymentFailed"
+                                    : isSubscriptionDeleted
+                                        ? "SubscriptionExpired"
+                                        : "SubscriptionPending",
+                            subscription.Status,
+                            eventId,
+                            subscription.ExternalSubscriptionId,
+                            command.RawBody,
+                            cancellationToken);
 
-                    var resolvedPlanId = resolvedPlan?.PlanCode ?? existingSubscription!.PlanId;
-                    var monthlyTokenLimit = resolvedPlan?.MonthlyTokenLimit ?? existingSubscription!.MonthlyTokenLimit;
-                    var subscriptionStatus = "Pending";
-                    if (shouldActivatePremium)
-                    {
-                        subscriptionStatus = parsedEvent.CancelAtPeriodEnd
-                            ? "Canceled"
-                            : EconomyWebhookParser.MapStripeSubscriptionStatus(parsedEvent.Status);
-                    }
-                    else if (isInvoiceFailed)
-                    {
-                        subscriptionStatus = "PastDue";
-                    }
-                    else if (isSubscriptionDeleted)
-                    {
-                        subscriptionStatus = "Expired";
-                    }
-
-                    var subscription = await UpsertUserSubscriptionAsync(
-                        parsedEvent.UserId.Value,
-                        "stripe",
-                        isCheckoutCompleted ? "web" : "payment_sheet",
-                        string.Empty,
-                        resolvedPlanId,
-                        subscriptionStatus,
-                        parsedEvent.CustomerId,
-                        parsedEvent.SubscriptionId,
-                        parsedEvent.ObjectId,
-                        parsedEvent.CurrentPeriodStartUtc ?? existingSubscription?.CurrentPeriodStartUtc ?? DateTime.UtcNow,
-                        parsedEvent.CurrentPeriodEndUtc,
-                        parsedEvent.CancelAtPeriodEnd,
-                        monthlyTokenLimit,
-                        cancellationToken);
-
-                    await AppendSubscriptionEventAsync(
-                        parsedEvent.UserId.Value,
-                        subscription.Id,
-                        "stripe",
-                        shouldActivatePremium
-                            ? "SubscriptionActivated"
-                            : isInvoiceFailed
-                                ? "SubscriptionPaymentFailed"
-                                : isSubscriptionDeleted
-                                    ? "SubscriptionExpired"
-                                    : "SubscriptionPending",
-                        subscription.Status,
-                        eventId,
-                        subscription.ExternalSubscriptionId,
-                        command.RawBody,
-                        cancellationToken);
-
-                    if (shouldActivatePremium)
-                    {
-                        await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                        if (shouldActivatePremium)
+                        {
+                            await GrantPremiumSubscriptionAllowanceIfDueAsync(
                             subscription,
                             "stripe",
                             cancellationToken);
 
-                        await SettlePendingReferralBonusAsync(
-                            parsedEvent.UserId.Value,
-                            $"premium:stripe:{subscription.PlanId}",
-                            DateTime.UtcNow,
-                            cancellationToken);
+                            await SettlePendingReferralBonusAsync(
+                                parsedEvent.UserId.Value,
+                                $"premium:stripe:{subscription.PlanId}",
+                                DateTime.UtcNow,
+                                cancellationToken);
+                        }
                     }
                 }
             }
-        }
 
-        if (string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal)
-            && string.Equals(parsedEvent.Purpose, "payment_method_setup", StringComparison.Ordinal)
-            && parsedEvent.UserId.HasValue
-            && !string.IsNullOrWhiteSpace(parsedEvent.SetupIntentId))
-        {
-            var methodResult = await paymentGateway.ResolveSetupIntentPaymentMethodAsync(
-                new PaymentMethodResolveRequest("stripe", parsedEvent.SetupIntentId),
-                cancellationToken);
-
-            if (methodResult.IsFailure)
+            if (string.Equals(eventType, "checkout.session.completed", StringComparison.Ordinal)
+                && string.Equals(parsedEvent.Purpose, "payment_method_setup", StringComparison.Ordinal)
+                && parsedEvent.UserId.HasValue
+                && !string.IsNullOrWhiteSpace(parsedEvent.SetupIntentId))
             {
-                return StripeWebhookFailure(methodResult.Error, "payment_method.resolve", eventType);
+                var methodResult = await paymentGateway.ResolveSetupIntentPaymentMethodAsync(
+                    new PaymentMethodResolveRequest("stripe", parsedEvent.SetupIntentId),
+                    cancellationToken);
+
+                if (methodResult.IsFailure)
+                {
+                    return StripeWebhookFailure(methodResult.Error, "payment_method.resolve", eventType);
+                }
+
+                await SavePaymentMethodAsync(parsedEvent.UserId.Value, "stripe", methodResult.Value, cancellationToken);
             }
 
-            await SavePaymentMethodAsync(parsedEvent.UserId.Value, "stripe", methodResult.Value, cancellationToken);
-        }
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return Result.Success(new StripeWebhookResultResponse(eventId, true, "processed"));
+            return Result.Success(new StripeWebhookResultResponse(eventId, true, "processed"));
+        }
+        catch (DbUpdateException exception) when (IsUniqueWebhookEventConflict(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            return Result.Success(new StripeWebhookResultResponse(eventId, false, "ignored_duplicate"));
+        }
+    }
+
+    private static bool IsUniqueWebhookEventConflict(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
     }
 
     private static Result<StripeWebhookResultResponse> StripeWebhookFailure(Error error, string stage, string? eventType = null)

@@ -102,7 +102,7 @@ public sealed partial class TemplatesServiceTests
 
     private static TemplateGenerationService CreateGenerationService(TemplatesDbContext dbContext, TemplatesOptions? options = null)
     {
-        return new TemplateGenerationService(dbContext, new PassiveGenerationBilling(), options ?? CreateTemplatesOptions());
+        return new TemplateGenerationService(dbContext, new PassiveGenerationBilling(), new RecordingMediaStorage(), options ?? CreateTemplatesOptions());
     }
 
     private static TemplatesOptions CreateTemplatesOptions(

@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: petmagic_user
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-PetMagic_DevPassword123}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       POSTGRES_DB: petmagic_db
     ports:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
@@ -22,13 +22,13 @@ services:
       context: .
       dockerfile: Dockerfile.api
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       ASPNETCORE_HTTP_PORTS: 5000
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:-PetMagic_DevPassword123};"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};"
       Jwt__SigningKey: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env. Generate with openssl rand -base64 64}"
       Jwt__Issuer: petmagic.app
       Jwt__Audience: petmagic-admin
-      DataProtection__CertificatePassword: "${DATA_PROTECTION_CERTIFICATE_PASSWORD:-PetMagic.DataProtection.Dev.2026}"
+      DataProtection__CertificatePassword: "${DATA_PROTECTION_CERTIFICATE_PASSWORD:-}"
       BootstrapAdmin__Email: "${BOOTSTRAP_ADMIN_EMAIL:-admin@petmagic.app}"
       BootstrapAdmin__Password: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
       BootstrapAdmin__DisplayName: "${BOOTSTRAP_ADMIN_DISPLAY_NAME:-PetMagic Admin}"
@@ -61,6 +61,16 @@ services:
       SupportChat__AttachmentStorage__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
       Templates__PublicBaseUrl: "${BACKEND_PUBLIC_BASE_URL:-http://localhost:5000}"
       Templates__GenerationWorkerEnabled: "false"
+      RateLimiting__Auth__PermitLimit: "${RATE_LIMIT_AUTH_PERMIT:-30}"
+      RateLimiting__Economy__PermitLimit: "${RATE_LIMIT_ECONOMY_PERMIT:-60}"
+      RateLimiting__Templates__PermitLimit: "${RATE_LIMIT_TEMPLATES_PERMIT:-90}"
+      RateLimiting__GenerationCreate__PermitLimit: "${RATE_LIMIT_GENERATION_CREATE_PERMIT:-12}"
+      RateLimiting__GenerationStatus__PermitLimit: "${RATE_LIMIT_GENERATION_STATUS_PERMIT:-180}"
+      RateLimiting__SupportChat__PermitLimit: "${RATE_LIMIT_SUPPORT_CHAT_PERMIT:-60}"
+      RateLimiting__Admin__PermitLimit: "${RATE_LIMIT_ADMIN_PERMIT:-120}"
+      RateLimiting__Webhooks__PermitLimit: "${RATE_LIMIT_WEBHOOKS_PERMIT:-120}"
+      RateLimiting__AuthRegister__PermitLimit: "${RATE_LIMIT_AUTH_REGISTER_PERMIT:-8}"
+      RateLimiting__AuthPasswordReset__PermitLimit: "${RATE_LIMIT_AUTH_PASSWORD_RESET_PERMIT:-10}"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
     ports:
       - "${BACKEND_HOST_PORT:-5000}:5000"
@@ -86,9 +96,9 @@ services:
       context: .
       dockerfile: Dockerfile.generation-worker
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:-PetMagic_DevPassword123};"
+      ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
+      DOTNET_ENVIRONMENT: "${DOTNET_ENVIRONMENT:-${ASPNETCORE_ENVIRONMENT:-Production}}"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};"
       FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
       R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
       R2_ACCESS_KEY: "${R2_ACCESS_KEY:-}"

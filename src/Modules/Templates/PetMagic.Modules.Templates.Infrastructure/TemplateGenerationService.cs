@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -15,6 +16,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class TemplateGenerationService(
     TemplatesDbContext dbContext,
     ITemplateGenerationBilling billing,
+    IMediaStorage mediaStorage,
     TemplatesOptions options) : ITemplateGenerationService
 {
     internal static readonly Guid AdminTestUserId = Guid.Empty;
@@ -23,6 +25,7 @@ internal sealed class TemplateGenerationService(
     {
         var normalizedIdempotencyKey = NormalizeOptionalText(command.IdempotencyKey, 256);
         var normalizedRequestHash = NormalizeOptionalText(command.RequestHash, 128);
+        var correlationId = NormalizeOptionalText(CorrelationContext.CurrentId, CorrelationContext.MaxLength);
 
         var template = await dbContext.TemplateItems
             .Include(x => x.Assets)
@@ -87,6 +90,7 @@ internal sealed class TemplateGenerationService(
             ReferenceMotionUrl = GetAsset(template, TemplateAssetKind.ReferenceMotion)?.Url,
             IdempotencyKey = normalizedIdempotencyKey,
             RequestHash = normalizedRequestHash,
+            CorrelationId = correlationId,
             CreatedAtUtc = now,
             QueuedAtUtc = now,
             UpdatedAtUtc = now
@@ -153,6 +157,7 @@ internal sealed class TemplateGenerationService(
         }
 
         var now = DateTime.UtcNow;
+        var correlationId = NormalizeOptionalText(CorrelationContext.CurrentId, CorrelationContext.MaxLength);
         var job = new TemplateGenerationJob
         {
             Id = Guid.NewGuid(),
@@ -166,6 +171,7 @@ internal sealed class TemplateGenerationService(
             SourceImageContentType = sourceImageAsset.ContentType,
             SourceImageFileSizeBytes = sourceImageAsset.FileSizeBytes,
             ReferenceMotionUrl = GetAsset(template, TemplateAssetKind.ReferenceMotion)?.Url,
+            CorrelationId = correlationId,
             CreatedAtUtc = now,
             QueuedAtUtc = now,
             UpdatedAtUtc = now
@@ -212,13 +218,8 @@ internal sealed class TemplateGenerationService(
             .Take(take)
             .ToArrayAsync(cancellationToken);
 
-        var items = new List<TemplateGenerationResponse>(jobs.Length);
-        foreach (var job in jobs)
-        {
-            items.Add(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
-        }
-
-        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>(items);
+        return Result.Success<IReadOnlyList<TemplateGenerationResponse>>(
+            await MapResponsesWithQueueMetricsAsync(jobs, cancellationToken));
     }
 
     public async Task<Result<TemplateGenerationUnreadCountResponse>> GetUnreadCountAsync(Guid userId, CancellationToken cancellationToken)
@@ -431,7 +432,7 @@ internal sealed class TemplateGenerationService(
     {
         if (job.Status != TemplateGenerationStatus.Queued)
         {
-            return MapResponse(job);
+            return await SignUserMediaUrlsAsync(MapResponse(job), cancellationToken);
         }
 
         var queuePosition = await dbContext.TemplateGenerationJobs
@@ -440,13 +441,108 @@ internal sealed class TemplateGenerationService(
                 && x.QueuedAtUtc < job.QueuedAtUtc,
                 cancellationToken) + 1;
 
+        return await SignUserMediaUrlsAsync(
+            MapResponse(job, queuePosition, EstimateWaitSeconds(job, queuePosition)),
+            cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<TemplateGenerationResponse>> MapResponsesWithQueueMetricsAsync(
+        IReadOnlyList<TemplateGenerationJob> jobs,
+        CancellationToken cancellationToken)
+    {
+        if (jobs.Count == 0)
+        {
+            return [];
+        }
+
+        var queuedJobs = jobs
+            .Where(x => x.Status == TemplateGenerationStatus.Queued)
+            .ToArray();
+        if (queuedJobs.Length == 0)
+        {
+            var mapped = new List<TemplateGenerationResponse>(jobs.Count);
+            foreach (var job in jobs)
+            {
+                mapped.Add(await SignUserMediaUrlsAsync(MapResponse(job), cancellationToken));
+            }
+
+            return mapped;
+        }
+
+        var latestQueuedAtUtc = queuedJobs.Max(x => x.QueuedAtUtc);
+        var queuedAtUtcValues = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.Queued
+                && x.QueuedAtUtc <= latestQueuedAtUtc)
+            .Select(x => x.QueuedAtUtc)
+            .ToArrayAsync(cancellationToken);
+
+        var positionByQueuedAtUtc = new Dictionary<DateTime, int>();
+        var olderQueuedCount = 0;
+        foreach (var group in queuedAtUtcValues.GroupBy(x => x).OrderBy(x => x.Key))
+        {
+            positionByQueuedAtUtc[group.Key] = olderQueuedCount + 1;
+            olderQueuedCount += group.Count();
+        }
+
+        var items = new List<TemplateGenerationResponse>(jobs.Count);
+        foreach (var job in jobs)
+        {
+            if (job.Status != TemplateGenerationStatus.Queued)
+            {
+                items.Add(await SignUserMediaUrlsAsync(MapResponse(job), cancellationToken));
+                continue;
+            }
+
+            var queuePosition = positionByQueuedAtUtc.GetValueOrDefault(job.QueuedAtUtc, 1);
+            items.Add(await SignUserMediaUrlsAsync(
+                MapResponse(job, queuePosition, EstimateWaitSeconds(job, queuePosition)),
+                cancellationToken));
+        }
+
+        return items;
+    }
+
+    private async Task<TemplateGenerationResponse> SignUserMediaUrlsAsync(
+        TemplateGenerationResponse response,
+        CancellationToken cancellationToken)
+    {
+        var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
+        var sourceImageAsset = response.SourceImageAsset;
+        if (sourceImageAsset is not null)
+        {
+            var signedSourceUrl = await TryCreateReadUrlAsync(sourceImageAsset.Url, ttl, cancellationToken);
+            sourceImageAsset = signedSourceUrl is null
+                ? null
+                : sourceImageAsset with { Url = signedSourceUrl };
+        }
+
+        return response with
+        {
+            SourceImageAsset = sourceImageAsset,
+            NormalizedImageUrl = await TryCreateReadUrlAsync(response.NormalizedImageUrl, ttl, cancellationToken),
+            OutputUrl = await TryCreateReadUrlAsync(response.OutputUrl, ttl, cancellationToken)
+        };
+    }
+
+    private async Task<string?> TryCreateReadUrlAsync(string? assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl))
+        {
+            return null;
+        }
+
+        var signed = await mediaStorage.CreateReadUrlAsync(assetUrl, ttl, cancellationToken);
+        return signed.IsSuccess ? signed.Value : null;
+    }
+
+    private int EstimateWaitSeconds(TemplateGenerationJob job, int queuePosition)
+    {
         var averageGenerationSeconds = job.Template?.TemplateType == TemplateType.Video
             ? options.EstimatedVideoGenerationSeconds
             : options.EstimatedImageGenerationSeconds;
         var globalConcurrency = Math.Max(1, options.GlobalMaxConcurrentGenerations);
-        var estimatedWaitSeconds = (int)Math.Ceiling(queuePosition * averageGenerationSeconds / (double)globalConcurrency);
-
-        return MapResponse(job, queuePosition, estimatedWaitSeconds);
+        return (int)Math.Ceiling(queuePosition * averageGenerationSeconds / (double)globalConcurrency);
     }
 
     private Task<TemplateGenerationJob?> FindActiveDuplicateAsync(

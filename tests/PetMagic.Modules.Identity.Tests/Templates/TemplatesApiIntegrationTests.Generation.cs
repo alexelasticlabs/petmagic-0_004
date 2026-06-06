@@ -54,7 +54,7 @@ public sealed partial class TemplatesApiIntegrationTests
             created.TemplateId,
             "pet.jpg",
             "image/jpeg",
-            "source-pet-image"u8.ToArray());
+            JpegBytes());
 
         Assert.Equal(TestUserId, queued.UserId);
         Assert.Equal(created.TemplateId, queued.TemplateId);
@@ -74,7 +74,7 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.False(generation.UserMediaExpired);
         Assert.NotNull(generation.SourceImageAsset);
         Assert.Equal("pet.jpg", generation.SourceImageAsset!.FileName);
-        Assert.Equal(generation.SourceImageAsset.Url, generation.NormalizedImageUrl);
+        Assert.NotNull(generation.NormalizedImageUrl);
         Assert.Equal(referenceAsset.Url, generation.ReferenceMotionUrl);
         Assert.EndsWith($"generated-{generation.GenerationId:N}.mp4", generation.OutputUrl, StringComparison.OrdinalIgnoreCase);
         Assert.Null(generation.FailureCode);
@@ -122,7 +122,7 @@ public sealed partial class TemplatesApiIntegrationTests
             created.TemplateId,
             "pet.jpg",
             "image/jpeg",
-            "source-pet-image"u8.ToArray());
+            JpegBytes());
 
         Assert.Equal(TestUserId, queued.UserId);
         Assert.Equal(created.TemplateId, queued.TemplateId);
@@ -198,7 +198,7 @@ public sealed partial class TemplatesApiIntegrationTests
                 TemplateStatus.Draft.ToString()));
 
         using var multipart = new MultipartFormDataContent();
-        using var fileContent = new ByteArrayContent("source-pet-image"u8.ToArray());
+        using var fileContent = new ByteArrayContent(JpegBytes());
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
         multipart.Add(fileContent, "sourceImage", "pet.jpg");
 
@@ -256,7 +256,7 @@ public sealed partial class TemplatesApiIntegrationTests
             created.TemplateId,
             "pet.jpg",
             "image/jpeg",
-            "source-pet-image"u8.ToArray());
+            JpegBytes());
 
         var failed = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Failed");
 
@@ -355,6 +355,50 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Queued", queued.Status);
     }
 
+    [Fact]
+    public async Task GenerationCreate_ShouldHandleSeventyFiveConcurrentRequests_ForDifferentUsers()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Concurrent Portrait",
+            "Load",
+            ["concurrent"]);
+
+        var requests = Enumerable.Range(0, 75)
+            .Select(async index =>
+            {
+                var userId = Guid.Parse($"00000000-0000-0000-0000-{index + 1:000000000000}");
+                using var multipart = new MultipartFormDataContent();
+                using var fileContent = new ByteArrayContent(JpegBytes(index));
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+                multipart.Add(fileContent, "sourceImage", $"pet-{index}.jpg");
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/templates/{created.TemplateId}/generations")
+                {
+                    Content = multipart
+                };
+                request.Headers.Add("X-Test-UserId", userId.ToString("D"));
+
+                using var response = await application.Client.SendAsync(request);
+                await EnsureSuccessStatusCodeAsync(response, $"/api/templates/{created.TemplateId}/generations");
+                return await ReadJsonAsync<TemplateGenerationResponse>(response);
+            });
+
+        var queued = await Task.WhenAll(requests);
+
+        Assert.Equal(75, queued.Length);
+        Assert.Equal(75, queued.Select(x => x.GenerationId).Distinct().Count());
+        Assert.Equal(75, queued.Select(x => x.UserId).Distinct().Count());
+        Assert.All(queued, generation =>
+        {
+            Assert.Equal(created.TemplateId, generation.TemplateId);
+            Assert.Equal("Queued", generation.Status);
+        });
+        Assert.Equal(75, application.Billing.ChargedGenerationIds.Distinct().Count());
+    }
+
     private static async Task<HttpResponseMessage> UploadGenerationSourceWithClaimsAsync(
         HttpClient client,
         Guid templateId,
@@ -362,7 +406,7 @@ public sealed partial class TemplatesApiIntegrationTests
         string role)
     {
         using var multipart = new MultipartFormDataContent();
-        using var fileContent = new ByteArrayContent("source-pet-image"u8.ToArray());
+        using var fileContent = new ByteArrayContent(JpegBytes());
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
         multipart.Add(fileContent, "sourceImage", "pet.jpg");
 
@@ -374,6 +418,11 @@ public sealed partial class TemplatesApiIntegrationTests
         request.Headers.Add("X-Test-Premium", premiumClaim ? "true" : "false");
 
         return await client.SendAsync(request);
+    }
+
+    private static byte[] JpegBytes(int marker = 0)
+    {
+        return [0xFF, 0xD8, 0xFF, 0xE0, (byte)(marker & 0xFF), 0x00, 0x00, 0x00];
     }
 
 }

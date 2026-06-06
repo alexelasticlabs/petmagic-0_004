@@ -31,8 +31,12 @@ node_modules/
 .pub-cache/
 **/ios/Pods/
 **/ios/.symlinks/
+**/ios/SourcePackages/
 **/ios/Flutter/Flutter.framework
 **/ios/Flutter/Flutter.podspec
+**/ios/Flutter/ephemeral/
+**/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+**/ios/Runner.xcworkspace/xcshareddata/swiftpm/
 
 # IDE
 .vs/
@@ -63,6 +67,7 @@ Thumbs.db
 temp/
 tmp/
 artifacts/load/
+artifacts/query-plans/
 
 # Docker Compose volumes
 postgres_data/

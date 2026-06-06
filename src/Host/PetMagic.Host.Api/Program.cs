@@ -30,6 +30,12 @@ LoadDotEnvFileIfPresent();
 
 var builder = WebApplication.CreateBuilder(args);
 
+TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
+    builder.Configuration,
+    builder.Environment,
+    "PetMagic.Host.Api",
+    expectedEnabled: false);
+
 builder.Host.UseSerilog((context, loggerConfiguration) =>
 {
     loggerConfiguration
@@ -72,6 +78,7 @@ if (builder.Environment.IsDevelopment())
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
+HostApiProductionConfigurationValidator.ValidateCorsAllowedOrigins(allowedOrigins, builder.Environment);
 
 builder.Services.AddCors(options =>
 {
@@ -93,6 +100,10 @@ builder.Services.AddCors(options =>
     });
 });
 
+var rateLimitSection = builder.Configuration.GetSection("RateLimiting");
+int RateLimitPermit(string policyName, int defaultPermitLimit) =>
+    Math.Max(1, rateLimitSection.GetSection(policyName).GetValue<int?>("PermitLimit") ?? defaultPermitLimit);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -103,7 +114,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 30,
+                PermitLimit = RateLimitPermit("Auth", 30),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -114,7 +125,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 60,
+                PermitLimit = RateLimitPermit("Economy", 60),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -125,7 +136,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 90,
+                PermitLimit = RateLimitPermit("Templates", 90),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -136,7 +147,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 12,
+                PermitLimit = RateLimitPermit("GenerationCreate", 12),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -147,7 +158,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 180,
+                PermitLimit = RateLimitPermit("GenerationStatus", 180),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -158,7 +169,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 60,
+                PermitLimit = RateLimitPermit("SupportChat", 60),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -169,7 +180,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 120,
+                PermitLimit = RateLimitPermit("Admin", 120),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -180,7 +191,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.Ip(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 120,
+                PermitLimit = RateLimitPermit("Webhooks", 120),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -191,7 +202,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.Ip(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 8,
+                PermitLimit = RateLimitPermit("AuthRegister", 8),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -202,7 +213,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: RateLimitPartitionKeys.Ip(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = RateLimitPermit("AuthPasswordReset", 10),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -311,6 +322,21 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AdminWeb");
+if (!app.Environment.IsDevelopment())
+{
+    app.Use(async (context, next) =>
+    {
+        var requestPath = context.Request.Path.Value ?? string.Empty;
+        if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        await next();
+    });
+}
+
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = static staticFileContext =>
@@ -385,10 +411,17 @@ static X509Certificate2 LoadOrCreateDataProtectionCertificate(
 
     if (File.Exists(certificatePath))
     {
-        return X509CertificateLoader.LoadPkcs12FromFile(
-            certificatePath,
-            certificatePassword,
-            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+        try
+        {
+            return X509CertificateLoader.LoadPkcs12FromFile(
+                certificatePath,
+                certificatePassword,
+                X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+        }
+        catch (CryptographicException)
+        {
+            File.Delete(certificatePath);
+        }
     }
 
     using var rsa = RSA.Create(2048);
